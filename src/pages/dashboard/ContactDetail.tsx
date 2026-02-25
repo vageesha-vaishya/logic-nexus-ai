@@ -96,12 +96,50 @@ export default function ContactDetail() {
 
   const handleUpdate = async (formData: any) => {
     try {
+      const toUuidOrNull = (v: any) => {
+        if (v === undefined || v === null) return null;
+        const s = String(v).trim().toLowerCase();
+        if (s === '' || s === 'none' || s === 'null') return null;
+        return v;
+      };
+
+      const parseJsonSafe = (s: any) => {
+        if (!s) return {};
+        if (typeof s !== 'string') return s;
+        const trimmed = s.trim();
+        if (!trimmed) return {};
+        try {
+          return JSON.parse(trimmed);
+        } catch {
+          return {};
+        }
+      };
+
+      const payload = {
+        first_name: formData.first_name,
+        last_name: formData.last_name,
+        title: formData.title || null,
+        department: formData.department || null,
+        email: formData.email || null,
+        phone: formData.phone || null,
+        mobile: formData.mobile || null,
+        linkedin_url: formData.linkedin_url || null,
+        lifecycle_stage: formData.lifecycle_stage || null,
+        lead_source: formData.lead_source || null,
+        is_primary: !!formData.is_primary,
+        notes: formData.notes || null,
+        // IDs
+        account_id: toUuidOrNull(formData.account_id),
+        franchise_id: toUuidOrNull(formData.franchise_id),
+        // NEVER update tenant_id here; keep RLS-owned. Omit from payload.
+        // JSON fields
+        social_profiles: parseJsonSafe(formData.social_profiles),
+        custom_fields: parseJsonSafe(formData.custom_fields),
+      };
+
       const { error } = await scopedDb
         .from('contacts')
-        .update({
-          ...formData,
-          account_id: formData.account_id === 'none' || formData.account_id === '' ? null : formData.account_id,
-        })
+        .update(payload)
         .eq('id', id);
 
       if (error) throw error;

@@ -34,6 +34,13 @@ alter table public.tenant_domains enable row level security;
 
 -- RLS Policies for tenant_domains
 
+-- Ensure idempotency: drop existing policies if they already exist
+drop policy if exists "Platform admins can manage all domains" on public.tenant_domains;
+drop policy if exists "Tenant admins can view own domains" on public.tenant_domains;
+drop policy if exists "Tenant admins can manage own domains" on public.tenant_domains;
+drop policy if exists "Tenant admins can update own domains" on public.tenant_domains;
+drop policy if exists "Tenant admins can delete own domains" on public.tenant_domains;
+
 -- Policy: Platform admins can do everything
 create policy "Platform admins can manage all domains"
     on public.tenant_domains for all

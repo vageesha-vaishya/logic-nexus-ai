@@ -14,7 +14,11 @@ import {
   Printer,
   FolderInput,
   UserPlus,
-  ShieldAlert
+  ShieldAlert,
+  Flame,
+  Smile,
+  Frown,
+  Meh
 } from "lucide-react";
 import {
   DropdownMenu,

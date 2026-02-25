@@ -38,22 +38,32 @@ export async function invokeAnonymous<T = any>(functionName: string, body: any):
     }
 
     try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
+
         const response = await fetch(functionUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${supabaseAnonKey}`
             },
-            body: JSON.stringify(enrichPayload(body))
+            body: JSON.stringify(enrichPayload(body)),
+            signal: controller.signal
         });
+        clearTimeout(timeoutId);
 
         if (!response.ok) {
             const text = await response.text();
             let errorMsg = text;
-            try { 
-                const json = JSON.parse(text);
-                errorMsg = json.error || json.message || text;
-            } catch {}
+            let parsed: any = null;
+            try {
+                parsed = JSON.parse(text);
+            } catch (e) {
+                parsed = null;
+            }
+            if (parsed) {
+                errorMsg = parsed.error || parsed.message || text;
+            }
             console.error(`[invokeAnonymous] Failed: ${errorMsg}`);
             updateCircuit(key, false);
             throw new Error(errorMsg);
@@ -105,21 +115,26 @@ export async function invokeFunction<T = any>(
   options: InvokeOptions = {}
 ): Promise<{ data: T | null; error: any }> {
   try {
-    const key = `cb:${functionName}`;
+    const keyBody = options.body ? JSON.stringify({ accountId: (options.body as any)?.accountId ?? null }) : '';
+    const key = `cb:${functionName}:${computeIdempotencyKey(keyBody)}`;
     const now = Date.now();
     const cb = CIRCUIT.get(key) || { state: 'closed', failures: 0, nextTryAt: 0 };
     if (cb.state === 'open' && now < cb.nextTryAt) {
       return { data: null, error: new Error(`Circuit open for ${functionName}`) };
     }
-    // Use the official client's invoke method which handles auth headers and token refresh automatically
-     // We filter out Authorization header to ensure we rely on the client's auth handling
-     const { Authorization, authorization, ...customHeaders } = options.headers || {};
-     
-     let { data, error } = await supabase.functions.invoke(functionName, {
-       body: enrichPayload(options.body),
-       headers: customHeaders,
-       method: options.method || 'POST',
-     });
+    const { Authorization, authorization, ...customHeaders } = options.headers || {};
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token;
+    const initialHeaders = token
+      ? { ...customHeaders, Authorization: `Bearer ${token}` }
+      : customHeaders;
+    const resultInvoke = await supabase.functions.invoke(functionName, {
+      body: enrichPayload(options.body),
+      headers: initialHeaders,
+      method: options.method || 'POST',
+    });
+    const data = resultInvoke.data;
+    let error = resultInvoke.error;
 
     if (error) {
       // Check if it's a "Failed to send a request" error (FunctionsFetchError)
@@ -129,8 +144,16 @@ export async function invokeFunction<T = any>(
       if (isFetchError) {
         console.warn(`[Supabase Function] Fetch failed for ${functionName}. Attempting manual fetch fallback...`);
         try {
-            const { data: { session } } = await supabase.auth.getSession();
-            const token = session?.access_token || import.meta.env.VITE_SUPABASE_ANON_KEY;
+            // Always prefer USER token; if missing, try to refresh
+            let { data: { session } } = await supabase.auth.getSession();
+            if (!session) {
+              const { data: refreshData } = await supabase.auth.refreshSession();
+              session = refreshData.session || null;
+            }
+            const token = session?.access_token;
+            if (!token) {
+              return { data: null, error: new Error('Unauthorized: No active session') };
+            }
             
             // In development, use relative path to trigger Vite proxy which bypasses CORS
             // In production, use full URL
@@ -142,25 +165,36 @@ export async function invokeFunction<T = any>(
                 functionUrl = `${projectUrl}/functions/v1/${functionName}`;
             }
             
-            const response = await fetch(functionUrl, {
-                method: options.method || 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`,
-                    ...(options.headers || {})
-                },
-                body: options.body ? JSON.stringify(options.body) : undefined
-            });
-            
-            if (!response.ok) {
-                const text = await response.text();
-                let errorData;
-                try { errorData = JSON.parse(text); } catch { errorData = { message: text }; }
-                return { data: null, error: new Error(errorData.message || `Function returned ${response.status}`) };
+            // Add 30s timeout
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+            try {
+              const response = await fetch(functionUrl, {
+                  method: options.method || 'POST',
+                  headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${token}`,
+                      ...(options.headers || {})
+                  },
+                  body: options.body ? JSON.stringify(options.body) : undefined,
+                  signal: controller.signal
+              });
+              clearTimeout(timeoutId);
+              
+              if (!response.ok) {
+                  const text = await response.text();
+                  let errorData;
+                  try { errorData = JSON.parse(text); } catch { errorData = { message: text }; }
+                  return { data: null, error: new Error(errorData.message || `Function returned ${response.status}`) };
+              }
+              
+              const data = await response.json();
+              return { data, error: null };
+            } catch (err: any) {
+              clearTimeout(timeoutId);
+              throw err;
             }
-            
-            const data = await response.json();
-            return { data, error: null };
         } catch (manualError: any) {
              console.error(`[Supabase Function] Manual fetch fallback failed:`, manualError);
              // Enhance the original error message
@@ -208,54 +242,7 @@ export async function invokeFunction<T = any>(
             (retryError || error).message?.includes('jwt expired')
         );
 
-          // Step 2: Fallback to ANON key if User Token fails
-          if (isStill401) {
-              console.warn(`[Supabase Function] Still 401 after refresh. Fallback to ANON key for ${functionName}...`);
-              // Try VITE_SUPABASE_ANON_KEY first, then VITE_SUPABASE_PUBLISHABLE_KEY
-              const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-              
-              if (anonKey) {
-                   // Use direct fetch to ensure we control the Authorization header completely
-                   // avoiding any potential interference from the supabase client's auto-auth
-                   
-                   // ALWAYS use the absolute URL to avoid local proxy issues and ensure we hit the correct project
-                   const projectUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, '') || "https://gzhxgoigflftharcmdqj.supabase.co";
-                   const functionUrl = `${projectUrl}/functions/v1/${functionName}`;
-
-                   console.log(`[Supabase Function] Fallback fetching: ${functionUrl}`);
-
-                   const { Authorization, authorization, ...baseHeaders } = options.headers || {};
-                   
-                   try {
-                       const response = await fetch(functionUrl, {
-                           method: options.method || 'POST',
-                           headers: {
-                               'Content-Type': 'application/json',
-                               'Authorization': `Bearer ${anonKey}`,
-                               ...baseHeaders
-                           },
-                           body: options.body ? JSON.stringify(enrichPayload(options.body)) : undefined
-                       });
-
-                       if (!response.ok) {
-                           const text = await response.text();
-                           let errorData;
-                           try { errorData = JSON.parse(text); } catch { errorData = { message: text }; }
-                           console.error(`[Supabase Function] Fallback failed with ${response.status}:`, text);
-                           retryData = null;
-                           retryError = new Error(errorData.message || `Function returned ${response.status}`);
-                       } else {
-                           retryData = await response.json();
-                           retryError = null;
-                       }
-                   } catch (fetchErr) {
-                       console.error(`[Supabase Function] Fallback fetch error:`, fetchErr);
-                       retryError = fetchErr;
-                   }
-              } else {
-                  console.warn("[Supabase Function] No ANON key found for fallback.");
-              }
-          }
+          // If still 401 after refresh, do not fallback to ANON for auth-required functions; return error
 
         // If we have a successful retry (or a different error), return it
         if (!retryError) {

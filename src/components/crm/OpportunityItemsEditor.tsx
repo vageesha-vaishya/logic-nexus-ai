@@ -30,7 +30,7 @@ export function OpportunityItemsEditor({ opportunityId }: { opportunityId: strin
     const fetchItems = async () => {
       try {
         const { data, error } = await (scopedDb as any)
-          .from('opportunity_items')
+          .from('opportunity_items', true)
           .select('*')
           .eq('opportunity_id', opportunityId)
           .order('line_number', { ascending: true });
@@ -93,7 +93,7 @@ export function OpportunityItemsEditor({ opportunityId }: { opportunityId: strin
       
       // Replace all items for simplicity
       const { error: delErr } = await (scopedDb as any)
-        .from('opportunity_items')
+        .from('opportunity_items', true)
         .delete()
         .eq('opportunity_id', opportunityId);
       if (delErr) throw delErr;
@@ -112,7 +112,7 @@ export function OpportunityItemsEditor({ opportunityId }: { opportunityId: strin
       }));
 
       if (payload.length > 0) {
-        const { error: insErr } = await (scopedDb as any).from('opportunity_items').insert(payload as any[]);
+        const { error: insErr } = await (scopedDb as any).from('opportunity_items', true).insert(payload as any[]);
         if (insErr) throw insErr;
       }
 

@@ -18,6 +18,7 @@ import {
   useSidebar,
   SidebarHeader,
 } from '@/components/ui/sidebar';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { RoleGuard } from '@/components/auth/RoleGuard';
@@ -68,6 +69,39 @@ export function AppSidebar() {
       setIsSigningOut(false);
     }
   };
+
+  // Restore saved scroll position on mount
+  useEffect(() => {
+    const saved = sessionStorage.getItem('sidebar:scrollTop');
+    const el = scrollRef.current?.querySelector('[data-radix-scroll-area-viewport]') as HTMLDivElement | null;
+    if (el && saved) {
+      el.scrollTop = Number(saved);
+    }
+  }, []);
+
+  // Persist scroll position during scrolling
+  useEffect(() => {
+    const el = scrollRef.current?.querySelector('[data-radix-scroll-area-viewport]') as HTMLDivElement | null;
+    if (!el) return;
+    const handler = () => sessionStorage.setItem('sidebar:scrollTop', String(el.scrollTop));
+    el.addEventListener('scroll', handler);
+    return () => el.removeEventListener('scroll', handler);
+  }, []);
+
+  // Ensure active item stays in view after navigation
+  useEffect(() => {
+    const container = scrollRef.current?.querySelector('[data-radix-scroll-area-viewport]') as HTMLDivElement | null;
+    if (!container) return;
+    const activeLink = container.querySelector('a[aria-current="page"]') as HTMLElement | null;
+    if (activeLink) {
+      const linkRect = activeLink.getBoundingClientRect();
+      const contRect = container.getBoundingClientRect();
+      const outOfView = linkRect.top < contRect.top || linkRect.bottom > contRect.bottom;
+      if (outOfView) {
+        activeLink.scrollIntoView({ block: 'nearest' });
+      }
+    }
+  }, [location]);
 
   // Use Salesforce-style order from navigation config
   const salesItems = (APP_MENU.find((m) => m.label === 'Sales')?.items ?? []).map((i) => ({
@@ -192,83 +226,83 @@ export function AppSidebar() {
 
         {/* Financials Group - Collapsible */}
         <Collapsible open={openGroups.financials} onOpenChange={() => toggleGroup('financials')}>
-          <SidebarGroup>
-            <SidebarGroupLabel asChild>
-              <CollapsibleTrigger className="flex w-full items-center justify-between hover:text-foreground transition-colors group">
-                {!collapsed && (
-                  <>
-                    <span>Financials</span>
-                    <ChevronDown className={cn("h-3 w-3 transition-transform duration-200", !openGroups.financials && "-rotate-90")} />
-                  </>
-                )}
-              </CollapsibleTrigger>
-            </SidebarGroupLabel>
-            <CollapsibleContent>
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  {financialItems.map(renderMenuItem)}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </CollapsibleContent>
-          </SidebarGroup>
-        </Collapsible>
+            <SidebarGroup>
+              <SidebarGroupLabel asChild>
+                <CollapsibleTrigger className="flex w-full items-center justify-between hover:text-foreground transition-colors group">
+                  {!collapsed && (
+                    <>
+                      <span>Financials</span>
+                      <ChevronDown className={cn("h-3 w-3 transition-transform duration-200", !openGroups.financials && "-rotate-90")} />
+                    </>
+                  )}
+                </CollapsibleTrigger>
+              </SidebarGroupLabel>
+              <CollapsibleContent>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    {financialItems.map(renderMenuItem)}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </CollapsibleContent>
+            </SidebarGroup>
+          </Collapsible>
 
-        {/* Logistics Group - Collapsible */}
-        <Collapsible open={openGroups.logistics} onOpenChange={() => toggleGroup('logistics')}>
-          <SidebarGroup>
-            <SidebarGroupLabel asChild>
-              <CollapsibleTrigger className="flex w-full items-center justify-between hover:text-foreground transition-colors group">
-                {!collapsed && (
-                  <>
-                    <span>Logistics</span>
-                    <ChevronDown className={cn("h-3 w-3 transition-transform duration-200", !openGroups.logistics && "-rotate-90")} />
-                  </>
-                )}
-              </CollapsibleTrigger>
-            </SidebarGroupLabel>
-            <CollapsibleContent>
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  {logisticsItems.map(renderMenuItem)}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </CollapsibleContent>
-          </SidebarGroup>
-        </Collapsible>
+          {/* Logistics Group - Collapsible */}
+          <Collapsible open={openGroups.logistics} onOpenChange={() => toggleGroup('logistics')}>
+            <SidebarGroup>
+              <SidebarGroupLabel asChild>
+                <CollapsibleTrigger className="flex w-full items-center justify-between hover:text-foreground transition-colors group">
+                  {!collapsed && (
+                    <>
+                      <span>Logistics</span>
+                      <ChevronDown className={cn("h-3 w-3 transition-transform duration-200", !openGroups.logistics && "-rotate-90")} />
+                    </>
+                  )}
+                </CollapsibleTrigger>
+              </SidebarGroupLabel>
+              <CollapsibleContent>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    {logisticsItems.map(renderMenuItem)}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </CollapsibleContent>
+            </SidebarGroup>
+          </Collapsible>
 
-        {/* Admin Group - Collapsible */}
-        <Collapsible open={openGroups.admin} onOpenChange={() => toggleGroup('admin')}>
-          <SidebarGroup>
-            <SidebarGroupLabel asChild>
-              <CollapsibleTrigger className="flex w-full items-center justify-between hover:text-foreground transition-colors group">
-                {!collapsed && (
-                  <>
-                    <span>Administration</span>
-                    <ChevronDown className={cn("h-3 w-3 transition-transform duration-200", !openGroups.admin && "-rotate-90")} />
-                  </>
-                )}
-              </CollapsibleTrigger>
-            </SidebarGroupLabel>
-            <CollapsibleContent>
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  {adminItems.map(renderMenuItem)}
-                  <RoleGuard roles={["platform_admin","tenant_admin","franchise_admin"] as any} permissions={["admin.settings.manage"] as any}>
-                    <SidebarMenuItem>
-                      <SidebarMenuButton asChild tooltip={collapsed ? "Settings" : undefined}>
-                        <NavLink to="/dashboard/settings" className={getNavClass}>
-                          <Settings className="h-4 w-4 shrink-0" />
-                          {!collapsed && <span>Settings</span>}
-                        </NavLink>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  </RoleGuard>
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </CollapsibleContent>
-          </SidebarGroup>
-        </Collapsible>
-      </SidebarContent>
+          {/* Admin Group - Collapsible */}
+          <Collapsible open={openGroups.admin} onOpenChange={() => toggleGroup('admin')}>
+            <SidebarGroup>
+              <SidebarGroupLabel asChild>
+                <CollapsibleTrigger className="flex w-full items-center justify-between hover:text-foreground transition-colors group">
+                  {!collapsed && (
+                    <>
+                      <span>Administration</span>
+                      <ChevronDown className={cn("h-3 w-3 transition-transform duration-200", !openGroups.admin && "-rotate-90")} />
+                    </>
+                  )}
+                </CollapsibleTrigger>
+              </SidebarGroupLabel>
+              <CollapsibleContent>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    {adminItems.map(renderMenuItem)}
+                    <RoleGuard roles={["platform_admin","tenant_admin","franchise_admin"] as any} permissions={["admin.settings.manage"] as any}>
+                      <SidebarMenuItem>
+                        <SidebarMenuButton asChild tooltip={collapsed ? "Settings" : undefined}>
+                          <NavLink to="/dashboard/settings" className={getNavClass}>
+                            <Settings className="h-4 w-4 shrink-0" />
+                            {!collapsed && <span>Settings</span>}
+                          </NavLink>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    </RoleGuard>
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </CollapsibleContent>
+            </SidebarGroup>
+          </Collapsible>
+        </SidebarContent>
 
       <SidebarFooter className="border-t p-4">
         {!collapsed && profile && (

@@ -47,48 +47,75 @@ export default function Auth() {
 
     setLoading(true);
 
-    const { error } = await signIn(email, password);
+    try {
+      // Add timeout protection for sign in
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Request timed out. Please check your connection.')), 15000)
+      );
 
-    if (error) {
-      // If initial admin credentials fail, attempt to auto-seed the admin account
-      const isAdminEmail = email.trim().toLowerCase() === 'bahuguna.vimal@gmail.com';
-      if (error.message.includes('Invalid login credentials') && isAdminEmail) {
-        try {
-          const { data, error: seedError } = await invokeFunction('seed-platform-admin', {
-            body: { email, password }
-          });
+      const result = await Promise.race([
+        signIn(email, password),
+        timeoutPromise
+      ]) as { error: any };
+      
+      const { error } = result;
 
-          if (seedError) {
-            // Fall back to guidance if seeding fails
-            toast.error('Admin account not found. Use Setup to create it.');
-          } else if (data?.success) {
-            toast.success('Admin created. Signing you in...');
-            const { error: retryError } = await signIn(email, password);
-            if (!retryError) {
-              navigate(from, { replace: true });
-              setLoading(false);
-              return;
+      if (error) {
+        console.error('Sign in error:', error);
+        
+        // If initial admin credentials fail, attempt to auto-seed the admin account
+        const isAdminEmail = email.trim().toLowerCase() === 'bahuguna.vimal@gmail.com';
+        if (error.message.includes('Invalid login credentials') && isAdminEmail) {
+          try {
+            console.log('Attempting to seed admin account...');
+            // Add timeout protection for seeding too
+            const seedResult = await Promise.race([
+              invokeFunction('seed-platform-admin', {
+                body: { email, password }
+              }),
+              new Promise((_, reject) => setTimeout(() => reject(new Error('Seeding timed out')), 10000))
+            ]) as { data: any, error: any };
+            
+            const { data, error: seedError } = seedResult;
+  
+            if (seedError) {
+              console.error('Seeding error:', seedError);
+              // Fall back to guidance if seeding fails
+              toast.error('Admin account not found. Use Setup to create it.');
+            } else if (data?.success) {
+              toast.success('Admin created. Signing you in...');
+              const { error: retryError } = await signIn(email, password);
+              if (!retryError) {
+                navigate(from, { replace: true });
+                setLoading(false);
+                return;
+              }
             }
+          } catch (e: any) {
+            console.error('Seeding failed:', e);
+            // Edge function may not be deployed; guide the user
+            toast.error('Setup required. Please run Platform Setup.');
           }
-        } catch (e: any) {
-          // Edge function may not be deployed; guide the user
-          toast.error('Setup required. Please run Platform Setup.');
+        } else if (error.message.includes('Email not confirmed')) {
+          toast.error('Please verify your email address');
+        } else if (error.message.includes('Failed to fetch')) {
+          toast.error('Connection Error', { 
+            description: 'Could not connect to the server. Please check your internet connection or VPN.' 
+          });
+        } else {
+          toast.error(error.message);
         }
-      } else if (error.message.includes('Email not confirmed')) {
-        toast.error('Please verify your email address');
-      } else if (error.message.includes('Failed to fetch')) {
-        toast.error('Connection Error', { 
-          description: 'Could not connect to the server. Please check your internet connection or VPN.' 
-        });
-      } else {
-        toast.error(error.message);
+        setLoading(false);
+        return;
       }
+  
+      toast.success('Welcome back!');
+      navigate(from, { replace: true });
+    } catch (err: any) {
+      console.error('Login process error:', err);
+      toast.error(err.message || 'An unexpected error occurred');
       setLoading(false);
-      return;
     }
-
-    toast.success('Welcome back!');
-    navigate(from, { replace: true });
   };
 
   return (

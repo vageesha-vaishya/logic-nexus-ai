@@ -1,6 +1,6 @@
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Settings as SettingsIcon, User, Bell, Shield, Database, CreditCard, Palette, Info, Globe } from 'lucide-react';
+import { Settings as SettingsIcon, User, Bell, Shield, Database, CreditCard, Palette, Info, Globe, Mail } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
@@ -195,6 +195,39 @@ export default function Settings() {
                       Database Export
                     </Button>
                   </div>
+                </CardContent>
+              </Card>
+
+              <div className="md:col-span-2 lg:col-span-3">
+                <div className="flex items-center">
+                  <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Integrations</h2>
+                  <div className="ml-4 flex-1 h-px bg-border"></div>
+                </div>
+              </div>
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center gap-2">
+                    <Mail className="h-5 w-5 text-primary" />
+                    <CardTitle className="flex items-center gap-2">
+                      Channel Integrations
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="inline-flex items-center cursor-help">
+                            <Info className="h-4 w-4 text-muted-foreground" />
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Manage WhatsApp, X, Telegram, LinkedIn, and Web channels</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </CardTitle>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <p className="text-sm text-muted-foreground">Configure and activate messaging channels for unified communications.</p>
+                  <Button variant="default" onClick={() => navigate('/dashboard/settings/channel-integrations')}>
+                    Open
+                  </Button>
                 </CardContent>
               </Card>
 

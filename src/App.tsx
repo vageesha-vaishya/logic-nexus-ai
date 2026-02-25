@@ -62,6 +62,8 @@ const LeadRouting = lazy(() => import("./pages/dashboard/LeadRouting"));
 const QueueManagement = lazy(() => import("./pages/dashboard/QueueManagement"));
 const LeadAssignment = lazy(() => import("./pages/dashboard/LeadAssignment"));
 const EmailManagement = lazy(() => import("./pages/dashboard/EmailManagement"));
+const CommunicationsHub = lazy(() => import("./pages/dashboard/CommunicationsHub"));
+const ChannelIntegrations = lazy(() => import("./pages/dashboard/ChannelIntegrations"));
 const ThemeManagement = lazy(() => import("./pages/dashboard/ThemeManagement"));
 const Files = lazy(() => import("./pages/dashboard/Files"));
 const Campaigns = lazy(() => import("./pages/dashboard/Campaigns"));
@@ -567,6 +569,22 @@ const App = () => (
                   <EmailManagement />
                 </ProtectedRoute>
               } 
+            />
+            <Route 
+              path="/dashboard/communications-hub" 
+              element={
+                <ProtectedRoute requiredPermissions={["email.manage"]}>
+                  <CommunicationsHub />
+                </ProtectedRoute>
+              } 
+            />
+            <Route
+              path="/dashboard/settings/channel-integrations"
+              element={
+                <ProtectedRoute requiredPermissions={["admin.settings.manage"]}>
+                  <ChannelIntegrations />
+                </ProtectedRoute>
+              }
             />
             <Route 
               path="/dashboard/themes" 

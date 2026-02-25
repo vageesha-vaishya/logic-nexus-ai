@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS public.compliance_domain_verifications (
 ALTER TABLE public.compliance_domain_verifications ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies
+DROP POLICY IF EXISTS "Tenant admins can manage domain verifications" ON public.compliance_domain_verifications;
 CREATE POLICY "Tenant admins can manage domain verifications" ON public.compliance_domain_verifications
     FOR ALL
     TO authenticated

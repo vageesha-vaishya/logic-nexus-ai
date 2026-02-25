@@ -17,6 +17,8 @@ import { Switch } from '@/components/ui/switch';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import type { TransportOption } from '@/components/email/email-to-lead-helpers';
+import { extractMaxPrice } from '@/components/email/email-to-lead-helpers';
 
 export const leadSchema = z.object({
   first_name: z.string().min(1, 'First name is required').max(100),
@@ -53,9 +55,10 @@ interface LeadFormProps {
   onCancel: () => void;
   suggestedService?: string;
   isSuggestingService?: boolean;
+  recommendationSelection?: TransportOption | null;
 }
 
-export function LeadForm({ initialData, onSubmit, onCancel, suggestedService, isSuggestingService }: LeadFormProps) {
+export function LeadForm({ initialData, onSubmit, onCancel, suggestedService, isSuggestingService, recommendationSelection }: LeadFormProps) {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [pendingData, setPendingData] = useState<LeadFormData | null>(null);
   const { supabase, context, scopedDb } = useCRM();
@@ -146,6 +149,29 @@ export function LeadForm({ initialData, onSubmit, onCancel, suggestedService, is
       }
     }
   }, [suggestedService, form]);
+
+  useEffect(() => {
+    if (recommendationSelection) {
+      const mode = recommendationSelection.mode?.trim();
+      if (mode) {
+        form.setValue('service_id', mode, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
+      }
+      const maxPrice = extractMaxPrice(recommendationSelection.price || '');
+      if (maxPrice !== null && !isNaN(maxPrice)) {
+        form.setValue('estimated_value', String(maxPrice), { shouldValidate: true, shouldDirty: true, shouldTouch: true });
+      }
+      const bestFor = recommendationSelection.bestFor?.trim();
+      const interchange = recommendationSelection.interchangePoints?.trim();
+      const currentNotes = form.getValues('notes') || '';
+      const lines: string[] = [];
+      if (bestFor && !currentNotes.includes(bestFor)) lines.push(`Best For: ${bestFor}`);
+      if (interchange && !currentNotes.includes(interchange)) lines.push(`Interchange Points: ${interchange}`);
+      if (lines.length > 0) {
+        const newNotes = currentNotes ? `${currentNotes}\n\n${lines.join('\n')}` : lines.join('\n');
+        form.setValue('notes', newNotes, { shouldValidate: true, shouldDirty: true, shouldTouch: true });
+      }
+    }
+  }, [recommendationSelection, form]);
 
   // Debug: Monitor service_id changes
   const currentServiceId = form.watch('service_id');

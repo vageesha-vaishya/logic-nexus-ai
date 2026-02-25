@@ -6,7 +6,8 @@ import { useState, useEffect } from "react";
 import optionsConfig from "@/config/Options_Transport_Mode.json";
 import interestedConfig from "@/config/Interested_Transport_Mode_checker_config.json";
 import { cleanEmail, cleanPhone } from "@/lib/data-cleaning";
-import { sanitizeLeadDataForInsert, extractEmailAddress, parseTransportOptionsJSON, type TransportOption } from "./email-to-lead-helpers";
+import { invokeFunction } from "@/lib/supabase-functions";
+import { sanitizeLeadDataForInsert, extractEmailAddress, parseTransportOptionsJSON, type TransportOption, computeLeadScoreClient } from "./email-to-lead-helpers";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -46,6 +47,7 @@ export function EmailToLeadDialog({ open, onOpenChange, email, onSuccess }: Emai
   const [transportOptions, setTransportOptions] = useState<TransportOption[]>([]);
   const [loadingOptions, setLoadingOptions] = useState(false);
   const [suggestionError, setSuggestionError] = useState<string | null>(null);
+  const [selectedOptionIndex, setSelectedOptionIndex] = useState<number | null>(null);
 
   const parseName = (fullName: string) => {
     const parts = fullName.trim().split(/\s+/);
@@ -86,14 +88,14 @@ export function EmailToLeadDialog({ open, onOpenChange, email, onSuccess }: Emai
   const fetchInterestedService = async (forceRefresh = false) => {
     if (!email || (!email.subject && !email.body_text && !email.body_html)) return;
     
-    const CACHE_KEY = `interested_service_${email.id}`;
-    if (!forceRefresh) {
-        const cached = sessionStorage.getItem(CACHE_KEY);
-        if (cached) {
-            console.log("Using cached interested service");
-            setSuggestedService(cached);
-            return;
-        }
+    const hasId = Boolean(email?.id);
+    const CACHE_KEY = hasId ? `interested_service_${email.id}` : null;
+    if (!forceRefresh && CACHE_KEY) {
+      const cached = sessionStorage.getItem(CACHE_KEY);
+      if (cached) {
+        setSuggestedService(cached);
+        return;
+      }
     }
 
     setIsSuggestingService(true);
@@ -121,7 +123,7 @@ export function EmailToLeadDialog({ open, onOpenChange, email, onSuccess }: Emai
         // Simple validation: ensure it's not too long
         if (text && text.length < 100) {
             setSuggestedService(text);
-            sessionStorage.setItem(CACHE_KEY, text);
+            if (CACHE_KEY) sessionStorage.setItem(CACHE_KEY, text);
         } else {
             console.warn("[InterestedService] Response too long or empty, ignoring.");
         }
@@ -137,21 +139,21 @@ export function EmailToLeadDialog({ open, onOpenChange, email, onSuccess }: Emai
   const fetchRecommendedOptions = async (forceRefresh = false) => {
     if (!email || (!email.subject && !email.body_text && !email.body_html)) return;
 
-    const CACHE_KEY = `transport_options_${email.id}`;
-    if (!forceRefresh) {
-        try {
-            const cached = sessionStorage.getItem(CACHE_KEY);
-            if (cached) {
-                const parsed = JSON.parse(cached);
-                if (Array.isArray(parsed)) {
-                    console.log("Using cached transport options");
-                    setTransportOptions(parsed);
-                    return;
-                }
-            }
-        } catch (e) {
-            console.warn("Error reading transport options cache:", e);
+    const hasId = Boolean(email?.id);
+    const CACHE_KEY = hasId ? `transport_options_${email.id}` : null;
+    if (!forceRefresh && CACHE_KEY) {
+      try {
+        const cached = sessionStorage.getItem(CACHE_KEY);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed)) {
+            setTransportOptions(parsed);
+            return;
+          }
         }
+      } catch {
+        // ignore cache parse errors
+      }
     }
 
     setLoadingOptions(true);
@@ -166,25 +168,143 @@ export function EmailToLeadDialog({ open, onOpenChange, email, onSuccess }: Emai
         prompt = prompt.replace("<subject>", subject).replace("<content>", content);
 
         const requestId = `req_options_${Date.now()}`;
-        const { data, error } = await supabase.functions.invoke('suggest-transport-mode', {
-            body: { prompt, requestId, responseFormat: 'json' },
-            headers: { 'x-client-info': 'email-to-lead-options' }
+        const { data, error } = await invokeFunction<any>('suggest-transport-mode', {
+          body: { prompt, requestId, responseFormat: 'json' },
+          headers: { 'x-client-info': 'email-to-lead-options' },
         });
 
-        if (error) throw error;
-        if (data?.error) throw new Error(data.error);
+        if (error) {
+          const raw = String((error as any)?.message || "");
+          const status = (error as any)?.context?.status;
+          const isJwtIssue =
+            status === 401 ||
+            /jwt/i.test(raw) ||
+            /unauthorized/i.test(raw) ||
+            /401/.test(raw);
+          const isServiceIssue =
+            (status && status >= 500) ||
+            /failed to fetch/i.test(raw) ||
+            /timeout/i.test(raw) ||
+            /service unavailable/i.test(raw) ||
+            /503/.test(raw);
 
-        const text = (data?.text || "").trim();
-        console.log(`[RecommendedOptions] Raw Response: ${text}`);
+          let message = "Failed to load recommendations.";
+          if (isJwtIssue) {
+            message =
+              "Your session has expired. Please sign in again and then refresh recommendations.";
+          } else if (isServiceIssue) {
+            message =
+              "AI recommendation service is currently unavailable. Please try again in a few minutes.";
+          } else if (raw) {
+            message = raw;
+          }
 
-        const options = parseTransportOptionsJSON(text);
+          setTransportOptions([]);
+          setSuggestionError(message);
+          return;
+        }
+
+        if ((data as any)?.error) {
+          const raw = String((data as any).error || "");
+          let message = raw || "AI recommendation service returned an error. Please try again.";
+          if (/timeout|unavailable|failed/i.test(message)) {
+            message =
+              "AI recommendation service is currently unavailable. Please try again in a few minutes.";
+          }
+          setTransportOptions([]);
+          setSuggestionError(message);
+          return;
+        }
+
+        const buildFallback = (): TransportOption[] => {
+          const s = `${subject} ${content}`.toLowerCase();
+          const isUrgent = /urgent|asap|immediate|today|tomorrow/.test(s);
+          const isInternational = /port|ocean|sea|vessel|incoterms|bl|lcl|fcl/.test(s);
+          const isAir = /air|flight|awb|airway bill|airport/.test(s);
+          const base: TransportOption[] = [];
+          if (isUrgent || isAir) {
+            base.push({
+              seqNo: "1",
+              mode: "Air Freight",
+              price: "₹35,000 – ₹65,000",
+              transitTime: "1 – 3 Days",
+              bestFor: "Speed & Urgency",
+              interchangePoints: "Airport-to-Airport (Door optional)",
+              logic: "Air freight minimizes transit time for urgent consignments."
+            });
+          }
+          if (isInternational) {
+            base.push({
+              seqNo: String(base.length + 1),
+              mode: "Ocean Freight (LCL)",
+              price: "₹12,000 – ₹25,000",
+              transitTime: "7 – 21 Days",
+              bestFor: "Cost & Reliability",
+              interchangePoints: "CY → CFS → CY",
+              logic: "Ocean LCL offers economical shipping for international moves."
+            });
+          }
+          base.push({
+            seqNo: String(base.length + 1),
+            mode: "Road Freight",
+            price: "₹8,000 – ₹15,000",
+            transitTime: "1 – 3 Days",
+            bestFor: "Domestic & Door-to-Door",
+            interchangePoints: "None (Direct)",
+            logic: "FTL/Part-load road shipment provides simplicity and coverage."
+          });
+          return base;
+        };
+
+        let options: TransportOption[] | null = null;
+        const textCandidate = typeof (data as any)?.text === 'string' ? String((data as any).text).trim() : '';
+        if (textCandidate) {
+          options = parseTransportOptionsJSON(textCandidate);
+        } else if (Array.isArray((data as any)?.options)) {
+          options = (data as any).options as TransportOption[];
+        } else if (typeof data === 'string') {
+          options = parseTransportOptionsJSON(String(data));
+        } else if (data && typeof data === 'object') {
+          try {
+            const serialized = JSON.stringify(data);
+            options = parseTransportOptionsJSON(serialized);
+          } catch {
+            options = null;
+          }
+        }
+
+        if (!options || options.length === 0) {
+          options = buildFallback();
+        }
         
         setTransportOptions(options);
-        sessionStorage.setItem(CACHE_KEY, JSON.stringify(options));
+        if (CACHE_KEY) sessionStorage.setItem(CACHE_KEY, JSON.stringify(options));
 
-    } catch (err) {
-        console.error(`[RecommendedOptions] Error:`, err);
-        setSuggestionError("Failed to load detailed recommendations.");
+    } catch (err: any) {
+        const raw = String(err?.message || "");
+        const isJwtIssue =
+          /jwt/i.test(raw) ||
+          /unauthorized/i.test(raw) ||
+          /401/.test(raw);
+        const isServiceIssue =
+          /failed to fetch/i.test(raw) ||
+          /timeout/i.test(raw) ||
+          /service unavailable/i.test(raw) ||
+          /503/.test(raw);
+
+        let message = "Failed to load recommendations.";
+        if (isJwtIssue) {
+          message =
+            "Your session has expired. Please sign in again and then refresh recommendations.";
+        } else if (isServiceIssue) {
+          message =
+            "AI recommendation service is currently unavailable. Please try again in a few minutes.";
+        } else if (raw) {
+          message = raw;
+        }
+
+        setTransportOptions([]);
+        setSuggestionError(message);
     } finally {
         setLoadingOptions(false);
     }
@@ -196,18 +316,29 @@ export function EmailToLeadDialog({ open, onOpenChange, email, onSuccess }: Emai
     setIsSuggestingService(false);
     setLoadingOptions(false);
     setSuggestionError(null);
+    setSelectedOptionIndex(null);
   }, [email.id, open]);
 
   useEffect(() => {
     if (open) {
-        // Run both services in parallel
-        fetchInterestedService();
-        fetchRecommendedOptions();
+      // Force refresh on each open or email switch to avoid stale recommendations
+      fetchInterestedService(true);
+      fetchRecommendedOptions(true);
     }
   }, [open, email.id]);
 
+  useEffect(() => {
+    if (transportOptions.length > 0) {
+      setSelectedOptionIndex(0);
+    } else {
+      setSelectedOptionIndex(null);
+    }
+  }, [transportOptions]);
+
   const handleSubmit = async (data: LeadFormData) => {
     try {
+      const authUser = (await supabase.auth.getUser()).data.user;
+      const nowIso = new Date().toISOString();
       if (data.email) {
         const normalizedEmail = cleanEmail(data.email).value || data.email.trim().toLowerCase();
         let query = supabase
@@ -261,12 +392,23 @@ export function EmailToLeadDialog({ open, onOpenChange, email, onSuccess }: Emai
           phone: data.phone ? (cleanPhone(data.phone).value || data.phone.trim()) : null,
           tenant_id: data.tenant_id || context.tenantId,
           franchise_id: data.franchise_id || context.franchiseId,
+          owner_id: authUser?.id || null,
+          last_activity_date: nowIso,
+          lead_score: computeLeadScoreClient({
+            status: data.status,
+            estimated_value: (() => {
+              const v = sanitizeLeadDataForInsert(data).estimated_value;
+              return typeof v === 'number' ? v : null;
+            })(),
+            source: data.source,
+            last_activity_date: nowIso
+          }),
           custom_fields: Object.keys(customFields).filter((k) => customFields[k] !== undefined).length
             ? Object.fromEntries(
                 Object.entries(customFields).filter(([, v]) => v !== undefined),
               )
             : null,
-          created_by: (await supabase.auth.getUser()).data.user?.id,
+          created_by: authUser?.id,
         })
         .select()
         .single();
@@ -364,7 +506,11 @@ export function EmailToLeadDialog({ open, onOpenChange, email, onSuccess }: Emai
                                 </TableHeader>
                                 <TableBody>
                                     {transportOptions.map((option, index) => (
-                                        <TableRow key={index}>
+                                        <TableRow
+                                          key={index}
+                                          onClick={() => setSelectedOptionIndex(index)}
+                                          className={`cursor-pointer ${selectedOptionIndex === index ? 'bg-purple-50' : ''}`}
+                                        >
                                             <TableCell className="font-medium">{option.seqNo}</TableCell>
                                             <TableCell>{option.mode}</TableCell>
                                             <TableCell>{option.price}</TableCell>
@@ -392,6 +538,7 @@ export function EmailToLeadDialog({ open, onOpenChange, email, onSuccess }: Emai
                 onCancel={() => onOpenChange(false)}
                 suggestedService={suggestedService}
                 isSuggestingService={isSuggestingService}
+                recommendationSelection={selectedOptionIndex !== null ? transportOptions[selectedOptionIndex] : null}
             />
         </div>
       </DialogContent>

@@ -1,5 +1,8 @@
 
+// @ts-ignore
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+// @ts-ignore
+declare const Deno: any;
 import { ParsedEmail, ParsedAttachment } from "./parser.ts";
 
 export type { SupabaseClient };
@@ -123,6 +126,17 @@ export async function saveEmailToDb(
   folder: string = "inbox",
   direction: "inbound" | "outbound" = "inbound"
 ) {
+  const normalizeEmail = (v?: string) => String(v || "").trim().toLowerCase();
+  const findLinkedLeadId = async (addr?: string | null) => {
+    const e = normalizeEmail(addr || undefined);
+    if (!e) return null;
+    let query = supabase.from("leads").select("id").eq("email", e);
+    if (account.tenant_id) query = query.eq("tenant_id", account.tenant_id);
+    if (account.franchise_id) query = query.eq("franchise_id", account.franchise_id);
+    const { data, error } = await query.limit(1);
+    if (error || !data || data.length === 0) return null;
+    return data[0]?.id ?? null;
+  };
   // Check existence
   const { data: existing } = await supabase
     .from("emails")
@@ -169,6 +183,25 @@ export async function saveEmailToDb(
     last_sync_attempt: new Date().toISOString(),
     raw_headers: email.headers
   };
+
+  // Auto-link to Lead by matching sender/recipient email
+  try {
+    let leadId: string | null = null;
+    if (direction === "inbound") {
+      leadId = await findLinkedLeadId(email.from?.email);
+    } else {
+      const toList = Array.isArray(email.to) ? email.to : [];
+      for (const r of toList) {
+        leadId = await findLinkedLeadId((r as any)?.email);
+        if (leadId) break;
+      }
+    }
+    if (leadId) {
+      (payload as any).lead_id = leadId;
+    }
+  } catch (e) {
+    console.warn("Auto-link lead failed:", e);
+  }
 
   const { error } = await supabase.from("emails").insert(payload);
   

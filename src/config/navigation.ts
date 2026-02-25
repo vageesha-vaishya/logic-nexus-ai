@@ -123,6 +123,8 @@ export const APP_MENU: MenuModule[] = [
     label: 'Settings',
     items: [
       { name: 'System Settings', path: '/dashboard/settings', icon: Cog, description: 'Account and app settings' },
+      { name: 'Channel Integrations', path: '/dashboard/settings/channel-integrations', icon: Cog, description: 'Manage WhatsApp, X, Telegram, LinkedIn, Web', permissions: ['admin.settings.manage'] },
+      { name: 'Communications Hub', path: '/dashboard/communications-hub', icon: Mail, description: 'Unified messages across channels', permissions: ['email.manage'] },
       { name: 'Email Management', path: '/dashboard/email-management', icon: Mail, description: 'Manage emails', permissions: ['email.manage'] },
       { name: 'Roles & Permissions', path: '/dashboard/settings/permissions', icon: Cog, description: 'Configure access control', permissions: ['admin.settings.manage'] },
       { name: 'Theme Management', path: '/dashboard/themes', icon: Palette, description: 'Customize theme' },

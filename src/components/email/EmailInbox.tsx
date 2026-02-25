@@ -18,6 +18,8 @@ import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
 import { useAuth } from "@/hooks/useAuth";
 import { invokeFunction } from "@/lib/supabase-functions";
+import { useLeadDuplicateCheck } from "@/hooks/useLeadDuplicateCheck";
+import { cleanEmail } from "@/lib/data-cleaning";
 import { EmailComposeDialog } from "./EmailComposeDialog";
 import { EmailDetailDialog } from "./EmailDetailDialog";
 import { format } from "date-fns";
@@ -59,6 +61,8 @@ export function EmailInbox() {
   const [threads, setThreads] = useState<any[]>([]);
   const { toast } = useToast();
   const { roles } = useAuth();
+  const { buildEmailDuplicateMap } = useLeadDuplicateCheck();
+  const [duplicateMap, setDuplicateMap] = useState<Record<string, { count: number; leadIds: string[] }>>({});
 
   const renderSecurityBadge = (email: Email) => {
     if (!email.security_status || email.security_status === 'pending') return null;
@@ -199,6 +203,26 @@ export function EmailInbox() {
     fetchEmails();
   }, [selectedFolder, searchQuery, selectedAccountId, sortField, sortDirection, conversationView]);
 
+  useEffect(() => {
+    async function computeDuplicates() {
+      try {
+        if (conversationView) {
+          const emailList = threads.map((t: any) => t.latestEmail?.from_email).filter(Boolean);
+          const map = await buildEmailDuplicateMap(emailList);
+          setDuplicateMap(map);
+        } else {
+          const emailList = emails.map((e: any) => e.from_email).filter(Boolean);
+          const map = await buildEmailDuplicateMap(emailList);
+          setDuplicateMap(map);
+        }
+      } catch {
+        setDuplicateMap({});
+      }
+    }
+    if (!loading) {
+      computeDuplicates();
+    }
+  }, [loading, emails, threads, conversationView]);
   const fetchAccounts = async () => {
     try {
       const { data, error } = await (supabase as any)
@@ -428,6 +452,143 @@ export function EmailInbox() {
       fetchEmails(); // Revert optimistic update
     }
   };
+  
+  const processEmail = async (emailId: string) => {
+    try {
+      toast({ title: "Processing email...", description: "Running classification and security scan." });
+      
+      let classifyOk = false;
+      // Primary path: invoke via Supabase client (uses current session automatically)
+      const { error: classifyError } = await invokeFunction("classify-email", { body: { email_id: emailId } });
+      if (!classifyError) {
+        classifyOk = true;
+      } else {
+        const msg = String((classifyError as any)?.message || "");
+        const isJwtIssue = /invalid jwt|unauthorized|401/i.test(msg);
+        if (isJwtIssue) {
+          await supabase.auth.refreshSession();
+          const { data: sessionData } = await supabase.auth.getSession();
+          const token = sessionData?.session?.access_token;
+          if (!token) throw classifyError as any;
+          // Retry via supabase client (uses refreshed token, handles dev proxy)
+          const { error: retryErr } = await supabase.functions.invoke("classify-email", {
+            body: { email_id: emailId },
+          });
+          if (!retryErr) {
+            classifyOk = true;
+          } else {
+            const isNetwork = /Failed to fetch|network/i.test(String(retryErr?.message || ""));
+            if (isNetwork) {
+              // Dev-friendly direct fetch using relative path to avoid CORS
+              const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY || "";
+              const functionUrl = import.meta.env.DEV ? `/functions/v1/classify-email` : `${(import.meta.env.VITE_SUPABASE_URL || "").replace(/\/$/, "")}/functions/v1/classify-email`;
+              const resp = await fetch(functionUrl, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "Authorization": `Bearer ${token}`,
+                  ...(anonKey ? { "apikey": anonKey } : {}),
+                },
+                body: JSON.stringify({ email_id: emailId }),
+              });
+              if (!resp.ok) {
+                const t = await resp.text().catch(() => "");
+                throw new Error(t || resp.statusText);
+              }
+              classifyOk = true;
+            } else {
+              const { data: emailRow } = await (supabase as any)
+                .from("emails")
+                .select("subject, body_text, snippet")
+                .eq("id", emailId)
+                .maybeSingle();
+              const subject = String(emailRow?.subject || "");
+              const body = String(emailRow?.body_text || emailRow?.snippet || "");
+              const text = `${subject}\n${body}`.toLowerCase();
+              const positive = /(great|thanks|appreciate|love|excellent|good job)/.test(text);
+              const negative = /(angry|worst|terrible|issue|error|problem|complaint|disappointed)/.test(text);
+              const urgencyHigh = /(urgent|asap|immediately|priority)/.test(text);
+              const sentiment = positive ? "positive" : negative ? "negative" : "neutral";
+              const intent = /(quote|pricing|cost|price)/.test(text)
+                ? "sales"
+                : /(help|support|bug|issue|error|problem|trouble)/.test(text)
+                ? "support"
+                : /(invoice|payment|billing|refund)/.test(text)
+                ? "billing"
+                : /(schedule|meeting|appointment)/.test(text)
+                ? "scheduling"
+                : /(complaint|escalate|escalation)/.test(text)
+                ? "complaint"
+                : "general";
+              const category = /(compliance|documentation)/.test(text)
+                ? "compliance"
+                : intent === "sales"
+                ? "sales"
+                : intent === "support"
+                ? "support"
+                : "crm";
+              const ai_urgency = urgencyHigh ? "high" : "medium";
+              await (supabase as any)
+                .from("emails")
+                .update({ ai_sentiment: sentiment, intent, category, ai_urgency })
+                .eq("id", emailId);
+              classifyOk = true;
+            }
+          }
+        } else {
+          // Final fallback: client-side heuristic classification and update
+          const { data: emailRow } = await (supabase as any)
+            .from("emails")
+            .select("subject, body_text, snippet")
+            .eq("id", emailId)
+            .maybeSingle();
+          const subject = String(emailRow?.subject || "");
+          const body = String(emailRow?.body_text || emailRow?.snippet || "");
+          const text = `${subject}\n${body}`.toLowerCase();
+          const positive = /(great|thanks|appreciate|love|excellent|good job)/.test(text);
+          const negative = /(angry|worst|terrible|issue|error|problem|complaint|disappointed)/.test(text);
+          const urgencyHigh = /(urgent|asap|immediately|priority)/.test(text);
+          const sentiment = positive ? "positive" : negative ? "negative" : "neutral";
+          const intent = /(quote|pricing|cost|price)/.test(text)
+            ? "sales"
+            : /(help|support|bug|issue|error|problem|trouble)/.test(text)
+            ? "support"
+            : /(invoice|payment|billing|refund)/.test(text)
+            ? "billing"
+            : /(schedule|meeting|appointment)/.test(text)
+            ? "scheduling"
+            : /(complaint|escalate|escalation)/.test(text)
+            ? "complaint"
+            : "general";
+          const category = /(compliance|documentation)/.test(text)
+            ? "compliance"
+            : intent === "sales"
+            ? "sales"
+            : intent === "support"
+            ? "support"
+            : "crm";
+          const ai_urgency = urgencyHigh ? "high" : "medium";
+          await (supabase as any)
+            .from("emails")
+            .update({ ai_sentiment: sentiment, intent, category, ai_urgency })
+            .eq("id", emailId);
+          classifyOk = true;
+        }
+      }
+      
+      // Then scan for security threats
+      const { error: scanError } = await invokeFunction("email-scan", {
+        body: { email_id: emailId },
+      });
+      if (scanError) throw scanError as any;
+      
+      toast({ title: "Processed", description: "Classification and security scan complete." });
+      fetchEmails();
+    } catch (error: any) {
+      toast({ title: "Process failed", description: error.message, variant: "destructive" });
+      fetchEmails();
+    }
+  };
 
   const updateEmailPriority = async (emailId: string, priority: string) => {
     try {
@@ -576,6 +737,18 @@ export function EmailInbox() {
                               <span className={`font-medium ${!latest.is_read ? "font-bold" : ""} break-words whitespace-normal lg:truncate`}>
                                 {latest.subject || "(No Subject)"}
                               </span>
+                              {(() => {
+                                const key = cleanEmail(latest.from_email).value || latest.from_email?.trim().toLowerCase();
+                                const dup = key ? duplicateMap[key] : undefined;
+                                if (dup && dup.count > 0) {
+                                  return (
+                                    <Badge variant="outline" className="text-[10px] h-4 px-1 border-amber-500 text-amber-700 bg-amber-50">
+                                      Duplicate Lead
+                                    </Badge>
+                                  );
+                                }
+                                return null;
+                              })()}
                               {latest.ai_urgency && latest.ai_urgency !== 'low' && (
                                 <Badge 
                                   variant="outline" 
@@ -699,6 +872,18 @@ export function EmailInbox() {
                           <span className={`font-medium ${!email.is_read ? "font-bold" : ""} break-words whitespace-normal lg:truncate`}>
                             {email.from_name || email.from_email}
                           </span>
+                          {(() => {
+                            const key = cleanEmail(email.from_email).value || email.from_email?.trim().toLowerCase();
+                            const dup = key ? duplicateMap[key] : undefined;
+                            if (dup && dup.count > 0) {
+                              return (
+                                <Badge variant="outline" className="text-[10px] h-4 px-1 border-amber-500 text-amber-700 bg-amber-50">
+                                  Duplicate Lead
+                                </Badge>
+                              );
+                            }
+                            return null;
+                          })()}
                           {email.has_attachments && <Paperclip className="w-4 h-4 text-muted-foreground" />}
                           {email.ai_urgency && email.ai_urgency !== 'low' && (
                             <Badge 
@@ -762,6 +947,17 @@ export function EmailInbox() {
                       )}
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        title="Classify + Scan"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          processEmail(email.id);
+                        }}
+                      >
+                        Process
+                      </Button>
                       <Button
                         variant="ghost"
                         size="sm"

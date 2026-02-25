@@ -110,6 +110,16 @@ services:
     networks:
       - supabase-network
 
+  timesfm-service:
+    build:
+      context: ./services/timesfm-service
+    container_name: timesfm-service
+    restart: unless-stopped
+    ports:
+      - "8098:8080"
+    networks:
+      - supabase-network
+
 networks:
   supabase-network:
     driver: bridge

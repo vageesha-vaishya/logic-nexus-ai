@@ -1,11 +1,10 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
+import { createClient } from "@supabase/supabase-js"
 import { getCorsHeaders } from "../_shared/cors.ts"
 import { requireAuth } from "../_shared/auth.ts"
+import { sanitizeForLLM } from "../_shared/pii-guard.ts"
+import { logAiCall } from "../_shared/audit.ts"
 
-declare const Deno: {
-  env: { get(name: string): string | undefined };
-};
+declare const Deno: any;
 
 console.log("AI Advisor v2.1 (Enhanced) Initialized")
 
@@ -39,7 +38,7 @@ const KNOWLEDGE_BASE = {
   ]
 };
 
-serve(async (req: Request) => {
+Deno.serve(async (req: Request) => {
   const headers = getCorsHeaders(req);
 
   // Handle CORS preflight requests
@@ -99,7 +98,7 @@ serve(async (req: Request) => {
         result = await predictPrice(payload);
         break;
       case 'generate_smart_quotes':
-        result = await generateSmartQuotes(payload, openAiKey, supabase, userToken);
+        result = await generateSmartQuotes(payload, openAiKey, supabase, userToken, user.id);
         break;
       case 'lookup_codes':
         result = await lookupCodes(payload.query, payload.mode, supabase);
@@ -234,7 +233,7 @@ async function validateCompliance(payload: any) {
 
 // --- Main Generation Logic ---
 
-async function generateSmartQuotes(payload: any, apiKey: string | undefined, supabase: any, userToken?: string) {
+async function generateSmartQuotes(payload: any, apiKey: string | undefined, supabase: any, userToken?: string, userId?: string) {
     if (!apiKey) throw new Error("OpenAI API Key is required for Smart Quotes");
 
     const { 
@@ -394,6 +393,7 @@ Output JSON Format:
 }
 `;
 
+    const start = performance.now();
     const completion = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -426,33 +426,23 @@ Output JSON Format:
         response_payload: aiResponse
     });
 
-    // 6. Audit Log
-    await logAudit(supabase, 'generate_smart_quotes', payload, { 
-        options_count: aiResponse.options?.length, 
-        confidence: aiResponse.confidence_score 
-    }, userToken);
+    const latency = Math.round(performance.now() - start);
+    const inputSummary = JSON.stringify({ origin, destination, mode, commodity });
+    const { sanitized, redacted } = sanitizeForLLM(inputSummary);
+    await logAiCall(supabase, {
+      user_id: userId ?? null,
+      function_name: "ai-advisor.generate_smart_quotes",
+      model_used: "gpt-4o",
+      latency_ms: latency,
+      pii_detected: redacted.length > 0,
+      pii_fields_redacted: redacted,
+      output_summary: { options_count: aiResponse.options?.length, confidence: aiResponse.confidence_score }
+    });
 
     return aiResponse;
 }
 
-async function logAudit(supabase: any, action: string, payload: any, resultSummary: any, userToken?: string) {
-    try {
-        let userId = null;
-        if (userToken) {
-             const { data: { user } } = await supabase.auth.getUser(userToken);
-             userId = user?.id;
-        }
-        await supabase.from('quote_audit_logs').insert({
-            user_id: userId, // Can be null if anon
-            action,
-            payload: { ...payload, sensitive_data_redacted: true }, // Simple redaction placeholder
-            result_summary: resultSummary
-        });
-    } catch (e) {
-        console.warn("Audit log failed:", e);
-        // Don't fail the request if logging fails
-    }
-}
+ 
 
 function applyDynamicPricing(response: any) {
     const fuelSurchargeRate = 0.12; // Mock 12% global fuel surcharge
