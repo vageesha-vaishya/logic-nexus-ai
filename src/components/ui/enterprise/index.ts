@@ -9,3 +9,6 @@ export type { EnterpriseModalProps } from './EnterpriseModal';
 
 export { EnterpriseHeader } from './EnterpriseHeader';
 export type { EnterpriseHeaderProps } from './EnterpriseHeader';
+
+export { EnterpriseButton } from './EnterpriseButton';
+export type { EnterpriseButtonProps } from './EnterpriseButton';
