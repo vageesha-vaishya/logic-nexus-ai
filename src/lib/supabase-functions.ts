@@ -38,14 +38,19 @@ export async function invokeAnonymous<T = any>(functionName: string, body: any):
     }
 
     try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
+
         const response = await fetch(functionUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${supabaseAnonKey}`
             },
-            body: JSON.stringify(enrichPayload(body))
+            body: JSON.stringify(enrichPayload(body)),
+            signal: controller.signal
         });
+        clearTimeout(timeoutId);
 
         if (!response.ok) {
             const text = await response.text();
@@ -160,25 +165,36 @@ export async function invokeFunction<T = any>(
                 functionUrl = `${projectUrl}/functions/v1/${functionName}`;
             }
             
-            const response = await fetch(functionUrl, {
-                method: options.method || 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`,
-                    ...(options.headers || {})
-                },
-                body: options.body ? JSON.stringify(options.body) : undefined
-            });
-            
-            if (!response.ok) {
-                const text = await response.text();
-                let errorData;
-                try { errorData = JSON.parse(text); } catch { errorData = { message: text }; }
-                return { data: null, error: new Error(errorData.message || `Function returned ${response.status}`) };
+            // Add 30s timeout
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+            try {
+              const response = await fetch(functionUrl, {
+                  method: options.method || 'POST',
+                  headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${token}`,
+                      ...(options.headers || {})
+                  },
+                  body: options.body ? JSON.stringify(options.body) : undefined,
+                  signal: controller.signal
+              });
+              clearTimeout(timeoutId);
+              
+              if (!response.ok) {
+                  const text = await response.text();
+                  let errorData;
+                  try { errorData = JSON.parse(text); } catch { errorData = { message: text }; }
+                  return { data: null, error: new Error(errorData.message || `Function returned ${response.status}`) };
+              }
+              
+              const data = await response.json();
+              return { data, error: null };
+            } catch (err: any) {
+              clearTimeout(timeoutId);
+              throw err;
             }
-            
-            const data = await response.json();
-            return { data, error: null };
         } catch (manualError: any) {
              console.error(`[Supabase Function] Manual fetch fallback failed:`, manualError);
              // Enhance the original error message
