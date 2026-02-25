@@ -1,86 +1,115 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { DashboardRouter } from '../DashboardRouter';
-import * as useCRMModule from '@/hooks/useCRM';
+import * as crmHooks from '@/hooks/useCRM';
 
+// Mock dependencies
+vi.mock('@/hooks/useCRM');
 vi.mock('@/components/layout/DashboardLayout', () => ({
-  DashboardLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  DashboardLayout: ({ children }: any) => <div>{children}</div>,
 }));
-
 vi.mock('../DashboardTemplateLoader', () => ({
-  DashboardTemplateLoader: ({ userRole }: { userRole: string }) => (
-    <div data-testid="template-loader">Template Loader: {userRole}</div>
-  ),
+  DashboardTemplateLoader: ({ userRole }: any) => <div>Role: {userRole}</div>,
 }));
 
-describe('DashboardRouter Component', () => {
+describe('DashboardRouter', () => {
   beforeEach(() => {
-    vi.spyOn(useCRMModule, 'useCRM').mockReturnValue({
-      context: { user: { id: 'test-user-1' } },
-      scopedDb: {} as any,
-    } as any);
+    vi.clearAllMocks();
   });
 
-  it('renders loading state initially', () => {
-    render(<DashboardRouter />);
-    // The loading state should render before layout loads
-    // Check that flex-1 container exists
-    expect(document.querySelector('.flex-1')).toBeInTheDocument();
-  });
+  it('should fetch dashboard_role from profiles table', async () => {
+    const mockScopedDb = {
+      from: vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            single: vi.fn().mockResolvedValue({
+              data: { dashboard_role: 'crm_sales_manager' },
+              error: null,
+            }),
+          }),
+        }),
+      }),
+    };
 
-  it('renders dashboard template loader after loading', async () => {
-    const { container } = render(<DashboardRouter />);
-
-    // Wait a bit for the effect to run
-    await new Promise(resolve => setTimeout(resolve, 50));
-
-    const templateLoader = screen.queryByTestId('template-loader');
-    expect(templateLoader).toBeInTheDocument();
-  });
-
-  it('uses default role crm_sales_rep', async () => {
-    render(<DashboardRouter />);
-
-    // Wait for state to update
-    await new Promise(resolve => setTimeout(resolve, 50));
-
-    const templateLoader = screen.queryByTestId('template-loader');
-    expect(templateLoader?.textContent).toContain('crm_sales_rep');
-  });
-
-  it('shows error message when userRole cannot be determined', () => {
-    // Mock a scenario where no context available after loading
-    vi.spyOn(useCRMModule, 'useCRM').mockReturnValue({
-      context: null,
-      scopedDb: {} as any,
-    } as any);
-
-    const { rerender } = render(<DashboardRouter />);
-
-    // Rerender to trigger effect again
-    rerender(<DashboardRouter />);
-  });
-
-  it('passes correct userId to template loader', async () => {
-    render(<DashboardRouter />);
-
-    // Wait for loading to complete
-    await new Promise(resolve => setTimeout(resolve, 50));
-
-    const templateLoader = screen.queryByTestId('template-loader');
-    expect(templateLoader).toBeInTheDocument();
-  });
-
-  it('handles missing user id gracefully', async () => {
-    vi.spyOn(useCRMModule, 'useCRM').mockReturnValue({
-      context: { user: null },
-      scopedDb: {} as any,
+    vi.mocked(crmHooks.useCRM).mockReturnValue({
+      context: { user: { id: 'user-123' } },
+      user: { id: 'user-123' },
+      scopedDb: mockScopedDb,
+      supabase: {} as any,
+      preferences: {},
+      setScopePreference: vi.fn(),
+      setAdminOverride: vi.fn(),
     } as any);
 
     render(<DashboardRouter />);
 
-    // Should still render without errors
-    await new Promise(resolve => setTimeout(resolve, 50));
-    expect(document.querySelector('.flex-1')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('Role: crm_sales_manager')).toBeInTheDocument();
+    });
+  });
+
+  it('should map auth roles to dashboard roles if dashboard_role not found', async () => {
+    const mockScopedDb = {
+      from: vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            single: vi.fn().mockResolvedValue({
+              data: { dashboard_role: null },
+              error: null,
+            }),
+          }),
+        }),
+      }),
+    };
+
+    vi.mocked(crmHooks.useCRM).mockReturnValue({
+      context: {
+        user: { id: 'user-123' },
+        isTenantAdmin: true,
+      },
+      user: { id: 'user-123' },
+      scopedDb: mockScopedDb,
+      supabase: {} as any,
+      preferences: {},
+      setScopePreference: vi.fn(),
+      setAdminOverride: vi.fn(),
+    } as any);
+
+    render(<DashboardRouter />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Role: crm_sales_manager')).toBeInTheDocument();
+    });
+  });
+
+  it('should default to crm_sales_rep if no role found', async () => {
+    const mockScopedDb = {
+      from: vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            single: vi.fn().mockResolvedValue({
+              data: null,
+              error: new Error('Not found'),
+            }),
+          }),
+        }),
+      }),
+    };
+
+    vi.mocked(crmHooks.useCRM).mockReturnValue({
+      context: { user: { id: 'user-123' } },
+      user: { id: 'user-123' },
+      scopedDb: mockScopedDb,
+      supabase: {} as any,
+      preferences: {},
+      setScopePreference: vi.fn(),
+      setAdminOverride: vi.fn(),
+    } as any);
+
+    render(<DashboardRouter />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Role: crm_sales_rep')).toBeInTheDocument();
+    });
   });
 });
