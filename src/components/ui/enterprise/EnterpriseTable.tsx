@@ -14,15 +14,18 @@ export interface Column<T> {
 export interface EnterpriseTableProps<T extends Record<string, any>> {
   columns: Column<T>[];
   data: T[];
-  loading?: boolean;
-  empty?: boolean;
-  emptyContent?: React.ReactNode;
-  onRowClick?: (row: T) => void;
+  rowKey?: (row: T, index: number) => string | number;
+  onRowClick?: (row: T, index: number) => void;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+  onSort?: (key: string, order: 'asc' | 'desc') => void;
+  isLoading?: boolean;
+  emptyState?: React.ReactNode;
   rowClassName?: string;
+  className?: string;
   headerClassName?: string;
-  bodyClassName?: string;
   striped?: boolean;
-  keyExtractor?: (row: T, index: number) => string | number;
+  hover?: boolean;
 }
 
 type SortDirection = 'asc' | 'desc' | null;
@@ -30,85 +33,111 @@ type SortDirection = 'asc' | 'desc' | null;
 export function EnterpriseTable<T extends Record<string, any>>({
   columns,
   data,
-  loading = false,
-  empty = false,
-  emptyContent,
+  rowKey,
   onRowClick,
+  sortBy,
+  sortOrder = 'asc',
+  onSort,
+  isLoading = false,
+  emptyState,
   rowClassName,
+  className,
   headerClassName,
-  bodyClassName,
   striped = true,
-  keyExtractor,
+  hover = true,
 }: EnterpriseTableProps<T>) {
-  const [sortConfig, setSortConfig] = useState<{
+  const [internalSortConfig, setInternalSortConfig] = useState<{
     column: keyof T;
     direction: SortDirection;
   } | null>(null);
 
+  const isControlledSort = !!(sortBy && onSort);
+
+  // Use controlled sort if provided, otherwise use internal state
+  const currentSortConfig = isControlledSort
+    ? sortBy
+      ? {
+          column: sortBy as keyof T,
+          direction: sortOrder as SortDirection,
+        }
+      : null
+    : internalSortConfig;
+
   const sortedData = useMemo(() => {
-    if (!sortConfig) return data;
+    if (!currentSortConfig) return data;
 
     const sorted = [...data].sort((a, b) => {
-      const aVal = a[sortConfig.column];
-      const bVal = b[sortConfig.column];
+      const aVal = a[currentSortConfig.column];
+      const bVal = b[currentSortConfig.column];
 
       if (aVal == null && bVal == null) return 0;
       if (aVal == null) return 1;
       if (bVal == null) return -1;
 
       if (typeof aVal === 'string' && typeof bVal === 'string') {
-        return sortConfig.direction === 'asc'
+        return currentSortConfig.direction === 'asc'
           ? aVal.localeCompare(bVal)
           : bVal.localeCompare(aVal);
       }
 
       if (typeof aVal === 'number' && typeof bVal === 'number') {
-        return sortConfig.direction === 'asc' ? aVal - bVal : bVal - aVal;
+        return currentSortConfig.direction === 'asc'
+          ? aVal - bVal
+          : bVal - aVal;
       }
 
       return 0;
     });
 
     return sorted;
-  }, [data, sortConfig]);
+  }, [data, currentSortConfig]);
 
   const handleSort = (column: Column<T>) => {
     if (!column.sortable) return;
 
-    setSortConfig((prev) => {
-      if (prev?.column !== column.key) {
-        return { column: column.key, direction: 'asc' };
-      }
+    if (isControlledSort && onSort) {
+      // Controlled sort: call the parent handler
+      const currentDirection = sortBy === String(column.key) ? sortOrder : 'asc';
+      const newDirection: 'asc' | 'desc' =
+        currentDirection === 'asc' ? 'desc' : 'asc';
+      onSort(String(column.key), newDirection);
+    } else {
+      // Uncontrolled sort: update internal state
+      setInternalSortConfig((prev) => {
+        if (prev?.column !== column.key) {
+          return { column: column.key, direction: 'asc' };
+        }
 
-      if (prev.direction === 'asc') {
-        return { column: column.key, direction: 'desc' };
-      }
+        if (prev.direction === 'asc') {
+          return { column: column.key, direction: 'desc' };
+        }
 
-      return null;
-    });
+        return null;
+      });
+    }
   };
 
   const getSortIcon = (column: Column<T>) => {
     if (!column.sortable) return null;
 
-    if (sortConfig?.column !== column.key) {
+    if (currentSortConfig?.column !== column.key) {
       return <ChevronsUpDown className="h-4 w-4 text-gray-400" />;
     }
 
-    if (sortConfig.direction === 'asc') {
+    if (currentSortConfig.direction === 'asc') {
       return <ChevronUp className="h-4 w-4 text-[#714B67]" />;
     }
 
-    if (sortConfig.direction === 'desc') {
+    if (currentSortConfig.direction === 'desc') {
       return <ChevronDown className="h-4 w-4 text-[#714B67]" />;
     }
 
     return <ChevronsUpDown className="h-4 w-4 text-gray-400" />;
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
-      <div className="border border-gray-200 rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.05)]">
+      <div className={cn('border border-gray-200 rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.05)]', className)}>
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
@@ -144,11 +173,11 @@ export function EnterpriseTable<T extends Record<string, any>>({
     );
   }
 
-  if (empty || data.length === 0) {
+  if (data.length === 0) {
     return (
-      <div className="border border-gray-200 rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.05)] p-8">
+      <div className={cn('border border-gray-200 rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.05)] p-8', className)}>
         <div className="text-center text-muted-foreground">
-          {emptyContent || (
+          {emptyState || (
             <>
               <p className="text-sm text-gray-500">No data available</p>
             </>
@@ -159,7 +188,7 @@ export function EnterpriseTable<T extends Record<string, any>>({
   }
 
   return (
-    <div className="border border-gray-200 rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.05)] overflow-hidden">
+    <div className={cn('border border-gray-200 rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.05)] overflow-hidden', className)}>
       <table className="w-full">
         <thead className={cn('bg-gray-50 border-b border-gray-200', headerClassName)}>
           <tr>
@@ -181,16 +210,17 @@ export function EnterpriseTable<T extends Record<string, any>>({
             ))}
           </tr>
         </thead>
-        <tbody className={bodyClassName}>
+        <tbody>
           {sortedData.map((row, index) => (
             <tr
-              key={keyExtractor ? keyExtractor(row, index) : index}
-              onClick={() => onRowClick?.(row)}
+              key={rowKey ? rowKey(row, index) : index}
+              onClick={() => onRowClick?.(row, index)}
               className={cn(
                 'border-b border-gray-200 transition-colors',
                 striped && index % 2 === 1 && 'bg-gray-50',
-                onRowClick && 'cursor-pointer hover:bg-gray-100',
-                !onRowClick && 'bg-white',
+                hover && 'hover:bg-gray-100',
+                onRowClick && 'cursor-pointer',
+                !striped && !hover && 'bg-white',
                 rowClassName
               )}
             >
