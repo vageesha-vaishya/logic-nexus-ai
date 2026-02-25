@@ -2,24 +2,32 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { AccountForm } from '@/components/crm/AccountForm';
 import { EmailClient } from "@/components/email/EmailClient";
-import { EmailHistoryPanel } from '@/components/email/EmailHistoryPanel'; // Keep if needed or remove
-import { ArrowLeft, Edit, Trash2, Building2, Phone, Mail, Globe, DollarSign, Users } from 'lucide-react';
+import { Trash2, Building2, Phone, Mail, Globe, DollarSign, Users } from 'lucide-react';
 import { invokeFunction } from '@/lib/supabase-functions';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { DetailScreenTemplate } from '@/components/system/DetailScreenTemplate';
+import {
+  EnterpriseSheet,
+  EnterpriseField,
+  EnterpriseStatButton,
+  EnterpriseFormLayout,
+  EnterpriseNotebook,
+  EnterpriseTab,
+  EnterpriseActivityFeed,
+  EnterpriseTable,
+  EnterpriseCard,
+  type Column,
+} from '@/components/ui/enterprise';
 
-export default function AccountDetail() {
+export default function AccountDetailLegacy() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { supabase, context, scopedDb } = useCRM();
+  const { context, scopedDb } = useCRM();
   const [account, setAccount] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
@@ -262,6 +270,46 @@ export default function AccountDetail() {
     }
   };
 
+  // Calculate stats
+  const totalOppValue = relatedOpps.reduce((sum, opp) => sum + (opp.amount || 0), 0);
+
+  // Define columns for related contacts table
+  const contactColumns: Column<any>[] = [
+    { key: 'first_name', label: 'First Name', width: '150px' },
+    { key: 'last_name', label: 'Last Name', width: '150px' },
+    { key: 'email', label: 'Email', width: '200px' },
+    { key: 'phone', label: 'Phone', width: '150px' },
+  ];
+
+  // Define columns for child accounts table
+  const childAccountColumns: Column<any>[] = [
+    { key: 'name', label: 'Name', width: '200px' },
+    { key: 'account_type', label: 'Type', width: '120px' },
+    { key: 'status', label: 'Status', width: '120px', render: (value) => <Badge>{value}</Badge> },
+  ];
+
+  // Define columns for opportunities table
+  const opportunityColumns: Column<any>[] = [
+    { key: 'name', label: 'Opportunity', width: '200px' },
+    { key: 'stage', label: 'Stage', width: '120px', render: (value) => <Badge>{value}</Badge> },
+    { key: 'amount', label: 'Amount', width: '150px', render: (value) => `$${value?.toLocaleString() || '0.00'}` },
+  ];
+
+  // Define columns for activities table
+  const activityColumns: Column<any>[] = [
+    { key: 'subject', label: 'Subject', width: '200px' },
+    { key: 'activity_type', label: 'Type', width: '120px', render: (value) => <Badge variant="outline">{value}</Badge> },
+    { key: 'status', label: 'Status', width: '120px', render: (value) => <Badge variant="secondary">{value?.replace(/_/g, ' ')}</Badge> },
+    { key: 'due_date', label: 'Due Date', width: '150px', render: (value) => value ? format(new Date(value), 'PPP') : 'No due date' },
+  ];
+
+  // Define columns for relationships table
+  const relationshipColumns: Column<any>[] = [
+    { key: 'to_account.name', label: 'Account', width: '200px', render: (value, row) => row.to_account?.name || '-' },
+    { key: 'relationship_type', label: 'Type', width: '150px', render: (value) => <Badge variant="outline">{value?.replace(/_/g, ' ')}</Badge> },
+    { key: 'notes', label: 'Notes', width: '250px', render: (value) => value || '-' },
+  ];
+
   if (loading) {
     return (
       <DashboardLayout>
@@ -286,182 +334,211 @@ export default function AccountDetail() {
   }
 
   return (
-    <DashboardLayout>
-      <DetailScreenTemplate
+    <div className="h-screen w-full bg-[#f9fafb] overflow-hidden">
+      <EnterpriseFormLayout
         title={account.name}
         breadcrumbs={[
-          { label: 'Dashboard', to: '/dashboard' },
           { label: 'Accounts', to: '/dashboard/accounts' },
           { label: account.name },
         ]}
-        subtitle={
-          <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-            {account.industry && (
-              <span className="inline-flex items-center gap-1">
-                <Building2 className="h-4 w-4" />
-                {account.industry}
-              </span>
-            )}
-            {account.website && (
-              <a 
-                href={account.website.startsWith('http') ? account.website : `https://${account.website}`}
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-primary hover:underline"
-              >
-                <Globe className="h-4 w-4" />
-                {account.website}
-              </a>
-            )}
-            {account.phone && (
-              <span className="inline-flex items-center gap-1">
-                <Phone className="h-4 w-4" />
-                {account.phone}
-              </span>
-            )}
-          </div>
-        }
+        status={account.status}
         actions={
-          <div className="flex items-center gap-2">
-            {!isEditing && (
-              <>
-                <Button variant="default" onClick={handleEnrich} disabled={isEnriching}>
-                  {isEnriching ? 'Enriching…' : 'Enrich'}
-                </Button>
-                <Button variant="outline" onClick={() => setIsEditing(true)}>
-                  <Edit className="mr-2 h-4 w-4" />
-                  Edit
-                </Button>
-                <Button variant="destructive" onClick={() => setShowDeleteDialog(true)}>
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Delete
-                </Button>
-              </>
-            )}
-          </div>
+          !isEditing && (
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                className="h-8 border-[#714B67] text-[#714B67] hover:bg-[#714B67]/10"
+                onClick={() => setIsEditing(true)}
+              >
+                Edit
+              </Button>
+              <Button
+                variant="outline"
+                className="h-8 text-gray-600"
+                onClick={handleEnrich}
+                disabled={isEnriching}
+              >
+                {isEnriching ? 'Enriching…' : 'Enrich'}
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-gray-500"
+                onClick={() => setShowDeleteDialog(true)}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          )
         }
       >
+        {/* Main Sheet */}
+        <EnterpriseSheet
+          smartButtons={
+            !isEditing && (
+              <>
+                <EnterpriseStatButton
+                  icon={<DollarSign className="h-5 w-5" />}
+                  label="Opportunity"
+                  value={relatedOpps.length}
+                />
+                <EnterpriseStatButton
+                  icon={<Users className="h-5 w-5" />}
+                  label="Contacts"
+                  value={relatedContacts.length}
+                />
+              </>
+            )
+          }
+          header={
+            !isEditing && (
+              <div className="flex flex-col md:flex-row gap-6 w-full">
+                {/* Logo / Image */}
+                <div className="w-24 h-24 bg-muted rounded-sm flex items-center justify-center border shadow-sm shrink-0">
+                  {account.logo_url ? (
+                    <img src={account.logo_url} alt="Logo" className="w-full h-full object-contain" />
+                  ) : (
+                    <Building2 className="h-10 w-10 text-muted-foreground/50" />
+                  )}
+                </div>
 
-        {isEditing ? (
-          <Card>
-            <CardHeader>
-              <CardTitle>Edit Account</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <AccountForm
-                initialData={account}
-                onSubmit={handleUpdate}
-                onCancel={() => setIsEditing(false)}
-              />
-            </CardContent>
-          </Card>
-        ) : (
-          <Tabs value={tab} onValueChange={(v) => setTab(v as 'details' | 'related' | 'activities' | 'emails')} key={id}>
-            <TabsList>
-              <TabsTrigger value="details">Details</TabsTrigger>
-              <TabsTrigger value="related">Related</TabsTrigger>
-              <TabsTrigger value="activities">Activities</TabsTrigger>
-              <TabsTrigger value="emails">Emails</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="details">
-              <div className="grid gap-6 md:grid-cols-2">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Building2 className="h-5 w-5" />
-                      Basic Information
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {parentAccount && (
-                      <div className="p-3 bg-muted rounded-lg">
-                        <p className="text-sm font-medium text-muted-foreground">Parent Account</p>
-                        <Button
-                          variant="link"
-                          className="p-0 h-auto text-primary"
-                          onClick={() => navigate(`/dashboard/accounts/${parentAccount.id}`)}
-                        >
-                          {parentAccount.name}
-                        </Button>
+                <div className="flex-1 flex flex-col gap-4">
+                  {/* Title Section */}
+                  <div>
+                    <div className="flex items-center gap-6 mb-2">
+                      <div className="flex items-center gap-2">
+                        <input type="radio" checked={account.account_type !== 'individual'} readOnly className="accent-[#714B67] h-4 w-4" />
+                        <span className="text-sm font-semibold text-gray-700">Company</span>
                       </div>
-                    )}
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Type</p>
-                      <Badge className="mt-1">{account.account_type}</Badge>
+                      <div className="flex items-center gap-2">
+                        <input type="radio" checked={account.account_type === 'individual'} readOnly className="accent-[#714B67] h-4 w-4" />
+                        <span className="text-sm font-semibold text-gray-700">Individual</span>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Status</p>
-                      <Badge className="mt-1">{account.status}</Badge>
+                    <h1 className="text-3xl font-bold text-gray-900">{account.name}</h1>
+                  </div>
+
+                  {/* Address & Metadata Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4 mt-2">
+                    {/* Left Column: Address/Contact */}
+                    <div className="space-y-4">
+                      <div className="text-[13px] text-gray-900 font-normal leading-relaxed">
+                        <div className="flex gap-8 mb-1">
+                          <span className="font-bold min-w-[60px]">Address</span>
+                          <div className="flex flex-col">
+                            <span>{account.billing_street || 'Street...'}</span>
+                            <span>{account.billing_city} {account.billing_state} {account.billing_postal_code}</span>
+                            <span>{account.billing_country || 'United States'}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {account.email && (
+                        <div className="flex items-center gap-2 text-[13px]">
+                          <Mail className="h-3.5 w-3.5 text-gray-500" />
+                          <a href={`mailto:${account.email}`} className="text-[#714B67] hover:underline font-medium">{account.email}</a>
+                        </div>
+                      )}
+                      {account.phone && (
+                        <div className="flex items-center gap-2 text-[13px]">
+                          <Phone className="h-3.5 w-3.5 text-gray-500" />
+                          <span className="text-gray-700">{account.phone}</span>
+                        </div>
+                      )}
                     </div>
-                    {account.industry && (
+
+                    {/* Right Column: Metadata */}
+                    <div className="space-y-1">
+                      <EnterpriseField label="Industry" value={account.industry || '-'} />
+                      <EnterpriseField label="Website" value={
+                        account.website ? (
+                          <a href={account.website} target="_blank" rel="noopener noreferrer" className="text-[#714B67] hover:underline">{account.website}</a>
+                        ) : '-'
+                      } />
+                      <EnterpriseField label="Tags" value={
+                        <div className="flex gap-1 flex-wrap">
+                          {account.account_type && <Badge variant="secondary" className="rounded-full px-2 font-normal bg-green-100 text-green-800 hover:bg-green-200">{account.account_type}</Badge>}
+                          {account.status && <Badge variant="outline" className="rounded-full px-2 font-normal">{account.status}</Badge>}
+                        </div>
+                      } />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )
+          }
+        >
+          {isEditing ? (
+            <AccountForm
+              initialData={account}
+              onSubmit={handleUpdate}
+              onCancel={() => setIsEditing(false)}
+            />
+          ) : (
+            <EnterpriseNotebook>
+              <EnterpriseTab label="Details" value="details">
+                <div className="space-y-6">
+                  {/* Basic Information */}
+                  <EnterpriseCard
+                    title="Basic Information"
+                    description="Account type and status"
+                  >
+                    <div className="space-y-4">
+                      {parentAccount && (
+                        <div className="p-3 bg-muted rounded-lg">
+                          <p className="text-sm font-medium text-muted-foreground">Parent Account</p>
+                          <Button
+                            variant="link"
+                            className="p-0 h-auto text-primary"
+                            onClick={() => navigate(`/dashboard/accounts/${parentAccount.id}`)}
+                          >
+                            {parentAccount.name}
+                          </Button>
+                        </div>
+                      )}
                       <div>
-                        <p className="text-sm font-medium text-muted-foreground">Industry</p>
-                        <p className="text-sm">{account.industry}</p>
+                        <p className="text-sm font-medium text-muted-foreground">Type</p>
+                        <Badge className="mt-1">{account.account_type}</Badge>
                       </div>
-                    )}
-                  </CardContent>
-                </Card>
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Status</p>
+                        <Badge className="mt-1">{account.status}</Badge>
+                      </div>
+                    </div>
+                  </EnterpriseCard>
 
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Contact Information</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {account.phone && (
-                      <div className="flex items-center gap-2">
-                        <Phone className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm">{account.phone}</span>
-                      </div>
-                    )}
-                    {account.email && (
-                      <div className="flex items-center gap-2">
-                        <Mail className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm">{account.email}</span>
-                      </div>
-                    )}
-                    {account.website && (
-                      <div className="flex items-center gap-2">
-                        <Globe className="h-4 w-4 text-muted-foreground" />
-                        <a href={account.website} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline">
-                          {account.website}
-                        </a>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Company Details</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {account.annual_revenue && (
-                      <div className="flex items-center gap-2">
-                        <DollarSign className="h-4 w-4 text-muted-foreground" />
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground">Annual Revenue</p>
-                          <p className="text-sm">${parseFloat(account.annual_revenue).toLocaleString()}</p>
+                  {/* Company Details */}
+                  <EnterpriseCard
+                    title="Company Details"
+                    description="Financial and operational information"
+                  >
+                    <div className="space-y-4">
+                      {account.annual_revenue && (
+                        <div className="flex items-center gap-2">
+                          <DollarSign className="h-4 w-4 text-muted-foreground" />
+                          <div>
+                            <p className="text-sm font-medium text-muted-foreground">Annual Revenue</p>
+                            <p className="text-sm">${parseFloat(account.annual_revenue).toLocaleString()}</p>
+                          </div>
                         </div>
-                      </div>
-                    )}
-                    {account.employee_count && (
-                      <div className="flex items-center gap-2">
-                        <Users className="h-4 w-4 text-muted-foreground" />
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground">Employees</p>
-                          <p className="text-sm">{account.employee_count}</p>
+                      )}
+                      {account.employee_count && (
+                        <div className="flex items-center gap-2">
+                          <Users className="h-4 w-4 text-muted-foreground" />
+                          <div>
+                            <p className="text-sm font-medium text-muted-foreground">Employees</p>
+                            <p className="text-sm">{account.employee_count}</p>
+                          </div>
                         </div>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
+                      )}
+                    </div>
+                  </EnterpriseCard>
 
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Segments</CardTitle>
-                  </CardHeader>
-                  <CardContent>
+                  {/* Segments */}
+                  <EnterpriseCard
+                    title="Segments"
+                    description={`${activeSegments.length} active segments`}
+                  >
                     {activeSegments.length > 0 ? (
                       <div className="flex flex-wrap gap-2">
                         {activeSegments.map((seg: any) => (
@@ -471,26 +548,24 @@ export default function AccountDetail() {
                     ) : (
                       <p className="text-sm text-muted-foreground">No active segments.</p>
                     )}
-                  </CardContent>
-                </Card>
+                  </EnterpriseCard>
 
-                {account.description && (
-                  <Card className="md:col-span-2">
-                    <CardHeader>
-                      <CardTitle>Description</CardTitle>
-                    </CardHeader>
-                    <CardContent>
+                  {/* Description */}
+                  {account.description && (
+                    <EnterpriseCard
+                      title="Description"
+                      description="Account notes and details"
+                    >
                       <p className="text-sm text-muted-foreground whitespace-pre-wrap">{account.description}</p>
-                    </CardContent>
-                  </Card>
-                )}
+                    </EnterpriseCard>
+                  )}
 
-                <Card className="md:col-span-2">
-                  <CardHeader>
-                    <CardTitle>Custom Fields</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {account.custom_fields && Object.keys(account.custom_fields).length > 0 ? (
+                  {/* Custom Fields */}
+                  {account.custom_fields && Object.keys(account.custom_fields).length > 0 && (
+                    <EnterpriseCard
+                      title="Custom Fields"
+                      description="Additional custom data"
+                    >
                       <div className="grid grid-cols-2 gap-4">
                         {Object.entries(account.custom_fields).map(([key, value]) => (
                           <div key={key}>
@@ -499,205 +574,138 @@ export default function AccountDetail() {
                           </div>
                         ))}
                       </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">No custom fields defined.</p>
-                    )}
-                  </CardContent>
-                </Card>
+                    </EnterpriseCard>
+                  )}
 
-                <Card className="md:col-span-2">
-                  <CardHeader>
-                    <CardTitle>Metadata</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2 text-sm text-muted-foreground">
-                    <div>Created: {format(new Date(account.created_at), 'PPpp')}</div>
-                    <div>Last Updated: {format(new Date(account.updated_at), 'PPpp')}</div>
-                  </CardContent>
-                </Card>
-              </div>
-            </TabsContent>
+                  {/* Metadata */}
+                  <EnterpriseCard
+                    title="Metadata"
+                    description="System timestamps"
+                  >
+                    <div className="space-y-2 text-sm text-muted-foreground">
+                      <div>Created: {format(new Date(account.created_at), 'PPpp')}</div>
+                      <div>Last Updated: {format(new Date(account.updated_at), 'PPpp')}</div>
+                    </div>
+                  </EnterpriseCard>
+                </div>
+              </EnterpriseTab>
 
-            <TabsContent value="related">
-              <div className="grid gap-6 md:grid-cols-2">
-                {childAccounts.length > 0 && (
-                  <Card className="md:col-span-2">
-                    <CardHeader>
-                      <CardTitle>Child Accounts</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-2">
-                        {childAccounts.map((child) => (
-                          <div key={child.id} className="flex items-center justify-between p-2 hover:bg-muted rounded-lg">
-                            <div>
-                              <p className="font-medium">{child.name}</p>
-                              <p className="text-sm text-muted-foreground">
-                                {child.account_type} • {child.status}
-                              </p>
-                            </div>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => navigate(`/dashboard/accounts/${child.id}`)}
-                            >
-                              View
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
+              <EnterpriseTab label="Related" value="related">
+                <div className="space-y-6">
+                  {/* Parent and Child Accounts */}
+                  {childAccounts.length > 0 && (
+                    <EnterpriseCard
+                      title="Child Accounts"
+                      description={`${childAccounts.length} subsidiary accounts`}
+                    >
+                      <EnterpriseTable
+                        columns={childAccountColumns}
+                        data={childAccounts}
+                        rowKey={(row) => row.id}
+                        onRowClick={(row) => navigate(`/dashboard/accounts/${row.id}`)}
+                        emptyState={<p className="text-center py-8 text-muted-foreground">No child accounts.</p>}
+                      />
+                    </EnterpriseCard>
+                  )}
 
-                <Card className="md:col-span-2">
-                  <CardHeader>
-                    <CardTitle>Duplicates</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground">We found no potential duplicates of this Account.</p>
-                  </CardContent>
-                </Card>
-
-                <Card className="md:col-span-2">
-                  <CardHeader>
-                    <CardTitle>Relationships</CardTitle>
-                  </CardHeader>
-                  <CardContent>
+                  {/* Relationships */}
+                  <EnterpriseCard
+                    title="Relationships"
+                    description={`${relationships.length} defined relationships`}
+                  >
                     {relationships.length > 0 ? (
-                      <div className="space-y-4">
-                        {relationships.map((rel: any) => (
-                          <div key={rel.id} className="flex items-center justify-between p-3 border rounded-lg">
-                            <div>
-                              <p className="font-medium">{rel.to_account?.name}</p>
-                              <Badge variant="outline" className="mt-1 capitalize">
-                                {rel.relationship_type.replace(/_/g, ' ')}
-                              </Badge>
-                              {rel.notes && <p className="text-sm text-muted-foreground mt-1">{rel.notes}</p>}
-                            </div>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => navigate(`/dashboard/accounts/${rel.to_account?.id}`)}
-                            >
-                              View
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
+                      <EnterpriseTable
+                        columns={relationshipColumns}
+                        data={relationships}
+                        rowKey={(row) => row.id}
+                        onRowClick={(row) => navigate(`/dashboard/accounts/${row.to_account?.id}`)}
+                        emptyState={<p className="text-center py-8 text-muted-foreground">No relationships.</p>}
+                      />
                     ) : (
                       <p className="text-sm text-muted-foreground">No defined relationships.</p>
                     )}
-                  </CardContent>
-                </Card>
+                  </EnterpriseCard>
+                </div>
+              </EnterpriseTab>
 
-                <Card>
-                  <CardHeader className="flex items-center justify-between">
-                    <CardTitle>Contacts</CardTitle>
-                    <Button size="sm" onClick={() => navigate('/dashboard/contacts/new')}>New</Button>
-                  </CardHeader>
-                  <CardContent>
-                    {relatedContacts.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">No contacts yet</p>
-                    ) : (
-                      <div className="space-y-2">
-                        {relatedContacts.map((c) => (
-                          <div key={c.id} className="flex items-center justify-between">
-                            <div>
-                              <p className="font-medium">{c.first_name} {c.last_name}</p>
-                              <p className="text-sm text-muted-foreground">{c.email || c.phone || '-'}</p>
-                            </div>
-                            <Button variant="ghost" size="sm" onClick={() => navigate(`/dashboard/contacts/${c.id}`)}>View</Button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
+              <EnterpriseTab label="Contacts" value="contacts">
+                <EnterpriseCard
+                  title="Related Contacts"
+                  description={`${relatedContacts.length} contacts`}
+                >
+                  <EnterpriseTable
+                    columns={contactColumns}
+                    data={relatedContacts}
+                    rowKey={(row) => row.id}
+                    onRowClick={(row) => navigate(`/dashboard/contacts/${row.id}`)}
+                    emptyState={<p className="text-center py-8 text-muted-foreground">No contacts yet. <Button variant="link" onClick={() => navigate('/dashboard/contacts/new')} className="p-0">Create one</Button></p>}
+                  />
+                </EnterpriseCard>
+              </EnterpriseTab>
 
-                <Card>
-                  <CardHeader className="flex items-center justify-between">
-                    <CardTitle>Opportunities</CardTitle>
-                    <Button size="sm" onClick={() => navigate('/dashboard/opportunities/new')}>New</Button>
-                  </CardHeader>
-                  <CardContent>
-                    {relatedOpps.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">No opportunities yet</p>
-                    ) : (
-                      <div className="space-y-2">
-                        {relatedOpps.map((o) => (
-                          <div key={o.id} className="flex items-center justify-between">
-                            <div>
-                              <p className="font-medium">{o.name}</p>
-                              <p className="text-sm text-muted-foreground">Stage: {o.stage} • Amount: {o.amount ?? '-'} • Close: {o.close_date ? new Date(o.close_date).toLocaleDateString() : '-'}</p>
-                            </div>
-                            <Button variant="ghost" size="sm" onClick={() => navigate(`/dashboard/opportunities/${o.id}`)}>View</Button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
-            </TabsContent>
+              <EnterpriseTab label="Opportunities" value="opportunities">
+                <EnterpriseCard
+                  title="Opportunities"
+                  description={`${relatedOpps.length} opportunities · $${totalOppValue.toLocaleString()}`}
+                >
+                  <EnterpriseTable
+                    columns={opportunityColumns}
+                    data={relatedOpps}
+                    rowKey={(row) => row.id}
+                    onRowClick={(row) => navigate(`/dashboard/opportunities/${row.id}`)}
+                    emptyState={<p className="text-center py-8 text-muted-foreground">No opportunities yet. <Button variant="link" onClick={() => navigate('/dashboard/opportunities/new')} className="p-0">Create one</Button></p>}
+                  />
+                </EnterpriseCard>
+              </EnterpriseTab>
 
-            <TabsContent value="activities">
-              <Card>
-                <CardHeader className="flex items-center justify-between">
-                  <CardTitle>Activities</CardTitle>
-                  <Button size="sm" onClick={() => navigate(`/dashboard/activities/new?accountId=${id}`)}>New Activity</Button>
-                </CardHeader>
-                <CardContent>
+              <EnterpriseTab label="Activities" value="activities">
+                <EnterpriseCard
+                  title="Activities"
+                  description={`${activities.length} recorded activities`}
+                >
                   {activities.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No activities recorded yet.</p>
+                    <p className="text-sm text-muted-foreground">No activities recorded yet. <Button variant="link" onClick={() => navigate(`/dashboard/activities/new?accountId=${id}`)} className="p-0">Create one</Button></p>
                   ) : (
-                    <div className="space-y-4">
-                      {activities.map((activity) => (
-                        <div key={activity.id} className="flex items-start justify-between p-3 border rounded-lg hover:bg-muted/50 cursor-pointer" onClick={() => navigate(`/dashboard/activities/${activity.id}`)}>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <p className="font-medium">{activity.subject}</p>
-                              <Badge variant="outline" className="text-xs capitalize">{activity.activity_type}</Badge>
-                              <Badge variant="secondary" className="text-xs capitalize">{activity.status.replace(/_/g, ' ')}</Badge>
-                            </div>
-                            <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{activity.description || 'No description'}</p>
-                            <p className="text-xs text-muted-foreground mt-2">
-                              Due: {activity.due_date ? format(new Date(activity.due_date), 'PPP') : 'No due date'}
-                            </p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                    <EnterpriseTable
+                      columns={activityColumns}
+                      data={activities}
+                      rowKey={(row) => row.id}
+                      onRowClick={(row) => navigate(`/dashboard/activities/${row.id}`)}
+                      emptyState={<p className="text-center py-8 text-muted-foreground">No activities recorded yet.</p>}
+                    />
                   )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-            <TabsContent value="emails">
-              <EmailClient 
-                emailAddress={account.email} 
-                entityType="account" 
-                entityId={account.id} 
-              />
-            </TabsContent>
-          </Tabs>
-        )}
+                </EnterpriseCard>
+              </EnterpriseTab>
 
-        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Delete Account</AlertDialogTitle>
-              <AlertDialogDescription>
-                Are you sure you want to delete this account? This action cannot be undone.
-                All related contacts and activities will also be affected.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                Delete
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </DetailScreenTemplate>
-    </DashboardLayout>
+              <EnterpriseTab label="Emails" value="emails">
+                <div className="min-h-[300px]">
+                  <EmailClient
+                    emailAddress={account.email}
+                    entityType="account"
+                    entityId={account.id}
+                  />
+                </div>
+              </EnterpriseTab>
+            </EnterpriseNotebook>
+          )}
+        </EnterpriseSheet>
+
+        {/* Activity Sidebar */}
+        <EnterpriseActivityFeed className="hidden xl:flex shrink-0 w-[400px]" />
+      </EnterpriseFormLayout>
+
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Account?</AlertDialogTitle>
+            <AlertDialogDescription>This action cannot be undone. All related contacts and activities will also be affected.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive">Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
   );
 }
