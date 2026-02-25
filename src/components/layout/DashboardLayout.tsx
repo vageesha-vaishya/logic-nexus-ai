@@ -48,7 +48,6 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       <AppSidebar />
       <div className="flex-1 flex flex-col">
         <header className="h-12 border-b flex items-center px-3 gap-3 bg-background sticky top-0 z-10">
-          <SidebarTrigger />
           <Button
             variant="ghost"
             size="icon"

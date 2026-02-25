@@ -24,15 +24,15 @@ export default defineConfig(({ mode }) => {
         },
       },
     },
-    headers: {
-      "Permissions-Policy": [
-        "browsing-topics=()",
-        "run-ad-auction=()",
-        "join-ad-interest-group=()",
-        "private-state-token-redemption=()",
-        "private-state-token-issuance=()"
-      ].join(", "),
-    },
+    // headers: {
+    //   "Permissions-Policy": [
+    //     "browsing-topics=()",
+    //     "run-ad-auction=()",
+    //     "join-ad-interest-group=()",
+    //     "private-state-token-redemption=()",
+    //     "private-state-token-issuance=()"
+    //   ].join(", "),
+    // },
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {
