@@ -27,20 +27,20 @@ export function SalesRepDashboard() {
   };
 
   const renderWidget = (widget: WidgetInstance) => {
-    // Map widget IDs to their components
-    switch (widget.id) {
-      case '1':
-        return <HeroMetrics />;
-      case '2':
+    // Map widget types to their components
+    switch (widget.type) {
+      case 'stats':
+        if (widget.id === '1') return <HeroMetrics />;
+        if (widget.id === '3') return <QuickActions />;
+        return <div>Unknown stats widget</div>;
+      case 'leads':
         return <MyActiveLeads />;
-      case '3':
-        return <QuickActions />;
-      case '4':
-        return <ActivityCalendar />;
-      case '5':
-        return <TodayActivityStream />;
+      case 'activities':
+        if (widget.id === '4') return <ActivityCalendar />;
+        if (widget.id === '5') return <TodayActivityStream />;
+        return <div>Unknown activities widget</div>;
       default:
-        return <div>Unknown widget: {widget.id}</div>;
+        return <div>Unknown widget type: {widget.type}</div>;
     }
   };
 

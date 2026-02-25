@@ -18,6 +18,7 @@ export function QuickActions() {
       <Button
         variant="outline"
         className="h-16 flex flex-col items-center justify-center gap-1"
+        onClick={() => console.log('Log Call - Feature coming soon')}
       >
         <Phone className="h-5 w-5" />
         <span className="text-xs">Log Call</span>
@@ -25,6 +26,7 @@ export function QuickActions() {
       <Button
         variant="outline"
         className="h-16 flex flex-col items-center justify-center gap-1"
+        onClick={() => console.log('Send Email - Feature coming soon')}
       >
         <MessageSquare className="h-5 w-5" />
         <span className="text-xs">Send Email</span>

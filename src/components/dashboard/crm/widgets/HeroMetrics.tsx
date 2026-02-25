@@ -26,13 +26,15 @@ export function HeroMetrics() {
           .from('activities')
           .select('*', { count: 'exact', head: true })
           .eq('type', 'call')
-          .gte('created_at', `${today}T00:00:00`);
+          .gte('created_at', `${today}T00:00:00`)
+          .lte('created_at', `${today}T23:59:59`);
 
         const { count: emailsCount } = await scopedDb
           .from('activities')
           .select('*', { count: 'exact', head: true })
           .eq('type', 'email')
-          .gte('created_at', `${today}T00:00:00`);
+          .gte('created_at', `${today}T00:00:00`)
+          .lte('created_at', `${today}T23:59:59`);
 
         setMetrics({
           todayActivities: activitiesCount || 0,
