@@ -168,10 +168,53 @@ export function EmailToLeadDialog({ open, onOpenChange, email, onSuccess }: Emai
         prompt = prompt.replace("<subject>", subject).replace("<content>", content);
 
         const requestId = `req_options_${Date.now()}`;
-        const { data, error } = await invokeFunction<any>('suggest-transport-mode', {
+        
+        // 1. Attempt Supabase Edge Function
+        let { data, error } = await invokeFunction<any>('suggest-transport-mode', {
           body: { prompt, requestId, responseFormat: 'json' },
           headers: { 'x-client-info': 'email-to-lead-options' },
         });
+
+        // 2. Fallback to Client-Side OpenAI if Supabase Function fails (Auth/Network/Server Error)
+        if (error) {
+             console.warn("[EmailToLead] Supabase Function failed. Attempting Client-Side OpenAI fallback...", error);
+             const clientSideKey = import.meta.env.VITE_OPENAI_API_KEY;
+             
+             // Only attempt if we have a key and it looks valid
+             if (clientSideKey && clientSideKey.startsWith('sk-')) {
+                 try {
+                     const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${clientSideKey}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            model: 'gpt-4o',
+                            messages: [
+                                { role: 'system', content: prompt }
+                            ],
+                            response_format: { type: "json_object" }
+                        })
+                     });
+
+                     if (response.ok) {
+                         const json = await response.json();
+                         const contentStr = json.choices[0].message.content;
+                         if (contentStr) {
+                             const parsed = JSON.parse(contentStr);
+                             data = parsed;
+                             error = null; // Clear error on success
+                             console.log("[EmailToLead] Client-Side OpenAI success.");
+                         }
+                     } else {
+                         console.error("[EmailToLead] Client-Side OpenAI failed:", response.status);
+                     }
+                 } catch (clientErr) {
+                     console.error("[EmailToLead] Client-Side OpenAI Exception:", clientErr);
+                 }
+             }
+        }
 
         if (error) {
           const raw = String((error as any)?.message || "");

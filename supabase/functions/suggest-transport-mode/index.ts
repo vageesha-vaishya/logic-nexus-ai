@@ -36,7 +36,8 @@ Deno.serve(async (req) => {
     // STRATEGY 1: Use Gemini if key exists
     if (geminiKey) {
         usedService = "Gemini";
-        const targetModel = model || 'gemini-2.5-flash';
+        // Use a valid model version. 1.5-flash is current standard.
+        const targetModel = model || 'gemini-1.5-flash';
         usedModel = targetModel;
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${geminiKey}`;
 
@@ -59,7 +60,8 @@ Deno.serve(async (req) => {
               const data = await response.json();
               text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
           } else {
-              console.error("Gemini API failed with status:", response.status);
+              const errorText = await response.text();
+              console.error(`Gemini API failed with status ${response.status}:`, errorText);
           }
         } catch (e) {
           console.error("Gemini API error:", e);
@@ -69,12 +71,13 @@ Deno.serve(async (req) => {
     // STRATEGY 2: Use OpenAI if Gemini failed/skipped and key exists
     if (!text && openAiKey) {
         usedService = "OpenAI";
-        const targetModel = 'gpt-4o-mini';
+        // Default to gpt-4o-mini for speed/cost, or gpt-4o for quality
+        const targetModel = model || 'gpt-4o-mini';
         usedModel = targetModel;
         try {
           const bodyPayload: any = {
               model: targetModel,
-              messages: [{ role: 'user', content: promptWithLang }],
+              messages: [{ role: 'system', content: "You are a helpful assistant." }, { role: 'user', content: promptWithLang }],
           };
 
           if (responseFormat === 'json') {
@@ -94,7 +97,8 @@ Deno.serve(async (req) => {
               const data = await response.json();
               text = data.choices?.[0]?.message?.content || '';
           } else {
-               console.error("OpenAI API failed with status:", response.status);
+              const errorText = await response.text();
+              console.error(`OpenAI API failed with status ${response.status}:`, errorText);
           }
         } catch (e) {
           console.error("OpenAI API error:", e);
