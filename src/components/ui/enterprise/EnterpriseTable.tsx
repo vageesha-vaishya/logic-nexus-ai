@@ -5,10 +5,12 @@ import { ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 export interface Column<T> {
   key: string;
   label: string;
+  width?: string;
   sortable?: boolean;
   render?: (value: any, row: T, index: number) => React.ReactNode;
   className?: string;
   headerClassName?: string;
+  cellClassName?: string;
 }
 
 export interface EnterpriseTableProps<T extends Record<string, any>> {
@@ -144,6 +146,7 @@ export function EnterpriseTable<T extends Record<string, any>>({
               {columns.map((col) => (
                 <th
                   key={String(col.key)}
+                  style={{ width: col.width }}
                   className={cn(
                     'px-6 py-3 text-left text-sm font-medium text-gray-900',
                     col.headerClassName
@@ -160,7 +163,10 @@ export function EnterpriseTable<T extends Record<string, any>>({
                 {columns.map((col) => (
                   <td
                     key={`${i}-${String(col.key)}`}
-                    className="px-6 py-3 text-sm"
+                    className={cn(
+                      'px-6 py-3 text-sm',
+                      col.cellClassName
+                    )}
                   >
                     <div className="h-4 bg-gray-200 rounded animate-pulse" />
                   </td>
@@ -195,6 +201,7 @@ export function EnterpriseTable<T extends Record<string, any>>({
             {columns.map((col) => (
               <th
                 key={String(col.key)}
+                style={{ width: col.width }}
                 onClick={() => handleSort(col)}
                 className={cn(
                   'px-6 py-3 text-left text-sm font-medium text-gray-900',
@@ -229,7 +236,8 @@ export function EnterpriseTable<T extends Record<string, any>>({
                   key={String(col.key)}
                   className={cn(
                     'px-6 py-3 text-sm text-gray-900',
-                    col.className
+                    col.className,
+                    col.cellClassName
                   )}
                 >
                   {col.render
