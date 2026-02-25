@@ -1,0 +1,1 @@
+import{r as o}from"./index-B2-qRKKC.js";import"./jsx-runtime-DF2Pcvd1.js";function c(t,[r,e]){return Math.min(e,Math.max(r,t))}var n=o.createContext(void 0);function s(t){const r=o.useContext(n);return t||r||"ltr"}export{c,s as u};

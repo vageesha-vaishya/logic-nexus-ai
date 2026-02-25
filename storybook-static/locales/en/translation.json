@@ -1,0 +1,103 @@
+{
+  "leads": {
+    "title": "Leads Workspace",
+    "subtitle": "Focus on pipeline and active contacts",
+    "kpi": {
+      "totalLeads": "Total Leads",
+      "wonDeals": "Won Deals",
+      "contacted": "Contacted",
+      "highScore": "High Score"
+    },
+    "actions": {
+      "newLead": "New Lead",
+      "refresh": "Refresh",
+      "listView": "List View",
+      "pipelineView": "Pipeline View",
+      "setDefault": "Set as Default",
+      "cancel": "Cancel",
+      "delete": "Delete"
+    },
+    "filters": {
+      "search": "Search leads...",
+      "status": "Status",
+      "score": "Score",
+      "owner": "Owner",
+      "allStatuses": "All Statuses",
+      "allScores": "All Scores",
+      "anyOwner": "Any Owner",
+      "nameOp": "Name op",
+      "name": "Name",
+      "scoreMin": "Score min",
+      "scoreMax": "Score max",
+      "valueMin": "Value min",
+      "valueMax": "Value max",
+      "companyOp": "Company op",
+      "company": "Company",
+      "emailOp": "Email op",
+      "email": "Email",
+      "ops": {
+        "contains": "Contains",
+        "equals": "Equals",
+        "startsWith": "Starts With",
+        "endsWith": "Ends With"
+      },
+      "statusOptions": {
+        "new": "New",
+        "contacted": "Contacted",
+        "qualified": "Qualified",
+        "proposal": "Proposal",
+        "negotiation": "Negotiation",
+        "won": "Won",
+        "lost": "Lost"
+      },
+      "scoreOptions": {
+        "high": "High (70+)",
+        "medium": "Medium (40-69)",
+        "low": "Low (<40)"
+      },
+      "ownerOptions": {
+        "me": "Assigned to Me",
+        "unassigned": "Unassigned"
+      }
+    },
+    "columns": {
+      "name": "Name",
+      "company": "Company",
+      "email": "Email",
+      "phone": "Phone",
+      "status": "Status",
+      "source": "Source",
+      "score": "Score",
+      "value": "Value"
+    },
+    "messages": {
+      "loading": "Loading leads...",
+      "noLeads": "No leads found",
+      "noLeadsDescSearch": "Try adjusting your search",
+      "noLeadsDescNew": "Get started by creating a new lead",
+      "loadError": "Failed to load leads",
+      "defaultViewSet": "Default view set to {{view}}",
+      "defaultViewError": "Failed to update default view",
+      "deleteConfirm": "Are you sure you want to delete {{count}} leads?",
+      "deleteSuccess": "{{count}} leads deleted",
+      "deleteError": "Failed to delete leads",
+      "newLead": "New lead: {{name}}",
+      "statusUpdate": "Lead moved to {{status}}",
+      "leadUpdate": "Lead updated",
+      "updateError": "Failed to update lead",
+      "statusError": "Failed to update status"
+    },
+    "tabs": {
+      "board": "Kanban Board",
+      "analytics": "Analytics"
+    },
+    "pipeline": {
+      "loading": "Loading pipeline...",
+      "found": "{{count}} leads found",
+      "user": "User"
+    },
+    "bulk": {
+      "selected": "{{count}} selected"
+    }
+  }
+}
