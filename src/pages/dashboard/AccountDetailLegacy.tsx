@@ -24,6 +24,39 @@ import {
   type Column,
 } from '@/components/ui/enterprise';
 
+// Column definitions moved outside component to prevent recreation on every render
+const contactColumns: Column<any>[] = [
+  { key: 'first_name', label: 'First Name', width: '150px' },
+  { key: 'last_name', label: 'Last Name', width: '150px' },
+  { key: 'email', label: 'Email', width: '200px' },
+  { key: 'phone', label: 'Phone', width: '150px' },
+];
+
+const childAccountColumns: Column<any>[] = [
+  { key: 'name', label: 'Name', width: '200px' },
+  { key: 'account_type', label: 'Type', width: '120px' },
+  { key: 'status', label: 'Status', width: '120px', render: (value) => <Badge>{value}</Badge> },
+];
+
+const opportunityColumns: Column<any>[] = [
+  { key: 'name', label: 'Opportunity', width: '200px' },
+  { key: 'stage', label: 'Stage', width: '120px', render: (value) => <Badge>{value}</Badge> },
+  { key: 'amount', label: 'Amount', width: '150px', render: (value) => `$${value?.toLocaleString() || '0.00'}` },
+];
+
+const activityColumns: Column<any>[] = [
+  { key: 'subject', label: 'Subject', width: '200px' },
+  { key: 'activity_type', label: 'Type', width: '120px', render: (value) => <Badge variant="outline">{value}</Badge> },
+  { key: 'status', label: 'Status', width: '120px', render: (value) => <Badge variant="secondary">{value?.replace(/_/g, ' ')}</Badge> },
+  { key: 'due_date', label: 'Due Date', width: '150px', render: (value) => value ? format(new Date(value), 'PPP') : 'No due date' },
+];
+
+const relationshipColumns: Column<any>[] = [
+  { key: 'to_account.name', label: 'Account', width: '200px', render: (value, row) => row.to_account?.name || '-' },
+  { key: 'relationship_type', label: 'Type', width: '150px', render: (value) => <Badge variant="outline">{value?.replace(/_/g, ' ')}</Badge> },
+  { key: 'notes', label: 'Notes', width: '250px', render: (value) => value || '-' },
+];
+
 export default function AccountDetailLegacy() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -144,7 +177,6 @@ export default function AccountDetailLegacy() {
         .eq('account_id', accountId)
         .limit(5);
       if (error) throw error;
-      console.log('Related contacts fetched:', data);
       setRelatedContacts(data || []);
     } catch (err) {
       console.error('Failed to load related contacts', err);
@@ -272,43 +304,6 @@ export default function AccountDetailLegacy() {
 
   // Calculate stats
   const totalOppValue = relatedOpps.reduce((sum, opp) => sum + (opp.amount || 0), 0);
-
-  // Define columns for related contacts table
-  const contactColumns: Column<any>[] = [
-    { key: 'first_name', label: 'First Name', width: '150px' },
-    { key: 'last_name', label: 'Last Name', width: '150px' },
-    { key: 'email', label: 'Email', width: '200px' },
-    { key: 'phone', label: 'Phone', width: '150px' },
-  ];
-
-  // Define columns for child accounts table
-  const childAccountColumns: Column<any>[] = [
-    { key: 'name', label: 'Name', width: '200px' },
-    { key: 'account_type', label: 'Type', width: '120px' },
-    { key: 'status', label: 'Status', width: '120px', render: (value) => <Badge>{value}</Badge> },
-  ];
-
-  // Define columns for opportunities table
-  const opportunityColumns: Column<any>[] = [
-    { key: 'name', label: 'Opportunity', width: '200px' },
-    { key: 'stage', label: 'Stage', width: '120px', render: (value) => <Badge>{value}</Badge> },
-    { key: 'amount', label: 'Amount', width: '150px', render: (value) => `$${value?.toLocaleString() || '0.00'}` },
-  ];
-
-  // Define columns for activities table
-  const activityColumns: Column<any>[] = [
-    { key: 'subject', label: 'Subject', width: '200px' },
-    { key: 'activity_type', label: 'Type', width: '120px', render: (value) => <Badge variant="outline">{value}</Badge> },
-    { key: 'status', label: 'Status', width: '120px', render: (value) => <Badge variant="secondary">{value?.replace(/_/g, ' ')}</Badge> },
-    { key: 'due_date', label: 'Due Date', width: '150px', render: (value) => value ? format(new Date(value), 'PPP') : 'No due date' },
-  ];
-
-  // Define columns for relationships table
-  const relationshipColumns: Column<any>[] = [
-    { key: 'to_account.name', label: 'Account', width: '200px', render: (value, row) => row.to_account?.name || '-' },
-    { key: 'relationship_type', label: 'Type', width: '150px', render: (value) => <Badge variant="outline">{value?.replace(/_/g, ' ')}</Badge> },
-    { key: 'notes', label: 'Notes', width: '250px', render: (value) => value || '-' },
-  ];
 
   if (loading) {
     return (
