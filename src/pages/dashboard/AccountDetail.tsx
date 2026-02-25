@@ -4,21 +4,20 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { UnifiedPartnerForm } from '@/components/crm/UnifiedPartnerForm';
-import { Edit, Trash2, Building2, Phone, Mail, Globe, Star, MoreHorizontal, DollarSign, FileText, Calendar } from 'lucide-react';
+import { Trash2, Building2, Phone, Mail, DollarSign, FileText } from 'lucide-react';
 import { invokeFunction } from '@/lib/supabase-functions';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
-import { 
-    EnterpriseSheet, 
-    EnterpriseField, 
-    EnterpriseStatButton 
+import {
+    EnterpriseSheet,
+    EnterpriseField,
+    EnterpriseStatButton
 } from '@/components/ui/enterprise/EnterpriseComponents';
 import { EnterpriseFormLayout } from '@/components/ui/enterprise/EnterpriseFormLayout';
 import { EnterpriseNotebook, EnterpriseTab } from '@/components/ui/enterprise/EnterpriseTabs';
 import { EnterpriseActivityFeed } from '@/components/ui/enterprise/EnterpriseActivityFeed';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { EnterpriseTable, type Column, EnterpriseCard } from '@/components/ui/enterprise';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
 
 export default function AccountDetail() {
   const { id } = useParams();
@@ -138,6 +137,22 @@ export default function AccountDetail() {
 
   // Calculate stats
   const totalOppValue = relatedOpps.reduce((sum, opp) => sum + (opp.amount || 0), 0);
+
+  // Define columns for related contacts table
+  const contactColumns: Column<any>[] = [
+    { key: 'first_name', label: 'First Name', width: '150px' },
+    { key: 'last_name', label: 'Last Name', width: '150px' },
+    { key: 'email', label: 'Email', width: '200px' },
+    { key: 'phone', label: 'Phone', width: '150px' },
+    { key: 'title', label: 'Title', width: '150px', render: (value) => value || '-' },
+  ];
+
+  // Define columns for related opportunities table
+  const opportunityColumns: Column<any>[] = [
+    { key: 'name', label: 'Opportunity', width: '200px' },
+    { key: 'stage', label: 'Stage', width: '120px', render: (value) => <Badge>{value}</Badge> },
+    { key: 'amount', label: 'Amount', width: '150px', render: (value) => `$${value?.toLocaleString() || '0.00'}` },
+  ];
 
   return (
     <div className="h-screen w-full bg-[#f9fafb] overflow-hidden">
@@ -284,65 +299,33 @@ export default function AccountDetail() {
                     ) : (
                         <EnterpriseNotebook>
                             <EnterpriseTab label="Contacts" value="contacts">
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                    {relatedContacts.map((contact) => (
-                                        <Card key={contact.id} className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate(`/dashboard/contacts/${contact.id}`)}>
-                                            <div className="flex p-3 gap-3">
-                                                <Avatar className="h-12 w-12 rounded-lg">
-                                                    <AvatarFallback className="rounded-lg bg-primary/10 text-primary">
-                                                        {contact.first_name[0]}{contact.last_name[0]}
-                                                    </AvatarFallback>
-                                                </Avatar>
-                                                <div className="overflow-hidden">
-                                                    <p className="font-semibold truncate">{contact.first_name} {contact.last_name}</p>
-                                                    <p className="text-xs text-muted-foreground truncate">{contact.title}</p>
-                                                    {contact.email && (
-                                                        <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
-                                                            <Mail className="h-3 w-3" />
-                                                            <span className="truncate">{contact.email}</span>
-                                                        </div>
-                                                    )}
-                                                    {contact.phone && (
-                                                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                                            <Phone className="h-3 w-3" />
-                                                            <span className="truncate">{contact.phone}</span>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </Card>
-                                    ))}
-                                    {/* Add Contact Ghost Card */}
-                                    <Button variant="outline" className="h-full min-h-[80px] border-dashed flex flex-col gap-2 hover:bg-muted/10" onClick={() => navigate('/dashboard/contacts/new')}>
-                                        <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
-                                            <PlusIcon className="h-4 w-4" />
-                                        </div>
-                                        Add Contact
-                                    </Button>
-                                </div>
+                                <EnterpriseCard
+                                    title="Related Contacts"
+                                    description={`${relatedContacts.length} contacts`}
+                                >
+                                    <EnterpriseTable
+                                        columns={contactColumns}
+                                        data={relatedContacts}
+                                        rowKey={(row) => row.id}
+                                        onRowClick={(row) => navigate(`/dashboard/contacts/${row.id}`)}
+                                        emptyState={<p className="text-center py-8 text-muted-foreground">No contacts found. <Button variant="link" onClick={() => navigate('/dashboard/contacts/new')} className="p-0">Create one</Button></p>}
+                                    />
+                                </EnterpriseCard>
                             </EnterpriseTab>
                             
                             <EnterpriseTab label="Sales & Purchase" value="sales">
-                                <div className="space-y-6">
-                                    <div>
-                                        <h3 className="text-sm font-semibold mb-3">Opportunities</h3>
-                                        {relatedOpps.length > 0 ? (
-                                            <div className="space-y-2">
-                                                {relatedOpps.map(opp => (
-                                                    <div key={opp.id} className="flex items-center justify-between p-3 border rounded-lg bg-white">
-                                                        <div className="font-medium">{opp.name}</div>
-                                                        <div className="flex items-center gap-3">
-                                                            <Badge>{opp.stage}</Badge>
-                                                            <span className="text-sm font-mono">${opp.amount?.toLocaleString()}</span>
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        ) : (
-                                            <p className="text-sm text-muted-foreground italic">No opportunities found.</p>
-                                        )}
-                                    </div>
-                                </div>
+                                <EnterpriseCard
+                                    title="Opportunities"
+                                    description={`${relatedOpps.length} opportunities · $${totalOppValue.toLocaleString()}`}
+                                >
+                                    <EnterpriseTable
+                                        columns={opportunityColumns}
+                                        data={relatedOpps}
+                                        rowKey={(row) => row.id}
+                                        onRowClick={(row) => navigate(`/dashboard/opportunities/${row.id}`)}
+                                        emptyState={<p className="text-center py-8 text-muted-foreground">No opportunities found.</p>}
+                                    />
+                                </EnterpriseCard>
                             </EnterpriseTab>
 
                             <EnterpriseTab label="Internal Notes" value="notes">
@@ -378,13 +361,4 @@ export default function AccountDetail() {
         </AlertDialog>
     </div>
   );
-}
-
-function PlusIcon({ className }: { className?: string }) {
-    return (
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-            <path d="M5 12h14" />
-            <path d="M12 5v14" />
-        </svg>
-    )
 }
