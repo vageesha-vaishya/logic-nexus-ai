@@ -221,9 +221,9 @@ Update your application's `.env` file with new Supabase project details:
 
 ```env
 # New Supabase Cloud Project
-VITE_SUPABASE_PROJECT_ID="pqulscbawoqzhqobwupu"
-VITE_SUPABASE_URL="https://pqulscbawoqzhqobwupu.supabase.co"
-VITE_SUPABASE_PUBLISHABLE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+VITE_SUPABASE_PROJECT_ID="[PROJECT-REF]"
+VITE_SUPABASE_URL="https://[PROJECT-REF].supabase.co"
+VITE_SUPABASE_PUBLISHABLE_KEY="[YOUR-ANON-KEY]"
 ```
 
 ### Regenerate TypeScript Types (Important!)

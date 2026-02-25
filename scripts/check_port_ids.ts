@@ -1,9 +1,9 @@
 console.log('Starting check_port_ids script...');
 import { createClient } from '@supabase/supabase-js';
 
-// Hardcoded credentials from .env (ignoring comments)
-const supabaseUrl = "https://iutyqzjlpenfddqdwcsk.supabase.co";
-const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml1dHlxempscGVuZmRkcWR3Y3NrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg2NjQ4MjMsImV4cCI6MjA4NDI0MDgyM30.90USeHOMTy-Nz7AFZIwZ3s75AO5ch9uFgSHTDbmbWQw";
+// Credentials should be loaded from environment variables
+const supabaseUrl = process.env.VITE_SUPABASE_URL || "YOUR_SUPABASE_URL";
+const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || "YOUR_SUPABASE_ANON_KEY";
 
 if (!supabaseUrl || !supabaseKey) {
   console.error('Missing Supabase credentials');
