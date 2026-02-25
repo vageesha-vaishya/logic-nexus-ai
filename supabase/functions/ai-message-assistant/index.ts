@@ -24,7 +24,7 @@ function sanitize(text: string): { sanitized: string; redacted: string[] } {
 async function callGemini(prompt: string) {
   const key = Deno.env.get("GOOGLE_API_KEY");
   if (!key) return null;
-  const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + key;
+  const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + key;
   const body = {
     contents: [{ role: "user", parts: [{ text: prompt }]}],
     generationConfig: { responseMimeType: "text/plain" }
@@ -109,7 +109,7 @@ serve(async (req: Request) => {
       const admin = getSupabaseAdmin();
       await logAiCall(admin, {
         function_name: "ai-message-assistant",
-        model_used: Deno.env.get("GOOGLE_API_KEY") ? "gemini-2.0-flash" : "fallback",
+        model_used: Deno.env.get("GOOGLE_API_KEY") ? "gemini-2.5-flash" : "fallback",
         error_message: e?.message || String(e),
       });
     } catch {}

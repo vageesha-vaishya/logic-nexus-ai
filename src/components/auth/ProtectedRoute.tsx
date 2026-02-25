@@ -23,8 +23,6 @@ export function ProtectedRoute({
 }: ProtectedRouteProps) {
   const { user, loading, hasRole, hasPermission, isPlatformAdmin } = useAuth();
   const location = useLocation();
-  const [graceActive, setGraceActive] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
 
   if (loading) {
     logger.debug('ProtectedRoute waiting for auth loading', { path: location.pathname, component: 'ProtectedRoute' });
@@ -36,36 +34,6 @@ export function ProtectedRoute({
   }
 
   if (requireAuth && !user) {
-    useEffect(() => {
-      let mounted = true;
-      const attemptRefresh = async () => {
-        if (refreshing) return;
-        setRefreshing(true);
-        try {
-          const { data: sessionData } = await supabase.auth.getSession();
-          if (!sessionData.session) {
-            await supabase.auth.refreshSession();
-          }
-        } finally {
-          if (mounted) setRefreshing(false);
-        }
-      };
-      attemptRefresh();
-      return () => {
-        mounted = false;
-      };
-    }, [refreshing]);
-    if (!graceActive) {
-      setGraceActive(true);
-      setTimeout(() => setGraceActive(false), 5000);
-    }
-    if (graceActive) {
-      return (
-        <div className="min-h-screen flex items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
-      );
-    }
     logger.warn('Access denied. User not authenticated.', { path: location.pathname, component: 'ProtectedRoute' });
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }

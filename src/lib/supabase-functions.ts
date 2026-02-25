@@ -133,8 +133,28 @@ export async function invokeFunction<T = any>(
       headers: initialHeaders,
       method: options.method || 'POST',
     });
-    const data = resultInvoke.data;
+    let data = resultInvoke.data;
     let error = resultInvoke.error;
+
+    // Retry on 401 Unauthorized (Token expired)
+    if (error && (error as any)?.context?.status === 401) {
+        console.warn(`[Supabase Function] 401 Unauthorized for ${functionName}. Refreshing session and retrying...`);
+        const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+        
+        if (!refreshError && refreshData.session) {
+             const newToken = refreshData.session.access_token;
+             // Retry with new token
+             const retryResult = await supabase.functions.invoke(functionName, {
+                body: enrichPayload(options.body),
+                headers: { ...customHeaders, Authorization: `Bearer ${newToken}` },
+                method: options.method || 'POST',
+             });
+             data = retryResult.data;
+             error = retryResult.error;
+        } else {
+             console.error(`[Supabase Function] Session refresh failed:`, refreshError);
+        }
+    }
 
     if (error) {
       // Check if it's a "Failed to send a request" error (FunctionsFetchError)

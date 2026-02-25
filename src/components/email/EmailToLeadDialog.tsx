@@ -109,7 +109,7 @@ export function EmailToLeadDialog({ open, onOpenChange, email, onSuccess }: Emai
         prompt = prompt.replace("<subject>", subject).replace("<content>", content);
 
         const requestId = `req_interested_${Date.now()}`;
-        const { data, error } = await supabase.functions.invoke('suggest-transport-mode', {
+        const { data, error } = await invokeFunction('suggest-transport-mode', {
             body: { prompt, requestId },
             headers: { 'x-client-info': 'email-to-lead-interested' }
         });

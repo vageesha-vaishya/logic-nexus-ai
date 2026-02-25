@@ -1,4 +1,4 @@
-import { getCorsHeaders } from '../_shared/cors.ts';
+import { corsHeaders } from '../_shared/cors.ts';
 import { requireAuth } from '../_shared/auth.ts';
 
 declare const Deno: {
@@ -7,7 +7,7 @@ declare const Deno: {
 };
 
 Deno.serve(async (req) => {
-  const headers = getCorsHeaders(req);
+  const headers = corsHeaders;
 
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers });
@@ -36,7 +36,7 @@ Deno.serve(async (req) => {
     // STRATEGY 1: Use Gemini if key exists
     if (geminiKey) {
         usedService = "Gemini";
-        const targetModel = model || 'gemini-2.0-flash';
+        const targetModel = model || 'gemini-2.5-flash';
         usedModel = targetModel;
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${geminiKey}`;
 

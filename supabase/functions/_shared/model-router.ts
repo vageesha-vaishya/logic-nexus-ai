@@ -23,7 +23,7 @@ export function pickClassifier(tier: Tier = "low"): {
   headers: HeadersInit;
 } {
   const key = Deno.env.get("GOOGLE_API_KEY") ?? "";
-  const model = tier === "low" ? "gemini-2.0-flash" : "gemini-2.0-pro";
+  const model = tier === "low" ? "gemini-2.5-flash" : "gemini-2.5-pro";
   return {
     provider: "google",
     model,
