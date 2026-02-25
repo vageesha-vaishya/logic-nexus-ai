@@ -1,0 +1,69 @@
+{
+  "system": {
+    "version": "1.0.0",
+    "last_updated": "2026-02-25",
+    "optimization_strategy": "context_aware",
+    "environment": "logic-nexus-ai"
+  },
+  "logs": {
+    "file": ".trae/skills/logic-nexus-ai/SKILL_LOG.md"
+  },
+  "contexts": {
+    "logistics": {
+      "name": "Logistics & Freight Management",
+      "description": "Context for handling shipments, bookings, containers, and carrier interactions.",
+      "related_files": [
+        "src/components/sales/quote-form/QuoteLogistics.tsx",
+        "src/components/logistics/SmartCargoInput.tsx",
+        "src/domain/shipments/types.ts",
+        "src/plugins/logistics/services/LogisticsRateMapper.ts",
+        "src/services/quotation/engines/LogisticsQuotationEngine.ts"
+      ],
+      "prompt_instructions": "Focus on multi-leg shipment logic, container specifications, and carrier rate mapping. Ensure incoterms and mode of transport are considered."
+    },
+    "crm": {
+      "name": "CRM & Sales Pipeline",
+      "description": "Context for managing leads, opportunities, accounts, and contacts.",
+      "related_files": [
+        "src/pages/dashboard/Leads.tsx",
+        "src/pages/dashboard/Opportunities.tsx",
+        "src/components/kanban/KanbanBoard.tsx",
+        "src/hooks/useCRM.ts"
+      ],
+      "prompt_instructions": "Focus on sales lifecycle, pipeline stages, and customer relationship data. Ensure tenant isolation is maintained."
+    },
+    "finance": {
+      "name": "Finance & Invoicing",
+      "description": "Context for billing, invoicing, tax calculations, and profit margins.",
+      "related_files": [
+        "src/services/invoicing/InvoiceService.ts",
+        "src/services/pricing.service.ts",
+        "src/components/sales/quote-form/QuoteFinancials.tsx",
+        "src/services/taxation/TaxEngine.ts"
+      ],
+      "prompt_instructions": "Focus on financial accuracy, currency conversion, and tax compliance. Ensure buy/sell rates and margins are correctly calculated."
+    },
+    "platform": {
+      "name": "Platform Administration",
+      "description": "Context for tenant management, security, and global settings.",
+      "related_files": [
+        "src/components/auth/RoleGuard.tsx",
+        "src/config/permissions.ts",
+        "src/lib/db/access.ts",
+        "src/integrations/supabase/client.ts"
+      ],
+      "prompt_instructions": "Focus on security, role-based access control (RBAC), and tenant isolation. Ensure ScopedDataAccess is used for all DB operations."
+    },
+    "skill_management": {
+      "name": "Adaptive Skill Management",
+      "description": "Context for analyzing prompts, detecting new patterns, and updating skill definitions.",
+      "related_files": [
+        ".trae/skills/logic-nexus-ai/SKILL.md",
+        ".trae/skills/logic-nexus-ai/CONTEXT_CONFIG.json",
+        ".trae/skills/logic-nexus-ai/SKILL_LOG.md"
+      ],
+      "prompt_instructions": "Analyze user intent to identify missing capabilities. Follow the 'Discovery & Analysis Protocol' in SKILL.md. Ensure all config updates are valid JSON."
+    }
+  },
+  "emergent_skills": []
+}

@@ -34,6 +34,10 @@ export default function ThemeManagement() {
   const [bgEnd, setBgEnd] = useState<string | undefined>(undefined);
   const [bgAngle, setBgAngle] = useState<number | undefined>(undefined);
   const [radius, setRadius] = useState('0.75rem');
+  // Kanban settings
+  const [kanbanCardBg, setKanbanCardBg] = useState<string | undefined>(undefined);
+  const [kanbanCardRadius, setKanbanCardRadius] = useState('0.5rem');
+  
   const [sidebarBackground, setSidebarBackground] = useState('222 47% 11%');
   const [sidebarAccent, setSidebarAccent] = useState('217 32% 17%');
   const [dark, setDark] = useState(false);
@@ -55,6 +59,8 @@ export default function ThemeManagement() {
         setBgEnd(found.bgEnd ?? found.end);
         setBgAngle(found.bgAngle ?? found.angle ?? angle);
         setRadius(found.radius ?? radius);
+        setKanbanCardBg(found.kanbanCardBg || kanbanCardBg);
+        setKanbanCardRadius(found.kanbanCardRadius || kanbanCardRadius);
         setSidebarBackground(found.sidebarBackground || sidebarBackground);
         setSidebarAccent(found.sidebarAccent || sidebarAccent);
         setDark(found.dark ?? dark);
@@ -101,6 +107,8 @@ export default function ThemeManagement() {
       radius,
       sidebarBackground,
       sidebarAccent,
+      kanbanCardBg,
+      kanbanCardRadius,
       dark,
       bgStart: bgStart ?? start,
       bgEnd: bgEnd ?? end,
@@ -263,6 +271,20 @@ export default function ThemeManagement() {
               </div>
               <HslPicker label="Sidebar Background" value={sidebarBackground} onChange={setSidebarBackground} />
               <HslPicker label="Sidebar Accent" value={sidebarAccent} onChange={setSidebarAccent} />
+              <HslPicker label="Kanban Card Background" value={kanbanCardBg} onChange={setKanbanCardBg} />
+              <div className="space-y-2">
+                <label className="text-sm">Kanban Card Radius</label>
+                <div className="flex items-center gap-2">
+                  <select className="border rounded px-2 py-1 text-sm" value={kanbanCardRadius} onChange={(e) => setKanbanCardRadius(e.target.value)}>
+                    <option value="0rem">0</option>
+                    <option value="0.25rem">0.25rem</option>
+                    <option value="0.5rem">0.5rem</option>
+                    <option value="0.75rem">0.75rem</option>
+                    <option value="1rem">1rem</option>
+                  </select>
+                  <Input value={kanbanCardRadius} onChange={(e) => setKanbanCardRadius(e.target.value)} placeholder="e.g., 0.5rem" />
+                </div>
+              </div>
             </div>
 
             <div className="mt-4 flex items-center gap-3">
@@ -271,7 +293,7 @@ export default function ThemeManagement() {
             </div>
 
             <div className="mt-6 flex items-center gap-3">
-              <Button onClick={() => applyTheme({ start, end, primary, accent, titleStrip, angle, radius, sidebarBackground, sidebarAccent, dark, tableHeaderText, tableHeaderSeparator: tableHeaderSeparator ?? (dark ? '0 0% 100% / 0.75' : '0 0% 0% / 0.2'), tableHeaderBackground: tableHeaderBackground ?? titleStrip, tableBackground: tableBackground ?? (dark ? '222 47% 11%' : '0 0% 100%'), tableForeground: tableForeground ?? (dark ? '210 40% 98%' : '222.2 84% 4.9%'), bgStart: bgStart ?? start, bgEnd: bgEnd ?? end, bgAngle: bgAngle ?? angle })}>Preview</Button>
+              <Button onClick={() => applyTheme({ start, end, primary, accent, titleStrip, angle, radius, sidebarBackground, sidebarAccent, kanbanCardBg, kanbanCardRadius, dark, tableHeaderText, tableHeaderSeparator: tableHeaderSeparator ?? (dark ? '0 0% 100% / 0.75' : '0 0% 0% / 0.2'), tableHeaderBackground: tableHeaderBackground ?? titleStrip, tableBackground: tableBackground ?? (dark ? '222 47% 11%' : '0 0% 100%'), tableForeground: tableForeground ?? (dark ? '210 40% 98%' : '222.2 84% 4.9%'), bgStart: bgStart ?? start, bgEnd: bgEnd ?? end, bgAngle: bgAngle ?? angle })}>Preview</Button>
               <Button variant="secondary" onClick={() => setOpen(true)} disabled={!canWrite}>Save As</Button>
               <div className="flex-1 h-16 rounded-lg bg-gradient-primary shadow-primary flex items-center justify-between px-4">
                 <Button className="rounded-lg" variant="default">Primary Button</Button>
@@ -304,6 +326,8 @@ export default function ThemeManagement() {
                           bgStart: (p as any).bgStart ?? p.start,
                           bgEnd: (p as any).bgEnd ?? p.end,
                           bgAngle: (p as any).bgAngle ?? p.angle ?? angle,
+                          kanbanCardBg: (p as any).kanbanCardBg,
+                          kanbanCardRadius: (p as any).kanbanCardRadius,
                           radius: p.radius ?? radius,
                           sidebarBackground: p.sidebarBackground ?? sidebarBackground,
                           sidebarAccent: p.sidebarAccent ?? sidebarAccent,
@@ -331,6 +355,8 @@ export default function ThemeManagement() {
                               bgStart: (p as any).bgStart ?? p.start,
                               bgEnd: (p as any).bgEnd ?? p.end,
                               bgAngle: (p as any).bgAngle ?? p.angle ?? angle,
+                              kanbanCardBg: (p as any).kanbanCardBg,
+                              kanbanCardRadius: (p as any).kanbanCardRadius,
                               tableHeaderText: (p as any).tableHeaderText ?? '0 0% 100%',
                               tableHeaderSeparator: (p as any).tableHeaderSeparator ?? (isDarkPreset ? '0 0% 100% / 0.75' : '0 0% 0% / 0.2'),
                               tableHeaderBackground: (p as any).tableHeaderBackground ?? (p as any).titleStrip ?? p.accent ?? p.primary,
@@ -352,6 +378,8 @@ export default function ThemeManagement() {
                         setBgEnd((p as any).bgEnd ?? p.end);
                         setBgAngle((p as any).bgAngle ?? p.angle ?? angle);
                         setRadius(p.radius ?? radius);
+                        setKanbanCardBg((p as any).kanbanCardBg || kanbanCardBg);
+                        setKanbanCardRadius((p as any).kanbanCardRadius || kanbanCardRadius);
                         setSidebarBackground(p.sidebarBackground ?? sidebarBackground);
                         setSidebarAccent(p.sidebarAccent ?? sidebarAccent);
                         const isDarkPreset = p.dark ?? dark;
@@ -380,9 +408,9 @@ export default function ThemeManagement() {
             </div>
             <DialogFooter>
               <Button disabled={!canWrite} onClick={() => {
-                saveTheme({ name, start, end, primary, accent, titleStrip, angle, radius, sidebarBackground, sidebarAccent, dark, tableHeaderText, tableHeaderSeparator: tableHeaderSeparator ?? (dark ? '0 0% 100% / 0.75' : '0 0% 0% / 0.2'), tableHeaderBackground: tableHeaderBackground ?? titleStrip, tableBackground: tableBackground ?? (dark ? '222 47% 11%' : '0 0% 100%'), tableForeground: tableForeground ?? (dark ? '210 40% 98%' : '222.2 84% 4.9%'), bgStart: bgStart ?? start, bgEnd: bgEnd ?? end, bgAngle: bgAngle ?? angle });
+                saveTheme({ name, start, end, primary, accent, titleStrip, angle, radius, sidebarBackground, sidebarAccent, kanbanCardBg, kanbanCardRadius, dark, tableHeaderText, tableHeaderSeparator: tableHeaderSeparator ?? (dark ? '0 0% 100% / 0.75' : '0 0% 0% / 0.2'), tableHeaderBackground: tableHeaderBackground ?? titleStrip, tableBackground: tableBackground ?? (dark ? '222 47% 11%' : '0 0% 100%'), tableForeground: tableForeground ?? (dark ? '210 40% 98%' : '222.2 84% 4.9%'), bgStart: bgStart ?? start, bgEnd: bgEnd ?? end, bgAngle: bgAngle ?? angle });
                 setActive(name);
-                applyTheme({ start, end, primary, accent, titleStrip, angle, radius, sidebarBackground, sidebarAccent, dark, tableHeaderText, tableHeaderSeparator: tableHeaderSeparator ?? (dark ? '0 0% 100% / 0.75' : '0 0% 0% / 0.2'), tableHeaderBackground: tableHeaderBackground ?? titleStrip, tableBackground: tableBackground ?? (dark ? '222 47% 11%' : '0 0% 100%'), tableForeground: tableForeground ?? (dark ? '210 40% 98%' : '222.2 84% 4.9%'), bgStart: bgStart ?? start, bgEnd: bgEnd ?? end, bgAngle: bgAngle ?? angle });
+                applyTheme({ start, end, primary, accent, titleStrip, angle, radius, sidebarBackground, sidebarAccent, kanbanCardBg, kanbanCardRadius, dark, tableHeaderText, tableHeaderSeparator: tableHeaderSeparator ?? (dark ? '0 0% 100% / 0.75' : '0 0% 0% / 0.2'), tableHeaderBackground: tableHeaderBackground ?? titleStrip, tableBackground: tableBackground ?? (dark ? '222 47% 11%' : '0 0% 100%'), tableForeground: tableForeground ?? (dark ? '210 40% 98%' : '222.2 84% 4.9%'), bgStart: bgStart ?? start, bgEnd: bgEnd ?? end, bgAngle: bgAngle ?? angle });
                 setOpen(false);
               }}>Save</Button>
             </DialogFooter>

@@ -3,6 +3,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle, Plus, Layout, Save, X, GripVertical, Users, Eye } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
 import {
   DndContext,
@@ -51,11 +52,12 @@ import { useToast } from '@/components/ui/use-toast';
 import { WidgetSkeleton } from '@/components/dashboard/widgets/WidgetSkeleton';
 
 const DEFAULT_WIDGETS: WidgetConfig[] = [
-  { id: 'stats-1', type: 'stats', title: 'KPIs', size: 'full', order: 0 },
-  { id: 'financial-1', type: 'financial', title: 'Financial Performance', size: 'large', order: 1 },
-  { id: 'volume-1', type: 'volume', title: 'Shipment Volume', size: 'medium', order: 2 },
-  { id: 'leads-1', type: 'leads', title: 'My Leads', size: 'medium', order: 3 },
-  { id: 'activities-1', type: 'activities', title: 'My Activities', size: 'medium', order: 4 },
+  { id: 'kanban-1', type: 'kanban', title: 'Pipelines Overview', size: 'full', order: 0 },
+  { id: 'stats-1', type: 'stats', title: 'KPIs', size: 'full', order: 1 },
+  { id: 'financial-1', type: 'financial', title: 'Financial Performance', size: 'large', order: 2 },
+  { id: 'volume-1', type: 'volume', title: 'Shipment Volume', size: 'medium', order: 3 },
+  { id: 'leads-1', type: 'leads', title: 'My Leads', size: 'medium', order: 4 },
+  { id: 'activities-1', type: 'activities', title: 'My Activities', size: 'medium', order: 5 },
 ];
 
 export default function Dashboards() {
