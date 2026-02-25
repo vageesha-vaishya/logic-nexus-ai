@@ -3,10 +3,11 @@ import { QuoteFormValues, QuoteItem } from '@/components/sales/quote-form/types'
 import { z } from 'zod';
 import { logger } from '@/lib/logger';
 import { SupabaseClient } from '@supabase/supabase-js';
+import { normalizeModeCode, type ModeCarrierTypeMap, DEFAULT_MODE_CARRIER_TYPE_MAP, carrierValidationMessages } from '@/lib/mode-utils';
 
 interface MasterData {
     serviceTypes: { id: string; name: string; code: string }[];
-    carriers: { id: string; carrier_name: string; scac?: string }[];
+    carriers: { id: string; carrier_name: string; scac?: string; carrier_type?: string | null }[];
     ports?: { id: string; location_name: string; location_code?: string; country?: string }[];
     containerTypes?: { id: string; name: string; code: string }[];
     containerSizes?: { id: string; name: string; code: string }[];
@@ -67,6 +68,48 @@ export class QuoteTransformService {
     }
 
     /**
+     * Validates that a carrier is compatible with the specified transport mode.
+     * Uses the ModeCarrierTypeMap as the authoritative mapping.
+     */
+    public static validateCarrierMode(
+        carrierId: string | null | undefined,
+        mode: string | null | undefined,
+        carriers: { id: string; carrier_name: string; carrier_type?: string | null }[],
+        modeCarrierMap: ModeCarrierTypeMap = DEFAULT_MODE_CARRIER_TYPE_MAP
+    ): { valid: boolean; error?: string } {
+        if (!carrierId) {
+            return { valid: true };
+        }
+
+        const carrier = carriers.find(c => c.id === carrierId);
+        if (!carrier) {
+            return { valid: false, error: `Carrier not found: ${carrierId}` };
+        }
+
+        const normalizedMode = normalizeModeCode(mode || '');
+        const allowedTypes = modeCarrierMap[normalizedMode] || [];
+
+        if (allowedTypes.length === 0) {
+            return { valid: true };
+        }
+
+        const carrierType = String(carrier.carrier_type || '').toLowerCase();
+        if (!carrierType || !allowedTypes.includes(carrierType)) {
+            return {
+                valid: false,
+                error: carrierValidationMessages.carrierModeMismatch(
+                    carrier.carrier_name,
+                    carrierType || null,
+                    normalizedMode,
+                    allowedTypes
+                ),
+            };
+        }
+
+        return { valid: true };
+    }
+
+    /**
      * Executes an async operation with exponential backoff retry logic.
      */
     static async retryOperation<T>(
@@ -109,16 +152,23 @@ export class QuoteTransformService {
      * Handles all ID resolutions, cargo unification, and structured note generation.
      */
     static transformToQuoteForm(data: QuoteTransferData, masterData: MasterData): Partial<QuoteFormValues> {
-        // Normalize selectedRates for backward compatibility
         const rates = data.selectedRates || (data.selectedRate ? [data.selectedRate] : []);
-        
-        // If no rates, we can still proceed with partial data, or return early. 
-        // But let's try to map what we can.
-        const primaryRate = rates[0];
+        const primaryRate = Array.isArray(rates) && rates.length > 0 ? rates[0] : undefined;
 
         const tradeDirection = data.trade_direction || 'export';
         const serviceTypeId = this.resolveServiceTypeId(data.mode, data.service_type_id, masterData.serviceTypes);
         const carrierId = this.resolveCarrierId(primaryRate, masterData.carriers);
+        const hasCarrierType = Array.isArray(masterData.carriers) && masterData.carriers.some(c => c.carrier_type);
+        if (carrierId && hasCarrierType) {
+            const carrierValidation = this.validateCarrierMode(
+                carrierId,
+                data.mode,
+                masterData.carriers as any
+            );
+            if (!carrierValidation.valid && carrierValidation.error) {
+                throw new Error(carrierValidation.error);
+            }
+        }
         const originPortId = this.resolvePortId(
             data.origin, 
             masterData.ports, 
@@ -234,7 +284,7 @@ export class QuoteTransformService {
                 id: leg.id,
                 sequence_number: i + 1,
                 transport_mode: (leg.mode || transferData.mode || 'ocean').toLowerCase(),
-                carrier_id: leg.carrier ? this.resolveCarrierId({ carrier_name: leg.carrier } as any, masterData.carriers) : carrierId,
+                carrier_id: (leg as any).carrier ? this.resolveCarrierId({ carrier_name: (leg as any).carrier } as any, masterData.carriers) : carrierId,
                 origin_location_name: leg.origin 
                     || (i === 0 ? (transferData.originDetails?.name || transferData.origin) : undefined),
                 destination_location_name: leg.destination 

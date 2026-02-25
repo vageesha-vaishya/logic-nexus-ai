@@ -1,6 +1,6 @@
 
 /**
- * Utilities for formatting container information
+ * Utilities for formatting and normalizing container information
  */
 
 /**
@@ -29,4 +29,28 @@ export function formatContainerSize(name: string | null | undefined): string {
   }
   
   return str;
+}
+
+export function reconcileContainerTypeWithSize(
+  containerSizeId: string | null | undefined,
+  containerTypeId: string | null | undefined,
+  containerSizes: Array<{ id: string; type_id?: string }> | null | undefined,
+  guardsEnabled: boolean
+): string | null | undefined {
+  if (!guardsEnabled || !containerSizeId || !Array.isArray(containerSizes)) {
+    return containerTypeId;
+  }
+
+  const sizeMeta = containerSizes.find(s => s.id === containerSizeId);
+  const expectedTypeId = sizeMeta?.type_id;
+
+  if (!expectedTypeId) {
+    return containerTypeId;
+  }
+
+  if (!containerTypeId || containerTypeId !== expectedTypeId) {
+    return expectedTypeId;
+  }
+
+  return containerTypeId;
 }

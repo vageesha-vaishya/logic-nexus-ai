@@ -46,10 +46,15 @@ export function SendQuoteDialog({ quoteId, quoteNumber, versionId, customerEmail
         action: 'generate-pdf'
       }));
 
-      // invokeAnonymous returns the parsed JSON directly on success, or throws
       const pdfData = pdfResponse;
 
-      if (!pdfData || !pdfData.content) throw new Error('PDF Generation returned no content');
+      if (!pdfData || !pdfData.content) {
+        const issues = Array.isArray(pdfData?.issues) ? String(pdfData.issues.join('; ')) : null;
+        if (issues) {
+          throw new Error(issues);
+        }
+        throw new Error('PDF Generation returned no content');
+      }
 
       // 2. Send Email
       console.log('[SendQuote] Sending email...');

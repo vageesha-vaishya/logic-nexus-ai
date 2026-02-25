@@ -184,10 +184,21 @@ export default function LeadsPipeline() {
     
     setLoading(true);
     try {
-      const { data, error } = await scopedDb
+      let query = scopedDb
         .from('leads')
         .select('*')
         .order('created_at', { ascending: false });
+
+      // Apply filters from URL params (passed from Dashboard)
+      const fromDate = searchParams.get('from');
+      const toDate = searchParams.get('to');
+      const franchiseId = searchParams.get('franchise');
+
+      if (fromDate) query = query.gte('created_at', new Date(fromDate).toISOString());
+      if (toDate) query = query.lte('created_at', new Date(toDate).toISOString());
+      if (franchiseId && franchiseId !== 'all') query = query.eq('franchise_id', franchiseId);
+
+      const { data, error } = await query;
 
       if (error) throw error;
       

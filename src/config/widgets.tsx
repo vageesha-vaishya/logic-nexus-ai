@@ -15,6 +15,7 @@ const CustomChartWidget = lazy(() => import('@/components/dashboard/widgets/Cust
 const InsightsWidget = lazy(() => import('@/components/dashboard/widgets/InsightsWidget').then(m => ({ default: m.InsightsWidget })));
 const FinancialWidget = lazy(() => import('@/components/dashboard/widgets/FinancialWidget').then(m => ({ default: m.FinancialWidget })));
 const VolumeWidget = lazy(() => import('@/components/dashboard/widgets/VolumeWidget').then(m => ({ default: m.VolumeWidget })));
+const KanbanWidget = lazy(() => import('@/components/dashboard/widgets/KanbanWidget').then(m => ({ default: m.KanbanWidget })));
 
 export const AVAILABLE_WIDGETS: WidgetDefinition[] = [
   {
@@ -105,6 +106,13 @@ export const AVAILABLE_WIDGETS: WidgetDefinition[] = [
     description: 'Shipment volume by carrier',
     defaultSize: 'medium',
     component: VolumeWidget as unknown as ComponentType<any>,
+  },
+  {
+    type: 'kanban',
+    label: 'Kanban Board',
+    description: 'Overview of pipelines (Leads, Opportunities, Quotes)',
+    defaultSize: 'full',
+    component: KanbanWidget as unknown as ComponentType<any>,
   },
 ];
 

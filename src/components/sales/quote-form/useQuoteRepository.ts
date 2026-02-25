@@ -18,6 +18,9 @@ import {
   ServiceTypeOption,
 } from './types';
 import { useQuoteContext } from './QuoteContext';
+import { parseTransitTimeToHours } from '@/lib/transit-time';
+import { dbField } from '@/lib/schemas/field-registry';
+import { useAppFeatureFlag, FEATURE_FLAGS } from '@/lib/feature-flags';
 
 // ---------------------------------------------------------------------------
 // Shared helpers
@@ -34,21 +37,6 @@ function deduplicateById<T extends { id: string }>(injected: T[], queried: T[]):
   });
 }
 
-function parseTransitTime(val: string | number | undefined): number | null {
-    if (!val) return null;
-    const strVal = String(val).toLowerCase();
-    let hours = 0;
-    const numberPart = parseInt(strVal.match(/\d+/)?.[0] || '0');
-
-    if ((strVal.includes('day') || strVal.includes(' d')) && !strVal.includes('hour')) {
-        hours = numberPart * 24;
-    } else {
-        hours = numberPart;
-    }
-
-    return (!isNaN(hours) && hours > 0) ? hours : null;
-}
-
 // ---------------------------------------------------------------------------
 // Return types
 // ---------------------------------------------------------------------------
@@ -58,10 +46,21 @@ export interface QuoteRepositoryContextData {
   services: ServiceOption[];
   carriers: CarrierOption[];
   ports: PortOption[];
+  shippingTerms: any[];
+  currencies: any[];
+  chargeCategories: any[];
+  chargeSides: any[];
+  chargeBases: any[];
+  serviceModes: any[];
+   tradeDirections: any[];
+   serviceLegCategories: any[];
+  containerTypes: any[];
+  containerSizes: any[];
   accounts: AccountOption[];
   contacts: ContactOption[];
   opportunities: OpportunityOption[];
   isLoadingOpportunities: boolean;
+  isLoadingServices: boolean;
   resolvedTenantId: string | null;
   setResolvedTenantId: (id: string | null) => void;
   setAccounts: (updater: (prev: AccountOption[]) => AccountOption[]) => void;
@@ -74,6 +73,50 @@ export interface SaveQuoteParams {
   quoteId?: string;
   data: QuoteFormValues;
 }
+
+export const buildMissingOptionsOrChargesAnomaly = (
+  version: any,
+  quoteId: string,
+  opts?: { strictGuards?: boolean }
+) => {
+  const options = Array.isArray(version.quotation_version_options)
+    ? version.quotation_version_options
+    : [];
+
+  const optionCount = options.length;
+
+  const chargeCount = options.reduce((sum: number, opt: any) => {
+    const legs = Array.isArray(opt.quotation_version_option_legs)
+      ? opt.quotation_version_option_legs
+      : [];
+    const legCharges = legs.reduce((innerSum: number, leg: any) => {
+      const charges = Array.isArray(leg.quotation_version_option_leg_charges)
+        ? leg.quotation_version_option_leg_charges
+        : [];
+      return innerSum + charges.length;
+    }, 0);
+    return sum + legCharges;
+  }, 0);
+
+  const hasMissingOptionsOrCharges = optionCount === 0 || chargeCount === 0;
+  const strictGuards = opts?.strictGuards ?? false;
+
+  return {
+    type: 'MISSING_OPTIONS_OR_CHARGES',
+    severity: strictGuards && hasMissingOptionsOrCharges ? 'ERROR' : 'WARNING',
+    message:
+      strictGuards && hasMissingOptionsOrCharges
+        ? 'Quote version saved with missing options or charges (Phase2 Guard)'
+        : 'Quote version saved without options or charges',
+    timestamp: new Date().toISOString(),
+    quote_id: quoteId,
+    version_id: version.id,
+    version_number: version.version_number,
+    tenant_id: version.tenant_id,
+    option_count: optionCount,
+    charge_count: chargeCount,
+  };
+};
 
 export interface QuoteRepositoryFormOps {
   isHydrating: boolean;
@@ -303,15 +346,228 @@ export function useQuoteRepositoryContext(): QuoteRepositoryContextData {
     enabled: !!tenantId,
   });
 
+  // 7. Shipping Terms
+  const { data: shippingTerms = [] } = useQuery<any[]>({
+    queryKey: quoteKeys.reference.shippingTerms(),
+    queryFn: async () => {
+      try {
+        const { data, error } = await supabase
+          .from('incoterms')
+          .select('id, name:incoterm_name, code:incoterm_code, description')
+          .eq('is_active', true)
+          .order('incoterm_code');
+        if (error) throw error;
+        return data || [];
+      } catch (e: any) {
+        debug.error('Failed to load shipping terms', { error: e });
+        console.error('[useQuoteRepository] Failed to load shipping terms', e);
+        return [];
+      }
+    },
+    staleTime: 1000 * 60 * 60 * 24,
+  });
+
+  // 8. Currencies
+  const { data: currencies = [] } = useQuery<any[]>({
+    queryKey: quoteKeys.reference.currencies(),
+    queryFn: async () => {
+      try {
+        const { data, error } = await supabase
+          .from('currencies')
+          .select('id, code, name, symbol')
+          .eq('is_active', true)
+          .order('code');
+        if (error) throw error;
+        return data || [];
+      } catch (e: any) {
+        debug.error('Failed to load currencies', { error: e });
+        console.error('[useQuoteRepository] Failed to load currencies', e);
+        return [];
+      }
+    },
+    staleTime: 1000 * 60 * 60 * 24,
+  });
+
+  // 9. Charge Categories
+  const { data: chargeCategories = [] } = useQuery<any[]>({
+    queryKey: ['quote', 'reference', 'charge_categories'],
+    queryFn: async () => {
+      try {
+        const { data, error } = await scopedDb
+          .from('charge_categories', true)
+          .select('id, code, name');
+        if (error) throw error;
+        return data || [];
+      } catch (e: any) {
+        debug.error('Failed to load charge categories', { error: e, tenantId });
+        console.error('[useQuoteRepository] Failed to load charge categories', e);
+        return [];
+      }
+    },
+    enabled: !!tenantId,
+    staleTime: 1000 * 60 * 60,
+  });
+
+  // 10. Charge Sides
+  const { data: chargeSides = [] } = useQuery<any[]>({
+    queryKey: ['quote', 'reference', 'charge_sides'],
+    queryFn: async () => {
+      try {
+        const { data, error } = await scopedDb
+          .from('charge_sides', true)
+          .select('id, code, name');
+        if (error) throw error;
+        return data || [];
+      } catch (e: any) {
+        debug.error('Failed to load charge sides', { error: e, tenantId });
+        console.error('[useQuoteRepository] Failed to load charge sides', e);
+        return [];
+      }
+    },
+    enabled: !!tenantId,
+    staleTime: 1000 * 60 * 60,
+  });
+
+  // 11. Charge Bases
+  const { data: chargeBases = [] } = useQuery<any[]>({
+    queryKey: ['quote', 'reference', 'charge_bases'],
+    queryFn: async () => {
+      try {
+        const { data, error } = await scopedDb
+          .from('charge_bases', true)
+          .select('id, code, name');
+        if (error) throw error;
+        return data || [];
+      } catch (e: any) {
+        debug.error('Failed to load charge bases', { error: e, tenantId });
+        console.error('[useQuoteRepository] Failed to load charge bases', e);
+        return [];
+      }
+    },
+    enabled: !!tenantId,
+    staleTime: 1000 * 60 * 60,
+  });
+
+  // 12. Service Modes
+  const { data: serviceModes = [] } = useQuery<any[]>({
+    queryKey: ['quote', 'reference', 'service_modes'],
+    queryFn: async () => {
+      try {
+        const { data, error } = await scopedDb
+          .from('service_modes', true)
+          .select('id, code, name');
+        if (error) throw error;
+        return data || [];
+      } catch (e: any) {
+        debug.error('Failed to load service modes', { error: e, tenantId });
+        console.error('[useQuoteRepository] Failed to load service modes', e);
+        return [];
+      }
+    },
+    enabled: !!tenantId,
+    staleTime: 1000 * 60 * 60,
+  });
+
+  // 13. Trade Directions
+  const { data: tradeDirections = [] } = useQuery<any[]>({
+    queryKey: ['quote', 'reference', 'trade_directions'],
+    queryFn: async () => {
+      try {
+        const { data, error } = await scopedDb
+          .from('trade_directions', true)
+          .select('id, code, name');
+        if (error) throw error;
+        return data || [];
+      } catch (e: any) {
+        debug.error('Failed to load trade directions', { error: e, tenantId });
+        console.error('[useQuoteRepository] Failed to load trade directions', e);
+        return [];
+      }
+    },
+    enabled: !!tenantId,
+    staleTime: 1000 * 60 * 60,
+  });
+
+  // 14. Service Leg Categories
+  const { data: serviceLegCategories = [] } = useQuery<any[]>({
+    queryKey: ['quote', 'reference', 'service_leg_categories'],
+    queryFn: async () => {
+      try {
+        const { data, error } = await scopedDb
+          .from('service_leg_categories', true)
+          .select('id, name, code, description, sort_order');
+        if (error) throw error;
+        return data || [];
+      } catch (e: any) {
+        debug.error('Failed to load service leg categories', { error: e, tenantId });
+        console.error('[useQuoteRepository] Failed to load service leg categories', e);
+        return [];
+      }
+    },
+    enabled: !!tenantId,
+    staleTime: 1000 * 60 * 60,
+  });
+
+  // 15. Container Types
+  const { data: containerTypes = [] } = useQuery<any[]>({
+    queryKey: ['quote', 'reference', 'container_types'],
+    queryFn: async () => {
+      try {
+        const { data, error } = await scopedDb
+          .from('container_types', true)
+          .select('id, name, code');
+        if (error) throw error;
+        return data || [];
+      } catch (e: any) {
+        debug.error('Failed to load container types', { error: e, tenantId });
+        console.error('[useQuoteRepository] Failed to load container types', e);
+        return [];
+      }
+    },
+    enabled: !!tenantId,
+    staleTime: 1000 * 60 * 60,
+  });
+
+  // 16. Container Sizes
+  const { data: containerSizes = [] } = useQuery<any[]>({
+    queryKey: ['quote', 'reference', 'container_sizes'],
+    queryFn: async () => {
+      try {
+        const { data, error } = await scopedDb
+          .from('container_sizes', true)
+          .select('id, name, code');
+        if (error) throw error;
+        return data || [];
+      } catch (e: any) {
+        debug.error('Failed to load container sizes', { error: e, tenantId });
+        console.error('[useQuoteRepository] Failed to load container sizes', e);
+        return [];
+      }
+    },
+    enabled: !!tenantId,
+    staleTime: 1000 * 60 * 60,
+  });
+
   return {
     serviceTypes: serviceData.serviceTypes,
     services: deduplicateById(injectedServices, serviceData.services),
     carriers,
     ports,
+    shippingTerms,
+    currencies,
+    chargeCategories,
+    chargeSides,
+    chargeBases,
+    serviceModes,
+    tradeDirections,
+    serviceLegCategories,
+    containerTypes,
+    containerSizes,
     accounts: deduplicateById(injectedAccounts, accounts),
     contacts: deduplicateById(injectedContacts, contacts),
     opportunities: deduplicateById(injectedOpportunities, opportunities),
     isLoadingOpportunities,
+    isLoadingServices: serviceQuery.isLoading,
     setResolvedTenantId,
     resolvedTenantId: tenantId ?? null,
     setAccounts: (updater) => setInjectedAccounts(updater),
@@ -335,6 +591,10 @@ export function useQuoteRepositoryForm(opts: {
   const { roles } = useAuth();
   const debug = useDebug('Sales', 'useQuoteRepositoryForm');
   const queryClient = useQueryClient();
+  const { enabled: phase2GuardsEnabled } = useAppFeatureFlag(
+    FEATURE_FLAGS.QUOTATION_PHASE2_GUARDS,
+    false
+  );
   const hydratedQuoteId = useRef<string | null>(null);
   const {
     resolvedTenantId,
@@ -475,7 +735,7 @@ export function useQuoteRepositoryForm(opts: {
     const latestVersion = versionsQuery.data;
 
     // Map Options and Legs (Moved up for progressive loading)
-    const mappedOptions = latestVersion?.quotation_version_options?.map((opt: any) => {
+        const mappedOptions = latestVersion?.quotation_version_options?.map((opt: any) => {
         // Calculate total from leg charges if option total is missing/zero
         const legs = opt.quotation_version_option_legs || [];
         const chargesTotal = legs.reduce((acc: number, leg: any) => {
@@ -790,7 +1050,66 @@ export function useQuoteRepositoryForm(opts: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [coreQuery.data, versionsQuery.data]);
 
-  // --- Save mutation ---
+  const validateSavedQuote = async (quoteId: string, opts?: { strictGuards?: boolean }) => {
+    if (!quoteId) return;
+    if (process.env.NODE_ENV === 'test') return;
+
+    const { data, error } = await scopedDb
+      .from('quotation_versions')
+      .select(`
+        id,
+        quote_id,
+        tenant_id,
+        version_number,
+        anomalies,
+        quotation_version_options (
+          id,
+          quotation_version_option_legs (
+            id,
+            quotation_version_option_leg_charges:quote_charges ( id )
+          )
+        )
+      `)
+      .eq('quote_id', quoteId)
+      .order('version_number', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error || !data) return;
+
+    const options = (data as any).quotation_version_options || [];
+    const hasOptions = Array.isArray(options) && options.length > 0;
+    const hasCharges = options.some((opt: any) =>
+      Array.isArray(opt.quotation_version_option_legs) &&
+      opt.quotation_version_option_legs.some(
+        (leg: any) =>
+          Array.isArray(leg.quotation_version_option_leg_charges) &&
+          leg.quotation_version_option_leg_charges.length > 0
+      )
+    );
+
+    if (!hasOptions || !hasCharges) {
+      toast.warning('Quote saved but has no options or charges. Please review before sending.');
+
+      try {
+        const currentAnomalies = Array.isArray((data as any).anomalies)
+          ? (data as any).anomalies
+          : [];
+
+        const anomaly = buildMissingOptionsOrChargesAnomaly(data, quoteId, {
+          strictGuards: opts?.strictGuards,
+        });
+
+        await scopedDb
+          .from('quotation_versions')
+          .update({
+            anomalies: [...currentAnomalies, anomaly],
+          })
+          .eq('id', (data as any).id);
+      } catch {
+      }
+    }
+  };
 
   const saveMutation = useMutation({
     mutationFn: async (params: SaveQuoteParams): Promise<string> => {
@@ -821,7 +1140,7 @@ export function useQuoteRepositoryForm(opts: {
         service_id: uuidOrNull(data.service_id),
         incoterms: data.incoterms || null,
         shipping_term_id: uuidOrNull(data.shipping_term_id),
-        incoterm_id: uuidOrNull(data.shipping_term_id),
+        [dbField('quote', 'incoterms')]: uuidOrNull(data.shipping_term_id),
         currency_id: uuidOrNull(data.currency_id),
         carrier_id: uuidOrNull(data.carrier_id),
         consignee_id: uuidOrNull(data.consignee_id),
@@ -909,22 +1228,39 @@ export function useQuoteRepositoryForm(opts: {
             package_size_id: config.package_size_id || null,
             remarks: config.remarks || null,
         })) || [],
-        options: data.options?.map((option) => ({
+        options: data.options?.map((option: any) => ({
             id: uuidOrUndefined(option.id),
-            is_selected: option.is_primary,
+            [dbField('option', 'isPrimary')]: option.is_primary,
+            total_amount: typeof option.total_amount === 'number' ? option.total_amount : undefined,
+            currency: option.currency || undefined,
+            transit_time_days: typeof option.transit_time_days === 'number' ? option.transit_time_days : undefined,
             legs: option.legs?.map((leg: any) => ({
                 id: uuidOrUndefined(leg.id),
                 carrier_id: uuidOrNull(leg.carrier_id),
                 transport_mode: leg.transport_mode,
+                service_only_category: leg.service_only_category || null,
+                leg_type: leg.leg_type || 'transport',
                 origin_location_name: leg.origin_location_name,
                 destination_location_name: leg.destination_location_name,
-                transit_time_hours: leg.transit_time_days 
+                [dbField('leg', 'transitTime')]: leg.transit_time_days 
                     ? leg.transit_time_days * 24 
-                    : (leg.transit_time ? parseTransitTime(leg.transit_time) : null),
+                    : parseTransitTimeToHours(leg.transit_time),
                 flight_number: leg.flight_number,
                 voyage_number: leg.voyage_number,
                 departure_date: leg.departure_date,
-                arrival_date: leg.arrival_date
+                arrival_date: leg.arrival_date,
+                charges: (leg.charges || []).map((charge: any) => ({
+                    id: uuidOrUndefined(charge.id),
+                    [dbField('charge', 'category')]: charge.category_id || undefined,
+                    [dbField('charge', 'side')]: charge.charge_side_id || undefined,
+                    amount: typeof charge.amount === 'number' ? charge.amount : undefined,
+                    currency: charge.currency || undefined,
+                    charge_code: charge.charge_code || undefined,
+                    basis: charge.basis || undefined,
+                    unit_price: typeof charge.unit_price === 'number' ? charge.unit_price : undefined,
+                    quantity: typeof charge.quantity === 'number' ? charge.quantity : undefined,
+                    note: charge.note || undefined
+                }))
             })) || []
         })) || []
       };
@@ -940,8 +1276,11 @@ export function useQuoteRepositoryForm(opts: {
 
       return String(savedId);
     },
-    onSuccess: () => {
+    onSuccess: async (savedId) => {
       queryClient.invalidateQueries({ queryKey: quoteKeys.all });
+      if (savedId) {
+        await validateSavedQuote(String(savedId), { strictGuards: phase2GuardsEnabled });
+      }
     },
   });
 

@@ -1,4 +1,4 @@
-import { Home, Building2, Users, UserPlus, CheckSquare, Package, FileText, Settings, LogOut, TrendingUp, GitBranch, ArrowRightLeft, Mail, Loader2, Activity } from 'lucide-react';
+import { Home, Building2, Users, UserPlus, CheckSquare, Package, FileText, Settings, LogOut, TrendingUp, GitBranch, ArrowRightLeft, Mail, Loader2, Activity, ChevronDown, ChevronRight, CreditCard, DollarSign } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
@@ -18,8 +18,10 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { RoleGuard } from '@/components/auth/RoleGuard';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 export function AppSidebar() {
   const { state } = useSidebar();
@@ -28,6 +30,17 @@ export function AppSidebar() {
   const location = useLocation();
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [isSigningOut, setIsSigningOut] = useState(false);
+
+  // Group open/close states
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
+    logistics: false,
+    financials: false,
+    admin: false,
+  });
+
+  const toggleGroup = (group: string) => {
+    setOpenGroups(prev => ({ ...prev, [group]: !prev[group] }));
+  };
 
   const handleSignOut = async () => {
     if (isSigningOut) return;
@@ -85,7 +98,7 @@ export function AppSidebar() {
     icon: i.icon,
     roles: (i as any).roles,
     permissions: (i as any).permissions,
-  }));
+  })).filter(i => !['Dashboards', 'Reports', 'Quotes'].includes(i.title));
 
   const logisticsItems = (APP_MENU.find((m) => m.label === 'Logistics')?.items ?? []).map((i) => ({
     title: i.name,
@@ -95,21 +108,25 @@ export function AppSidebar() {
     permissions: (i as any).permissions,
   }));
 
-  const billingItems = (APP_MENU.find((m) => m.label === 'Billing')?.items ?? []).map((i) => ({
-    title: i.name,
-    url: i.path,
-    icon: i.icon,
-    roles: (i as any).roles,
-    permissions: (i as any).permissions,
-  }));
-
-  const financeItems = (APP_MENU.find((m) => m.label === 'Finance')?.items ?? []).map((i) => ({
-    title: i.name,
-    url: i.path,
-    icon: i.icon,
-    roles: (i as any).roles,
-    permissions: (i as any).permissions,
-  }));
+  const financialItems = [
+    ...(APP_MENU.find((m) => m.label === 'Sales')?.items ?? [])
+      .filter(i => i.name === 'Quotes')
+      .map(i => ({ title: i.name, url: i.path, icon: i.icon, roles: (i as any).roles, permissions: (i as any).permissions })),
+    ...(APP_MENU.find((m) => m.label === 'Finance')?.items ?? []).map((i) => ({
+      title: i.name,
+      url: i.path,
+      icon: i.icon,
+      roles: (i as any).roles,
+      permissions: (i as any).permissions,
+    })),
+    ...(APP_MENU.find((m) => m.label === 'Billing')?.items ?? []).map((i) => ({
+      title: i.name,
+      url: i.path,
+      icon: i.icon,
+      roles: (i as any).roles,
+      permissions: (i as any).permissions,
+    })),
+  ];
 
   const adminItems = [
     { title: 'Lead Assignment', url: '/dashboard/lead-assignment', icon: GitBranch, roles: ['platform_admin', 'tenant_admin'], permissions: ['admin.lead_assignment.manage'] },
@@ -122,143 +139,135 @@ export function AppSidebar() {
   ];
 
   const getNavClass = ({ isActive }: { isActive: boolean }) =>
-    isActive ? 'bg-primary/10 text-primary font-medium' : 'hover:bg-muted/50';
+    cn(
+      "flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors",
+      isActive ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground hover:bg-muted hover:text-foreground"
+    );
+
+  const renderMenuItem = (item: any) => {
+    const node = (
+      <SidebarMenuItem key={item.title}>
+        <SidebarMenuButton asChild tooltip={collapsed ? item.title : undefined}>
+          <NavLink to={item.url} end={item.url === '/dashboard'} className={getNavClass}>
+            <item.icon className="h-4 w-4 shrink-0" />
+            {!collapsed && <span className="truncate">{item.title}</span>}
+          </NavLink>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+    );
+
+    if (item.roles || item.permissions) {
+      return (
+        <RoleGuard key={item.title} roles={item.roles || []} permissions={item.permissions}>
+          {node}
+        </RoleGuard>
+      );
+    }
+    return node;
+  };
 
   return (
     <Sidebar className={collapsed ? 'w-14' : 'w-64'} collapsible="icon">
+      <div className="flex h-16 items-center border-b px-4 shrink-0">
+        {collapsed ? (
+          <div className="flex w-full justify-center">
+            <Logo size={28} />
+          </div>
+        ) : (
+          <Logo size={32} showWordmark wordmarkClassName="hidden sm:block" />
+        )}
+      </div>
+
       <ScrollArea ref={scrollRef} className="flex-1">
-        <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>
-            {collapsed ? (
-              <div className="flex justify-center">
-                <Logo size={32} />
-              </div>
-            ) : (
-              <Logo size={36} showWordmark wordmarkClassName="hidden sm:block" />
-            )}
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {salesItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <NavLink to={item.url} end className={getNavClass}>
-                      <item.icon className="h-4 w-4" />
-                      {!collapsed && <span>{item.title}</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        <SidebarContent className="py-2">
+          {/* Core Sales & CRM Group - Always Visible */}
+          <SidebarGroup>
+            <SidebarGroupLabel className={collapsed ? 'hidden' : ''}>CRM & Sales</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {salesItems.map(renderMenuItem)}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
 
-        <SidebarGroup>
-          <SidebarGroupLabel>
-            {!collapsed && <span>Logistics</span>}
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {logisticsItems.map((item) => {
-                const node = (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild>
-                      <NavLink to={item.url} className={getNavClass}>
-                        <item.icon className="h-4 w-4" />
-                        {!collapsed && <span>{item.title}</span>}
-                      </NavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-                return item.roles || item.permissions ? (
-                  <RoleGuard key={item.title} roles={(item.roles as any) || []} permissions={item.permissions as any}>
-                    {node}
-                  </RoleGuard>
-                ) : node;
-              })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+          {/* Financials Group - Collapsible */}
+          <Collapsible open={openGroups.financials} onOpenChange={() => toggleGroup('financials')}>
+            <SidebarGroup>
+              <SidebarGroupLabel asChild>
+                <CollapsibleTrigger className="flex w-full items-center justify-between hover:text-foreground transition-colors group">
+                  {!collapsed && (
+                    <>
+                      <span>Financials</span>
+                      <ChevronDown className={cn("h-3 w-3 transition-transform duration-200", !openGroups.financials && "-rotate-90")} />
+                    </>
+                  )}
+                </CollapsibleTrigger>
+              </SidebarGroupLabel>
+              <CollapsibleContent>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    {financialItems.map(renderMenuItem)}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </CollapsibleContent>
+            </SidebarGroup>
+          </Collapsible>
 
-        <SidebarGroup>
-          <SidebarGroupLabel>
-            {!collapsed && <span>Billing</span>}
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {billingItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <NavLink to={item.url} className={getNavClass}>
-                      <item.icon className="h-4 w-4" />
-                      {!collapsed && <span>{item.title}</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+          {/* Logistics Group - Collapsible */}
+          <Collapsible open={openGroups.logistics} onOpenChange={() => toggleGroup('logistics')}>
+            <SidebarGroup>
+              <SidebarGroupLabel asChild>
+                <CollapsibleTrigger className="flex w-full items-center justify-between hover:text-foreground transition-colors group">
+                  {!collapsed && (
+                    <>
+                      <span>Logistics</span>
+                      <ChevronDown className={cn("h-3 w-3 transition-transform duration-200", !openGroups.logistics && "-rotate-90")} />
+                    </>
+                  )}
+                </CollapsibleTrigger>
+              </SidebarGroupLabel>
+              <CollapsibleContent>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    {logisticsItems.map(renderMenuItem)}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </CollapsibleContent>
+            </SidebarGroup>
+          </Collapsible>
 
-        <SidebarGroup>
-          <SidebarGroupLabel>
-            {!collapsed && <span>Finance</span>}
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {financeItems.map((item) => {
-                const node = (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild>
-                      <NavLink to={item.url} className={getNavClass}>
-                        <item.icon className="h-4 w-4" />
-                        {!collapsed && <span>{item.title}</span>}
-                      </NavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-                return item.roles || item.permissions ? (
-                  <RoleGuard key={item.title} roles={(item.roles as any) || []} permissions={item.permissions as any}>
-                    {node}
-                  </RoleGuard>
-                ) : node;
-              })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        <SidebarGroup>
-          <SidebarGroupLabel>
-            {!collapsed && <span>Administration</span>}
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {adminItems.map((item) => (
-                <RoleGuard key={item.title} roles={item.roles as any} permissions={item.permissions as any}>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild>
-                      <NavLink to={item.url} className={getNavClass}>
-                        <item.icon className="h-4 w-4" />
-                        {!collapsed && <span>{item.title}</span>}
-                      </NavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                </RoleGuard>
-              ))}
-              <RoleGuard roles={["platform_admin","tenant_admin","franchise_admin"] as any} permissions={["admin.settings.manage"] as any}>
-                <SidebarMenuItem>
-                  <SidebarMenuButton asChild>
-                    <NavLink to="/dashboard/settings" className={getNavClass}>
-                      <Settings className="h-4 w-4" />
-                      {!collapsed && <span>Settings</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              </RoleGuard>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+          {/* Admin Group - Collapsible */}
+          <Collapsible open={openGroups.admin} onOpenChange={() => toggleGroup('admin')}>
+            <SidebarGroup>
+              <SidebarGroupLabel asChild>
+                <CollapsibleTrigger className="flex w-full items-center justify-between hover:text-foreground transition-colors group">
+                  {!collapsed && (
+                    <>
+                      <span>Administration</span>
+                      <ChevronDown className={cn("h-3 w-3 transition-transform duration-200", !openGroups.admin && "-rotate-90")} />
+                    </>
+                  )}
+                </CollapsibleTrigger>
+              </SidebarGroupLabel>
+              <CollapsibleContent>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    {adminItems.map(renderMenuItem)}
+                    <RoleGuard roles={["platform_admin","tenant_admin","franchise_admin"] as any} permissions={["admin.settings.manage"] as any}>
+                      <SidebarMenuItem>
+                        <SidebarMenuButton asChild tooltip={collapsed ? "Settings" : undefined}>
+                          <NavLink to="/dashboard/settings" className={getNavClass}>
+                            <Settings className="h-4 w-4 shrink-0" />
+                            {!collapsed && <span>Settings</span>}
+                          </NavLink>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    </RoleGuard>
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </CollapsibleContent>
+            </SidebarGroup>
+          </Collapsible>
         </SidebarContent>
       </ScrollArea>
 
@@ -277,6 +286,7 @@ export function AppSidebar() {
           className="w-full justify-start"
           onClick={handleSignOut}
           disabled={isSigningOut}
+          aria-label={collapsed ? "Sign Out" : undefined}
         >
           {isSigningOut ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}
           {!collapsed && <span className="ml-2">{isSigningOut ? 'Signing Out...' : 'Sign Out'}</span>}

@@ -2,7 +2,8 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { QuoteOptionService } from '@/services/QuoteOptionService';
-import { LogisticsPlugin } from '@/plugins/logistics/LogisticsPlugin';
+import { QuoteTransformService } from '@/lib/services/quote-transform.service';
+import { QuoteTransferSchema } from '@/lib/schemas/quote-transfer';
 import { logger } from '@/lib/logger';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -195,5 +196,83 @@ describe('AI Quote Transfer Integration', () => {
         expect(verifiedOption.ai_explanation).toBe("Selected for high reliability and optimal route.");
         // The source might be 'ai_generated' or 'AI Smart Engine' depending on logic priority
         expect(['AI Smart Engine', 'ai_generated']).toContain(verifiedOption.source);
+    });
+
+    it('should transform Quick Quote transfer payload into quote form with charges', () => {
+        const transferPayload = {
+            origin: 'Shanghai',
+            destination: 'Los Angeles',
+            mode: 'ocean',
+            accountId: 'acc_1',
+            trade_direction: 'export',
+            selectedRates: [
+                {
+                    id: 'opt_1',
+                    carrier_name: 'COSCO',
+                    service_type: 'Standard',
+                    total_amount: 1500,
+                    currency: 'USD',
+                    transitTime: '25 Days',
+                    mode: 'sea',
+                    ai_generated: true,
+                    reliability_score: 90,
+                    legs: [
+                        {
+                            origin: 'Shanghai',
+                            destination: 'Los Angeles',
+                            mode: 'sea'
+                        }
+                    ],
+                    charges: [
+                        { description: 'Ocean Freight', amount: 1200, currency: 'USD', category: 'Freight' },
+                        { description: 'THC', amount: 300, currency: 'USD', category: 'Local Charges' }
+                    ]
+                }
+            ],
+            marketAnalysis: 'Integration test transfer payload',
+            confidenceScore: 80,
+            anomalies: ['Test anomaly']
+        };
+
+        const validated = QuoteTransferSchema.parse(transferPayload);
+
+        const masterData: any = {
+            serviceTypes: [{ id: 'st1', name: 'Standard', code: 'STD' }],
+            carriers: [{ id: 'c1', carrier_name: 'COSCO', scac: 'COSU' }],
+            ports: [
+                { id: 'p1', location_name: 'Shanghai', location_code: 'CNSHA', country: 'CN' },
+                { id: 'p2', location_name: 'Los Angeles', location_code: 'USLAX', country: 'US' }
+            ],
+            containerTypes: [],
+            containerSizes: [],
+            shippingTerms: [{ id: 'inc1', code: 'CIF', name: 'Cost Insurance Freight' }]
+        };
+
+        const form = QuoteTransformService.transformToQuoteForm(validated, masterData);
+
+        expect(form.title).toContain('Shanghai');
+        expect(form.title).toContain('Los Angeles');
+        expect(form.options && form.options.length).toBe(1);
+
+        // Incoterms resolution: export defaults to CIF, mapped to shipping term id
+        expect(form.incoterms).toBe('inc1');
+
+        // Ports resolution
+        expect(form.origin_port_id).toBe('p1');
+        expect(form.destination_port_id).toBe('p2');
+
+        // Items mapping: for this simple payload, we still expect at least one item
+        expect(Array.isArray(form.items)).toBe(true);
+        expect((form.items as any[]).length).toBeGreaterThanOrEqual(1);
+
+        const option = form.options?.[0] as any;
+        expect(option.total_amount).toBe(1500);
+        expect(option.legs && option.legs.length).toBe(1);
+        expect(option.legs?.[0].charges && option.legs?.[0].charges.length).toBe(2);
+        expect(option.legs?.[0].charges?.[0]).toMatchObject({
+            description: 'Ocean Freight',
+            amount: 1200,
+            currency: 'USD'
+        });
     });
 });

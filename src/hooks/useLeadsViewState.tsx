@@ -26,6 +26,10 @@ type LeadsWorkspaceFilters = {
   valueMax: string;
   createdStart: string;
   createdEnd: string;
+  page: number;
+  pageSize: number;
+  sortField: string;
+  sortDirection: 'asc' | 'desc';
 };
 
 type LeadsPipelineState = {
@@ -80,6 +84,10 @@ const defaultWorkspace: LeadsWorkspaceFilters = {
   valueMax: '',
   createdStart: '',
   createdEnd: '',
+  page: 1,
+  pageSize: 10,
+  sortField: 'created_at',
+  sortDirection: 'desc',
 };
 
 const defaultState: LeadsViewState = {

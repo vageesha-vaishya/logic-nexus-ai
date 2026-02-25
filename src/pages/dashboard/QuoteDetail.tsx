@@ -1,9 +1,8 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { QuoteFormRefactored as QuoteForm } from '@/components/sales/quote-form/QuoteFormRefactored';
 import { QuotationVersionHistory } from '@/components/sales/QuotationVersionHistory';
-import { MultiModalQuoteComposer } from '@/components/sales/MultiModalQuoteComposer';
+import { UnifiedQuoteComposer } from '@/components/sales/unified-composer/UnifiedQuoteComposer';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList } from '@/components/ui/breadcrumb';
@@ -12,6 +11,7 @@ import { SendQuoteDialog } from '@/components/sales/SendQuoteDialog';
 import { QuotePreviewModal } from '@/components/sales/QuotePreviewModal';
 import { useDebug } from '@/hooks/useDebug';
 import { Button } from "@/components/ui/button";
+import { DetailScreenTemplate } from '@/components/system/DetailScreenTemplate';
 
 export default function QuoteDetail() {
   const { id } = useParams();
@@ -180,10 +180,6 @@ export default function QuoteDetail() {
     };
   }, [resolvedId]);
 
-  const handleSuccess = () => {
-    toast.success('Quote updated successfully');
-  };
-
   if (loading) {
     return (
       <DashboardLayout>
@@ -194,61 +190,49 @@ export default function QuoteDetail() {
 
   return (
     <DashboardLayout>
-      <div className="max-w-6xl mx-auto space-y-6">
-        <div className="space-y-2">
-          <Breadcrumb>
-            <BreadcrumbList>
-              <BreadcrumbItem>
-                <BreadcrumbLink href="/dashboard">Dashboard</BreadcrumbLink>
-              </BreadcrumbItem>
-              <BreadcrumbItem>
-                <BreadcrumbLink href="/dashboard/quotes">Quotes</BreadcrumbLink>
-              </BreadcrumbItem>
-              <BreadcrumbItem>
-                <BreadcrumbLink href={`/dashboard/quotes/${resolvedId ?? id}`}>Edit</BreadcrumbLink>
-              </BreadcrumbItem>
-            </BreadcrumbList>
-          </Breadcrumb>
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between">
-            <h1 className="text-3xl font-bold">Edit Quote</h1>
-            <div className="flex gap-2">
-              {resolvedId && (
-                <>
-                  <Button 
-                      variant="outline" 
-                      onClick={() => navigate(`/dashboard/bookings/new?quoteId=${resolvedId}`)}
-                      data-testid="convert-booking-btn"
-                  >
-                      Convert to Booking
-                  </Button>
-                  <QuotePreviewModal 
-                    quoteId={resolvedId} 
-                    quoteNumber={quoteNumber ?? (resolvedId ?? '')} 
-                    versionId={versionId || undefined}
-                  />
-                  <ShareQuoteDialog quoteId={resolvedId} quoteNumber={quoteNumber ?? (resolvedId ?? '')} />
-                  <SendQuoteDialog 
-                      quoteId={resolvedId} 
-                      quoteNumber={quoteNumber ?? (resolvedId ?? '')} 
-                      versionId={versionId || ''}
-                  />
-                </>
-              )}
-            </div>
-          </div>
+      <DetailScreenTemplate
+        title={`Edit Quote: ${quoteNumber ?? id}`}
+        breadcrumbs={[
+          { label: 'Dashboard', to: '/dashboard' },
+          { label: 'Quotes', to: '/dashboard/quotes' },
+          { label: quoteNumber ?? (id || 'Detail') },
+        ]}
+        actions={
+          resolvedId && (
+            <>
+              <Button 
+                  variant="outline" 
+                  onClick={() => navigate(`/dashboard/bookings/new?quoteId=${resolvedId}`)}
+                  data-testid="convert-booking-btn"
+              >
+                  Convert to Booking
+              </Button>
+              <QuotePreviewModal 
+                quoteId={resolvedId} 
+                quoteNumber={quoteNumber ?? (resolvedId ?? '')} 
+                versionId={versionId || undefined}
+              />
+              <ShareQuoteDialog quoteId={resolvedId} quoteNumber={quoteNumber ?? (resolvedId ?? '')} />
+              <SendQuoteDialog 
+                  quoteId={resolvedId} 
+                  quoteNumber={quoteNumber ?? (resolvedId ?? '')} 
+                  versionId={versionId || ''}
+              />
+            </>
+          )
+        }
+      >
+        <div className="space-y-6">
+          <UnifiedQuoteComposer
+              quoteId={resolvedId ?? id}
+              versionId={versionId || undefined}
+          />
+          <QuotationVersionHistory 
+              quoteId={resolvedId ?? (id as string)} 
+              key={versionId} // Force reload when version is resolved/created
+          />
         </div>
-        <QuoteForm 
-            quoteId={resolvedId ?? id} 
-            quoteNumber={quoteNumber ?? (resolvedId ?? '')}
-            versionId={versionId || undefined}
-            onSuccess={handleSuccess} 
-        />
-        <QuotationVersionHistory 
-            quoteId={resolvedId ?? id as string} 
-            key={versionId} // Force reload when version is resolved/created
-        />
-        
-      </div>
+      </DetailScreenTemplate>
     </DashboardLayout>
   );
 }

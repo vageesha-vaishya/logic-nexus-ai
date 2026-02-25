@@ -2,7 +2,7 @@ import { useState, useEffect, Suspense, lazy } from 'react';
 import { useForm, FormProvider } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/components/ui/button';
-import { QuoteDataProvider, useQuoteContext } from './QuoteContext';
+import { QuoteDataProvider } from './QuoteContext';
 import { QuoteHeader } from './QuoteHeader';
 import { QuoteLogistics } from './QuoteLogistics';
 // Lazy load non-critical components
@@ -11,7 +11,7 @@ const QuoteFinancials = lazy(() => import('./QuoteFinancials').then(module => ({
 
 import { quoteSchema, QuoteFormValues } from './types';
 import { QuoteErrorBoundary } from './QuoteErrorBoundary';
-import { MultiModalQuoteComposer } from '@/components/sales/MultiModalQuoteComposer';
+import { UnifiedQuoteComposer } from '@/components/sales/unified-composer/UnifiedQuoteComposer';
 import { Loader2, Save, X, LayoutDashboard } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQuoteRepositoryForm } from './useQuoteRepository';
@@ -28,10 +28,11 @@ interface QuoteFormProps {
   initialData?: Partial<QuoteFormValues>;
   autoSave?: boolean;
   initialViewMode?: 'form' | 'composer';
+  showPreviewInFormHeader?: boolean;
 }
 
-function QuoteFormContent({ quoteId, quoteNumber, versionId, onSuccess, initialData, autoSave, initialViewMode = 'form' }: QuoteFormProps) {
-  const { resolvedTenantId } = useQuoteContext();
+function QuoteFormContent({ quoteId, quoteNumber, versionId, onSuccess, initialData, autoSave, initialViewMode = 'form', showPreviewInFormHeader = true }: QuoteFormProps) {
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasAutoSaved, setHasAutoSaved] = useState(false);
   const [showCatalogDialog, setShowCatalogDialog] = useState(false);
@@ -233,8 +234,8 @@ function QuoteFormContent({ quoteId, quoteNumber, versionId, onSuccess, initialD
                     </p>
                 </div>
             </div>
-            <div className="flex gap-3">
-                 {quoteId && (
+                <div className="flex gap-3">
+                 {quoteId && showPreviewInFormHeader && (
                     <>
                         <QuotePreviewModal 
                             quoteId={quoteId} 
@@ -252,26 +253,9 @@ function QuoteFormContent({ quoteId, quoteNumber, versionId, onSuccess, initialD
                             disabled={isSubmitting || isHydrating}
                         >
                             <LayoutDashboard className="h-4 w-4" />
-                            {isSubmitting ? 'Saving...' : (viewMode === 'form' ? 'Save & Switch to Composer' : 'Back to Form')}
+                            {isSubmitting ? 'Saving...' : (viewMode === 'form' ? 'Save & Compose' : 'Back to Form')}
                         </Button>
                     </>
-                 )}
-                 {quoteId && viewMode === 'form' && (
-                     <Button 
-                        type="button" 
-                        variant="secondary"
-                        onClick={form.handleSubmit(async (data) => {
-                            const success = await onSubmit(data);
-                            if (success) {
-                                setViewMode('composer');
-                            }
-                        }, onInvalid)}
-                        disabled={isSubmitting || isHydrating}
-                        className="gap-2"
-                     >
-                        <Save className="h-4 w-4" />
-                        Save & Compose
-                     </Button>
                  )}
                  <Button type="button" variant="outline" onClick={() => window.history.back()} className="gap-2">
                     <X className="h-4 w-4" />
@@ -295,10 +279,9 @@ function QuoteFormContent({ quoteId, quoteNumber, versionId, onSuccess, initialD
           </div>
         ) : viewMode === 'composer' && quoteId ? (
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <MultiModalQuoteComposer 
+                <UnifiedQuoteComposer
                     quoteId={quoteId}
                     versionId={versionId}
-                    tenantId={resolvedTenantId || undefined}
                 />
             </div>
         ) : (

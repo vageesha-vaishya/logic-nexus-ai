@@ -142,7 +142,7 @@ export const DashboardHeader = () => {
             </div>
           )}
         </div>
-        <Button variant="ghost" size="icon" className="relative">
+        <Button variant="ghost" size="icon" className="relative" aria-label="Notifications">
           <Bell className="w-5 h-5" />
           <Badge 
             variant="destructive" 

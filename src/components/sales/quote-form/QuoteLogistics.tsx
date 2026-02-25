@@ -1,9 +1,11 @@
-import { useFormContext, useWatch } from 'react-hook-form';
+import { useFormContext, FormProvider, useWatch } from 'react-hook-form';
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useQuoteContext } from './QuoteContext';
+import { normalizeModeCode } from '@/lib/mode-utils';
+import { CarrierSelect } from '../composer/CarrierSelect';
 import { Ship, Plane, Truck, Train, MapPin, Anchor, ArrowRight, Settings2, Package, Globe } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { QuoteLegRow } from './QuoteLegRow';
@@ -64,29 +66,12 @@ export function QuoteLogistics() {
   const filteredServices = services.filter(
     (s: Service) => !serviceTypeId || String(s.service_type_id) === String(serviceTypeId)
   );
+  const selectedServiceType = serviceTypes.find(
+    (st: ServiceType) => String(st.id) === String(serviceTypeId)
+  );
 
-  const filteredCarriers = carriers.filter((c: Carrier) => {
-    if (!serviceTypeId) return true;
-
-    const selectedServiceType = serviceTypes.find((st: ServiceType) => String(st.id) === String(serviceTypeId));
-    const serviceModeName = selectedServiceType?.name?.toLowerCase() || '';
-
-    if (!serviceModeName) return true;
-    
-    if (serviceModeName.includes('ocean') || serviceModeName.includes('sea')) {
-        return c.carrier_type === 'ocean';
-    }
-    if (serviceModeName.includes('air')) {
-        return c.carrier_type === 'air_cargo';
-    }
-    if (serviceModeName.includes('road') || serviceModeName.includes('truck')) {
-        return c.carrier_type === 'trucking';
-    }
-    if (serviceModeName.includes('rail')) {
-        return c.carrier_type === 'rail';
-    }
-    return true;
-  });
+  const serviceModeCode = selectedServiceType?.code || selectedServiceType?.name;
+  const normalizedMode = normalizeModeCode(serviceModeCode || '');
 
   const getServiceIcon = (name: string) => {
     const n = name.toLowerCase();
@@ -107,8 +92,8 @@ export function QuoteLogistics() {
     return <Ship className="h-5 w-5 text-blue-600" />;
   };
 
-  // Resolve placeholders for blank fields if we have leg data
-  const mainLeg = legs.find((l: Leg) => l.transport_mode === 'ocean' || l.transport_mode === 'air') || legs[0];
+  const preferredModes = ['ocean', 'air', 'rail', 'road'];
+  const mainLeg = legs.find((l: Leg) => preferredModes.includes((l.transport_mode || '').toLowerCase())) || legs[0];
   const firstLeg = legs[0];
   const lastLeg = legs[legs.length - 1];
 
@@ -194,20 +179,14 @@ export function QuoteLogistics() {
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Preferred Carrier</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value}>
-                  <FormControl>
-                    <SelectTrigger className="bg-background">
-                      <SelectValue placeholder="Select Carrier (Optional)" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {filteredCarriers.map((c: Carrier) => (
-                      <SelectItem key={c.id} value={String(c.id)}>
-                        {c.carrier_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <CarrierSelect
+                  mode={normalizedMode}
+                  value={field.value || null}
+                  onChange={(id) => field.onChange(id || '')}
+                  placeholder="Select Carrier (Optional)"
+                  showPreferred
+                  clearable
+                />
                 <FormMessage />
               </FormItem>
             )}
@@ -368,20 +347,14 @@ export function QuoteLogistics() {
                     <Ship className="h-4 w-4 text-muted-foreground" />
                     Preferred Carrier
                 </FormLabel>
-                <Select onValueChange={field.onChange} value={field.value}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select carrier" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {filteredCarriers.map((c: Carrier) => (
-                      <SelectItem key={c.id} value={String(c.id)}>
-                        {c.carrier_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <CarrierSelect
+                  mode={normalizedMode}
+                  value={field.value || null}
+                  onChange={(id) => field.onChange(id || '')}
+                  placeholder="Select carrier"
+                  showPreferred
+                  clearable
+                />
                 <FormMessage />
               </FormItem>
             )}

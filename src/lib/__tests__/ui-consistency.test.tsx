@@ -1,16 +1,16 @@
 
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
-import { QuoteResultsList } from '@/components/sales/quick-quote/QuoteResultsList';
+import { QuoteResultsList } from '@/components/sales/shared/QuoteResultsList';
 import { QuoteOptionsOverview } from '@/components/sales/composer/QuoteOptionsOverview';
 import { mapOptionToQuote } from '@/lib/quote-mapper';
 
 // Mock UI components that might cause issues in testing environment
-vi.mock('@/components/sales/quick-quote/QuoteMapVisualizer', () => ({
+vi.mock('@/components/sales/shared/QuoteMapVisualizer', () => ({
   QuoteMapVisualizer: () => <div data-testid="map-visualizer">Map Visualizer</div>
 }));
 
-vi.mock('@/components/sales/quick-quote/QuoteLegsVisualizer', () => ({
+vi.mock('@/components/sales/shared/QuoteLegsVisualizer', () => ({
   QuoteLegsVisualizer: () => <div data-testid="legs-visualizer">Legs Visualizer</div>
 }));
 

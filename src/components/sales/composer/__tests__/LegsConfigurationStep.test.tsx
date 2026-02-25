@@ -24,9 +24,12 @@ vi.mock('@/components/ui/tabs', () => ({
 
 // Mock Store and Hooks
 const mockDispatch = vi.fn();
-const mockState = {
+const mockState: any = {
   legs: [],
   validationErrors: [],
+  quoteData: {},
+  options: [],
+  optionId: null,
   referenceData: {
     serviceTypes: [
       { id: 'st1', name: 'Ocean Freight', code: 'OCEAN', is_active: true, transport_modes: { code: 'ocean' } }
@@ -60,6 +63,52 @@ vi.mock('@/hooks/useAiAdvisor', () => ({
   })
 }));
 
+vi.mock('@/hooks/useCarriersByMode', () => ({
+  useCarriersByMode: () => ({
+    carrierMap: {
+      ocean: [
+        {
+          id: 'c1',
+          carrier_name: 'Maersk',
+          carrier_code: 'MAEU',
+          carrier_type: 'ocean',
+          scac: 'MAEU',
+          iata: null,
+          mc_dot: null,
+          mode: 'ocean',
+          is_preferred: true,
+          service_types: [],
+        },
+      ],
+    },
+    getCarriersForMode: () => [
+      {
+        id: 'c1',
+        carrier_name: 'Maersk',
+        carrier_code: 'MAEU',
+        carrier_type: 'ocean',
+        scac: 'MAEU',
+        iata: null,
+        mc_dot: null,
+        mode: 'ocean',
+        is_preferred: true,
+        service_types: [],
+      },
+    ],
+    getAllCarriers: () => [],
+    hasCarriersForMode: () => true,
+    isLoading: false,
+    error: null,
+  }),
+}));
+
+vi.mock('@/lib/feature-flags', () => ({
+  FEATURE_FLAGS: {
+    COMPOSER_MULTI_LEG_AUTOFILL: 'composer_multi_leg_autofill'
+  },
+  useAppFeatureFlag: () => ({ enabled: true, isLoading: false, error: null })
+}));
+
 describe('LegsConfigurationStep', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -89,6 +138,89 @@ describe('LegsConfigurationStep', () => {
         })
       })
     );
+  });
+
+  it('auto-populates origin and destination for a new leg when previous legs exist', () => {
+    mockState.quoteData = {
+      origin: 'Shanghai',
+      destination: 'Los Angeles'
+    };
+    mockState.legs = [
+      {
+        id: 'leg-1',
+        mode: 'ocean',
+        origin: 'Shanghai',
+        destination: 'Honolulu',
+        legType: 'transport'
+      }
+    ] as any;
+
+    render(<LegsConfigurationStep />);
+
+    const addButton = screen.getByText('Add Ocean Leg');
+    fireEvent.click(addButton);
+
+    expect(mockDispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'ADD_LEG',
+        payload: expect.objectContaining({
+          origin: 'Honolulu',
+          destination: 'Los Angeles'
+        })
+      })
+    );
+  });
+
+  it('prefills mode and service type from active option legs when available', () => {
+    mockState.quoteData = {
+      origin: 'Shanghai',
+      destination: 'Los Angeles'
+    };
+
+    mockState.options = [
+      {
+        id: 'opt-1',
+        carrier_id: 'c1',
+        carrier_name: 'Maersk',
+        legs: [
+          {
+            id: 'db-leg-1',
+            mode: 'air',
+            service_type_id: 'st2',
+            sort_order: 0,
+            carrier_id: 'c1',
+            carrier_name: 'Maersk',
+            leg_type: 'transport',
+            service_only_category: 'doc'
+          }
+        ]
+      }
+    ];
+    mockState.optionId = 'opt-1';
+
+    mockState.referenceData.serviceTypes = [
+      { id: 'st1', name: 'Ocean Freight', code: 'OCEAN', is_active: true, transport_modes: { code: 'ocean' } },
+      { id: 'st2', name: 'Air Freight', code: 'AIR', is_active: true, transport_modes: { code: 'air' } }
+    ];
+
+    mockState.legs = [] as any;
+
+    render(<LegsConfigurationStep />);
+
+    const addButton = screen.getByText('Add Ocean Leg');
+    fireEvent.click(addButton);
+
+    const addCall = mockDispatch.mock.calls.find(
+      (call) => call[0]?.type === 'ADD_LEG'
+    );
+    expect(addCall).toBeTruthy();
+
+    const payload = addCall![0].payload;
+    expect(payload.mode.toLowerCase()).toBe('air');
+    expect(payload.serviceTypeId).toBe('st2');
+    expect(payload.carrierId).toBe('c1');
+    expect(payload.carrierName).toBe('Maersk');
+    expect(payload.serviceOnlyCategory).toBe('doc');
   });
 
   it('displays existing legs', () => {

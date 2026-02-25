@@ -42,9 +42,9 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { QuoteLegsVisualizer } from '../quick-quote/QuoteLegsVisualizer';
-import { QuoteDetailView } from '../quick-quote/QuoteDetailView';
-import { QuoteMapVisualizer } from '../quick-quote/QuoteMapVisualizer';
+import { QuoteLegsVisualizer } from '../shared/QuoteLegsVisualizer';
+import { QuoteDetailView } from '../shared/QuoteDetailView';
+import { QuoteMapVisualizer } from '../shared/QuoteMapVisualizer';
 import { mapOptionToQuote } from '@/lib/quote-mapper';
 import { PricingService } from '@/services/pricing.service';
 import { useCRM } from '@/hooks/useCRM';

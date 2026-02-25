@@ -6,8 +6,8 @@ import { mapOptionToQuote } from '@/lib/quote-mapper';
 import { matchLegForCharge } from '@/lib/charge-bifurcation';
 import { TransportLeg } from '@/types/quote-breakdown';
 import { logger } from '@/lib/logger';
-
 import { QuoteTransformService } from '@/lib/services/quote-transform.service';
+import { parseTransitTimeToDays, parseTransitTimeToHours } from '@/lib/transit-time';
 
 export interface AddOptionParams {
     tenantId: string;
@@ -99,7 +99,7 @@ export class QuoteOptionService {
                 margin_percentage: markupPercent,
                 quote_currency_id: rateMapper.getCurrId(rate.currency || 'USD'),
                 transit_time: rate.transitTime,
-                total_transit_days: rate.transitTime ? parseInt(rate.transitTime.match(/\d+/)?.[0] || '0') || null : null,
+                total_transit_days: parseTransitTimeToDays(rate.transitTime),
                 valid_until: rate.validUntil ? new Date(rate.validUntil).toISOString() : null,
                 
                 // Container Details (for Matrix Quotes)
@@ -141,16 +141,6 @@ export class QuoteOptionService {
         const baseMode = rate.mode || 'ocean';
         const rateLegs = (rate.legs && rate.legs.length > 0) ? rate.legs : [{ mode: baseMode }];
 
-        const parseDurationToHours = (duration: string | number | undefined) => {
-            if (typeof duration === 'number') return duration; 
-            if (!duration) return null;
-            const str = String(duration).toLowerCase();
-            const val = parseFloat(str);
-            if (isNaN(val)) return null;
-            if (str.includes('day')) return Math.round(val * 24);
-            return Math.round(val);
-        };
-
         if (rateLegs.length > 1 && rateLegs.every((l: any) => typeof l.sequence === 'number' || typeof l.leg_order === 'number')) {
             rateLegs.sort((a: any, b: any) => (a.sequence || a.leg_order || 0) - (b.sequence || b.leg_order || 0));
         }
@@ -177,6 +167,24 @@ export class QuoteOptionService {
             }
             if (!isUuid(providerId)) {
                 providerId = null;
+            }
+
+            if (providerId && Array.isArray(context.carriers) && context.carriers.length > 0) {
+                const result = QuoteTransformService.validateCarrierMode(
+                    providerId,
+                    legMode,
+                    context.carriers
+                );
+                if (!result.valid && result.error) {
+                    this.debug.error('Carrier-mode validation failed for leg', {
+                        legIndex: index,
+                        legMode,
+                        carrierName,
+                        providerId,
+                        error: result.error
+                    });
+                    throw new Error(result.error);
+                }
             }
             
             const isFirstLeg = index === 0;
@@ -221,7 +229,7 @@ export class QuoteOptionService {
                 destination_location_id: destinationLocationId,
                 sort_order: index + 1,
                 leg_type: legType,
-                transit_time_hours: parseDurationToHours(leg.transit_time),
+                transit_time_hours: parseTransitTimeToHours(leg.transit_time),
                 co2_kg: leg.co2_emission || leg.co2 || null,
                 voyage_number: leg.voyage_number || leg.voyage || null
             });

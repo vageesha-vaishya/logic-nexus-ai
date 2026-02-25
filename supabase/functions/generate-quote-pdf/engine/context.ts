@@ -1,8 +1,6 @@
 
 import { z } from "zod";
 
-// Define the shape of the raw input data (from DB)
-// This is a loose schema to validate what we expect from the caller
 export const RawQuoteDataSchema = z.object({
   quote: z.object({
     quote_number: z.string(),
@@ -12,6 +10,8 @@ export const RawQuoteDataSchema = z.object({
     total_amount: z.number().optional(),
     currency: z.string().default("USD"),
     service_level: z.string().optional(),
+    notes: z.string().optional(),
+    terms_conditions: z.string().optional(),
   }),
   customer: z.object({
     company_name: z.string().optional(),
@@ -56,6 +56,61 @@ export const RawQuoteDataSchema = z.object({
 
 export type RawQuoteData = z.infer<typeof RawQuoteDataSchema>;
 
+export class ValidationBlockError extends Error {
+  issues: string[];
+
+  constructor(issues: string[]) {
+    super("PDF pre-render validation failed");
+    this.name = "ValidationBlockError";
+    this.issues = issues;
+  }
+}
+
+function validateForPdf(raw: any): string[] {
+  const issues: string[] = [];
+
+  const items = Array.isArray(raw.items) ? raw.items : [];
+  const charges = Array.isArray(raw.charges) ? raw.charges : [];
+
+  if (items.length > 0) {
+    items.forEach((item: any, index: number) => {
+      const commodity = item?.commodity;
+      if (!commodity || commodity === "General Cargo") {
+        issues.push(`Item ${index + 1}: commodity missing or too generic`);
+      }
+
+      const weight = Number(item?.weight ?? 0);
+      const volume = Number(item?.volume ?? 0);
+
+      if (!(weight > 0)) {
+        issues.push(`Item ${index + 1}: weight must be greater than 0`);
+      }
+      if (volume < 0) {
+        issues.push(`Item ${index + 1}: volume must be zero or greater`);
+      }
+    });
+  }
+
+  if (charges.length === 0) {
+    issues.push("No sell-side charges available for PDF");
+  } else {
+    const totalAmount = charges.reduce(
+      (sum: number, c: any) => sum + Number(c?.amount ?? 0),
+      0
+    );
+    if (!(totalAmount > 0)) {
+      issues.push("Total charge amount must be greater than 0");
+    }
+  }
+
+  const companyName = raw?.branding?.company_name;
+  if (!companyName || String(companyName).trim().length === 0) {
+    issues.push("Branding company name is missing");
+  }
+
+  return issues;
+}
+
 export function mapQuoteItemsToRawItems(items: any[] | null | undefined) {
   if (!items) return [];
   return items.map((i: any) => {
@@ -99,6 +154,8 @@ export interface SafeContext {
     expiry?: string;
     grand_total: number;
     currency: string;
+    notes?: string;
+    terms_conditions?: string;
   };
   customer: {
     name: string;
@@ -127,14 +184,6 @@ export interface SafeContext {
   }>;
 }
 
-/**
- * Safe Context Builder
- * 
- * Transforms raw DB data into a safe, structured context for the template engine.
- * - Removes sensitive internal IDs
- * - Standardizes field names
- * - Handles missing values gracefully
- */
 export function buildSafeContext(rawData: unknown, locale: string = "en-US"): SafeContext {
   // 1. Validate Input
   const result = RawQuoteDataSchema.safeParse(rawData);
@@ -147,6 +196,11 @@ export function buildSafeContext(rawData: unknown, locale: string = "en-US"): Sa
   }
 
   const data = result.success ? result.data : (rawData as any);
+
+  const validationIssues = validateForPdf(data);
+  if (validationIssues.length > 0) {
+    throw new ValidationBlockError(validationIssues);
+  }
 
   // 2. Transform & Sanitize
   const safeCtx: SafeContext = {
@@ -169,6 +223,8 @@ export function buildSafeContext(rawData: unknown, locale: string = "en-US"): Sa
       expiry: data.quote?.expiration_date,
       grand_total: Number(data.quote?.total_amount) || 0,
       currency: data.quote?.currency || "USD",
+      notes: data.quote?.notes,
+      terms_conditions: data.quote?.terms_conditions,
     },
     customer: {
       name: data.customer?.company_name || "Valued Customer",
@@ -188,13 +244,24 @@ export function buildSafeContext(rawData: unknown, locale: string = "en-US"): Sa
       commodity: i.commodity || "General Cargo",
       details: `${i.weight || 0} kg / ${i.volume || 0} cbm`
     })),
-    charges: (data.charges || []).map((c: any) => ({
-      desc: c.description || "Service Charge",
-      total: Number(c.amount) || 0,
-      curr: c.currency || "USD",
-      unit_price: Number(c.amount) / (c.quantity || 1), // Simplified logic
-      qty: c.quantity || 1,
-    })),
+    charges: (data.charges || []).map((c: any) => {
+      const amount = Number(c.amount) || 0;
+      const quantity = c.quantity || 1;
+      const currency = c.currency || "USD";
+      const description = c.description || "Service Charge";
+
+      return {
+        desc: description,
+        description,
+        total: amount,
+        amount,
+        curr: currency,
+        currency,
+        unit_price: quantity ? amount / quantity : amount,
+        qty: quantity,
+        quantity,
+      };
+    }),
   };
 
   return safeCtx;

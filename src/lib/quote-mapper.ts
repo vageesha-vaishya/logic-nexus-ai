@@ -17,17 +17,17 @@ export const mapOptionToQuote = (opt: any) => {
         if (!str) return undefined;
         if (str.includes('air')) return 'air';
         if (str.includes('ocean') || str.includes('sea')) return 'ocean';
+        if (str.includes('rail')) return 'rail';
         if (str.includes('courier') || str.includes('express') || str.includes('parcel')) return 'courier';
-        if (str.includes('moving') || str.includes('movers') || str.includes('packers')) return 'movers_packers';
+        if (str.includes('moving') || str.includes('movers') || str.includes('packers')) return 'moving';
         if (
             str.includes('road') ||
             str.includes('truck') ||
             str.includes('trucking') ||
             str.includes('ground') ||
-            str.includes('inland') ||
-            str.includes('rail')
+            str.includes('inland')
         ) {
-            return 'inland_trucking';
+            return 'road';
         }
         return undefined;
     };

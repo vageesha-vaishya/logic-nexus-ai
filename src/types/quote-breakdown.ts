@@ -55,6 +55,7 @@ export interface RateOption {
     co2_kg?: number;
     route_type?: 'Direct' | 'Transshipment';
     stops?: number;
+    ai_generated?: boolean;
     // Financials
     buyPrice?: number;
     marginAmount?: number;

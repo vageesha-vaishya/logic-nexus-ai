@@ -3,7 +3,6 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { FileText } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -13,6 +12,8 @@ import { EmptyState } from '@/components/system/EmptyState';
 import { InvoiceService } from '@/services/invoicing/InvoiceService';
 import { Invoice } from '@/services/invoicing/types';
 import { format } from 'date-fns';
+import { DataTable, ColumnDef } from '@/components/system/DataTable';
+import { useUrlFilters } from '@/hooks/useUrlFilters';
 
 export default function Invoices() {
   const navigate = useNavigate();
@@ -20,15 +21,31 @@ export default function Invoices() {
   const { scopedDb } = useCRM();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
+  const [totalCount, setTotalCount] = useState(0);
+
+  const { filters, setFilters } = useUrlFilters({
+    page: 1,
+    pageSize: 10,
+    sortField: 'created_at',
+    sortDirection: 'desc' as 'asc' | 'desc',
+    search: '',
+  });
 
   useEffect(() => {
     fetchInvoices();
-  }, [scopedDb]);
+  }, [scopedDb, filters.page, filters.pageSize, filters.sortField, filters.sortDirection, filters.search]);
 
   const fetchInvoices = async () => {
+    setLoading(true);
     try {
-      const data = await InvoiceService.listInvoices(scopedDb);
+      const { data, totalCount } = await InvoiceService.listInvoices(scopedDb, {
+        pageIndex: Number(filters.page),
+        pageSize: Number(filters.pageSize),
+        sortField: String(filters.sortField),
+        sortDirection: filters.sortDirection as 'asc' | 'desc'
+      });
       setInvoices(data);
+      setTotalCount(totalCount);
     } catch (error: any) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
     } finally {
@@ -48,6 +65,49 @@ export default function Invoices() {
     }
   };
 
+  const columns: ColumnDef<Invoice>[] = [
+    { 
+      key: 'invoice_number', 
+      header: 'Invoice #', 
+      className: 'font-mono font-medium',
+      sortable: true
+    },
+    { 
+      key: 'customer', 
+      header: 'Customer', 
+      render: (inv) => inv.customer?.name || inv.customer_id || 'Unknown' 
+    },
+    { 
+      key: 'issue_date', 
+      header: 'Date', 
+      render: (inv) => inv.issue_date ? format(new Date(inv.issue_date), 'MMM d, yyyy') : '-',
+      sortable: true
+    },
+    { 
+      key: 'due_date', 
+      header: 'Due Date', 
+      render: (inv) => inv.due_date ? format(new Date(inv.due_date), 'MMM d, yyyy') : '-',
+      sortable: true
+    },
+    { 
+      key: 'total', 
+      header: 'Amount', 
+      className: 'text-right font-medium',
+      render: (inv) => new Intl.NumberFormat('en-US', { style: 'currency', currency: inv.currency || 'USD' }).format(inv.total || 0),
+      sortable: true
+    },
+    { 
+      key: 'status', 
+      header: 'Status', 
+      render: (inv) => (
+        <Badge variant={getStatusColor(inv.status) as any}>
+          {inv.status.toUpperCase()}
+        </Badge>
+      ),
+      sortable: true
+    },
+  ];
+
   return (
     <DashboardLayout>
       <FirstScreenTemplate
@@ -66,9 +126,7 @@ export default function Invoices() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {loading ? (
-              <div className="text-center py-8">Loading...</div>
-            ) : invoices.length === 0 ? (
+            {invoices.length === 0 && !loading ? (
               <EmptyState
                 title="No invoices found"
                 description="Create your first invoice."
@@ -76,40 +134,34 @@ export default function Invoices() {
                 onAction={() => navigate('/dashboard/finance/invoices/new')}
               />
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Invoice #</TableHead>
-                    <TableHead>Customer</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Due Date</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {invoices.map((inv) => (
-                    <TableRow
-                      key={inv.id}
-                      className="cursor-pointer"
-                      onClick={() => navigate(`/dashboard/finance/invoices/${inv.id}`)}
-                    >
-                      <TableCell className="font-mono font-medium">{inv.invoice_number}</TableCell>
-                      <TableCell>{inv.customer?.name || inv.customer_id || 'Unknown'}</TableCell>
-                      <TableCell>{inv.issue_date ? format(new Date(inv.issue_date), 'MMM d, yyyy') : '-'}</TableCell>
-                      <TableCell>{inv.due_date ? format(new Date(inv.due_date), 'MMM d, yyyy') : '-'}</TableCell>
-                      <TableCell className="text-right font-medium">
-                        {new Intl.NumberFormat('en-US', { style: 'currency', currency: inv.currency }).format(inv.total)}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={getStatusColor(inv.status) as any}>
-                          {inv.status.toUpperCase()}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              <DataTable
+                data={invoices}
+                columns={columns}
+                isLoading={loading}
+                onRowClick={(inv) => navigate(`/dashboard/finance/invoices/${inv.id}`)}
+                pagination={{
+                  pageIndex: Number(filters.page),
+                  pageSize: Number(filters.pageSize),
+                  totalCount,
+                  onPageChange: (page) => setFilters({ page }),
+                  onPageSizeChange: (pageSize) => setFilters({ pageSize, page: 1 })
+                }}
+                sorting={{
+                  field: String(filters.sortField),
+                  direction: filters.sortDirection as 'asc' | 'desc',
+                  onSort: (field) => {
+                    const direction = filters.sortField === field && filters.sortDirection === 'asc' ? 'desc' : 'asc';
+                    setFilters({ sortField: field, sortDirection: direction });
+                  }
+                }}
+                search={{
+                  query: String(filters.search),
+                  onQueryChange: (search) => setFilters({ search, page: 1 }),
+                  placeholder: "Search invoices..."
+                }}
+                mobileTitleKey="invoice_number"
+                mobileSubtitleKey="customer_id"
+              />
             )}
           </CardContent>
         </Card>

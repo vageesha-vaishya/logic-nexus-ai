@@ -82,9 +82,9 @@ vi.mock('@/components/sales/shared/SharedCargoInput', () => ({
   )
 }));
 
-// Mock MultiModalQuoteComposer
-vi.mock('@/components/sales/MultiModalQuoteComposer', () => ({
-  MultiModalQuoteComposer: () => <div>Mocked Composer</div>
+// Mock UnifiedQuoteComposer
+vi.mock('@/components/sales/unified-composer/UnifiedQuoteComposer', () => ({
+  UnifiedQuoteComposer: () => <div>Mocked Composer</div>
 }));
 
 // Mock useFormDebug

@@ -12,8 +12,11 @@ import { useAiAdvisor } from '@/hooks/useAiAdvisor';
 import { Command, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useQuoteStore } from './store/QuoteStore';
+import { useAppFeatureFlag, FEATURE_FLAGS } from '@/lib/feature-flags';
 import { Leg } from './store/types';
 import { useCRM } from '@/hooks/useCRM';
+import { normalizeModeCode } from '@/lib/mode-utils';
+import { CarrierSelect } from './CarrierSelect';
 
 interface LegsConfigurationStepProps {}
 
@@ -113,40 +116,92 @@ function LocationAutocomplete({
 
 export function LegsConfigurationStep({}: LegsConfigurationStepProps) {
   const { state, dispatch } = useQuoteStore();
-  const { legs, validationErrors, referenceData } = state;
+  const { legs, validationErrors, referenceData, options, optionId } = state;
   const { serviceTypes = [], carriers = [], serviceLegCategories: serviceCategories = [] } = referenceData || {};
   const { scopedDb } = useCRM();
+  const { enabled: multiLegAutoFillEnabled } = useAppFeatureFlag(FEATURE_FLAGS.COMPOSER_MULTI_LEG_AUTOFILL, false);
 
-  const normalizeModeKey = (value: string) => {
-    const v = (value || '').toLowerCase();
-    if (!v) return '';
-    if (v.includes('ocean') || v.includes('sea') || v.includes('maritime')) return 'ocean';
-    if (v.includes('air')) return 'air';
-    if (v.includes('rail')) return 'rail';
-    if (v.includes('truck') || v.includes('road') || v.includes('inland')) return 'road';
-    if (v.includes('courier') || v.includes('express') || v.includes('parcel')) return 'courier';
-    if (v.includes('move') || v.includes('mover') || v.includes('packer')) return 'moving';
-    return v;
-  };
+  const activeOption = Array.isArray(options)
+    ? options.find((o: any) => o.id === optionId) || options[0]
+    : undefined;
+
+  const optionLegTemplates = Array.isArray((activeOption as any)?.legs)
+    ? [...(activeOption as any).legs].sort(
+        (a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0)
+      )
+    : [];
 
   const onAddLeg = (mode: string) => {
-    const targetKey = normalizeModeKey(mode);
+    const legIndex = legs.length;
+    const templateLeg = optionLegTemplates[legIndex];
+
+    const resolvedModeRaw = templateLeg?.mode || mode;
+    const targetKey = normalizeModeCode(resolvedModeRaw);
+
     const defaultServiceType = serviceTypes.find(st => {
       if (!st) return false;
       const transportMode = (st as any).transport_modes;
-      const codeKey = normalizeModeKey(transportMode?.code || (st as any).mode || '');
+      const codeKey = normalizeModeCode(transportMode?.code || (st as any).mode || '');
       if (!codeKey) return false;
       return codeKey === targetKey;
     });
 
+    let serviceTypeId = defaultServiceType?.id || '';
+    if (templateLeg?.service_type_id) {
+      const fromTemplate = serviceTypes.find(
+        st => st.id === templateLeg.service_type_id
+      );
+      if (fromTemplate) {
+        serviceTypeId = fromTemplate.id;
+      }
+    }
+
+    const carrierId =
+      templateLeg?.carrier_id ||
+      templateLeg?.provider_id ||
+      (activeOption as any)?.carrier_id ||
+      (activeOption as any)?.provider_id ||
+      undefined;
+
+    const carrierName =
+      (carrierId
+        ? carriers.find(c => c.id === carrierId)?.carrier_name
+        : templateLeg?.carrier_name ||
+          (templateLeg?.leg_type === 'transport'
+            ? (activeOption as any)?.carrier_name
+            : undefined)) || undefined;
+
+    const serviceOnlyCategory =
+      templateLeg?.service_only_category ||
+      (templateLeg?.leg_type === 'service'
+        ? (activeOption as any)?.service_only_category
+        : undefined);
+
+    const baseOrigin =
+      legs.length === 0
+        ? state.quoteData.origin
+        : legs[legs.length - 1]?.destination || '';
+
+    let baseDestination = '';
+    if (legs.length === 0) {
+      baseDestination = state.quoteData.destination;
+    } else if (multiLegAutoFillEnabled) {
+      baseDestination = state.quoteData.destination || legs[legs.length - 1]?.destination || '';
+    } else {
+      baseDestination = '';
+    }
+
     const newLeg: Leg = {
       id: crypto.randomUUID(),
-      mode,
-      serviceTypeId: defaultServiceType?.id || '',
-      origin: legs.length === 0 ? state.quoteData.origin : '', // Default to Quote Origin for first leg
-      destination: legs.length === 0 ? state.quoteData.destination : '', // Default to Quote Dest for first leg
+      mode: resolvedModeRaw,
+      serviceTypeId,
+      origin: baseOrigin,
+      destination: baseDestination,
       charges: [],
-      legType: 'transport'
+      legType: 'transport',
+      carrierId,
+      carrierName,
+      serviceOnlyCategory
     };
     dispatch({ type: 'ADD_LEG', payload: newLeg });
   };
@@ -305,47 +360,19 @@ export function LegsConfigurationStep({}: LegsConfigurationStepProps) {
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
                           <Label className="text-sm font-medium mb-2 block">Preferred Carrier</Label>
-                          <Select
-                            value={leg.carrierId || ''}
-                            onValueChange={(val) => {
-                               const selectedCarrier = carriers?.find(c => c.id === val);
-                               onUpdateLeg(leg.id, { 
-                                 carrierId: val,
-                                 carrierName: selectedCarrier?.carrier_name 
-                               });
-                            }}
-                          >
-                            <SelectTrigger className="w-full">
-                              <SelectValue placeholder="Select carrier" />
-                            </SelectTrigger>
-                            <SelectContent>
-                            {carriers
-                              .filter(c => {
-                                // Map leg mode to carrier type with robust fallback
-                                const modeMap: Record<string, string> = {
-                                  'ocean': 'ocean',
-                                  'sea': 'ocean',
-                                  'air': 'air_cargo',
-                                  'air_cargo': 'air_cargo',
-                                  'road': 'trucking',
-                                  'truck': 'trucking',
-                                  'rail': 'rail',
-                                  'train': 'rail'
-                                };
-                                const legMode = (leg.mode || '').toLowerCase();
-                                const targetType = modeMap[legMode] || legMode;
-                                const carrierType = (c.carrier_type || '').toLowerCase();
-                                
-                                // Direct match or mapped match
-                                return carrierType === targetType || carrierType === legMode;
+                          <CarrierSelect
+                            mode={leg.mode}
+                            value={leg.carrierId || null}
+                            onChange={(id, name) =>
+                              onUpdateLeg(leg.id, {
+                                carrierId: id || undefined,
+                                carrierName: name || undefined,
                               })
-                              .map((carrier) => (
-                                  <SelectItem key={carrier.id} value={carrier.id}>
-                                    {carrier.carrier_name}
-                                  </SelectItem>
-                                ))}
-                            </SelectContent>
-                          </Select>
+                            }
+                            placeholder="Select carrier"
+                            showPreferred
+                            clearable
+                          />
                         </div>
 
                         <div>

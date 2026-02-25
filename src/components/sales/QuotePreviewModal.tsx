@@ -36,6 +36,10 @@ export function QuotePreviewModal({ quoteId, quoteNumber, versionId, disabled }:
       const response = await invokeAnonymous('generate-quote-pdf', enrichPayload(basePayload));
 
       if (!response || !response.content) {
+        const issues = Array.isArray(response?.issues) ? String(response.issues.join('; ')) : null;
+        if (issues) {
+          throw new Error(issues);
+        }
         throw new Error('Received empty content from PDF generation service');
       }
 

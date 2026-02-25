@@ -13,7 +13,8 @@ export type WidgetType =
   | 'custom_chart'
   | 'insights'
   | 'financial'
-  | 'volume';
+  | 'volume'
+  | 'kanban';
 
 export interface FinancialMetric {
   month: string;

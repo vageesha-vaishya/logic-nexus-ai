@@ -86,6 +86,16 @@ export const DefaultTemplate: QuoteTemplate = {
       }
     },
     {
+      type: "terms_block",
+      height: 180,
+      page_break_before: false,
+      content: {
+        text: "Notes and Terms apply as per quote.",
+        alignment: "left",
+        style: { fontSize: 10 }
+      }
+    },
+    {
       type: "footer",
       height: 50,
       page_break_before: false,
