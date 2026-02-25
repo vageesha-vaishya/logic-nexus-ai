@@ -53,9 +53,6 @@ export default function ContactDetail() {
 
   const fetchContact = async () => {
     try {
-      console.log('Fetching contact with ID:', id);
-      console.log('Current context:', context);
-      
       const { data, error } = await scopedDb
         .from('contacts')
         .select(`
@@ -69,8 +66,7 @@ export default function ContactDetail() {
         console.error('Supabase error fetching contact:', error);
         throw error;
       }
-      
-      console.log('Contact data fetched:', data);
+
       setContact(data);
     } catch (error: any) {
       toast.error('Failed to load contact');
