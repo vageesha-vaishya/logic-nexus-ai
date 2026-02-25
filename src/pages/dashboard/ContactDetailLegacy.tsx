@@ -2,16 +2,34 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { ContactForm } from '@/components/crm/ContactForm';
 import { EmailHistoryPanel } from '@/components/email/EmailHistoryPanel';
-import { ArrowLeft, Edit, Trash2, User, Phone, Mail, Building2, Linkedin } from 'lucide-react';
+import { Edit, Trash2, User, Phone, Mail, Building2, Linkedin } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
-import { DetailScreenTemplate } from '@/components/system/DetailScreenTemplate';
+import {
+  EnterpriseSheet,
+  EnterpriseField,
+  EnterpriseStatButton,
+  EnterpriseFormLayout,
+  EnterpriseNotebook,
+  EnterpriseTab,
+  EnterpriseActivityFeed,
+  EnterpriseCard,
+  EnterpriseTable,
+  type Column,
+} from '@/components/ui/enterprise';
+
+// Column definitions moved outside component to prevent recreation on every render
+const activityColumns: Column<any>[] = [
+  { key: 'subject', label: 'Subject', width: '200px' },
+  { key: 'activity_type', label: 'Type', width: '120px', render: (value) => <Badge variant="outline">{value}</Badge> },
+  { key: 'status', label: 'Status', width: '120px', render: (value) => <Badge variant="secondary">{value?.replace(/_/g, ' ')}</Badge> },
+  { key: 'due_date', label: 'Due Date', width: '150px', render: (value) => value ? format(new Date(value), 'PPP') : 'No due date' },
+];
 
 export default function ContactDetail() {
   const { id } = useParams();
@@ -193,284 +211,306 @@ export default function ContactDetail() {
     );
   }
 
+  const contactName = `${contact.first_name} ${contact.last_name}`;
+
   return (
-    <DashboardLayout>
-      <DetailScreenTemplate
-        title={`${contact.first_name} ${contact.last_name}`}
+    <div className="h-screen w-full bg-[#f9fafb] overflow-hidden">
+      <EnterpriseFormLayout
+        title={contactName}
         breadcrumbs={[
-          { label: 'Dashboard', to: '/dashboard' },
           { label: 'Contacts', to: '/dashboard/contacts' },
-          { label: `${contact.first_name} ${contact.last_name}` },
+          { label: contactName },
         ]}
-        subtitle={
-          <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-            {contact.title && (
-              <span className="inline-flex items-center gap-1">
-                <User className="h-4 w-4" />
-                {contact.title}
-              </span>
-            )}
-            {contact.accounts?.name && (
-              <span className="inline-flex items-center gap-1">
-                <Building2 className="h-4 w-4" />
-                {contact.accounts.name}
-              </span>
-            )}
-            {contact.email && (
-              <a href={`mailto:${contact.email}`} className="inline-flex items-center gap-1 text-primary hover:underline">
-                <Mail className="h-4 w-4" />
-                {contact.email}
-              </a>
-            )}
-            {contact.phone && (
-              <span className="inline-flex items-center gap-1">
-                <Phone className="h-4 w-4" />
-                {contact.phone}
-              </span>
-            )}
-          </div>
-        }
         actions={
-          <div className="flex items-center gap-2">
-            {!isEditing && (
-              <>
-                <Button variant="outline" onClick={() => setIsEditing(true)}>
-                  <Edit className="mr-2 h-4 w-4" />
-                  Edit
-                </Button>
-                <Button variant="destructive" onClick={() => setShowDeleteDialog(true)}>
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Delete
-                </Button>
-              </>
-            )}
-          </div>
+          !isEditing && (
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                className="h-8 border-[#714B67] text-[#714B67] hover:bg-[#714B67]/10"
+                onClick={() => setIsEditing(true)}
+              >
+                Edit
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-gray-500"
+                onClick={() => setShowDeleteDialog(true)}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          )
         }
       >
-        {isEditing ? (
-          <Card>
-            <CardHeader>
-              <CardTitle>Edit Contact</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ContactForm
-                initialData={contact}
-                onSubmit={handleUpdate}
-                onCancel={() => setIsEditing(false)}
-              />
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-6 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <User className="h-5 w-5" />
-                  Basic Information
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {contact.title && (
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Title</p>
-                    <p className="text-sm">{contact.title}</p>
-                  </div>
-                )}
-                {contact.department && (
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Department</p>
-                    <p className="text-sm">{contact.department}</p>
-                  </div>
-                )}
-                {contact.accounts && (
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Account</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Building2 className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm">{contact.accounts.name}</span>
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex gap-2 flex-wrap">
-                  {contact.is_primary && (
-                    <Badge variant="outline">Primary Contact</Badge>
-                  )}
-                  {contact.lifecycle_stage && (
-                    <Badge variant="secondary" className="capitalize">{contact.lifecycle_stage}</Badge>
-                  )}
-                  {contact.lead_source && (
-                    <Badge variant="outline" className="capitalize">Source: {contact.lead_source}</Badge>
-                  )}
+        {/* Main Sheet */}
+        <EnterpriseSheet
+          header={
+            !isEditing && (
+              <div className="flex flex-col gap-4 w-full">
+                <div>
+                  <h1 className="text-3xl font-bold text-gray-900">{contactName}</h1>
                 </div>
-              </CardContent>
-            </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Contact Information</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {contact.email && (
-                  <div className="flex items-center gap-2">
-                    <Mail className="h-4 w-4 text-muted-foreground" />
-                    <a href={`mailto:${contact.email}`} className="text-sm text-primary hover:underline">
-                      {contact.email}
-                    </a>
-                  </div>
-                )}
-                {contact.phone && (
-                  <div className="flex items-center gap-2">
-                    <Phone className="h-4 w-4 text-muted-foreground" />
-                    <a href={`tel:${contact.phone}`} className="text-sm">{contact.phone}</a>
-                  </div>
-                )}
-                {contact.mobile && (
-                  <div className="flex items-center gap-2">
-                    <Phone className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm">{contact.mobile} (Mobile)</span>
-                  </div>
-                )}
-                {contact.linkedin_url && (
-                  <div className="flex items-center gap-2">
-                    <Linkedin className="h-4 w-4 text-muted-foreground" />
-                    <a href={contact.linkedin_url} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline">
-                      LinkedIn Profile
-                    </a>
-                  </div>
-                )}
-                {contact.social_profiles && Object.keys(contact.social_profiles).length > 0 && (
-                  <div className="space-y-1 mt-2 pt-2 border-t">
-                     <p className="text-sm font-medium text-muted-foreground">Social Profiles</p>
-                     {Object.entries(contact.social_profiles).map(([network, url]) => (
-                       <div key={network} className="flex items-center gap-2">
-                         <span className="text-xs text-muted-foreground capitalize w-16">{network}:</span>
-                         <a href={String(url)} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline truncate">
-                           {String(url)}
-                         </a>
-                       </div>
-                     ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Segments</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {activeSegments.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {activeSegments.map((seg: any) => (
-                      <Badge key={seg.id} variant="secondary">{seg.name}</Badge>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">No active segments.</p>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Custom Fields</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {contact.custom_fields && Object.keys(contact.custom_fields).length > 0 ? (
-                  <div className="grid grid-cols-2 gap-4">
-                    {Object.entries(contact.custom_fields).map(([key, value]) => (
-                      <div key={key}>
-                        <p className="text-sm font-medium text-muted-foreground capitalize">{key.replace(/_/g, ' ')}</p>
-                        <p className="text-sm">{String(value)}</p>
+                {/* Contact Details Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4">
+                  {/* Left Column */}
+                  <div className="space-y-3">
+                    {contact.title && (
+                      <div className="flex items-center gap-2 text-[13px]">
+                        <User className="h-3.5 w-3.5 text-gray-500" />
+                        <span className="text-gray-700">{contact.title}</span>
                       </div>
-                    ))}
+                    )}
+                    {contact.email && (
+                      <div className="flex items-center gap-2 text-[13px]">
+                        <Mail className="h-3.5 w-3.5 text-gray-500" />
+                        <a href={`mailto:${contact.email}`} className="text-[#714B67] hover:underline font-medium">{contact.email}</a>
+                      </div>
+                    )}
+                    {contact.phone && (
+                      <div className="flex items-center gap-2 text-[13px]">
+                        <Phone className="h-3.5 w-3.5 text-gray-500" />
+                        <span className="text-gray-700">{contact.phone}</span>
+                      </div>
+                    )}
                   </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">No custom fields defined.</p>
-                )}
-              </CardContent>
-            </Card>
 
-            <div className="md:col-span-2">
-              <EmailHistoryPanel 
-                emailAddress={contact.email} 
-                entityType="contact" 
-                entityId={contact.id} 
-                tenantId={contact.tenant_id}
-              />
-            </div>
-
-            {contact.notes && (
-              <Card className="md:col-span-2">
-                <CardHeader>
-                  <CardTitle>Notes</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">{contact.notes}</p>
-                </CardContent>
-              </Card>
-            )}
-
-            <Card className="md:col-span-2">
-              <CardHeader className="flex items-center justify-between">
-                <CardTitle>Activities</CardTitle>
-                <Button size="sm" onClick={() => navigate(`/dashboard/activities/new?contactId=${id}`)}>New Activity</Button>
-              </CardHeader>
-              <CardContent>
-                {activities.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No activities recorded yet.</p>
-                ) : (
-                  <div className="space-y-4">
-                    {activities.map((activity) => (
-                      <div key={activity.id} className="flex items-start justify-between p-3 border rounded-lg hover:bg-muted/50 cursor-pointer" onClick={() => navigate(`/dashboard/activities/${activity.id}`)}>
+                  {/* Right Column */}
+                  <div className="space-y-1">
+                    {contact.accounts?.name && (
+                      <EnterpriseField
+                        label="Account"
+                        value={
+                          <Button
+                            variant="link"
+                            className="p-0 h-auto text-[#714B67] hover:underline"
+                            onClick={() => navigate(`/dashboard/accounts/${contact.account_id}`)}
+                          >
+                            {contact.accounts.name}
+                          </Button>
+                        }
+                      />
+                    )}
+                    {contact.is_primary && (
+                      <EnterpriseField label="Status" value={<Badge variant="outline">Primary Contact</Badge>} />
+                    )}
+                  </div>
+                </div>
+              </div>
+            )
+          }
+        >
+          {isEditing ? (
+            <ContactForm
+              initialData={contact}
+              onSubmit={handleUpdate}
+              onCancel={() => setIsEditing(false)}
+            />
+          ) : (
+            <EnterpriseNotebook>
+              <EnterpriseTab label="Details" value="details">
+                <div className="space-y-6">
+                  {/* Basic Information */}
+                  <EnterpriseCard
+                    title="Basic Information"
+                    description="Contact title and department"
+                  >
+                    <div className="space-y-4">
+                      {contact.title && (
                         <div>
-                          <div className="flex items-center gap-2">
-                            <p className="font-medium">{activity.subject}</p>
-                            <Badge variant="outline" className="text-xs capitalize">{activity.activity_type}</Badge>
-                            <Badge variant="secondary" className="text-xs capitalize">{activity.status.replace(/_/g, ' ')}</Badge>
-                          </div>
-                          <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{activity.description || 'No description'}</p>
-                          <p className="text-xs text-muted-foreground mt-2">
-                            Due: {activity.due_date ? format(new Date(activity.due_date), 'PPP') : 'No due date'}
-                          </p>
+                          <p className="text-sm font-medium text-muted-foreground">Title</p>
+                          <p className="text-sm">{contact.title}</p>
+                        </div>
+                      )}
+                      {contact.department && (
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">Department</p>
+                          <p className="text-sm">{contact.department}</p>
+                        </div>
+                      )}
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Tags</p>
+                        <div className="flex gap-2 flex-wrap mt-2">
+                          {contact.is_primary && (
+                            <Badge variant="outline">Primary Contact</Badge>
+                          )}
+                          {contact.lifecycle_stage && (
+                            <Badge variant="secondary" className="capitalize">{contact.lifecycle_stage}</Badge>
+                          )}
+                          {contact.lead_source && (
+                            <Badge variant="outline" className="capitalize">Source: {contact.lead_source}</Badge>
+                          )}
                         </div>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                    </div>
+                  </EnterpriseCard>
 
-            <Card className="md:col-span-2">
-              <CardHeader>
-                <CardTitle>Metadata</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2 text-sm text-muted-foreground">
-                <div>Created: {format(new Date(contact.created_at), 'PPpp')}</div>
-                <div>Last Updated: {format(new Date(contact.updated_at), 'PPpp')}</div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-      </DetailScreenTemplate>
+                  {/* Contact Information */}
+                  <EnterpriseCard
+                    title="Contact Information"
+                    description="Email, phone, and social profiles"
+                  >
+                    <div className="space-y-4">
+                      {contact.email && (
+                        <div className="flex items-center gap-2">
+                          <Mail className="h-4 w-4 text-muted-foreground" />
+                          <a href={`mailto:${contact.email}`} className="text-sm text-primary hover:underline">
+                            {contact.email}
+                          </a>
+                        </div>
+                      )}
+                      {contact.phone && (
+                        <div className="flex items-center gap-2">
+                          <Phone className="h-4 w-4 text-muted-foreground" />
+                          <a href={`tel:${contact.phone}`} className="text-sm">{contact.phone}</a>
+                        </div>
+                      )}
+                      {contact.mobile && (
+                        <div className="flex items-center gap-2">
+                          <Phone className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm">{contact.mobile} (Mobile)</span>
+                        </div>
+                      )}
+                      {contact.linkedin_url && (
+                        <div className="flex items-center gap-2">
+                          <Linkedin className="h-4 w-4 text-muted-foreground" />
+                          <a href={contact.linkedin_url} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline">
+                            LinkedIn Profile
+                          </a>
+                        </div>
+                      )}
+                      {contact.social_profiles && Object.keys(contact.social_profiles).length > 0 && (
+                        <div className="space-y-2 mt-4 pt-4 border-t">
+                          <p className="text-sm font-medium text-muted-foreground">Social Profiles</p>
+                          {Object.entries(contact.social_profiles).map(([network, url]) => (
+                            <div key={network} className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground capitalize w-16">{network}:</span>
+                              <a href={String(url)} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline truncate">
+                                {String(url)}
+                              </a>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </EnterpriseCard>
+
+                  {/* Segments */}
+                  <EnterpriseCard
+                    title="Segments"
+                    description={`${activeSegments.length} active segments`}
+                  >
+                    {activeSegments.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {activeSegments.map((seg: any) => (
+                          <Badge key={seg.id} variant="secondary">{seg.name}</Badge>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No active segments.</p>
+                    )}
+                  </EnterpriseCard>
+
+                  {/* Custom Fields */}
+                  {contact.custom_fields && Object.keys(contact.custom_fields).length > 0 && (
+                    <EnterpriseCard
+                      title="Custom Fields"
+                      description="Additional custom data"
+                    >
+                      <div className="grid grid-cols-2 gap-4">
+                        {Object.entries(contact.custom_fields).map(([key, value]) => (
+                          <div key={key}>
+                            <p className="text-sm font-medium text-muted-foreground capitalize">{key.replace(/_/g, ' ')}</p>
+                            <p className="text-sm">{String(value)}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </EnterpriseCard>
+                  )}
+
+                  {/* Notes */}
+                  {contact.notes && (
+                    <EnterpriseCard
+                      title="Notes"
+                      description="Contact notes and additional information"
+                    >
+                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">{contact.notes}</p>
+                    </EnterpriseCard>
+                  )}
+
+                  {/* Metadata */}
+                  <EnterpriseCard
+                    title="Metadata"
+                    description="System timestamps"
+                  >
+                    <div className="space-y-2 text-sm text-muted-foreground">
+                      <div>Created: {format(new Date(contact.created_at), 'PPpp')}</div>
+                      <div>Last Updated: {format(new Date(contact.updated_at), 'PPpp')}</div>
+                    </div>
+                  </EnterpriseCard>
+                </div>
+              </EnterpriseTab>
+
+              <EnterpriseTab label="Activities" value="activities">
+                <EnterpriseCard
+                  title="Activities"
+                  description={`${activities.length} recorded activities`}
+                >
+                  {activities.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-8">
+                      <p className="text-sm text-muted-foreground">No activities recorded yet.</p>
+                      <Button
+                        variant="link"
+                        size="sm"
+                        onClick={() => navigate(`/dashboard/activities/new?contactId=${id}`)}
+                        className="mt-2"
+                      >
+                        Create one
+                      </Button>
+                    </div>
+                  ) : (
+                    <EnterpriseTable
+                      columns={activityColumns}
+                      data={activities}
+                      rowKey={(row) => row.id}
+                      onRowClick={(row) => navigate(`/dashboard/activities/${row.id}`)}
+                      emptyState={<p className="text-center py-8 text-muted-foreground">No activities recorded yet.</p>}
+                    />
+                  )}
+                </EnterpriseCard>
+              </EnterpriseTab>
+
+              <EnterpriseTab label="Email History" value="emails">
+                <div className="min-h-[300px]">
+                  <EmailHistoryPanel
+                    emailAddress={contact.email}
+                    entityType="contact"
+                    entityId={contact.id}
+                    tenantId={contact.tenant_id}
+                  />
+                </div>
+              </EnterpriseTab>
+            </EnterpriseNotebook>
+          )}
+        </EnterpriseSheet>
+
+        {/* Activity Sidebar */}
+        <EnterpriseActivityFeed className="hidden xl:flex shrink-0 w-[400px]" />
+      </EnterpriseFormLayout>
 
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Contact</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete this contact? This action cannot be undone.
-            </AlertDialogDescription>
+            <AlertDialogTitle>Delete Contact?</AlertDialogTitle>
+            <AlertDialogDescription>This action cannot be undone. All related activities will also be affected.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Delete
-            </AlertDialogAction>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive">Delete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </DashboardLayout>
+    </div>
   );
 }
