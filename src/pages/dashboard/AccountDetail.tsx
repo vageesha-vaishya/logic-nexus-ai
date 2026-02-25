@@ -272,7 +272,7 @@ export default function AccountDetail() {
                                             <EnterpriseField label="VAT" value={account.vat_number} />
                                             <EnterpriseField label="Website" value={
                                                 account.website ? (
-                                                    <a href={account.website} target="_blank" className="text-[#714B67] hover:underline">{account.website}</a>
+                                                    <a href={account.website} target="_blank" rel="noopener noreferrer" className="text-[#714B67] hover:underline">{account.website}</a>
                                                 ) : null
                                             } />
                                             <EnterpriseField label="Tags" value={
