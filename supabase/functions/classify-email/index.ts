@@ -1,4 +1,4 @@
-import { getCorsHeaders } from "../_shared/cors.ts";
+import { corsHeaders } from "../_shared/cors.ts";
 import { requireAuth, createServiceClient } from "../_shared/auth.ts";
 import { sanitizeForLLM } from "../_shared/pii-guard.ts";
 import { pickClassifier } from "../_shared/model-router.ts";
@@ -7,8 +7,9 @@ import { logAiCall } from "../_shared/audit.ts";
 // @ts-ignore
 declare const Deno: any;
 
+
 Deno.serve(async (req: Request) => {
-  const headers = getCorsHeaders(req);
+  const headers = corsHeaders;
 
   if (req.method === "OPTIONS") {
     return new Response(null, { headers });
