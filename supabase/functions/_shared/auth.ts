@@ -32,6 +32,7 @@ export async function requireAuth(req: Request): Promise<AuthResult> {
 
   const authHeader = req.headers.get('Authorization');
   if (!authHeader) {
+    console.error('[requireAuth] Missing Authorization header');
     const client = createClient(supabaseUrl, supabaseAnonKey);
     return { user: null, error: 'Missing Authorization header', supabaseClient: client };
   }
@@ -44,9 +45,11 @@ export async function requireAuth(req: Request): Promise<AuthResult> {
   const { data: { user }, error } = await supabaseClient.auth.getUser();
 
   if (error || !user) {
+    console.error('[requireAuth] getUser failed:', error);
     return { user: null, error: error?.message || 'Invalid or expired token', supabaseClient };
   }
 
+  console.log('[requireAuth] User authenticated:', user.id);
   return { user: { id: user.id, email: user.email }, error: null, supabaseClient };
 }
 

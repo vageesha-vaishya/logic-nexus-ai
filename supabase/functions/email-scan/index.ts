@@ -13,6 +13,7 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    console.log(`[email-scan] Starting scan for email ID (request body present)`);
     // 1. Authenticate User
     const { user, error: authError, supabaseClient: userClient } = await requireAuth(req);
     
