@@ -124,13 +124,16 @@ export async function invokeFunction<T = any>(
     }
 
     const { Authorization, authorization, ...customHeaders } = options.headers || {};
+    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "";
     
     // Get current session token
     const { data: sessionData } = await supabase.auth.getSession();
     let token = sessionData?.session?.access_token;
     
     const getHeaders = (t?: string) => {
-        return t ? { ...customHeaders, Authorization: `Bearer ${t}` } : customHeaders;
+        const headers: any = { ...customHeaders, apikey: anonKey };
+        if (t) headers.Authorization = `Bearer ${t}`;
+        return headers;
     };
 
     let resultInvoke = await supabase.functions.invoke(functionName, {
@@ -171,6 +174,7 @@ export async function invokeFunction<T = any>(
                   method: options.method || 'POST',
                   headers: {
                       'Content-Type': 'application/json',
+                      'apikey': anonKey,
                       ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
                       ...(options.headers || {})
                   },

@@ -1,7 +1,7 @@
 // @ts-ignore
 import { serve } from "std/http/server.ts";
 import { createClient } from "@supabase/supabase-js";
-import { getCorsHeaders } from "../_shared/cors.ts";
+import { corsHeaders } from "../_shared/cors.ts";
 
 // @ts-ignore
 declare const Deno: any;
@@ -11,15 +11,22 @@ console.log("Hello from email-scan!");
 serve(async (req: Request) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: getCorsHeaders(req) });
+    return new Response("ok", { headers: corsHeaders });
   }
 
   try {
-    // 1. Initialize Supabase Admin Client
-    const supabaseClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-    );
+    const host = (() => {
+      try { return new URL(req.url).host; } catch { return ""; }
+    })();
+    const supabaseUrl = (Deno.env.get("SUPABASE_URL") ?? (host ? `https://${host}` : ""));
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? (req.headers.get("apikey") ?? "");
+    const authHeader = req.headers.get("Authorization") ?? "";
+
+    // 1. Initialize Supabase Client (prefer Service Role; fallback to user-scoped)
+    const supabaseClient = serviceKey
+      ? createClient(supabaseUrl, serviceKey)
+      : createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authHeader } } });
 
     // 2. Parse Input
     const { email_id } = await req.json();
@@ -115,7 +122,7 @@ serve(async (req: Request) => {
         scan_result: updates
       }),
       {
-        headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
       }
     );
@@ -124,7 +131,7 @@ serve(async (req: Request) => {
     return new Response(
       JSON.stringify({ error: error.message }),
       {
-        headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 400,
       }
     );

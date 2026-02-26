@@ -1,6 +1,9 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
+// @ts-ignore
+declare const Deno: any;
+
 interface AuthResult {
   user: { id: string; email?: string } | null;
   error: string | null;
@@ -16,8 +19,16 @@ interface AuthResult {
  *   if (error) return new Response(JSON.stringify({ error }), { status: 401, headers });
  */
 export async function requireAuth(req: Request): Promise<AuthResult> {
-  const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
-  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+  const host = (() => {
+    try {
+      return new URL(req.url).host;
+    } catch {
+      return '';
+    }
+  })();
+  const defaultUrl = host ? `https://${host}` : '';
+  const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? defaultUrl;
+  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? (req.headers.get('apikey') ?? '');
 
   const authHeader = req.headers.get('Authorization');
   if (!authHeader) {

@@ -470,9 +470,11 @@ export function EmailInbox() {
           const { data: sessionData } = await supabase.auth.getSession();
           const token = sessionData?.session?.access_token;
           if (!token) throw classifyError as any;
+          const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY || "";
           // Retry via supabase client (uses refreshed token, handles dev proxy)
           const { error: retryErr } = await supabase.functions.invoke("classify-email", {
             body: { email_id: emailId },
+            headers: { apikey: anonKey }
           });
           if (!retryErr) {
             classifyOk = true;
@@ -480,7 +482,6 @@ export function EmailInbox() {
             const isNetwork = /Failed to fetch|network/i.test(String(retryErr?.message || ""));
             if (isNetwork) {
               // Dev-friendly direct fetch using relative path to avoid CORS
-              const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY || "";
               const functionUrl = import.meta.env.DEV ? `/functions/v1/classify-email` : `${(import.meta.env.VITE_SUPABASE_URL || "").replace(/\/$/, "")}/functions/v1/classify-email`;
               const resp = await fetch(functionUrl, {
                 method: "POST",
