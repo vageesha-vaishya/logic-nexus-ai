@@ -10,6 +10,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuCheckboxItem } from '@/components/ui/dropdown-menu';
 import { Plane, Ship, Truck, Train, Timer, Sparkles, ChevronDown, Save, Settings2, Building2, User, FileText, Loader2, CheckCircle2, XCircle } from 'lucide-react';
@@ -26,16 +27,7 @@ import { useCRM } from '@/hooks/useCRM';
 import { logger } from '@/lib/logger';
 import { QuotationNumberService } from '@/services/quotation/QuotationNumberService';
 
-export type FormZoneValues = {
-  mode: 'air' | 'ocean' | 'road' | 'rail';
-  origin: string;
-  destination: string;
-  commodity: string;
-  preferredCarriers?: string[];
-  weight?: string;
-  volume?: string;
-  unit?: 'kg' | 'lb' | 'cbm';
-};
+export type FormZoneValues = QuoteComposerValues;
 
 export interface ExtendedFormData {
   containerType: string;
@@ -454,98 +446,298 @@ export function FormZone({
               </div>
             )}
             {standalone && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <FormField
-                  control={form.control}
-                  name={"guestCompany" as any}
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs">Company</FormLabel>
-                      <FormControl>
-                        <Input {...field} placeholder="Company name" className="bg-background h-9 text-xs" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name={"guestName" as any}
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs">Contact Name</FormLabel>
-                      <FormControl>
-                        <Input {...field} placeholder="Full name" className="bg-background h-9 text-xs" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name={"guestEmail" as any}
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs">Email</FormLabel>
-                      <FormControl>
-                        <Input {...field} placeholder="name@company.com" className="bg-background h-9 text-xs" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name={"guestPhone" as any}
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs">Phone</FormLabel>
-                      <FormControl>
-                        <Input {...field} placeholder="+1 555-0100" className="bg-background h-9 text-xs" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name={"customerPo" as any}
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs">Customer PO</FormLabel>
-                      <FormControl>
-                        <Input {...field} placeholder="e.g. PO-12345" className="bg-background h-9 text-xs" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name={"vendorRef" as any}
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs">Vendor Reference</FormLabel>
-                      <FormControl>
-                        <Input {...field} placeholder="Optional" className="bg-background h-9 text-xs" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name={"projectCode" as any}
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs">Project Code</FormLabel>
-                      <FormControl>
-                        <Input {...field} placeholder="Optional" className="bg-background h-9 text-xs" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name={"guestCompany" as any}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs">Company Name *</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="Acme Corp" className="bg-background h-9 text-xs" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name={"taxId" as any}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs">Tax ID / VAT</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="Tax Identification Number" className="bg-background h-9 text-xs" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                
+                <Separator className="my-2" />
+                <Label className="text-xs font-semibold">Primary Contact</Label>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <FormField
+                    control={form.control}
+                    name={"guestName" as any}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs">Full Name *</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="John Doe" className="bg-background h-9 text-xs" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name={"guestEmail" as any}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs">Email Address *</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="john@example.com" className="bg-background h-9 text-xs" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name={"guestPhone" as any}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs">Phone Number</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="+1 234 567 8900" className="bg-background h-9 text-xs" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name={"guestJobTitle" as any}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs">Job Title</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="Manager" className="bg-background h-9 text-xs" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name={"guestDepartment" as any}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs">Department</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="Logistics" className="bg-background h-9 text-xs" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <Separator className="my-2" />
+                <Label className="text-xs font-semibold">Billing Address</Label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                   <FormField
+                    control={form.control}
+                    name={"billingAddress.street" as any}
+                    render={({ field }) => (
+                      <FormItem className="col-span-2">
+                        <FormLabel className="text-xs">Street Address *</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="123 Main St" className="bg-background h-9 text-xs" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name={"billingAddress.city" as any}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs">City *</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="New York" className="bg-background h-9 text-xs" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name={"billingAddress.state" as any}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs">State / Province</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="NY" className="bg-background h-9 text-xs" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name={"billingAddress.postalCode" as any}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs">Postal Code</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="10001" className="bg-background h-9 text-xs" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name={"billingAddress.country" as any}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs">Country *</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="USA" className="bg-background h-9 text-xs" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <Collapsible>
+                  <CollapsibleTrigger asChild>
+                     <Button variant="ghost" size="sm" className="p-0 h-auto text-xs text-muted-foreground hover:text-foreground">
+                        <ChevronDown className="h-3 w-3 mr-1" /> Add Shipping Address (if different)
+                     </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="mt-2 space-y-4">
+                     <Label className="text-xs font-semibold">Shipping Address</Label>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <FormField
+                          control={form.control}
+                          name={"shippingAddress.street" as any}
+                          render={({ field }) => (
+                            <FormItem className="col-span-2">
+                              <FormLabel className="text-xs">Street Address</FormLabel>
+                              <FormControl>
+                                <Input {...field} placeholder="123 Main St" className="bg-background h-9 text-xs" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name={"shippingAddress.city" as any}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-xs">City</FormLabel>
+                              <FormControl>
+                                <Input {...field} placeholder="New York" className="bg-background h-9 text-xs" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name={"shippingAddress.state" as any}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-xs">State / Province</FormLabel>
+                              <FormControl>
+                                <Input {...field} placeholder="NY" className="bg-background h-9 text-xs" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name={"shippingAddress.postalCode" as any}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-xs">Postal Code</FormLabel>
+                              <FormControl>
+                                <Input {...field} placeholder="10001" className="bg-background h-9 text-xs" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name={"shippingAddress.country" as any}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-xs">Country</FormLabel>
+                              <FormControl>
+                                <Input {...field} placeholder="USA" className="bg-background h-9 text-xs" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                  </CollapsibleContent>
+                </Collapsible>
+                
+                <Separator className="my-2" />
+                <Label className="text-xs font-semibold">References</Label>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <FormField
+                    control={form.control}
+                    name={"customerPo" as any}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs">Customer PO</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="PO-12345" className="bg-background h-9 text-xs" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name={"vendorRef" as any}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs">Vendor Reference</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="Optional" className="bg-background h-9 text-xs" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name={"projectCode" as any}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs">Project Code</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="Optional" className="bg-background h-9 text-xs" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
               </div>
             )}
             <FormField
@@ -575,10 +767,10 @@ export function FormZone({
                   control={form.control}
                   name={"termsConditions" as any}
                   render={({ field }) => (
-                    <FormItem>
+                    <FormItem className="col-span-2">
                       <FormLabel className="text-xs">Terms & Conditions</FormLabel>
                       <FormControl>
-                        <textarea {...field} placeholder="Enter terms and conditions" className="bg-background text-xs p-2 rounded-md border h-24" />
+                        <textarea {...field} placeholder="Enter terms and conditions" className="bg-background text-xs p-2 rounded-md border h-24 w-full" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -586,12 +778,25 @@ export function FormZone({
                 />
                 <FormField
                   control={form.control}
-                  name={"notesText" as any}
+                  name={"internalNotes" as any}
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-xs">Internal Notes / Special Instructions</FormLabel>
+                      <FormLabel className="text-xs">Internal Notes</FormLabel>
                       <FormControl>
-                        <textarea {...field} placeholder="Internal notes and special instructions" className="bg-background text-xs p-2 rounded-md border h-24" />
+                        <textarea {...field} placeholder="Internal comments (not visible to customer)" className="bg-background text-xs p-2 rounded-md border h-24 w-full" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name={"specialInstructions" as any}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs">Special Instructions</FormLabel>
+                      <FormControl>
+                        <textarea {...field} placeholder="Special handling instructions" className="bg-background text-xs p-2 rounded-md border h-24 w-full" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

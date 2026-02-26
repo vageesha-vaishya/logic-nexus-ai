@@ -17,11 +17,36 @@ export const quoteComposerSchema = z.object({
   guestName: z.string().optional(),
   guestEmail: z.string().email('Invalid email format').optional(),
   guestPhone: z.string().optional(),
+  guestJobTitle: z.string().optional(),
+  guestDepartment: z.string().optional(),
+  
+  // Addresses
+  billingAddress: z.object({
+    street: z.string().optional(),
+    city: z.string().optional(),
+    state: z.string().optional(),
+    postalCode: z.string().optional(),
+    country: z.string().optional(),
+  }).optional(),
+  shippingAddress: z.object({
+    street: z.string().optional(),
+    city: z.string().optional(),
+    state: z.string().optional(),
+    postalCode: z.string().optional(),
+    country: z.string().optional(),
+  }).optional(),
+  
+  // Tax & References
+  taxId: z.string().optional(),
   customerPo: z.string().optional(),
   vendorRef: z.string().optional(),
   projectCode: z.string().optional(),
+  
+  // Notes
   termsConditions: z.string().optional(),
-  notesText: z.string().optional(),
+  internalNotes: z.string().optional(),
+  specialInstructions: z.string().optional(),
+  notesText: z.string().optional(), // Deprecated but kept for backward compatibility
 
   // Phase 1: FormZone fields
   mode: z.enum(['air', 'ocean', 'road', 'rail']),
@@ -50,6 +75,7 @@ export const quoteComposerSchema = z.object({
   pickupDate: z.string().optional(),
   deliveryDeadline: z.string().optional(),
   incoterms: z.string().optional(),
+  vehicleType: z.string().optional(),
   
   // Phase 2: Results & Finalize fields
   selectedOptionId: z.string().optional(),
@@ -98,9 +124,22 @@ export const quoteComposerSchema = z.object({
     if (!data.guestName || data.guestName.trim().length < 2) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Contact name is required in standalone mode', path: ['guestName'] });
     }
-    if (!data.guestEmail || data.guestEmail.trim().length < 3) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Contact email is required in standalone mode', path: ['guestEmail'] });
+    if (!data.guestEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.guestEmail)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Valid email is required', path: ['guestEmail'] });
     }
+    // Phone validation (E.164-ish)
+    if (data.guestPhone && !/^\+?[1-9]\d{1,14}$/.test(data.guestPhone.replace(/[\s-()]/g, ''))) {
+       ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Invalid phone format', path: ['guestPhone'] });
+    }
+    // Tax ID
+    if (data.taxId && !/^[A-Z0-9-]{5,20}$/i.test(data.taxId)) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Invalid Tax ID format', path: ['taxId'] });
+    }
+    
+    // Billing Address Mandatory
+    if (!data.billingAddress?.street) ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Street is required', path: ['billingAddress', 'street'] });
+    if (!data.billingAddress?.city) ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'City is required', path: ['billingAddress', 'city'] });
+    if (!data.billingAddress?.country) ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Country is required', path: ['billingAddress', 'country'] });
   } else {
     if (!data.opportunityId && !data.accountId) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Select an Opportunity or Account', path: ['opportunityId'] });

@@ -18,11 +18,43 @@ describe('quoteComposerSchema modes', () => {
       mode: 'ocean',
       origin: 'Shanghai',
       destination: 'Los Angeles',
+      commodity: 'Electronics',
+      // Container details for ocean
+      containerType: 'Dry',
+      containerSize: '40ft',
+      containerQty: '1',
       guestCompany: 'Test Co',
       guestName: 'John Doe',
       guestEmail: 'john@example.com',
+      billingAddress: {
+        street: '123 Main St',
+        city: 'NY',
+        country: 'USA'
+      }
     });
     expect(result.success).toBe(true);
+  });
+
+  it('validates standalone address requirements', () => {
+    const result = quoteComposerSchema.safeParse({
+      standalone: true,
+      mode: 'ocean',
+      origin: 'Shanghai',
+      destination: 'Los Angeles',
+      commodity: 'Electronics',
+      containerType: 'Dry',
+      containerSize: '40ft',
+      containerQty: '1',
+      guestCompany: 'Test Co',
+      guestName: 'John Doe',
+      guestEmail: 'john@example.com',
+      billingAddress: {
+        street: '', // Missing
+        city: 'NY',
+        country: 'USA'
+      }
+    });
+    expect(result.success).toBe(false);
   });
 
   it('requires opportunity or account in CRM mode', () => {
@@ -31,6 +63,10 @@ describe('quoteComposerSchema modes', () => {
       mode: 'ocean',
       origin: 'Shanghai',
       destination: 'Los Angeles',
+      commodity: 'Electronics',
+      containerType: 'Dry',
+      containerSize: '40ft',
+      containerQty: '1',
     });
     expect(result.success).toBe(false);
   });
@@ -41,6 +77,10 @@ describe('quoteComposerSchema modes', () => {
       mode: 'ocean',
       origin: 'Shanghai',
       destination: 'Los Angeles',
+      commodity: 'Electronics',
+      containerType: 'Dry',
+      containerSize: '40ft',
+      containerQty: '1',
       opportunityId: 'opp-1',
     });
     expect(result.success).toBe(true);
@@ -52,6 +92,10 @@ describe('quoteComposerSchema modes', () => {
       mode: 'ocean',
       origin: 'Shanghai',
       destination: 'Los Angeles',
+      commodity: 'Electronics',
+      containerType: 'Dry',
+      containerSize: '40ft',
+      containerQty: '1',
       accountId: 'acc-1',
     });
     expect(result.success).toBe(true);
