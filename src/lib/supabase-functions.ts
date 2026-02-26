@@ -231,16 +231,16 @@ export async function invokeFunction<T = any>(
                  if (error) {
                      console.warn(`[Supabase Function] Client retry failed. Attempting raw fetch fallback for ${functionName}...`);
                      try {
-                        const projectUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, '') || "https://qzhxgoigflftharcmdqj.supabase.co";
-                        const functionUrl = import.meta.env.DEV 
-                            ? `/functions/v1/${functionName}` 
-                            : `${projectUrl}/functions/v1/${functionName}`;
+                        const projectUrl = (import.meta.env.VITE_SUPABASE_URL || "https://qzhxgoigflftharcmdqj.supabase.co").replace(/\/$/, '');
+                        const functionUrl = `${projectUrl}/functions/v1/${functionName}`;
+
+                        console.log(`[Supabase Function] Fetching ${functionUrl} with token length ${newToken.length}`);
 
                         const response = await fetch(functionUrl, {
                             method: options.method || 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
-                                'apikey': anonKey,
+                                'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY || '',
                                 'Authorization': `Bearer ${newToken}`,
                                 ...(options.headers || {})
                             },

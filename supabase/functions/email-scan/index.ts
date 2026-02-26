@@ -1,42 +1,54 @@
-// @ts-ignore
-import { serve } from "std/http/server.ts";
-import { createClient } from "@supabase/supabase-js";
 import { corsHeaders } from "../_shared/cors.ts";
+import { requireAuth, createServiceClient } from "../_shared/auth.ts";
 
 // @ts-ignore
 declare const Deno: any;
 
 console.log("Hello from email-scan!");
 
-serve(async (req: Request) => {
+Deno.serve(async (req: Request) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
   try {
-    const host = (() => {
-      try { return new URL(req.url).host; } catch { return ""; }
-    })();
-    const supabaseUrl = (Deno.env.get("SUPABASE_URL") ?? (host ? `https://${host}` : ""));
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-    const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? (req.headers.get("apikey") ?? "");
-    const authHeader = req.headers.get("Authorization") ?? "";
+    // 1. Authenticate User
+    const { user, error: authError, supabaseClient: userClient } = await requireAuth(req);
+    
+    if (authError || !user) {
+        console.error("Auth Error:", authError);
+        return new Response(
+            JSON.stringify({ error: "Unauthorized", details: authError }),
+            { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+    }
 
-    // 1. Initialize Supabase Client (prefer Service Role; fallback to user-scoped)
-    const supabaseClient = serviceKey
-      ? createClient(supabaseUrl, serviceKey)
-      : createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authHeader } } });
-
-    // 2. Parse Input
+    // 2. Initialize Service Client for Admin operations (updating status)
+    const supabaseClient = createServiceClient();
+    
+    // 3. Parse Input
     const { email_id } = await req.json();
 
     if (!email_id) {
       throw new Error("Missing email_id");
     }
 
-    // 3. Fetch Email Content
-    // We select basic fields. In a real scenario, we'd fetch attachments from Storage too.
+    // 4. Fetch Email Content (Verify user access first via RLS-scoped client)
+    const { data: emailCheck, error: checkError } = await userClient
+        .from("emails")
+        .select("id")
+        .eq("id", email_id)
+        .single();
+
+    if (checkError || !emailCheck) {
+        return new Response(
+            JSON.stringify({ error: "Email not found or access denied" }),
+            { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+    }
+
+    // Now fetch full content with Service Role
     const { data: email, error: fetchError } = await supabaseClient
       .from("emails")
       .select("id, subject, body_text, body_html, security_status")
