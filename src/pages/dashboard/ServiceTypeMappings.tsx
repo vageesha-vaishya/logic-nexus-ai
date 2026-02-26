@@ -70,18 +70,24 @@ export default function ServiceTypeMappings() {
     const direct: Record<string,string> = {
       'ocean': 'ocean',
       'ocean freight': 'ocean',
+      'ocean_freight': 'ocean',
       'sea': 'ocean',
       'sea freight': 'ocean',
+      'sea_freight': 'ocean',
       'sea cargo': 'ocean',
       'air': 'air',
       'air freight': 'air',
+      'air_freight': 'air',
       'air cargo': 'air',
       'trucking': 'trucking',
       'inland trucking': 'trucking',
+      'inland_trucking': 'trucking',
       'truck': 'trucking',
       'road': 'trucking',
       'road transport': 'trucking',
+      'road_transport': 'trucking',
       'road freight': 'trucking',
+      'road_freight': 'trucking',
       'courier': 'courier',
       'courier service': 'courier',
       'express': 'courier',
@@ -96,6 +102,7 @@ export default function ServiceTypeMappings() {
       'rail': 'railway_transport',
       'railway': 'railway_transport',
       'railway transport': 'railway_transport',
+      'rail_transport': 'railway_transport',
       'rail transport': 'railway_transport',
     };
     return direct[n] || String(name);
@@ -133,10 +140,10 @@ export default function ServiceTypeMappings() {
         .from('services')
         .select('id, service_name, service_type, tenant_id, is_active');
       
-      // For platform admins, we manually apply the selected tenant filter if present
-      if (isPlatform && selectedTenantId) {
-        query = query.eq('tenant_id', selectedTenantId);
-      }
+      // We removed the manual tenant filter for platform admins here because it caused issues with
+      // editing mappings from different tenants (since services were filtered out).
+      // Now we fetch all services (scopedDb handles tenant isolation for non-platform users automatically).
+      // The dropdowns for Create/Edit will filter the list client-side using useMemo.
       
       const { data, error } = await query.order('service_name');
       if (error) throw error;
@@ -148,13 +155,8 @@ export default function ServiceTypeMappings() {
     }
   };
 
-  useEffect(() => {
-    // When platform admin changes selected tenant, refetch services
-    if (isPlatform && open) {
-      fetchServices();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedTenantId]);
+  // We no longer need to refetch services when selectedTenantId changes because we fetch all now.
+  // The useEffect below is simplified.
 
   const fetchMappings = async () => {
     try {

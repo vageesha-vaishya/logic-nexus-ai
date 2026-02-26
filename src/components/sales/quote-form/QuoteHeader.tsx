@@ -28,13 +28,13 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 
 export function QuoteHeader({ quoteNumber }: { quoteNumber?: string }) {
-  const { control, setValue, register, watch } = useFormContext();
+  const { control, setValue, register, watch, getValues } = useFormContext();
   const { opportunities, accounts, contacts, isLoadingOpportunities } = useQuoteContext() as QuoteContextType;
   const [open, setOpen] = useState(false);
 
-  const opportunityId = useWatch({ control, name: 'opportunity_id' });
-  const accountId = useWatch({ control, name: 'account_id' });
-  const contactId = useWatch({ control, name: 'contact_id' });
+  const opportunityId = watch('opportunity_id');
+  const accountId = watch('account_id');
+  const contactId = watch('contact_id');
   
   // Standalone Mode State
   const [isStandalone, setIsStandalone] = useState(false);
@@ -62,36 +62,61 @@ export function QuoteHeader({ quoteNumber }: { quoteNumber?: string }) {
       }
   };
 
-  // Filter contacts based on selected account
+  // Filter contacts based on selected account, but show all if no account is selected
+  // Also, if opportunity is selected but has no account, allow picking any contact (or filter by opp if needed?)
+  // Requirement: "show (b) all Contacts when no Contact is linked to the Opportunity"
   const filteredContacts = useMemo(() => {
-    if (!accountId) return contacts;
-    return contacts.filter((c: any) => String(c.account_id) === accountId);
+    // If account is selected, strictly filter by account
+    if (accountId) {
+        return contacts.filter((c: any) => String(c.account_id) === accountId);
+    }
+    // If no account, show all contacts (allowing manual selection for unmapped opps)
+    return contacts;
   }, [contacts, accountId]);
 
   // Filter opportunities based on selected account
+  // Requirement: "show (a) all Accounts when no Account is linked to the Opportunity"
+  // This memo filters opportunities, not accounts. Let's check filteredAccounts logic if it exists, or the account Select options.
   const filteredOpportunities = useMemo(() => {
     if (!accountId) return opportunities;
+    // When an account is selected, only show opportunities linked to that account
+    // OR opportunities that are NOT linked to any account yet (so they can be linked now)
     return opportunities.filter((o: any) => !o.account_id || String(o.account_id) === accountId);
   }, [opportunities, accountId]);
 
   // Auto-populate Account and Contact when Opportunity is selected
   useEffect(() => {
     if (opportunityId) {
+      // NOTE: Use getValues inside useEffect to avoid stale closures? No, opportunityId is dependency.
+      // But we must use the CURRENT 'opportunities' from context.
       const selectedOpp = opportunities.find((o: any) => String(o.id) === opportunityId);
       if (selectedOpp) {
-        // Only set if not already set or if different
-        if (selectedOpp.account_id && String(selectedOpp.account_id) !== accountId) {
-          setValue('account_id', String(selectedOpp.account_id), { shouldValidate: true });
+        console.log('Selected Opportunity:', selectedOpp); // Debugging
+        
+        // Auto-populate Account if linked
+        if (selectedOpp.account_id) {
+            const currentAcc = getValues('account_id');
+            const newAcc = String(selectedOpp.account_id);
+            if (newAcc !== currentAcc) {
+                setValue('account_id', newAcc, { shouldValidate: true });
+            }
         }
-        if (selectedOpp.contact_id && String(selectedOpp.contact_id) !== contactId) {
-          setValue('contact_id', String(selectedOpp.contact_id), { shouldValidate: true });
+        
+        // Auto-populate Contact if linked
+        if (selectedOpp.contact_id) {
+            const currentContact = getValues('contact_id');
+            const newContact = String(selectedOpp.contact_id);
+            if (newContact !== currentContact) {
+                setValue('contact_id', newContact, { shouldValidate: true });
+            }
         }
       }
     }
-  }, [opportunityId, opportunities, setValue, accountId, contactId]);
+  }, [opportunityId, opportunities, setValue, getValues]);
 
   // Auto-populate Account when Contact is selected (if not already selected)
   useEffect(() => {
+    // Only auto-populate account if one isn't already selected
     if (contactId && !accountId) {
       const selectedContact = contacts.find((c: any) => String(c.id) === contactId);
       if (selectedContact && selectedContact.account_id) {
@@ -99,6 +124,31 @@ export function QuoteHeader({ quoteNumber }: { quoteNumber?: string }) {
       }
     }
   }, [contactId, accountId, contacts, setValue]);
+
+  // Ensure opportunity is cleared if account is changed and mismatch occurs
+  // This logic was previously inside the onChange handler of the Select component,
+  // but due to state update timing issues (stale closures or race conditions), it's safer in a useEffect.
+  useEffect(() => {
+      // Only check if BOTH accountId and opportunityId are present.
+      // This prevents clearing opportunity if account is initially empty (allowing auto-population to happen first).
+      // ALSO: Check if opportunity is linked to an account. If not, it shouldn't be cleared.
+      if (accountId && opportunityId) {
+          const currentOpp = opportunities.find((o: any) => String(o.id) === opportunityId);
+          // If currentOpp has an account_id (is mapped), and it doesn't match the new accountId, clear it.
+          // If currentOpp has NO account_id (unmapped), it is valid for ANY account, so keep it.
+          if (currentOpp && currentOpp.account_id && String(currentOpp.account_id) !== accountId) {
+                // Add explicit check for safety
+                const isMatch = String(currentOpp.account_id) === accountId;
+                if (!isMatch) {
+                    // Check if we are currently auto-populating (race condition check)
+                    // If the accountId was just set by the OTHER useEffect, we might be fine.
+                    // But if accountId is STABLE and doesn't match, then we clear.
+                    console.log('Clearing mismatched opportunity');
+                    setValue('opportunity_id', '', { shouldValidate: true });
+                }
+          }
+      }
+  }, [accountId, opportunityId, opportunities, setValue]);
 
   return (
     <Card className="shadow-sm border-t-4 border-t-primary">
@@ -368,6 +418,15 @@ export function QuoteHeader({ quoteNumber }: { quoteNumber?: string }) {
                 <div className="flex gap-2">
                   <Select onValueChange={(val) => {
                       field.onChange(val);
+                      // If user manually changes account, we clear invalid contact.
+                      // Opportunity clearing is now handled by useEffect.
+                      const currentContactId = getValues('contact_id');
+                      if (currentContactId) {
+                        const currentContact = contacts.find((c: any) => String(c.id) === currentContactId);
+                        if (currentContact && String(currentContact.account_id) !== val) {
+                            setValue('contact_id', '', { shouldValidate: true });
+                        }
+                      }
                   }} value={field.value}>
                     <FormControl>
                       <SelectTrigger className="bg-muted/5">
@@ -411,10 +470,10 @@ export function QuoteHeader({ quoteNumber }: { quoteNumber?: string }) {
                     <User className="h-4 w-4 text-muted-foreground" />
                     Contact
                 </FormLabel>
-                <Select onValueChange={field.onChange} value={field.value} disabled={!accountId && filteredContacts.length === 0}>
+                <Select onValueChange={field.onChange} value={field.value} disabled={filteredContacts.length === 0}>
                   <FormControl>
                     <SelectTrigger className="bg-muted/5">
-                      <SelectValue placeholder={accountId ? "Select Contact" : "Select Account First"} />
+                      <SelectValue placeholder="Select Contact" />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>

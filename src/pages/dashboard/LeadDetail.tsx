@@ -10,7 +10,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { LeadForm } from '@/components/crm/LeadForm';
 import type { LeadFormData } from '@/components/crm/LeadForm';
 import type { Json } from '@/integrations/supabase/types';
-import { LeadConversionDialog } from '@/components/crm/LeadConversionDialog';
+import { LeadConversionDialog } from '@/components/crm/conversion/LeadConversionDialog';
 import { LeadActivitiesTimeline } from '@/components/crm/LeadActivitiesTimeline';
 import { EmailClient } from "@/components/email/EmailClient";
 import { EmailComposeDialog } from "@/components/email/EmailComposeDialog";

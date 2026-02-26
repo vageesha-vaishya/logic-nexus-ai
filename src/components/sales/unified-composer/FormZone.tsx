@@ -4,13 +4,15 @@ import { QuoteComposerValues } from './schema';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuCheckboxItem } from '@/components/ui/dropdown-menu';
-import { Plane, Ship, Truck, Train, Timer, Sparkles, ChevronDown, Save, Settings2 } from 'lucide-react';
+import { Plane, Ship, Truck, Train, Timer, Sparkles, ChevronDown, Save, Settings2, Building2, User, FileText, Loader2, CheckCircle2, XCircle } from 'lucide-react';
 import { LocationAutocomplete } from '@/components/common/LocationAutocomplete';
 import { SharedCargoInput } from '@/components/sales/shared/SharedCargoInput';
 import { CommoditySelection } from '@/components/logistics/SmartCargoInput';
@@ -22,6 +24,7 @@ import { useAiAdvisor } from '@/hooks/useAiAdvisor';
 import { useToast } from '@/hooks/use-toast';
 import { useCRM } from '@/hooks/useCRM';
 import { logger } from '@/lib/logger';
+import { QuotationNumberService } from '@/services/quotation/QuotationNumberService';
 
 export type FormZoneValues = {
   mode: 'air' | 'ocean' | 'road' | 'rail';
@@ -78,9 +81,23 @@ interface FormZoneProps {
   loading?: boolean;
   initialValues?: Partial<FormZoneValues>;
   initialExtended?: Partial<ExtendedFormData>;
+  accounts?: any[];
+  contacts?: any[];
+  opportunities?: any[];
+  onChange?: (values: any) => void;
 }
 
-export function FormZone({ onGetRates, onSaveDraft, loading = false, initialValues, initialExtended }: FormZoneProps) {
+export function FormZone({ 
+  onGetRates, 
+  onSaveDraft, 
+  loading = false, 
+  initialValues, 
+  initialExtended,
+  accounts = [],
+  contacts = [],
+  opportunities = [],
+  onChange
+}: FormZoneProps) {
   const [smartMode, setSmartMode] = useState(true);
   const [moreOpen, setMoreOpen] = useState(false);
   const [carriers, setCarriers] = useState<{ id: string; carrier_name: string; carrier_type: string }[]>([]);
@@ -89,14 +106,85 @@ export function FormZone({ onGetRates, onSaveDraft, loading = false, initialValu
   const { incoterms, loading: incLoading } = useIncoterms();
   const { invokeAiAdvisor } = useAiAdvisor();
   const { toast } = useToast();
-  const { supabase, context } = useCRM();
+  const { supabase, scopedDb, context } = useCRM();
 
   const form = useFormContext<QuoteComposerValues>();
+
+  const quoteNumber = form.watch('quoteNumber' as any);
+  const [availability, setAvailability] = useState<'loading' | 'available' | 'unavailable' | null>(null);
+  const standalone = form.watch('standalone' as any);
+
+  useEffect(() => {
+    if (!quoteNumber) {
+      setAvailability(null);
+      return;
+    }
+    setAvailability('loading');
+    const timer = setTimeout(async () => {
+      try {
+        const isUnique = await QuotationNumberService.isUnique(scopedDb, context.tenantId || '', quoteNumber);
+        setAvailability(isUnique ? 'available' : 'unavailable');
+      } catch (err) {
+        setAvailability('unavailable');
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [quoteNumber, scopedDb, context?.tenantId]);
+
+  const onOpportunityChange = (opportunityId: string | undefined) => {
+    form.setValue('opportunityId' as any, opportunityId || '');
+    if (!opportunityId) {
+        // Optional: Clear account/contact if opportunity is cleared?
+        // Usually better to keep them if user just wants to unlink opportunity but keep context.
+        return;
+    }
+    
+    const opp = opportunities.find(o => o.id === opportunityId);
+    if (opp) {
+      // 1. Set Account
+      if (opp.account_id) {
+        form.setValue('accountId' as any, opp.account_id);
+      }
+      
+      // 2. Set Contact
+      // Prefer the contact explicitly linked to the opportunity
+      if (opp.contact_id) {
+         form.setValue('contactId' as any, opp.contact_id);
+      } else if (opp.account_id) {
+         // Fallback: Try to find a contact for this account
+         const related = contacts.filter(c => c.account_id === opp.account_id);
+         if (related.length === 1) {
+             // Single contact found - auto-select
+             form.setValue('contactId' as any, related[0].id);
+         } else {
+             // Multiple or no contacts - clear to force user selection
+             form.setValue('contactId' as any, '');
+         }
+      } else {
+          // No account linked - clear contact
+          form.setValue('contactId' as any, '');
+      }
+    }
+  };
+
+  // Propagate changes
+  useEffect(() => {
+    const subscription = form.watch((value) => {
+      onChange?.(value);
+    });
+    return () => subscription.unsubscribe();
+  }, [form.watch, onChange]);
 
   const mode = form.watch('mode');
   const commodity = form.watch('commodity');
   const origin = form.watch('origin');
   const destination = form.watch('destination');
+  const accountId = form.watch('accountId' as any);
+
+  const filteredContacts = useMemo(() => {
+    if (!accountId) return contacts;
+    return contacts.filter(c => c.account_id === accountId);
+  }, [contacts, accountId]);
 
   // Sync initial values to form context
   useEffect(() => {
@@ -250,6 +338,270 @@ export function FormZone({ onGetRates, onSaveDraft, loading = false, initialValu
           const message = (firstError as any)?.message || 'Please fix the highlighted fields.';
           toast({ title: 'Validation Error', description: String(message), variant: 'destructive' });
         })} className="space-y-5">
+        
+        {/* General Information */}
+        <Card className={`border ${standalone ? 'border-amber-300' : 'border-blue-300'} bg-muted/10`}>
+          <CardContent className="p-4 grid grid-cols-1 gap-4">
+            <div className="flex items-center justify-between p-3 rounded-md border bg-background">
+              <Label className="text-xs">{standalone ? 'Standalone Mode' : 'CRM-Linked Mode'}</Label>
+              <Switch
+                id="standalone-mode"
+                checked={!!standalone}
+                onCheckedChange={(checked) => {
+                  form.setValue('standalone' as any, checked);
+                }}
+              />
+            </div>
+
+            {!standalone && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <FormField
+              control={form.control}
+              name={"opportunityId" as any}
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="flex items-center gap-2 text-xs">
+                    <FileText className="h-3.5 w-3.5" /> Opportunity
+                  </FormLabel>
+                  <Select onValueChange={(val) => onOpportunityChange(val)} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger className="bg-background h-9 text-xs">
+                        <SelectValue placeholder="Select Opportunity" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {opportunities.map(o => (
+                        <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name={"accountId" as any}
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="flex items-center gap-2 text-xs">
+                    <Building2 className="h-3.5 w-3.5" /> Account
+                  </FormLabel>
+                  <Select onValueChange={(v) => {
+                    field.onChange(v);
+                    const related = contacts.filter(c => c.account_id === v);
+                    const firstContact = related[0];
+                    if (firstContact) {
+                      form.setValue('contactId' as any, firstContact.id);
+                    } else {
+                      form.setValue('contactId' as any, '');
+                    }
+                  }} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger className="bg-background h-9 text-xs">
+                        <SelectValue placeholder="Select Customer" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {accounts.map(acc => (
+                        <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name={"contactId" as any}
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="flex items-center gap-2 text-xs">
+                    <User className="h-3.5 w-3.5" /> Contact
+                  </FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value} disabled={!accountId}>
+                    <FormControl>
+                      <SelectTrigger className="bg-background h-9 text-xs">
+                        <SelectValue placeholder="Select Contact" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {filteredContacts.map(c => (
+                        <SelectItem key={c.id} value={c.id}>{c.first_name} {c.last_name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+                  control={form.control}
+                  name={"quoteTitle" as any}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center gap-2 text-xs">
+                        <FileText className="h-3.5 w-3.5" /> Quote Reference
+                      </FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="e.g. Q3 Shipment" className="bg-background h-9 text-xs" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            )}
+            {standalone && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <FormField
+                  control={form.control}
+                  name={"guestCompany" as any}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs">Company</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Company name" className="bg-background h-9 text-xs" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name={"guestName" as any}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs">Contact Name</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Full name" className="bg-background h-9 text-xs" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name={"guestEmail" as any}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs">Email</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="name@company.com" className="bg-background h-9 text-xs" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name={"guestPhone" as any}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs">Phone</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="+1 555-0100" className="bg-background h-9 text-xs" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name={"customerPo" as any}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs">Customer PO</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="e.g. PO-12345" className="bg-background h-9 text-xs" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name={"vendorRef" as any}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs">Vendor Reference</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Optional" className="bg-background h-9 text-xs" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name={"projectCode" as any}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs">Project Code</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Optional" className="bg-background h-9 text-xs" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            )}
+            <FormField
+              control={form.control}
+              name={"quoteNumber" as any}
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="flex items-center gap-2 text-xs">
+                    <FileText className="h-3.5 w-3.5" /> Quote Number (Manual Override)
+                  </FormLabel>
+                  <FormControl>
+                    <div className="relative">
+                      <Input {...field} placeholder="Auto-generated if left blank" className="bg-background h-9 text-xs pr-8" />
+                      {availability === 'loading' && <Loader2 className="absolute right-2 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />}
+                      {availability === 'available' && <CheckCircle2 className="absolute right-2 top-2.5 h-4 w-4 text-green-500" />}
+                      {availability === 'unavailable' && <XCircle className="absolute right-2 top-2.5 h-4 w-4 text-destructive" />}
+                    </div>
+                  </FormControl>
+                  {availability === 'unavailable' && <p className="text-[10px] text-destructive mt-1">This number is already taken.</p>}
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            {standalone && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name={"termsConditions" as any}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs">Terms & Conditions</FormLabel>
+                      <FormControl>
+                        <textarea {...field} placeholder="Enter terms and conditions" className="bg-background text-xs p-2 rounded-md border h-24" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name={"notesText" as any}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs">Internal Notes / Special Instructions</FormLabel>
+                      <FormControl>
+                        <textarea {...field} placeholder="Internal notes and special instructions" className="bg-background text-xs p-2 rounded-md border h-24" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Smart Mode Toggle */}
         <div className="flex items-center justify-between bg-purple-50 dark:bg-purple-950/30 p-3 rounded-md border border-purple-100 dark:border-purple-900">
           <div className="flex items-center gap-2">

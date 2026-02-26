@@ -1,6 +1,28 @@
 import * as z from 'zod';
 
 export const quoteComposerSchema = z.object({
+  // Phase 0: General Info
+  accountId: z.string().optional(),
+  contactId: z.string().optional(),
+  quoteTitle: z.string().optional(),
+  opportunityId: z.string().optional(),
+  quoteNumber: z
+    .string()
+    .max(32, 'Quote number too long')
+    .regex(/^[A-Za-z0-9._-]*$/, 'Only letters, numbers, dot, dash and underscore allowed')
+    .optional(),
+  standalone: z.boolean().default(false),
+  // Standalone guest fields
+  guestCompany: z.string().optional(),
+  guestName: z.string().optional(),
+  guestEmail: z.string().email('Invalid email format').optional(),
+  guestPhone: z.string().optional(),
+  customerPo: z.string().optional(),
+  vendorRef: z.string().optional(),
+  projectCode: z.string().optional(),
+  termsConditions: z.string().optional(),
+  notesText: z.string().optional(),
+
   // Phase 1: FormZone fields
   mode: z.enum(['air', 'ocean', 'road', 'rail']),
   origin: z.string().min(2, 'Origin is required'),
@@ -69,6 +91,22 @@ export const quoteComposerSchema = z.object({
   if (data.origin.trim().toLowerCase() === data.destination.trim().toLowerCase()) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Origin and Destination cannot be the same', path: ['destination'] });
   }
+  if (data.standalone) {
+    if (!data.guestCompany || data.guestCompany.trim().length < 2) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Company is required in standalone mode', path: ['guestCompany'] });
+    }
+    if (!data.guestName || data.guestName.trim().length < 2) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Contact name is required in standalone mode', path: ['guestName'] });
+    }
+    if (!data.guestEmail || data.guestEmail.trim().length < 3) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Contact email is required in standalone mode', path: ['guestEmail'] });
+    }
+  } else {
+    if (!data.opportunityId && !data.accountId) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Select an Opportunity or Account', path: ['opportunityId'] });
+    }
+  }
 });
 
 export type QuoteComposerValues = z.infer<typeof quoteComposerSchema>;
+export type FormZoneValues = QuoteComposerValues;

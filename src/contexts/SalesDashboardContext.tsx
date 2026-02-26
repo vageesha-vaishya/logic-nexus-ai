@@ -3,7 +3,6 @@ import { useCRM } from '@/hooks/useCRM';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
-import { CommandCenterModal } from '@/components/sales/modals/CommandCenterModal';
 import { AIQuotationModal } from '@/components/sales/modals/AIQuotationModal';
 
 interface SalesDashboardContextType {
@@ -11,8 +10,6 @@ interface SalesDashboardContextType {
   setActiveView: (view: string) => void;
   showConfig: boolean;
   setShowConfig: (show: boolean) => void;
-  showCommandCenter: boolean;
-  setShowCommandCenter: (show: boolean) => void;
   showAIQuote: boolean;
   setShowAIQuote: (show: boolean) => void;
   unreadMessages: number;
@@ -31,7 +28,6 @@ export function SalesDashboardProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const [activeView, setActiveView] = useState('quotations');
   const [showConfig, setShowConfig] = useState(false);
-  const [showCommandCenter, setShowCommandCenter] = useState(false);
   const [showAIQuote, setShowAIQuote] = useState(false);
   
   // Mock data for initial implementation - replace with real queries later
@@ -52,7 +48,7 @@ export function SalesDashboardProvider({ children }: { children: ReactNode }) {
         setShowConfig(true);
         break;
       case 'command_center':
-        setShowCommandCenter(true);
+        navigate('/dashboard/sales/command-center');
         break;
       case 'ai_quote':
         setShowAIQuote(true);
@@ -74,8 +70,6 @@ export function SalesDashboardProvider({ children }: { children: ReactNode }) {
       setActiveView,
       showConfig,
       setShowConfig,
-      showCommandCenter,
-      setShowCommandCenter,
       showAIQuote,
       setShowAIQuote,
       unreadMessages,
@@ -86,7 +80,6 @@ export function SalesDashboardProvider({ children }: { children: ReactNode }) {
       handleAction,
     }}>
       {children}
-      <CommandCenterModal />
       <AIQuotationModal />
     </SalesDashboardContext.Provider>
   );

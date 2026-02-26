@@ -1,15 +1,16 @@
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { UnifiedPartnerForm } from '@/components/crm/UnifiedPartnerForm';
-import { ArrowLeft } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 import { EnterpriseFormLayout } from '@/components/ui/enterprise/EnterpriseFormLayout';
 import { EnterpriseSheet } from '@/components/ui/enterprise/EnterpriseComponents';
+import { AccountService } from '@/services/account-service';
+import { AccountInput } from '@/lib/account-validation';
 
 export default function AccountNew() {
   const navigate = useNavigate();
-  const { context, scopedDb } = useCRM();
+  const { context, supabase } = useCRM();
 
   const handleCreate = async (formData: any) => {
     try {
@@ -23,38 +24,50 @@ export default function AccountNew() {
         return;
       }
 
-      // Prepare data for insertion
-      const accountData = {
-        ...formData,
-        tenant_id: tenantId,
-        franchise_id: context.franchiseId,
-        // Ensure numeric conversion
-        annual_revenue: formData.annual_revenue ? parseFloat(formData.annual_revenue) : null,
-        employee_count: formData.employee_count ? parseInt(formData.employee_count) : null,
-        // Handle address object flattening if needed, or if UnifiedPartnerForm returns flattened data?
-        // UnifiedPartnerForm returns nested address object. We need to flatten it.
-        billing_street: formData.address?.street,
-        billing_city: formData.address?.city,
-        billing_state: formData.address?.state,
-        billing_postal_code: formData.address?.postal_code,
-        billing_country: formData.address?.country,
-        // Remove address object to avoid Supabase error
-        address: undefined,
-        type: undefined // Remove form-specific type field
+      // Prepare data for service
+      const accountData: AccountInput = {
+        name: formData.name || '', // Name is mandatory in form for company
+        tax_id: formData.vat_number,
+        website: formData.website,
+        email: formData.email,
+        phone: formData.phone,
+        billing_address: {
+            street: formData.address?.street,
+            city: formData.address?.city,
+            state: formData.address?.state,
+            postal_code: formData.address?.postal_code,
+            country: formData.address?.country,
+        },
+        shipping_address: { // Default shipping to billing if not provided (UI only has one address)
+            street: formData.address?.street,
+            city: formData.address?.city,
+            state: formData.address?.state,
+            postal_code: formData.address?.postal_code,
+            country: formData.address?.country,
+        },
+        primary_contact: formData.first_name ? {
+            first_name: formData.first_name,
+            last_name: formData.last_name,
+            email: formData.email, // Shared email if individual? UnifiedPartnerForm logic
+            phone: formData.mobile || formData.phone,
+            title: formData.job_title
+        } : undefined,
+        references: [], // Form doesn't capture refs yet
+        notes: formData.notes ? [{ content: formData.notes, type: 'general' }] : [],
       };
 
-      const { data, error } = await scopedDb
-        .from('accounts')
-        .insert(accountData)
-        .select()
-        .single();
+      const accountService = new AccountService(supabase);
+      const result = await accountService.createOrUpdateAccount(accountData, tenantId);
 
-      if (error) throw error;
+      if (result?.status === 'success') {
+        toast.success('Account created successfully');
+        navigate(`/dashboard/accounts/${result.account_id}`);
+      } else {
+        throw new Error('Unexpected response from server');
+      }
 
-      toast.success('Account created successfully');
-      navigate(`/dashboard/accounts/${data.id}`);
     } catch (error: any) {
-      toast.error('Failed to create account');
+      toast.error(`Failed to create account: ${error.message}`);
       console.error('Error:', error);
     }
   };

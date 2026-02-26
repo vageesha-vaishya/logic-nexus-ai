@@ -1,4 +1,4 @@
-import React, { ReactNode } from 'react';
+import React, { ReactNode, useState } from 'react';
 import { 
   LayoutGrid, 
   ShoppingCart, 
@@ -26,7 +26,9 @@ import {
   Download,
   Settings2,
   Table,
-  Building
+  Building,
+  Menu,
+  Home
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -48,6 +50,7 @@ import { AdvancedSearchFilter, FilterCriterion } from './AdvancedSearchFilter';
 import { ViewMode } from '@/components/ui/view-toggle';
 import { useSalesDashboard } from '@/contexts/SalesDashboardContext';
 import { toast } from 'sonner';
+import { QuotationSidebar } from './QuotationSidebar';
 
 interface QuotationManagerLayoutProps {
   children: ReactNode;
@@ -87,12 +90,14 @@ export function QuotationManagerLayout({
     companyName, 
     userRole 
   } = useSalesDashboard();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const startRecord = (pagination.current - 1) * pagination.pageSize + 1;
   const endRecord = Math.min(pagination.current * pagination.pageSize, pagination.total);
 
   return (
     <div className="flex flex-col h-screen bg-gray-50">
+      
       {/* --- Top Header Strip --- */}
       <header className="h-14 bg-[#714B67] text-white flex items-center justify-between px-4 shadow-sm shrink-0 z-50">
         {/* Left Section */}
@@ -101,10 +106,20 @@ export function QuotationManagerLayout({
             variant="ghost" 
             size="icon" 
             className="text-white hover:bg-white/10" 
-            title="Command Center"
-            onClick={() => handleAction('command_center')}
+            title="Main Menu"
+            onClick={() => handleNavigation('/dashboard')}
           >
-            <LayoutGrid className="h-5 w-5" />
+            <Home className="h-5 w-5" />
+          </Button>
+          
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="text-white hover:bg-white/10" 
+            title="Module Panel"
+            onClick={() => setIsSidebarOpen(true)}
+          >
+            <Menu className="h-5 w-5" />
           </Button>
           
           <DropdownMenu>
@@ -285,8 +300,11 @@ export function QuotationManagerLayout({
         </div>
       </header>
 
-      {/* --- Sub-Header Strip (Control Panel) --- */}
-      <div className="h-16 bg-white border-b flex items-center justify-between px-4 shrink-0 gap-4 shadow-sm z-40">
+      <div className="flex flex-1 overflow-hidden">
+        <QuotationSidebar />
+        <div className="flex flex-col flex-1 overflow-hidden min-w-0">
+          {/* --- Sub-Header Strip (Control Panel) --- */}
+          <div className="h-16 bg-white border-b flex items-center justify-between px-4 shrink-0 gap-4 shadow-sm z-40">
         {/* Left: Actions */}
         <div className="flex items-center gap-3">
           <Button 
@@ -404,6 +422,8 @@ export function QuotationManagerLayout({
       <main className="flex-1 overflow-auto p-4 md:p-6 relative">
         {children}
       </main>
+      </div>
+    </div>
     </div>
   );
 }

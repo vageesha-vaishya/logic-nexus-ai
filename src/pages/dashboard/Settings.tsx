@@ -10,12 +10,51 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { DebugSettingsCard } from '@/components/admin/DebugSettingsCard';
 import { DashboardRoleSwitcher } from '@/components/settings/DashboardRoleSwitcher';
+import { Switch } from '@/components/ui/switch';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { useEffect, useState } from 'react';
+import { Label } from '@/components/ui/label';
+import { useToast } from '@/hooks/use-toast';
+import { CheckCircle2 } from 'lucide-react';
 
 export default function Settings() {
   const { profile, roles } = useAuth();
   const navigate = useNavigate();
   const { toggleDark } = useTheme();
-  const { context } = useCRM();
+  const { context, scopedDb } = useCRM();
+  const { toast } = useToast();
+  const [standaloneEnabled, setStandaloneEnabled] = useState<boolean>(false);
+  const [loadingStandalone, setLoadingStandalone] = useState<boolean>(false);
+  const isAdmin = context.isPlatformAdmin || context.isTenantAdmin;
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        setLoadingStandalone(true);
+        const { data } = await scopedDb.getSystemSetting('standalone_quote_mode_enabled');
+        if (!active) return;
+        setStandaloneEnabled(Boolean(data?.setting_value));
+      } catch {
+      } finally {
+        if (active) setLoadingStandalone(false);
+      }
+    })();
+    return () => { active = false; };
+  }, [scopedDb]);
+
+  const applyStandaloneToggle = async (checked: boolean) => {
+    try {
+      setLoadingStandalone(true);
+      await scopedDb.setSystemSetting('standalone_quote_mode_enabled', checked);
+      setStandaloneEnabled(checked);
+      toast({ title: 'Saved', description: checked ? 'Standalone Quote Mode enabled' : 'Standalone Quote Mode disabled' });
+    } catch (e: any) {
+      toast({ title: 'Failed to save', description: e?.message || String(e), variant: 'destructive' });
+    } finally {
+      setLoadingStandalone(false);
+    }
+  };
 
   return (
     <DashboardLayout>
@@ -38,6 +77,7 @@ export default function Settings() {
               <div className="md:col-span-2 lg:col-span-3">
                 <DashboardRoleSwitcher />
               </div>
+              
               <div className="md:col-span-2 lg:col-span-3">
                 <div className="flex items-center">
                   <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Appearance</h2>

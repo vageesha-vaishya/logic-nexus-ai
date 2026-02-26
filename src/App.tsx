@@ -159,6 +159,7 @@ const LogTestPage = lazy(() => import("./pages/dashboard/LogTest"));
 const DebugConsole = lazy(() => import("./pages/dashboard/DebugConsole"));
 const Commodities = lazy(() => import("./pages/dashboard/Commodities"));
 const SalesPlaceholder = lazy(() => import("./pages/dashboard/SalesPlaceholder"));
+const SalesCommandCenter = lazy(() => import("./pages/dashboard/SalesCommandCenter"));
 
 // Initialize plugins at startup
 try {
@@ -748,6 +749,7 @@ const App = () => (
             <Route path="/dashboard/debug-console" element={<ProtectedRoute><DebugConsole /></ProtectedRoute>} />
             
             {/* Sales Dashboard Routes */}
+            <Route path="/dashboard/sales/command-center" element={<ProtectedRoute><SalesCommandCenter /></ProtectedRoute>} />
             <Route path="/dashboard/sales" element={<ProtectedRoute><SalesPlaceholder /></ProtectedRoute>} />
             <Route path="/dashboard/sales/performance" element={<ProtectedRoute><SalesPlaceholder /></ProtectedRoute>} />
             <Route path="/dashboard/orders" element={<ProtectedRoute><SalesPlaceholder /></ProtectedRoute>} />
