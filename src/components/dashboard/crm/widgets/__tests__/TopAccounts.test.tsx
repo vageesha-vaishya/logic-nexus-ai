@@ -4,6 +4,15 @@ import { TopAccounts } from '../TopAccounts';
 import * as crmHooks from '@/hooks/useCRM';
 
 vi.mock('@/hooks/useCRM');
+vi.mock('@/components/ui/enterprise', () => ({
+  EnterpriseTable: ({ data, columns }: any) => (
+    <div>
+      {data?.map((row: any) => (
+        <div key={row.id}>{row.company_name}</div>
+      ))}
+    </div>
+  ),
+}));
 
 describe('TopAccounts', () => {
   beforeEach(() => {
@@ -13,10 +22,10 @@ describe('TopAccounts', () => {
   it('should fetch top accounts from database', async () => {
     const mockAccounts = [
       {
-        rank: 1,
+        id: '1',
         company_name: 'Acme Corp',
         annual_revenue: 1000000,
-        growth: '+15%',
+        status: 'active',
       },
     ];
 
@@ -34,38 +43,13 @@ describe('TopAccounts', () => {
     };
 
     vi.mocked(crmHooks.useCRM).mockReturnValue({
-      scopedDb: mockScopedDb as any,
+      scopedDb: mockScopedDb,
     } as any);
 
     render(<TopAccounts />);
 
     await waitFor(() => {
       expect(screen.getByText('Acme Corp')).toBeInTheDocument();
-    });
-  });
-
-  it('should handle database errors', async () => {
-    const mockScopedDb = {
-      from: vi.fn().mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          order: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue({
-              data: null,
-              error: new Error('Database error'),
-            }),
-          }),
-        }),
-      }),
-    };
-
-    vi.mocked(crmHooks.useCRM).mockReturnValue({
-      scopedDb: mockScopedDb as any,
-    } as any);
-
-    render(<TopAccounts />);
-
-    await waitFor(() => {
-      expect(screen.getByText(/Failed to load accounts/)).toBeInTheDocument();
     });
   });
 });

@@ -135,13 +135,35 @@ export function WidgetSettingsDialog({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="bar">{t('Bar Chart')}</SelectItem>
-                    <SelectItem value="pie">{t('Pie Chart')}</SelectItem>
                     <SelectItem value="line">{t('Line Chart')}</SelectItem>
+                    <SelectItem value="pie">{t('Pie Chart')}</SelectItem>
                     <SelectItem value="area">{t('Area Chart')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </>
+          )}
+
+          {config.type === 'kanban' && (
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right">{t('View Mode')}</Label>
+              <Select 
+                value={settings.module || 'overview'} 
+                onValueChange={(v) => setSettings({ ...settings, module: v })}
+              >
+                <SelectTrigger className="col-span-3">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="overview">{t('Pipelines Overview')}</SelectItem>
+                  <SelectItem value="leads">{t('Leads Board')}</SelectItem>
+                  <SelectItem value="opportunities">{t('Opportunities Board')}</SelectItem>
+                  <SelectItem value="quotes">{t('Quotes Board')}</SelectItem>
+                  <SelectItem value="shipments">{t('Shipments Board')}</SelectItem>
+                  <SelectItem value="activities">{t('Activities Board')}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           )}
         </div>
         <DialogFooter>

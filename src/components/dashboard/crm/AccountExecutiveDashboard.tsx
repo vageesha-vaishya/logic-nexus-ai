@@ -1,26 +1,28 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { X, Maximize2, Minimize2 } from 'lucide-react';
-import { MyAccounts } from './widgets/MyAccounts';
-import { AccountTimeline } from './widgets/AccountTimeline';
-import { RevenueByAccount } from './widgets/RevenueByAccount';
-import { WinLossAnalysis } from './widgets/WinLossAnalysis';
+import { MyActiveLeads } from './widgets/MyActiveLeads';
+import { TopAccounts } from './widgets/TopAccounts';
+import { PipelineByStage } from './widgets/PipelineByStage';
+import { UpcomingActivities } from './widgets/UpcomingActivities';
 import { WidgetInstance } from '@/types/dashboardTemplates';
+import { useDashboardPreferences } from '@/hooks/useDashboardPreferences';
 
 const defaultWidgets: WidgetInstance[] = [
-  { id: '1', type: 'my_accounts', title: 'My Accounts', size: 'large', position: 0 },
-  { id: '2', type: 'account_timeline', title: 'Recent Activities', size: 'large', position: 1 },
-  { id: '3', type: 'revenue_by_account', title: 'Revenue Distribution', size: 'large', position: 2 },
-  { id: '4', type: 'win_loss', title: 'Win/Loss Analysis', size: 'large', position: 3 },
+  { id: '1', type: 'my_active_leads', title: 'My Active Leads', size: 'large', position: 0 },
+  { id: '2', type: 'top_accounts', title: 'Top Accounts', size: 'large', position: 1 },
+  { id: '3', type: 'pipeline_by_stage', title: 'Pipeline by Stage', size: 'large', position: 2 },
+  { id: '4', type: 'upcoming_activities', title: 'Upcoming Activities', size: 'large', position: 3 },
 ];
 
 export function AccountExecutiveDashboard() {
-  const [widgets, setWidgets] = useState<WidgetInstance[]>(defaultWidgets);
-  const [resizedWidget, setResizedWidget] = useState<string | null>(null);
+  const { widgets, loading, savePreferences } = useDashboardPreferences(defaultWidgets);
+  const [resizedWidget, setResizedWidget] = React.useState<string | null>(null);
 
   const handleRemoveWidget = (id: string) => {
-    setWidgets(widgets.filter(w => w.id !== id));
+    const updatedWidgets = widgets.filter(w => w.id !== id);
+    savePreferences(updatedWidgets);
   };
 
   const handleResizeWidget = (id: string) => {
@@ -29,14 +31,14 @@ export function AccountExecutiveDashboard() {
 
   const renderWidget = (widget: WidgetInstance) => {
     switch (widget.type) {
-      case 'my_accounts':
-        return <MyAccounts />;
-      case 'account_timeline':
-        return <AccountTimeline />;
-      case 'revenue_by_account':
-        return <RevenueByAccount />;
-      case 'win_loss':
-        return <WinLossAnalysis />;
+      case 'my_active_leads':
+        return <MyActiveLeads />;
+      case 'top_accounts':
+        return <TopAccounts />;
+      case 'pipeline_by_stage':
+        return <PipelineByStage />;
+      case 'upcoming_activities':
+        return <UpcomingActivities />;
       default:
         return <div className="text-gray-500">Unknown widget type: {widget.type}</div>;
     }
@@ -57,11 +59,15 @@ export function AccountExecutiveDashboard() {
     }
   };
 
+  if (loading) {
+    return <div className="p-8 text-center">Loading dashboard preferences...</div>;
+  }
+
   return (
     <div className="w-full">
       <div className="mb-6">
         <h2 className="text-3xl font-bold text-gray-900">Account Executive Dashboard</h2>
-        <p className="text-gray-600 mt-1">Your accounts, revenue, and deal performance</p>
+        <p className="text-gray-600 mt-1">Manage your accounts, leads, and pipeline</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 auto-rows-max">
@@ -103,18 +109,6 @@ export function AccountExecutiveDashboard() {
           </Card>
         ))}
       </div>
-
-      {widgets.length === 0 && (
-        <Card className="col-span-4 text-center py-12">
-          <p className="text-gray-500 mb-4">All widgets have been removed</p>
-          <Button
-            variant="outline"
-            onClick={() => setWidgets(defaultWidgets)}
-          >
-            Reset Dashboard
-          </Button>
-        </Card>
-      )}
     </div>
   );
 }

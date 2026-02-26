@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { X, Maximize2, Minimize2 } from 'lucide-react';
@@ -7,6 +7,7 @@ import { SalesForecast } from './widgets/SalesForecast';
 import { WinLossMetrics } from './widgets/WinLossMetrics';
 import { RevenueYTD } from './widgets/RevenueYTD';
 import { WidgetInstance } from '@/types/dashboardTemplates';
+import { useDashboardPreferences } from '@/hooks/useDashboardPreferences';
 
 const defaultWidgets: WidgetInstance[] = [
   { id: '1', type: 'pipeline_by_stage', title: 'My Pipeline', size: 'large', position: 0 },
@@ -16,11 +17,12 @@ const defaultWidgets: WidgetInstance[] = [
 ];
 
 export function SalesRepDashboard() {
-  const [widgets, setWidgets] = useState<WidgetInstance[]>(defaultWidgets);
-  const [resizedWidget, setResizedWidget] = useState<string | null>(null);
+  const { widgets, loading, savePreferences } = useDashboardPreferences(defaultWidgets);
+  const [resizedWidget, setResizedWidget] = React.useState<string | null>(null);
 
   const handleRemoveWidget = (id: string) => {
-    setWidgets(widgets.filter(w => w.id !== id));
+    const updatedWidgets = widgets.filter(w => w.id !== id);
+    savePreferences(updatedWidgets);
   };
 
   const handleResizeWidget = (id: string) => {
@@ -56,6 +58,10 @@ export function SalesRepDashboard() {
         return 'col-span-1';
     }
   };
+
+  if (loading) {
+    return <div className="p-8 text-center">Loading dashboard preferences...</div>;
+  }
 
   return (
     <div className="w-full">
@@ -103,18 +109,6 @@ export function SalesRepDashboard() {
           </Card>
         ))}
       </div>
-
-      {widgets.length === 0 && (
-        <Card className="col-span-4 text-center py-12">
-          <p className="text-gray-500 mb-4">All widgets have been removed</p>
-          <Button
-            variant="outline"
-            onClick={() => setWidgets(defaultWidgets)}
-          >
-            Reset Dashboard
-          </Button>
-        </Card>
-      )}
     </div>
   );
 }

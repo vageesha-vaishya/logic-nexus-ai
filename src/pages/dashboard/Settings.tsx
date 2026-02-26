@@ -9,6 +9,7 @@ import { useCRM } from '@/hooks/useCRM';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { DebugSettingsCard } from '@/components/admin/DebugSettingsCard';
+import { DashboardRoleSwitcher } from '@/components/settings/DashboardRoleSwitcher';
 
 export default function Settings() {
   const { profile, roles } = useAuth();
@@ -33,6 +34,9 @@ export default function Settings() {
             <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
               <div className="md:col-span-2 lg:col-span-3">
                 <DebugSettingsCard />
+              </div>
+              <div className="md:col-span-2 lg:col-span-3">
+                <DashboardRoleSwitcher />
               </div>
               <div className="md:col-span-2 lg:col-span-3">
                 <div className="flex items-center">

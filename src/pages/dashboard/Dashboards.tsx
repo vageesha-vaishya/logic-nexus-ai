@@ -106,17 +106,38 @@ export default function Dashboards() {
       const targetUserId = viewingUserId || user.id;
       setIsLoading(true);
       
+      const deduplicateWidgets = (widgets: WidgetConfig[]) => {
+        const uniqueWidgets: WidgetConfig[] = [];
+        const seenTypes = new Set<string>();
+        const seenIds = new Set<string>();
+
+        for (const w of widgets) {
+          // Deduplicate by ID and Type to ensure clean dashboard
+          if (!seenIds.has(w.id) && !seenTypes.has(w.type)) {
+            seenIds.add(w.id);
+            seenTypes.add(w.type);
+            uniqueWidgets.push(w);
+          }
+        }
+        return uniqueWidgets;
+      };
+      
       try {
         const savedWidgets = await DashboardService.getPreferences(scopedDb, targetUserId);
         if (savedWidgets && savedWidgets.length > 0) {
-          setWidgets(savedWidgets);
+          setWidgets(deduplicateWidgets(savedWidgets));
         } else {
           // Fallback to local storage only for own dashboard if DB is empty (migration path)
           // Or just default. Let's try localStorage if it's own dashboard.
           if (targetUserId === user.id) {
              const local = localStorage.getItem('dashboard_widgets');
              if (local) {
-               setWidgets(JSON.parse(local));
+               try {
+                 const parsed = JSON.parse(local);
+                 setWidgets(deduplicateWidgets(parsed));
+               } catch (e) {
+                 setWidgets(DEFAULT_WIDGETS);
+               }
              } else {
                setWidgets(DEFAULT_WIDGETS);
              }

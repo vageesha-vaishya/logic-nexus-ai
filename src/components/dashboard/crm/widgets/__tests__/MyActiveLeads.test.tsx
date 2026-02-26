@@ -47,7 +47,7 @@ describe('MyActiveLeads', () => {
     };
 
     vi.mocked(crmHooks.useCRM).mockReturnValue({
-      scopedDb: mockScopedDb as any,
+      scopedDb: mockScopedDb,
     } as any);
 
     render(<MyActiveLeads />);
@@ -72,7 +72,7 @@ describe('MyActiveLeads', () => {
     };
 
     vi.mocked(crmHooks.useCRM).mockReturnValue({
-      scopedDb: mockScopedDb as any,
+      scopedDb: mockScopedDb,
     } as any);
 
     render(<MyActiveLeads />);

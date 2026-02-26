@@ -206,86 +206,6 @@ export function AccountForm({ initialData, onSubmit, onCancel }: AccountFormProp
             )}
           />
 
-          {context.isPlatformAdmin && (
-            <FormField
-              control={form.control}
-              name="tenant_id"
-              render={({ field }) => (
-                <FormItem className="col-span-2">
-                  <FormLabel>Tenant *</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select tenant" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {tenants.map((tenant) => (
-                        <SelectItem key={tenant.id} value={tenant.id}>
-                          {tenant.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          )}
-
-          {(context.isPlatformAdmin || context.isTenantAdmin) && franchises.length > 0 && (
-            <FormField
-              control={form.control}
-              name="franchise_id"
-              render={({ field }) => (
-                <FormItem className="col-span-2">
-                  <FormLabel>Franchise (Optional)</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select franchise" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {franchises.map((franchise) => (
-                        <SelectItem key={franchise.id} value={franchise.id}>
-                          {franchise.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          )}
-
-          <FormField
-            control={form.control}
-            name="parent_account_id"
-            render={({ field }) => (
-              <FormItem className="col-span-2">
-                <FormLabel>Parent Account (Optional)</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="None (Top-level account)" />
-                    </SelectTrigger>
-                  </FormControl>
-                <SelectContent>
-                    <SelectItem value="none">None (Top-level account)</SelectItem>
-                    {parentAccounts.map((account) => (
-                      <SelectItem key={account.id} value={account.id}>
-                        {account.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
           <FormField
             control={form.control}
             name="industry"
@@ -316,30 +236,12 @@ export function AccountForm({ initialData, onSubmit, onCancel }: AccountFormProp
 
           <FormField
             control={form.control}
-            name="custom_fields"
-            render={({ field }) => (
-              <FormItem className="col-span-2">
-                <FormLabel>Custom Fields (JSON)</FormLabel>
-                <FormControl>
-                  <Textarea 
-                    placeholder='{"priority": "high", "segment": "enterprise"}' 
-                    className="font-mono text-xs"
-                    {...field} 
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
             name="phone"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Phone</FormLabel>
                 <FormControl>
-                  <Input placeholder="+1 (555) 123-4567" {...field} />
+                  <Input placeholder="+1 (555) 000-0000" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -353,7 +255,7 @@ export function AccountForm({ initialData, onSubmit, onCancel }: AccountFormProp
               <FormItem>
                 <FormLabel>Email</FormLabel>
                 <FormControl>
-                  <Input placeholder="contact@example.com" {...field} />
+                  <Input placeholder="contact@company.com" type="email" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -379,10 +281,36 @@ export function AccountForm({ initialData, onSubmit, onCancel }: AccountFormProp
             name="employee_count"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Employee Count</FormLabel>
+                <FormLabel>Employees</FormLabel>
                 <FormControl>
-                  <Input placeholder="50" type="number" {...field} />
+                  <Input placeholder="100" type="number" {...field} />
                 </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="parent_account_id"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Parent Account</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="None (Top-level)" />
+                    </SelectTrigger>
+                  </FormControl>
+                <SelectContent>
+                    <SelectItem value="none">None (Top-level)</SelectItem>
+                    {parentAccounts.map((account) => (
+                      <SelectItem key={account.id} value={account.id}>
+                        {account.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <FormMessage />
               </FormItem>
             )}

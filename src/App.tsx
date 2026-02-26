@@ -158,6 +158,7 @@ const DocumentManager = lazy(() => import("./pages/dashboard/DocumentManager"));
 const LogTestPage = lazy(() => import("./pages/dashboard/LogTest"));
 const DebugConsole = lazy(() => import("./pages/dashboard/DebugConsole"));
 const Commodities = lazy(() => import("./pages/dashboard/Commodities"));
+const SalesPlaceholder = lazy(() => import("./pages/dashboard/SalesPlaceholder"));
 
 // Initialize plugins at startup
 try {
@@ -745,6 +746,18 @@ const App = () => (
             <Route path="/dashboard/tenant-subscriptions" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><TenantSubscription /></ProtectedRoute>} />
             <Route path="/dashboard/log-test" element={<ProtectedRoute><LogTestPage /></ProtectedRoute>} />
             <Route path="/dashboard/debug-console" element={<ProtectedRoute><DebugConsole /></ProtectedRoute>} />
+            
+            {/* Sales Dashboard Routes */}
+            <Route path="/dashboard/sales" element={<ProtectedRoute><SalesPlaceholder /></ProtectedRoute>} />
+            <Route path="/dashboard/sales/performance" element={<ProtectedRoute><SalesPlaceholder /></ProtectedRoute>} />
+            <Route path="/dashboard/orders" element={<ProtectedRoute><SalesPlaceholder /></ProtectedRoute>} />
+            <Route path="/dashboard/team" element={<ProtectedRoute><SalesPlaceholder /></ProtectedRoute>} />
+            <Route path="/dashboard/invoicing/orders" element={<ProtectedRoute><SalesPlaceholder /></ProtectedRoute>} />
+            <Route path="/dashboard/reports/sales" element={<ProtectedRoute><SalesPlaceholder /></ProtectedRoute>} />
+            <Route path="/dashboard/reports/reps" element={<ProtectedRoute><SalesPlaceholder /></ProtectedRoute>} />
+            <Route path="/dashboard/settings/teams" element={<ProtectedRoute><SalesPlaceholder /></ProtectedRoute>} />
+            <Route path="/dashboard/settings/activities" element={<ProtectedRoute><SalesPlaceholder /></ProtectedRoute>} />
+            
             <Route path="*" element={<NotFound />} />
           </Routes>
                 </Suspense>

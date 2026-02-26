@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useCRM } from '@/hooks/useCRM';
-import { Star, DollarSign } from 'lucide-react';
+import { EnterpriseTable, type Column } from '@/components/ui/enterprise';
 
 interface Account {
-  rank: number;
+  id: string;
   company_name: string;
   annual_revenue?: number;
-  growth?: string;
+  status: string;
 }
 
 export function TopAccounts() {
@@ -21,21 +21,12 @@ export function TopAccounts() {
         setLoading(true);
         const { data, error: err } = await scopedDb
           .from('accounts')
-          .select('id, company_name, annual_revenue')
+          .select('id, company_name, annual_revenue, status')
           .order('annual_revenue', { ascending: false })
-          .limit(5);
+          .limit(10);
 
         if (err) throw err;
-
-        // Add rank and format for display
-        const formattedAccounts: Account[] = (data || []).map((account: any, index) => ({
-          rank: index + 1,
-          company_name: account.company_name,
-          annual_revenue: account.annual_revenue,
-          growth: `+${Math.floor(Math.random() * 25)}%`, // Placeholder - would come from database
-        }));
-
-        setAccounts(formattedAccounts);
+        setAccounts(data || []);
         setError(null);
       } catch (err) {
         console.error('Failed to fetch accounts:', err);
@@ -48,68 +39,36 @@ export function TopAccounts() {
     fetchAccounts();
   }, [scopedDb]);
 
-  if (loading) {
-    return (
-      <div className="space-y-3">
-        <div className="flex items-center gap-2 mb-4">
-          <Star className="h-5 w-5 text-yellow-600" />
-          <h4 className="font-semibold text-gray-900">Top 5 Accounts</h4>
-        </div>
-        <div className="space-y-2">
-          {[1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="h-16 bg-gray-100 rounded animate-pulse" />
-          ))}
-        </div>
-      </div>
-    );
-  }
+  const columns: Column<Account>[] = [
+    { key: 'company_name', label: 'Company', width: '250px' },
+    {
+      key: 'annual_revenue',
+      label: 'Annual Revenue',
+      width: '150px',
+      render: (v) =>
+        v
+          ? new Intl.NumberFormat('en-US', {
+              style: 'currency',
+              currency: 'USD',
+              maximumFractionDigits: 0,
+            }).format(v)
+          : 'N/A',
+    },
+    { key: 'status', label: 'Status', width: '100px' },
+  ];
 
-  if (error) {
-    return (
-      <div className="space-y-3">
-        <div className="flex items-center gap-2 mb-4">
-          <Star className="h-5 w-5 text-yellow-600" />
-          <h4 className="font-semibold text-gray-900">Top 5 Accounts</h4>
-        </div>
-        <div className="p-4 text-red-600 text-sm">{error}</div>
-      </div>
-    );
-  }
+  if (loading) return <div className="p-4">Loading accounts...</div>;
+  if (error) return <div className="p-4 text-red-600">{error}</div>;
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-2 mb-4">
-        <Star className="h-5 w-5 text-yellow-600" />
-        <h4 className="font-semibold text-gray-900">Top 5 Accounts</h4>
-      </div>
-      <div className="space-y-2">
-        {accounts.length > 0 ? (
-          accounts.map((account) => (
-            <div key={account.rank} className="flex items-center justify-between p-3 bg-gray-50 rounded border border-gray-200">
-              <div className="flex items-center gap-3">
-                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center text-xs font-bold text-white">
-                  {account.rank}
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-gray-900">{account.company_name}</p>
-                  <div className="flex items-center gap-1 text-xs text-gray-600 mt-0.5">
-                    <DollarSign className="h-3 w-3" />
-                    {account.annual_revenue ? account.annual_revenue.toLocaleString() : 'N/A'}
-                  </div>
-                </div>
-              </div>
-              <div className="text-right">
-                <p className={`text-sm font-semibold ${account.growth?.startsWith('+') ? 'text-green-600' : 'text-red-600'}`}>
-                  {account.growth || 'N/A'}
-                </p>
-                <p className="text-xs text-gray-500">YoY</p>
-              </div>
-            </div>
-          ))
-        ) : (
-          <p className="text-center py-8 text-gray-500">No accounts found</p>
-        )}
-      </div>
-    </div>
+    <EnterpriseTable
+      columns={columns}
+      data={accounts}
+      rowKey={(row) => row.id}
+      onRowClick={(row) => console.log('Selected:', row)}
+      emptyState={
+        <p className="text-center py-8 text-gray-500">No accounts found</p>
+      }
+    />
   );
 }

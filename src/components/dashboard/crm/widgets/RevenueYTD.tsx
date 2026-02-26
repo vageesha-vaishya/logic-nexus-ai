@@ -1,21 +1,101 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { useCRM } from '@/hooks/useCRM';
 import { DollarSign, TrendingUp, Target } from 'lucide-react';
 
-export function RevenueYTD() {
-  const revenueData = {
-    ytd: 2850000,
-    target: 3000000,
-    achieved: 95,
-    growth: '+18%',
-    byQuarter: [
-      { q: 'Q1', revenue: 680000 },
-      { q: 'Q2', revenue: 720000 },
-      { q: 'Q3', revenue: 750000 },
-      { q: 'Q4', revenue: 700000 },
-    ],
-  };
+interface RevenueData {
+  ytd: number;
+  target: number;
+  achieved: number;
+  growth: string;
+  byQuarter: { q: string; revenue: number }[];
+}
 
-  const maxRevenue = Math.max(...revenueData.byQuarter.map(q => q.revenue));
+export function RevenueYTD() {
+  const { scopedDb } = useCRM();
+  const [revenueData, setRevenueData] = useState<RevenueData>({
+    ytd: 0,
+    target: 0,
+    achieved: 0,
+    growth: '0%',
+    byQuarter: [],
+  });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchRevenue = async () => {
+      try {
+        setLoading(true);
+        const now = new Date();
+        const startOfYear = new Date(now.getFullYear(), 0, 1).toISOString();
+        const endOfYear = new Date(now.getFullYear(), 11, 31).toISOString();
+
+        // Fetch won opportunities this year
+        const { data, error } = await scopedDb
+          .from('opportunities')
+          .select('amount, close_date')
+          .eq('stage', 'closed_won')
+          .gte('close_date', startOfYear)
+          .lte('close_date', endOfYear);
+
+        if (!error && data) {
+          let ytd = 0;
+          const quarters = { Q1: 0, Q2: 0, Q3: 0, Q4: 0 };
+
+          data.forEach((opp: any) => {
+            const amount = opp.amount || 0;
+            ytd += amount;
+
+            const date = new Date(opp.close_date);
+            const month = date.getMonth();
+            if (month < 3) quarters.Q1 += amount;
+            else if (month < 6) quarters.Q2 += amount;
+            else if (month < 9) quarters.Q3 += amount;
+            else quarters.Q4 += amount;
+          });
+
+          // Mock target as 120% of current YTD or a fixed baseline if 0
+          // In a real app, this would come from a quotas/targets table
+          const target = ytd > 0 ? ytd * 1.2 : 1000000; 
+          const achieved = target > 0 ? Math.min(100, Math.round((ytd / target) * 100)) : 0;
+
+          setRevenueData({
+            ytd,
+            target,
+            achieved,
+            growth: '+12%', // Mock growth for now, would need last year's data to calc real growth
+            byQuarter: [
+              { q: 'Q1', revenue: quarters.Q1 },
+              { q: 'Q2', revenue: quarters.Q2 },
+              { q: 'Q3', revenue: quarters.Q3 },
+              { q: 'Q4', revenue: quarters.Q4 },
+            ],
+          });
+        }
+      } catch (error) {
+        console.error('Failed to fetch revenue YTD:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchRevenue();
+  }, [scopedDb]);
+
+  const maxRevenue = Math.max(...revenueData.byQuarter.map(q => q.revenue)) || 1;
+
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <DollarSign className="h-5 w-5 text-green-600" />
+            <h4 className="font-semibold text-gray-900">Revenue YTD</h4>
+          </div>
+        </div>
+        <div className="h-32 bg-gray-100 rounded animate-pulse" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -54,12 +134,12 @@ export function RevenueYTD() {
 
       <div className="pt-3 border-t">
         <p className="text-xs font-semibold text-gray-700 mb-2">Quarterly Breakdown</p>
-        <div className="flex items-end justify-between gap-2">
+        <div className="flex items-end justify-between gap-2 h-16">
           {revenueData.byQuarter.map((item, idx) => (
-            <div key={idx} className="flex-1 flex flex-col items-center gap-1">
+            <div key={idx} className="flex-1 flex flex-col items-center gap-1 h-full justify-end">
               <div
-                className="w-full bg-gradient-to-t from-blue-500 to-blue-400 rounded transition-all"
-                style={{ height: `${(item.revenue / maxRevenue) * 40}px` }}
+                className="w-full bg-gradient-to-t from-blue-500 to-blue-400 rounded-t transition-all"
+                style={{ height: `${Math.max(4, (item.revenue / maxRevenue) * 100)}%` }}
                 title={`${item.q}: $${(item.revenue / 1000).toFixed(0)}k`}
               />
               <p className="text-xs text-gray-600">{item.q}</p>

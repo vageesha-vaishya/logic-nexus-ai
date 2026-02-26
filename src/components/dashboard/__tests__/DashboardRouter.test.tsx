@@ -54,7 +54,7 @@ describe('DashboardRouter', () => {
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
             single: vi.fn().mockResolvedValue({
-              data: { dashboard_role: null },
+              data: null,
               error: null,
             }),
           }),
