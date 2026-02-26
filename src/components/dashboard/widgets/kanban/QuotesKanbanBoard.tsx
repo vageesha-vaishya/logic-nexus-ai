@@ -23,7 +23,7 @@ export function QuotesKanbanBoard() {
       
       const { data, error } = await scopedDb
         .from('quotes')
-        .select('id, quote_number, title, sell_price, status')
+        .select('id, quote_number, title, sell_price:total, status')
         //.eq('owner_id', context.userId) // Quotes don't have owner_id directly
         .order('created_at', { ascending: false });
 

@@ -397,9 +397,13 @@ export function FormZone({
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {accounts.map(acc => (
-                        <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>
-                      ))}
+                      {accounts.length === 0 ? (
+                        <SelectItem value="none" disabled>No accounts found</SelectItem>
+                      ) : (
+                        accounts.map(acc => (
+                          <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -421,9 +425,13 @@ export function FormZone({
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {filteredContacts.map(c => (
-                        <SelectItem key={c.id} value={c.id}>{c.first_name} {c.last_name}</SelectItem>
-                      ))}
+                      {filteredContacts.length === 0 ? (
+                        <SelectItem value="none" disabled>No contacts found</SelectItem>
+                      ) : (
+                        filteredContacts.map(c => (
+                          <SelectItem key={c.id} value={c.id}>{c.first_name} {c.last_name}</SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                   <FormMessage />

@@ -244,24 +244,20 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
         
         // Parallel fetch for performance
         const [accRes, conRes, oppRes] = await Promise.all([
-            scopedDb.from('accounts').select('id, name, type').order('name'),
+            scopedDb.from('accounts').select('id, name').order('name'),
             scopedDb.from('contacts').select('id, first_name, last_name, account_id').order('first_name'),
             scopedDb.from('opportunities').select('id, name, account_id, contact_id').order('created_at', { ascending: false })
         ]);
 
-        if (accRes.error) console.error('[UnifiedComposer] Failed to load accounts:', accRes.error);
-        if (conRes.error) console.error('[UnifiedComposer] Failed to load contacts:', conRes.error);
-        if (oppRes.error) console.error('[UnifiedComposer] Failed to load opportunities:', oppRes.error);
+        if (accRes.error || conRes.error || oppRes.error) {
+            console.error('[UnifiedComposer] Failed to load CRM data', { accError: accRes.error, conError: conRes.error, oppError: oppRes.error });
+        } else {
+            console.log(`[UnifiedComposer] Loaded ${accRes.data?.length || 0} accounts, ${conRes.data?.length || 0} contacts`);
+        }
 
-        const accs = accRes.data || [];
-        const cons = conRes.data || [];
-        const opps = oppRes.data || [];
-
-        console.log(`[UnifiedComposer] Loaded ${accs.length} accounts, ${cons.length} contacts, ${opps.length} opportunities`);
-
-        setAccounts(accs);
-        setContacts(cons);
-        setOpportunities(opps);
+        setAccounts(accRes.data || []);
+        setContacts(conRes.data || []);
+        setOpportunities(oppRes.data || []);
       } catch (e) {
         console.error('[UnifiedComposer] Critical error loading CRM data', e);
         toast({ title: 'Data Load Error', description: 'Failed to load customer data. Please refresh.', variant: 'destructive' });

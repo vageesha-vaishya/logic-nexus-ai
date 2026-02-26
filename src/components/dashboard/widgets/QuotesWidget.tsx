@@ -28,7 +28,7 @@ export function QuotesWidget() {
       try {
         const { data, error } = await scopedDb
           .from('quotes')
-          .select('id, quote_number, total_amount, status, account:accounts(name)')
+          .select('id, quote_number, total_amount:total, status, account:accounts(name)')
           .order('created_at', { ascending: false })
           .limit(5);
 

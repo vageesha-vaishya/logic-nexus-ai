@@ -47,7 +47,8 @@ export default function Quotes() {
         .from('quotes')
         .select(`
           *,
-          accounts:account_id (id, name),
+          sell_price:total,
+          accounts:customer_id (id, name),
           contacts:contact_id (id, first_name, last_name),
           opportunities:opportunity_id (id, name),
           carriers:carrier_id (id, carrier_name)
