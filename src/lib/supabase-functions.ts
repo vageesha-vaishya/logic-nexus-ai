@@ -122,61 +122,40 @@ export async function invokeFunction<T = any>(
     if (cb.state === 'open' && now < cb.nextTryAt) {
       return { data: null, error: new Error(`Circuit open for ${functionName}`) };
     }
+
     const { Authorization, authorization, ...customHeaders } = options.headers || {};
+    
+    // Get current session token
     const { data: sessionData } = await supabase.auth.getSession();
-    const token = sessionData?.session?.access_token;
-    const initialHeaders = token
-      ? { ...customHeaders, Authorization: `Bearer ${token}` }
-      : customHeaders;
-    const resultInvoke = await supabase.functions.invoke(functionName, {
+    let token = sessionData?.session?.access_token;
+    
+    const getHeaders = (t?: string) => {
+        return t ? { ...customHeaders, Authorization: `Bearer ${t}` } : customHeaders;
+    };
+
+    let resultInvoke = await supabase.functions.invoke(functionName, {
       body: enrichPayload(options.body),
-      headers: initialHeaders,
+      headers: getHeaders(token),
       method: options.method || 'POST',
     });
+
     let data = resultInvoke.data;
     let error = resultInvoke.error;
 
-    // Retry on 401 Unauthorized (Token expired)
-    if (error && (error as any)?.context?.status === 401) {
-        console.warn(`[Supabase Function] 401 Unauthorized for ${functionName}. Refreshing session and retrying...`);
-        const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
-        
-        if (!refreshError && refreshData.session) {
-             const newToken = refreshData.session.access_token;
-             // Retry with new token
-             const retryResult = await supabase.functions.invoke(functionName, {
-                body: enrichPayload(options.body),
-                headers: { ...customHeaders, Authorization: `Bearer ${newToken}` },
-                method: options.method || 'POST',
-             });
-             data = retryResult.data;
-             error = retryResult.error;
-        } else {
-             console.error(`[Supabase Function] Session refresh failed:`, refreshError);
-        }
-    }
-
+    // Check for "Failed to send a request" error (FunctionsFetchError) -> Manual Fetch Fallback
     if (error) {
-      // Check if it's a "Failed to send a request" error (FunctionsFetchError)
-      // This often happens due to Ad Blockers or browser network restrictions
       const isFetchError = error.name === 'FunctionsFetchError' || error.message === 'Failed to send a request to the Edge Function';
       
       if (isFetchError) {
         console.warn(`[Supabase Function] Fetch failed for ${functionName}. Attempting manual fetch fallback...`);
         try {
-            // Always prefer USER token; if missing, try to refresh
-            let { data: { session } } = await supabase.auth.getSession();
-            if (!session) {
-              const { data: refreshData } = await supabase.auth.refreshSession();
-              session = refreshData.session || null;
-            }
-            const token = session?.access_token;
+            // Ensure we have a token (refresh if needed)
             if (!token) {
-              return { data: null, error: new Error('Unauthorized: No active session') };
+              const { data: refreshData } = await supabase.auth.refreshSession();
+              token = refreshData.session?.access_token;
             }
             
-            // In development, use relative path to trigger Vite proxy which bypasses CORS
-            // In production, use full URL
+            // Construct URL
             let functionUrl;
             if (import.meta.env.DEV) {
                 functionUrl = `/functions/v1/${functionName}`;
@@ -185,119 +164,88 @@ export async function invokeFunction<T = any>(
                 functionUrl = `${projectUrl}/functions/v1/${functionName}`;
             }
             
-            // Add 30s timeout
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-            try {
-              const response = await fetch(functionUrl, {
+            const response = await fetch(functionUrl, {
                   method: options.method || 'POST',
                   headers: {
                       'Content-Type': 'application/json',
-                      'Authorization': `Bearer ${token}`,
+                      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
                       ...(options.headers || {})
                   },
                   body: options.body ? JSON.stringify(options.body) : undefined,
                   signal: controller.signal
-              });
-              clearTimeout(timeoutId);
+            });
+            clearTimeout(timeoutId);
               
-              if (!response.ok) {
+            if (!response.ok) {
                   const text = await response.text();
                   let errorData;
                   try { errorData = JSON.parse(text); } catch { errorData = { message: text }; }
-                  return { data: null, error: new Error(errorData.message || `Function returned ${response.status}`) };
-              }
-              
-              const data = await response.json();
-              return { data, error: null };
-            } catch (err: any) {
-              clearTimeout(timeoutId);
-              throw err;
+                  
+                  error = new Error(errorData.message || `Function returned ${response.status}`);
+                  (error as any).status = response.status; 
+            } else {
+                data = await response.json();
+                error = null;
             }
         } catch (manualError: any) {
              console.error(`[Supabase Function] Manual fetch fallback failed:`, manualError);
-             // Enhance the original error message
              error.message = `${error.message} (Check for Ad Blockers or Network Firewall)`;
         }
       }
+    }
 
-      // Check if it's a 401 and we haven't retried yet (though supabase-js usually handles this)
-      // We can add a layer of safety here if needed, but usually the client is sufficient.
-      // If the error is a FunctionsHttpError, it has a context property
-      const is401 = (error as any)?.context?.status === 401 || 
-                    error.message?.includes('Invalid JWT') || 
-                    error.message?.includes('jwt expired');
+    // Check for 401 Unauthorized (Token expired) -> Retry logic
+    if (error) {
+        const is401 = (error as any)?.context?.status === 401 || 
+                      (error as any)?.status === 401 ||
+                      (error as any)?.code === 401 ||
+                      /jwt/i.test(String(error.message || error)) ||
+                      /unauthorized/i.test(String(error.message || error));
 
-      if (is401) {
-        console.warn(`[Supabase Function] 401/Invalid JWT for ${functionName}. Attempting manual session refresh...`);
-        
-        let retryData = null;
-        let retryError = error;
-
-        // Step 1: Try refreshing session
-        const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
-        
-        if (!refreshError && refreshData.session) {
-           console.log('[Supabase Function] Session refreshed successfully. Retrying invocation with fresh token...');
-           
-           const { Authorization, authorization, ...baseHeaders } = options.headers || {};
-           
-           const result = await supabase.functions.invoke(functionName, {
-           body: enrichPayload(options.body),
-            headers: {
-              ...baseHeaders,
-              Authorization: `Bearer ${refreshData.session.access_token}`
-            },
-            method: options.method || 'POST',
-          });
-          retryData = result.data;
-          retryError = result.error;
+        if (is401) {
+            console.warn(`[Supabase Function] 401/Invalid JWT for ${functionName}. Refreshing session and retrying...`);
+            
+            const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+            
+            if (!refreshError && refreshData.session) {
+                 const newToken = refreshData.session.access_token;
+                 console.log('[Supabase Function] Session refreshed. Retrying...');
+                 
+                 // Retry with new token
+                 const retryResult = await supabase.functions.invoke(functionName, {
+                    body: enrichPayload(options.body),
+                    headers: getHeaders(newToken),
+                    method: options.method || 'POST',
+                 });
+                 data = retryResult.data;
+                 error = retryResult.error;
+            } else {
+                 console.error(`[Supabase Function] Session refresh failed:`, refreshError);
+            }
         }
+    }
 
-          // Check if retry is still 401 (or if refresh failed)
-        const isStill401 = (retryError || error) && (
-            (retryError || error)?.context?.status === 401 || 
-            (retryError || error).message?.includes('Invalid JWT') || 
-            (retryError || error).message?.includes('jwt expired')
-        );
-
-          // If still 401 after refresh, do not fallback to ANON for auth-required functions; return error
-
-        // If we have a successful retry (or a different error), return it
-        if (!retryError) {
-            updateCircuit(key, true);
-            return { data: retryData, error: null };
-        }
-        
-        // Update the main error to be the retry error so we can parse it below
-        error = retryError;
-      }
-
-      // Enhance error message if possible
-      if (error && typeof error === 'object' && 'context' in error) {
+    if (error) {
+      // Enhance error message if possible (parse context body)
+      if (typeof error === 'object' && 'context' in error) {
          try {
             const response = (error as any).context;
-            // Check if context is a Response-like object and has not been consumed
             if (response && typeof response.text === 'function' && !response.bodyUsed) {
                 const text = await response.text();
                 try {
                     const data = JSON.parse(text);
-                    if (data && data.error) {
-                        error.message = data.error;
-                    } else if (data && data.message) {
-                        error.message = data.message;
-                    } else {
-                         // If it's a valid JSON but unknown structure, use stringified
-                         error.message = text;
-                    }
+                    if (data && data.error) error.message = data.error;
+                    else if (data && data.message) error.message = data.message;
+                    else error.message = text;
                 } catch {
-                    // Not JSON, use raw text
                     if (text) error.message = text;
                 }
             }
          } catch (e) {
-            console.warn('[Supabase Function] Failed to parse error response body:', e);
+            // ignore
          }
       }
       updateCircuit(key, false);
