@@ -60,6 +60,22 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
   const { invokeAiAdvisor } = useAiAdvisor();
   const repoData = useQuoteRepositoryContext();
 
+  const form = useForm<QuoteComposerValues>({
+    resolver: zodResolver(quoteComposerSchema),
+    defaultValues: {
+      mode: 'ocean',
+      origin: '',
+      destination: '',
+      commodity: '',
+      marginPercent: 15,
+      autoMargin: true,
+      accountId: '',
+      contactId: '',
+      opportunityId: '',
+      quoteTitle: '',
+    },
+  });
+
   // Rate fetching hook
   const rateFetching = useRateFetching();
 
@@ -74,6 +90,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
    const [accounts, setAccounts] = useState<any[]>([]);
    const [contacts, setContacts] = useState<any[]>([]);
    const [opportunities, setOpportunities] = useState<any[]>([]);
+   const [isCrmLoading, setIsCrmLoading] = useState(false);
    const { profile } = useAuth();
    const canOverrideQuoteNumber = ['platform_admin', 'tenant_admin', 'sales_manager'].includes((profile as any)?.role || '');
 
@@ -117,18 +134,11 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
   // Edit mode: load existing quote data
   // ---------------------------------------------------------------------------
 
-  useEffect(() => {
-    if (!quoteId || !versionId) return;
-    loadExistingQuote();
-  }, [quoteId, versionId]);
-
   const loadExistingQuote = async () => {
     if (!quoteId) return;
     setEditLoading(true);
-
     try {
       const tenantId = context?.tenantId || null;
-
       // Load quote
       const { data: quoteRow, error: quoteError } = await scopedDb
         .from('quotes', true)
@@ -141,9 +151,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
         setEditLoading(false);
         return;
       }
-
       const raw = quoteRow as any;
-
       // Initialize store
       dispatch({
         type: 'INITIALIZE',
@@ -169,6 +177,21 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
         weight: String(cargoDetails?.total_weight_kg || raw.total_weight || ''),
         volume: String(cargoDetails?.total_volume_cbm || raw.total_volume || ''),
       });
+      // Sync to form directly
+      if (form) {
+        form.reset({
+            ...form.getValues(),
+            accountId: raw.account_id || '',
+            contactId: raw.contact_id || '',
+            quoteTitle: raw.title || '',
+            mode: (raw.transport_mode || 'ocean') as any,
+            origin: raw.origin_location?.location_name || raw.origin || '',
+            destination: raw.destination_location?.location_name || raw.destination || '',
+            commodity: cargoDetails?.commodity || raw.commodity || '',
+            weight: String(cargoDetails?.total_weight_kg || raw.total_weight || ''),
+            volume: String(cargoDetails?.total_volume_cbm || raw.total_volume || ''),
+        });
+      }
 
       setInitialExtended({
         incoterms: raw.incoterms || '',
@@ -200,23 +223,58 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
     }
   };
 
+  useEffect(() => {
+    if (!quoteId || !versionId) return;
+    loadExistingQuote();
+  }, [quoteId, versionId]);
+
   // Load CRM Data
   useEffect(() => {
      const loadCRMData = async () => {
+      // Ensure we have a tenant context before fetching
+      const currentTenantId = context?.tenantId;
+      if (!currentTenantId && !context?.isPlatformAdmin) {
+          console.warn('[UnifiedComposer] No tenant ID available, skipping CRM data load');
+          return;
+      }
+
       try {
-        const { data: accs } = await scopedDb.from('accounts').select('id, name, type');
-         const { data: cons } = await scopedDb.from('contacts').select('id, first_name, last_name, account_id');
-         // Added contact_id to selection to support auto-population in FormZone
-         const { data: opps } = await scopedDb.from('opportunities').select('id, name, account_id, contact_id');
-        if (accs) setAccounts(accs);
-        if (cons) setContacts(cons);
-         if (opps) setOpportunities(opps);
+        console.log('[UnifiedComposer] Loading CRM data...');
+        setIsCrmLoading(true);
+        
+        // Parallel fetch for performance
+        const [accRes, conRes, oppRes] = await Promise.all([
+            scopedDb.from('accounts').select('id, name, type').order('name'),
+            scopedDb.from('contacts').select('id, first_name, last_name, account_id').order('first_name'),
+            scopedDb.from('opportunities').select('id, name, account_id, contact_id').order('created_at', { ascending: false })
+        ]);
+
+        if (accRes.error) console.error('[UnifiedComposer] Failed to load accounts:', accRes.error);
+        if (conRes.error) console.error('[UnifiedComposer] Failed to load contacts:', conRes.error);
+        if (oppRes.error) console.error('[UnifiedComposer] Failed to load opportunities:', oppRes.error);
+
+        const accs = accRes.data || [];
+        const cons = conRes.data || [];
+        const opps = oppRes.data || [];
+
+        console.log(`[UnifiedComposer] Loaded ${accs.length} accounts, ${cons.length} contacts, ${opps.length} opportunities`);
+
+        setAccounts(accs);
+        setContacts(cons);
+        setOpportunities(opps);
       } catch (e) {
-        console.error('Failed to load CRM data', e);
+        console.error('[UnifiedComposer] Critical error loading CRM data', e);
+        toast({ title: 'Data Load Error', description: 'Failed to load customer data. Please refresh.', variant: 'destructive' });
+      } finally {
+        setIsCrmLoading(false);
       }
     };
-    loadCRMData();
-  }, [scopedDb]);
+    
+    // Only load if scopedDb is ready
+    if (scopedDb) {
+        loadCRMData();
+    }
+  }, [scopedDb, context?.tenantId]);
 
   // ---------------------------------------------------------------------------
   // Handle pre-population from navigation state (QuickQuoteHistory)
@@ -236,6 +294,22 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
       volume: initialData.volume ? String(initialData.volume) : undefined,
       preferredCarriers: initialData.preferredCarriers,
     });
+    // Sync to form directly
+    if (form) {
+      form.reset({
+          ...form.getValues(),
+          accountId: initialData.accountId || '',
+          contactId: initialData.contactId || '',
+          quoteTitle: initialData.quoteTitle || '',
+          mode: (initialData.mode || 'ocean') as any,
+          origin: initialData.origin || '',
+          destination: initialData.destination || '',
+          commodity: initialData.commodity || initialData.commodity_description || '',
+          weight: initialData.weight ? String(initialData.weight) : undefined,
+          volume: initialData.volume ? String(initialData.volume) : undefined,
+          preferredCarriers: initialData.preferredCarriers,
+      });
+    }
 
     if (initialData.containerType || initialData.incoterms || initialData.htsCode) {
       setInitialExtended({
@@ -250,7 +324,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
         destinationDetails: initialData.destinationDetails || null,
       });
     }
-  }, [initialData]);
+  }, [initialData, form]);
 
   // ---------------------------------------------------------------------------
   // Compliance check
@@ -645,18 +719,6 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
     );
   }
 
-  const form = useForm<QuoteComposerValues>({
-    resolver: zodResolver(quoteComposerSchema),
-    defaultValues: {
-      mode: 'ocean',
-      origin: '',
-      destination: '',
-      commodity: '',
-      marginPercent: 15,
-      autoMargin: true,
-    },
-  });
-
   return (
     <FormProvider {...form}>
       <div className="space-y-6">
@@ -676,6 +738,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
           onGetRates={handleGetRates}
           onSaveDraft={storeState.versionId ? handleSaveDraft : undefined}
           loading={rateFetching.loading}
+          crmLoading={isCrmLoading}
           initialValues={initialFormValues}
           initialExtended={initialExtended}
           accounts={accounts}

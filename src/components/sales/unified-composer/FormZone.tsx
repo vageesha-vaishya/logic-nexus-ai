@@ -79,6 +79,7 @@ interface FormZoneProps {
   onGetRates: (formValues: FormZoneValues, extendedData: ExtendedFormData, smartMode: boolean) => void;
   onSaveDraft?: () => void;
   loading?: boolean;
+  crmLoading?: boolean;
   initialValues?: Partial<FormZoneValues>;
   initialExtended?: Partial<ExtendedFormData>;
   accounts?: any[];
@@ -91,6 +92,7 @@ export function FormZone({
   onGetRates, 
   onSaveDraft, 
   loading = false, 
+  crmLoading = false,
   initialValues, 
   initialExtended,
   accounts = [],
@@ -363,10 +365,10 @@ export function FormZone({
                   <FormLabel className="flex items-center gap-2 text-xs">
                     <FileText className="h-3.5 w-3.5" /> Opportunity
                   </FormLabel>
-                  <Select onValueChange={(val) => onOpportunityChange(val)} value={field.value}>
+                  <Select onValueChange={(val) => onOpportunityChange(val)} value={field.value} disabled={crmLoading}>
                     <FormControl>
                       <SelectTrigger className="bg-background h-9 text-xs">
-                        <SelectValue placeholder="Select Opportunity" />
+                        <SelectValue placeholder={crmLoading ? "Loading opportunities..." : "Select Opportunity"} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
@@ -390,16 +392,16 @@ export function FormZone({
                   <Select onValueChange={(v) => {
                     field.onChange(v);
                     const related = contacts.filter(c => c.account_id === v);
-                    const firstContact = related[0];
-                    if (firstContact) {
-                      form.setValue('contactId' as any, firstContact.id);
+                    // Only auto-select if there is exactly one contact
+                    if (related.length === 1) {
+                      form.setValue('contactId' as any, related[0].id);
                     } else {
                       form.setValue('contactId' as any, '');
                     }
-                  }} value={field.value}>
+                  }} value={field.value} disabled={crmLoading}>
                     <FormControl>
                       <SelectTrigger className="bg-background h-9 text-xs">
-                        <SelectValue placeholder="Select Customer" />
+                        <SelectValue placeholder={crmLoading ? "Loading accounts..." : "Select Customer"} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
@@ -420,10 +422,10 @@ export function FormZone({
                   <FormLabel className="flex items-center gap-2 text-xs">
                     <User className="h-3.5 w-3.5" /> Contact
                   </FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value} disabled={!accountId}>
+                  <Select onValueChange={field.onChange} value={field.value} disabled={!accountId || crmLoading}>
                     <FormControl>
                       <SelectTrigger className="bg-background h-9 text-xs">
-                        <SelectValue placeholder="Select Contact" />
+                        <SelectValue placeholder={crmLoading ? "Loading contacts..." : "Select Contact"} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
