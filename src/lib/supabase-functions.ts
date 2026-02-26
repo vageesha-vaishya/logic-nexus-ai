@@ -124,13 +124,16 @@ export async function invokeFunction<T = any>(
     }
 
     const { Authorization, authorization, ...customHeaders } = options.headers || {};
+    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "";
     
     // Get current session token
     const { data: sessionData } = await supabase.auth.getSession();
     let token = sessionData?.session?.access_token;
     
     const getHeaders = (t?: string) => {
-        return t ? { ...customHeaders, Authorization: `Bearer ${t}` } : customHeaders;
+        const headers: any = { ...customHeaders, apikey: anonKey };
+        if (t) headers.Authorization = `Bearer ${t}`;
+        return headers;
     };
 
     let resultInvoke = await supabase.functions.invoke(functionName, {
@@ -171,6 +174,7 @@ export async function invokeFunction<T = any>(
                   method: options.method || 'POST',
                   headers: {
                       'Content-Type': 'application/json',
+                      'apikey': anonKey,
                       ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
                       ...(options.headers || {})
                   },
@@ -214,7 +218,7 @@ export async function invokeFunction<T = any>(
                  const newToken = refreshData.session.access_token;
                  console.log('[Supabase Function] Session refreshed. Retrying...');
                  
-                 // Retry with new token
+                 // Retry with new token via Client
                  const retryResult = await supabase.functions.invoke(functionName, {
                     body: enrichPayload(options.body),
                     headers: getHeaders(newToken),
@@ -222,6 +226,44 @@ export async function invokeFunction<T = any>(
                  });
                  data = retryResult.data;
                  error = retryResult.error;
+
+                 // If client retry still fails, try raw fetch (handles some CORS/Client issues)
+                 if (error) {
+                     console.warn(`[Supabase Function] Client retry failed. Attempting raw fetch fallback for ${functionName}...`);
+                     try {
+                        const projectUrl = (import.meta.env.VITE_SUPABASE_URL || "https://qzhxgoigflftharcmdqj.supabase.co").replace(/\/$/, '');
+                        const functionUrl = `${projectUrl}/functions/v1/${functionName}`;
+
+                        console.log(`[Supabase Function] Fetching ${functionUrl} with token length ${newToken.length}`);
+
+                        const response = await fetch(functionUrl, {
+                            method: options.method || 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY || '',
+                                'Authorization': `Bearer ${newToken}`,
+                                ...(options.headers || {})
+                            },
+                            body: options.body ? JSON.stringify(enrichPayload(options.body)) : undefined,
+                        });
+                        
+                        if (!response.ok) {
+                             const text = await response.text();
+                             let errorData;
+                             try { errorData = JSON.parse(text); } catch { errorData = { message: text }; }
+                             throw new Error(errorData.message || `Function returned ${response.status}`);
+                        }
+                        
+                        data = await response.json();
+                        error = null;
+                     } catch (fetchErr: any) {
+                         console.error(`[Supabase Function] Raw fetch retry failed:`, fetchErr);
+                         // Keep the original error if fetch fails, or overwrite? 
+                         // Overwrite allows us to see the fetch error which might be more descriptive
+                         error = fetchErr;
+                     }
+                 }
+
             } else {
                  console.error(`[Supabase Function] Session refresh failed:`, refreshError);
             }
