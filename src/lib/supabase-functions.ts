@@ -231,16 +231,17 @@ export async function invokeFunction<T = any>(
                  if (error) {
                      console.warn(`[Supabase Function] Client retry failed. Attempting raw fetch fallback for ${functionName}...`);
                      try {
-                        const projectUrl = (import.meta.env.VITE_SUPABASE_URL || "https://qzhxgoigflftharcmdqj.supabase.co").replace(/\/$/, '');
+                        const projectUrl = (import.meta.env.VITE_SUPABASE_URL || "https://gzhxgoigflftharcmdqj.supabase.co").replace(/\/$/, '');
                         const functionUrl = `${projectUrl}/functions/v1/${functionName}`;
+                        const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd6aHhnb2lnZmxmdGhhcmNtZHFqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk1MTk2ODcsImV4cCI6MjA4NTA5NTY4N30.6xIZ3VYubUZ73pNPurzYuf-2RUpXj_9w-LpU-6d6kqU";
 
-                        console.log(`[Supabase Function] Fetching ${functionUrl} with token length ${newToken.length}`);
+                        console.log(`[Supabase Function] Fetching ${functionUrl} with token length ${newToken.length} and apikey prefix ${anonKey.substring(0, 10)}...`);
 
                         const response = await fetch(functionUrl, {
                             method: options.method || 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
-                                'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY || '',
+                                'apikey': anonKey,
                                 'Authorization': `Bearer ${newToken}`,
                                 ...(options.headers || {})
                             },

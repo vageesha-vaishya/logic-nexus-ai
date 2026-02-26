@@ -466,10 +466,38 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
         name: formData?.values.guestName || null,
         email: formData?.values.guestEmail || null,
         phone: formData?.values.guestPhone || null,
+        job_title: formData?.values.guestJobTitle || null,
+        department: formData?.values.guestDepartment || null,
+        billing_address: formData?.values.billingAddress || null,
+        shipping_address: formData?.values.shippingAddress || null,
+        tax_id: formData?.values.taxId || null,
         customer_po: formData?.values.customerPo || null,
         vendor_ref: formData?.values.vendorRef || null,
         project_code: formData?.values.projectCode || null,
       } : null;
+
+      // Duplicate detection
+      if (isStandalone && formData?.values.guestCompany) {
+        try {
+          const { data: dups } = await scopedDb
+            .from('quotes')
+            .select('id, quote_number, billing_address')
+            .eq('tenant_id', tenantId)
+            .neq('id', currentQuoteId || '00000000-0000-0000-0000-000000000000')
+            .ilike('billing_address->>company', `%${formData.values.guestCompany}%`)
+            .limit(1);
+
+          if (dups && dups.length > 0) {
+             const companyName = (dups[0] as any).billing_address?.company || 'Unknown';
+             if (!window.confirm(`Potential duplicate found: Quote ${dups[0].quote_number} for company "${companyName}". Continue saving?`)) {
+               setSaving(false);
+               return;
+             }
+          }
+        } catch (err) {
+          logger.warn('Duplicate check failed', err);
+        }
+      }
 
       const quotePayload: any = {
         id: isUUID(currentQuoteId) ? currentQuoteId : undefined,
@@ -480,7 +508,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
         destination: formData?.values.destination || '',
         status: 'draft',
         tenant_id: tenantId,
-        notes: [notes, formData?.values.notesText].filter(Boolean).join('\n') || null,
+        notes: [notes, formData?.values.internalNotes, formData?.values.specialInstructions, formData?.values.notesText].filter(Boolean).join('\n\n') || null,
         terms_conditions: formData?.values.termsConditions || null,
         billing_address: billingForStandalone,
         pickup_date: formData?.extended.pickupDate || null,
