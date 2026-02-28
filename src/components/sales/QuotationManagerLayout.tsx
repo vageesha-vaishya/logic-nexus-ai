@@ -1,4 +1,4 @@
-import React, { ReactNode, useState } from 'react';
+import React, { ReactNode, useState, useEffect } from 'react';
 import { 
   LayoutGrid, 
   ShoppingCart, 
@@ -28,7 +28,9 @@ import {
   Table,
   Building,
   Menu,
-  Home
+  Home,
+  Store,
+  Check
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -80,17 +82,72 @@ export function QuotationManagerLayout({
   onRemoveFilter,
   pagination
 }: QuotationManagerLayoutProps) {
-  const { context } = useCRM();
+  const { context, scopedDb, setScopePreference, preferences } = useCRM();
   const { signOut, profile } = useAuth();
   const { 
     handleNavigation, 
     handleAction, 
     unreadMessages, 
     dueActivities, 
-    companyName, 
+    companyName: defaultCompanyName, 
     userRole 
   } = useSalesDashboard();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  
+  const [tenants, setTenants] = useState<any[]>([]);
+  const [franchises, setFranchises] = useState<any[]>([]);
+  
+  // Load scope data
+  useEffect(() => {
+    const loadScopeData = async () => {
+      try {
+        // Load Tenants if Platform Admin
+        if (context.isPlatformAdmin) {
+          const { data: tData } = await scopedDb.from('tenants', true).select('id, name').order('name');
+          setTenants(tData || []);
+        }
+
+        // Load Franchises based on current effective tenant
+        const targetTenantId = context.isPlatformAdmin ? (preferences?.tenant_id || context.tenantId) : context.tenantId;
+
+        if (targetTenantId) {
+          const { data: fData } = await scopedDb.from('franchises', true).select('id, name').eq('tenant_id', targetTenantId).order('name');
+          setFranchises(fData || []);
+        } else {
+          setFranchises([]);
+        }
+      } catch (error) {
+        console.error("Failed to load scope data", error);
+      }
+    };
+    loadScopeData();
+  }, [context.isPlatformAdmin, context.tenantId, preferences?.tenant_id, scopedDb]);
+
+  const handleTenantSwitch = async (tId: string) => {
+    const newVal = tId === 'all' ? null : tId;
+    await setScopePreference(newVal, null);
+    toast.success(`Switched to ${newVal ? 'Tenant Scope' : 'Global View'}`);
+  };
+
+  const handleFranchiseSwitch = async (fId: string) => {
+    const currentTenantId = preferences?.tenant_id || context.tenantId;
+    const newVal = fId === 'all' ? null : fId;
+    await setScopePreference(currentTenantId, newVal);
+    toast.success(`Switched to ${newVal ? 'Franchise Scope' : 'All Franchises'}`);
+  };
+
+  // Compute display name
+  const currentTenantName = tenants.find(t => t.id === (preferences?.tenant_id || context.tenantId))?.name;
+  const currentFranchiseName = franchises.find(f => f.id === (preferences?.franchise_id || context.franchiseId))?.name;
+  
+  let displayCompanyName = defaultCompanyName;
+  if (currentFranchiseName) {
+    displayCompanyName = currentFranchiseName;
+  } else if (currentTenantName) {
+    displayCompanyName = currentTenantName;
+  } else if (context.isPlatformAdmin && !preferences?.tenant_id) {
+    displayCompanyName = "Global Admin";
+  }
 
   const startRecord = (pagination.current - 1) * pagination.pageSize + 1;
   const endRecord = Math.min(pagination.current * pagination.pageSize, pagination.total);
@@ -260,18 +317,63 @@ export function QuotationManagerLayout({
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="text-white hover:bg-white/10 h-8 px-3 hidden md:flex">
-                {companyName}
+                {displayCompanyName}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuLabel>Switch Company</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => toast.success('Switched to SOS Logistics Global')}>
-                SOS Logistics Global
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => toast.success('Switched to Franchise A')}>
-                Franchise A
-              </DropdownMenuItem>
+              
+              {/* Platform Admin: Tenant Switcher */}
+              {context.isPlatformAdmin && (
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger>
+                    <Building className="mr-2 h-4 w-4" />
+                    <span>Tenant</span>
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent className="p-0">
+                    <DropdownMenuItem onSelect={() => handleTenantSwitch('all')}>
+                      <span className={!preferences?.tenant_id ? "font-bold" : ""}>All Tenants</span>
+                      {!preferences?.tenant_id && <Check className="ml-auto h-4 w-4" />}
+                    </DropdownMenuItem>
+                    {tenants.map(t => (
+                      <DropdownMenuItem key={t.id} onSelect={() => handleTenantSwitch(t.id)}>
+                        <span className={preferences?.tenant_id === t.id ? "font-bold" : ""}>{t.name}</span>
+                        {preferences?.tenant_id === t.id && <Check className="ml-auto h-4 w-4" />}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+              )}
+
+              {/* Franchise Switcher */}
+              {(context.isTenantAdmin || (context.isPlatformAdmin && (preferences?.tenant_id || context.tenantId))) && (
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger>
+                    <Store className="mr-2 h-4 w-4" />
+                    <span>Franchise</span>
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent className="p-0 max-h-[300px] overflow-y-auto">
+                    <DropdownMenuItem onSelect={() => handleFranchiseSwitch('all')}>
+                      <span className={!preferences?.franchise_id ? "font-bold" : ""}>All Franchises</span>
+                      {!preferences?.franchise_id && <Check className="ml-auto h-4 w-4" />}
+                    </DropdownMenuItem>
+                    {franchises.map(f => (
+                      <DropdownMenuItem key={f.id} onSelect={() => handleFranchiseSwitch(f.id)}>
+                        <span className={preferences?.franchise_id === f.id ? "font-bold" : ""}>{f.name}</span>
+                        {preferences?.franchise_id === f.id && <Check className="ml-auto h-4 w-4" />}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+              )}
+
+              {/* If just a user with no switch options */}
+              {!context.isPlatformAdmin && !context.isTenantAdmin && (
+                <DropdownMenuItem disabled>
+                  No other companies available
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
           

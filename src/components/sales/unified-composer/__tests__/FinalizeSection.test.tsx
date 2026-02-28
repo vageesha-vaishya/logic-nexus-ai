@@ -3,6 +3,26 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { FinalizeSection } from '../FinalizeSection';
 
+// Mock react-hook-form
+vi.mock('react-hook-form', async () => {
+  const actual = await vi.importActual('react-hook-form');
+  return {
+    ...actual,
+    useFormContext: () => ({
+      getValues: (key: string) => key === 'marginPercent' ? 15 : undefined,
+      setValue: vi.fn(),
+      watch: vi.fn(),
+      register: vi.fn(),
+    }),
+    useFieldArray: () => ({
+      fields: [],
+      append: vi.fn(),
+      remove: vi.fn(),
+      update: vi.fn(),
+    }),
+  };
+});
+
 // Mock formatCurrency from @/lib/utils
 vi.mock('@/lib/utils', () => ({
   formatCurrency: (amount: number, currency: string) =>
@@ -121,8 +141,8 @@ describe('FinalizeSection', () => {
     // Should show leg tab: "Shanghai → Los Angeles" (appears in tab + content)
     const legMatches = screen.getAllByText(/Shanghai → Los Angeles/);
     expect(legMatches.length).toBeGreaterThanOrEqual(1);
-    // Should show Combined tab
-    expect(screen.getAllByText('Combined').length).toBeGreaterThanOrEqual(1);
+    // Should show Global Charges tab
+    expect(screen.getAllByText('Global').length).toBeGreaterThanOrEqual(1);
   });
 
   it('renders charges grouped by leg', () => {
@@ -145,8 +165,8 @@ describe('FinalizeSection', () => {
     const chargeRowsBefore = screen.getAllByTestId(/^charge-row-/);
     const beforeCount = chargeRowsBefore.length;
 
-    const addButton = screen.getByText('Add Charge');
-    fireEvent.click(addButton);
+    const addButtons = screen.getAllByText('Add Charge');
+    fireEvent.click(addButtons[0]);
 
     const chargeRowsAfter = screen.getAllByTestId(/^charge-row-/);
     expect(chargeRowsAfter.length).toBe(beforeCount + 1);

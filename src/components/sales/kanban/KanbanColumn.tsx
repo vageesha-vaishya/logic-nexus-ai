@@ -21,6 +21,7 @@ interface KanbanColumnProps {
     value: boolean;
     margin: boolean;
     validUntil: boolean;
+    status: boolean;
   };
 }
 

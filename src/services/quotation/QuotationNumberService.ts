@@ -34,18 +34,21 @@ export const DEFAULT_CONFIG: QuoteNumberConfig = {
 export class QuotationNumberService {
   static async getConfig(scopedDb: any, tenantId: string): Promise<QuoteNumberConfig> {
     try {
+      // Use maybeSingle to avoid 406 on empty result set (PostgREST quirk)
       const { data } = await scopedDb
-        .from('quotation_number_config')
-        .select('prefix, date_format, separator, pad_length, suffix')
+        .from('quote_number_config_tenant')
+        .select('prefix, reset_policy')
         .eq('tenant_id', tenantId)
         .maybeSingle();
+
       if (data) {
         return {
           prefix: data.prefix || DEFAULT_CONFIG.prefix,
-          dateFormat: (data.date_format || DEFAULT_CONFIG.dateFormat) as any,
-          separator: (data.separator || DEFAULT_CONFIG.separator) as any,
-          padLength: data.pad_length || DEFAULT_CONFIG.padLength,
-          suffix: data.suffix || '',
+          // Map legacy/different column names if necessary
+          dateFormat: DEFAULT_CONFIG.dateFormat, // Table doesn't store format currently
+          separator: DEFAULT_CONFIG.separator,
+          padLength: DEFAULT_CONFIG.padLength,
+          suffix: '', // Table doesn't store suffix
         };
       }
     } catch {

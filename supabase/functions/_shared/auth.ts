@@ -61,7 +61,8 @@ export async function requireAuth(req: Request, logger?: Logger): Promise<AuthRe
     global: { headers: { Authorization: authHeader } },
   });
 
-  const { data: { user }, error } = await supabaseClient.auth.getUser();
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice('Bearer '.length) : authHeader;
+  const { data: { user }, error } = await supabaseClient.auth.getUser(token);
 
   if (error || !user) {
     const msg = `[requireAuth] getUser failed: ${error?.message}`;

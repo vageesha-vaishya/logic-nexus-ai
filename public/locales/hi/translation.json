@@ -1,3 +1,6 @@
 {
-  "welcome": "नमस्ते"
+  "welcome": "नमस्ते",
+  "quotation": {
+    "manualQuote": "Manual Quotation"
+  }
 }

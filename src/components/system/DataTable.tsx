@@ -27,7 +27,7 @@ import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Card, CardContent } from '@/components/ui/card';
-import { TableSkeleton } from './TableSkeleton';
+import { TableSkeleton, TableRowsSkeleton } from './TableSkeleton';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useDebounce } from '@/hooks/useDebounce';
 
@@ -63,6 +63,12 @@ interface DataTableProps<T> {
     onSort: (field: string) => void;
   };
   
+  // Multi-column Sorting
+  multiSort?: {
+    sorts: { field: string; direction: 'asc' | 'desc' }[];
+    onSort: (field: string, multi?: boolean) => void;
+  };
+  
   // Selection
   selection?: {
     selectedIds: string[];
@@ -92,6 +98,9 @@ interface DataTableProps<T> {
   // Mobile View
   mobileTitleKey?: keyof T | string;
   mobileSubtitleKey?: keyof T | string;
+
+  // View Mode
+  viewMode?: 'table' | 'grid';
 }
 
 export function DataTable<T extends { id?: string | number }>({
@@ -101,15 +110,18 @@ export function DataTable<T extends { id?: string | number }>({
   onRowClick,
   pagination,
   sorting,
+  multiSort,
   selection,
   search,
   facets,
   actions,
   mobileTitleKey,
   mobileSubtitleKey,
+  viewMode = 'table',
 }: DataTableProps<T>) {
   const [localSearch, setLocalSearch] = useState(search?.query || '');
   const isMobile = useIsMobile();
+  const showGrid = isMobile || viewMode === 'grid';
   const debouncedSearch = useDebounce(localSearch, 300);
 
   // Sync local search with external query changes (e.g. clear button)
@@ -199,10 +211,13 @@ export function DataTable<T extends { id?: string | number }>({
       )}
 
       {/* Table / Card View */}
-      {isMobile ? (
-        <div className="grid grid-cols-1 gap-4">
+      {showGrid ? (
+        <div className={cn(
+          "grid gap-4",
+          isMobile ? "grid-cols-1" : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
+        )}>
           {isLoading ? (
-            Array.from({ length: 3 }).map((_, i) => (
+            Array.from({ length: 6 }).map((_, i) => (
               <Card key={i} className="animate-pulse">
                 <CardContent className="p-4 space-y-4">
                   <div className="flex items-start justify-between">
@@ -296,6 +311,25 @@ export function DataTable<T extends { id?: string | number }>({
                 )}
                 {columns.map((col, index) => {
                   const key = String(col.key);
+                  if (col.sortable && multiSort) {
+                    const sortIndex = multiSort.sorts.findIndex(s => s.field === key);
+                    const sortState = multiSort.sorts[sortIndex];
+                    return (
+                      <SortableHead
+                        key={key + index}
+                        field={key}
+                        isActive={sortIndex >= 0}
+                        direction={sortState?.direction}
+                        sortOrder={multiSort.sorts.length > 1 && sortIndex >= 0 ? sortIndex + 1 : undefined}
+                        onSort={(f, m) => multiSort.onSort(f, m)}
+                        className={col.className}
+                        style={{ width: col.width }}
+                      >
+                        {col.header}
+                      </SortableHead>
+                    );
+                  }
+
                   if (col.sortable && sorting) {
                     return (
                       <SortableHead
@@ -325,11 +359,7 @@ export function DataTable<T extends { id?: string | number }>({
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                <TableRow>
-                  <TableCell colSpan={columns.length + (selection ? 1 : 0)} className="p-0">
-                    <TableSkeleton columns={columns.length + (selection ? 1 : 0)} rows={5} />
-                  </TableCell>
-                </TableRow>
+                <TableRowsSkeleton columns={columns.length + (selection ? 1 : 0)} rows={5} />
               ) : data.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={columns.length + (selection ? 1 : 0)} className="h-24 text-center">

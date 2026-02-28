@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { DashboardRouter } from '../DashboardRouter';
 import * as crmHooks from '@/hooks/useCRM';
+import { DashboardLayout } from '@/components/layout/DashboardLayout';
 
 // Mock dependencies
 vi.mock('@/hooks/useCRM');

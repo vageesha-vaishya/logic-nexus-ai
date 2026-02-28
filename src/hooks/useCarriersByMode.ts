@@ -15,17 +15,49 @@ export interface CarrierOption {
   service_types: string[];
 }
 
-interface CarriersByModeMap {
+export interface CarriersByModeMap {
   [modeCode: string]: CarrierOption[];
 }
 
 export function useCarriersByMode() {
-  const { data: carrierMap = {}, isLoading, error } = useQuery<CarriersByModeMap>({
+  const { data: carrierMap = {}, isLoading, error, refetch } = useQuery<CarriersByModeMap>({
     queryKey: ['carriers_by_mode'],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_all_carriers_grouped_by_mode');
+      // Fetch directly from carriers table instead of RPC to avoid schema dependency issues
+      const { data, error } = await supabase
+        .from('carriers')
+        .select('id, carrier_name, carrier_code, carrier_type, scac, iata, mc_dot, mode, is_active')
+        .eq('is_active', true)
+        .order('carrier_name');
+
       if (error) throw error;
-      return (data as CarriersByModeMap) || {};
+
+      // Group by mode manually
+      const grouped: CarriersByModeMap = {};
+      
+      data?.forEach((carrier) => {
+        // Map to CarrierOption interface
+        const option: CarrierOption = {
+          id: carrier.id,
+          carrier_name: carrier.carrier_name,
+          carrier_code: carrier.carrier_code,
+          carrier_type: carrier.carrier_type,
+          scac: carrier.scac,
+          iata: carrier.iata,
+          mc_dot: carrier.mc_dot,
+          mode: carrier.mode,
+          is_preferred: false, // Default since we're not fetching preferences yet
+          service_types: [],   // Default empty array
+        };
+
+        const modeKey = carrier.mode ? normalizeModeCode(carrier.mode) : 'unknown';
+        if (!grouped[modeKey]) {
+          grouped[modeKey] = [];
+        }
+        grouped[modeKey].push(option);
+      });
+
+      return grouped;
     },
     staleTime: 1000 * 60 * 30,
     retry: 2,
@@ -52,6 +84,7 @@ export function useCarriersByMode() {
     hasCarriersForMode,
     isLoading,
     error,
+    refetch,
   };
 }
 

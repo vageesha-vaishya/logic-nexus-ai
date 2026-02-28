@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## \[Unreleased]
 
+### Changed
+
+* Renamed the quotation option label from "Manual Entry" to "Manual Quote" across the quotation UI and documentation.
+
 ## \[2026-01-21]
 
 ### Changed

@@ -5,6 +5,7 @@ import { BrowserRouter } from 'react-router-dom';
 import '@testing-library/jest-dom';
 import { useCRM } from '@/hooks/useCRM';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { DashboardLayout } from '@/components/layout/DashboardLayout';
 
 vi.mock('@/components/layout/DashboardLayout', () => ({
   DashboardLayout: ({ children }: any) => <div data-testid="dashboard-layout">{children}</div>,

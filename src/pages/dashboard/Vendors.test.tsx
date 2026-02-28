@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { describe, it, vi, expect } from 'vitest';
 import Vendors from './Vendors';
 import { BrowserRouter } from 'react-router-dom';
+import { DashboardLayout } from '@/components/layout/DashboardLayout';
 
 // Mock DashboardLayout
 vi.mock('@/components/layout/DashboardLayout', () => ({

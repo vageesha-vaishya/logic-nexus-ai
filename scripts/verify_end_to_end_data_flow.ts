@@ -190,8 +190,8 @@ async function runTests() {
         console.error("❌ AI Quote Failed:", e);
     }
 
-    // Scenario 4: Manual Entry (Create Detailed Quote)
-    console.log("\n--- Scenario 4: Manual Entry ---");
+    // Scenario 4: Manual Quote (Create Detailed Quote)
+    console.log("\n--- Scenario 4: Manual Quote ---");
     try {
         const manualRate = {
             carrier_name: "Manual Carrier",
@@ -210,7 +210,7 @@ async function runTests() {
         });
         console.log("✅ Manual Option Created:", optId);
     } catch (e) {
-        console.error("❌ Manual Entry Failed:", e);
+        console.error("❌ Manual Quote Failed:", e);
     }
 }
 

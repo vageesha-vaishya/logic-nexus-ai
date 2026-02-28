@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { RateOption, TransportLeg, Charge } from '@/types/quote-breakdown';
 
 export interface ManagedCharge {
@@ -28,10 +28,22 @@ export interface UseChargesManagerParams {
   selectedOption: RateOption;
   referenceData: ReferenceData;
   defaultMarginPercent?: number;
+  initialCharges?: ManagedCharge[];
+  initialLegs?: TransportLeg[];
+  initialAutoMargin?: boolean;
+  initialMarginPercent?: number;
+  resetKey?: string;
+  onStateChange?: (state: {
+    legs: TransportLeg[];
+    charges: ManagedCharge[];
+    autoMargin: boolean;
+    marginPercent: number;
+  }) => void;
 }
 
 export interface UseChargesManagerReturn {
   legs: TransportLeg[];
+  setLegs: (legs: TransportLeg[]) => void;
   chargesByLeg: Record<string, ManagedCharge[]>;
   allCharges: ManagedCharge[];
   addCharge: (legId: string | null) => void;
@@ -146,14 +158,58 @@ export function useChargesManager({
   selectedOption,
   referenceData,
   defaultMarginPercent = 15,
+  initialCharges,
+  initialLegs,
+  initialAutoMargin,
+  initialMarginPercent,
+  resetKey,
+  onStateChange,
 }: UseChargesManagerParams): UseChargesManagerReturn {
+  const [autoMargin, setAutoMargin] = useState<boolean>(initialAutoMargin ?? true);
+  const [marginPercent, setMarginPercent] = useState<number>(initialMarginPercent ?? defaultMarginPercent);
   const [charges, setCharges] = useState<ManagedCharge[]>(() =>
-    initCharges(selectedOption, referenceData, defaultMarginPercent, true)
+    initialCharges ?? initCharges(selectedOption, referenceData, initialMarginPercent ?? defaultMarginPercent, initialAutoMargin ?? true)
   );
-  const [autoMargin, setAutoMargin] = useState(true);
-  const [marginPercent, setMarginPercent] = useState(defaultMarginPercent);
 
-  const legs: TransportLeg[] = useMemo(() => selectedOption.legs || [], [selectedOption.legs]);
+  // Allow internal management of legs for manual creation 
+  const [internalLegs, setInternalLegs] = useState<TransportLeg[]>((initialLegs ?? selectedOption.legs) || []);
+
+  // Sync internal legs if selectedOption.legs changes externally (e.g. AI regeneration), 
+  // but only if it's not a manual option (manual options are managed internally).
+  // Actually, we should just init state from props and then let user edit.
+  // But if props change (AI run), we want to update.
+  // For now, let's trust that manual mode sets selectedOption once.
+  // If we switch back to AI, selectedOption changes completely.
+  
+  // Actually, useEffect to sync is safer for transitions.
+  // But we want to edit 'legs' in manual mode.
+  // So we expose setInternalLegs as setLegs.
+  
+  // Note: We need to be careful not to overwrite manual edits if the parent re-renders.
+  // If selectedOption.id changes, we reset.
+  useEffect(() => {
+    setAutoMargin(initialAutoMargin ?? true);
+    setMarginPercent(initialMarginPercent ?? defaultMarginPercent);
+    setCharges(initialCharges ?? initCharges(selectedOption, referenceData, initialMarginPercent ?? defaultMarginPercent, initialAutoMargin ?? true));
+    setInternalLegs((initialLegs ?? selectedOption.legs) || []);
+  }, [
+    resetKey,
+    selectedOption.id,
+    // defaultMarginPercent,
+    // initialAutoMargin,
+    // initialMarginPercent,
+    // initialCharges,
+    // initialLegs,
+  ]);
+
+  useEffect(() => {
+    onStateChange?.({
+      legs: internalLegs,
+      charges,
+      autoMargin,
+      marginPercent,
+    });
+  }, [charges, internalLegs, autoMargin, marginPercent, onStateChange]);
 
   const chargesByLeg = useMemo(() => {
     const grouped: Record<string, ManagedCharge[]> = {};
@@ -261,7 +317,8 @@ export function useChargesManager({
   }, [charges, marginPercent]);
 
   return {
-    legs,
+    legs: internalLegs,
+    setLegs: setInternalLegs,
     chargesByLeg,
     allCharges: charges,
     addCharge,

@@ -98,19 +98,29 @@ export function useDraftAutoSave(
                     if (c.buy && typeof c.buy.rate === 'number') {
                       entries.push({
                         category_id: c.category_id,
+                        basis_id: c.basis_id,
+                        currency_id: c.currency_id,
+                        basis: c.basis,
+                        currency: c.currency,
                         side: 'buy',
                         unit_price: c.buy.rate,
                         quantity: c.buy.quantity,
                         amount: c.buy.amount,
+                        note: c.note,
                       });
                     }
                     if (c.sell && typeof c.sell.rate === 'number') {
                       entries.push({
                         category_id: c.category_id,
+                        basis_id: c.basis_id,
+                        currency_id: c.currency_id,
+                        basis: c.basis,
+                        currency: c.currency,
                         side: 'sell',
                         unit_price: c.sell.rate,
                         quantity: c.sell.quantity,
                         amount: c.sell.amount,
+                        note: c.note,
                       });
                     }
                     return entries;
@@ -121,19 +131,29 @@ export function useDraftAutoSave(
                   if (c.buy && typeof c.buy.rate === 'number') {
                     entries.push({
                       category_id: c.category_id,
+                      basis_id: c.basis_id,
+                      currency_id: c.currency_id,
+                      basis: c.basis,
+                      currency: c.currency,
                       side: 'buy',
                       unit_price: c.buy.rate,
                       quantity: c.buy.quantity,
                       amount: c.buy.amount,
+                      note: c.note,
                     });
                   }
                   if (c.sell && typeof c.sell.rate === 'number') {
                     entries.push({
                       category_id: c.category_id,
+                      basis_id: c.basis_id,
+                      currency_id: c.currency_id,
+                      basis: c.basis,
+                      currency: c.currency,
                       side: 'sell',
                       unit_price: c.sell.rate,
                       quantity: c.sell.quantity,
                       amount: c.sell.amount,
+                      note: c.note,
                     });
                   }
                   return entries;

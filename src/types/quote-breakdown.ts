@@ -22,11 +22,16 @@ export interface TransportLeg {
     mode: 'air' | 'ocean' | 'road' | 'rail' | string;
     leg_type?: 'origin' | 'main' | 'destination' | 'pickup' | 'delivery' | 'transport'; // Bifurcation role
     carrier?: string;
+    carrier_id?: string;
+    voyage?: string; // Vessel/Voyage or Flight No
     origin: string;
     destination: string;
+    departure_date?: string; // ISO Date
+    arrival_date?: string; // ISO Date
     transit_time?: string;
-    sequence: number;
-    charges: Charge[];
+    service_type?: string; // Standard, Express, Saver
+    sequence?: number; // Order in route
+    charges?: Charge[];
 }
 
 export interface RateBreakdown {
@@ -66,6 +71,11 @@ export interface RateOption {
     validUntil?: string | null;
     verified?: boolean;
     verificationTimestamp?: string;
+    is_manual?: boolean; // Indicates if this option was manually created
+    rank_score?: number;
+    rank_details?: Record<string, number>;
+    is_recommended?: boolean;
+    recommendation_reason?: string;
     regulatory_info?: {
         customs_procedures?: string[];
         restrictions?: string[];

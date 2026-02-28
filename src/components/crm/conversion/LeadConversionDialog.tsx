@@ -77,6 +77,8 @@ export function LeadConversionDialog({ open, onOpenChange, lead, onConversionCom
       opportunityCloseDate: lead?.expected_close_date || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       opportunityStage: 'prospecting',
       
+      createQuote: false,
+      
       notes: '',
     },
   });
@@ -109,6 +111,8 @@ export function LeadConversionDialog({ open, onOpenChange, lead, onConversionCom
         opportunityAmount: lead.estimated_value || 0,
         opportunityCloseDate: lead.expected_close_date || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         opportunityStage: 'prospecting',
+        
+        createQuote: false,
         
         notes: '',
       });
@@ -278,8 +282,18 @@ export function LeadConversionDialog({ open, onOpenChange, lead, onConversionCom
       onOpenChange(false);
       onConversionComplete();
 
-      // Navigate to new opportunity if created
-      if (data && data.opportunity_id) {
+      // Navigation logic
+       if (pendingValues?.createQuote && data.opportunity_id) {
+         // Navigate to Quote Composer with pre-filled data
+         navigate('/dashboard/quotes/new', {
+           state: {
+             accountId: data.account_id,
+             contactId: data.contact_id,
+             opportunityId: data.opportunity_id,
+             // Map other lead fields if applicable
+           }
+         });
+       } else if (data && data.opportunity_id) {
         navigate(`/dashboard/opportunities/${data.opportunity_id}`);
       } else if (data && data.account_id) {
         navigate(`/dashboard/accounts/${data.account_id}`);
@@ -296,6 +310,7 @@ export function LeadConversionDialog({ open, onOpenChange, lead, onConversionCom
   const createAccountChecked = form.watch('createAccount');
   const createContactChecked = form.watch('createContact');
   const createOpportunityChecked = form.watch('createOpportunity');
+  const createQuoteChecked = form.watch('createQuote');
 
   return (
     <>
@@ -615,6 +630,28 @@ export function LeadConversionDialog({ open, onOpenChange, lead, onConversionCom
                       )}
                     />
                   </div>
+                  
+                  <Separator className="my-4" />
+                  
+                  <FormField
+                    control={form.control}
+                    name="createQuote"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center space-x-2 space-y-0 bg-secondary/10 p-3 rounded-md">
+                        <FormControl>
+                          <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel className="font-semibold text-sm">
+                            Create Quotation
+                          </FormLabel>
+                          <p className="text-xs text-muted-foreground">
+                            Immediately open quote builder after conversion
+                          </p>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
                 </CollapsibleContent>
               </Collapsible>
             </div>

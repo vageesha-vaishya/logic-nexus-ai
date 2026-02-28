@@ -1,4 +1,5 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -22,6 +23,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { QuoteDetailView } from './QuoteDetailView';
 import { mapOptionToQuote } from '@/lib/quote-mapper';
+import { useCRM } from '@/hooks/useCRM';
+import { PricingService } from '@/services/pricing.service';
 
 interface QuoteComparisonViewProps {
     options: RateOption[];
@@ -38,10 +41,15 @@ export function QuoteComparisonView({
     onToggleSelection,
     onGenerateSmartOptions 
 }: QuoteComparisonViewProps) {
+    const { t } = useTranslation();
+    const manualQuoteLabel = t('quotation.manualQuote', { defaultValue: 'Manual Quotation' });
     const { scopedDb, supabase } = useCRM();
     const [showBreakdown, setShowBreakdown] = React.useState(false);
     const [viewDetailsOption, setViewDetailsOption] = React.useState<RateOption | null>(null);
     const [options, setOptions] = useState<RateOption[]>([]);
+    const viewDetailsOptionForRender = viewDetailsOption
+      ? { ...viewDetailsOption, carrier: getCarrierLabel(viewDetailsOption, manualQuoteLabel) }
+      : null;
 
     // Normalize options and ensure financials
     useEffect(() => {
@@ -100,47 +108,37 @@ export function QuoteComparisonView({
             currency: opt.currency
         };
 
-        // 1. Sum up charges from legs (already assigned by mapOptionToQuote)
+        const allCharges: Charge[] = [];
+        
+        // Collect leg charges
         if (opt.legs) {
             opt.legs.forEach(leg => {
-                const legTotal = (leg.charges || []).reduce((sum, c) => sum + (c.amount || 0), 0);
-                // Use bifurcation_role if available (from quote-mapper), fallback to legacy leg_type checks
-                const role = leg.bifurcation_role;
-                
-                if (role === 'origin' || leg.leg_type === 'origin' || leg.leg_type === 'pickup') {
-                    totals.origin += legTotal;
-                } else if (role === 'destination' || leg.leg_type === 'destination' || leg.leg_type === 'delivery') {
-                    totals.destination += legTotal;
-                } else if (role === 'main' || leg.leg_type === 'main' || leg.leg_type === 'transport') {
-                    totals.freight += legTotal;
-                } else {
-                    totals.freight += legTotal; // Default to freight
-                }
-            });
-        }
-
-        // 2. Handle remaining global charges (bifurcate them)
-        if (opt.charges && opt.charges.length > 0) {
-            const bifurcated = bifurcateCharges(opt.charges, opt.legs || []);
-            bifurcated.forEach(c => {
-                 // Check assignedLegType or if we can map it to a role
-                 if (c.assignedLegType === 'pickup' || c.assignedLegType === 'origin') {
-                    totals.origin += c.amount;
-                } else if (c.assignedLegType === 'transport' || c.assignedLegType === 'main') {
-                    totals.freight += c.amount;
-                } else if (c.assignedLegType === 'delivery' || c.assignedLegType === 'destination') {
-                    totals.destination += c.amount;
-                } else {
-                    totals.other += c.amount;
+                const legType = leg.leg_type || 'transport';
+                if (leg.charges) {
+                    leg.charges.forEach(c => {
+                        allCharges.push({ ...c, leg_id: leg.id, mode: leg.mode });
+                    });
                 }
             });
         }
         
-        // 3. Fallback: If everything is 0 but we have a total price, put it in Freight
-        const sum = totals.origin + totals.freight + totals.destination + totals.other;
-        if (sum === 0 && (opt.price || opt.total_amount)) {
-            totals.freight = opt.price || opt.total_amount || 0;
+        // Collect global charges
+        if (opt.charges) {
+            opt.charges.forEach(c => {
+                allCharges.push({ ...c });
+            });
+        } else if (opt.price_breakdown) {
+            // Legacy/alternate structure
+            // ...
         }
+
+        // Bifurcate
+        const buckets = bifurcateCharges(allCharges, opt.legs || []);
+        
+        totals.origin = buckets.origin.reduce((sum, c) => sum + (c.amount || 0), 0);
+        totals.freight = buckets.freight.reduce((sum, c) => sum + (c.amount || 0), 0);
+        totals.destination = buckets.destination.reduce((sum, c) => sum + (c.amount || 0), 0);
+        totals.other = buckets.other.reduce((sum, c) => sum + (c.amount || 0), 0);
 
         return totals;
     };
@@ -200,7 +198,7 @@ export function QuoteComparisonView({
                                             {/* Tier Badge */}
                                             {getTierBadge(opt.tier)}
                                             
-                                            <span className="font-bold text-lg text-foreground leading-tight">{opt.carrier}</span>
+                                            <span className="font-bold text-lg text-foreground leading-tight">{getCarrierLabel(opt, manualQuoteLabel)}</span>
                                             <span className="text-xs text-muted-foreground">{opt.name}</span>
                                         </div>
                                     </div>
@@ -383,7 +381,7 @@ export function QuoteComparisonView({
                 <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
-                            <span>{viewDetailsOption?.carrier} - {viewDetailsOption?.name}</span>
+                            <span>{viewDetailsOptionForRender?.carrier} - {viewDetailsOptionForRender?.name}</span>
                             {viewDetailsOption?.tier && (
                                 <Badge variant="secondary" className="capitalize">
                                     {viewDetailsOption.tier.replace('_', ' ')}
@@ -391,11 +389,11 @@ export function QuoteComparisonView({
                             )}
                         </DialogTitle>
                     </DialogHeader>
-                    {viewDetailsOption && (
+                    {viewDetailsOptionForRender && (
                         <div className="py-4">
                             <QuoteDetailView 
-                                quote={mapOptionToQuote(viewDetailsOption)} 
-                                defaultAnalysisView={viewDetailsOption.source_attribution === 'AI Smart Engine' ? 'mode' : 'category'}
+                                quote={mapOptionToQuote(viewDetailsOptionForRender)} 
+                                defaultAnalysisView={viewDetailsOptionForRender.source_attribution === 'AI Smart Engine' ? 'mode' : 'category'}
                             />
                         </div>
                     )}
@@ -403,4 +401,14 @@ export function QuoteComparisonView({
             </Dialog>
         </div>
     );
+}
+
+function getCarrierLabel(option: RateOption, manualQuoteLabel: string) {
+  if (!option) return manualQuoteLabel;
+  const carrier = option.carrier || '';
+  const source = option.source_attribution || '';
+  const isManual = !!option.is_manual || source === 'Manual Entry' || source === 'Manual Quote' || carrier === 'Manual Entry' || carrier.startsWith('Manual Quote');
+  if (!isManual) return carrier;
+  const match = carrier.match(/(\d+)\s*$/);
+  return match ? `${manualQuoteLabel} ${match[1]}` : manualQuoteLabel;
 }

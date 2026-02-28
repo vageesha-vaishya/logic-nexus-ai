@@ -6,6 +6,9 @@ import { QuotesList } from "@/components/sales/QuotesList";
 import { FilterCriterion } from "@/components/sales/AdvancedSearchFilter";
 import { ViewMode } from "@/components/ui/view-toggle";
 import { useToast } from "@/hooks/use-toast";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertCircle, RefreshCcw } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Quote, QuoteStatus } from "./quotes-data";
 import { logger } from "@/lib/logger";
 
@@ -31,6 +34,7 @@ function QuotationManagerContent() {
   // Data State
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   
   // Filter State
   const [searchQuery, setSearchQuery] = useState("");
@@ -58,6 +62,7 @@ function QuotationManagerContent() {
   const fetchQuotes = async () => {
     try {
       setLoading(true);
+      setError(null);
       
       let query = scopedDb
         .from("quotes")
@@ -114,8 +119,9 @@ function QuotationManagerContent() {
       setQuotes(transformedData);
       setPagination(prev => ({ ...prev, total: count || 0 }));
 
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Failed to fetch quotes', error);
+      setError(error.message || "Failed to load quotations. Please check your connection and try again.");
       toast({
         title: "Error fetching quotations",
         description: "Please try again later.",
@@ -196,6 +202,22 @@ function QuotationManagerContent() {
         onPageChange: (page) => setPagination(prev => ({ ...prev, current: page }))
       }}
     >
+      {error && (
+        <div className="mb-4">
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription className="flex items-center justify-between">
+              <span>{error}</span>
+              <Button variant="outline" size="sm" onClick={() => fetchQuotes()} className="h-7 bg-background text-destructive border-destructive hover:bg-destructive/10">
+                <RefreshCcw className="mr-2 h-3 w-3" />
+                Retry
+              </Button>
+            </AlertDescription>
+          </Alert>
+        </div>
+      )}
+
       {loading ? (
         <div className="flex items-center justify-center h-full">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#714B67]" />

@@ -1,38 +1,73 @@
 
-import { createClient } from '@supabase/supabase-js';
+import { Client } from 'pg';
 import dotenv from 'dotenv';
 import path from 'path';
-import { fileURLToPath } from 'url';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// Load environment variables from .env and .env.local
+dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 
-dotenv.config({ path: path.resolve(__dirname, '../.env.local') });
+const dbUrl = process.env.SUPABASE_DB_URL || process.env.DATABASE_URL;
 
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'https://gzhxgoigflftharcmdqj.supabase.co';
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd6aHhnb2lnZmxmdGhhcmNtZHFqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2OTUxOTY4NywiZXhwIjoyMDg1MDk1Njg3fQ.MImJoQhZUG2lSQ9PpN0z1QwDI1nvA2AsYPOeVfDGMos';
+if (!dbUrl) {
+  console.error('DATABASE_URL is not defined in .env.local');
+  process.exit(1);
+}
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+const tableName = process.argv[2] || 'quotation_versions';
 
-async function main() {
-  const tableName = process.argv[2] || 'carriers';
-  console.log(`--- Inspecting Schema for table: ${tableName} ---`);
-  
-  const { data, error } = await supabase
-    .from(tableName)
-    .select('*')
-    .limit(1);
+async function inspectSchema() {
+  console.log(`Connecting to database... (Target: ${tableName})`);
+  const client = new Client({
+    connectionString: dbUrl,
+    ssl: { rejectUnauthorized: false }
+  });
 
-  if (error) {
-    console.error('Error selecting:', error);
-  } else if (data && data.length > 0) {
-    console.log('Columns:', Object.keys(data[0]));
-  } else {
-    console.log('No data found, cannot infer columns from data.');
-    // Try to insert a dummy record with just required fields to see what works
-    // Or check if there is a way to get schema definition via RPC?
-    // Let's try to select from information_schema if possible (usually not via client)
+  try {
+    await client.connect();
+    console.log('Connected.');
+
+    const res = await client.query(`
+      SELECT column_name, data_type, is_nullable, column_default
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+      AND table_name = $1
+      ORDER BY ordinal_position;
+    `, [tableName]);
+
+    console.log(`Columns in ${tableName}:`);
+    console.table(res.rows);
+
+    // Foreign Keys
+    const fks = await client.query(`
+        SELECT
+            kcu.column_name, 
+            ccu.table_name AS foreign_table_name,
+            ccu.column_name AS foreign_column_name 
+        FROM 
+            information_schema.key_column_usage AS kcu
+            JOIN information_schema.constraint_column_usage AS ccu
+            ON ccu.constraint_name = kcu.constraint_name
+            JOIN information_schema.table_constraints AS tc
+            ON tc.constraint_name = kcu.constraint_name
+        WHERE kcu.table_name = $1 AND tc.constraint_type = 'FOREIGN KEY';
+    `, [tableName]);
+    console.log(`Foreign Keys in ${tableName}:`);
+    console.table(fks.rows);
+
+    const policies = await client.query(`
+      SELECT policyname, cmd, roles, qual, with_check
+      FROM pg_policies
+      WHERE tablename = $1;
+    `, [tableName]);
+    console.log(`Policies on ${tableName}:`);
+    console.table(policies.rows);
+
+  } catch (error) {
+    console.error('Error inspecting schema:', error);
+  } finally {
+    await client.end();
   }
 }
 
-main();
+inspectSchema();

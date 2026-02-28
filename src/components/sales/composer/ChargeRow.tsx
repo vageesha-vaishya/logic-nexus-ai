@@ -1,8 +1,17 @@
+import { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { Trash2, Settings } from 'lucide-react';
+import { Trash2, Settings, Container } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 
 interface ChargeRowProps {
   charge: any;
@@ -15,6 +24,8 @@ interface ChargeRowProps {
   showBuySell?: boolean;
 }
 
+import { ContainerConfigurationDialog } from './ContainerConfigurationDialog';
+
 export function ChargeRow({
   charge,
   categories,
@@ -25,10 +36,16 @@ export function ChargeRow({
   onConfigureBasis,
   showBuySell = true
 }: ChargeRowProps) {
+  const [isConfigOpen, setIsConfigOpen] = useState(false);
   const buyAmount = (charge.buy?.quantity || 1) * (charge.buy?.rate || 0);
   const sellAmount = (charge.sell?.quantity || 1) * (charge.sell?.rate || 0);
   const margin = sellAmount - buyAmount;
   const marginPercent = buyAmount > 0 ? ((margin / buyAmount) * 100) : 0;
+
+  const handleContainerSelect = (type: string) => {
+    onUpdate('unit', type);
+    setIsConfigOpen(false);
+  };
 
   return (
     <>
@@ -70,15 +87,24 @@ export function ChargeRow({
               </SelectContent>
             </Select>
             {charge.basis_id && bases.find(b => b.id === charge.basis_id)?.code === 'container' && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onConfigureBasis}
-                className="h-9 w-9 p-0"
-                title="Configure container details"
-              >
-                <Settings className="h-4 w-4" />
-              </Button>
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsConfigOpen(true)}
+                  className="h-9 w-9 p-0"
+                  title="Configure container details"
+                >
+                  <Settings className="h-4 w-4" />
+                </Button>
+                
+                <ContainerConfigurationDialog
+                  open={isConfigOpen}
+                  onOpenChange={setIsConfigOpen}
+                  selectedType={charge.unit}
+                  onSelect={handleContainerSelect}
+                />
+              </>
             )}
           </div>
         </td>

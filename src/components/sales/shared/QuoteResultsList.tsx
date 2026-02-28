@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -11,6 +12,17 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { 
     Tooltip, 
     TooltipContent, 
@@ -44,6 +56,7 @@ import {
     Plane,
     Truck,
     Train,
+    Trash2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatContainerSize } from '@/lib/container-utils';
@@ -65,6 +78,7 @@ interface QuoteResultsListProps {
     marketAnalysis?: string | null;
     confidenceScore?: number | null;
     anomalies?: any[];
+    onRemoveOption?: (optionId: string) => void;
 }
 
 const mapLegsForVisualizer = (legs: TransportLeg[] | undefined) => {
@@ -80,6 +94,44 @@ const mapLegsForVisualizer = (legs: TransportLeg[] | undefined) => {
     }));
 };
 
+const DeleteOptionButton = ({ optionId, onRemoveOption }: { optionId: string, onRemoveOption?: (id: string) => void }) => {
+    if (!onRemoveOption) return null;
+    
+    return (
+        <AlertDialog>
+            <AlertDialogTrigger asChild>
+                <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+                    aria-label="Delete option"
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Delete this option?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        This will remove the quote option and its charges/legs. This action cannot be undone.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        onClick={() => onRemoveOption(optionId)}
+                    >
+                        Delete
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+    );
+};
+
 export function QuoteResultsList({  
     results, 
     onSelect, 
@@ -88,13 +140,19 @@ export function QuoteResultsList({
     onGenerateSmartOptions,
     marketAnalysis,
     confidenceScore,
-    anomalies
+    anomalies,
+    onRemoveOption,
 }: QuoteResultsListProps) {
+    const { t } = useTranslation();
+    const manualQuoteLabel = t('quotation.manualQuote', { defaultValue: 'Manual Quotation' });
     const [viewMode, setViewMode] = useState<'card' | 'list' | 'table'>('card');
     const [viewDetailsId, setViewDetailsId] = useState<string | null>(null);
     const [filterType, setFilterType] = useState<'all' | 'market' | 'ai'>('all');
 
     const viewDetailsOption = results.find(r => r.id === viewDetailsId);
+    const viewDetailsOptionForRender = viewDetailsOption
+      ? { ...viewDetailsOption, carrier: getCarrierLabel(viewDetailsOption, manualQuoteLabel) }
+      : null;
 
     if (!results || results.length === 0) return null;
 
@@ -112,6 +170,7 @@ export function QuoteResultsList({
         <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-6">
             {filteredResults.map((option) => {
                 const isSelected = selectedIds.includes(option.id);
+                const displayCarrier = getCarrierLabel(option, manualQuoteLabel);
                 return (
                     <Card 
                         key={option.id} 
@@ -133,7 +192,7 @@ export function QuoteResultsList({
                                                 onClick={(e) => e.stopPropagation()}
                                             />
                                         )}
-                                        <h4 className="font-bold text-lg leading-tight truncate">{option.carrier}</h4>
+                                        <h4 className="font-bold text-lg leading-tight truncate">{displayCarrier}</h4>
                                         {getTierBadge(option.tier)}
                                         {option.source_attribution?.includes("AI") ? (
                                             <TooltipProvider>
@@ -166,7 +225,8 @@ export function QuoteResultsList({
                                     </div>
                                     <p className="text-sm text-muted-foreground truncate font-medium" title={option.name}>{formatContainerSize(option.name)}</p>
                                 </div>
-                                <div className="text-right shrink-0">
+                                <div className="text-right shrink-0 flex flex-col items-end gap-1">
+                                    <DeleteOptionButton optionId={option.id} onRemoveOption={onRemoveOption} />
                                     <div className="text-xl font-bold text-primary whitespace-nowrap tracking-tight">
                                         {formatCurrency(option.price, option.currency)}
                                     </div>
@@ -276,6 +336,7 @@ export function QuoteResultsList({
         <div className="space-y-2">
             {results.map((option) => {
                 const isSelected = selectedIds.includes(option.id);
+                const displayCarrier = getCarrierLabel(option, manualQuoteLabel);
                 return (
                     <div 
                         key={option.id}
@@ -302,7 +363,7 @@ export function QuoteResultsList({
                                     </div>
                                     <div className="min-w-0">
                                         <div className="flex items-center gap-2 flex-wrap">
-                                            <span className="font-semibold truncate">{option.carrier}</span>
+                                            <span className="font-semibold truncate">{displayCarrier}</span>
                                             {getTierBadge(option.tier)}
                                         </div>
                                         <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
@@ -350,6 +411,7 @@ export function QuoteResultsList({
                                     >
                                         <ListIcon className="w-4 h-4" />
                                     </Button>
+                                    <DeleteOptionButton optionId={option.id} onRemoveOption={onRemoveOption} />
                                     <Button 
                                         size="sm"
                                         className="shrink-0"
@@ -391,6 +453,7 @@ export function QuoteResultsList({
                 <TableBody>
                     {results.map((option) => {
                         const isSelected = selectedIds.includes(option.id);
+                        const displayCarrier = getCarrierLabel(option, manualQuoteLabel);
                         return (
                             <React.Fragment key={option.id}>
                                 <TableRow 
@@ -409,7 +472,7 @@ export function QuoteResultsList({
                                     </TableCell>
                                     <TableCell>
                                         <div className="flex items-center gap-2">
-                                            <span className="font-medium">{option.carrier}</span>
+                                            <span className="font-medium">{displayCarrier}</span>
                                             {option.source_attribution?.includes("AI") && (
                                                 <Sparkles className="h-3 w-3 text-purple-500" />
                                             )}
@@ -467,6 +530,7 @@ export function QuoteResultsList({
                                             >
                                                 <ListIcon className="w-4 h-4" />
                                             </Button>
+                                            <DeleteOptionButton optionId={option.id} onRemoveOption={onRemoveOption} />
                                             <Button 
                                                 size="sm"
                                                 variant="outline"
@@ -583,19 +647,19 @@ export function QuoteResultsList({
                 <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
-                            <span>{viewDetailsOption?.carrier} - {viewDetailsOption?.name}</span>
-                            {viewDetailsOption?.tier && (
+                            <span>{viewDetailsOptionForRender?.carrier} - {viewDetailsOptionForRender?.name}</span>
+                            {viewDetailsOptionForRender?.tier && (
                                 <span className="transform scale-90 origin-left">
-                                    {getTierBadge(viewDetailsOption.tier)}
+                                    {getTierBadge(viewDetailsOptionForRender.tier)}
                                 </span>
                             )}
                         </DialogTitle>
                     </DialogHeader>
-                    {viewDetailsOption && (
+                    {viewDetailsOptionForRender && (
                         <div className="py-4">
                             <QuoteDetailView 
-                                quote={mapOptionToQuote(viewDetailsOption)} 
-                                defaultAnalysisView={viewDetailsOption.source_attribution === 'AI Smart Engine' ? 'mode' : 'category'}
+                                quote={mapOptionToQuote(viewDetailsOptionForRender)} 
+                                defaultAnalysisView={viewDetailsOptionForRender.source_attribution === 'AI Smart Engine' ? 'mode' : 'category'}
                             />
                         </div>
                     )}
@@ -603,4 +667,14 @@ export function QuoteResultsList({
             </Dialog>
         </div>
     );
+}
+
+function getCarrierLabel(option: RateOption, manualQuoteLabel: string) {
+  if (!option) return manualQuoteLabel;
+  const carrier = option.carrier || '';
+  const source = option.source_attribution || '';
+  const isManual = !!option.is_manual || source === 'Manual Entry' || source === 'Manual Quote' || carrier === 'Manual Entry' || carrier.startsWith('Manual Quote');
+  if (!isManual) return carrier;
+  const match = carrier.match(/(\d+)\s*$/);
+  return match ? `${manualQuoteLabel} ${match[1]}` : manualQuoteLabel;
 }

@@ -226,6 +226,14 @@ export class ScopedDataAccess {
       return query;
     }
 
+    // Quotation Configuration is tenant-scoped only (no franchise column)
+    if (table === 'quotation_configuration' as TableName || table === 'quote_number_config_tenant' as TableName) {
+      if (ctx.tenantId) {
+        query = query.eq('tenant_id', ctx.tenantId);
+      }
+      return query;
+    }
+
     // Admin Override Logic - Platform Admin with override enabled
     if (ctx.isPlatformAdmin && ctx.adminOverrideEnabled) {
       if (typeof import.meta !== 'undefined' && import.meta.env?.DEV) {

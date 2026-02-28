@@ -9,6 +9,8 @@ import { formatContainerSize } from '@/lib/container-utils';
 import { RateOption } from '@/types/quote-breakdown';
 import { logger } from '@/lib/logger';
 
+import { QuotationRankingService } from '@/services/quotation/QuotationRankingService';
+
 // --- Sorting / Selection helpers ---
 
 const getTransitDaysFromString = (value?: string) => {
@@ -341,9 +343,21 @@ export function useRateFetching(): RateFetchingResult {
         }
       }
 
-      setResults(combinedOptions);
+      // 5. Final Ranking and Recommendations
+      const rankableOptions = combinedOptions.map(opt => ({
+        ...opt,
+        // Map RateOption fields to RankableOption interface
+        total_amount: opt.price || 0,
+        transit_time_days: getTransitDaysFromString(opt.transitTime),
+        reliability_score: opt.reliability?.score || 0.5,
+      }));
 
-      // 5. Save to history
+      // Apply ranking service
+      const rankedResults = QuotationRankingService.rankOptions(rankableOptions);
+
+      setResults(rankedResults);
+
+      // 6. Save to history
       try {
         const authUser = (await supabase.auth.getUser()).data.user;
         if (authUser && context?.tenantId) {

@@ -6,6 +6,22 @@ interface TableSkeletonProps {
   rows?: number;
 }
 
+export function TableRowsSkeleton({ columns, rows = 5 }: { columns: number; rows?: number }) {
+  return (
+    <>
+      {Array.from({ length: rows }).map((_, rowIndex) => (
+        <TableRow key={rowIndex}>
+          {Array.from({ length: columns }).map((_, colIndex) => (
+            <TableCell key={colIndex}>
+              <Skeleton className="h-4 w-full" />
+            </TableCell>
+          ))}
+        </TableRow>
+      ))}
+    </>
+  );
+}
+
 export function TableSkeleton({ columns, rows = 5 }: TableSkeletonProps) {
   return (
     <div className="rounded-md border">
@@ -20,15 +36,7 @@ export function TableSkeleton({ columns, rows = 5 }: TableSkeletonProps) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {Array.from({ length: rows }).map((_, rowIndex) => (
-            <TableRow key={rowIndex}>
-              {Array.from({ length: columns }).map((_, colIndex) => (
-                <TableCell key={colIndex}>
-                  <Skeleton className="h-4 w-full" />
-                </TableCell>
-              ))}
-            </TableRow>
-          ))}
+          <TableRowsSkeleton columns={columns} rows={rows} />
         </TableBody>
       </Table>
     </div>

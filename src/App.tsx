@@ -119,6 +119,7 @@ const Incoterms = lazy(() => import("./pages/dashboard/Incoterms"));
 const UIDemoForms = lazy(() => import("./pages/dashboard/UIDemoForms"));
 const UIDemoAdvanced = lazy(() => import("./pages/dashboard/UIDemoAdvanced"));
 const QuoteNumberSettings = lazy(() => import("./pages/dashboard/QuoteNumberSettings"));
+const QuotationSettings = lazy(() => import("./pages/dashboard/QuotationSettings"));
 const DataManagement = lazy(() => import("./pages/dashboard/DataManagement"));
 const ServiceTypeMappings = lazy(() => import("./pages/dashboard/ServiceTypeMappings"));
 const ServiceTypes = lazy(() => import("./pages/dashboard/ServiceTypes"));
@@ -627,6 +628,10 @@ const App = () => (
             <Route 
               path="/dashboard/settings/quote-numbers" 
               element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><QuoteNumberSettings /></ProtectedRoute>} 
+            />
+            <Route 
+              path="/dashboard/settings/quotations" 
+              element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><QuotationSettings /></ProtectedRoute>} 
             />
             {/* Settings → Data Management */}
             <Route 

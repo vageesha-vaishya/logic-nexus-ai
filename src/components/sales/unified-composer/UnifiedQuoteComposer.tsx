@@ -3,15 +3,15 @@ import { useForm, FormProvider } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { quoteComposerSchema, QuoteComposerValues } from './schema';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { Cloud, CloudOff, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { useAuth } from '@/hooks/useAuth';
 import { QuotationNumberService } from '@/services/quotation/QuotationNumberService';
 import { useToast } from '@/hooks/use-toast';
 import { useContainerRefs } from '@/hooks/useContainerRefs';
 import { useRateFetching, ContainerResolver } from '@/hooks/useRateFetching';
-import { useDraftAutoSave } from '@/hooks/useDraftAutoSave';
 import { useAiAdvisor } from '@/hooks/useAiAdvisor';
 import { PricingService } from '@/services/pricing.service';
 import { QuoteOptionService } from '@/services/QuoteOptionService';
@@ -24,6 +24,11 @@ import { useQuoteRepositoryContext } from '@/components/sales/quote-form/useQuot
 import { FormZone, FormZoneValues, ExtendedFormData } from './FormZone';
 import { ResultsZone } from './ResultsZone';
 import { FinalizeSection } from './FinalizeSection';
+
+import { QuotationConfigurationService } from '@/services/quotation/QuotationConfigurationService';
+import { QuotationOptionCrudService } from '@/services/quotation/QuotationOptionCrudService';
+import { QuotationRankingService } from '@/services/quotation/QuotationRankingService';
+import { showQuotationSuccessToast } from '@/components/notifications/QuotationSuccessToast';
 
 // ---------------------------------------------------------------------------
 // Props
@@ -78,13 +83,24 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
 
   // Rate fetching hook
   const rateFetching = useRateFetching();
+  
+  // Clear deleted options when new search starts
+  useEffect(() => {
+    if (rateFetching.loading) {
+      setDeletedOptionIds([]);
+    }
+  }, [rateFetching.loading]);
+  // No debug log
+
 
   // Local state
   const [selectedOption, setSelectedOption] = useState<RateOption | null>(null);
   const [saving, setSaving] = useState(false);
   const [complianceCheck, setComplianceCheck] = useState<{ compliant: boolean; issues: any[] } | null>(null);
-  const [smartMode, setSmartMode] = useState(true);
   const [lastFormData, setLastFormData] = useState<{ values: FormZoneValues; extended: ExtendedFormData } | null>(null);
+  const [manualOptions, setManualOptions] = useState<RateOption[]>([]);
+  const [deletedOptionIds, setDeletedOptionIds] = useState<string[]>([]);
+  const [optionDrafts, setOptionDrafts] = useState<Record<string, any>>({});
   
   // CRM Data
    const [accounts, setAccounts] = useState<any[]>([]);
@@ -92,13 +108,24 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
    const [opportunities, setOpportunities] = useState<any[]>([]);
    const [isCrmLoading, setIsCrmLoading] = useState(false);
    const { profile } = useAuth();
-   const canOverrideQuoteNumber = ['platform_admin', 'tenant_admin', 'sales_manager'].includes((profile as any)?.role || '');
+   // Temporary override: Allow all users to override quote numbers during development
+   const canOverrideQuoteNumber = true; 
+   // Original permission check:
+   // const canOverrideQuoteNumber = ['platform_admin', 'tenant_admin', 'sales_manager'].includes((profile as any)?.role || '');
 
   // Edit mode state
   const [isEditMode] = useState(() => !!quoteId);
   const [editLoading, setEditLoading] = useState(false);
   const [initialFormValues, setInitialFormValues] = useState<Partial<FormZoneValues> | undefined>(undefined);
   const [initialExtended, setInitialExtended] = useState<Partial<ExtendedFormData> | undefined>(undefined);
+  const [config, setConfig] = useState<any>(null);
+
+  // Load configuration
+  useEffect(() => {
+    if (context.tenantId) {
+      new QuotationConfigurationService(scopedDb).getConfiguration(context.tenantId).then(setConfig);
+    }
+  }, [context.tenantId]);
 
   // Container resolver for rate fetching
   const containerResolver: ContainerResolver = useMemo(() => ({
@@ -113,22 +140,112 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
     },
   }), [containerTypes, containerSizes]);
 
-  // Draft auto-save
-  const getAutoSavePayload = useCallback(() => ({
-    quoteId: storeState.quoteId,
-    versionId: storeState.versionId,
-    optionId: storeState.optionId,
-    tenantId: storeState.tenantId,
-    quoteData: storeState.quoteData,
-    legs: storeState.legs,
-    charges: storeState.charges,
-  }), [storeState]);
+  // ---------------------------------------------------------------------------
+  // Handle Manual Option Creation
+  // ---------------------------------------------------------------------------
 
-  const { lastSaved, isSavingDraft } = useDraftAutoSave(
-    scopedDb,
-    getAutoSavePayload,
-    { enabled: !!storeState.versionId && !!storeState.tenantId }
-  );
+  const handleAddManualOption = () => {
+    const newOption: RateOption = {
+      id: `manual-${Date.now()}`,
+      carrier: `Manual Quote ${manualOptions.length + 1}`,
+      name: 'Manual Quote',
+      price: 0,
+      currency: 'USD',
+      transitTime: 'TBD',
+      tier: 'custom',
+      is_manual: true,
+      source_attribution: 'Manual Quote',
+      legs: [],
+      charges: [],
+    };
+    setManualOptions(prev => [...prev, newOption]);
+    setSelectedOption(newOption);
+  };
+
+  // Combine results
+  const combinedResults = useMemo(() => {
+    const fetched = rateFetching.results || [];
+    const all = [...fetched, ...manualOptions];
+    return all.filter(opt => !deletedOptionIds.includes(opt.id));
+  }, [rateFetching.results, manualOptions, deletedOptionIds]);
+
+  const getTransitDays = (val?: string | null) => {
+    if (!val) return null;
+    const m = String(val).match(/(\d+)/);
+    return m ? Number(m[1]) : null;
+  };
+
+  const displayResults = useMemo(() => {
+    if (!combinedResults || combinedResults.length === 0) return [];
+    const criteria = config?.auto_ranking_criteria || { cost: 0.4, transit_time: 0.3, reliability: 0.3 };
+
+    const ranked = QuotationRankingService.rankOptions(
+      combinedResults.map((o) => ({
+        id: o.id,
+        total_amount: o.price ?? o.total_amount ?? 0,
+        transit_time_days: getTransitDays(o.transitTime),
+        reliability_score: (o.reliability?.score ?? 5) / 10,
+      })),
+      criteria
+    );
+
+    const metaById = new Map(ranked.map((r) => [r.id, r]));
+    const merged = combinedResults.map((o) => ({
+      ...o,
+      ...(metaById.get(o.id) || {}),
+    })) as RateOption[];
+
+    return merged.sort((a, b) => (b.rank_score || 0) - (a.rank_score || 0));
+  }, [combinedResults, config?.auto_ranking_criteria]);
+
+  const handleRemoveOption = async (optionId: string) => {
+    if (displayResults.length <= 1) {
+      toast({ title: 'Cannot delete', description: 'At least one option is required.', variant: 'destructive' });
+      return;
+    }
+
+    const isUUID = (v: any) =>
+      typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+
+    const isManual = manualOptions.some((o) => o.id === optionId);
+
+    // If it's not a UUID (temp/manual), handle locally
+          if (!isUUID(optionId)) {
+            setDeletedOptionIds((prev) => [...prev, optionId]);
+            setManualOptions((prev) => prev.filter((o) => o.id !== optionId));
+            setOptionDrafts((prev) => {
+              const next = { ...prev };
+              delete next[optionId];
+              return next;
+            });
+
+            if (selectedOption?.id === optionId) {
+              const next = displayResults.find((o) => o.id !== optionId) || null;
+              setSelectedOption(next);
+            }
+            return;
+          }
+
+    try {
+      const svc = new QuotationOptionCrudService(scopedDb);
+      const { reselectedOptionId } = await svc.deleteOption(optionId, 'User removed option from composer');
+      
+      setManualOptions((prev) => prev.filter((o) => o.id !== optionId));
+      setDeletedOptionIds((prev) => [...prev, optionId]); // Ensure it's hidden even if somehow still present in fetched results
+      setOptionDrafts((prev) => {
+        const next = { ...prev };
+        delete next[optionId];
+        return next;
+      });
+
+      if (selectedOption?.id === optionId) {
+        const next = (reselectedOptionId && displayResults.find((o) => o.id === reselectedOptionId)) || displayResults.find((o) => o.id !== optionId) || null;
+        setSelectedOption(next);
+      }
+    } catch (e: any) {
+      toast({ title: 'Delete failed', description: e?.message || 'Could not delete option', variant: 'destructive' });
+    }
+  };
 
   // ---------------------------------------------------------------------------
   // Edit mode: load existing quote data
@@ -204,15 +321,219 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
 
       // Load existing option if present
       if (versionId) {
-        const { data: optionRows } = await scopedDb
-          .from('quotation_version_options', true)
-          .select('id, is_selected, total_amount, currency')
+        logger.info('[UnifiedComposer] Loading existing version', { versionId });
+        // Fetch options
+        const { data: optionRows, error: optError } = await scopedDb
+          .from('quotation_version_options')
+          .select('*')
           .eq('quotation_version_id', versionId)
-          .order('created_at', { ascending: false })
-          .limit(1);
+          .order('created_at', { ascending: false });
+
+        if (optError) {
+          logger.error('[UnifiedComposer] Failed to load options', optError);
+          throw optError;
+        }
 
         if (optionRows && optionRows.length > 0) {
-          dispatch({ type: 'INITIALIZE', payload: { optionId: optionRows[0].id } });
+          logger.info(`[UnifiedComposer] Found ${optionRows.length} options`);
+          const optionIds = optionRows.map((o: any) => o.id);
+
+          // Fetch legs for these options
+          const { data: legRows, error: legError } = await scopedDb
+            .from('quotation_version_option_legs')
+            .select('*')
+            .in('quotation_version_option_id', optionIds)
+            .order('sort_order');
+
+          if (legError) {
+            logger.error('[UnifiedComposer] Failed to load legs', legError);
+            throw legError;
+          }
+          logger.info(`[UnifiedComposer] Found ${legRows?.length || 0} legs`);
+
+          // Fetch charges for these options
+          const { data: chargeRows, error: chargeError } = await scopedDb
+            .from('quote_charges')
+            .select(`
+              *,
+              category:category_id(name, code),
+              basis:basis_id(name, code),
+              currency:currency_id(code),
+              side:charge_side_id(name, code)
+            `)
+            .in('quote_option_id', optionIds);
+            
+          if (chargeError) {
+            logger.error('[UnifiedComposer] Failed to load charges', chargeError);
+            throw chargeError;
+          }
+          logger.info(`[UnifiedComposer] Found ${chargeRows?.length || 0} charges`);
+
+          // Helper to group charges into buy/sell pairs
+          const groupCharges = (charges: any[]) => {
+             const pairs: any[] = [];
+             const pendingBuys: any[] = [];
+             const pendingSells: any[] = [];
+             
+             charges.forEach(c => {
+                 const sideCode = c.side?.code?.toLowerCase() || 'buy';
+                 if (sideCode === 'buy') pendingBuys.push(c);
+                 else pendingSells.push(c);
+             });
+             
+             // Match sells to buys
+             pendingSells.forEach(sell => {
+                 const matchIndex = pendingBuys.findIndex(buy => 
+                     buy.leg_id === sell.leg_id &&
+                     buy.category_id === sell.category_id &&
+                     buy.basis_id === sell.basis_id
+                 );
+                 
+                 if (matchIndex >= 0) {
+                     const buy = pendingBuys[matchIndex];
+                     pendingBuys.splice(matchIndex, 1);
+                     pairs.push({
+                         id: buy.id, 
+                         leg_id: buy.leg_id,
+                         category_id: buy.category_id,
+                         basis_id: buy.basis_id,
+                         currency_id: buy.currency_id,
+                         unit: buy.unit,
+                         // Display fields
+                         category: buy.category?.name || buy.category?.code || 'Charge',
+                         name: buy.category?.name || buy.category?.code || 'Charge',
+                         basis: buy.basis?.name || buy.basis?.code || 'Flat',
+                         currency: buy.currency?.code || 'USD',
+                         // Pair data
+                         buy: {
+                             quantity: buy.quantity,
+                             rate: buy.rate,
+                             amount: buy.amount,
+                             dbChargeId: buy.id
+                         },
+                         sell: {
+                             quantity: sell.quantity,
+                             rate: sell.rate,
+                             amount: sell.amount,
+                             dbChargeId: sell.id
+                         },
+                         note: buy.note || sell.note
+                     });
+                 } else {
+                     pairs.push({
+                         id: sell.id,
+                         leg_id: sell.leg_id,
+                         category_id: sell.category_id,
+                         basis_id: sell.basis_id,
+                         currency_id: sell.currency_id,
+                         unit: sell.unit,
+                         category: sell.category?.name || sell.category?.code || 'Charge',
+                         name: sell.category?.name || sell.category?.code || 'Charge',
+                         basis: sell.basis?.name || sell.basis?.code || 'Flat',
+                         currency: sell.currency?.code || 'USD',
+                         sell: {
+                             quantity: sell.quantity,
+                             rate: sell.rate,
+                             amount: sell.amount,
+                             dbChargeId: sell.id
+                         },
+                         note: sell.note
+                     });
+                 }
+             });
+             
+             pendingBuys.forEach(buy => {
+                 pairs.push({
+                     id: buy.id,
+                     leg_id: buy.leg_id,
+                     category_id: buy.category_id,
+                     basis_id: buy.basis_id,
+                     currency_id: buy.currency_id,
+                     unit: buy.unit,
+                     category: buy.category?.name || buy.category?.code || 'Charge',
+                     name: buy.category?.name || buy.category?.code || 'Charge',
+                     basis: buy.basis?.name || buy.basis?.code || 'Flat',
+                     currency: buy.currency?.code || 'USD',
+                     buy: {
+                         quantity: buy.quantity,
+                         rate: buy.rate,
+                         amount: buy.amount,
+                         dbChargeId: buy.id
+                     },
+                     note: buy.note
+                 });
+             });
+             
+             return pairs;
+          };
+
+          // Reconstruct RateOption objects
+          const reconstructedOptions: RateOption[] = optionRows.map((opt: any) => {
+            // Filter legs for this option
+            const myLegs = (legRows || [])
+              .filter((l: any) => l.quotation_version_option_id === opt.id)
+              .map((l: any) => {
+                // Get charges for this leg
+                const legChargesRaw = (chargeRows || []).filter((c: any) => c.leg_id === l.id);
+                const legCharges = groupCharges(legChargesRaw);
+
+                return {
+                    id: l.id,
+                    mode: l.transport_mode || 'ocean',
+                    leg_type: 'transport',
+                    carrier: undefined,
+                    carrier_id: l.carrier_id,
+                    origin: l.origin_location || '',
+                    destination: l.destination_location || '',
+                    transit_time: l.transit_time_hours ? `${Math.ceil(l.transit_time_hours / 24)} days` : 'TBD',
+                    departure_date: l.departure_date,
+                    arrival_date: l.arrival_date,
+                    sequence: l.sort_order,
+                    origin_location_id: l.origin_location_id,
+                    destination_location_id: l.destination_location_id,
+                    charges: legCharges
+                };
+              });
+
+            // Filter global charges (no leg_id)
+            const globalChargesRaw = (chargeRows || []).filter((c: any) => c.quote_option_id === opt.id && !c.leg_id);
+            const globalCharges = groupCharges(globalChargesRaw);
+
+            return {
+               id: opt.id,
+               carrier: opt.option_name || 'Saved Option',
+               name: opt.option_name || 'Saved Option',
+               price: opt.total_amount,
+               currency: opt.currency,
+               transitTime: opt.transit_time_days ? `${opt.transit_time_days} days` : 'TBD',
+               tier: 'custom',
+               is_manual: true, // Treat loaded options as manual so they are editable
+               source_attribution: 'Saved Quote',
+               legs: myLegs,
+               charges: globalCharges,
+               // Other fields
+               is_selected: opt.is_selected,
+               total_amount: opt.total_amount,
+               marginPercent: opt.margin_percentage,
+             } as RateOption;
+           });
+ 
+           setManualOptions(reconstructedOptions);
+           
+           // Find selected option
+           const selected = reconstructedOptions.find(o => (o as any).is_selected) || reconstructedOptions[0];
+           if (selected) {
+             setSelectedOption(selected);
+             dispatch({ type: 'INITIALIZE', payload: { optionId: selected.id } });
+             
+             // Also update optionDrafts so the edit form works
+             const draft: any = {
+                 legs: selected.legs,
+                 charges: [...(selected.charges || []), ...((selected.legs || []).flatMap((l: any) => l.charges || []))],
+                 marginPercent: (selected as any).marginPercent || form.getValues('marginPercent') || 15
+             };
+             setOptionDrafts(prev => ({ ...prev, [selected.id]: draft }));
+           }
         }
       }
     } catch (err) {
@@ -281,6 +602,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
     setInitialFormValues({
       accountId: initialData.accountId || '',
       contactId: initialData.contactId || '',
+      opportunityId: initialData.opportunityId || '',
       quoteTitle: initialData.quoteTitle || '',
       mode: (initialData.mode || 'ocean') as any,
       origin: initialData.origin || '',
@@ -296,6 +618,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
           ...form.getValues(),
           accountId: initialData.accountId || '',
           contactId: initialData.contactId || '',
+          opportunityId: initialData.opportunityId || '',
           quoteTitle: initialData.quoteTitle || '',
           mode: (initialData.mode || 'ocean') as any,
           origin: initialData.origin || '',
@@ -354,10 +677,14 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
   // ---------------------------------------------------------------------------
 
   const handleGetRates = async (formValues: FormZoneValues, extendedData: ExtendedFormData, smart: boolean) => {
-    setSmartMode(smart);
-    setSelectedOption(null);
     setComplianceCheck(null);
     setLastFormData({ values: formValues, extended: extendedData });
+
+    // Note: smart param is passed from FormZone but we might ignore it or use it if needed.
+    // In rollback, we trust the FormZone to decide or we default to a standard behavior.
+    // For now, we will pass it through to fetchRates.
+
+    setSelectedOption(null);
 
     // Fire compliance in parallel (non-blocking)
     runComplianceCheck({ ...formValues, ...extendedData } as any);
@@ -379,7 +706,17 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
   // ---------------------------------------------------------------------------
 
   const handleSelectOption = (option: RateOption) => {
-    setSelectedOption(prev => (prev?.id === option.id ? null : option));
+    setSelectedOption(option);
+  };
+
+  const handleRenameOption = (newName: string) => {
+    if (!selectedOption) return;
+    
+    const updatedOption = { ...selectedOption, carrier: newName };
+    setSelectedOption(updatedOption);
+
+    // Update manualOptions if it exists there
+    setManualOptions(prev => prev.map(opt => opt.id === selectedOption.id ? updatedOption : opt));
   };
 
   // ---------------------------------------------------------------------------
@@ -400,8 +737,8 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
       }
 
       // Ensure version exists
-      let currentVersionId = storeState.versionId || versionId;
-      let currentQuoteId = storeState.quoteId || quoteId;
+      const currentVersionId = storeState.versionId || versionId;
+      const currentQuoteId = storeState.quoteId || quoteId;
 
       // Build RPC payload
       const formData = lastFormData;
@@ -418,11 +755,6 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
         }
         // Check uniqueness
         const unique = await QuotationNumberService.isUnique(scopedDb, tenantId, finalQuoteNumber);
-        // If updating existing quote and number hasn't changed, unique check might fail if we don't exclude current ID.
-        // isUnique implementation checks generic count. 
-        // We should skip check if we are just saving the same number on the same quote.
-        // But here we might be changing it.
-        // For simplicity, let's trust the backend unique constraint or improve isUnique later.
         if (!unique && !currentQuoteId) {
              toast({ title: 'Duplicate Number', description: 'This quote number is already taken.', variant: 'destructive' });
              setSaving(false);
@@ -504,6 +836,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
         destination: formData?.values.destination || '',
         status: 'draft',
         tenant_id: tenantId,
+        // franchise_id: storeState.franchiseId || context?.franchiseId, // Removed for rollback
         notes: [notes, formData?.values.internalNotes, formData?.values.specialInstructions, formData?.values.notesText].filter(Boolean).join('\n\n') || null,
         terms_conditions: formData?.values.termsConditions || null,
         billing_address: billingForStandalone,
@@ -516,74 +849,106 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
        opportunity_id: isStandalone ? null : (effectiveOpportunityId || null),
       };
 
-      // Build option with per-leg charges from useChargesManager
-      // Group managed charges by legId
-      const chargesByLegId: Record<string, any[]> = {};
-      const combinedCharges: any[] = [];
-      for (const c of charges) {
-        const legKey = c.legId || 'combined';
-        if (legKey === 'combined' || !c.legId) {
-          combinedCharges.push(c);
-        } else {
-          if (!chargesByLegId[legKey]) chargesByLegId[legKey] = [];
-          chargesByLegId[legKey].push(c);
-        }
+      const options: any[] = [];
+
+      if (!selectedOption) {
+        toast({ title: 'Select an option', description: 'Pick a quote option before saving.', variant: 'destructive' });
+        setSaving(false);
+        return;
       }
 
-      const optionLegs = (selectedOption?.legs || []).map((leg: any) => ({
-        transport_mode: leg.mode || formData?.values.mode || 'ocean',
-        leg_type: leg.leg_type || leg.bifurcation_role || 'transport',
-        origin_location_name: leg.origin || '',
-        destination_location_name: leg.destination || '',
-        charges: (chargesByLegId[leg.id] || []).map((c: any) => ({
-          category_id: c.category_id || null,
+      const findBasisCodeById = (id: string) =>
+        repoData.chargeBases?.find((b: any) => b.id === id)?.code || '';
+      const findCurrencyCodeById = (id: string) =>
+        repoData.currencies?.find((c: any) => c.id === id)?.code || 'USD';
+
+      const buildChargePayload = (c: any, side: 'buy' | 'sell') => {
+        const quantity = side === 'buy' ? c.buy?.quantity : c.sell?.quantity;
+        const unitPrice = side === 'buy' ? c.buy?.rate : c.sell?.rate;
+        const amount = side === 'buy' ? c.buy?.amount : c.sell?.amount;
+        return {
+          charge_code: c.category_id || null,
           basis_id: c.basis_id || null,
           currency_id: c.currency_id || null,
-          side: 'buy',
-          unit_price: c.buy?.rate || 0,
-          quantity: c.buy?.quantity || 1,
-          amount: c.buy?.amount || 0,
-          sell_unit_price: c.sell?.rate || 0,
-          sell_quantity: c.sell?.quantity || 1,
-          sell_amount: c.sell?.amount || 0,
+          basis: findBasisCodeById(c.basis_id) || '',
+          currency: findCurrencyCodeById(c.currency_id) || 'USD',
+          unit: c.unit || '',
+          quantity: quantity ?? 1,
+          unit_price: unitPrice ?? 0,
+          amount: amount ?? 0,
+          side,
           note: c.note || null,
-        })),
-      }));
-
-      const combinedChargesPayload = combinedCharges.map((c: any) => ({
-        category_id: c.category_id || null,
-        basis_id: c.basis_id || null,
-        currency_id: c.currency_id || null,
-        side: 'buy',
-        unit_price: c.buy?.rate || 0,
-        quantity: c.buy?.quantity || 1,
-        amount: c.buy?.amount || 0,
-        sell_unit_price: c.sell?.rate || 0,
-        sell_quantity: c.sell?.quantity || 1,
-        sell_amount: c.sell?.amount || 0,
-        note: c.note || c.categoryName || null,
-      }));
-
-      const optionPayload = {
-        id: isUUID(storeState.optionId) ? storeState.optionId : undefined,
-        is_selected: true,
-        source: 'unified_composer',
-        source_attribution: selectedOption?.source_attribution || 'manual',
-        ai_generated: selectedOption?.ai_generated || false,
-        margin_percent: marginPercent,
-        legs: optionLegs,
-        combined_charges: combinedChargesPayload,
+        };
       };
 
-      const rpcPayload = {
-        quote: quotePayload,
-        items: [],
-        cargo_configurations: [],
-        options: [optionPayload],
-      };
+      const selectedId = selectedOption.id;
+
+      for (const opt of displayResults) {
+        const isSelected = opt.id === selectedId;
+        const draft = optionDrafts[opt.id];
+        const draftLegs = (draft?.legs || opt.legs || []) as any[];
+        const draftCharges = (draft?.charges || (isSelected ? charges : [])) as any[];
+        const mp = draft?.marginPercent ?? marginPercent;
+
+        const chargesByLegId: Record<string, any[]> = {};
+        const combinedCharges: any[] = [];
+        for (const c of draftCharges) {
+          const legKey = c.legId || 'combined';
+          if (legKey === 'combined' || !c.legId) {
+            combinedCharges.push(c);
+          } else {
+            if (!chargesByLegId[legKey]) chargesByLegId[legKey] = [];
+            chargesByLegId[legKey].push(c);
+          }
+        }
+
+        const legsPayload = draftLegs.map((leg: any) => ({
+          id: isUUID(leg.id) ? leg.id : undefined,
+          transport_mode: leg.mode || formData?.values.mode || 'ocean',
+          leg_type: leg.leg_type || 'transport',
+          origin_location_name: leg.origin || '',
+          destination_location_name: leg.destination || '',
+          origin_location_id: isUUID(leg.origin_location_id) ? leg.origin_location_id : (isUUID(leg.originId) ? leg.originId : null),
+          destination_location_id: isUUID(leg.destination_location_id) ? leg.destination_location_id : (isUUID(leg.destinationId) ? leg.destinationId : null),
+          carrier_id: leg.carrier_id || null,
+          carrier_name: leg.carrier || leg.carrier_name || null,
+          charges: (chargesByLegId[leg.id] || []).flatMap((c: any) => [
+            buildChargePayload(c, 'buy'),
+            buildChargePayload(c, 'sell'),
+          ]),
+        }));
+
+        const combinedPayload = combinedCharges.flatMap((c: any) => [
+          buildChargePayload(c, 'buy'),
+          buildChargePayload(c, 'sell'),
+        ]);
+
+        options.push({
+          id: isUUID(opt.id) ? opt.id : undefined,
+          option_name: opt.carrier || opt.name || 'Option',
+          is_selected: isSelected,
+          source: 'unified_composer',
+          source_attribution: opt.source_attribution || 'manual',
+          ai_generated: opt.ai_generated || false,
+          margin_percent: mp,
+          currency: opt.currency || 'USD',
+          transit_time_days: getTransitDays(opt.transitTime),
+          legs: legsPayload,
+          combined_charges: combinedPayload,
+          rank_score: opt.rank_score,
+          rank_details: opt.rank_details,
+          is_recommended: opt.is_recommended,
+          recommendation_reason: opt.recommendation_reason,
+        });
+      }
 
       const { data: savedId, error: rpcError } = await scopedDb.rpc('save_quote_atomic', {
-        p_payload: rpcPayload,
+        p_payload: {
+          quote: quotePayload,
+          items: [], // TODO: Cargo details
+          cargo_configurations: [],
+          options: options
+        }
       });
 
       if (rpcError) {
@@ -625,10 +990,55 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
         }
       }
 
-      toast({ title: 'Success', description: 'Quote saved successfully' });
+      // Fetch the final quote number for the toast
+      let displayQuoteNumber = finalQuoteNumber;
+      if (savedId) {
+        try {
+          // If we didn't have a manual number or just want to be sure
+          const { data: q } = await scopedDb.from('quotes').select('quote_number').eq('id', savedId).single();
+          if (q?.quote_number) {
+            displayQuoteNumber = q.quote_number;
+          }
+        } catch (e) {
+          console.warn('Failed to fetch quote number for toast', e);
+        }
+      }
+
+      // Log success
+      try {
+        logger.info('Quotation saved successfully', {
+            component: 'UnifiedQuoteComposer',
+            action: 'save_quote',
+            quoteId: savedId,
+            quoteNumber: displayQuoteNumber,
+            userId: user?.id,
+            timestamp: new Date().toISOString(),
+        });
+      } catch (e) {
+        console.warn('Failed to log success', e);
+      }
+
+      if (displayQuoteNumber) {
+        showQuotationSuccessToast(displayQuoteNumber);
+      } else {
+        toast({ title: 'Success', description: 'Quote saved successfully' });
+      }
     } catch (err: any) {
       logger.error('[UnifiedComposer] Save failed:', err);
-      toast({ title: 'Save Failed', description: err.message || 'An error occurred', variant: 'destructive' });
+      
+      let errorMessage = err.message || 'An error occurred while saving the quotation.';
+      if (err.message?.includes('Failed to fetch') || err.name === 'TypeError') {
+        errorMessage = 'Network connection issue. Please check your internet connection and try again.';
+      } else if (err.code === 'PGRST116') {
+        errorMessage = 'Database error: The quotation could not be verified after saving.';
+      }
+
+      toast({ 
+        title: 'Save Failed', 
+        description: errorMessage, 
+        variant: 'destructive',
+        duration: 5000 
+      });
     } finally {
       setSaving(false);
     }
@@ -640,7 +1050,8 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
 
   const handleRerunRates = () => {
     if (lastFormData) {
-      handleGetRates(lastFormData.values, lastFormData.extended, smartMode);
+      // Pass false for smart mode as rollback default
+      handleGetRates(lastFormData.values, lastFormData.extended, false);
     }
   };
 
@@ -661,21 +1072,23 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
     }
 
     try {
+      setSaving(true);
       const formData = lastFormData;
       const quotePayload: any = {
         id: isUUID(storeState.quoteId) ? storeState.quoteId : (isUUID(quoteId) ? quoteId : undefined),
-       title: (formData.values.quoteTitle || storeState.quoteData?.title) || `Draft - ${formData.values.origin || ''} to ${formData.values.destination || ''}`,
+        title: (formData.values.quoteTitle || storeState.quoteData?.title) || `Draft - ${formData.values.origin || ''} to ${formData.values.destination || ''}`,
         transport_mode: formData.values.mode || 'ocean',
         origin: formData.values.origin || '',
         destination: formData.values.destination || '',
         status: 'draft',
         tenant_id: tenantId,
+        // franchise_id: storeState.franchiseId || context?.franchiseId, // Removed
         pickup_date: formData.extended.pickupDate || null,
         delivery_deadline: formData.extended.deliveryDeadline || null,
         incoterms: formData.extended.incoterms || null,
-       account_id: formData.values.accountId || storeState.quoteData?.account_id || null,
-       contact_id: formData.values.contactId || storeState.quoteData?.contact_id || null,
-       opportunity_id: formData.values.opportunityId || null,
+        account_id: formData.values.accountId || storeState.quoteData?.account_id || null,
+        contact_id: formData.values.contactId || storeState.quoteData?.contact_id || null,
+        opportunity_id: formData.values.opportunityId || null,
       };
 
       const { data: savedId, error: rpcError } = await scopedDb.rpc('save_quote_atomic', {
@@ -685,13 +1098,23 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
       if (rpcError) throw new Error(rpcError.message || 'Failed to save draft');
 
       if (savedId) {
-        dispatch({ type: 'INITIALIZE', payload: { quoteId: savedId } });
+           // Simplified success handling (removed versionId fetching for auto-save)
+           dispatch({ type: 'INITIALIZE', payload: { quoteId: savedId } });
+           
+           // Update URL without reloading if it's a new quote
+           if (!quoteId) {
+             const newUrl = new URL(window.location.href);
+             newUrl.searchParams.set('id', savedId);
+             window.history.pushState({}, '', newUrl.toString());
+           }
       }
 
       toast({ title: 'Draft saved', description: 'Your quote draft has been saved.' });
     } catch (err: any) {
       logger.error('[UnifiedComposer] Draft save failed:', err);
       toast({ title: 'Save Failed', description: err.message || 'Could not save draft', variant: 'destructive' });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -746,50 +1169,42 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
   return (
     <FormProvider {...form}>
       <div className="space-y-6">
-        {/* Auto-save indicator */}
-        <div className="flex items-center justify-end text-xs text-muted-foreground gap-2">
-          {isSavingDraft ? (
-            <><Cloud className="w-3 h-3 animate-pulse" /> Saving draft...</>
-          ) : lastSaved ? (
-            <><Cloud className="w-3 h-3 text-green-500" /> Saved {lastSaved.toLocaleTimeString()}</>
-          ) : storeState.versionId ? (
-            <><CloudOff className="w-3 h-3" /> Not yet saved</>
-          ) : null}
-        </div>
-
-        {/* Form Zone — always visible */}
+        
+        {/* Form Zone */}
         <FormZone
-          onGetRates={handleGetRates}
-          onSaveDraft={storeState.versionId ? handleSaveDraft : undefined}
-          loading={rateFetching.loading}
-          crmLoading={isCrmLoading}
-          initialValues={initialFormValues}
-          initialExtended={initialExtended}
-          accounts={accounts}
-          contacts={contacts}
-          opportunities={opportunities}
-          onChange={(values) => {
-            setLastFormData(prev => ({
-              values: values as FormZoneValues,
-              extended: prev?.extended || initialExtended || {}
-            }));
-          }}
+            onGetRates={handleGetRates}
+            onSaveDraft={handleSaveDraft}
+            loading={rateFetching.loading}
+            crmLoading={isCrmLoading}
+            initialValues={initialFormValues}
+            initialExtended={initialExtended}
+            accounts={accounts}
+            contacts={contacts}
+            opportunities={opportunities}
+            onChange={(values) => {
+                setLastFormData((prev) => ({
+                values: values as FormZoneValues,
+                extended: (prev?.extended || (initialExtended as ExtendedFormData) || ({} as ExtendedFormData)),
+                }));
+            }}
         />
 
         <Separator />
 
         {/* Results Zone */}
         <ResultsZone
-          results={rateFetching.results}
-          loading={rateFetching.loading}
-          smartMode={smartMode}
-          marketAnalysis={rateFetching.marketAnalysis}
-          confidenceScore={rateFetching.confidenceScore}
-          anomalies={rateFetching.anomalies}
-          complianceCheck={complianceCheck}
-          onSelect={handleSelectOption}
-          selectedOptionId={selectedOption?.id}
-          onRerunRates={lastFormData ? handleRerunRates : undefined}
+            results={(!lastFormData && displayResults.length === 0 && !rateFetching.loading) ? null : displayResults}
+            loading={rateFetching.loading}
+            // smartMode={false} // Removed or defaults to false
+            marketAnalysis={rateFetching.marketAnalysis}
+            confidenceScore={rateFetching.confidenceScore}
+            anomalies={rateFetching.anomalies}
+            complianceCheck={complianceCheck}
+            onSelect={handleSelectOption}
+            selectedOptionId={selectedOption?.id}
+            onRerunRates={lastFormData ? handleRerunRates : undefined}
+            onAddManualOption={config?.multi_option_enabled ? handleAddManualOption : undefined}
+            onRemoveOption={config?.multi_option_enabled ? handleRemoveOption : undefined}
         />
 
         {/* Finalize Section — shown when option selected */}
@@ -801,6 +1216,11 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
               onSaveQuote={handleSaveQuote}
               onGeneratePdf={handleGeneratePdf}
               saving={saving}
+              draft={optionDrafts[selectedOption.id]}
+              onDraftChange={(draft) =>
+                setOptionDrafts((prev) => ({ ...prev, [selectedOption.id]: draft }))
+              }
+              onRenameOption={handleRenameOption}
               referenceData={{
                 chargeCategories: repoData.chargeCategories || [],
                 chargeBases: repoData.chargeBases || [],

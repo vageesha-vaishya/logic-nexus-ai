@@ -1,6 +1,6 @@
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Settings as SettingsIcon, User, Bell, Shield, Database, CreditCard, Palette, Info, Globe, Mail } from 'lucide-react';
+import { Settings as SettingsIcon, User, Bell, Shield, Database, CreditCard, Palette, Info, Globe, Mail, FileCheck } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
@@ -195,6 +195,29 @@ export default function Settings() {
               <p className="text-sm text-muted-foreground">Notification settings coming soon</p>
             </CardContent>
           </Card>
+
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center gap-2">
+                    <FileCheck className="h-5 w-5 text-primary" />
+                    <CardTitle>Quotation Engine</CardTitle>
+                  </div>
+                  <CardDescription>
+                    Configure pricing logic and workflows
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <p className="text-sm text-muted-foreground">Set up default modules, smart mode, and numbering sequences.</p>
+                  <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => navigate('/dashboard/settings/quote-numbers')}>
+                      Numbering
+                    </Button>
+                    <Button variant="default" onClick={() => navigate('/dashboard/settings/quotations')}>
+                      Configuration
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
 
               <div className="md:col-span-2 lg:col-span-3">
                 <div className="flex items-center">

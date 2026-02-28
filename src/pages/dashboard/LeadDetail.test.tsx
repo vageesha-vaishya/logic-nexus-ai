@@ -1,8 +1,11 @@
-import { render, screen } from '@testing-library/react';
-import { describe, it, vi, expect } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/react';
+import { describe, it, vi, expect, beforeEach } from 'vitest';
 import LeadDetail from './LeadDetail';
 import { BrowserRouter } from 'react-router-dom';
+import { useCRM } from '@/hooks/useCRM';
+import { DashboardLayout } from '@/components/layout/DashboardLayout';
 
+// Mock dependencies
 vi.mock('@/components/layout/DashboardLayout', () => ({
   DashboardLayout: ({ children }: any) => <div data-testid="dashboard-layout">{children}</div>,
 }));

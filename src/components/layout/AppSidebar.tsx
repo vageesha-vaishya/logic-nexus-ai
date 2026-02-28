@@ -70,17 +70,21 @@ export function AppSidebar() {
 
   // Ensure active item stays in view after navigation
   useEffect(() => {
-    const container = scrollRef.current?.querySelector('[data-radix-scroll-area-viewport]') as HTMLDivElement | null;
-    if (!container) return;
-    const activeLink = container.querySelector('a[aria-current="page"]') as HTMLElement | null;
-    if (activeLink) {
-      const linkRect = activeLink.getBoundingClientRect();
-      const contRect = container.getBoundingClientRect();
-      const outOfView = linkRect.top < contRect.top || linkRect.bottom > contRect.bottom;
-      if (outOfView) {
-        activeLink.scrollIntoView({ block: 'nearest' });
+    // Small timeout to allow collapsible sections to expand/render
+    const timer = setTimeout(() => {
+      const container = scrollRef.current?.querySelector('[data-radix-scroll-area-viewport]') as HTMLDivElement | null;
+      if (!container) return;
+      const activeLink = container.querySelector('a[aria-current="page"]') as HTMLElement | null;
+      if (activeLink) {
+        const linkRect = activeLink.getBoundingClientRect();
+        const contRect = container.getBoundingClientRect();
+        const outOfView = linkRect.top < contRect.top || linkRect.bottom > contRect.bottom;
+        if (outOfView) {
+          activeLink.scrollIntoView({ block: 'nearest' });
+        }
       }
-    }
+    }, 100);
+    return () => clearTimeout(timer);
   }, [location]);
 
   return (

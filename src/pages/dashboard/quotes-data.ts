@@ -20,6 +20,7 @@ export interface Quote {
   margin_percentage: number | null;
   valid_until: string | null;
   created_at: string;
+  updated_at?: string;
   account_id: string | null;
   opportunity_id: string | null;
   franchise_id: string | null;

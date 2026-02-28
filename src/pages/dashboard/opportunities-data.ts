@@ -18,6 +18,7 @@ export interface Opportunity {
   expected_revenue: number | null;
   created_at: string;
   account_id: string | null;
+  contact_id: string | null;
   owner_id: string | null;
   franchise_id: string | null;
   tenant_id?: string;

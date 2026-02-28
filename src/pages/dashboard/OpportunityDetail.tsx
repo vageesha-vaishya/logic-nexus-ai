@@ -466,7 +466,19 @@ export default function OpportunityDetail() {
             <Card>
               <CardHeader className="flex items-center justify-between">
                 <CardTitle>Quotes</CardTitle>
-                <Button size="sm" onClick={() => navigate(`/dashboard/quotes/new?opportunityId=${id}`)} data-testid="new-quote-btn">New Quote</Button>
+                <Button 
+                  size="sm" 
+                  onClick={() => navigate('/dashboard/quotes/new', { 
+                    state: { 
+                      opportunityId: id,
+                      accountId: opportunity.account_id,
+                      contactId: opportunity.contact_id
+                    } 
+                  })} 
+                  data-testid="new-quote-btn"
+                >
+                  New Quote
+                </Button>
               </CardHeader>
               <CardContent>
                 {quotesLoading ? (

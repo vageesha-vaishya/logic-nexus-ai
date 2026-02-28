@@ -6,6 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { BrowserRouter } from 'react-router-dom';
 import '@testing-library/jest-dom';
 import { stages } from './quotes-data';
+import { DashboardLayout } from '@/components/layout/DashboardLayout';
 
 // Mock dependencies
 vi.mock('@/hooks/useCRM');

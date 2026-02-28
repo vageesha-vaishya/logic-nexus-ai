@@ -49,16 +49,32 @@ export function CommandCenterNav() {
   const location = useLocation();
   const [searchQuery, setSearchQuery] = useState('');
   
-  // Manage collapsible states
-  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
-    logistics: false,
-    financials: false,
-    admin: false,
-    sales: true, // Default open for core group
+  // Manage collapsible states with persistence
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
+    try {
+      const saved = sessionStorage.getItem('sidebar:groups');
+      return saved ? JSON.parse(saved) : {
+        logistics: false,
+        financials: false,
+        admin: false,
+        sales: true, // Default open for core group
+      };
+    } catch {
+      return {
+        logistics: false,
+        financials: false,
+        admin: false,
+        sales: true,
+      };
+    }
   });
 
   const toggleGroup = (group: string) => {
-    setOpenGroups(prev => ({ ...prev, [group]: !prev[group] }));
+    setOpenGroups(prev => {
+      const next = { ...prev, [group]: !prev[group] };
+      sessionStorage.setItem('sidebar:groups', JSON.stringify(next));
+      return next;
+    });
   };
 
   // 1. Aggregate all menu items

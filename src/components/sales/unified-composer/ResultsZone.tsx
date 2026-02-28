@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Package, LayoutList, Columns, Sparkles, AlertTriangle, HelpCircle } from 'lucide-react';
+import { Package, LayoutList, Columns, Sparkles, AlertTriangle, HelpCircle, Plus, Info } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { QuoteResultsList } from '@/components/sales/shared/QuoteResultsList';
 import { QuoteComparisonView } from '@/components/sales/shared/QuoteComparisonView';
 import { RateOption } from '@/types/quote-breakdown';
@@ -17,6 +19,8 @@ interface ResultsZoneProps {
   onSelect: (option: RateOption) => void;
   selectedOptionId?: string | null;
   onRerunRates?: () => void;
+  onAddManualOption?: () => void;
+  onRemoveOption?: (optionId: string) => void;
 }
 
 export function ResultsZone({
@@ -30,6 +34,8 @@ export function ResultsZone({
   onSelect,
   selectedOptionId,
   onRerunRates,
+  onAddManualOption,
+  onRemoveOption,
 }: ResultsZoneProps) {
   const [viewMode, setViewMode] = useState<'list' | 'compare'>('list');
 
@@ -107,13 +113,39 @@ export function ResultsZone({
         <div className="flex items-center gap-2">
           <h3 className="font-semibold text-lg">Rate Options</h3>
           <Badge variant="outline" className="text-xs">{results.length} Options</Badge>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger>
+                <Info className="w-3.5 h-3.5 text-muted-foreground" />
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Compare multiple carrier options side-by-side.</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
-        <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'list' | 'compare')} className="w-auto">
-          <TabsList className="h-8">
-            <TabsTrigger value="list" className="text-xs h-7 px-2"><LayoutList className="w-3 h-3 mr-1" /> Browse</TabsTrigger>
-            <TabsTrigger value="compare" className="text-xs h-7 px-2"><Columns className="w-3 h-3 mr-1" /> Compare</TabsTrigger>
-          </TabsList>
-        </Tabs>
+        <div className="flex items-center gap-2">
+          {onAddManualOption && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button size="sm" variant="outline" onClick={onAddManualOption} className="h-8 text-xs">
+                    <Plus className="w-3.5 h-3.5 mr-1" /> Add Option
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Manually create a new rate option to compare.</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+          <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'list' | 'compare')} className="w-auto">
+            <TabsList className="h-8">
+              <TabsTrigger value="list" className="text-xs h-7 px-2"><LayoutList className="w-3 h-3 mr-1" /> Browse</TabsTrigger>
+              <TabsTrigger value="compare" className="text-xs h-7 px-2"><Columns className="w-3 h-3 mr-1" /> Compare</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
       </div>
 
       {/* Results */}
@@ -127,6 +159,7 @@ export function ResultsZone({
           marketAnalysis={marketAnalysis}
           confidenceScore={confidenceScore}
           anomalies={anomalies}
+          onRemoveOption={onRemoveOption}
         />
       ) : (
         <QuoteComparisonView

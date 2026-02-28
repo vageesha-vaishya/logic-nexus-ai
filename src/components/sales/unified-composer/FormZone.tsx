@@ -78,6 +78,7 @@ interface FormZoneProps {
   contacts?: any[];
   opportunities?: any[];
   onChange?: (values: any) => void;
+  onOpenSmartSettings?: () => void;
 }
 
 export function FormZone({ 
@@ -90,9 +91,10 @@ export function FormZone({
   accounts = [],
   contacts = [],
   opportunities = [],
-  onChange
+  onChange,
+  onOpenSmartSettings,
 }: FormZoneProps) {
-  const [smartMode, setSmartMode] = useState(true);
+  const [smartMode, setSmartMode] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [carriers, setCarriers] = useState<{ id: string; carrier_name: string; carrier_type: string }[]>([]);
 
@@ -817,18 +819,6 @@ export function FormZone({
           </CardContent>
         </Card>
 
-        {/* Smart Mode Toggle */}
-        <div className="flex items-center justify-between bg-purple-50 dark:bg-purple-950/30 p-3 rounded-md border border-purple-100 dark:border-purple-900">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-purple-600" />
-            <div className="flex flex-col">
-              <span className="text-sm font-medium text-purple-900 dark:text-purple-200">Smart Quote Mode</span>
-              <span className="text-[10px] text-purple-600 dark:text-purple-400">AI-optimized routes & pricing</span>
-            </div>
-          </div>
-          <Switch checked={smartMode} onCheckedChange={setSmartMode} data-testid="smart-mode-switch" />
-        </div>
-
         {/* Mode Tabs */}
         <div className="space-y-2">
           <Label>Transport Mode</Label>
@@ -1002,15 +992,51 @@ export function FormZone({
           </CollapsibleContent>
         </Collapsible>
 
+        {/* Smart Mode Toggle */}
+        <div className="flex items-center justify-between bg-purple-50 dark:bg-purple-950/30 p-3 rounded-md border border-purple-100 dark:border-purple-900">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-purple-600" />
+            <div className="flex flex-col">
+              <span className="text-sm font-medium text-purple-900 dark:text-purple-200">Smart Quote Mode</span>
+              <span className="text-[10px] text-purple-600 dark:text-purple-400">AI-optimized routes & pricing</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {smartMode && onOpenSmartSettings && (
+              <Button variant="ghost" size="sm" onClick={onOpenSmartSettings} className="h-6 w-6 p-0">
+                <Settings2 className="w-3.5 h-3.5" />
+              </Button>
+            )}
+            <Switch checked={smartMode} onCheckedChange={setSmartMode} data-testid="smart-mode-switch" />
+          </div>
+        </div>
+
         {/* Action Row */}
         <div className="flex gap-3 pt-2">
-          <Button type="submit" className="flex-1" disabled={loading} data-testid="get-rates-btn">
-            {loading ? (
-              <><Timer className="w-4 h-4 mr-2 animate-spin" /> Calculating...</>
-            ) : (
-              smartMode ? 'Get Rates (AI Enhanced)' : 'Get Rates'
-            )}
-          </Button>
+          {smartMode ? (
+            <Button type="submit" className="flex-1" disabled={loading} data-testid="get-rates-btn">
+              {loading ? (
+                <><Timer className="w-4 h-4 mr-2 animate-spin" /> Calculating...</>
+              ) : (
+                'Get Rates (AI Enhanced)'
+              )}
+            </Button>
+          ) : (
+            <Button 
+              type="button" 
+              className="flex-1 bg-green-600 hover:bg-green-700 text-white" 
+              disabled={loading} 
+              data-testid="quotation-composer-btn"
+              onClick={() => onGetRates(form.getValues() as any, {} as any, false)}
+            >
+              {loading ? (
+                <><Timer className="w-4 h-4 mr-2 animate-spin" /> Creating...</>
+              ) : (
+                <><FileText className="w-4 h-4 mr-2" /> Quotation Composer</>
+              )}
+            </Button>
+          )}
+          
           {onSaveDraft && (
             <Button type="button" variant="outline" onClick={onSaveDraft} disabled={loading}>
               <Save className="w-4 h-4 mr-1" /> Draft

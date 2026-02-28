@@ -1,39 +1,73 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList } from '@/components/ui/breadcrumb';
 import { useCRM } from '@/hooks/useCRM';
+import { useAuth } from '@/hooks/useAuth';
 import { Loader2 } from 'lucide-react';
-import { useLocation } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { logger } from '@/lib/logger';
 import { useBenchmark } from '@/lib/benchmark';
 import { UnifiedQuoteComposer } from '@/components/sales/unified-composer/UnifiedQuoteComposer';
+import { QuotationConfigurationService } from '@/services/quotation/QuotationConfigurationService';
 
 function QuoteNewInner() {
   useBenchmark('QuoteNew');
   const { supabase, context, scopedDb } = useCRM();
+  const { user, loading: authLoading } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
   const [createdQuoteId, setCreatedQuoteId] = useState<string | null>(null);
   const [versionId, setVersionId] = useState<string | null>(null);
   const [, setTenantId] = useState<string | null>(null);
   const [initializing, setInitializing] = useState(true);
+  const initializedRef = useRef(false);
+
+  // Check default module configuration
+  useEffect(() => {
+    const checkConfig = async () => {
+        if (!context.tenantId) return;
+        try {
+            const config = await new QuotationConfigurationService(scopedDb).getConfiguration(context.tenantId);
+            if (config.default_module === 'legacy') {
+                // Redirect to legacy composer if configured
+                navigate('/dashboard/quotes/new-legacy', { replace: true });
+            }
+        } catch (e) {
+            console.error('Failed to check quote config', e);
+        }
+    };
+    checkConfig();
+  }, [context.tenantId]);
 
   // Create quote + version shell on mount so UnifiedQuoteComposer has IDs to save against
   useEffect(() => {
-    createQuoteShell();
-  }, []);
+    if (!authLoading && !initializedRef.current) {
+        initializedRef.current = true;
+        createQuoteShell();
+    }
+  }, [authLoading]);
 
   const createQuoteShell = async () => {
     try {
       // Resolve tenant
       let resolvedTenantId = context?.tenantId || null;
+      let currentUser = user;
+
       if (!resolvedTenantId) {
-        const { data: { user } } = await supabase.auth.getUser();
-        resolvedTenantId = user?.user_metadata?.tenant_id || null;
+        const { data } = await supabase.auth.getUser();
+        currentUser = data.user as any;
+        resolvedTenantId = currentUser?.user_metadata?.tenant_id || null;
       }
       setTenantId(resolvedTenantId);
 
       if (!resolvedTenantId) {
         logger.error('[QuoteNew] No tenant context available');
+        setInitializing(false);
+        return;
+      }
+
+      if (!currentUser?.id) {
+        logger.error('[QuoteNew] No user context available');
         setInitializing(false);
         return;
       }
@@ -49,12 +83,15 @@ function QuoteNewInner() {
         .from('quotes')
         .insert({
           tenant_id: resolvedTenantId,
+          owner_id: currentUser?.id,
+          created_by: currentUser?.id,
           status: 'draft',
           transport_mode: mode,
           origin: originLabel,
           destination: destLabel,
           account_id: state?.accountId || null,
           contact_id: state?.contactId || null,
+          opportunity_id: state?.opportunityId || null,
         })
         .select('id')
         .single();

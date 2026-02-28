@@ -3,6 +3,7 @@ import { describe, it, vi, expect, beforeEach } from 'vitest';
 import Dashboards from './Dashboards';
 import { BrowserRouter } from 'react-router-dom';
 import { useCRM } from '@/hooks/useCRM';
+import { DashboardLayout } from '@/components/layout/DashboardLayout';
 
 // Mock translations
 vi.mock('react-i18next', () => ({

@@ -26,6 +26,8 @@ export const leadConversionSchema = z.object({
   opportunityCloseDate: z.string().optional(),
   opportunityStage: z.string().optional(),
 
+  createQuote: z.boolean().optional(),
+  
   notes: z.string().optional(),
 }).superRefine((data, ctx) => {
   if (data.createAccount) {

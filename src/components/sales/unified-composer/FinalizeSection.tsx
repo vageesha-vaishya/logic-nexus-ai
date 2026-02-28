@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useFormContext, useFieldArray } from 'react-hook-form';
 import { QuoteComposerValues } from './schema';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,7 +12,7 @@ import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
-import { Save, FileText, Plus, ChevronDown, ChevronUp, Ship, Plane, Truck, TrainFront, Package, BarChart3 } from 'lucide-react';
+import { Save, FileText, Plus, ChevronDown, ChevronUp, Ship, Plane, Truck, TrainFront, Package, BarChart3, ArrowRight, Pencil, Check, X } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { RateOption, TransportLeg, Charge } from '@/types/quote-breakdown';
 import { ChargeRow } from '@/components/sales/composer/ChargeRow';
@@ -28,6 +29,19 @@ export interface FinalizeSectionProps {
   onSaveQuote: (charges: ManagedCharge[], marginPercent: number, notes: string) => void;
   onGeneratePdf?: () => void;
   saving?: boolean;
+  draft?: {
+    legs?: TransportLeg[];
+    charges?: ManagedCharge[];
+    autoMargin?: boolean;
+    marginPercent?: number;
+  };
+  onDraftChange?: (draft: {
+    legs: TransportLeg[];
+    charges: ManagedCharge[];
+    autoMargin: boolean;
+    marginPercent: number;
+  }) => void;
+  onRenameOption?: (newName: string) => void;
   referenceData?: {
     chargeCategories: any[];
     chargeBases: any[];
@@ -81,6 +95,9 @@ function getModeIcon(mode?: string) {
   }
 }
 
+import { CarrierComparisonPanel } from '@/components/sales/composer/CarrierComparisonPanel';
+import { LegManager } from '@/components/sales/composer/LegManager';
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -90,11 +107,50 @@ export function FinalizeSection({
   onSaveQuote,
   onGeneratePdf,
   saving = false,
+  draft,
+  onDraftChange,
+  onRenameOption,
   referenceData,
 }: FinalizeSectionProps) {
+  const { t } = useTranslation();
+  const manualQuoteLabel = t('quotation.manualQuote', { defaultValue: 'Manual Quotation' });
+  const selectedCarrier = (() => {
+    const carrier = selectedOption?.carrier || '';
+    const source = selectedOption?.source_attribution || '';
+    const isManual = !!selectedOption?.is_manual || source === 'Manual Entry' || source === 'Manual Quote' || carrier === 'Manual Entry' || carrier.startsWith('Manual Quote');
+    if (!isManual) return carrier || 'N/A';
+    // If it's manual, we prefer to show the raw carrier string if it's customized, 
+    // but if it matches "Manual Quote X", we localize it.
+    // However, if we are allowing renaming, we should just show carrier as is, unless it's the default "Manual Quote X" pattern which we want to localize.
+    // For now, let's keep localization logic but apply it only if it matches standard pattern.
+    const match = carrier.match(/Manual (Entry|Quote|Option) (\d+)$/i);
+    return match ? `${manualQuoteLabel} ${match[2]}` : carrier;
+  })();
+
   const [expanded, setExpanded] = useState(true);
   const [showAnalysis, setShowAnalysis] = useState(false);
-  const [activeFilter, setActiveFilter] = useState<{ type: 'category' | 'mode' | 'leg'; value: string } | null>(null);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [tempName, setTempName] = useState(selectedCarrier);
+  const [activeFilter, setActiveFilter] = useState<{ type: 'category' | 'mode' | 'leg', value: string } | null>(null);
+
+  useEffect(() => {
+    setTempName(selectedCarrier);
+  }, [selectedCarrier]);
+
+  const handleNameSave = () => {
+    if (tempName.trim() && onRenameOption) {
+      onRenameOption(tempName.trim());
+    }
+    setIsEditingName(false);
+  };
+
+  const handleNameKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') handleNameSave();
+    if (e.key === 'Escape') {
+      setTempName(selectedCarrier);
+      setIsEditingName(false);
+    }
+  };
 
   const form = useFormContext<QuoteComposerValues>();
 
@@ -104,6 +160,7 @@ export function FinalizeSection({
 
   const {
     legs,
+    setLegs,
     chargesByLeg,
     allCharges,
     addCharge,
@@ -119,6 +176,12 @@ export function FinalizeSection({
     selectedOption,
     referenceData: refData as UseChargesManagerParams['referenceData'],
     defaultMarginPercent: form.getValues('marginPercent') || 15,
+    initialCharges: draft?.charges,
+    initialLegs: draft?.legs,
+    initialAutoMargin: draft?.autoMargin,
+    initialMarginPercent: draft?.marginPercent,
+    resetKey: selectedOption.id,
+    onStateChange: onDraftChange,
   });
 
   // Sync charges manager state to form
@@ -129,9 +192,11 @@ export function FinalizeSection({
   }, [marginPercent, autoMargin, form]);
 
   // Build tab keys: one per leg + combined
+  // If manual, we want a 'manual' tab if no legs defined
+  const isManual = selectedOption.is_manual;
   const legTabKeys = legs.map((l) => l.id);
-  const hasCombined = (chargesByLeg['combined']?.length || 0) > 0 || legs.length === 0;
-  const defaultTab = legTabKeys[0] || 'combined';
+  const hasCombined = (chargesByLeg['combined']?.length || 0) > 0 || legs.length === 0 || isManual;
+  const defaultTab = legTabKeys.length > 0 ? legTabKeys[0] : 'combined';
 
   const handleSave = () => {
     const { charges: savableCharges, marginPercent: mp } = getChargesForSave();
@@ -217,11 +282,49 @@ export function FinalizeSection({
 
   return (
     <Card className="border-primary/20" data-testid="finalize-section">
-      <CardHeader className="cursor-pointer" onClick={() => setExpanded(!expanded)}>
+      <CardHeader className="cursor-pointer" onClick={(e) => {
+        // Prevent collapsing when clicking input or buttons
+        if ((e.target as HTMLElement).closest('.no-collapse')) return;
+        setExpanded(!expanded);
+      }}>
         <CardTitle className="flex items-center justify-between text-base">
           <span className="flex items-center gap-2">
             <FileText className="w-4 h-4" />
-            Finalize Quote — {selectedOption.carrier || 'Selected Option'}
+            Finalize Quote — 
+            {isEditingName ? (
+              <div className="flex items-center gap-1 no-collapse" onClick={(e) => e.stopPropagation()}>
+                <Input 
+                  value={tempName} 
+                  onChange={(e) => setTempName(e.target.value)}
+                  onKeyDown={handleNameKeyDown}
+                  className="h-7 w-[200px] text-sm"
+                  autoFocus
+                />
+                <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={handleNameSave}>
+                  <Check className="w-4 h-4 text-green-600" />
+                </Button>
+                <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => { setIsEditingName(false); setTempName(selectedCarrier); }}>
+                  <X className="w-4 h-4 text-red-500" />
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 group">
+                <span>{selectedCarrier || 'Selected Option'}</span>
+                {onRenameOption && selectedOption.is_manual && (
+                  <Button 
+                    size="sm" 
+                    variant="ghost" 
+                    className="h-6 w-6 p-0 opacity-50 group-hover:opacity-100 transition-opacity no-collapse"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsEditingName(true);
+                    }}
+                  >
+                    <Pencil className="w-3 h-3 text-muted-foreground" />
+                  </Button>
+                )}
+              </div>
+            )}
           </span>
           <div className="flex items-center gap-3">
             <Badge variant="secondary">{formatCurrency(totals.totalSell, selectedOption.currency || 'USD')}</Badge>
@@ -232,11 +335,19 @@ export function FinalizeSection({
 
       {expanded && (
         <CardContent className="space-y-6">
+          {/* Leg Management (Manual Mode Only) */}
+          {selectedOption.is_manual && (
+            <>
+              <LegManager legs={legs} onChange={setLegs} />
+              <Separator />
+            </>
+          )}
+
           {/* Option Summary */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
             <div>
               <span className="text-muted-foreground">Carrier</span>
-              <p className="font-medium">{selectedOption.carrier || 'N/A'}</p>
+              <p className="font-medium">{selectedCarrier}</p>
             </div>
             <div>
               <span className="text-muted-foreground">Transit</span>
@@ -254,71 +365,107 @@ export function FinalizeSection({
 
           <Separator />
 
-          {/* Per-Leg Charges Editor with Tabs */}
-          <div className="space-y-3">
-            <h4 className="text-sm font-semibold">Charges by Leg</h4>
+          {/* Dynamic Charge Configuration Panel */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-semibold flex items-center gap-2">
+                <FileText className="w-4 h-4" /> Cost & Charge Configuration
+              </h4>
+              {/* Add Charge Button (Global) */}
+               <Button size="sm" variant="outline" onClick={() => addCharge(null)} className="h-7 text-xs">
+                  <Plus className="w-3.5 h-3.5 mr-1" /> Add Global Charge
+               </Button>
+            </div>
 
-            {legs.length > 0 ? (
-              <Tabs defaultValue={defaultTab} className="w-full">
-                <TabsList className="w-full flex flex-wrap h-auto gap-1 bg-transparent p-0">
-                  {legs.map((leg) => (
-                    <TabsTrigger
-                      key={leg.id}
-                      value={leg.id}
-                      className="flex items-center gap-1.5 text-xs px-3 py-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-md border"
-                    >
-                      {getModeIcon(leg.mode)}
-                      <span className="truncate max-w-[120px]">
-                        {leg.origin} → {leg.destination}
-                      </span>
-                      <Badge variant="outline" className="ml-1 h-4 px-1 text-[10px]">
-                        {chargesByLeg[leg.id]?.length || 0}
-                      </Badge>
-                    </TabsTrigger>
-                  ))}
-                  {hasCombined && (
-                    <TabsTrigger
-                      value="combined"
-                      className="flex items-center gap-1.5 text-xs px-3 py-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-md border"
-                    >
-                      <Package className="w-3.5 h-3.5" />
-                      Combined
-                      <Badge variant="outline" className="ml-1 h-4 px-1 text-[10px]">
-                        {chargesByLeg['combined']?.length || 0}
-                      </Badge>
-                    </TabsTrigger>
-                  )}
-                </TabsList>
+            <Tabs defaultValue={defaultTab} className="w-full">
+               <div className="flex items-center gap-2 overflow-x-auto pb-2">
+                 <TabsList className="flex h-auto p-1 bg-muted/50 rounded-lg">
+                    {/* Render tabs for each leg */}
+                    {legs.map((leg, idx) => (
+                      <TabsTrigger 
+                        key={leg.id} 
+                        value={leg.id}
+                        className="flex items-center gap-2 px-3 py-1.5 text-xs data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all"
+                      >
+                         {getModeIcon(leg.mode)}
+                         <div className="flex flex-col items-start text-left leading-tight">
+                            <span className="font-medium">Leg {idx + 1}</span>
+                            <span className="text-[10px] text-muted-foreground truncate max-w-[100px]">
+                              {leg.origin} → {leg.destination}
+                            </span>
+                         </div>
+                         <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-[10px]">
+                            {(chargesByLeg[leg.id] || []).length}
+                         </Badge>
+                      </TabsTrigger>
+                    ))}
 
-                {legs.map((leg) => (
-                  <TabsContent key={leg.id} value={leg.id} className="mt-3">
-                    <div className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
-                      {getModeIcon(leg.mode)}
-                      <span className="capitalize">{leg.mode}</span> — {leg.origin} → {leg.destination}
-                      {leg.carrier && <span className="ml-1">({leg.carrier})</span>}
+                    {/* Combined/Global Tab */}
+                    {(hasCombined || legs.length === 0) && (
+                      <TabsTrigger 
+                        value="combined"
+                        className="flex items-center gap-2 px-3 py-1.5 text-xs data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all"
+                      >
+                         <Package className="w-3.5 h-3.5" />
+                         <div className="flex flex-col items-start text-left leading-tight">
+                            <span className="font-medium">Global</span>
+                            <span className="text-[10px] text-muted-foreground">General Charges</span>
+                         </div>
+                         <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-[10px]">
+                            {(chargesByLeg['combined'] || []).length}
+                         </Badge>
+                      </TabsTrigger>
+                    )}
+                 </TabsList>
+               </div>
+
+               {/* Tab Contents */}
+               {legs.map((leg) => (
+                 <TabsContent key={leg.id} value={leg.id} className="mt-4 space-y-4 animate-in fade-in-50 duration-200">
+                    <div className="flex items-center justify-between bg-muted/30 p-2 rounded-md border">
+                       <div className="flex items-center gap-3">
+                          <Badge variant="outline" className="uppercase bg-background">{leg.mode}</Badge>
+                          <span className="text-sm font-medium">{leg.origin} <ArrowRight className="w-3 h-3 inline mx-1" /> {leg.destination}</span>
+                       </div>
+                       <Button size="sm" variant="secondary" onClick={() => addCharge(leg.id)} className="h-7 text-xs">
+                          <Plus className="w-3 h-3 mr-1" /> Add Charge
+                       </Button>
                     </div>
-                    {renderChargeTable(chargesByLeg[leg.id] || [], leg.id)}
-                  </TabsContent>
-                ))}
 
-                {hasCombined && (
-                  <TabsContent value="combined" className="mt-3">
-                    <div className="text-xs text-muted-foreground mb-2">
-                      Global charges not tied to a specific transport leg
+                    {/* Ocean Leg Carrier Comparison (Only for Manual Ocean Legs) */}
+                    {leg.mode === 'ocean' && selectedOption.is_manual && (
+                       <CarrierComparisonPanel leg={leg} />
+                    )}
+
+                    {/* Charge Table */}
+                    <Card>
+                      <CardContent className="p-0">
+                         {renderChargeTable(chargesByLeg[leg.id] || [], leg.id)}
+                      </CardContent>
+                    </Card>
+                 </TabsContent>
+               ))}
+
+               {/* Global/Combined Content */}
+               {(hasCombined || legs.length === 0) && (
+                 <TabsContent value="combined" className="mt-4 space-y-4 animate-in fade-in-50 duration-200">
+                    <div className="flex items-center justify-between bg-muted/30 p-2 rounded-md border">
+                       <div className="flex items-center gap-2">
+                          <Package className="w-4 h-4 text-muted-foreground" />
+                          <span className="text-sm font-medium">Global / General Charges</span>
+                       </div>
+                       <Button size="sm" variant="secondary" onClick={() => addCharge(null)} className="h-7 text-xs">
+                          <Plus className="w-3 h-3 mr-1" /> Add Charge
+                       </Button>
                     </div>
-                    {renderChargeTable(chargesByLeg['combined'] || [], null)}
-                  </TabsContent>
-                )}
-              </Tabs>
-            ) : (
-              // No legs — single combined view
-              <div>
-                <div className="text-xs text-muted-foreground mb-2">
-                  All charges
-                </div>
-                {renderChargeTable(allCharges, null)}
-              </div>
-            )}
+                    <Card>
+                      <CardContent className="p-0">
+                         {renderChargeTable(chargesByLeg['combined'] || [], null)}
+                      </CardContent>
+                    </Card>
+                 </TabsContent>
+               )}
+            </Tabs>
           </div>
 
           {/* Charge Analysis Visualization */}

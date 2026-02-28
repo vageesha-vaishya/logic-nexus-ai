@@ -90,32 +90,38 @@ interface SortableHeadProps extends React.ThHTMLAttributes<HTMLTableCellElement>
   field: string;
   activeField?: string;
   direction?: "asc" | "desc";
-  onSort: (field: string) => void;
+  onSort: (field: string, multi?: boolean) => void;
   label?: React.ReactNode;
+  sortOrder?: number;
+  isActive?: boolean;
 }
 
 const SortableHead = React.forwardRef<HTMLTableCellElement, SortableHeadProps>(
-  ({ className, field, activeField, direction = "asc", onSort, label, children, ...props }, ref) => {
-    const isActive = activeField === field;
+  ({ className, field, activeField, direction = "asc", onSort, label, children, sortOrder, isActive: propIsActive, ...props }, ref) => {
+    const isActive = propIsActive !== undefined ? propIsActive : activeField === field;
     const ariaSort = isActive ? (direction === "asc" ? "ascending" : "descending") : "none";
+    
     return (
       <TableHead ref={ref as any} className={cn("select-none", className)} aria-sort={ariaSort} {...props}>
         <button
           type="button"
-          className="flex items-center gap-2 w-full text-left hover:opacity-80"
-          onClick={() => onSort(field)}
-          title={isActive ? (direction === "asc" ? "Sorted ascending" : "Sorted descending") : "Click to sort"}
+          className="flex items-center gap-2 w-full text-left hover:opacity-80 group"
+          onClick={(e) => onSort(field, e.shiftKey)}
+          title={isActive ? (direction === "asc" ? "Sorted ascending" : "Sorted descending") : "Click to sort (Shift+Click for multi-sort)"}
         >
           <span className="truncate">{label ?? children}</span>
-          <span className="inline-flex items-center">
+          <span className="inline-flex items-center gap-1">
             {isActive ? (
-              direction === "asc" ? (
-                <ChevronUp className="h-4 w-4" />
-              ) : (
-                <ChevronDown className="h-4 w-4" />
-              )
+              <>
+                {direction === "asc" ? (
+                  <ChevronUp className="h-4 w-4" />
+                ) : (
+                  <ChevronDown className="h-4 w-4" />
+                )}
+                {sortOrder && <span className="text-[10px] font-medium opacity-70">{sortOrder}</span>}
+              </>
             ) : (
-              <ChevronsUpDown className="h-4 w-4 opacity-40" />
+              <ChevronsUpDown className="h-4 w-4 opacity-0 group-hover:opacity-40 transition-opacity" />
             )}
           </span>
         </button>
