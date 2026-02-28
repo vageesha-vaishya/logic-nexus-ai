@@ -199,3 +199,9 @@ otp_expiry = 3600
 
 [functions.save-quotation-version]
 verify_jwt = false
+
+[functions.classify-email]
+verify_jwt = false
+
+[functions.suggest-transport-mode]
+verify_jwt = false
