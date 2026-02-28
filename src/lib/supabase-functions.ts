@@ -124,7 +124,7 @@ export async function invokeFunction<T = any>(
     }
 
     const { Authorization, authorization, ...customHeaders } = options.headers || {};
-    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd6aHhnb2lnZmxmdGhhcmNtZHFqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk1MTk2ODcsImV4cCI6MjA4NTA5NTY4N30.6xIZ3VYubUZ73pNPurzYuf-2RUpXj_9w-LpU-6d6kqU";
     if (!anonKey) {
         console.error('Missing VITE_SUPABASE_ANON_KEY or VITE_SUPABASE_PUBLISHABLE_KEY');
         return { data: null, error: new Error('Missing Supabase configuration') };
@@ -135,7 +135,9 @@ export async function invokeFunction<T = any>(
     let token = sessionData?.session?.access_token;
     
     const getHeaders = (t?: string) => {
-        const headers: any = { ...customHeaders, apikey: anonKey };
+        // Do not explicitly add apikey here as Supabase SDK adds it automatically.
+        // Adding it manually might cause duplication or override issues.
+        const headers: any = { ...customHeaders };
         if (t) headers.Authorization = `Bearer ${t}`;
         return headers;
     };

@@ -3,18 +3,25 @@ import { requireAuth } from "../_shared/auth.ts";
 import { sanitizeForLLM } from "../_shared/pii-guard.ts";
 import { pickClassifier } from "../_shared/model-router.ts";
 import { logAiCall } from "../_shared/audit.ts";
+import { getCorsHeaders } from "../_shared/cors.ts";
 
 // @ts-ignore
 declare const Deno: any;
 
 serveWithLogger(async (req, logger, supabaseAdmin) => {
+  const corsHeaders = getCorsHeaders(req);
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
   try {
     // Require authentication
-    const { user, error: authError, supabaseClient } = await requireAuth(req);
+    const { user, error: authError, supabaseClient } = await requireAuth(req, logger);
     if (authError || !user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      console.error(`[classify-email] Auth failed: ${authError}`);
+      return new Response(JSON.stringify({ error: authError || "Unauthorized" }), {
         status: 401,
-        headers: { "Content-Type": "application/json" },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -23,7 +30,7 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
     if (!emailId || typeof emailId !== 'string') {
       return new Response(JSON.stringify({ error: "Missing or invalid email_id" }), {
         status: 400,
-        headers: { "Content-Type": "application/json" },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -35,7 +42,7 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
     if (emailErr || !email) {
       return new Response(JSON.stringify({ error: "Email not found or not accessible" }), {
         status: 404,
-        headers: { "Content-Type": "application/json" },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -75,7 +82,7 @@ ${sanitized}
       });
       return new Response(JSON.stringify({ error: "LLM classification failed" }), {
         status: 502,
-        headers: { "Content-Type": "application/json" },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -120,13 +127,13 @@ ${sanitized}
 
     return new Response(JSON.stringify({ category, sentiment, intent }), {
       status: 200,
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e: any) {
     logger.error("Classify email error", { error: e });
     return new Response(JSON.stringify({ error: e?.message || String(e) }), {
       status: 500,
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 }, "classify-email");
