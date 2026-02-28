@@ -1,8 +1,8 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { serveWithLogger } from '../_shared/logger.ts';
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { requireAuth } from '../_shared/auth.ts';
 
-Deno.serve(async (req) => {
+serveWithLogger(async (req, logger, supabaseAdmin) => {
   const headers = getCorsHeaders(req);
 
   if (req.method === 'OPTIONS') {
@@ -15,10 +15,12 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...headers, 'Content-Type': 'application/json' } });
     }
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    // Using supabaseAdmin (Service Role) because we need to read/write lead scores which might be protected or we are a system process
+    // However, originally it was using Service Role. 
+    // To respect RLS, we should probably use the user client if possible.
+    // But since this is a "calculate" function often triggered by system or admin, and the original code used Service Role Key, 
+    // I will stick to supabaseAdmin to ensure it works as before (bypassing RLS if needed for scoring).
+    const supabase = supabaseAdmin;
 
     const { lead_id } = await req.json();
 
@@ -147,9 +149,10 @@ Deno.serve(async (req) => {
 
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
+    logger.error("Error in calculate-lead-score", { error: message });
     return new Response(
       JSON.stringify({ error: message }),
       { headers: { ...headers, 'Content-Type': 'application/json' }, status: 400 }
     );
   }
-});
+}, "calculate-lead-score");;

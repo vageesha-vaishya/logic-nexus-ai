@@ -1,7 +1,7 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { corsHeaders, preflight } from "../_shared/cors.ts";
-import { getSupabaseAdmin } from "../_shared/supabase.ts";
+import { serveWithLogger } from "../_shared/logger.ts";
 import { logAiCall } from "../_shared/audit.ts";
+import { requireAuth } from "../_shared/auth.ts";
 
 type Action = "draft" | "summarize";
 
@@ -36,11 +36,16 @@ async function callGemini(prompt: string) {
   return String(out || "").trim();
 }
 
-serve(async (req: Request) => {
+serveWithLogger(async (req, logger, adminSupabase) => {
   const pre = preflight(req);
   if (pre) return pre;
+  
+  const { user, error: authError, supabaseClient } = await requireAuth(req, logger);
+  if (authError || !user) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
+  }
+
   try {
-    const admin = getSupabaseAdmin();
     const payload = await req.json() as RequestBody;
     const { action, message_id, text } = payload;
     if (!action) return new Response(JSON.stringify({ error: "Missing action" }), { status: 400, headers: corsHeaders });
@@ -48,7 +53,8 @@ serve(async (req: Request) => {
     let baseText = text || "";
     let tenantId = payload.tenant_id || "";
     if (!baseText && message_id) {
-      const { data, error } = await admin
+      // Use user-scoped client
+      const { data, error } = await supabaseClient
         .from("messages")
         .select("tenant_id, subject, body_text, body_html")
         .eq("id", message_id)
@@ -68,12 +74,12 @@ serve(async (req: Request) => {
       const ai = await callGemini(prompt);
       const summary = ai || "Summary: Customer message received. Intent unclear. No immediate urgency. Next step: acknowledge and clarify.";
       if (message_id) {
-        await admin.from("messages").update({ ai_summary: summary, updated_at: new Date().toISOString() }).eq("id", message_id);
+        await supabaseClient.from("messages").update({ ai_summary: summary, updated_at: new Date().toISOString() }).eq("id", message_id);
       }
       const latency = Math.round(performance.now() - t0);
-      await logAiCall(admin, {
+      await logAiCall(adminSupabase, {
         tenant_id: tenantId || null,
-        user_id: null,
+        user_id: user.id,
         function_name: "ai-message-assistant",
         model_used: modelUsed,
         latency_ms: latency,
@@ -90,9 +96,9 @@ serve(async (req: Request) => {
       const ai = await callGemini(prompt);
       const draft = ai || "Thanks for reaching out. We’ve received your message and will follow up with the next steps shortly.";
       const latency = Math.round(performance.now() - t0);
-      await logAiCall(admin, {
+      await logAiCall(adminSupabase, {
         tenant_id: tenantId || null,
-        user_id: null,
+        user_id: user.id,
         function_name: "ai-message-assistant",
         model_used: modelUsed,
         latency_ms: latency,
@@ -105,9 +111,9 @@ serve(async (req: Request) => {
 
     return new Response(JSON.stringify({ error: "Unsupported action" }), { status: 400, headers: corsHeaders });
   } catch (e: any) {
+    logger.error("AI Assistant Error", { error: e });
     try {
-      const admin = getSupabaseAdmin();
-      await logAiCall(admin, {
+      await logAiCall(adminSupabase, {
         function_name: "ai-message-assistant",
         model_used: Deno.env.get("GOOGLE_API_KEY") ? "gemini-2.5-flash" : "fallback",
         error_message: e?.message || String(e),
@@ -115,4 +121,4 @@ serve(async (req: Request) => {
     } catch {}
     return new Response(JSON.stringify({ error: e?.message || "Unhandled" }), { status: 500, headers: corsHeaders });
   }
-});
+}, "ai-message-assistant");

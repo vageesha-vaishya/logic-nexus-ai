@@ -1,7 +1,7 @@
 declare const Deno: any;
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { serveWithLogger } from '../_shared/logger.ts';
+import { requireAuth } from '../_shared/auth.ts';
 import { getCorsHeaders } from '../_shared/cors.ts';
-import { Logger } from '../_shared/logger.ts';
 
 interface PlanPayload {
   name: string;
@@ -27,9 +27,7 @@ interface PlanPayload {
   max_users?: number | null;
 }
 
-const logger = new Logger({ resource: 'subscription-plans' });
-
-Deno.serve(async (req: Request) => {
+serveWithLogger(async (req, logger, supabase) => {
   const headers = getCorsHeaders(req);
 
   if (req.method === 'OPTIONS') {
@@ -41,35 +39,12 @@ Deno.serve(async (req: Request) => {
     const id = url.searchParams.get('id');
     const { method } = req;
 
-    const requireEnv = (name: string) => {
-      const v = Deno.env.get(name);
-      if (!v) throw new Error(`Missing environment variable: ${name}`);
-      return v;
-    };
-
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
+    const { user, error: authError } = await requireAuth(req);
+    if (authError || !user) {
       return new Response(
-        JSON.stringify({ error: 'Missing Authorization header' }),
+        JSON.stringify({ error: 'Unauthorized' }),
         { status: 401, headers: { ...headers, 'Content-Type': 'application/json' } },
       );
-    }
-
-    const supabase = createClient(requireEnv('SUPABASE_URL'), requireEnv('SUPABASE_ANON_KEY'), {
-      global: {
-        headers: { Authorization: authHeader },
-      },
-    });
-
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-    if (userError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...headers, 'Content-Type': 'application/json' },
-      });
     }
 
     const { data: isAdmin } = await supabase.rpc('is_platform_admin', { check_user_id: user.id });
@@ -202,4 +177,4 @@ Deno.serve(async (req: Request) => {
       headers: { ...headers, 'Content-Type': 'application/json' },
     });
   }
-});
+}, "subscription-plans");

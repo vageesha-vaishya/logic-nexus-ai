@@ -1,7 +1,10 @@
-declare const Deno: any;
-import { Client } from "https://deno.land/x/postgres@v0.17.0/mod.ts";
+// @ts-ignore
+import { Client } from "postgres";
+import { serveWithLogger } from '../_shared/logger.ts';
 import { getCorsHeaders } from '../_shared/cors.ts';
-import { requireAuth, createServiceClient } from '../_shared/auth.ts';
+import { requireAuth } from '../_shared/auth.ts';
+
+declare const Deno: any;
 
 interface MigrationFile {
   name: string;
@@ -118,8 +121,6 @@ function parseConnectionString(connectionString: string): {
   // Remove any surrounding quotes
   cleanUrl = cleanUrl.replace(/^["']|["']$/g, '').trim();
 
-  console.log(`[parseConnectionString] Cleaned URL starts with: ${cleanUrl.substring(0, 30)}...`);
-
   // Ensure it starts with postgresql:// or postgres://
   if (!cleanUrl.startsWith('postgresql://') && !cleanUrl.startsWith('postgres://')) {
     throw new Error(
@@ -138,10 +139,6 @@ function parseConnectionString(connectionString: string): {
     password: normalizePassword(url.password),
   };
 
-  console.log(
-    `[parseConnectionString] Parsed: host=${result.hostname}, port=${result.port}, db=${result.database}, user=${result.user}`
-  );
-
   if (!result.hostname || !result.database || !result.user) {
     throw new Error(
       `Invalid connection parameters: hostname=${result.hostname}, database=${result.database}, user=${result.user}`
@@ -151,26 +148,25 @@ function parseConnectionString(connectionString: string): {
   return result;
 }
 
-Deno.serve(async (req: Request) => {
+serveWithLogger(async (req, logger, supabase) => {
   const corsHeaders = getCorsHeaders(req);
-  console.log(`[push-migrations-to-target] ${req.method} request received`);
+  logger.info(`[push-migrations-to-target] ${req.method} request received`);
 
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   // Auth validation
-  const { user, error: authError } = await requireAuth(req);
+  const { user, error: authError } = await requireAuth(req, logger);
   if (authError || !user) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+    return new Response(JSON.stringify({ error: authError || 'Unauthorized' }), {
       status: 401,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 
   // Verify platform_admin role
-  const serviceClient = createServiceClient();
-  const { data: roleData } = await serviceClient.from('user_roles').select('role').eq('user_id', user.id).eq('role', 'platform_admin').maybeSingle();
+  const { data: roleData } = await supabase.from('user_roles').select('role').eq('user_id', user.id).eq('role', 'platform_admin').maybeSingle();
   if (!roleData) {
     return new Response(JSON.stringify({ error: 'Forbidden: platform_admin required' }), {
       status: 403,
@@ -209,12 +205,12 @@ Deno.serve(async (req: Request) => {
         user: body.user,
         password: normalizePassword(body.password),
       };
-      console.log(`[push-migrations-to-target] Using explicit connection params`);
+      logger.info(`[push-migrations-to-target] Using explicit connection params`);
     }
     // Priority 2: Connection string from request
     else if (body.connectionString) {
       connConfig = parseConnectionString(body.connectionString);
-      console.log(`[push-migrations-to-target] Using connection string from request`);
+      logger.info(`[push-migrations-to-target] Using connection string from request`);
     }
     // Priority 3: Environment variable
     else {
@@ -223,15 +219,15 @@ Deno.serve(async (req: Request) => {
         throw new Error('No connection provided. Pass host/database/user/password params, connectionString, or configure TARGET_DB_URL secret');
       }
       connConfig = parseConnectionString(targetDbUrl);
-      console.log(`[push-migrations-to-target] Using TARGET_DB_URL from environment`);
+      logger.info(`[push-migrations-to-target] Using TARGET_DB_URL from environment`);
     }
 
     if (!migrations || !Array.isArray(migrations) || migrations.length === 0) {
       throw new Error('No migrations provided');
     }
 
-    console.log(`[push-migrations-to-target] Processing ${migrations.length} migrations (dryRun: ${dryRun})`);
-    console.log(`[push-migrations-to-target] Connecting to ${connConfig.hostname}:${connConfig.port}/${connConfig.database}`);
+    logger.info(`[push-migrations-to-target] Processing ${migrations.length} migrations (dryRun: ${dryRun})`);
+    logger.info(`[push-migrations-to-target] Connecting to ${connConfig.hostname}:${connConfig.port}/${connConfig.database}`);
 
     // Connect to target database with explicit options
     const client = new Client({
@@ -244,7 +240,7 @@ Deno.serve(async (req: Request) => {
     });
     
     await client.connect();
-    console.log('[push-migrations-to-target] Connected to target database');
+    logger.info('[push-migrations-to-target] Connected to target database');
 
     // Create schema_migrations table if not exists
     await client.queryObject(`
@@ -267,7 +263,7 @@ Deno.serve(async (req: Request) => {
       )
     `);
 
-    console.log('[push-migrations-to-target] Ensured migration tracking tables exist');
+    logger.info('[push-migrations-to-target] Ensured migration tracking tables exist');
 
     const batchSize = Math.max(1, Math.min(200, Number((body as any).batchSize ?? 50)));
 
@@ -280,21 +276,31 @@ Deno.serve(async (req: Request) => {
       `SELECT version FROM public.schema_migrations WHERE success = true AND version = ANY($1::text[])`,
       [versions]
     );
-    const appliedVersions = new Set(appliedResult.rows.map((r) => r.version));
+    const appliedVersions = new Set(appliedResult.rows.map((r: { version: string }) => r.version));
 
     const failedResult = await client.queryObject<{ version: string; error_message: string | null }>(
       `SELECT version, error_message FROM public.schema_migrations WHERE success = false AND version = ANY($1::text[])`,
       [versions]
     );
-    const failedMap = new Map(failedResult.rows.map((r) => [r.version, r.error_message ?? 'Migration failed']));
+    const failedMap = new Map<string, string>(
+      failedResult.rows.map((r: { version: string; error_message: string | null }) => [
+        r.version,
+        r.error_message ?? 'Migration failed',
+      ])
+    );
 
     const progressResult = await client.queryObject<{ version: string; next_index: number; total_statements: number | null }>(
       `SELECT version, next_index, total_statements FROM public.schema_migration_progress WHERE version = ANY($1::text[])`,
       [versions]
     );
-    const progressMap = new Map(progressResult.rows.map((r) => [r.version, r]));
+    const progressMap = new Map<string, { version: string; next_index: number; total_statements: number | null }>(
+      progressResult.rows.map((r: { version: string; next_index: number; total_statements: number | null }) => [
+        r.version,
+        r,
+      ])
+    );
 
-    console.log(
+    logger.info(
       `[push-migrations-to-target] State: applied=${appliedVersions.size}, failed=${failedMap.size}, in_progress=${progressMap.size}`
     );
 
@@ -391,7 +397,7 @@ Deno.serve(async (req: Request) => {
       const totalStatements = statements.length;
       const endIndex = Math.min(totalStatements, startIndex + batchSize);
 
-      console.log(
+      logger.info(
         `[push-migrations-to-target] Applying chunk: ${migration.name} statements ${startIndex + 1}-${endIndex}/${totalStatements} (batchSize=${batchSize})`
       );
 
@@ -435,7 +441,7 @@ Deno.serve(async (req: Request) => {
           );
 
           appliedVersions.add(version);
-          console.log(`[push-migrations-to-target] COMPLETE: ${migration.name} (${totalStatements} statements)`);
+          logger.info(`[push-migrations-to-target] COMPLETE: ${migration.name} (${totalStatements} statements)`);
         }
 
         progress = {
@@ -465,7 +471,7 @@ Deno.serve(async (req: Request) => {
 
         failedMap.set(version, errorMessage);
 
-        console.error(`[push-migrations-to-target] FAILED: ${migration.name} - ${errorMessage}`);
+        logger.error(`[push-migrations-to-target] FAILED: ${migration.name} - ${errorMessage}`);
         break;
       }
 
@@ -484,7 +490,7 @@ Deno.serve(async (req: Request) => {
     });
 
     await client.end();
-    console.log('[push-migrations-to-target] Disconnected from target database');
+    logger.info('[push-migrations-to-target] Disconnected from target database');
 
     const response = {
       success: failedMap.size === 0 && !stillPending,
@@ -503,7 +509,7 @@ Deno.serve(async (req: Request) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error: unknown) {
-    console.error('[push-migrations-to-target] Error:', error);
+    logger.error('[push-migrations-to-target] Error:', { error: error instanceof Error ? error.message : String(error) });
 
     let message = error instanceof Error ? error.message : String(error);
     if (message.includes('password authentication failed')) {
@@ -522,4 +528,4 @@ Deno.serve(async (req: Request) => {
       }
     );
   }
-});
+}, "push-migrations-to-target");

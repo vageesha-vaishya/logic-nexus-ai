@@ -1,5 +1,5 @@
-import { corsHeaders } from "../_shared/cors.ts";
-import { requireAuth, createServiceClient } from "../_shared/auth.ts";
+import { serveWithLogger } from "../_shared/logger.ts";
+import { requireAuth } from "../_shared/auth.ts";
 import { sanitizeForLLM } from "../_shared/pii-guard.ts";
 import { pickClassifier } from "../_shared/model-router.ts";
 import { logAiCall } from "../_shared/audit.ts";
@@ -7,28 +7,14 @@ import { logAiCall } from "../_shared/audit.ts";
 // @ts-ignore
 declare const Deno: any;
 
-
-Deno.serve(async (req: Request) => {
-  const headers = corsHeaders;
-
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers });
-  }
-
+serveWithLogger(async (req, logger, supabaseAdmin) => {
   try {
-    if (req.method !== "POST") {
-      return new Response(JSON.stringify({ error: "Method not allowed" }), {
-        status: 405,
-        headers: { ...headers, "Content-Type": "application/json" },
-      });
-    }
-
     // Require authentication
     const { user, error: authError, supabaseClient } = await requireAuth(req);
     if (authError || !user) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
-        headers: { ...headers, "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" },
       });
     }
 
@@ -37,7 +23,7 @@ Deno.serve(async (req: Request) => {
     if (!emailId || typeof emailId !== 'string') {
       return new Response(JSON.stringify({ error: "Missing or invalid email_id" }), {
         status: 400,
-        headers: { ...headers, "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" },
       });
     }
 
@@ -49,7 +35,7 @@ Deno.serve(async (req: Request) => {
     if (emailErr || !email) {
       return new Response(JSON.stringify({ error: "Email not found or not accessible" }), {
         status: 404,
-        headers: { ...headers, "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" },
       });
     }
 
@@ -77,8 +63,8 @@ ${sanitized}
     const latency = Math.round(performance.now() - start);
     if (!res.ok) {
       const errText = await res.text();
-      const admin = createServiceClient();
-      await logAiCall(admin, {
+      // Use injected supabaseAdmin instead of createServiceClient
+      await logAiCall(supabaseAdmin, {
         user_id: user.id,
         function_name: "classify-email",
         model_used: model,
@@ -89,7 +75,7 @@ ${sanitized}
       });
       return new Response(JSON.stringify({ error: "LLM classification failed" }), {
         status: 502,
-        headers: { ...headers, "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" },
       });
     }
 
@@ -113,8 +99,8 @@ ${sanitized}
     const sentiment = parsed.sentiment ?? "neutral";
     const intent = parsed.intent ?? "general";
 
-    const admin = createServiceClient();
-    await admin
+    // Use user-scoped client for RLS compliance
+    await supabaseClient
       .from("emails")
       .update({
         category,
@@ -122,7 +108,7 @@ ${sanitized}
         intent,
       })
       .eq("id", emailId);
-    await logAiCall(admin, {
+    await logAiCall(supabaseAdmin, {
       user_id: user.id,
       function_name: "classify-email",
       model_used: model,
@@ -134,12 +120,13 @@ ${sanitized}
 
     return new Response(JSON.stringify({ category, sentiment, intent }), {
       status: 200,
-      headers: { ...headers, "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json" },
     });
-  } catch (e) {
-    return new Response(JSON.stringify({ error: (e as any)?.message || String(e) }), {
+  } catch (e: any) {
+    logger.error("Classify email error", { error: e });
+    return new Response(JSON.stringify({ error: e?.message || String(e) }), {
       status: 500,
-      headers: { ...headers, "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json" },
     });
   }
-});
+}, "classify-email");

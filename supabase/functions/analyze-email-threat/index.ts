@@ -1,37 +1,20 @@
 
-// @ts-ignore
-import { serve } from "std/http/server.ts";
-import { createClient } from "@supabase/supabase-js";
 import { getCorsHeaders } from "../_shared/cors.ts";
+import { serveWithLogger, Logger } from "../_shared/logger.ts";
+import { requireAuth } from "../_shared/auth.ts";
 
-// @ts-ignore
-declare const Deno: any;
-
-console.log("Analyze Email Threat Function Initialized");
-
-serve(async (req: Request) => {
+serveWithLogger(async (req, logger, _adminSupabase) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: getCorsHeaders(req) });
   }
 
   try {
-    // 1. Initialize Supabase Client
-    const supabaseClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-    );
-
-    // 2. Auth Check
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-        throw new Error("Missing Authorization header");
-    }
-    
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
+    // 1. Auth Check
+    const { user, supabaseClient, error: authError } = await requireAuth(req, logger);
 
     if (authError || !user) {
+        logger.error("Auth error:", { error: authError });
         throw new Error("Unauthorized: Invalid token");
     }
 
@@ -74,7 +57,7 @@ serve(async (req: Request) => {
     const openAiKey = Deno.env.get('OPENAI_API_KEY');
     if (!openAiKey) {
         // Fallback for dev/test without key: Simulate analysis
-        console.warn("Missing OPENAI_API_KEY. Using simulation mode.");
+        logger.warn("Missing OPENAI_API_KEY. Using simulation mode.");
         const isPhishing = emailSubject.toLowerCase().includes("urgent") || emailBody.toLowerCase().includes("wire transfer");
         
         const simulatedResult = {
@@ -88,8 +71,7 @@ serve(async (req: Request) => {
         return await handleResult(supabaseClient, email_id, tenantId, simulatedResult, req, user.id);
     }
 
-    const systemPrompt = `
-    You are an expert Cyber Security AI specializing in Email Security.
+    const systemPrompt = `You are an expert Cyber Security AI specializing in Email Security.
     Analyze the provided email for:
     1. Phishing attempts
     2. Business Email Compromise (BEC) - e.g., urgent wire transfers, CEO fraud
@@ -138,13 +120,13 @@ serve(async (req: Request) => {
     return await handleResult(supabaseClient, email_id, tenantId, analysisResult, req, user.id);
 
   } catch (error: any) {
-    console.error("Error:", error);
+    logger.error("Error:", { error });
     return new Response(
       JSON.stringify({ error: error.message }),
       { status: 400, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
     );
   }
-});
+}, "analyze-email-threat");
 
 async function handleResult(supabase: any, emailId: string | undefined, tenantId: string, result: any, req: Request, userId: string) {
     // 6. Update DB if email_id provided

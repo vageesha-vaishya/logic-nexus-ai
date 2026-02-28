@@ -1,8 +1,11 @@
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { SupabaseClient } from "@supabase/supabase-js";
+// @ts-ignore
 import nodemailer from "nodemailer";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { requireAuth } from "../_shared/auth.ts";
 import { Logger, serveWithLogger } from "../_shared/logger.ts";
+
+declare const Deno: any;
 
 export interface EmailRequest {
   to: string[];
@@ -807,14 +810,6 @@ serveWithLogger(async (req: Request, baseLogger: Logger, _adminSupabase: Supabas
         isE2eBypass = true;
     }
 
-    // Only enforce User Auth if NOT using Service Role Key AND NOT using E2E Bypass
-    if (!isE2eBypass && (!authHeader || !authHeader.includes(serviceKey))) {
-        const { user, error: authError } = await requireAuth(req);
-        if (authError || !user) {
-            return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...headers, 'Content-Type': 'application/json' } });
-        }
-    }
-
     // Create Supabase client with Auth context (User or Service Role)
     let supabase: SupabaseClient;
 
@@ -823,13 +818,17 @@ serveWithLogger(async (req: Request, baseLogger: Logger, _adminSupabase: Supabas
 
     if (authHeader && authHeader.includes(serviceKey)) {
         // System/Admin call (e.g. from scheduler)
-        // We can reuse adminSupabase here, but let's stick to the existing pattern to be safe with references
-        supabase = createClient(supabaseUrl, serviceKey);
+        supabase = adminSupabase;
+    } else if (isE2eBypass) {
+        // E2E Bypass: Use admin client
+        supabase = adminSupabase;
     } else {
         // User call (RLS enforced)
-        supabase = createClient(supabaseUrl, anonKey, {
-            global: { headers: { Authorization: authHeader || '' } },
-        });
+        const { supabaseClient, error: authError } = await requireAuth(req, baseLogger);
+        if (authError || !supabaseClient) {
+             return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...headers, 'Content-Type': 'application/json' } });
+        }
+        supabase = supabaseClient;
     }
 
     const payload = await req.json();
@@ -1071,9 +1070,9 @@ serveWithLogger(async (req: Request, baseLogger: Logger, _adminSupabase: Supabas
 
   } catch (error: any) {
     await baseLogger.error("Email Send Error:", { error });
-    return new Response(JSON.stringify({ success: false, error: error.message }), {
+    return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...headers, "Content-Type": "application/json" },
-      status: 200,
+      status: 500,
     });
   }
-}, 'send-email');
+}, "send-email");

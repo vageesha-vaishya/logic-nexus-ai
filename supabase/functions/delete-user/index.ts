@@ -1,13 +1,8 @@
-// @ts-ignore
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { serveWithLogger } from '../_shared/logger.ts';
 import { getCorsHeaders } from '../_shared/cors.ts';
-import { requireAuth, createServiceClient } from '../_shared/auth.ts';
-import { Logger } from '../_shared/logger.ts';
+import { requireAuth } from '../_shared/auth.ts';
 
-declare const Deno: any;
-
-Deno.serve(async (req: Request) => {
-  const logger = new Logger({ function: 'delete-user' });
+serveWithLogger(async (req, logger, supabaseAdmin) => {
   const headers = getCorsHeaders(req);
 
   if (req.method === 'OPTIONS') {
@@ -22,34 +17,11 @@ Deno.serve(async (req: Request) => {
     }
 
     // Verify platform_admin role
-    const serviceClient = createServiceClient();
-    const { data: roleData } = await serviceClient.from('user_roles').select('role').eq('user_id', user.id).eq('role', 'platform_admin').maybeSingle();
+    // Use injected supabaseAdmin which is already service role
+    const { data: roleData } = await supabaseAdmin.from('user_roles').select('role').eq('user_id', user.id).eq('role', 'platform_admin').maybeSingle();
     if (!roleData) {
       return new Response(JSON.stringify({ error: 'Forbidden: platform_admin required' }), { status: 403, headers: { ...headers, 'Content-Type': 'application/json' } });
     }
-
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? Deno.env.get('SERVICE_ROLE_KEY');
-
-    if (!supabaseUrl || !serviceRoleKey) {
-      const errorMsg = 'Critical Configuration Error: Missing environment variables';
-      logger.error(errorMsg);
-      return new Response(
-        JSON.stringify({ error: errorMsg, code: 'CONFIG_ERROR' }),
-        { status: 500, headers: { ...headers, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const supabaseAdmin = createClient(
-      supabaseUrl,
-      serviceRoleKey,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      }
-    );
 
     const body = await req.json();
     const { userId } = body;
@@ -90,11 +62,12 @@ Deno.serve(async (req: Request) => {
       { status: 200, headers: { ...headers, 'Content-Type': 'application/json' } }
     );
 
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Internal Server Error';
     logger.error('Unhandled error in delete-user', { error });
     return new Response(
-      JSON.stringify({ error: error.message || 'Internal Server Error' }),
+      JSON.stringify({ error: errorMessage }),
       { status: 500, headers: { ...headers, 'Content-Type': 'application/json' } }
     );
   }
-});
+}, "delete-user");

@@ -1,12 +1,10 @@
-import { createClient } from "@supabase/supabase-js"
 import { getCorsHeaders } from "../_shared/cors.ts"
 import { requireAuth } from "../_shared/auth.ts"
 import { sanitizeForLLM } from "../_shared/pii-guard.ts"
 import { logAiCall } from "../_shared/audit.ts"
+import { serveWithLogger, Logger } from "../_shared/logger.ts"
 
 declare const Deno: any;
-
-console.log("AI Advisor v2.1 (Enhanced) Initialized")
 
 // Mock Knowledge Base for fallback
 const KNOWLEDGE_BASE = {
@@ -38,7 +36,7 @@ const KNOWLEDGE_BASE = {
   ]
 };
 
-Deno.serve(async (req: Request) => {
+serveWithLogger(async (req, logger, supabase) => {
   const headers = getCorsHeaders(req);
 
   // Handle CORS preflight requests
@@ -51,16 +49,16 @@ Deno.serve(async (req: Request) => {
 
     const { user, error: authError } = await requireAuth(req);
     if (authError || !user) {
-      console.warn("[AI-Advisor] Auth failed, continuing in anonymous mode", { correlationId, error: authError });
+      logger.warn("Auth failed, continuing in anonymous mode", { correlationId, error: authError });
     }
 
     const { action, payload } = await req.json()
     // Check for OpenAI Key
     const openAiKey = Deno.env.get('OPENAI_API_KEY')
-    console.log(`[AI-Advisor] Action: ${action}, Key Present: ${!!openAiKey}, correlationId: ${correlationId}, userId: ${user?.id ?? 'anonymous'}`);
+    logger.info(`Action: ${action}, Key Present: ${!!openAiKey}, correlationId: ${correlationId}, userId: ${user?.id ?? 'anonymous'}`);
 
     if (action === 'generate_smart_quotes' && !openAiKey) {
-        console.warn("[AI-Advisor] Missing OpenAI Key. Returning fallback/empty response.");
+        logger.warn("Missing OpenAI Key. Returning fallback/empty response.");
         return new Response(
             JSON.stringify({ 
                 options: [], 
@@ -74,12 +72,6 @@ Deno.serve(async (req: Request) => {
             }
         );
     }
-
-    
-    // Create Supabase Client
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
-    const supabaseKey = Deno.env.get('SERVICE_ROLE_KEY') ?? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-    const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Get User Token
     const authHeader = req.headers.get('Authorization');
@@ -98,7 +90,7 @@ Deno.serve(async (req: Request) => {
         result = await predictPrice(payload);
         break;
       case 'generate_smart_quotes':
-        result = await generateSmartQuotes(payload, openAiKey, supabase, userToken, user.id);
+        result = await generateSmartQuotes(payload, openAiKey, supabase, logger, userToken, user?.id);
         break;
       case 'lookup_codes':
         result = await lookupCodes(payload.query, payload.mode, supabase);
@@ -122,8 +114,8 @@ Deno.serve(async (req: Request) => {
       }
     )
 
-  } catch (error) {
-    console.error("Error:", error);
+  } catch (error: any) {
+    logger.error("Error processing request", { error: error.message || String(error) });
     return new Response(
       JSON.stringify({ error: (error as Error).message }),
       { 
@@ -136,7 +128,7 @@ Deno.serve(async (req: Request) => {
       }
     )
   }
-})
+}, "ai-advisor")
 
 // --- Helper Functions ---
 
@@ -233,7 +225,7 @@ async function validateCompliance(payload: any) {
 
 // --- Main Generation Logic ---
 
-async function generateSmartQuotes(payload: any, apiKey: string | undefined, supabase: any, userToken?: string, userId?: string) {
+async function generateSmartQuotes(payload: any, apiKey: string | undefined, supabase: any, logger: Logger, userToken?: string, userId?: string) {
     if (!apiKey) throw new Error("OpenAI API Key is required for Smart Quotes");
 
     const { 
@@ -254,16 +246,16 @@ async function generateSmartQuotes(payload: any, apiKey: string | undefined, sup
             .single();
         
         if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows found"
-            console.warn("[AI-Advisor] Cache lookup warning (continuing):", error.message);
+            logger.warn("[AI-Advisor] Cache lookup warning (continuing):", { error: error.message });
         } else if (data) {
             cached = data;
         }
     } catch (err) {
-        console.warn("[AI-Advisor] Cache lookup failed (continuing):", err);
+        logger.warn("[AI-Advisor] Cache lookup failed (continuing):", { error: err });
     }
 
     if (cached) {
-        console.log("[AI-Advisor] Cache Hit");
+        logger.info("[AI-Advisor] Cache Hit");
         return cached.response_payload;
     }
 
@@ -285,7 +277,7 @@ async function generateSmartQuotes(payload: any, apiKey: string | undefined, sup
             historicalContext = `Internal Historical Data: Found ${rates.length} past rates. Average base price: $${historicalAvg.toFixed(2)}.`;
         }
     } catch (err) {
-        console.warn("Failed to fetch historical data:", err);
+        logger.warn("Failed to fetch historical data:", { error: err });
     }
 
     // 3. Construct System Prompt

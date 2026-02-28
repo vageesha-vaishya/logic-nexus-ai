@@ -1,9 +1,8 @@
-import { Logger } from '../_shared/logger.ts';
+import { Logger, serveWithLogger } from '../_shared/logger.ts';
 import { getCorsHeaders } from '../_shared/cors.ts';
-import { requireAuth, createServiceClient } from '../_shared/auth.ts';
+import { requireAuth } from '../_shared/auth.ts';
 
-Deno.serve(async (req) => {
-  const logger = new Logger({ function: 'export-data' });
+serveWithLogger(async (req, logger, serviceClient) => {
   const headers = getCorsHeaders(req);
 
   if (req.method === 'OPTIONS') {
@@ -22,7 +21,7 @@ Deno.serve(async (req) => {
 
   try {
     // Verify user is a platform admin before allowing full export
-    const serviceClient = createServiceClient();
+    // Use injected serviceClient which is already authenticated with service role
     const { data: roleData, error: roleError } = await serviceClient
       .from('user_roles')
       .select('role')
@@ -155,4 +154,4 @@ Deno.serve(async (req) => {
       headers: { ...headers, 'Content-Type': 'application/json' },
     });
   }
-});
+}, "export-data");

@@ -1,6 +1,7 @@
-import { serve } from "std/http/server.ts";
-import { parse } from "xml";
+// @ts-ignore
+import { parse } from "https://deno.land/x/xml@2.1.3/mod.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
+import { serveWithLogger, Logger } from "../_shared/logger.ts";
 
 interface EmailSettings {
   provider: string; // 'gmail', 'office365', 'imap', 'exchange', 'unknown'
@@ -49,7 +50,7 @@ const STATIC_PROVIDERS: Record<string, EmailSettings> = {
   }
 };
 
-serve(async (req) => {
+serveWithLogger(async (req, logger, _supabase) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: getCorsHeaders(req) });
   }
@@ -85,7 +86,7 @@ serve(async (req) => {
 
     for (const url of urls) {
       try {
-        console.log(`Fetching autoconfig from: ${url}`);
+        logger.info(`Fetching autoconfig from: ${url}`);
         const controller = new AbortController();
         const id = setTimeout(() => controller.abort(), 3000); // 3s timeout
 
@@ -95,7 +96,7 @@ serve(async (req) => {
         if (res.ok) {
           const text = await res.text();
           const xmlData = parse(text);
-          const settings = parseAutoconfigXml(xmlData, email);
+          const settings = parseAutoconfigXml(xmlData, email, logger);
           
           if (settings) {
             return new Response(JSON.stringify(settings), {
@@ -103,8 +104,8 @@ serve(async (req) => {
             });
           }
         }
-      } catch (e) {
-        console.log(`Failed to fetch/parse ${url}: ${e.message}`);
+      } catch (e: any) {
+        logger.warn(`Failed to fetch/parse ${url}: ${e.message}`);
       }
     }
 
@@ -113,15 +114,15 @@ serve(async (req) => {
       headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' },
     });
 
-  } catch (error) {
+  } catch (error: any) {
     return new Response(JSON.stringify({ error: error.message }), {
       status: 400,
       headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' },
     });
   }
-});
+}, "discover-email-settings");
 
-function parseAutoconfigXml(xml: any, email: string): EmailSettings | null {
+function parseAutoconfigXml(xml: any, email: string, logger: Logger): EmailSettings | null {
   try {
     const config = xml?.clientConfig?.emailProvider;
     if (!config) return null;
@@ -158,7 +159,7 @@ function parseAutoconfigXml(xml: any, email: string): EmailSettings | null {
       }
     };
   } catch (e) {
-    console.error("Error parsing XML logic:", e);
+    logger.error("Error parsing XML logic:", { error: e });
     return null;
   }
 }

@@ -1,15 +1,12 @@
-import { serve } from "std/http/server.ts"
-import { createClient } from "@supabase/supabase-js"
+import { serveWithLogger } from "../_shared/logger.ts"
 import { getCorsHeaders } from "../_shared/cors.ts"
 import { requireAuth } from "../_shared/auth.ts"
 
-declare const Deno: {
-  env: { get(name: string): string | undefined };
-};
+declare const Deno: any;
 
-console.log("Cargo Damage Analyzer v1.0 Initialized")
+serveWithLogger(async (req, logger, _supabase) => {
+  logger.info("Cargo Damage Analyzer v1.0 Initialized")
 
-serve(async (req: Request) => {
   const headers = getCorsHeaders(req);
 
   // Handle CORS preflight requests
@@ -18,7 +15,7 @@ serve(async (req: Request) => {
   }
 
   try {
-    const { user, error: authError } = await requireAuth(req);
+    const { user, error: authError } = await requireAuth(req, logger);
     if (authError || !user) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...headers, 'Content-Type': 'application/json' } });
     }
@@ -35,7 +32,7 @@ serve(async (req: Request) => {
         throw new Error('Missing OPENAI_API_KEY');
     }
 
-    console.log(`Analyzing Cargo Image: ${file_url}`);
+    logger.info(`Analyzing Cargo Image: ${file_url}`);
 
     // Call OpenAI GPT-4o
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -83,7 +80,7 @@ serve(async (req: Request) => {
 
     if (!response.ok) {
         const errorText = await response.text();
-        console.error("OpenAI Error:", errorText);
+        logger.error("OpenAI Error", { error: errorText });
         throw new Error(`OpenAI API Error: ${response.status} ${response.statusText} - ${errorText}`);
     }
 
@@ -96,7 +93,7 @@ serve(async (req: Request) => {
         const cleanContent = content.replace(/```json/g, '').replace(/```/g, '').trim();
         analysisResult = JSON.parse(cleanContent);
     } catch (e) {
-        console.error("JSON Parse Error:", content);
+        logger.error("JSON Parse Error", { content });
         throw new Error("Failed to parse AI response as JSON");
     }
 
@@ -108,11 +105,12 @@ serve(async (req: Request) => {
       }),
       { headers: { ...headers, 'Content-Type': 'application/json' } }
     )
-  } catch (error: any) {
-    console.error(error)
+  } catch (error: unknown) {
+    logger.error('Error analyzing cargo damage', { error })
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
     return new Response(
-      JSON.stringify({ error: error.message || 'An unknown error occurred' }),
+      JSON.stringify({ error: errorMessage }),
       { headers: { ...headers, 'Content-Type': 'application/json' }, status: 400 }
     )
   }
-})
+}, "analyze-cargo-damage")

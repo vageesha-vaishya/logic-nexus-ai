@@ -1,15 +1,10 @@
 import { serveWithLogger } from "../_shared/logger.ts"
 import { getCorsHeaders } from "../_shared/cors.ts"
-import { createClient } from "@supabase/supabase-js"
 
-serveWithLogger(async (req, logger) => {
+serveWithLogger(async (req, logger, admin) => {
   const headers = getCorsHeaders(req)
   if (req.method === "OPTIONS") return new Response("ok", { headers })
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    const admin = createClient(supabaseUrl, serviceKey)
-
     const payload = await req.json()
     const sinceMinutes = Number(payload?.since_minutes ?? 5)
     const since = new Date(Date.now() - sinceMinutes * 60_000).toISOString()

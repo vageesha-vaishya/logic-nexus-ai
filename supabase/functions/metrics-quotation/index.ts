@@ -1,30 +1,33 @@
 import { serveWithLogger } from "../_shared/logger.ts"
 import { getCorsHeaders } from "../_shared/cors.ts"
-import { createClient } from "@supabase/supabase-js"
+import { requireAuth } from "../_shared/auth.ts"
 
-serveWithLogger(async (req, logger) => {
+serveWithLogger(async (req, logger, adminSupabase) => {
   const headers = getCorsHeaders(req)
   if (req.method === "OPTIONS") return new Response("ok", { headers })
+
+  // Auth: require authenticated user or admin
+  const { user, error: authError } = await requireAuth(req, logger)
+  if (authError || !user) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...headers, 'Content-Type': 'application/json' } })
+  }
+
   try {
     const payload = await req.json().catch(() => ({}))
     const minutes = Number(payload.minutes ?? 60)
     const since = new Date(Date.now() - minutes * 60_000).toISOString()
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    const admin = createClient(supabaseUrl, serviceKey)
-
-    const { data: pdfLogs } = await admin
+    const { data: pdfLogs } = await adminSupabase
       .from("audit_logs")
       .select("id, created_at")
       .eq("action", "EVENT:PdfGenerated")
       .gte("created_at", since)
-    const { data: emailLogs } = await admin
+    const { data: emailLogs } = await adminSupabase
       .from("audit_logs")
       .select("id, created_at")
       .eq("action", "EVENT:EmailSent")
       .gte("created_at", since)
-    const { data: alerts } = await admin
+    const { data: alerts } = await adminSupabase
       .from("audit_logs")
       .select("id, created_at")
       .eq("action", "ALERT:ReconcileMismatch")
@@ -37,7 +40,7 @@ serveWithLogger(async (req, logger) => {
     const successRate = total > 0 ? emailCount / total : 1
     const discrepancyRate = total > 0 ? discrepancies / total : 0
 
-    await logger.info("Metrics computed", { pdfCount, emailCount, discrepancies, successRate, discrepancyRate })
+    logger.info("Metrics computed", { pdfCount, emailCount, discrepancies, successRate, discrepancyRate })
     return new Response(JSON.stringify({
       window_minutes: minutes,
       pdfCount,
@@ -47,7 +50,7 @@ serveWithLogger(async (req, logger) => {
       discrepancyRate
     }), { headers: { ...headers, "Content-Type": "application/json" } })
   } catch (e: any) {
-    await logger.error("metrics-quotation failed", { error: e?.message || String(e) })
+    logger.error("metrics-quotation failed", { error: e?.message || String(e) })
     return new Response(JSON.stringify({ error: e?.message || String(e) }), {
       status: 500,
       headers: { ...headers, "Content-Type": "application/json" }

@@ -1,4 +1,4 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { serveWithLogger } from "../_shared/logger.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { requireAuth } from "../_shared/auth.ts";
 
@@ -9,7 +9,7 @@ type StatsPayload = {
   includeThreads?: boolean;
 };
 
-Deno.serve(async (req: Request) => {
+serveWithLogger(async (req, logger, supabaseAdmin) => {
   const headers = getCorsHeaders(req);
 
   if (req.method === "OPTIONS") {
@@ -17,22 +17,10 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { user, error: authError } = await requireAuth(req);
+    const { user, error: authError, supabaseClient: supabase } = await requireAuth(req);
     if (authError || !user) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...headers, 'Content-Type': 'application/json' } });
     }
-
-    const requireEnv = (name: string) => {
-      const v = Deno.env.get(name);
-      if (!v) throw new Error(`Missing environment variable: ${name}`);
-      return v;
-    };
-
-    const authHeader = req.headers.get("Authorization");
-
-    const supabase = createClient(requireEnv("SUPABASE_URL"), requireEnv("SUPABASE_ANON_KEY"), {
-      global: { headers: { Authorization: authHeader! } },
-    });
 
     let payload: StatsPayload | null;
     try {
@@ -81,10 +69,11 @@ Deno.serve(async (req: Request) => {
       }),
       { status: 200, headers: { ...headers, "Content-Type": "application/json" } }
     );
-  } catch (error: unknown) {
+  } catch (error: any) {
+    logger.error("Email Stats Error:", { error: error });
     return new Response(
-      JSON.stringify({ success: false, error: error instanceof Error ? error.message : String(error) }),
-      { status: 200, headers: { ...headers, "Content-Type": "application/json" } }
+      JSON.stringify({ success: false, error: error.message || String(error) }),
+      { status: 500, headers: { ...headers, "Content-Type": "application/json" } }
     );
   }
-});
+}, "email-stats");

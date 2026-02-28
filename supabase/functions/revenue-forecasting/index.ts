@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { serveWithLogger } from "../_shared/logger.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { requireAuth } from "../_shared/auth.ts";
 import { logAiCall } from "../_shared/audit.ts";
@@ -7,11 +7,11 @@ declare const Deno: any;
 
 type RevenueRequest = { horizon_months?: number };
 
-Deno.serve(async (req: Request) => {
+serveWithLogger(async (req, logger, supabaseAdmin) => {
   const headers = getCorsHeaders(req);
   if (req.method === "OPTIONS") return new Response(null, { headers });
   try {
-    const { user, error: authError } = await requireAuth(req);
+    const { user, error: authError, supabaseClient } = await requireAuth(req);
     if (authError || !user) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...headers, "Content-Type": "application/json" } });
     }
@@ -21,10 +21,9 @@ Deno.serve(async (req: Request) => {
     } catch {
       payload = { horizon_months: 6 };
     }
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
-    const authHeader = req.headers.get("Authorization") ?? "";
-    const supabase = createClient(supabaseUrl, supabaseKey, { global: { headers: { Authorization: authHeader } } });
+    
+    // User-scoped client for RLS
+    const supabase = supabaseClient;
     const months = Math.max(1, Math.min(24, payload?.horizon_months ?? 6));
     const { data: opps } = await supabase.from("opportunities").select("id, amount, close_date, stage").limit(5000);
     const now = new Date();
@@ -46,9 +45,10 @@ Deno.serve(async (req: Request) => {
       const v = byMonth[k];
       forecast.push({ month: k, expected_revenue: Math.round(v.amount * v.prob) });
     }
-    await logAiCall(supabase as any, { user_id: user.id, function_name: "revenue-forecasting", model_used: "pipeline-weighted", output_summary: { months: forecast.length }, pii_detected: false, pii_fields_redacted: [] });
+    await logAiCall(supabaseAdmin, { user_id: user.id, function_name: "revenue-forecasting", model_used: "pipeline-weighted", output_summary: { months: forecast.length }, pii_detected: false, pii_fields_redacted: [] });
     return new Response(JSON.stringify({ forecast }), { status: 200, headers: { ...headers, "Content-Type": "application/json" } });
   } catch (e: any) {
+    logger.error("Error:", e?.message);
     return new Response(JSON.stringify({ error: e?.message || String(e) }), { status: 500, headers: { ...headers, "Content-Type": "application/json" } });
   }
-});
+}, "revenue-forecasting");

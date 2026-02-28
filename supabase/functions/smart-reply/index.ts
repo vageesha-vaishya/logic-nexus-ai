@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { serveWithLogger } from "../_shared/logger.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { requireAuth } from "../_shared/auth.ts";
 import { sanitizeForLLM } from "../_shared/pii-guard.ts";
@@ -12,12 +12,12 @@ type SmartReplyRequest = {
   topK?: number;
 };
 
-Deno.serve(async (req: Request) => {
+serveWithLogger(async (req, logger, supabaseAdmin) => {
   const headers = getCorsHeaders(req);
   if (req.method === "OPTIONS") return new Response(null, { headers });
 
   try {
-    const { user, error: authError } = await requireAuth(req);
+    const { user, error: authError, supabaseClient: supabase } = await requireAuth(req);
     if (authError || !user) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
@@ -34,13 +34,6 @@ Deno.serve(async (req: Request) => {
         headers: { ...headers, "Content-Type": "application/json" },
       });
     }
-
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
-    const authHeader = req.headers.get("Authorization") ?? "";
-    const supabase = createClient(supabaseUrl, supabaseKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
 
     const topK = Math.min(Math.max(payload?.topK ?? 6, 1), 30);
     const { data: emails, error: emailErr } = await supabase
@@ -88,9 +81,10 @@ Deno.serve(async (req: Request) => {
       headers: { ...headers, "Content-Type": "application/json" },
     });
   } catch (e: any) {
+    logger.error("Error in smart-reply", { error: e });
     return new Response(JSON.stringify({ error: e?.message || String(e) }), {
       status: 500,
       headers: { ...headers, "Content-Type": "application/json" },
     });
   }
-});
+}, "smart-reply");

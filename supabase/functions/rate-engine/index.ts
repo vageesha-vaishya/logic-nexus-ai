@@ -1,10 +1,8 @@
-import { createClient } from '@supabase/supabase-js'
 import { getCorsHeaders } from '../_shared/cors.ts'
 import { requireAuth } from '../_shared/auth.ts'
+import { serveWithLogger } from '../_shared/logger.ts'
 
 declare const Deno: any;
-
-console.log("Rate Engine v2.1 Initialized")
 
 interface RateRequest {
   origin: string // Code (e.g., "LAX") or UUID
@@ -67,7 +65,7 @@ const CARRIERS = {
     ]
 };
 
-Deno.serve(async (req: Request) => {
+serveWithLogger(async (req, logger, supabaseAdmin) => {
   const headers = getCorsHeaders(req);
 
   // 1. CORS
@@ -76,18 +74,10 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { user, error: authError } = await requireAuth(req);
+    const { user, error: authError, supabaseClient: supabase } = await requireAuth(req);
     if (authError || !user) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...headers, 'Content-Type': 'application/json' } });
     }
-
-    // 2. Auth & Client Setup
-    const authHeader = req.headers.get('Authorization')
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: authHeader ?? '' } } }
-    )
 
     // 3. Parse Request
     let body: RateRequest;
@@ -97,7 +87,7 @@ Deno.serve(async (req: Request) => {
         throw new Error("Invalid JSON body");
     }
 
-    console.log("Processing Request Body:", JSON.stringify(body));
+    await logger.info("Processing Request Body:", { body });
 
     const { 
         origin, destination, weight, mode, unit, account_id,
@@ -137,7 +127,7 @@ Deno.serve(async (req: Request) => {
             resolveLocation(destination)
         ]);
     } catch (e) {
-        console.warn("Location resolution failed, proceeding to simulation:", e);
+        logger.warn("Location resolution failed, proceeding to simulation:", { error: e });
     }
 
     const options: RateOption[] = []
@@ -392,4 +382,4 @@ Deno.serve(async (req: Request) => {
       },
     )
   }
-})
+}, "rate-engine")

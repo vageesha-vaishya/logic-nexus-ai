@@ -1,5 +1,8 @@
+// @ts-ignore
 import { assertEquals, assertRejects } from "https://deno.land/std@0.190.0/testing/asserts.ts";
 import { processTemplate } from "./index.ts";
+
+declare const Deno: any;
 
 // Mock Supabase Client
 const mockSupabase = (templateData: any, error: any = null) => ({

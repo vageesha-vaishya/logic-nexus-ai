@@ -1,8 +1,11 @@
 // @ts-ignore Supabase Edge runtime provides this module at deploy time
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { Logger } from '../_shared/logger.ts';
+import { Logger, serveWithLogger } from '../_shared/logger.ts';
 import { getCorsHeaders } from '../_shared/cors.ts';
-import { requireAuth, createServiceClient } from '../_shared/auth.ts';
+import { requireAuth } from '../_shared/auth.ts';
+// @ts-ignore
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.8';
+
+declare const Deno: any;
 
 type RemoteConnection = {
   host: string;
@@ -37,8 +40,7 @@ type RemoteImportSummary = {
 };
 
 // @ts-ignore Supabase Edge runtime provides Deno global
-Deno.serve(async (req: Request) => {
-  const logger = new Logger({ function: 'remote-import' });
+serveWithLogger(async (req, logger, supabase) => {
   const corsHeaders = getCorsHeaders(req);
 
   if (req.method === 'OPTIONS') {
@@ -46,7 +48,7 @@ Deno.serve(async (req: Request) => {
   }
 
   // Auth validation
-  const { user, error: authError } = await requireAuth(req);
+  const { user, error: authError, supabaseClient } = await requireAuth(req, logger);
   if (authError || !user) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
       status: 401,
@@ -55,8 +57,8 @@ Deno.serve(async (req: Request) => {
   }
 
   // Verify platform_admin role
-  const serviceClient = createServiceClient();
-  const { data: roleData } = await serviceClient.from('user_roles').select('role').eq('user_id', user.id).eq('role', 'platform_admin').maybeSingle();
+  // We use the 'supabase' client provided by serveWithLogger which is a service role client
+  const { data: roleData } = await supabase.from('user_roles').select('role').eq('user_id', user.id).eq('role', 'platform_admin').maybeSingle();
   if (!roleData) {
     return new Response(JSON.stringify({ error: 'Forbidden: platform_admin required' }), {
       status: 403,
@@ -131,6 +133,12 @@ Deno.serve(async (req: Request) => {
     const remoteUrl = connection.host;
     const remoteKey = connection.key;
 
+    // Use the injected supabase client for the target database if it's internal, 
+    // but here we are connecting to a REMOTE Supabase instance.
+    // However, the prompt says "remove redundant createClient calls".
+    // In this specific case, remote-import NEEDS to create a client for the EXTERNAL database.
+    // So we keep createClient but ensure it's used correctly.
+    
     const remote = createClient(remoteUrl, remoteKey, {
       db: {
         schema: connection.schema || 'public',
@@ -337,4 +345,4 @@ Deno.serve(async (req: Request) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
-});
+}, "remote-import");

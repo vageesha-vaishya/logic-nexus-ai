@@ -1,10 +1,12 @@
 {
   "imports": {
     "std/": "https://deno.land/std@0.168.0/",
-    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.7.1",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.39.8",
     "xml": "https://deno.land/x/xml@2.1.3/mod.ts",
     "pdf-lib": "https://esm.sh/pdf-lib@1.17.1",
     "zod": "https://deno.land/x/zod@v3.22.4/mod.ts",
-    "nodemailer": "npm:nodemailer@6.9.7"
+    "nodemailer": "npm:nodemailer@6.9.7",
+    "postgres": "https://deno.land/x/postgres@v0.19.3/mod.ts",
+    "@aws-sdk/client-ses": "https://esm.sh/@aws-sdk/client-ses@3.451.0"
   }
 }

@@ -1,8 +1,8 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { serveWithLogger } from "../_shared/logger.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { requireAuth } from "../_shared/auth.ts";
 
-Deno.serve(async (req: Request) => {
+serveWithLogger(async (req, logger, supabaseAdmin) => {
   const headers = getCorsHeaders(req);
 
   if (req.method === "OPTIONS") {
@@ -10,24 +10,10 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { user, error: authError } = await requireAuth(req);
+    const { user, error: authError, supabaseClient: supabase } = await requireAuth(req);
     if (authError || !user) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...headers, 'Content-Type': 'application/json' } });
     }
-
-    const requireEnv = (name: string) => {
-      const v = Deno.env.get(name);
-      if (!v) throw new Error(`Missing environment variable: ${name}`);
-      return v;
-    };
-
-    const authHeader = req.headers.get("Authorization");
-
-    const supabase = createClient(requireEnv("SUPABASE_URL"), requireEnv("SUPABASE_ANON_KEY"), {
-      global: {
-        headers: { Authorization: authHeader! },
-      },
-    });
 
     type SearchPayload = {
       email: string;
@@ -66,7 +52,6 @@ Deno.serve(async (req: Request) => {
       accountId,
       direction,
       filterFrom,
-      filterTo,
       filterSubject,
       filterHasAttachment,
       filterDateFrom,
@@ -183,7 +168,7 @@ Deno.serve(async (req: Request) => {
       .range(groupBy === "conversation" ? 0 : from, groupBy === "conversation" ? Math.max(200, to) : to);
 
     if (error) {
-      console.error("Query error:", error);
+      logger.error("Query error:", { error });
       throw new Error(`Database query error: ${error.message}`);
     }
 
@@ -249,12 +234,11 @@ Deno.serve(async (req: Request) => {
         { headers: { ...headers, "Content-Type": "application/json" }, status: 200 }
       );
     }
-
-  } catch (error: unknown) {
-    console.error("Error searching emails:", error);
-    return new Response(
-      JSON.stringify({ success: false, error: (error instanceof Error) ? error.message : String(error) }),
-      { headers: { ...headers, "Content-Type": "application/json" }, status: 200 }
-    );
-  }
-});
+    } catch (e: any) {
+      logger.error("Error in search-emails", { error: e });
+      return new Response(JSON.stringify({ error: e?.message || String(e) }), {
+        status: 500,
+        headers: { ...headers, "Content-Type": "application/json" },
+      });
+    }
+  }, "search-emails");

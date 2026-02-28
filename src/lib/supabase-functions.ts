@@ -124,7 +124,11 @@ export async function invokeFunction<T = any>(
     }
 
     const { Authorization, authorization, ...customHeaders } = options.headers || {};
-    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "";
+    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+    if (!anonKey) {
+        console.error('Missing VITE_SUPABASE_ANON_KEY or VITE_SUPABASE_PUBLISHABLE_KEY');
+        return { data: null, error: new Error('Missing Supabase configuration') };
+    }
     
     // Get current session token
     const { data: sessionData } = await supabase.auth.getSession();
@@ -146,58 +150,59 @@ export async function invokeFunction<T = any>(
     let error = resultInvoke.error;
 
     // Check for "Failed to send a request" error (FunctionsFetchError) -> Manual Fetch Fallback
-    if (error) {
-      const isFetchError = error.name === 'FunctionsFetchError' || error.message === 'Failed to send a request to the Edge Function';
-      
-      if (isFetchError) {
-        console.warn(`[Supabase Function] Fetch failed for ${functionName}. Attempting manual fetch fallback...`);
-        try {
-            // Ensure we have a token (refresh if needed)
-            if (!token) {
-              const { data: refreshData } = await supabase.auth.refreshSession();
-              token = refreshData.session?.access_token;
-            }
-            
-            // Construct URL
-            let functionUrl;
-            if (import.meta.env.DEV) {
-                functionUrl = `/functions/v1/${functionName}`;
-            } else {
-                const projectUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/$/, '') || "https://gzhxgoigflftharcmdqj.supabase.co";
-                functionUrl = `${projectUrl}/functions/v1/${functionName}`;
-            }
-            
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 30000);
+    if (error && (error.name === 'FunctionsFetchError' || error.message === 'Failed to send a request to the Edge Function')) {
+      console.warn(`[Supabase Function] Fetch failed for ${functionName}. Attempting manual fetch fallback...`);
+      try {
+          // Ensure we have a token (refresh if needed)
+          if (!token) {
+            const { data: refreshData } = await supabase.auth.refreshSession();
+            token = refreshData.session?.access_token;
+          }
+          
+          // Construct URL
+          let functionUrl;
+          if (import.meta.env.DEV) {
+              functionUrl = `/functions/v1/${functionName}`;
+          } else {
+              const projectUrl = (import.meta.env.VITE_SUPABASE_URL || "").replace(/\/$/, '');
+              if (!projectUrl) throw new Error("VITE_SUPABASE_URL is not defined");
+              functionUrl = `${projectUrl}/functions/v1/${functionName}`;
+          }
+          
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-            const response = await fetch(functionUrl, {
-                  method: options.method || 'POST',
-                  headers: {
-                      'Content-Type': 'application/json',
-                      'apikey': anonKey,
-                      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-                      ...(options.headers || {})
-                  },
-                  body: options.body ? JSON.stringify(options.body) : undefined,
-                  signal: controller.signal
-            });
-            clearTimeout(timeoutId);
-              
-            if (!response.ok) {
-                  const text = await response.text();
-                  let errorData;
-                  try { errorData = JSON.parse(text); } catch { errorData = { message: text }; }
-                  
-                  error = new Error(errorData.message || `Function returned ${response.status}`);
-                  (error as any).status = response.status; 
-            } else {
-                data = await response.json();
-                error = null;
-            }
-        } catch (manualError: any) {
-             console.error(`[Supabase Function] Manual fetch fallback failed:`, manualError);
-             error.message = `${error.message} (Check for Ad Blockers or Network Firewall)`;
-        }
+          const response = await fetch(functionUrl, {
+                method: options.method || 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'apikey': anonKey,
+                    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+                    ...(options.headers || {})
+                },
+                body: options.body ? JSON.stringify(options.body) : undefined,
+                signal: controller.signal
+          });
+          clearTimeout(timeoutId);
+            
+          if (!response.ok) {
+                const text = await response.text();
+                let errorData;
+                try { errorData = JSON.parse(text); } catch { errorData = { message: text }; }
+                
+                // Keep the error object structure consistent
+                error = {
+                    message: errorData.message || `Function returned ${response.status}`,
+                    status: response.status,
+                    details: errorData.details
+                };
+          } else {
+              data = await response.json();
+              error = null;
+          }
+      } catch (manualError: any) {
+           console.error(`[Supabase Function] Manual fetch fallback failed:`, manualError);
+           error.message = `${error.message} (Check for Ad Blockers or Network Firewall)`;
       }
     }
 

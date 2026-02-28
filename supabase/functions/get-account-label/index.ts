@@ -2,12 +2,11 @@
 // Returns minimal label information (id, name) for an account id
 // Uses service role to bypass tenant filters, but only exposes safe fields
 
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { requireAuth } from "../_shared/auth.ts";
+import { serveWithLogger } from "../_shared/logger.ts";
 
-serve(async (req) => {
+serveWithLogger(async (req, logger, supabase) => {
   const headers = getCorsHeaders(req);
 
   if (req.method === "OPTIONS") {
@@ -30,15 +29,6 @@ serve(async (req) => {
       });
     }
 
-    const supabaseUrl = (Deno.env.get("SUPABASE_URL") || "").replace(/\/$/, "");
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-    if (!supabaseUrl || !serviceKey) {
-      return new Response(JSON.stringify({ error: "Server not configured" }), {
-        status: 500,
-        headers: { ...headers, "Content-Type": "application/json" },
-      });
-    }
-
     const payload = await req.json().catch(() => ({}));
     const id = payload?.id ?? payload?.accountId ?? payload?.account_id;
     if (!id) {
@@ -48,8 +38,7 @@ serve(async (req) => {
       });
     }
 
-    const supabase = createClient(supabaseUrl, serviceKey);
-
+    // supabase client injected by serveWithLogger is already service role
     const { data, error } = await supabase
       .from("accounts")
       .select("id, name")
@@ -57,6 +46,7 @@ serve(async (req) => {
       .maybeSingle();
 
     if (error) {
+      logger.error(`Error fetching account label for ${id}:`, { error: error });
       return new Response(JSON.stringify({ error: error.message }), {
         status: 500,
         headers: { ...headers, "Content-Type": "application/json" },
@@ -74,11 +64,12 @@ serve(async (req) => {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
-  } catch (err) {
-    const msg = (err as any)?.message || "Unexpected error";
+  } catch (err: any) {
+    logger.error("Get Account Label Error:", { error: err });
+    const msg = err?.message || "Unexpected error";
     return new Response(JSON.stringify({ error: msg }), {
       status: 500,
       headers: { "Content-Type": "application/json" },
     });
   }
-});
+}, "get-account-label");

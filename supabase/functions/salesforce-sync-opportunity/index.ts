@@ -1,10 +1,9 @@
-declare const Deno: {
-  env: { get(name: string): string | undefined };
-  serve(handler: (req: Request) => Promise<Response> | Response): void;
-};
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+import { serveWithLogger } from '../_shared/logger.ts';
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { requireAuth } from '../_shared/auth.ts';
+
+declare const Deno: any;
 
 type Stage =
   | 'prospecting'
@@ -27,7 +26,7 @@ const stageToSalesforce: Record<Stage, string> = {
   closed_lost: 'Closed Lost',
 };
 
-Deno.serve(async (req: Request) => {
+serveWithLogger(async (req, logger, supabaseAdmin) => {
   const corsHeaders = getCorsHeaders(req);
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -40,16 +39,14 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    const supabase = supabaseAdmin;
 
     const SALESFORCE_INSTANCE_URL = (Deno.env.get('SALESFORCE_INSTANCE_URL') || '').replace(/\/$/, '');
     const SALESFORCE_ACCESS_TOKEN = Deno.env.get('SALESFORCE_ACCESS_TOKEN') || '';
     const SALESFORCE_API_VERSION = Deno.env.get('SALESFORCE_API_VERSION') || 'v60.0';
 
     if (!SALESFORCE_INSTANCE_URL || !SALESFORCE_ACCESS_TOKEN) {
+      logger.error('Salesforce environment is not configured');
       return new Response(
         JSON.stringify({ error: 'Salesforce environment is not configured' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
@@ -71,6 +68,7 @@ Deno.serve(async (req: Request) => {
       .single();
 
     if (oppErr || !opp) {
+      logger.error('Opportunity not found', { error: oppErr });
       return new Response(
         JSON.stringify({ error: oppErr?.message || 'Opportunity not found' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 404 }
@@ -114,6 +112,7 @@ Deno.serve(async (req: Request) => {
 
     if (!resp.ok) {
       const text = await resp.text();
+      logger.error('Salesforce sync failed', { text });
       await supabase
         .from('opportunities')
         .update({
@@ -138,10 +137,11 @@ Deno.serve(async (req: Request) => {
       JSON.stringify({ success: true }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     );
-  } catch (error: unknown) {
+  } catch (error: any) {
+    logger.error('Error syncing opportunity', { error });
     return new Response(
       JSON.stringify({ error: (error instanceof Error) ? error.message : 'Unknown error' }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     );
   }
-});
+}, "salesforce-sync-opportunity");

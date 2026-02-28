@@ -1,4 +1,4 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { serveWithLogger } from "../_shared/logger.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 
 const GIF_1x1 = new Uint8Array([
@@ -7,7 +7,7 @@ const GIF_1x1 = new Uint8Array([
   0x01, 0x00, 0x01, 0x00, 0x00, 0x02, 0x02, 0x44, 0x01, 0x00, 0x3b
 ]);
 
-Deno.serve(async (req) => {
+serveWithLogger(async (req, logger, supabaseAdmin) => {
   const url = new URL(req.url);
   const path = url.pathname.split("/").pop(); // 'open' or 'click'
   
@@ -32,9 +32,7 @@ Deno.serve(async (req) => {
   }
 
   // Initialize Supabase (Service Role required for anonymous tracking)
-  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+  const supabase = supabaseAdmin;
 
   // Extract Metadata
   const userAgent = req.headers.get("user-agent") || "unknown";
@@ -57,7 +55,7 @@ Deno.serve(async (req) => {
         // location: {} // Implement GeoIP later
       });
     } catch (err) {
-      console.error(`Failed to log ${eventType} for ${emailId}:`, err);
+      logger.error(`Failed to log ${eventType} for ${emailId}:`, { error: err });
     }
   };
 
@@ -90,4 +88,4 @@ Deno.serve(async (req) => {
       },
     });
   }
-});
+}, "track-email");

@@ -1,15 +1,18 @@
 
 import { QuoteTemplate } from "./schema.ts";
+import { Logger } from "../../_shared/logger.ts";
 
 export class I18nEngine {
   private labels: Record<string, Record<string, string>> = {};
   private defaultLocale: string = "en-US";
+  private logger: Logger | null = null;
 
-  constructor(template?: QuoteTemplate) {
+  constructor(template?: QuoteTemplate, logger?: Logger) {
     if (template) {
       this.labels = template.i18n?.labels || {};
       this.defaultLocale = template.config.default_locale || "en-US";
     }
+    this.logger = logger || null;
   }
 
   /**
@@ -36,7 +39,9 @@ export class I18nEngine {
         currency: currency,
       }).format(amount);
     } catch (e) {
-      console.warn(`I18nEngine: Currency format failed for ${currency}`, e);
+      if (this.logger) {
+        this.logger.warn(`I18nEngine: Currency format failed for ${currency}`, { error: e });
+      }
       return `${amount.toFixed(2)} ${currency}`;
     }
   }
@@ -55,7 +60,9 @@ export class I18nEngine {
         day: "numeric",
       }).format(date);
     } catch (e) {
-      console.warn(`I18nEngine: Date format failed for ${dateStr}`, e);
+      if (this.logger) {
+        this.logger.warn(`I18nEngine: Date format failed for ${dateStr}`, { error: e });
+      }
       return dateStr;
     }
   }

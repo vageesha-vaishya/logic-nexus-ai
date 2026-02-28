@@ -1,5 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
-import { getCorsHeaders } from "../_shared/cors.ts";
+import { serveWithLogger } from "../_shared/logger.ts";
 import { requireAuth } from "../_shared/auth.ts";
 import { logAiCall } from "../_shared/audit.ts";
 
@@ -7,13 +6,11 @@ declare const Deno: any;
 
 type AnomalyRequest = { save?: boolean };
 
-Deno.serve(async (req: Request) => {
-  const headers = getCorsHeaders(req);
-  if (req.method === "OPTIONS") return new Response(null, { headers });
+serveWithLogger(async (req, logger, supabaseAdmin) => {
   try {
-    const { user, error: authError } = await requireAuth(req);
+    const { user, error: authError, supabaseClient } = await requireAuth(req);
     if (authError || !user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...headers, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { "Content-Type": "application/json" } });
     }
     let payload: AnomalyRequest | null = null;
     try {
@@ -21,10 +18,7 @@ Deno.serve(async (req: Request) => {
     } catch {
       payload = { save: false };
     }
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
-    const authHeader = req.headers.get("Authorization") ?? "";
-    const supabase = createClient(supabaseUrl, supabaseKey, { global: { headers: { Authorization: authHeader } } });
+    const supabase = supabaseClient;
     const anomalies: any[] = [];
     const { data: quotes } = await supabase.from("quotes").select("id, sell_price, buy_price, margin_pct").limit(1000);
     (quotes || []).forEach((q: any) => {
@@ -46,8 +40,9 @@ Deno.serve(async (req: Request) => {
       }
     }
     await logAiCall(supabase as any, { user_id: user.id, function_name: "anomaly-detection", model_used: "rules", output_summary: { count: anomalies.length }, pii_detected: false, pii_fields_redacted: [] });
-    return new Response(JSON.stringify({ anomalies }), { status: 200, headers: { ...headers, "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ anomalies }), { status: 200, headers: { "Content-Type": "application/json" } });
   } catch (e: any) {
-    return new Response(JSON.stringify({ error: e?.message || String(e) }), { status: 500, headers: { ...headers, "Content-Type": "application/json" } });
+    logger.error("Anomaly detection error", { error: e });
+    return new Response(JSON.stringify({ error: e?.message || String(e) }), { status: 500, headers: { "Content-Type": "application/json" } });
   }
-});
+}, "anomaly-detection");

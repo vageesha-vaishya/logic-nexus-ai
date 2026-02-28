@@ -1,27 +1,19 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { serveWithLogger } from "../_shared/logger.ts";
+import { getCorsHeaders } from "../_shared/cors.ts";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-serve(async (req) => {
+serveWithLogger(async (req, logger, supabaseClient) => {
+  const corsHeaders = getCorsHeaders(req);
+  
   // Handle CORS
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
   try {
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
-
     const body = await req.json();
     const { type, table, record, old_record } = body;
 
-    console.log(`Received ${type} event for table ${table}`);
+    logger.info(`Received ${type} event for table ${table}`);
 
     if (table !== 'quotes') {
       return new Response(JSON.stringify({ message: 'Ignored non-quote table' }), {
@@ -72,21 +64,21 @@ serve(async (req) => {
         details: eventDetails,
         actor_id: record.updated_by || record.created_by // Fallback
       });
-      console.log(`Logged ${eventType} for quote ${quoteId}`);
+      logger.info(`Logged ${eventType} for quote ${quoteId}`);
     }
 
     // 4. CRM Integration Logic (Simulated)
     if (!isStandalone) {
       if (record.opportunity_id) {
         // Sync to Opportunity
-        console.log(`[CRM-SYNC] Syncing Quote ${record.quote_number} to Opportunity ${record.opportunity_id}`);
+        logger.info(`[CRM-SYNC] Syncing Quote ${record.quote_number} to Opportunity ${record.opportunity_id}`);
         // In real impl: call CRM API or internal CRM tables
       } else if (record.account_id) {
         // Sync to Account
-        console.log(`[CRM-SYNC] Syncing Quote ${record.quote_number} to Account ${record.account_id}`);
+        logger.info(`[CRM-SYNC] Syncing Quote ${record.quote_number} to Account ${record.account_id}`);
       }
     } else {
-        console.log(`[STANDALONE] Quote ${record.quote_number} is standalone. No CRM sync required.`);
+        logger.info(`[STANDALONE] Quote ${record.quote_number} is standalone. No CRM sync required.`);
     }
 
     return new Response(JSON.stringify({ success: true }), {
@@ -94,11 +86,11 @@ serve(async (req) => {
       status: 200,
     });
 
-  } catch (error) {
-    console.error('Error processing webhook:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
+  } catch (error: any) {
+    logger.error('Error processing webhook:', error);
+    return new Response(JSON.stringify({ error: error.message || String(error) }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
     });
   }
-});
+}, "quote-event-webhook");

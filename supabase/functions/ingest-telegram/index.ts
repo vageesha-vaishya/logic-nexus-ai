@@ -1,9 +1,9 @@
 /// <reference path="../types.d.ts" />
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { serveWithLogger } from "../_shared/logger.ts";
 import { corsHeaders, preflight } from "../_shared/cors.ts";
-import { getSupabaseAdmin } from "../_shared/supabase.ts";
+import { requireAuth } from "../_shared/auth.ts";
 
-serve(async (req: Request) => {
+serveWithLogger(async (req, logger, supabaseAdmin) => {
   const pre = preflight(req);
   if (pre) return pre;
   try {
@@ -12,12 +12,16 @@ serve(async (req: Request) => {
     if (!expected || secretHeader !== expected) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
     }
-    const admin = getSupabaseAdmin();
+
+    // Attempt to get authenticated user if provided, otherwise fallback to admin for ingestion
+    // Inbound webhooks usually don't have user JWTs, so we use supabaseAdmin for insertion
+    // but we should still check if tenant_id is valid or provided.
+    
     const tenantId = req.headers.get("x-tenant-id") || "";
     const update = await req.json();
     const msg = update.message || update.edited_message || {};
     const text = msg.text || msg.caption || "";
-    const { error } = await admin.from("messages").insert({
+    const { error } = await supabaseAdmin.from("messages").insert({
       tenant_id: tenantId,
       channel: "telegram",
       direction: "inbound",
@@ -29,7 +33,9 @@ serve(async (req: Request) => {
     });
     if (error) return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: corsHeaders });
     return new Response(JSON.stringify({ status: "accepted" }), { headers: corsHeaders });
-  } catch (e: any) {
-    return new Response(JSON.stringify({ error: e?.message || "Unhandled" }), { status: 500, headers: corsHeaders });
+  } catch (e: unknown) {
+    const errorMessage = e instanceof Error ? e.message : "Unhandled";
+    logger.error("Error processing telegram update:", { error: e as any });
+    return new Response(JSON.stringify({ error: errorMessage }), { status: 500, headers: corsHeaders });
   }
-});
+}, "ingest-telegram");

@@ -1,10 +1,8 @@
 // /// <reference types="https://esm.sh/@supabase/functions@1.3.1/types.ts" />
-import { createClient } from "@supabase/supabase-js";
-import { Logger } from '../_shared/logger.ts';
+import { SupabaseClient } from "@supabase/supabase-js";
+import { serveWithLogger } from '../_shared/logger.ts';
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { requireAuth } from '../_shared/auth.ts';
-
-console.log("Sync-emails function loaded");
 
 type GmailHeader = { name: string; value: string };
 type GmailMessagePart = {
@@ -24,40 +22,28 @@ declare const Deno: any;
 const atob_ = (globalThis as any).atob as (s: string) => string;
 const btoa_ = (globalThis as any).btoa as (s: string) => string;
 
-Deno.serve(async (req: Request) => {
+serveWithLogger(async (req, logger, supabaseAdmin) => {
   const corsHeaders = getCorsHeaders(req);
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const logger = new Logger(null, { component: "sync-emails" });
-
   try {
-    const requireEnv = (name: string) => {
-      const v = Deno.env.get(name);
-      if (!v) throw new Error(`Missing environment variable: ${name}`);
-      return v;
-    };
-
-    const supabaseUrl = requireEnv("SUPABASE_URL");
-    const serviceKey = requireEnv("SUPABASE_SERVICE_ROLE_KEY");
-    const anonKey = requireEnv("SUPABASE_ANON_KEY");
-
     // Auth: verify service role key or authenticated user
     const authHeader = req.headers.get('Authorization');
-    let supabase: any;
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    let supabase: SupabaseClient;
 
-    if (authHeader && authHeader.includes(serviceKey)) {
-      supabase = createClient(supabaseUrl, serviceKey);
+    if (authHeader && serviceKey && authHeader.includes(serviceKey)) {
+      supabase = supabaseAdmin;
+      logger.info("Using Service Role for sync");
     } else {
       // Fallback: verify user auth
-      const { user, error: authError } = await requireAuth(req);
+      const { user, error: authError, supabaseClient } = await requireAuth(req);
       if (authError || !user) {
         return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
-      supabase = createClient(supabaseUrl, anonKey, {
-        global: { headers: { Authorization: authHeader || '' } },
-      });
+      supabase = supabaseClient;
     }
 
     let payload: any;
@@ -152,12 +138,12 @@ Deno.serve(async (req: Request) => {
           });
           
         if (error) {
-          console.error(`Failed to upload attachment ${path}:`, error);
+          logger.error(`Failed to upload attachment ${path}:`, { error });
           return null;
         }
         return path;
       } catch (e) {
-        console.error("Error uploading attachment:", e);
+        logger.error("Error uploading attachment:", { error: e });
         return null;
       }
     };
@@ -188,7 +174,7 @@ Deno.serve(async (req: Request) => {
       };
 
       const imapConfigSafe = { ...imapConfig, password: "***" };
-      console.log(`Syncing via IMAP for ${account.email_address}:`, imapConfigSafe);
+      logger.info(`Syncing via IMAP for ${account.email_address}:`, { config: imapConfigSafe });
 
       try {
         const encoder = new TextEncoder();
@@ -198,7 +184,7 @@ Deno.serve(async (req: Request) => {
         // Connect with improved error handling and STARTTLS fallback
         const connectImap = async (): Promise<any> => {
           try {
-            console.log(`Attempting connection to ${imapConfig.hostname}:${imapConfig.port} (SSL: ${imapConfig.ssl})`);
+            logger.info(`Attempting connection to ${imapConfig.hostname}:${imapConfig.port} (SSL: ${imapConfig.ssl})`);
             if (imapConfig.ssl) {
               return await Deno.connectTls({ hostname: imapConfig.hostname, port: imapConfig.port });
             } else {
@@ -206,11 +192,11 @@ Deno.serve(async (req: Request) => {
             }
           } catch (connError: any) {
              const errMsg = String(connError?.message || connError).toLowerCase();
-             console.error("Connection error:", errMsg);
+             logger.error("Connection error:", { error: errMsg });
              
              // Check for InvalidContentType (SSL on plain port) or handshake failure
              if (imapConfig.ssl && (errMsg.includes("invalidcontenttype") || errMsg.includes("handshake") || errMsg.includes("record overflow"))) {
-               console.warn("SSL handshake failed. Attempting automatic fallback to STARTTLS on plain connection...");
+               logger.warn("SSL handshake failed. Attempting automatic fallback to STARTTLS on plain connection...");
                
                try {
                  // 1. Connect Plain
@@ -221,7 +207,7 @@ Deno.serve(async (req: Request) => {
                  const n = await plainConn.read(buf);
                  if (!n) throw new Error("Connection closed immediately");
                  const greeting = new TextDecoder().decode(buf.subarray(0, n));
-                 console.log("Fallback Greeting:", greeting.trim());
+                 logger.info(`Fallback Greeting: ${greeting.trim()}`);
                  
                  // 3. Send STARTTLS
                  await plainConn.write(new TextEncoder().encode("A00 STARTTLS\r\n"));
@@ -232,14 +218,14 @@ Deno.serve(async (req: Request) => {
                  const resp = new TextDecoder().decode(buf.subarray(0, n2));
                  if (!resp.toUpperCase().includes("OK")) throw new Error("STARTTLS rejected: " + resp);
                  
-                 console.log("STARTTLS accepted, upgrading connection...");
+                 logger.info("STARTTLS accepted, upgrading connection...");
                  
                  // 5. Upgrade
                  const secureConn = await Deno.startTls(plainConn, { hostname: imapConfig.hostname });
                  greetingConsumed = true; // We already consumed the greeting
                  return secureConn;
                } catch (fallbackErr: any) {
-                 console.error("Fallback failed:", fallbackErr);
+                 logger.error("Fallback failed:", { error: fallbackErr });
                  throw new Error(`SSL/TLS Handshake Failed and STARTTLS Fallback failed. Please check your ports. SSL Error: ${errMsg}. Fallback Error: ${fallbackErr.message}`);
                }
              }
@@ -285,9 +271,9 @@ Deno.serve(async (req: Request) => {
         // IMAP conversation
         if (!greetingConsumed) {
           const { text: greeting } = await readResponse(); // Read greeting
-          console.log("IMAP Greeting:", greeting.trim());
+          logger.info(`IMAP Greeting: ${greeting.trim()}`);
         } else {
-          console.log("IMAP Greeting: (Consumed during STARTTLS handshake)");
+          logger.info("IMAP Greeting: (Consumed during STARTTLS handshake)");
         }
         
         // Login
@@ -301,10 +287,10 @@ Deno.serve(async (req: Request) => {
         const existsMatch = selectResp.match(/\* (\d+) EXISTS/i);
         const totalMessages = existsMatch ? parseInt(existsMatch[1], 10) : 0;
         
-        console.log(`IMAP Inbox has ${totalMessages} messages`);
+        logger.info(`IMAP Inbox has ${totalMessages} messages`);
 
         if (totalMessages === 0) {
-            console.log("Inbox is empty, nothing to sync.");
+            logger.info("Inbox is empty, nothing to sync.");
             await sendCommand("A99", "LOGOUT");
             conn.close();
             return new Response(
@@ -318,7 +304,7 @@ Deno.serve(async (req: Request) => {
         const startSeq = Math.max(1, totalMessages - 19);
         const endSeq = totalMessages;
         
-        console.log(`Fetching messages from sequence ${startSeq} to ${endSeq}`);
+        logger.info(`Fetching messages from sequence ${startSeq} to ${endSeq}`);
 
         // Fetch each message in the range (reverse order to get newest first)
         for (let seq = endSeq; seq >= startSeq; seq--) {
@@ -331,7 +317,7 @@ Deno.serve(async (req: Request) => {
             const bodyMatch = fetchResp.match(/BODY\[TEXT\] \{[\d]+\}\r\n([\s\S]+?)\r\n\)/);
             
             if (!headerMatch) {
-                console.warn(`Could not parse headers for message ${seq}. Response snippet: ${fetchResp.substring(0, 100)}...`);
+                logger.warn(`Could not parse headers for message ${seq}. Response snippet: ${fetchResp.substring(0, 100)}...`);
                 continue;
             }
 
@@ -356,7 +342,7 @@ Deno.serve(async (req: Request) => {
               const parser = new ParserCtor();
               parsed = await parser.parse(rawMessage);
             } catch (e) {
-              console.error(`IMAP mailparser error for message ${seq}:`, e);
+              logger.error(`IMAP mailparser error for message ${seq}:`, { error: e });
               // Fallback: continue with regex-extracted data if parser fails
             }
 
@@ -409,7 +395,7 @@ Deno.serve(async (req: Request) => {
                   });
                 }
               } catch (e) {
-                console.error("IMAP attachment processing failed:", e);
+                logger.error("IMAP attachment processing failed:", { error: e });
               }
             }
             const internetHeaders: Record<string, string> = Array.isArray(parsed?.headers)
@@ -463,7 +449,7 @@ Deno.serve(async (req: Request) => {
               .single();
 
             if (existing) {
-              console.log(`Email ${messageIdHeader} already exists, skipping`);
+              logger.info(`Email ${messageIdHeader} already exists, skipping`);
               continue;
             }
 
@@ -505,13 +491,13 @@ Deno.serve(async (req: Request) => {
             });
 
             if (insertError) {
-              console.error(`Error inserting email ${messageIdHeader}:`, insertError);
+              logger.error(`Error inserting email ${messageIdHeader}:`, { error: insertError });
             } else {
               syncedCount++;
-              console.log(`Synced email: ${subject}`);
+              logger.info(`Synced email: ${subject}`);
             }
           } catch (msgError: unknown) {
-            console.error(`Error processing IMAP message ${seq}:`, msgError instanceof Error ? msgError.message : String(msgError));
+            logger.error(`Error processing IMAP message ${seq}:`, { error: msgError instanceof Error ? msgError.message : String(msgError) });
             try {
               await supabase.from("emails").insert({
                 account_id: account.id,
@@ -535,21 +521,21 @@ Deno.serve(async (req: Request) => {
         await sendCommand("A99", "LOGOUT");
         conn.close();
 
-        console.log(`IMAP sync completed: ${syncedCount} emails synced`);
+        logger.info(`IMAP sync completed: ${syncedCount} emails synced`);
       } catch (imapError: unknown) {
-        console.error("IMAP error:", imapError);
+        logger.error("IMAP error:", { error: imapError });
         const msg = imapError instanceof Error ? imapError.message : String(imapError);
         throw new Error(`Failed to sync via IMAP: ${msg}`);
       }
     } else if (account.provider === "gmail") {
       // Use Gmail API
-      console.log("Syncing via Gmail API for account:", account.email_address);
+      logger.info(`Syncing via Gmail API for account: ${account.email_address}`);
       
       // Helper to refresh Gmail access token using stored refresh_token and oauth config
       const refreshGmailToken = async (): Promise<boolean> => {
         try {
           if (!account.refresh_token) {
-            console.warn("No refresh token available for Gmail account");
+            logger.warn("No refresh token available for Gmail account");
             return false;
           }
 
@@ -564,7 +550,7 @@ Deno.serve(async (req: Request) => {
             .single();
 
           if (oauthErr || !oauthCfg) {
-            console.error("OAuth configuration not found for Gmail refresh:", oauthErr);
+            logger.error("OAuth configuration not found for Gmail refresh:", { error: oauthErr });
             return false;
           }
 
@@ -581,7 +567,7 @@ Deno.serve(async (req: Request) => {
 
           if (!tokenResp.ok) {
             const t = await tokenResp.text();
-            console.error("Failed to refresh Gmail access token:", t);
+            logger.error(`Failed to refresh Gmail access token: ${t}`);
             return false;
           }
 
@@ -589,7 +575,7 @@ Deno.serve(async (req: Request) => {
           const newAccess = tokenJson.access_token as string | undefined;
           const expiresIn = (tokenJson.expires_in as number | undefined) ?? 3600;
           if (!newAccess) {
-            console.error("Token refresh response missing access_token:", tokenJson);
+            logger.error("Token refresh response missing access_token:", { response: tokenJson });
             return false;
           }
 
@@ -601,10 +587,10 @@ Deno.serve(async (req: Request) => {
 
           account.access_token = newAccess;
           account.token_expires_at = expiryIso;
-          console.log("Gmail access token refreshed");
+          logger.info("Gmail access token refreshed");
           return true;
         } catch (e) {
-          console.error("Exception while refreshing Gmail token:", e instanceof Error ? e.message : String(e));
+          logger.error("Exception while refreshing Gmail token:", { error: e instanceof Error ? e.message : String(e) });
           return false;
         }
       };
@@ -641,7 +627,7 @@ Deno.serve(async (req: Request) => {
 
         if (!listResponse.ok) {
           const errorText = await listResponse.text();
-          console.error("Gmail API list error:", errorText);
+          logger.error(`Gmail API list error: ${errorText}`);
           if (listResponse.status === 401) {
             const refreshed = await refreshGmailToken();
             if (refreshed) {
@@ -654,12 +640,12 @@ Deno.serve(async (req: Request) => {
 
         if (!listResponse.ok) {
           const errorText = await listResponse.text();
-          console.error("Gmail API list error (after refresh if attempted):", errorText);
+          logger.error(`Gmail API list error (after refresh if attempted): ${errorText}`);
           throw new Error(`Gmail API error: ${listResponse.status} - ${errorText}`);
         }
 
         const listData = await listResponse.json();
-        console.log(`Found ${listData.messages?.length || 0} Gmail messages in ${folder}`);
+        logger.info(`Found ${listData.messages?.length || 0} Gmail messages in ${folder}`);
 
         if (!listData.messages || listData.messages.length === 0) return;
 
@@ -671,7 +657,7 @@ Deno.serve(async (req: Request) => {
             );
 
             if (!msgResponse.ok) {
-              console.error(`Failed to fetch message ${msg.id}`);
+              logger.error(`Failed to fetch message ${msg.id}`);
               continue;
             }
 
@@ -731,7 +717,7 @@ Deno.serve(async (req: Request) => {
                     }
                   }
                 } catch (e) {
-                  console.error(`Failed to process attachment ${part.filename}:`, e);
+                  logger.error(`Failed to process attachment ${part.filename}:`, { error: e });
                 }
               }
 
@@ -756,7 +742,7 @@ Deno.serve(async (req: Request) => {
               .single();
 
             if (existing) {
-              console.log(`Email ${msgData.id} already exists, skipping`);
+              logger.info(`Email ${msgData.id} already exists, skipping`);
               continue;
             }
 
@@ -812,17 +798,17 @@ Deno.serve(async (req: Request) => {
               .insert(emailPayload);
 
             if (insertError) {
-              console.error(`Error inserting email ${msgData.id}:`, insertError);
+              logger.error(`Error inserting email ${msgData.id}:`, { error: insertError });
               await supabase.from("emails").upsert({
                 ...emailPayload,
                 sync_error: insertError.message,
               }, { onConflict: "message_id" });
             } else {
               syncedCount++;
-              console.log(`Synced email: ${subject}`);
+              logger.info(`Synced email: ${subject}`);
             }
           } catch (msgError: unknown) {
-            console.error(`Error processing message ${msg.id}:`, msgError instanceof Error ? msgError.message : String(msgError));
+            logger.error(`Error processing message ${msg.id}:`, { error: msgError instanceof Error ? msgError.message : String(msgError) });
             try {
               await supabase.from("emails").insert({
                 account_id: account.id,
@@ -847,7 +833,7 @@ Deno.serve(async (req: Request) => {
       await syncGmailLabel("SENT", "sent", "outbound");
     } else if (account.provider === "pop3") {
       // POP3: Simple inbox fetch with optional delete-after-fetch policy
-      console.log("Syncing via POP3 for account:", account.email_address);
+      logger.info(`Syncing via POP3 for account: ${account.email_address}`);
       const pop3 = {
         hostname: account.pop3_host,
         port: account.pop3_port || (account.pop3_use_ssl ? 995 : 110),
@@ -881,7 +867,7 @@ Deno.serve(async (req: Request) => {
         const statResp = await send("STAT");
         if (!/^\+OK/.test(statResp)) throw new Error(`POP3 STAT failed: ${statResp}`);
         const count = Number(statResp.split(" ")[1] || "0");
-        console.log(`POP3 mailbox has ${count} messages`);
+        logger.info(`POP3 mailbox has ${count} messages`);
         const listResp = await send("LIST");
         const lines = listResp.split("\r\n");
         const ids = lines
@@ -978,10 +964,10 @@ Deno.serve(async (req: Request) => {
             if (!insErr && pop3.deletePolicy === "delete_after_fetch") {
               await send(`DELE ${id}`);
             }
-            if (insErr) console.error("POP3 insert error:", insErr.message);
+            if (insErr) logger.error(`POP3 insert error: ${insErr.message}`);
             else syncedCount++;
           } catch (e) {
-            console.error(`POP3 retrieval error for id ${id}:`, e instanceof Error ? e.message : String(e));
+            logger.error(`POP3 retrieval error for id ${id}:`, { error: e instanceof Error ? e.message : String(e) });
           }
         }
         await send("QUIT");
@@ -992,12 +978,12 @@ Deno.serve(async (req: Request) => {
       }
     } else if (account.provider === "office365") {
       // Use Microsoft Outlook REST API (v2.0) with OAuth v2 tokens
-      console.log("Syncing via Office365 (Outlook API) for:", account.email_address);
+      logger.info(`Syncing via Office365 (Outlook API) for: ${account.email_address}`);
 
       const refreshOfficeToken = async (): Promise<{ accessToken?: string }> => {
         try {
           if (!account.refresh_token) {
-            console.warn("No refresh token available for Office365 account");
+            logger.warn("No refresh token available for Office365 account");
             return {};
           }
 
@@ -1012,7 +998,7 @@ Deno.serve(async (req: Request) => {
             .single();
 
           if (oauthErr || !oauthCfg) {
-            console.error("OAuth configuration not found for Office365 refresh:", oauthErr);
+            logger.error("OAuth configuration not found for Office365 refresh:", { error: oauthErr });
             return {};
           }
 
@@ -1021,7 +1007,7 @@ Deno.serve(async (req: Request) => {
           const isMSA = /@(hotmail|outlook|live|msn)\.com$/.test(lowerEmail);
           const tenant = isMSA ? "consumers" : (oauthCfg.tenant_id_provider || "common");
           
-          console.log(`Refreshing token for ${account.email_address} using tenant: ${tenant}`);
+          logger.info(`Refreshing token for ${account.email_address} using tenant: ${tenant}`);
           
           const tokenResp = await fetch(`https://login.microsoftonline.com/${tenant}/oauth2/v2.0/token`, {
             method: "POST",
@@ -1045,7 +1031,7 @@ Deno.serve(async (req: Request) => {
 
           if (!tokenResp.ok) {
             const t = await tokenResp.text();
-            console.error("Failed to refresh Office365 access token:", t);
+            logger.error(`Failed to refresh Office365 access token: ${t}`);
             return {};
           }
 
@@ -1063,7 +1049,7 @@ Deno.serve(async (req: Request) => {
 
           return { accessToken };
         } catch (e) {
-          console.error("Office365 token refresh error", e);
+          logger.error("Office365 token refresh error", { error: e });
           return {};
         }
       };
@@ -1141,7 +1127,7 @@ Deno.serve(async (req: Request) => {
 
         const listJson = await listRes.json();
         const messages = listJson.value || [];
-        console.log(`Found ${messages.length} Office365 messages in ${folder}`);
+        logger.info(`Found ${messages.length} Office365 messages in ${folder}`);
 
         for (const m of messages) {
           try {
@@ -1195,7 +1181,7 @@ Deno.serve(async (req: Request) => {
                   }
                 }
               } catch (e) {
-                console.error(`Failed to fetch Office365 attachments for ${m.id}`, e);
+                logger.error(`Failed to fetch Office365 attachments for ${m.id}`, { error: e });
               }
             }
 
@@ -1267,14 +1253,14 @@ Deno.serve(async (req: Request) => {
 
             const { error: insertErr } = await supabase.from("emails").insert(emailPayload);
             if (insertErr) {
-              console.error("Error inserting Office365 email:", insertErr);
+              logger.error("Error inserting Office365 email:", { error: insertErr });
             } else {
               syncedCount++;
-              console.log(`Successfully synced email: ${subject}`);
+              logger.info(`Successfully synced email: ${subject}`);
             }
           } catch (msgErr: unknown) {
             const msg = msgErr instanceof Error ? msgErr.message : String(msgErr);
-            console.error("Error processing Office365 message:", msg);
+            logger.error("Error processing Office365 message:", { error: msg });
           }
         }
       };
@@ -1285,14 +1271,14 @@ Deno.serve(async (req: Request) => {
       if (sentRes instanceof Response) return sentRes;
     }
 
-    console.log(`Total emails synced: ${syncedCount}`);
+    logger.info(`Total emails synced: ${syncedCount}`);
     const { error: updateError } = await supabase
       .from("email_accounts")
       .update({ last_sync_at: new Date().toISOString() })
       .eq("id", accountId);
 
     if (updateError) {
-      console.error("Error updating last sync time:", updateError);
+      logger.error("Error updating last sync time:", { error: updateError });
     }
 
     return new Response(
@@ -1307,7 +1293,6 @@ Deno.serve(async (req: Request) => {
       }
     );
   } catch (error: unknown) {
-    const logger = new Logger(null, { component: "sync-emails" }); // Re-instantiate if needed or just use console
     logger.error("Error syncing emails:", { error });
     
     return new Response(
@@ -1321,4 +1306,4 @@ Deno.serve(async (req: Request) => {
       }
     );
   }
-});
+}, "sync-emails");

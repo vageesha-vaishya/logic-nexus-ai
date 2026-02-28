@@ -1,15 +1,15 @@
-import { createClient } from "@supabase/supabase-js";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { requireAuth } from "../_shared/auth.ts";
 import { logAiCall } from "../_shared/audit.ts";
 import { sanitizeForLLM } from "../_shared/pii-guard.ts";
+import { serveWithLogger } from "../_shared/logger.ts";
 
 declare const Deno: any;
 
 type ToolCall = { name: string; args: any };
 type AgentRequest = { goal: string; tools?: string[] };
 
-Deno.serve(async (req: Request) => {
+serveWithLogger(async (req, logger, supabase) => {
   const headers = getCorsHeaders(req);
   if (req.method === "OPTIONS") return new Response(null, { headers });
   try {
@@ -23,10 +23,14 @@ Deno.serve(async (req: Request) => {
     } catch {
       return new Response(JSON.stringify({ error: "Invalid JSON body" }), { status: 400, headers: { ...headers, "Content-Type": "application/json" } });
     }
+    if (!payload) {
+        return new Response(JSON.stringify({ error: "Empty payload" }), { status: 400, headers: { ...headers, "Content-Type": "application/json" } });
+    }
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
     const authHeader = req.headers.get("Authorization") ?? "";
-    const supabase = createClient(supabaseUrl, supabaseKey, { global: { headers: { Authorization: authHeader } } });
+    // Note: serveWithLogger provides a service role 'supabase' client.
+    // For tool calls that need to act as the user, we'll rely on passing the 'Authorization' header in the fetch calls below.
+    
     const openaiKey = Deno.env.get("OPENAI_API_KEY") ?? "";
     const allowed = new Set(payload?.tools || ["rate-engine", "predict-eta", "categorize-document", "extract-bol-fields", "margin-optimizer"]);
     const sys = "You are an operations agent. Plan tool calls to achieve the goal. Return JSON with steps: [{name, args}]. Use only allowed tools.";
@@ -51,9 +55,10 @@ Deno.serve(async (req: Request) => {
         results.push({ name: step.name, ok: false, error: "call_failed" });
       }
     }
-    await logAiCall(supabase as any, { user_id: user.id, function_name: "ai-agent", model_used: "planner+tools", output_summary: { steps: plan.length }, pii_detected: false, pii_fields_redacted: [] });
+    await logAiCall(supabase, { user_id: user.id, function_name: "ai-agent", model_used: "planner+tools", output_summary: { steps: plan.length }, pii_detected: false, pii_fields_redacted: [] });
     return new Response(JSON.stringify({ plan, results }), { status: 200, headers: { ...headers, "Content-Type": "application/json" } });
   } catch (e: any) {
+    logger.error("Error in ai-agent:", { error: e });
     return new Response(JSON.stringify({ error: e?.message || String(e) }), { status: 500, headers: { ...headers, "Content-Type": "application/json" } });
   }
-});
+}, "ai-agent");

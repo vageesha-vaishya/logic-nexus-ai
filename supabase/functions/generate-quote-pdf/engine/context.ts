@@ -1,5 +1,6 @@
 
 import { z } from "zod";
+import { Logger } from "../../_shared/logger.ts";
 
 export const RawQuoteDataSchema = z.object({
   quote: z.object({
@@ -184,12 +185,12 @@ export interface SafeContext {
   }>;
 }
 
-export function buildSafeContext(rawData: unknown, locale: string = "en-US"): SafeContext {
+export function buildSafeContext(rawData: unknown, logger: Logger, locale: string = "en-US"): SafeContext {
   // 1. Validate Input
   const result = RawQuoteDataSchema.safeParse(rawData);
   
   if (!result.success) {
-    console.warn("SafeContextBuilder: Input validation failed", result.error);
+    logger.warn("SafeContextBuilder: Input validation failed", { error: result.error });
     // In production, we might want to throw or return a partial context. 
     // For now, we'll try to proceed with best-effort mapping if possible, 
     // or just return a default structure to prevent crash.

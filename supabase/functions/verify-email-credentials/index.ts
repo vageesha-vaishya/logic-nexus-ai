@@ -1,8 +1,11 @@
-import { serve } from "std/http/server.ts";
+// @ts-ignore
 import { ImapFlow } from "npm:imapflow";
 import { getCorsHeaders } from "../_shared/cors.ts";
+import { serveWithLogger } from "../_shared/logger.ts";
 
-serve(async (req) => {
+declare const Deno: any;
+
+serveWithLogger(async (req, logger, _supabase) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: getCorsHeaders(req) });
   }
@@ -14,7 +17,7 @@ serve(async (req) => {
       throw new Error("Missing IMAP credentials");
     }
 
-    console.log(`Verifying IMAP connection for ${imap.username} at ${imap.host}:${imap.port}`);
+    logger.info(`Verifying IMAP connection for ${imap.username} at ${imap.host}:${imap.port}`);
 
     const client = new ImapFlow({
       host: imap.host,
@@ -37,8 +40,8 @@ serve(async (req) => {
       return new Response(JSON.stringify({ success: true, message: "Connection successful" }), {
         headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' },
       });
-    } catch (err) {
-      console.error("Connection failed:", err);
+    } catch (err: any) {
+      logger.error("Connection failed:", { error: err });
       return new Response(JSON.stringify({ 
         success: false, 
         error: err.message || "Connection failed",
@@ -48,10 +51,10 @@ serve(async (req) => {
         headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' },
       });
     }
-  } catch (error) {
+  } catch (error: any) {
     return new Response(JSON.stringify({ error: error.message }), {
       status: 400,
       headers: { ...getCorsHeaders(req), 'Content-Type': 'application/json' },
     });
   }
-});
+}, "verify-email-credentials");

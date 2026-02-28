@@ -2,6 +2,7 @@ import { PDFDocument, StandardFonts, rgb, PDFFont, PDFPage } from "pdf-lib";
 import { QuoteTemplate, TemplateSection } from "./schema.ts";
 import { SafeContext } from "./context.ts";
 import { I18nEngine } from "./i18n.ts";
+import { Logger } from "../../_shared/logger.ts";
 
 export class PdfRenderer {
   private doc: PDFDocument | null = null;
@@ -10,14 +11,16 @@ export class PdfRenderer {
   private template: QuoteTemplate;
   private context: SafeContext;
   private i18n: I18nEngine;
+  private logger: Logger;
   private cursorY: number = 0;
   private currentPage: PDFPage | null = null;
   private margins: { top: number; bottom: number; left: number; right: number };
 
-  constructor(template: QuoteTemplate, context: SafeContext) {
+  constructor(template: QuoteTemplate, context: SafeContext, logger: Logger) {
     this.template = template;
     this.context = context;
-    this.i18n = new I18nEngine(template);
+    this.logger = logger;
+    this.i18n = new I18nEngine(template, logger);
     this.margins = template.config.margins;
   }
 
@@ -91,7 +94,7 @@ export class PdfRenderer {
             await this.renderFooter(section);
             break;
           default:
-            console.warn(`Unsupported section type: ${section.type}`);
+            this.logger.warn(`Unsupported section type: ${section.type}`);
         }
 
         // Update Cursor
@@ -105,7 +108,7 @@ export class PdfRenderer {
           this.cursorY -= 20; 
         }
     } catch (e) {
-        console.error(`Error rendering section #${index} (${section.type}):`, e);
+        this.logger.error(`Error rendering section #${index} (${section.type}):`, { error: e });
         // Resilience: Draw error placeholder instead of crashing entire PDF
         this.drawErrorBox(index, section.type, e instanceof Error ? e.message : String(e));
         this.cursorY -= 50;
@@ -383,12 +386,12 @@ export class PdfRenderer {
              width: dims.width,
              height: dims.height,
         });
-        return dims;
-     } catch (e) {
-         console.warn("Failed to render logo", e);
-         return null;
-     }
-  }
+              return dims;
+           } catch (e) {
+               this.logger.warn("Failed to render logo", { error: e });
+               return null;
+           }
+        }
 
   // Helpers
   private getDynamicField(row: any, field: string): any {

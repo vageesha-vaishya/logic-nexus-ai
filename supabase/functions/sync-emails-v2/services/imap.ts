@@ -1,16 +1,20 @@
 import { EmailAccount, saveEmailToDb, SupabaseClient } from "../utils/db.ts";
+// @ts-ignore
 import { ImapFlow } from "npm:imapflow";
 import { parseEmail } from "../utils/parser.ts";
+import { Logger } from "../../_shared/logger.ts";
 
 export class ImapService {
   private account: EmailAccount;
   private supabase: SupabaseClient;
   private adminSupabase?: SupabaseClient;
+  private logger?: Logger;
 
-  constructor(account: EmailAccount, supabase: SupabaseClient, adminSupabase?: SupabaseClient) {
+  constructor(account: EmailAccount, supabase: SupabaseClient, adminSupabase?: SupabaseClient, logger?: Logger) {
     this.account = account;
     this.supabase = supabase;
     this.adminSupabase = adminSupabase;
+    this.logger = logger;
   }
 
   async syncEmails(forceFullSync: boolean = false): Promise<{ syncedCount: number, debug?: any }> {
@@ -34,11 +38,11 @@ export class ImapService {
     };
 
     try {
-      console.log(`Connecting to IMAP ${this.account.imap_host}:${this.account.imap_port || 993}...`);
+      this.logger?.info(`Connecting to IMAP ${this.account.imap_host}:${this.account.imap_port || 993}...`);
       await client.connect();
       debugInfo.connected = true;
     } catch (err: any) {
-      console.error("IMAP Connection Error:", err);
+      this.logger?.error("IMAP Connection Error:", { error: err });
       throw new Error(`IMAP Connection Failed: ${err.message}`);
     }
 
@@ -66,7 +70,7 @@ export class ImapService {
 
       debugInfo.searchCriteria = searchCriteria;
       
-      console.log(`Fetching messages with criteria: ${JSON.stringify(searchCriteria)}`);
+      this.logger?.info(`Fetching messages with criteria: ${JSON.stringify(searchCriteria)}`);
       
       if (searchCriteria) {
           const messageStream = client.fetch(searchCriteria, { source: true, uid: true });
@@ -82,7 +86,8 @@ export class ImapService {
                 this.account, 
                 parsedEmail, 
                 "inbox", 
-                "inbound"
+                "inbound",
+                this.logger
               );
               
               if (saved) count++;
@@ -96,14 +101,14 @@ export class ImapService {
               // }
             } catch (e: unknown) {
               const msg = e instanceof Error ? e.message : String(e);
-              console.error(`Error processing message ${message.uid}:`, msg);
+              this.logger?.error(`Error processing message ${message.uid}:`, { error: msg });
               debugInfo.errors.push(`Msg ${message.uid}: ${msg}`);
             }
           }
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.error("IMAP Sync Error:", msg);
+      this.logger?.error("IMAP Sync Error:", { error: msg });
       debugInfo.errors.push(`Sync Error: ${msg}`);
       throw err;
     } finally {

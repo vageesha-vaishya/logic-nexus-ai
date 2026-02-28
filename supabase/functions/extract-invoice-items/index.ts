@@ -1,14 +1,8 @@
-import { serve } from "std/http/server.ts"
 import { getCorsHeaders } from "../_shared/cors.ts"
-import { requireAuth, createServiceClient } from "../_shared/auth.ts"
+import { requireAuth } from "../_shared/auth.ts"
+import { serveWithLogger } from "../_shared/logger.ts"
 
-declare const Deno: {
-  env: { get(name: string): string | undefined };
-};
-
-console.log("Invoice Extractor v1.0 Initialized")
-
-serve(async (req: Request) => {
+serveWithLogger(async (req, logger, supabase) => {
   const headers = getCorsHeaders(req);
 
   // Handle CORS preflight requests
@@ -39,9 +33,9 @@ serve(async (req: Request) => {
     }
 
     // Initialize Supabase with service role for HTS lookups
-    const supabase = createServiceClient();
+    // Already initialized by serveWithLogger as 'supabase'
 
-    console.log(`Processing Invoice: ${file_url}`);
+    logger.info(`Processing Invoice: ${file_url}`);
 
     // 1. Prepare Image for GPT-4o (Vision)
     // If it's a PDF, we assume the frontend or a previous step converted it to an image or 
@@ -94,7 +88,7 @@ serve(async (req: Request) => {
 
     if (!response.ok) {
         const error = await response.text();
-        console.error("OpenAI Error:", error);
+        logger.error(`OpenAI Error: ${error}`);
         throw new Error(`OpenAI API Error: ${response.statusText}`);
     }
 
@@ -107,7 +101,7 @@ serve(async (req: Request) => {
         const cleanContent = content.replace(/```json/g, '').replace(/```/g, '').trim();
         extractedData = JSON.parse(cleanContent);
     } catch (e) {
-        console.error("JSON Parse Error:", content);
+        logger.error("JSON Parse Error", { content });
         throw new Error("Failed to parse AI response as JSON");
     }
 
@@ -154,10 +148,10 @@ serve(async (req: Request) => {
       { headers: { ...headers, 'Content-Type': 'application/json' } }
     )
   } catch (error: any) {
-    console.error(error)
+    logger.error("Error processing invoice", { error });
     return new Response(
       JSON.stringify({ error: error.message || 'An unknown error occurred' }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      { headers: { ...headers, 'Content-Type': 'application/json' }, status: 400 }
     )
   }
-})
+}, "extract-invoice-items")

@@ -1,20 +1,23 @@
 
 import { EmailAccount, saveEmailToDb, SupabaseClient, uploadAttachments } from "../utils/db.ts";
 import { ParsedEmail, parseEmail } from "../utils/parser.ts";
+import { Logger } from "../../_shared/logger.ts";
 
 export class GmailService {
   private account: EmailAccount;
   private supabase: SupabaseClient;
   private adminSupabase?: SupabaseClient;
+  private logger?: Logger;
 
-  constructor(account: EmailAccount, supabase: SupabaseClient, adminSupabase?: SupabaseClient) {
+  constructor(account: EmailAccount, supabase: SupabaseClient, adminSupabase?: SupabaseClient, logger?: Logger) {
     this.account = account;
     this.supabase = supabase;
     this.adminSupabase = adminSupabase;
+    this.logger = logger;
   }
 
   async syncEmails(forceFullSync: boolean = false): Promise<{ syncedCount: number }> {
-    console.log(`Starting Gmail sync for ${this.account.email_address}`);
+    this.logger?.info(`Starting Gmail sync for ${this.account.email_address}`);
     await this.refreshAccessTokenIfNeeded();
     
     let count = 0;
@@ -30,7 +33,7 @@ export class GmailService {
         if (new Date(this.account.token_expires_at).getTime() - Date.now() > 5 * 60 * 1000) return;
     }
     
-    console.log("Refreshing Gmail access token...");
+    this.logger?.info("Refreshing Gmail access token...");
     
     // Get OAuth config
     // Use admin client if available to ensure we can read secrets
@@ -106,7 +109,7 @@ export class GmailService {
   private async processMessageList(messages: any[], folder: string, direction: "inbound" | "outbound"): Promise<number> {
     if (!messages || messages.length === 0) return 0;
     
-    console.log(`Processing ${messages.length} messages for ${folder}`);
+    this.logger?.info(`Processing ${messages.length} messages for ${folder}`);
     
     let savedCount = 0;
     let skippedCount = 0;
@@ -137,12 +140,12 @@ export class GmailService {
             await this.saveGmailMessage(msgData, folder, direction);
             savedCount++;
         } catch (e) {
-            console.error(`Error processing Gmail message ${msgStub.id}:`, e);
+            this.logger?.error(`Error processing Gmail message ${msgStub.id}:`, { error: e });
         }
     }
     
     if (skippedCount > 0) {
-        console.log(`Skipped ${skippedCount} existing messages for ${folder}`);
+        this.logger?.info(`Skipped ${skippedCount} existing messages for ${folder}`);
     }
     
     return savedCount;
@@ -169,6 +172,6 @@ export class GmailService {
         parsedEmail.snippet = msgData.snippet;
      }
      
-     await saveEmailToDb(this.supabase, this.account, parsedEmail, folder, direction);
+     await saveEmailToDb(this.supabase, this.account, parsedEmail, folder, direction, this.logger);
   }
 }

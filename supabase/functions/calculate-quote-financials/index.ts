@@ -1,14 +1,15 @@
 declare const Deno: any;
 import { getCorsHeaders } from "../_shared/cors.ts"
+import { serveWithLogger } from "../_shared/logger.ts"
 
-console.log("Hello from calculate-quote-financials!")
-
-Deno.serve(async (req: Request) => {
+serveWithLogger(async (req, logger) => {
   const headers = getCorsHeaders(req);
 
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers })
   }
+
+  logger.info("Hello from calculate-quote-financials!")
 
   try {
     const { shipping_amount, tax_percent } = await req.json()
@@ -44,9 +45,10 @@ Deno.serve(async (req: Request) => {
     })
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
+    logger.error("Error calculating financials", { error: message });
     return new Response(JSON.stringify({ error: message }), {
       headers: { ...headers, 'Content-Type': 'application/json', 'Content-Language': 'en' },
       status: 400,
     })
   }
-})
+}, "calculate-quote-financials")

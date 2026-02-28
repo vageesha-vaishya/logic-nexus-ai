@@ -1,5 +1,4 @@
 import { serveWithLogger } from "../_shared/logger.ts";
-import { createServiceClient } from "../_shared/auth.ts";
 import { pickEmbeddingModel } from "../_shared/model-router.ts";
 
 type Table = "knowledge_base" | "master_hts";
@@ -33,7 +32,7 @@ serveWithLogger(async (req, logger, supabase) => {
     });
 
   const payload = (await req.json()) as Payload;
-  const admin = createServiceClient();
+  const admin = supabase;
 
   if (payload.table === "knowledge_base") {
     if (payload.batch) {

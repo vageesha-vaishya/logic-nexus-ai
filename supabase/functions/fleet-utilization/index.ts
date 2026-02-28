@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { serveWithLogger } from "../_shared/logger.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { requireAuth } from "../_shared/auth.ts";
 import { logAiCall } from "../_shared/audit.ts";
@@ -7,11 +7,11 @@ declare const Deno: any;
 
 type FleetRequest = { date?: string };
 
-Deno.serve(async (req: Request) => {
+serveWithLogger(async (req, logger, supabaseAdmin) => {
   const headers = getCorsHeaders(req);
   if (req.method === "OPTIONS") return new Response(null, { headers });
   try {
-    const { user, error: authError } = await requireAuth(req);
+    const { user, error: authError, supabaseClient: supabase } = await requireAuth(req);
     if (authError || !user) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...headers, "Content-Type": "application/json" } });
     }
@@ -21,10 +21,7 @@ Deno.serve(async (req: Request) => {
     } catch {
       payload = {};
     }
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
-    const authHeader = req.headers.get("Authorization") ?? "";
-    const supabase = createClient(supabaseUrl, supabaseKey, { global: { headers: { Authorization: authHeader } } });
+    
     const { data: vehicles } = await supabase.from("vehicles").select("id, capacity").limit(1000);
     const { data: shipments } = await supabase.from("shipments").select("id, container_type, estimated_volume, planned_departure_date").limit(1000);
     const pending = (shipments || []).filter((s: any) => !s.assigned_vehicle_id);
@@ -50,6 +47,7 @@ Deno.serve(async (req: Request) => {
     await logAiCall(supabase as any, { user_id: user.id, function_name: "fleet-utilization", model_used: "greedy-capacity", output_summary: { assigned: assign.length }, pii_detected: false, pii_fields_redacted: [] });
     return new Response(JSON.stringify({ assignments: assign }), { status: 200, headers: { ...headers, "Content-Type": "application/json" } });
   } catch (e: any) {
+    logger.error("Error in fleet-utilization", { error: e });
     return new Response(JSON.stringify({ error: e?.message || String(e) }), { status: 500, headers: { ...headers, "Content-Type": "application/json" } });
   }
-});
+}, "fleet-utilization");

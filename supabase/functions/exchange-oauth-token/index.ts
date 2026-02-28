@@ -1,10 +1,11 @@
 // /// <reference types="https://esm.sh/@supabase/functions@1.3.1/types.ts" />
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { requireAuth } from "../_shared/auth.ts";
+import { serveWithLogger } from "../_shared/logger.ts";
 
-serve(async (req) => {
+declare const Deno: any;
+
+serveWithLogger(async (req, logger, supabaseAdmin) => {
   const corsHeaders = getCorsHeaders(req);
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -17,16 +18,6 @@ serve(async (req) => {
   }
 
   try {
-    const requireEnv = (name: string) => {
-      const v = Deno.env.get(name);
-      if (!v) throw new Error(`Missing environment variable: ${name}`);
-      return v;
-    };
-    const supabase = createClient(
-      requireEnv("SUPABASE_URL"),
-      requireEnv("SUPABASE_SERVICE_ROLE_KEY")
-    );
-
     let payload: any;
     try {
       payload = await req.json();
@@ -47,7 +38,7 @@ serve(async (req) => {
     }
 
     // Fetch OAuth configuration
-    const { data: config, error: configError } = await supabase
+    const { data: config, error: configError } = await supabaseAdmin
       .from("oauth_configurations")
       .select("*")
       .eq("user_id", userId)
@@ -78,7 +69,7 @@ serve(async (req) => {
     }
 
     if (!clientId || !clientSecret) {
-      console.error(`Missing OAuth credentials for ${provider}. DB Config: ${!!config}, Env Vars Present: ${!!Deno.env.get("GOOGLE_CLIENT_ID")}`);
+      logger.error(`Missing OAuth credentials for ${provider}. DB Config: ${!!config}, Env Vars Present: ${!!Deno.env.get("GOOGLE_CLIENT_ID")}`);
       throw new Error(`OAuth credentials not configured for ${provider}. System admin must set environment variables or user must have custom config.`);
     }
 
@@ -106,7 +97,7 @@ serve(async (req) => {
       const isMSA = /@(hotmail|outlook|live|msn)\.com$/.test(lowerEmail);
       const tenantId = isMSA ? "consumers" : (tenantIdProvider || "common");
       
-      console.log(`Exchanging token for ${emailAddress} using tenant: ${tenantId}`);
+      logger.info(`Exchanging token for ${emailAddress} using tenant: ${tenantId}`);
       
       tokenUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`;
       tokenBody = {
@@ -158,12 +149,12 @@ serve(async (req) => {
           resolvedName = resolvedName || profile.name || "";
         }
       } catch (e) {
-        console.log("Gmail userinfo fetch failed", e);
+        logger.error("Gmail userinfo fetch failed", { error: e });
       }
     }
 
     // Get user's tenant and franchise IDs
-    const { data: userRole } = await supabase
+    const { data: userRole } = await supabaseAdmin
       .from("user_roles")
       .select("tenant_id, franchise_id")
       .eq("user_id", userId)
@@ -176,7 +167,7 @@ serve(async (req) => {
     // Prefer updating the hinted account id (the one user clicked Re-authorize on)
     let existingId: string | null = null;
     if (accountIdHint) {
-      const { data: existingById } = await supabase
+      const { data: existingById } = await supabaseAdmin
         .from("email_accounts")
         .select("id, user_id, email_address")
         .eq("id", accountIdHint)
@@ -191,7 +182,7 @@ serve(async (req) => {
 
     // If no hinted row, try matching by exact email
     if (!existingId && (resolvedEmail || emailAddress)) {
-      const { data: existingByEmail } = await supabase
+      const { data: existingByEmail } = await supabaseAdmin
         .from("email_accounts")
         .select("id, email_address")
         .eq("user_id", userId)
@@ -203,7 +194,7 @@ serve(async (req) => {
 
     // Fallback: pick most recent account for this provider
     if (!existingId) {
-      const { data: existingAny } = await supabase
+      const { data: existingAny } = await supabaseAdmin
         .from("email_accounts")
         .select("id, email_address")
         .eq("user_id", userId)
@@ -229,17 +220,18 @@ serve(async (req) => {
       refresh_token: tokens.refresh_token || null,
       token_expires_at: new Date(Date.now() + (tokens.expires_in || 3600) * 1000).toISOString(),
       is_active: true,
+      updated_at: new Date().toISOString(), // Ensure updated_at is set
     };
 
     if (existingId) {
-      ({ data: account, error: accountError } = await supabase
+      ({ data: account, error: accountError } = await supabaseAdmin
         .from("email_accounts")
         .update(emailAccountPayload)
         .eq("id", existingId)
         .select()
         .single());
     } else {
-      ({ data: account, error: accountError } = await supabase
+      ({ data: account, error: accountError } = await supabaseAdmin
         .from("email_accounts")
         .insert(emailAccountPayload)
         .select()
@@ -255,10 +247,10 @@ serve(async (req) => {
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error: any) {
-    console.error("Error exchanging OAuth token:", error);
+    logger.error("Error exchanging OAuth token:", { error });
     return new Response(
       JSON.stringify({ error: error.message }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
-});
+}, "exchange-oauth-token");

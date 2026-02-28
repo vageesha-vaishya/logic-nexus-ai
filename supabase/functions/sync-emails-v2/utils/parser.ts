@@ -1,3 +1,4 @@
+// @ts-ignore
 import { simpleParser, Attachment } from "npm:mailparser";
 type AddressVal = { name?: string; address?: string }
 

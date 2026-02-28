@@ -1,24 +1,23 @@
 import { corsHeaders } from "../_shared/cors.ts";
-import { requireAuth, createServiceClient } from "../_shared/auth.ts";
+import { requireAuth } from "../_shared/auth.ts";
+import { serveWithLogger } from "../_shared/logger.ts";
 
 // @ts-ignore
 declare const Deno: any;
 
-console.log("Hello from email-scan!");
-
-Deno.serve(async (req: Request) => {
+serveWithLogger(async (req, logger, supabaseAdmin) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
   try {
-    console.log(`[email-scan] Starting scan for email ID (request body present)`);
+    logger.info(`[email-scan] Starting scan for email ID (request body present)`);
     // 1. Authenticate User
     const { user, error: authError, supabaseClient: userClient } = await requireAuth(req);
     
     if (authError || !user) {
-        console.error("Auth Error:", authError);
+        logger.error("Auth Error:", { error: authError });
         return new Response(
             JSON.stringify({ error: "Unauthorized", details: authError }),
             { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -26,7 +25,8 @@ Deno.serve(async (req: Request) => {
     }
 
     // 2. Initialize Service Client for Admin operations (updating status)
-    const supabaseClient = createServiceClient();
+    // Used injected supabaseAdmin
+    const supabaseClient = supabaseAdmin;
     
     // 3. Parse Input
     const { email_id } = await req.json();
@@ -61,7 +61,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // 4. Mock Scan Logic (Simulate VirusTotal / GuardDuty)
-    console.log(`Scanning email ${email_id}: ${email.subject}`);
+    logger.info(`Scanning email ${email_id}: ${email.subject}`);
     
     // Simple heuristics for demo
     const suspiciousKeywords = ['lottery', 'winner', 'wire transfer', 'urgent request', 'verify your account', 'bank', 'password'];
@@ -141,6 +141,7 @@ Deno.serve(async (req: Request) => {
     );
 
   } catch (error: any) {
+    logger.error("Error in email-scan", { error: error.message });
     return new Response(
       JSON.stringify({ error: error.message }),
       {
@@ -149,4 +150,4 @@ Deno.serve(async (req: Request) => {
       }
     );
   }
-});
+}, "email-scan");;

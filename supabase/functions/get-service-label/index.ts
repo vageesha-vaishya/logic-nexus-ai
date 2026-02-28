@@ -2,12 +2,11 @@
 // Returns minimal label information (id, service_name, service_type) for a service id
 // Uses service role to bypass tenant filters, but only exposes safe fields
 
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { requireAuth } from "../_shared/auth.ts";
+import { serveWithLogger } from "../_shared/logger.ts";
 
-serve(async (req) => {
+serveWithLogger(async (req, logger, supabase) => {
   const headers = getCorsHeaders(req);
 
   if (req.method === "OPTIONS") {
@@ -30,15 +29,6 @@ serve(async (req) => {
       });
     }
 
-    const supabaseUrl = (Deno.env.get("SUPABASE_URL") || "").replace(/\/$/, "");
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-    if (!supabaseUrl || !serviceKey) {
-      return new Response(JSON.stringify({ error: "Server not configured" }), {
-        status: 500,
-        headers: { ...headers, "Content-Type": "application/json" },
-      });
-    }
-
     const payload = await req.json().catch(() => ({}));
     const id = payload?.id ?? payload?.serviceId ?? payload?.service_id;
     if (!id) {
@@ -48,8 +38,8 @@ serve(async (req) => {
       });
     }
 
-    const supabase = createClient(supabaseUrl, serviceKey);
-
+    // supabase client is already initialized with service role by serveWithLogger
+    
     const { data, error } = await supabase
       .from("services")
       .select("id, service_name, service_type")
@@ -58,6 +48,7 @@ serve(async (req) => {
 
     if (error) {
       // Return safe error
+      logger.error(`Database error fetching service ${id}: ${error.message}`);
       return new Response(JSON.stringify({ error: error.message }), {
         status: 200,
         headers: { ...headers, "Content-Type": "application/json" },
@@ -68,10 +59,11 @@ serve(async (req) => {
       status: 200,
       headers: { ...headers, "Content-Type": "application/json" },
     });
-  } catch (e) {
-    return new Response(JSON.stringify({ error: (e as any)?.message || String(e) }), {
+  } catch (e: any) {
+    logger.error("Error in get-service-label:", { error: e });
+    return new Response(JSON.stringify({ error: e?.message || String(e) }), {
       status: 200,
       headers: { ...headers, "Content-Type": "application/json" },
     });
   }
-});
+}, "get-service-label");

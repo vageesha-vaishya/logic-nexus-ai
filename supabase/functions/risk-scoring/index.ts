@@ -1,5 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
-import { getCorsHeaders } from "../_shared/cors.ts";
+import { serveWithLogger } from "../_shared/logger.ts";
 import { requireAuth } from "../_shared/auth.ts";
 import { logAiCall } from "../_shared/audit.ts";
 
@@ -10,16 +9,13 @@ type RiskRequest = {
   route?: { origin_id?: string; destination_id?: string };
 };
 
-Deno.serve(async (req: Request) => {
-  const headers = getCorsHeaders(req);
-  if (req.method === "OPTIONS") return new Response(null, { headers });
-
+serveWithLogger(async (req, logger, supabaseAdmin) => {
   try {
-    const { user, error: authError } = await requireAuth(req);
+    const { user, error: authError, supabaseClient } = await requireAuth(req);
     if (authError || !user) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
-        headers: { ...headers, "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" },
       });
     }
 
@@ -29,16 +25,11 @@ Deno.serve(async (req: Request) => {
     } catch {
       return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
         status: 400,
-        headers: { ...headers, "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" },
       });
     }
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
-    const authHeader = req.headers.get("Authorization") ?? "";
-    const supabase = createClient(supabaseUrl, supabaseKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
+    const supabase = supabaseClient;
 
     // Internal signals
     let delayRisk = 0, complianceRisk = 0, routeRisk = 0;
@@ -86,7 +77,9 @@ Deno.serve(async (req: Request) => {
           const json = await res.json();
           geopoliticalRisk = Math.min(1, Number(json.global_risk_index ?? 0.3));
         }
-      } catch { /* ignore */ }
+      } catch (err) {
+        logger.error("Failed to fetch geopolitical risk", { error: err });
+      }
     }
 
     const weights = { delay: 0.35, compliance: 0.25, route: 0.2, geopolitical: 0.2 };
@@ -108,12 +101,13 @@ Deno.serve(async (req: Request) => {
 
     return new Response(JSON.stringify({ risk_score, components: { delayRisk, complianceRisk, routeRisk, geopoliticalRisk } }), {
       status: 200,
-      headers: { ...headers, "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json" },
     });
   } catch (e: any) {
+    logger.error("Risk scoring error", { error: e });
     return new Response(JSON.stringify({ error: e?.message || String(e) }), {
       status: 500,
-      headers: { ...headers, "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json" },
     });
   }
-});
+}, "risk-scoring");

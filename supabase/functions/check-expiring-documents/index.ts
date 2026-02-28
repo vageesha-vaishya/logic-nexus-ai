@@ -1,9 +1,9 @@
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { requireAuth } from "../_shared/auth.ts";
+import { serveWithLogger } from "../_shared/logger.ts";
 
-Deno.serve(async (req) => {
+serveWithLogger(async (req, logger, supabase) => {
   const headers = getCorsHeaders(req);
   if (req.method === "OPTIONS") return new Response(null, { headers });
 
@@ -18,10 +18,6 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
-
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -69,12 +65,12 @@ Deno.serve(async (req) => {
           .single();
 
         if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is "no rows returned"
-           console.error(`Error checking notification for doc ${doc.id}:`, checkError);
+           logger.error(`Error checking notification for doc ${doc.id}:`, { error: checkError });
            continue;
         }
 
         if (existing) {
-          console.log(`Already notified for doc ${doc.id} (${notificationType})`);
+          logger.info(`Already notified for doc ${doc.id} (${notificationType})`);
           continue;
         }
 
@@ -104,11 +100,11 @@ Deno.serve(async (req) => {
           });
 
           if (emailError) {
-             console.error(`Failed to send email for doc ${doc.id}:`, emailError);
+             logger.error(`Failed to send email for doc ${doc.id}:`, emailError);
              continue;
           }
         } else {
-            console.warn(`No email found for vendor ${vendorName} (${doc.vendor_id})`);
+            logger.warn(`No email found for vendor ${vendorName} (${doc.vendor_id})`);
         }
 
         // Log Notification
@@ -128,10 +124,10 @@ Deno.serve(async (req) => {
     });
 
   } catch (error: any) {
-    console.error("Check Expiring Documents Error:", error);
+    logger.error("Check Expiring Documents Error:", error);
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { ...headers, "Content-Type": "application/json" },
     });
   }
-});
+}, "check-expiring-documents");

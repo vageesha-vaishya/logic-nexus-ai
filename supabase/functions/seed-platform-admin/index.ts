@@ -1,33 +1,16 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { Logger } from '../_shared/logger.ts';
+import { Logger, serveWithLogger } from '../_shared/logger.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-Deno.serve(async (req: Request) => {
-  const logger = new Logger({ function: 'seed-platform-admin' });
-
+serveWithLogger(async (req, logger, supabaseAdmin) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Use logical OR to treat empty strings as missing and fall back correctly
-    const projectUrl = Deno.env.get('PROJECT_URL') || Deno.env.get('SUPABASE_URL') || Deno.env.get('VITE_SUPABASE_URL') || '';
-    const serviceKey = Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-    const supabaseAdmin = createClient(
-      projectUrl,
-      serviceKey,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      }
-    );
-
     const body = await req.json();
     const email = body.email || 'Bahuguna.vimal@gmail.com';
     const password = body.password || 'Vimal@1234';
@@ -48,72 +31,68 @@ Deno.serve(async (req: Request) => {
 
     if (createErr) {
       const msg = String(createErr.message || createErr);
-      const alreadyRegistered = msg.toLowerCase().includes('already been registered') || msg.toLowerCase().includes('already registered');
-      if (!alreadyRegistered) {
+      if (msg.includes('already has been registered') || msg.includes('unique constraint')) {
+        logger.info(`User ${email} already exists. Fetching ID...`);
+        // If user exists, we need to find their ID to assign role
+        // Since we can't search by email directly with simple client easily without admin listUsers permission (which we have)
+        const { data: users, error: listErr } = await supabaseAdmin.auth.admin.listUsers();
+        if (listErr) throw listErr;
+        const existing = users.users.find(u => u.email === email);
+        if (existing) {
+          userId = existing.id;
+        } else {
+          throw new Error(`User ${email} says it exists but cannot be found in list.`);
+        }
+      } else {
         throw createErr;
       }
-      // Fallback: find existing user by email
-      const { data: listRes, error: listErr } = await supabaseAdmin.auth.admin.listUsers();
-      if (listErr) throw listErr;
-      const existing = listRes?.users?.find((u: any) => (u?.email || '').toLowerCase() === String(email).toLowerCase());
-      if (!existing) {
-        return new Response(
-          JSON.stringify({ error: 'User already exists but could not be retrieved' }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      userId = existing.id;
-      // Optionally update password to provided one and confirm email
-      await supabaseAdmin.auth.admin.updateUserById(userId, { password, email_confirm: true });
-      logger.info('User exists; updated password and confirmed email', { userId });
     } else {
-      userId = createdUser?.user?.id ?? null;
-      logger.info('User created', { userId });
+      userId = createdUser.user.id;
+      logger.info(`Created new platform admin user: ${userId}`);
     }
 
-    if (!userId) {
-      throw new Error('Failed to determine user ID');
-    }
-
-    // Assign platform_admin role
-    // Insert role; if it already exists, ignore conflict by checking first
-    const { data: roleExisting, error: roleSelectError } = await supabaseAdmin
-      .from('user_roles')
+    // Assign 'Platform Admin' role
+    // Check if role exists
+    const { data: roleData, error: roleErr } = await supabaseAdmin
+      .from('roles')
       .select('id')
-      .eq('user_id', userId)
-      .eq('role', 'platform_admin')
-      .limit(1);
-
-    if (roleSelectError) {
-      logger.error('Role select error', { error: roleSelectError });
-    }
-
-    if (!roleExisting || roleExisting.length === 0) {
-      const { error: roleError } = await supabaseAdmin
-        .from('user_roles')
-        .insert({
-          user_id: userId,
-          role: 'platform_admin',
-          tenant_id: null,
-          franchise_id: null
-        });
-      if (roleError) {
-        logger.error('Role assignment error', { error: roleError });
-        throw roleError;
-      }
-    }
+      .eq('name', 'Platform Admin')
+      .single();
     
+    let roleId = roleData?.id;
+
+    if (roleErr || !roleId) {
+       logger.info("'Platform Admin' role not found. Creating it...");
+       const { data: newRole, error: newRoleErr } = await supabaseAdmin
+         .from('roles')
+         .insert({ name: 'Platform Admin', description: 'Super user with access to all tenants' })
+         .select()
+         .single();
+       
+       if (newRoleErr) throw newRoleErr;
+       roleId = newRole.id;
+    }
+
+    // Assign role to user
+    if (userId && roleId) {
+      const { error: assignErr } = await supabaseAdmin
+        .from('user_roles')
+        .upsert({ user_id: userId, role_id: roleId }, { onConflict: 'user_id, role_id' });
+      
+      if (assignErr) throw assignErr;
+      logger.info(`Assigned 'Platform Admin' role to ${email}`);
+    }
+
     return new Response(
-      JSON.stringify({ message: 'Platform admin seeded successfully', userId }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+      JSON.stringify({ success: true, message: `Platform Admin seeded: ${email}` }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : String(error);
-    logger.error('Error seeding platform admin', { error });
+  } catch (err: any) {
+    logger.error(`Failed to seed platform admin: ${err.message}`, { error: err });
     return new Response(
-      JSON.stringify({ error: message }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+      JSON.stringify({ error: err.message }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
-});
+}, "seed-platform-admin");

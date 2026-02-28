@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { serveWithLogger } from "../_shared/logger.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { requireAuth } from "../_shared/auth.ts";
 import { logAiCall } from "../_shared/audit.ts";
@@ -9,12 +9,12 @@ type CarrierScoreRequest = {
   carrier_id: string;
 };
 
-Deno.serve(async (req: Request) => {
+serveWithLogger(async (req, logger, supabaseAdmin) => {
   const headers = getCorsHeaders(req);
   if (req.method === "OPTIONS") return new Response(null, { headers });
 
   try {
-    const { user, error: authError } = await requireAuth(req);
+    const { user, error: authError, supabaseClient: supabase } = await requireAuth(req);
     if (authError || !user) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
@@ -37,13 +37,6 @@ Deno.serve(async (req: Request) => {
         headers: { ...headers, "Content-Type": "application/json" },
       });
     }
-
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
-    const authHeader = req.headers.get("Authorization") ?? "";
-    const supabase = createClient(supabaseUrl, supabaseKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
 
     const { data: legs, error: legsErr } = await supabase
       .from("shipment_legs")
@@ -86,9 +79,10 @@ Deno.serve(async (req: Request) => {
       headers: { ...headers, "Content-Type": "application/json" },
     });
   } catch (e: any) {
+    logger.error("Error in carrier-scoring", { error: e });
     return new Response(JSON.stringify({ error: e?.message || String(e) }), {
       status: 500,
       headers: { ...headers, "Content-Type": "application/json" },
     });
   }
-});
+}, "carrier-scoring");

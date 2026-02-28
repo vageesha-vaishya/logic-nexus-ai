@@ -1,6 +1,6 @@
-import { createClient } from "@supabase/supabase-js";
-import { getCorsHeaders } from '../_shared/cors.ts';
-import { requireAuth, createServiceClient } from '../_shared/auth.ts';
+import { serveWithLogger } from "../_shared/logger.ts";
+import { getCorsHeaders } from "../_shared/cors.ts";
+import { requireAuth } from "../_shared/auth.ts";
 
 type ResetPayload = {
   target_user_id: string;
@@ -11,7 +11,7 @@ type ResetPayload = {
 
 declare const Deno: any;
 
-Deno.serve(async (req: Request) => {
+serveWithLogger(async (req, logger, supabase) => {
   const corsHeaders = getCorsHeaders(req);
 
   if (req.method === "OPTIONS") {
@@ -28,9 +28,8 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // Verify platform_admin role
-    const serviceClient = createServiceClient();
-    const { data: roleData } = await serviceClient.from('user_roles').select('role').eq('user_id', user.id).eq('role', 'platform_admin').maybeSingle();
+    // Verify platform_admin role using injected supabase (Service Role)
+    const { data: roleData } = await supabase.from('user_roles').select('role').eq('user_id', user.id).eq('role', 'platform_admin').maybeSingle();
     if (!roleData) {
       return new Response(JSON.stringify({ error: 'Forbidden: platform_admin required' }), {
         status: 403,
@@ -40,13 +39,8 @@ Deno.serve(async (req: Request) => {
 
     const callerId = user.id;
 
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    if (!serviceKey || !supabaseUrl) {
-      throw new Error("Supabase environment not configured");
-    }
-
-    const supabaseAdmin = createClient(supabaseUrl, serviceKey);
+    // Redundant environment checks removed as serveWithLogger ensures client availability
+    // But we might need env vars for other things? No, client is ready.
 
     const body: ResetPayload = await req.json();
     const targetUserId = body?.target_user_id;
@@ -62,7 +56,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // Determine caller role and scope
-    const { data: callerRoles, error: rolesErr } = await supabaseAdmin
+    const { data: callerRoles, error: rolesErr } = await supabase
       .from("user_roles")
       .select("role, tenant_id, franchise_id")
       .eq("user_id", callerId);
@@ -74,7 +68,7 @@ Deno.serve(async (req: Request) => {
     const isFranchiseAdmin = (callerRoles || []).some((r: any) => r.role === "franchise_admin");
 
     // Get target user's roles
-    const { data: targetRoles, error: targetErr } = await supabaseAdmin
+    const { data: targetRoles, error: targetErr } = await supabase
       .from("user_roles")
       .select("role, tenant_id, franchise_id")
       .eq("user_id", targetUserId);
@@ -102,7 +96,7 @@ Deno.serve(async (req: Request) => {
 
     // Execute action
     if (newPassword) {
-      const { error: updErr } = await supabaseAdmin.auth.admin.updateUserById(targetUserId, {
+      const { error: updErr } = await supabase.auth.admin.updateUserById(targetUserId, {
         password: newPassword,
       });
       if (updErr) throw updErr;
@@ -111,11 +105,11 @@ Deno.serve(async (req: Request) => {
     if (sendResetLink) {
       // Generate recovery link to email to user
       // Note: Supabase returns link; client may choose to send email via own system
-      const { data: { user }, error: userErr } = await supabaseAdmin.auth.admin.getUserById(targetUserId);
+      const { data: { user }, error: userErr } = await supabase.auth.admin.getUserById(targetUserId);
       if (userErr) throw userErr;
       const email = user?.email;
       if (email) {
-        const { data: linkData, error: linkErr } = await supabaseAdmin.auth.admin.generateLink({
+        const { data: linkData, error: linkErr } = await supabase.auth.admin.generateLink({
           type: "recovery",
           email,
           options: { redirectTo: redirectUrl },
@@ -135,9 +129,10 @@ Deno.serve(async (req: Request) => {
       status: 200,
     });
   } catch (error: any) {
+    logger.error("Error:", error.message);
     return new Response(JSON.stringify({ error: error?.message || String(error) }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
-});
+}, "admin-reset-password");

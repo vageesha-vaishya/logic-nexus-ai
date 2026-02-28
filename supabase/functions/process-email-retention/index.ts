@@ -1,9 +1,11 @@
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { serveWithLogger } from "../_shared/logger.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { requireAuth } from "../_shared/auth.ts";
 
-Deno.serve(async (req) => {
+declare const Deno: any;
+
+serveWithLogger(async (req, logger, supabase) => {
   const headers = getCorsHeaders(req);
   if (req.method === "OPTIONS") return new Response(null, { headers });
 
@@ -23,10 +25,8 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
-
+    // supabase client injected by serveWithLogger is already service role
+    
     // 2. Fetch Active Policies
     const { data: policies, error: fetchError } = await supabase
         .from('compliance_retention_policies')
@@ -54,10 +54,10 @@ Deno.serve(async (req) => {
     );
 
   } catch (error: any) {
-    console.error("Error processing retention:", error);
+    logger.error("Error processing retention:", { error: error });
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error.message || String(error) }),
       { status: 400, headers: { ...headers, "Content-Type": "application/json" } }
     );
   }
-});
+}, "process-email-retention");

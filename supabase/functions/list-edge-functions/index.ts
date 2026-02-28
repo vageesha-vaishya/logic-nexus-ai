@@ -1,14 +1,14 @@
 import { getCorsHeaders } from '../_shared/cors.ts';
-import { requireAuth, createServiceClient } from '../_shared/auth.ts';
+import { requireAuth } from '../_shared/auth.ts';
+import { serveWithLogger } from '../_shared/logger.ts';
 
 declare const Deno: {
   env: { get(name: string): string | undefined };
-  serve(handler: (req: Request) => Promise<Response> | Response): void;
   readDir(path: string): AsyncIterable<{ name: string; isDirectory: boolean }>;
   stat(path: string): Promise<unknown>;
 };
 
-Deno.serve(async (req: Request) => {
+serveWithLogger(async (req, logger, supabaseAdmin) => {
   const corsHeaders = getCorsHeaders(req);
 
   // Handle CORS preflight requests
@@ -26,8 +26,7 @@ Deno.serve(async (req: Request) => {
   }
 
   // Verify platform_admin role
-  const serviceClient = createServiceClient();
-  const { data: roleData } = await serviceClient.from('user_roles').select('role').eq('user_id', user.id).eq('role', 'platform_admin').maybeSingle();
+  const { data: roleData } = await supabaseAdmin.from('user_roles').select('role').eq('user_id', user.id).eq('role', 'platform_admin').maybeSingle();
   if (!roleData) {
     return new Response(JSON.stringify({ error: 'Forbidden: platform_admin required' }), {
       status: 403,
@@ -36,7 +35,7 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-// Environment variables are available in Edge runtime; no Supabase client is needed here.
+    // Environment variables are available in Edge runtime; no Supabase client is needed here.
     
     // List all edge functions by reading the functions directory
     const functionsDir = new URL('../', import.meta.url).pathname;
@@ -66,7 +65,7 @@ Deno.serve(async (req: Request) => {
         }
       }
     } catch (error) {
-      console.error('Error reading functions directory:', error);
+      logger.error('Error reading functions directory:', { error });
     }
 
     // Get list of secret names (not values)
@@ -91,7 +90,7 @@ Deno.serve(async (req: Request) => {
       }
     );
   } catch (error) {
-    console.error('Error in list-edge-functions:', error);
+    logger.error('Error in list-edge-functions:', { error });
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : String(error) }),
       {
@@ -100,4 +99,4 @@ Deno.serve(async (req: Request) => {
       }
     );
   }
-});
+}, "list-edge-functions");

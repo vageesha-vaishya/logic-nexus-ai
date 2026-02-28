@@ -54,6 +54,14 @@ export class Logger {
 
   private maskObject(obj: any): any {
     if (!obj) return obj;
+    if (obj instanceof Error) {
+      return {
+        message: this.maskPII(obj.message),
+        name: obj.name,
+        stack: obj.stack,
+        cause: obj.cause ? this.maskObject(obj.cause) : undefined
+      };
+    }
     if (typeof obj === 'string') return this.maskPII(obj);
     if (Array.isArray(obj)) return obj.map(i => this.maskObject(i));
     if (typeof obj === 'object') {
@@ -163,7 +171,7 @@ export class Logger {
  */
 export const serveWithLogger = (
   handler: (req: Request, logger: Logger, supabase: SupabaseClient) => Promise<Response>,
-  componentName: string
+  componentName: string = 'edge-function'
 ) => {
   Deno.serve(async (req: Request) => {
     const correlationId = req.headers.get('x-correlation-id') || crypto.randomUUID();

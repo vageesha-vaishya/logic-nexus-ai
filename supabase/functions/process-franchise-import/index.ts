@@ -1,10 +1,12 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { serveWithLogger } from "../_shared/logger.ts"
 import { getCorsHeaders } from "../_shared/cors.ts"
 import { requireAuth } from "../_shared/auth.ts"
 
+declare const Deno: any;
+
 const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY')
 
-serve(async (req) => {
+serveWithLogger(async (req, logger, supabase) => {
   const corsHeaders = getCorsHeaders(req);
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -24,7 +26,7 @@ serve(async (req) => {
       throw new Error('Invalid data format. Expected an array of objects.')
     }
 
-    console.log(`Processing ${data.length} records...`)
+    logger.info(`Processing ${data.length} records...`)
 
     // In a real scenario with OpenAI key:
     /*
@@ -99,6 +101,7 @@ serve(async (req) => {
 
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    logger.error('Error processing franchise import:', { error: error });
     return new Response(
       JSON.stringify({ error: errorMessage }),
       {
@@ -107,7 +110,7 @@ serve(async (req) => {
       }
     )
   }
-})
+}, "process-franchise-import")
 
 function generateCode(name: string): string {
   if (!name) return 'FR-' + Math.random().toString(36).substr(2, 6).toUpperCase();

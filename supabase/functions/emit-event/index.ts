@@ -1,6 +1,5 @@
 import { serveWithLogger } from "../_shared/logger.ts"
 import { getCorsHeaders } from "../_shared/cors.ts"
-import { createClient } from "@supabase/supabase-js"
 
 type EventPayload = {
   trace_id?: string
@@ -19,7 +18,7 @@ function validateEvent(name: string, payload: EventPayload) {
   return { valid: true }
 }
 
-serveWithLogger(async (req, logger) => {
+serveWithLogger(async (req, logger, admin) => {
   const headers = getCorsHeaders(req)
   if (req.method === "OPTIONS") return new Response("ok", { headers })
 
@@ -32,10 +31,6 @@ serveWithLogger(async (req, logger) => {
     if (!valid) {
       return new Response(JSON.stringify({ error }), { status: 400, headers: { ...headers, "Content-Type": "application/json" } })
     }
-
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    const admin = createClient(supabaseUrl, serviceKey)
 
     const details = {
       event: name,

@@ -1,9 +1,8 @@
 declare const Deno: any;
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { z } from 'https://esm.sh/zod@3.22.4';
+import { z } from 'zod';
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { requireAuth } from '../_shared/auth.ts';
-import { Logger } from '../_shared/logger.ts';
+import { serveWithLogger } from '../_shared/logger.ts';
 
 const LeadEventSchema = z.object({
   lead_id: z.string().uuid(),
@@ -12,7 +11,7 @@ const LeadEventSchema = z.object({
   timestamp: z.string().datetime().optional()
 });
 
-Deno.serve(async (req: Request) => {
+serveWithLogger(async (req, logger, supabase) => {
   const corsHeaders = getCorsHeaders(req);
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -23,8 +22,6 @@ Deno.serve(async (req: Request) => {
   if (authError || !user) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
-
-  const logger = new Logger({ function: 'lead-event-webhook' });
 
   const WebIntakeSchema = z.object({
     tenant_id: z.string().uuid(),
@@ -48,11 +45,6 @@ Deno.serve(async (req: Request) => {
   });
 
   try {
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
-
     const body = await req.json();
 
     const asEvent = LeadEventSchema.safeParse(body);
@@ -252,4 +244,4 @@ Deno.serve(async (req: Request) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
     );
   }
-});
+}, "lead-event-webhook");

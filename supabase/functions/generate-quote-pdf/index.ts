@@ -1,16 +1,39 @@
 import { serveWithLogger } from "../_shared/logger.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
+// @ts-ignore
 import { PdfRenderer } from "./engine/renderer.ts";
+// @ts-ignore
 import { buildSafeContext, mapQuoteItemsToRawItems, ValidationBlockError } from "./engine/context.ts";
+// @ts-ignore
 import { DefaultTemplate } from "./engine/default_template.ts";
+// @ts-ignore
 import { getTemplate } from "./engine/template-service.ts";
+import { requireAuth } from "../_shared/auth.ts";
 
-console.log("Hello from generate-quote-pdf!");
+declare const Deno: any;
 
-serveWithLogger(async (req, logger, supabaseClient) => {
+serveWithLogger(async (req, logger, adminSupabase) => {
   try {
     if (req.method === "OPTIONS") {
       return new Response("ok", { headers: getCorsHeaders(req) });
+    }
+
+    // 1. Determine Auth Context
+    let supabaseClient = adminSupabase;
+    const authHeader = req.headers.get("Authorization");
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const isServiceRole = authHeader && serviceRoleKey && authHeader.includes(serviceRoleKey);
+
+    // If not service role (e.g. Webhook/Cron), require user auth
+    if (!isServiceRole) {
+        const { user, error, supabaseClient: userClient } = await requireAuth(req, logger);
+        if (error || !user) {
+            return new Response(JSON.stringify({ error: "Unauthorized" }), { 
+                status: 401, 
+                headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } 
+            });
+        }
+        supabaseClient = userClient;
     }
 
     const traceLogs: string[] = [];
@@ -316,8 +339,8 @@ serveWithLogger(async (req, logger, supabaseClient) => {
     }
 
     if (!pdfBytes) {
-      const context = buildSafeContext(rawData);
-      const renderer = new PdfRenderer(templateContent || DefaultTemplate, context);
+      const context = buildSafeContext(rawData, logger);
+      const renderer = new PdfRenderer(templateContent || DefaultTemplate, context, logger);
       pdfBytes = await renderer.render();
     }
 
@@ -412,7 +435,7 @@ serveWithLogger(async (req, logger, supabaseClient) => {
       },
     );
   } catch (error: any) {
-    console.error("Critical Error in generate-quote-pdf:", error);
+    logger.error("Critical Error in generate-quote-pdf", { error });
 
     if (error instanceof ValidationBlockError) {
       return new Response(

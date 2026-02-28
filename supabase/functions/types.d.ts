@@ -10,4 +10,6 @@ declare module "https://esm.sh/@supabase/supabase-js@2.39.8" {
 
 declare const Deno: {
   env: { get(name: string): string | undefined };
+  serve(handler: (req: Request) => Response | Promise<Response>): void;
+  serve(options: { port?: number; onListen?: (params: { hostname: string; port: number }) => void }, handler: (req: Request) => Response | Promise<Response>): void;
 };

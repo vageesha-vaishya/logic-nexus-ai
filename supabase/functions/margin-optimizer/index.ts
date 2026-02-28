@@ -1,5 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
-import { getCorsHeaders } from "../_shared/cors.ts";
+import { serveWithLogger } from "../_shared/logger.ts";
 import { requireAuth } from "../_shared/auth.ts";
 import { logAiCall } from "../_shared/audit.ts";
 
@@ -10,16 +9,13 @@ type MarginOptimizerRequest = {
   lookback_days?: number;
 };
 
-Deno.serve(async (req: Request) => {
-  const headers = getCorsHeaders(req);
-  if (req.method === "OPTIONS") return new Response(null, { headers });
-
+serveWithLogger(async (req, logger, supabaseAdmin) => {
   try {
-    const { user, error: authError } = await requireAuth(req);
+    const { user, error: authError, supabaseClient } = await requireAuth(req);
     if (authError || !user) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
-        headers: { ...headers, "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" },
       });
     }
 
@@ -29,16 +25,11 @@ Deno.serve(async (req: Request) => {
     } catch {
       return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
         status: 400,
-        headers: { ...headers, "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" },
       });
     }
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
-    const authHeader = req.headers.get("Authorization") ?? "";
-    const supabase = createClient(supabaseUrl, supabaseKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
+    const supabase = supabaseClient;
 
     const lookbackDays = Math.max(7, Math.min(365, payload?.lookback_days ?? 90));
     const since = new Date(Date.now() - lookbackDays * 24 * 60 * 60 * 1000).toISOString();
@@ -53,7 +44,7 @@ Deno.serve(async (req: Request) => {
     if (!rows.length) {
       return new Response(JSON.stringify({ suggestion: null, reason: "No data in lookback window" }), {
         status: 200,
-        headers: { ...headers, "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" },
       });
     }
 
@@ -104,12 +95,13 @@ Deno.serve(async (req: Request) => {
 
     return new Response(JSON.stringify({ suggestion: { margin_pct: best.margin_pct, estimated_win_prob: best.win_prob } }), {
       status: 200,
-      headers: { ...headers, "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json" },
     });
   } catch (e: any) {
+    logger.error("Margin optimizer error", { error: e });
     return new Response(JSON.stringify({ error: e?.message || String(e) }), {
       status: 500,
-      headers: { ...headers, "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json" },
     });
   }
-});
+}, "margin-optimizer");

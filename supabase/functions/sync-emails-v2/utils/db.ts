@@ -1,6 +1,7 @@
 
-// @ts-ignore
-import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { SupabaseClient } from "@supabase/supabase-js";
+import { Logger } from "../../_shared/logger.ts";
+
 // @ts-ignore
 declare const Deno: any;
 import { ParsedEmail, ParsedAttachment } from "./parser.ts";
@@ -38,41 +39,11 @@ export interface EmailSyncLog {
     details?: any;
 }
 
-export function getSupabaseClient(req?: Request): SupabaseClient {
-  const url = Deno.env.get("SUPABASE_URL");
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
-  
-  if (!url || !serviceKey || !anonKey) throw new Error("Missing Supabase env vars");
-
-  const authHeader = req?.headers.get('Authorization');
-
-  // If the caller provides the Service Role Key in the header, use it (System Context)
-  if (authHeader && authHeader.includes(serviceKey)) {
-     return createClient(url, serviceKey);
-  }
-  
-  // Otherwise, use Anon Key + Auth Header (User Context)
-  return createClient(url, anonKey, {
-    global: {
-      headers: { Authorization: authHeader || '' },
-    },
-  });
-}
-
-export function getAdminSupabaseClient(): SupabaseClient {
-  const url = Deno.env.get("SUPABASE_URL");
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  
-  if (!url || !serviceKey) throw new Error("Missing Supabase env vars");
-
-  return createClient(url, serviceKey);
-}
-
 export async function uploadAttachments(
   supabase: SupabaseClient, 
   attachments: ParsedAttachment[], 
-  messageId: string
+  messageId: string,
+  logger?: Logger
 ): Promise<any[]> {
   const uploaded = [];
   
@@ -90,7 +61,7 @@ export async function uploadAttachments(
         });
         
       if (error) {
-        console.error(`Failed to upload attachment ${path}:`, error);
+        logger?.error(`Failed to upload attachment ${path}:`, { error });
         continue;
       }
       
@@ -102,7 +73,7 @@ export async function uploadAttachments(
         content_id: att.contentId
       });
     } catch (e) {
-      console.error(`Error uploading attachment ${att.filename}:`, e);
+      logger?.error(`Error uploading attachment ${att.filename}:`, { error: e });
     }
   }
   return uploaded;
@@ -124,7 +95,8 @@ export async function saveEmailToDb(
   account: EmailAccount, 
   email: ParsedEmail,
   folder: string = "inbox",
-  direction: "inbound" | "outbound" = "inbound"
+  direction: "inbound" | "outbound" = "inbound",
+  logger?: Logger
 ) {
   const normalizeEmail = (v?: string) => String(v || "").trim().toLowerCase();
   const findLinkedLeadId = async (addr?: string | null) => {
@@ -146,12 +118,12 @@ export async function saveEmailToDb(
     .single();
 
   if (existing) {
-    console.log(`Email ${email.messageId} already exists. Skipping.`);
+    logger?.info(`Email ${email.messageId} already exists. Skipping.`);
     return false;
   }
 
   // Upload attachments first
-  const storedAttachments = await uploadAttachments(supabase, email.attachments, email.messageId);
+  const storedAttachments = await uploadAttachments(supabase, email.attachments, email.messageId, logger);
 
   // Prepare DB payload
   const payload = {
@@ -200,13 +172,13 @@ export async function saveEmailToDb(
       (payload as any).lead_id = leadId;
     }
   } catch (e) {
-    console.warn("Auto-link lead failed:", e);
+    logger?.warn("Auto-link lead failed:", { error: e });
   }
 
   const { error } = await supabase.from("emails").insert(payload);
   
   if (error) {
-    console.error(`DB Insert Error for ${email.messageId}:`, error);
+    logger?.error(`DB Insert Error for ${email.messageId}:`, { error });
     throw error;
   }
   

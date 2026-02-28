@@ -1,7 +1,10 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { Pool } from "https://deno.land/x/postgres@v0.19.3/mod.ts";
+// @ts-ignore
+import { Pool } from "https://deno.land/x/postgres@v0.17.0/mod.ts";
 import { getCorsHeaders } from '../_shared/cors.ts';
-import { requireAuth, createServiceClient } from '../_shared/auth.ts';
+import { requireAuth } from '../_shared/auth.ts';
+import { serveWithLogger } from '../_shared/logger.ts';
+
+declare const Deno: any;
 
 interface ConnectionConfig {
   host: string;
@@ -43,7 +46,7 @@ interface ExecuteResult {
   };
 }
 
-serve(async (req: Request): Promise<Response> => {
+serveWithLogger(async (req, logger, adminSupabase) => {
   const corsHeaders = getCorsHeaders(req);
 
   // Handle CORS preflight
@@ -52,7 +55,7 @@ serve(async (req: Request): Promise<Response> => {
   }
 
   // Auth validation
-  const { user, error: authError } = await requireAuth(req);
+  const { user, error: authError } = await requireAuth(req, logger);
   if (authError || !user) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
       status: 401,
@@ -61,8 +64,7 @@ serve(async (req: Request): Promise<Response> => {
   }
 
   // Verify platform_admin role
-  const serviceClient = createServiceClient();
-  const { data: roleData } = await serviceClient.from('user_roles').select('role').eq('user_id', user.id).eq('role', 'platform_admin').maybeSingle();
+  const { data: roleData } = await adminSupabase.from('user_roles').select('role').eq('user_id', user.id).eq('role', 'platform_admin').maybeSingle();
   if (!roleData) {
     return new Response(JSON.stringify({ error: 'Forbidden: platform_admin required' }), {
       status: 403,
@@ -88,10 +90,10 @@ serve(async (req: Request): Promise<Response> => {
              throw new Error("SUPABASE_DB_URL not found in environment");
         }
         poolConfig = dbUrl;
-        console.log(`[execute-sql-external] Connecting to local DB`);
+        logger.info(`Connecting to local DB`);
     } else {
         if (!connection?.host || !connection?.database || !connection?.user) {
-          console.warn('[execute-sql-external] Missing connection parameters', {
+          logger.warn('Missing connection parameters', {
             hasHost: !!connection?.host,
             hasDatabase: !!connection?.database,
             hasUser: !!connection?.user,
@@ -118,7 +120,7 @@ serve(async (req: Request): Promise<Response> => {
             interval: 500,
           },
         };
-        console.log(`[execute-sql-external] Connecting to ${connection.host}:${connection.port}/${connection.database}`);
+        logger.info(`Connecting to ${connection.host}:${connection.port}/${connection.database}`);
     }
     
     pool = new Pool(poolConfig, 1);
@@ -130,7 +132,7 @@ serve(async (req: Request): Promise<Response> => {
         const result = await client.queryObject('SELECT version()');
         const version = (result.rows[0] as { version?: string })?.version || 'Unknown';
         
-        console.log(`[execute-sql-external] Connection test successful: ${version.substring(0, 50)}...`);
+        logger.info(`Connection test successful: ${version.substring(0, 50)}...`);
         
         return new Response(
           JSON.stringify({
@@ -152,7 +154,7 @@ serve(async (req: Request): Promise<Response> => {
         const result = await client.queryObject(query);
         const duration = Date.now() - startTime;
         
-        console.log(`[execute-sql-external] Query executed in ${duration}ms, rows: ${result.rows.length}`);
+        logger.info(`Query executed in ${duration}ms, rows: ${result.rows.length}`);
         
         return new Response(
           JSON.stringify({
@@ -177,7 +179,7 @@ serve(async (req: Request): Promise<Response> => {
         const errors: Array<{ index: number; statement: string; error: string }> = [];
         let executed = 0;
 
-        console.log(`[execute-sql-external] Executing ${statements.length} statements (transaction: ${useTransaction})`);
+        logger.info(`Executing ${statements.length} statements (transaction: ${useTransaction})`);
 
         if (useTransaction) {
           await client.queryObject('BEGIN');
@@ -204,7 +206,7 @@ serve(async (req: Request): Promise<Response> => {
                 statement: stmt.substring(0, 200) + (stmt.length > 200 ? '...' : ''),
                 error: errorMsg,
               });
-              console.error(`[execute-sql-external] Statement ${i} failed: ${errorMsg}`);
+              logger.error(`Statement ${i} failed: ${errorMsg}`);
 
               if (stopOnError || useTransaction) {
                 if (useTransaction) {
@@ -233,7 +235,7 @@ serve(async (req: Request): Promise<Response> => {
           }
 
           const duration = Date.now() - startTime;
-          console.log(`[execute-sql-external] Completed: ${executed} executed, ${errors.length} failed in ${duration}ms`);
+          logger.info(`Completed: ${executed} executed, ${errors.length} failed in ${duration}ms`);
 
           return new Response(
             JSON.stringify({
@@ -262,7 +264,7 @@ serve(async (req: Request): Promise<Response> => {
         }
       }
 
-      console.warn('[execute-sql-external] Invalid action or missing parameters', {
+      logger.warn('Invalid action or missing parameters', {
         action,
         hasStatements: !!statements && statements.length > 0,
         hasQuery: !!query,
@@ -283,7 +285,7 @@ serve(async (req: Request): Promise<Response> => {
     }
 
   } catch (error: any) {
-    console.error('[execute-sql-external] Error:', error);
+    logger.error('Error:', error);
     
     const errorMessage = error.message || String(error);
     let userMessage = 'Failed to execute SQL';
@@ -325,8 +327,8 @@ serve(async (req: Request): Promise<Response> => {
       try {
         await pool.end();
       } catch {
-        console.warn('[execute-sql-external] Failed to close connection pool');
+        logger.warn('Failed to close connection pool');
       }
     }
   }
-});
+}, "execute-sql-external");

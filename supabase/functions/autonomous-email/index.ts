@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { serveWithLogger } from "../_shared/logger.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { requireAuth } from "../_shared/auth.ts";
 import { logAiCall } from "../_shared/audit.ts";
@@ -8,11 +8,11 @@ declare const Deno: any;
 
 type AutoEmailRequest = { email_id?: string; conversation_id?: string; dry_run?: boolean };
 
-Deno.serve(async (req: Request) => {
+serveWithLogger(async (req, logger, supabaseAdmin) => {
   const headers = getCorsHeaders(req);
   if (req.method === "OPTIONS") return new Response(null, { headers });
   try {
-    const { user, error: authError } = await requireAuth(req);
+    const { user, error: authError, supabaseClient: supabase } = await requireAuth(req);
     if (authError || !user) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...headers, "Content-Type": "application/json" } });
     }
@@ -22,10 +22,10 @@ Deno.serve(async (req: Request) => {
     } catch {
       return new Response(JSON.stringify({ error: "Invalid JSON body" }), { status: 400, headers: { ...headers, "Content-Type": "application/json" } });
     }
+    
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
     const authHeader = req.headers.get("Authorization") ?? "";
-    const supabase = createClient(supabaseUrl, supabaseKey, { global: { headers: { Authorization: authHeader } } });
+    
     let targetEmail: any = null;
     if (payload?.email_id) {
       const { data } = await supabase.from("emails").select("id, subject, body_text, body_html, conversation_id, from_email, to_emails").eq("id", payload.email_id).maybeSingle();
@@ -58,6 +58,7 @@ Deno.serve(async (req: Request) => {
     await logAiCall(supabase as any, { user_id: user.id, function_name: "autonomous-email", model_used: "classifier+reply", output_summary: { route, subject: draft.subject?.slice(0, 60) || "" }, pii_detected: false, pii_fields_redacted: [] });
     return new Response(JSON.stringify({ route, draft }), { status: 200, headers: { ...headers, "Content-Type": "application/json" } });
   } catch (e: any) {
+    logger.error("Error in autonomous-email", { error: e });
     return new Response(JSON.stringify({ error: e?.message || String(e) }), { status: 500, headers: { ...headers, "Content-Type": "application/json" } });
   }
-});
+}, "autonomous-email");

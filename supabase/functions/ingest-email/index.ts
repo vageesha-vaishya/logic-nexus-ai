@@ -1,5 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
-import { Logger } from '../_shared/logger.ts';
+import { serveWithLogger } from '../_shared/logger.ts';
 import { normalizeGmailPayload, normalizeOutlookPayload, NormalizedEmail, correlateThread } from './utils.ts';
 import { classifyEmailContent } from '../_shared/classification-logic.ts';
 import { determineRoute } from '../_shared/routing-logic.ts';
@@ -9,27 +8,22 @@ import { sanitizeForLLM } from "../_shared/pii-guard.ts";
 import { pickEmbeddingModel } from "../_shared/model-router.ts";
 import { logAiCall } from "../_shared/audit.ts";
 
-declare const Deno: any;
-
-const logger = new Logger(null, { component: "ingest-email" });
-
-Deno.serve(async (req: Request) => {
+serveWithLogger(async (req, logger, adminSupabase) => {
   const corsHeaders = getCorsHeaders(req);
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   // Auth: require authenticated user
-  const { user, error: authError } = await requireAuth(req);
+  const { user, supabaseClient: userSupabase, error: authError } = await requireAuth(req, logger);
   if (authError || !user) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 
-  try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+  // Use user-scoped client for DB operations to respect RLS
+  const supabase = userSupabase;
 
+  try {
     if (req.method !== "POST") {
       return new Response(JSON.stringify({ error: "Method not allowed" }), {
         status: 405,
@@ -264,4 +258,4 @@ Deno.serve(async (req: Request) => {
       headers: { ...corsHeaders, "Content-Type": "application/json", "Content-Language": "en" },
     });
   }
-});
+}, "ingest-email");

@@ -1,5 +1,9 @@
+// @ts-ignore
 import { assertEquals } from "https://deno.land/std@0.168.0/testing/asserts.ts";
+// @ts-ignore
 import { parseAddress, normalizeGmailPayload, normalizeOutlookPayload } from "../utils.ts";
+
+declare const Deno: any;
 
 Deno.test("parseAddress - full format", () => {
   const result = parseAddress("John Doe <john@example.com>");

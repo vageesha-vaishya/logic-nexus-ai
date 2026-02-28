@@ -1,22 +1,15 @@
-import { corsHeaders } from '../_shared/cors.ts';
+import { serveWithLogger } from '../_shared/logger.ts';
 import { requireAuth } from '../_shared/auth.ts';
 
 declare const Deno: {
   env: { get(name: string): string | undefined };
-  serve(handler: (req: Request) => Promise<Response> | Response): void;
 };
 
-Deno.serve(async (req) => {
-  const headers = corsHeaders;
-
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers });
-  }
-
+serveWithLogger(async (req, logger, supabaseAdmin) => {
   try {
     const { user, error: authError } = await requireAuth(req);
     if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...headers, 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
     }
 
     const { prompt, model, responseFormat } = await req.json();
@@ -61,10 +54,10 @@ Deno.serve(async (req) => {
               text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
           } else {
               const errorText = await response.text();
-              console.error(`Gemini API failed with status ${response.status}:`, errorText);
+              logger.error(`Gemini API failed with status ${response.status}:`, { error: errorText });
           }
         } catch (e) {
-          console.error("Gemini API error:", e);
+          logger.error("Gemini API error:", { error: e });
         }
     }
 
@@ -98,10 +91,10 @@ Deno.serve(async (req) => {
               text = data.choices?.[0]?.message?.content || '';
           } else {
               const errorText = await response.text();
-              console.error(`OpenAI API failed with status ${response.status}:`, errorText);
+              logger.error(`OpenAI API failed with status ${response.status}:`, { error: errorText });
           }
         } catch (e) {
-          console.error("OpenAI API error:", e);
+          logger.error("OpenAI API error:", { error: e });
         }
     }
 
@@ -110,7 +103,7 @@ Deno.serve(async (req) => {
     if (!text) {
         usedService = "Heuristic (Fallback)";
         usedModel = "keyword-match";
-        console.log("Using heuristic fallback logic.");
+        logger.info("Using heuristic fallback logic.");
         const lowerPrompt = (prompt || "").toLowerCase();
         let suggestion = "Road Freight"; // Default
 
@@ -139,19 +132,18 @@ Deno.serve(async (req) => {
       }
     }), {
       headers: { 
-          ...headers, 
           'Content-Type': 'application/json',
           'Content-Language': 'en'
       },
     });
-  } catch (error) {
+  } catch (error: any) {
+    logger.error("Suggest transport mode error", { error });
     return new Response(JSON.stringify({ error: (error as any).message || String(error) }), {
       status: 200, // Return 200 so client parses error message
       headers: { 
-          ...headers, 
           'Content-Type': 'application/json',
           'Content-Language': 'en'
       },
     });
   }
-});
+}, "suggest-transport-mode");

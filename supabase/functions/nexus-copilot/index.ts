@@ -1,5 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
-import { getCorsHeaders } from "../_shared/cors.ts";
+import { serveWithLogger } from "../_shared/logger.ts";
 import { requireAuth } from "../_shared/auth.ts";
 import { sanitizeForLLM } from "../_shared/pii-guard.ts";
 import { pickEmbeddingModel } from "../_shared/model-router.ts";
@@ -14,18 +13,13 @@ type CopilotRequest = {
   threshold?: number;
 };
 
-Deno.serve(async (req: Request) => {
-  const headers = getCorsHeaders(req);
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers });
-  }
-
+serveWithLogger(async (req, logger, supabaseAdmin) => {
   try {
-    const { user, error: authError } = await requireAuth(req);
+    const { user, error: authError, supabaseClient } = await requireAuth(req);
     if (authError || !user) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
-        headers: { ...headers, "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" },
       });
     }
 
@@ -35,7 +29,7 @@ Deno.serve(async (req: Request) => {
     } catch {
       return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
         status: 400,
-        headers: { ...headers, "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" },
       });
     }
 
@@ -43,18 +37,13 @@ Deno.serve(async (req: Request) => {
     if (!query) {
       return new Response(JSON.stringify({ error: "Missing query" }), {
         status: 400,
-        headers: { ...headers, "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" },
       });
     }
 
     const { sanitized, redacted } = sanitizeForLLM(query);
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const authHeader = req.headers.get("Authorization")!;
-    const supabase = createClient(supabaseUrl, supabaseKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
+    const supabase = supabaseClient;
 
     const { provider, model, url, headers: embHeaders } = pickEmbeddingModel();
     const embRes = await fetch(url, {
@@ -64,6 +53,7 @@ Deno.serve(async (req: Request) => {
     });
     if (!embRes.ok) {
       const text = await embRes.text();
+      logger.error(`Embedding error: ${text}`);
       throw new Error(`Embedding error: ${text}`);
     }
     const embJson = await embRes.json();
@@ -79,7 +69,10 @@ Deno.serve(async (req: Request) => {
       match_count: topK,
       tenant_id: payload?.tenantId ?? null,
     });
-    if (matchErr) throw matchErr;
+    if (matchErr) {
+      logger.error("Match documents error", { error: matchErr });
+      throw matchErr;
+    }
 
     const context = (matches || [])
       .map((m: any, i: number) => `# Doc ${i + 1}\nTitle: ${m.title}\nContent:\n${m.content}`)
@@ -110,6 +103,7 @@ Deno.serve(async (req: Request) => {
     });
     if (!chatRes.ok) {
       const t = await chatRes.text();
+      logger.error(`Chat error: ${t}`);
       throw new Error(`Chat error: ${t}`);
     }
     const chatJson = await chatRes.json();
@@ -127,12 +121,13 @@ Deno.serve(async (req: Request) => {
 
     return new Response(JSON.stringify({ ok: true, answer, snippets: matches || [] }), {
       status: 200,
-      headers: { ...headers, "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json" },
     });
   } catch (e: any) {
+    logger.error("Nexus copilot error", { error: e });
     return new Response(JSON.stringify({ ok: false, error: e?.message || String(e) }), {
       status: 500,
-      headers: { ...headers, "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json" },
     });
   }
-});
+}, "nexus-copilot");

@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { serveWithLogger } from "../_shared/logger.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { requireAuth } from "../_shared/auth.ts";
 import { logAiCall } from "../_shared/audit.ts";
@@ -6,9 +6,7 @@ import { sanitizeForLLM } from "../_shared/pii-guard.ts";
 
 declare const Deno: any;
 
-console.log("Forecast Demand Function Initialized");
-
-Deno.serve(async (req: Request) => {
+serveWithLogger(async (req, logger, supabase) => {
   const headers = getCorsHeaders(req);
 
   // 1. Handle CORS
@@ -17,7 +15,7 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { user, error: authError } = await requireAuth(req);
+    const { user, error: authError, supabaseClient: userSupabase } = await requireAuth(req, logger);
     if (authError || !user) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...headers, 'Content-Type': 'application/json' } });
     }
@@ -30,10 +28,8 @@ Deno.serve(async (req: Request) => {
     }
 
     // 3. Initialize Clients
-    const supabaseClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-    );
+    // Use user-scoped client for RLS
+    const supabaseClient = userSupabase;
 
     const openAiKey = Deno.env.get("OPENAI_API_KEY");
     if (!openAiKey) {
@@ -44,7 +40,7 @@ Deno.serve(async (req: Request) => {
     let historicalData = history;
 
     if (!historicalData || historicalData.length === 0) {
-      console.log(`Fetching history for HS Code: ${hs_code}`);
+      logger.info(`Fetching history for HS Code: ${hs_code}`);
       
       // Query cargo_details for volume history
       // Aggregating by month (naive approach using created_at)
@@ -60,7 +56,7 @@ Deno.serve(async (req: Request) => {
 
       // Aggregate data by month
       const monthlyAgg: Record<string, { volume: number; weight: number; count: number }> = {};
-      cargoData.forEach((item: any) => {
+      (cargoData || []).forEach((item: any) => {
         const date = new Date(item.created_at);
         const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
         
@@ -76,7 +72,7 @@ Deno.serve(async (req: Request) => {
         .map(([date, stats]) => ({ date, ...stats }))
         .sort((a, b) => a.date.localeCompare(b.date));
       
-      console.log(`Found ${historicalData.length} historical data points.`);
+      logger.info(`Found ${historicalData.length} historical data points.`);
     }
 
     // 5. Construct AI Prompt
@@ -155,7 +151,7 @@ Deno.serve(async (req: Request) => {
           "Authorization": `Bearer ${openAiKey}`,
         },
         body: JSON.stringify({
-          model: "gpt-4o",
+          model: "gpt-4o-mini",
           messages: [
             { role: "system", content: "You are a helpful logistics AI assistant that outputs JSON." },
             { role: "user", content: prompt }
@@ -173,34 +169,30 @@ Deno.serve(async (req: Request) => {
     }
 
     // 7. Store Predictions (Optional - if we want to cache them)
-    // We'll store the *first* prediction as a record for now, or all of them.
-    // For this implementation, we'll store the analysis in the most relevant month (next month).
-    
     if (result.predictions && result.predictions.length > 0) {
-      const firstPred = result.predictions[0];
-      const { error: insertError } = await supabaseClient
-        .from("demand_predictions")
-        .insert({
-          tenant_id: (await supabaseClient.auth.getUser()).data.user?.user_metadata?.tenant_id, // This might fail if using service role without context. 
-          // Actually, we are using Service Role Key in this function, so auth.uid() is undefined unless we pass JWT.
-          // For now, let's assume we pass the tenant_id in the request or extract from user JWT if available.
-          // But wait, we are using createClient with SERVICE ROLE KEY above.
-          // Let's rely on the user passing a JWT in the Authorization header to get the user context properly, 
-          // OR just insert with a placeholder tenant_id if we can't get it.
-          // Better: Create a client with the user's JWT to respect RLS and get correct tenant.
-          
-          // Re-creating client with user context if header exists
-          // For simplicity in this "MVP", let's assume we want to store it. 
-          // If we can't get tenant_id easily, we might skip storage or require it in payload.
-          // Let's skip storage logic for now to avoid RLS complexity in this turn, 
-          // OR fetch a default tenant.
-        });
-        
-       // Actually, let's just return the result to the UI. 
-       // The UI can decide to save it via a standard insert if needed, 
-       // or we can implement storage properly later.
-       // The requirement is "Deploy Transformer-based model". 
-       // Returning the prediction is the core "Deploy".
+       // Attempt to get tenant_id from user metadata
+       // @ts-ignore: Properties app_metadata and user_metadata exist on the extended user type from requireAuth
+       const tenantId = user.app_metadata?.tenant_id || user.user_metadata?.tenant_id;
+       
+       if (tenantId) {
+          const { error: insertError } = await supabaseClient
+            .from("demand_predictions")
+            .insert({
+              tenant_id: tenantId,
+              hs_code: hs_code,
+              horizon: horizon,
+              prediction_data: result,
+              created_by: user.id
+            });
+            
+          if (insertError) {
+             logger.error("Failed to store prediction", { error: insertError });
+          } else {
+             logger.info("Prediction stored successfully");
+          }
+       } else {
+          logger.warn("Skipping prediction storage: No tenant_id found in user metadata");
+       }
     }
 
     // 8. Return Result
@@ -209,7 +201,7 @@ Deno.serve(async (req: Request) => {
     await logAiCall(supabaseClient, {
       user_id: (await supabaseClient.auth.getUser()).data.user?.id ?? null,
       function_name: "forecast-demand",
-      model_used: Deno.env.get("TIMESFM_URL") ? "holt-winters-docker" : "gpt-4o",
+      model_used: Deno.env.get("TIMESFM_URL") ? "holt-winters-docker" : "gpt-4o-mini",
       latency_ms: latency,
       pii_detected: redacted.length > 0,
       pii_fields_redacted: redacted,
@@ -220,10 +212,10 @@ Deno.serve(async (req: Request) => {
     });
 
   } catch (error: any) {
-    console.error("Error:", error.message);
+    logger.error("Error in forecast-demand", { error: error });
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { ...headers, "Content-Type": "application/json" },
     });
   }
-});
+}, "forecast-demand");

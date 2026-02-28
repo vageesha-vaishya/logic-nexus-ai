@@ -1,5 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
-import { getCorsHeaders } from "../_shared/cors.ts";
+import { serveWithLogger } from "../_shared/logger.ts";
 import { requireAuth } from "../_shared/auth.ts";
 import { logAiCall } from "../_shared/audit.ts";
 
@@ -12,16 +11,13 @@ type ExtractRequest = {
   text_hint?: string; // optional OCR text
 };
 
-Deno.serve(async (req: Request) => {
-  const headers = getCorsHeaders(req);
-  if (req.method === "OPTIONS") return new Response(null, { headers });
-
+serveWithLogger(async (req, logger, supabaseAdmin) => {
   try {
-    const { user, error: authError } = await requireAuth(req);
+    const { user, error: authError, supabaseClient } = await requireAuth(req);
     if (authError || !user) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
-        headers: { ...headers, "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" },
       });
     }
 
@@ -31,17 +27,12 @@ Deno.serve(async (req: Request) => {
     } catch {
       return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
         status: 400,
-        headers: { ...headers, "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" },
       });
     }
 
     const openaiKey = Deno.env.get("OPENAI_API_KEY") ?? "";
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
-    const authHeader = req.headers.get("Authorization") ?? "";
-    const supabase = createClient(supabaseUrl, supabaseKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
+    const supabase = supabaseClient;
 
     // Fallback regex parsing from text_hint
     const text = (payload?.text_hint ?? "").toString();
@@ -66,24 +57,31 @@ Deno.serve(async (req: Request) => {
       const imageContent = payload?.url
         ? { type: "image_url", image_url: { url: payload.url } }
         : { type: "image_url", image_url: { url: `data:${payload?.mime || "application/octet-stream"};base64,${payload?.base64}` } };
-      const res = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${openaiKey}` },
-        body: JSON.stringify({
-          model: "gpt-4o",
-          messages: [
-            { role: "system", content: "Extract structured BOL fields. Reply JSON with keys: shipper, consignee, notify_party, booking_no, bl_no, vessel, voyage, port_of_loading, port_of_discharge, marks_numbers, description_goods, gross_weight, measurement." },
-            { role: "user", content: [{ type: "text", text: "Extract all BOL fields as JSON." }, imageContent] }
-          ],
-          temperature: 0.0,
-        }),
-      });
-      if (res.ok) {
-        const json = await res.json();
-        try {
-          const parsed = JSON.parse(json.choices[0].message.content);
-          Object.assign(fields, parsed);
-        } catch { /* ignore */ }
+      
+      try {
+        const res = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${openaiKey}` },
+          body: JSON.stringify({
+            model: "gpt-4o",
+            messages: [
+              { role: "system", content: "Extract structured BOL fields. Reply JSON with keys: shipper, consignee, notify_party, booking_no, bl_no, vessel, voyage, port_of_loading, port_of_discharge, marks_numbers, description_goods, gross_weight, measurement." },
+              { role: "user", content: [{ type: "text", text: "Extract all BOL fields as JSON." }, imageContent] }
+            ],
+            temperature: 0.0,
+          }),
+        });
+        if (res.ok) {
+          const json = await res.json();
+          try {
+            const parsed = JSON.parse(json.choices[0].message.content);
+            Object.assign(fields, parsed);
+          } catch { /* ignore */ }
+        } else {
+          logger.error(`OpenAI API error: ${res.status} ${res.statusText}`);
+        }
+      } catch (err) {
+        logger.error("Failed to call OpenAI", { error: err });
       }
     }
 
@@ -98,12 +96,13 @@ Deno.serve(async (req: Request) => {
 
     return new Response(JSON.stringify({ fields }), {
       status: 200,
-      headers: { ...headers, "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json" },
     });
   } catch (e: any) {
+    logger.error("Extract BOL fields error", { error: e });
     return new Response(JSON.stringify({ error: e?.message || String(e) }), {
       status: 500,
-      headers: { ...headers, "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json" },
     });
   }
-});
+}, "extract-bol-fields");

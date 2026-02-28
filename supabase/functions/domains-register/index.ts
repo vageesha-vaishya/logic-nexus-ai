@@ -1,36 +1,23 @@
-// @ts-ignore
-import { serve } from "std/http/server.ts";
-import { createClient } from "@supabase/supabase-js";
 import { getCorsHeaders } from "../_shared/cors.ts";
-import { SESClient, VerifyDomainDkimCommand } from "npm:@aws-sdk/client-ses";
-
 // @ts-ignore
+import { SESClient, VerifyDomainDkimCommand } from "npm:@aws-sdk/client-ses";
+import { serveWithLogger } from "../_shared/logger.ts";
+import { requireAuth } from "../_shared/auth.ts";
+
 declare const Deno: any;
 
-console.log("Hello from domains-register!");
-
-serve(async (req: Request) => {
+serveWithLogger(async (req, logger, _adminSupabase) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: getCorsHeaders(req) });
   }
 
   try {
-    const supabaseClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-    );
-
     // 1. Authenticate User
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-        throw new Error("Missing Authorization header");
-    }
-    
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
+    const { user, supabaseClient, error: authError } = await requireAuth(req);
 
     if (authError || !user) {
+        logger.error("Auth error:", { error: authError });
         throw new Error("Unauthorized: Invalid token");
     }
 
@@ -47,7 +34,7 @@ serve(async (req: Request) => {
         .rpc('get_user_tenant_id', { user_id: user.id });
 
     if (tenantError) {
-        console.error("Error getting tenant id:", tenantError);
+        logger.error("Error getting tenant id:", tenantError);
         throw new Error("Could not determine tenant for user");
     }
     
@@ -66,7 +53,7 @@ serve(async (req: Request) => {
 
     if (awsAccessKey && awsSecretKey) {
         // Real AWS SES Integration
-        console.log("Using Real AWS SES credentials");
+        logger.info("Using Real AWS SES credentials");
         const ses = new SESClient({
             region: awsRegion,
             credentials: {
@@ -90,7 +77,7 @@ serve(async (req: Request) => {
         };
     } else {
         // Mock Implementation (Fallback)
-        console.log("Using Mock AWS SES (No credentials found)");
+        logger.info("Using Mock AWS SES (No credentials found)");
         const generateToken = () => Math.random().toString(36).substring(2, 15);
         dkimTokens = [generateToken(), generateToken(), generateToken()];
         identityArn = `arn:aws:ses:us-east-1:123456789012:identity/${domain_name}`;
@@ -139,9 +126,10 @@ serve(async (req: Request) => {
     );
 
   } catch (error: any) {
+    logger.error("Error in domains-register:", error);
     return new Response(
       JSON.stringify({ error: error.message }),
       { status: 400, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
     );
   }
-});
+}, "domains-register");

@@ -1,20 +1,14 @@
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0"
-import { Logger } from "../_shared/logger.ts"
+import { serveWithLogger } from "../_shared/logger.ts"
 import { getCorsHeaders } from "../_shared/cors.ts"
 import { requireAuth } from "../_shared/auth.ts"
 
-Deno.serve(async (req) => {
+declare const Deno: any;
+
+serveWithLogger(async (req, logger, supabaseAdmin) => {
   const corsHeaders = getCorsHeaders(req);
   // Extract Correlation ID from headers or generate new one
   const correlationId = req.headers.get('x-correlation-id') || crypto.randomUUID();
-
-  // Initialize Logger (no client yet)
-  const logger = new Logger(null, {
-    method: req.method,
-    url: req.url,
-    component: 'sync-hts-data'
-  }, correlationId);
 
   await logger.info(`Request received: ${req.method} ${req.url}`);
 
@@ -27,14 +21,21 @@ Deno.serve(async (req) => {
   const authHeader = req.headers.get('Authorization');
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
   const isServiceRole = authHeader && serviceKey && authHeader.includes(serviceKey);
-  if (!isServiceRole) {
-    const { user, error: authError } = await requireAuth(req);
-    if (authError || !user) {
+  
+  let user: any = null;
+
+  if (isServiceRole) {
+    user = { id: 'system', email: 'system@internal' };
+    logger.info('Authenticated as Service Role');
+  } else {
+    const { user: authUser, error: authError } = await requireAuth(req);
+    if (authError || !authUser) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+    user = authUser;
   }
 
   try {
@@ -47,50 +48,12 @@ Deno.serve(async (req) => {
     }
 
     // 3. Initialize Supabase Client
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    const supabase = createClient(supabaseUrl, supabaseKey)
+    // Use the injected admin client for DB operations
+    const supabase = supabaseAdmin;
     
-    // Update logger with client for persistence
-    // We can't easily "update" the logger's client since it's private, but we can re-instantiate or just pass it if we made it public.
-    // Actually, I should have made a setter or allowed passing it.
-    // Let's just create a new logger instance with the client.
-    const dbLogger = new Logger(supabase, { 
-      method: req.method, 
-      url: req.url,
-      component: 'sync-hts-data' 
-    }, correlationId);
-
-    // 4. Verify Authentication
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader) {
-      await dbLogger.warn('Missing Authorization header');
-      return new Response(JSON.stringify({ error: 'Missing Authorization header' }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 401
-      })
-    }
-    
-    // Verify token using a separate client
-    const supabaseAuth = createClient(
-      supabaseUrl,
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: authHeader } } }
-    )
-    
-    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser()
-    
-    if (authError || !user) {
-        await dbLogger.warn("Auth failed", { error: authError });
-        return new Response(JSON.stringify({ error: 'Unauthorized: Invalid or expired token', details: authError?.message }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 401
-        })
-    }
-
     // 5. Fetch Census Data
     const CENSUS_URL = "https://www.census.gov/foreign-trade/aes/documentlibrary/concordance/expaes.txt"
-    await dbLogger.info(`User ${user.email} initiating sync...`, { user_id: user.id });
+    await logger.info(`User ${user.email} initiating sync...`, { user_id: user.id });
     
     // Log start (Business Audit)
     await supabase.from('audit_logs').insert({
@@ -141,7 +104,7 @@ Deno.serve(async (req) => {
     let errorCount = 0
     const totalRecords = records.length
     
-    await dbLogger.info(`Parsed ${totalRecords} records. Upserting...`);
+    await logger.info(`Parsed ${totalRecords} records. Upserting...`);
 
     for (let i = 0; i < totalRecords; i += BATCH_SIZE) {
         const chunk = records.slice(i, i + BATCH_SIZE)
@@ -151,7 +114,7 @@ Deno.serve(async (req) => {
           .upsert(chunk, { onConflict: 'hts_code', ignoreDuplicates: false })
         
         if (error) {
-            await dbLogger.error('Error upserting chunk', { error });
+            await logger.error('Error upserting chunk', { error });
             errorCount += chunk.length
         } else {
             insertedCount += chunk.length
@@ -170,7 +133,7 @@ Deno.serve(async (req) => {
         }
     })
 
-    await dbLogger.info('Sync completed successfully', { processed: totalRecords, success: insertedCount, errors: errorCount });
+    await logger.info('Sync completed successfully', { processed: totalRecords, success: insertedCount, errors: errorCount });
 
     return new Response(
       JSON.stringify({ 
@@ -188,8 +151,7 @@ Deno.serve(async (req) => {
     // We can re-create the logger if scope is lost, but here we likely have 'supabase' in scope if it didn't fail before initialization
     // But 'dbLogger' is scoped to the try block.
     // Let's use a safe fallback.
-    const errorLogger = new Logger(null, { component: 'sync-hts-data' }); // No DB access if init failed
-    await errorLogger.critical('Critical Error in sync-hts-data', { error: error.message, stack: error.stack });
+    await logger.error('Critical Error in sync-hts-data', { error: error.message, stack: error.stack });
     
     return new Response(
       JSON.stringify({ success: false, error: error.message }),
@@ -199,4 +161,4 @@ Deno.serve(async (req) => {
       }
     )
   }
-})
+}, "sync-hts-data");

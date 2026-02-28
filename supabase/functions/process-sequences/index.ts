@@ -1,14 +1,22 @@
-
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { serveWithLogger } from "../_shared/logger.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
+import { requireAuth } from "../_shared/auth.ts";
 
-Deno.serve(async (req) => {
+declare const Deno: any;
+
+serveWithLogger(async (req, logger, supabase) => {
   const headers = getCorsHeaders(req);
   if (req.method === "OPTIONS") return new Response(null, { headers });
 
-  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-  const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const supabase = createClient(supabaseUrl, supabaseKey);
+  // Auth: verify service role key or authenticated user (admin manually triggering)
+  const authHeader = req.headers.get('Authorization');
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+  if (!authHeader || !authHeader.includes(serviceKey)) {
+    const { user, error: authError } = await requireAuth(req);
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...headers, 'Content-Type': 'application/json' } });
+    }
+  }
 
   try {
     // 1. Get Due Steps
@@ -58,7 +66,7 @@ Deno.serve(async (req) => {
 
         } catch (err: any) {
             errorMsg = err.message;
-            console.error(`Error processing sequence ${item.sequence_id} step ${item.step_order} for ${item.recipient_email}:`, err);
+            logger.error(`Error processing sequence ${item.sequence_id} step ${item.step_order} for ${item.recipient_email}:`, { error: err });
         }
 
         // B. Update State
@@ -98,30 +106,33 @@ Deno.serve(async (req) => {
             });
 
         } else {
-            // Log Failure
-             await supabase.from('email_sequence_logs').insert({
+            // Retry logic or fail
+             await supabase.from('email_sequence_enrollments').update({
+                status: 'paused', // Pause on error
+                // error_message: errorMsg
+            }).eq('id', item.enrollment_id);
+             
+             // Log error
+            await supabase.from('email_sequence_logs').insert({
                 enrollment_id: item.enrollment_id,
                 step_order: item.step_order,
                 action: 'failed',
                 details: { error: errorMsg }
             });
-            
-            // Optionally pause enrollment on error?
-            // await supabase.from('email_sequence_enrollments').update({ status: 'paused' }).eq('id', item.enrollment_id);
         }
         
-        results.push({ enrollment: item.enrollment_id, success, error: errorMsg });
+        results.push({ id: item.enrollment_id, success });
     }
 
-    return new Response(
-      JSON.stringify({ success: true, processed: results.length, details: results }),
-      { headers: { ...headers, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify(results), { 
+      headers: { ...headers, "Content-Type": "application/json" } 
+    });
 
   } catch (error: any) {
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 400, headers: { ...headers, "Content-Type": "application/json" } }
-    );
+    logger.error("Sequence Processor Error:", { error: error });
+    return new Response(JSON.stringify({ error: error.message || String(error) }), { 
+      status: 500,
+      headers: { ...headers, "Content-Type": "application/json" } 
+    });
   }
-});
+}, "process-sequences");

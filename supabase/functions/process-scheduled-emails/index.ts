@@ -1,8 +1,8 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { serveWithLogger } from "../_shared/logger.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { requireAuth } from "../_shared/auth.ts";
 
-Deno.serve(async (req) => {
+serveWithLogger(async (req, logger, supabase) => {
   const headers = getCorsHeaders(req);
   if (req.method === "OPTIONS") return new Response(null, { headers });
 
@@ -17,10 +17,8 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
-
+    // supabase client injected by serveWithLogger is already service role
+    
     // 1. Fetch pending emails
     const { data: emails, error } = await supabase
       .from("scheduled_emails")
@@ -69,7 +67,7 @@ Deno.serve(async (req) => {
         results.push({ id: email.id, status: "sent" });
 
       } catch (err: any) {
-        console.error(`Failed to send email ${email.id}:`, err);
+        logger.error(`Failed to send email ${email.id}:`, { error: err });
         // 5. Update failure
         await supabase.from("scheduled_emails").update({
           status: "failed",
@@ -85,10 +83,10 @@ Deno.serve(async (req) => {
     });
 
   } catch (error: any) {
-    console.error("Scheduler Error:", error);
-    return new Response(JSON.stringify({ error: error.message }), { 
+    logger.error("Scheduler Error:", { error: error });
+    return new Response(JSON.stringify({ error: error.message || String(error) }), { 
       status: 500,
       headers: { ...headers, "Content-Type": "application/json" } 
     });
   }
-});
+}, "process-scheduled-emails");
