@@ -1,0 +1,507 @@
+[0;32m[2026-02-28 11:03:15] Starting comprehensive re-deployment to project: gzhxgoigflftharcmdqj[0m
+[0m[2026-02-28 11:03:15] Log file: deployment_log_20260228_110315.txt[0m
+[1;33m[2026-02-28 11:03:15] 1. Pre-flight Checks...[0m
+[1;33m[2026-02-28 11:03:15] Warning: 'deno' command not found. Skipping local syntax check.[0m
+[0;32m[2026-02-28 11:03:15] Pre-flight checks passed (npm found).[0m
+[1;33m[2026-02-28 11:03:15] 2. Discovering Edge Functions...[0m
+[0m[2026-02-28 11:03:15] Found 90 functions to deploy.[0m
+[1;33m[2026-02-28 11:03:15] 3. Starting Verification and Deployment...[0m
+[0m[2026-02-28 11:03:15] --------------------------------------------------[0m
+[1;33m[2026-02-28 11:03:15] Processing: admin-reset-password[0m
+[1;33m[2026-02-28 11:03:15]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 11:03:15]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: admin-reset-password
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (admin-reset-password): supabase/functions/import_map.json
+Uploading asset (admin-reset-password): supabase/functions/admin-reset-password/index.ts
+Uploading asset (admin-reset-password): supabase/functions/_shared/auth.ts
+Uploading asset (admin-reset-password): supabase/functions/_shared/logger.ts
+Uploading asset (admin-reset-password): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: admin-reset-password
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 11:03:18]   > Deployment command finished.[0m
+[0m[2026-02-28 11:03:18]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/admin-reset-password[0m
+[0;31m[2026-02-28 11:04:33]   > Health check WARNING (HTTP 000). Check logs.[0m
+[0m[2026-02-28 11:04:33] --------------------------------------------------[0m
+[1;33m[2026-02-28 11:04:33] Processing: ai-advisor[0m
+[1;33m[2026-02-28 11:04:33]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 11:04:33]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: ai-advisor
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (ai-advisor): supabase/functions/import_map.json
+Uploading asset (ai-advisor): supabase/functions/ai-advisor/index.ts
+Uploading asset (ai-advisor): supabase/functions/_shared/logger.ts
+Uploading asset (ai-advisor): supabase/functions/_shared/audit.ts
+Uploading asset (ai-advisor): supabase/functions/_shared/pii-guard.ts
+Uploading asset (ai-advisor): supabase/functions/_shared/auth.ts
+Uploading asset (ai-advisor): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: ai-advisor
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 11:04:34]   > Deployment command finished.[0m
+[0m[2026-02-28 11:04:34]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/ai-advisor[0m
+[0;31m[2026-02-28 11:05:49]   > Health check WARNING (HTTP 000). Check logs.[0m
+[0m[2026-02-28 11:05:49] --------------------------------------------------[0m
+[1;33m[2026-02-28 11:05:50] Processing: ai-agent[0m
+[1;33m[2026-02-28 11:05:50]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 11:05:50]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: ai-agent
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (ai-agent): supabase/functions/import_map.json
+Uploading asset (ai-agent): supabase/functions/ai-agent/index.ts
+Uploading asset (ai-agent): supabase/functions/_shared/logger.ts
+Uploading asset (ai-agent): supabase/functions/_shared/pii-guard.ts
+Uploading asset (ai-agent): supabase/functions/_shared/audit.ts
+Uploading asset (ai-agent): supabase/functions/_shared/auth.ts
+Uploading asset (ai-agent): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: ai-agent
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 11:05:52]   > Deployment command finished.[0m
+[0m[2026-02-28 11:05:52]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/ai-agent[0m
+[0;31m[2026-02-28 11:07:07]   > Health check WARNING (HTTP 000). Check logs.[0m
+[0m[2026-02-28 11:07:07] --------------------------------------------------[0m
+[1;33m[2026-02-28 11:07:07] Processing: ai-message-assistant[0m
+[1;33m[2026-02-28 11:07:07]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 11:07:07]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: ai-message-assistant
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (ai-message-assistant): supabase/functions/import_map.json
+Uploading asset (ai-message-assistant): supabase/functions/ai-message-assistant/index.ts
+Uploading asset (ai-message-assistant): supabase/functions/_shared/auth.ts
+Uploading asset (ai-message-assistant): supabase/functions/_shared/logger.ts
+Uploading asset (ai-message-assistant): supabase/functions/_shared/audit.ts
+Uploading asset (ai-message-assistant): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: ai-message-assistant
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 11:07:09]   > Deployment command finished.[0m
+[0m[2026-02-28 11:07:09]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/ai-message-assistant[0m
+[0;31m[2026-02-28 11:08:24]   > Health check WARNING (HTTP 000). Check logs.[0m
+[0m[2026-02-28 11:08:24] --------------------------------------------------[0m
+[1;33m[2026-02-28 11:08:24] Processing: alert-notifier[0m
+[1;33m[2026-02-28 11:08:24]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 11:08:24]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: alert-notifier
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (alert-notifier): supabase/functions/import_map.json
+Uploading asset (alert-notifier): supabase/functions/alert-notifier/index.ts
+Uploading asset (alert-notifier): supabase/functions/_shared/auth.ts
+Uploading asset (alert-notifier): supabase/functions/_shared/logger.ts
+Uploading asset (alert-notifier): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: alert-notifier
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 11:08:27]   > Deployment command finished.[0m
+[0m[2026-02-28 11:08:27]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/alert-notifier[0m
+[0;31m[2026-02-28 11:09:42]   > Health check WARNING (HTTP 000). Check logs.[0m
+[0m[2026-02-28 11:09:42] --------------------------------------------------[0m
+[1;33m[2026-02-28 11:09:42] Processing: analyze-cargo-damage[0m
+[1;33m[2026-02-28 11:09:42]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 11:09:42]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: analyze-cargo-damage
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (analyze-cargo-damage): supabase/functions/import_map.json
+Uploading asset (analyze-cargo-damage): supabase/functions/analyze-cargo-damage/index.ts
+Uploading asset (analyze-cargo-damage): supabase/functions/_shared/auth.ts
+Uploading asset (analyze-cargo-damage): supabase/functions/_shared/logger.ts
+Uploading asset (analyze-cargo-damage): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: analyze-cargo-damage
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 11:09:43]   > Deployment command finished.[0m
+[0m[2026-02-28 11:09:43]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/analyze-cargo-damage[0m
+[0;31m[2026-02-28 11:10:58]   > Health check WARNING (HTTP 000). Check logs.[0m
+[0m[2026-02-28 11:10:58] --------------------------------------------------[0m
+[1;33m[2026-02-28 11:10:58] Processing: analyze-email-threat[0m
+[1;33m[2026-02-28 11:10:58]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 11:10:58]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: analyze-email-threat
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (analyze-email-threat): supabase/functions/import_map.json
+Uploading asset (analyze-email-threat): supabase/functions/analyze-email-threat/index.ts
+Uploading asset (analyze-email-threat): supabase/functions/_shared/auth.ts
+Uploading asset (analyze-email-threat): supabase/functions/_shared/logger.ts
+Uploading asset (analyze-email-threat): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: analyze-email-threat
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 11:11:01]   > Deployment command finished.[0m
+[0m[2026-02-28 11:11:01]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/analyze-email-threat[0m
+[0;31m[2026-02-28 11:12:16]   > Health check WARNING (HTTP 000). Check logs.[0m
+[0m[2026-02-28 11:12:16] --------------------------------------------------[0m
+[1;33m[2026-02-28 11:12:16] Processing: anomaly-detection[0m
+[1;33m[2026-02-28 11:12:16]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 11:12:16]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: anomaly-detection
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (anomaly-detection): supabase/functions/import_map.json
+Uploading asset (anomaly-detection): supabase/functions/anomaly-detection/index.ts
+Uploading asset (anomaly-detection): supabase/functions/_shared/audit.ts
+Uploading asset (anomaly-detection): supabase/functions/_shared/auth.ts
+Uploading asset (anomaly-detection): supabase/functions/_shared/logger.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: anomaly-detection
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 11:12:18]   > Deployment command finished.[0m
+[0m[2026-02-28 11:12:18]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/anomaly-detection[0m
+[0;31m[2026-02-28 11:17:35]   > Health check WARNING (HTTP 000). Check logs.[0m
+[0m[2026-02-28 11:17:35] --------------------------------------------------[0m
+[1;33m[2026-02-28 11:17:35] Processing: anomaly-detector[0m
+[1;33m[2026-02-28 11:17:35]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 11:17:35]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: anomaly-detector
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (anomaly-detector): supabase/functions/import_map.json
+Uploading asset (anomaly-detector): supabase/functions/anomaly-detector/index.ts
+Uploading asset (anomaly-detector): supabase/functions/_shared/auth.ts
+Uploading asset (anomaly-detector): supabase/functions/_shared/logger.ts
+Uploading asset (anomaly-detector): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: anomaly-detector
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 11:17:37]   > Deployment command finished.[0m
+[0m[2026-02-28 11:17:37]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/anomaly-detector[0m
+[0;31m[2026-02-28 11:18:52]   > Health check WARNING (HTTP 000). Check logs.[0m
+[0m[2026-02-28 11:18:52] --------------------------------------------------[0m
+[1;33m[2026-02-28 11:18:52] Processing: autonomous-email[0m
+[1;33m[2026-02-28 11:18:52]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 11:18:52]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: autonomous-email
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (autonomous-email): supabase/functions/import_map.json
+Uploading asset (autonomous-email): supabase/functions/autonomous-email/index.ts
+Uploading asset (autonomous-email): supabase/functions/_shared/pii-guard.ts
+Uploading asset (autonomous-email): supabase/functions/_shared/audit.ts
+Uploading asset (autonomous-email): supabase/functions/_shared/auth.ts
+Uploading asset (autonomous-email): supabase/functions/_shared/logger.ts
+Uploading asset (autonomous-email): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: autonomous-email
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 11:18:55]   > Deployment command finished.[0m
+[0m[2026-02-28 11:18:55]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/autonomous-email[0m
+[0;31m[2026-02-28 11:20:10]   > Health check WARNING (HTTP 000). Check logs.[0m
+[0m[2026-02-28 11:20:10] --------------------------------------------------[0m
+[1;33m[2026-02-28 11:20:10] Processing: calculate-lead-score[0m
+[1;33m[2026-02-28 11:20:10]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 11:20:10]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: calculate-lead-score
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (calculate-lead-score): supabase/functions/import_map.json
+Uploading asset (calculate-lead-score): supabase/functions/calculate-lead-score/index.ts
+Uploading asset (calculate-lead-score): supabase/functions/_shared/auth.ts
+Uploading asset (calculate-lead-score): supabase/functions/_shared/logger.ts
+Uploading asset (calculate-lead-score): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: calculate-lead-score
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 11:20:12]   > Deployment command finished.[0m
+[0m[2026-02-28 11:20:12]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/calculate-lead-score[0m
+[0;31m[2026-02-28 11:21:27]   > Health check WARNING (HTTP 000). Check logs.[0m
+[0m[2026-02-28 11:21:27] --------------------------------------------------[0m
+[1;33m[2026-02-28 11:21:27] Processing: calculate-quote-financials[0m
+[1;33m[2026-02-28 11:21:27]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 11:21:27]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: calculate-quote-financials
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (calculate-quote-financials): supabase/functions/import_map.json
+Uploading asset (calculate-quote-financials): supabase/functions/calculate-quote-financials/index.ts
+Uploading asset (calculate-quote-financials): supabase/functions/_shared/logger.ts
+Uploading asset (calculate-quote-financials): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: calculate-quote-financials
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 11:21:29]   > Deployment command finished.[0m
+[0m[2026-02-28 11:21:29]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/calculate-quote-financials[0m
+[0;31m[2026-02-28 11:22:44]   > Health check WARNING (HTTP 000). Check logs.[0m
+[0m[2026-02-28 11:22:44] --------------------------------------------------[0m
+[1;33m[2026-02-28 11:22:44] Processing: carrier-scoring[0m
+[1;33m[2026-02-28 11:22:44]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 11:22:44]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: carrier-scoring
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (carrier-scoring): supabase/functions/import_map.json
+Uploading asset (carrier-scoring): supabase/functions/carrier-scoring/index.ts
+Uploading asset (carrier-scoring): supabase/functions/_shared/audit.ts
+Uploading asset (carrier-scoring): supabase/functions/_shared/auth.ts
+Uploading asset (carrier-scoring): supabase/functions/_shared/logger.ts
+Uploading asset (carrier-scoring): supabase/functions/_shared/cors.ts
+unexpected deploy status 520: error code: 520
+Try rerunning the command with --debug to troubleshoot the error.
+[0;32m[2026-02-28 11:22:53]   > Deployment command finished.[0m
+[0m[2026-02-28 11:22:53]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/carrier-scoring[0m
+[0;31m[2026-02-28 11:24:08]   > Health check WARNING (HTTP 000). Check logs.[0m
+[0m[2026-02-28 11:24:08] --------------------------------------------------[0m
+[1;33m[2026-02-28 11:24:08] Processing: categorize-document[0m
+[1;33m[2026-02-28 11:24:08]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 11:24:08]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: categorize-document
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (categorize-document): supabase/functions/import_map.json
+Uploading asset (categorize-document): supabase/functions/categorize-document/index.ts
+Uploading asset (categorize-document): supabase/functions/_shared/audit.ts
+Uploading asset (categorize-document): supabase/functions/_shared/auth.ts
+Uploading asset (categorize-document): supabase/functions/_shared/logger.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: categorize-document
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 11:24:10]   > Deployment command finished.[0m
+[0m[2026-02-28 11:24:10]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/categorize-document[0m
+[0;31m[2026-02-28 11:25:25]   > Health check WARNING (HTTP 000). Check logs.[0m
+[0m[2026-02-28 11:25:25] --------------------------------------------------[0m
+[1;33m[2026-02-28 11:25:25] Processing: check-expiring-documents[0m
+[1;33m[2026-02-28 11:25:25]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 11:25:25]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: check-expiring-documents
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (check-expiring-documents): supabase/functions/import_map.json
+Uploading asset (check-expiring-documents): supabase/functions/check-expiring-documents/index.ts
+Uploading asset (check-expiring-documents): supabase/functions/_shared/logger.ts
+Uploading asset (check-expiring-documents): supabase/functions/_shared/auth.ts
+Uploading asset (check-expiring-documents): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: check-expiring-documents
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 11:25:27]   > Deployment command finished.[0m
+[0m[2026-02-28 11:25:27]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/check-expiring-documents[0m
+[0;31m[2026-02-28 11:33:02]   > Health check WARNING (HTTP 000). Check logs.[0m
+[0m[2026-02-28 11:33:02] --------------------------------------------------[0m
+[1;33m[2026-02-28 11:33:02] Processing: classify-email[0m
+[1;33m[2026-02-28 11:33:02]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 11:33:02]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: classify-email
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (classify-email): supabase/functions/import_map.json
+Uploading asset (classify-email): supabase/functions/classify-email/index.ts
+Uploading asset (classify-email): supabase/functions/_shared/audit.ts
+Uploading asset (classify-email): supabase/functions/_shared/model-router.ts
+Uploading asset (classify-email): supabase/functions/_shared/pii-guard.ts
+Uploading asset (classify-email): supabase/functions/_shared/auth.ts
+Uploading asset (classify-email): supabase/functions/_shared/logger.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: classify-email
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 11:33:04]   > Deployment command finished.[0m
+[0m[2026-02-28 11:33:04]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/classify-email[0m
+[0;31m[2026-02-28 11:34:19]   > Health check WARNING (HTTP 000). Check logs.[0m
+[0m[2026-02-28 11:34:19] --------------------------------------------------[0m
+[1;33m[2026-02-28 11:34:19] Processing: cleanup-logs[0m
+[1;33m[2026-02-28 11:34:19]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 11:34:19]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: cleanup-logs
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (cleanup-logs): supabase/functions/import_map.json
+Uploading asset (cleanup-logs): supabase/functions/cleanup-logs/index.ts
+Uploading asset (cleanup-logs): supabase/functions/_shared/auth.ts
+Uploading asset (cleanup-logs): supabase/functions/_shared/logger.ts
+Uploading asset (cleanup-logs): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: cleanup-logs
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 11:34:22]   > Deployment command finished.[0m
+[0m[2026-02-28 11:34:22]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/cleanup-logs[0m
+[0;31m[2026-02-28 11:35:37]   > Health check WARNING (HTTP 000). Check logs.[0m
+[0m[2026-02-28 11:35:37] --------------------------------------------------[0m
+[1;33m[2026-02-28 11:35:37] Processing: container-demand[0m
+[1;33m[2026-02-28 11:35:37]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 11:35:37]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: container-demand
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (container-demand): supabase/functions/import_map.json
+Uploading asset (container-demand): supabase/functions/container-demand/index.ts
+Uploading asset (container-demand): supabase/functions/_shared/audit.ts
+Uploading asset (container-demand): supabase/functions/_shared/auth.ts
+Uploading asset (container-demand): supabase/functions/_shared/logger.ts
+Uploading asset (container-demand): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: container-demand
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 11:35:39]   > Deployment command finished.[0m
+[0m[2026-02-28 11:35:39]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/container-demand[0m
+[0;31m[2026-02-28 11:36:54]   > Health check WARNING (HTTP 000). Check logs.[0m
+[0m[2026-02-28 11:36:54] --------------------------------------------------[0m
+[1;33m[2026-02-28 11:36:54] Processing: create-user[0m
+[1;33m[2026-02-28 11:36:54]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 11:36:54]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: create-user
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (create-user): supabase/functions/import_map.json
+Uploading asset (create-user): supabase/functions/create-user/index.ts
+Uploading asset (create-user): supabase/functions/_shared/logger.ts
+Uploading asset (create-user): supabase/functions/_shared/auth.ts
+Uploading asset (create-user): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: create-user
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 11:36:55]   > Deployment command finished.[0m
+[0m[2026-02-28 11:36:55]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/create-user[0m
+[0;31m[2026-02-28 11:47:26]   > Health check WARNING (HTTP 000). Check logs.[0m
+[0m[2026-02-28 11:47:26] --------------------------------------------------[0m
+[1;33m[2026-02-28 11:47:26] Processing: delete-user[0m
+[1;33m[2026-02-28 11:47:26]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 11:47:26]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: delete-user
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (delete-user): supabase/functions/import_map.json
+Uploading asset (delete-user): supabase/functions/delete-user/index.ts
+Uploading asset (delete-user): supabase/functions/_shared/auth.ts
+Uploading asset (delete-user): supabase/functions/_shared/logger.ts
+Uploading asset (delete-user): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: delete-user
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 11:47:28]   > Deployment command finished.[0m
+[0m[2026-02-28 11:47:28]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/delete-user[0m
+[0;31m[2026-02-28 11:58:18]   > Health check WARNING (HTTP 000). Check logs.[0m
+[0m[2026-02-28 11:58:18] --------------------------------------------------[0m
+[1;33m[2026-02-28 11:58:18] Processing: discover-email-settings[0m
+[1;33m[2026-02-28 11:58:18]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 11:58:18]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: discover-email-settings
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (discover-email-settings): supabase/functions/import_map.json
+Uploading asset (discover-email-settings): supabase/functions/discover-email-settings/index.ts
+Uploading asset (discover-email-settings): supabase/functions/_shared/logger.ts
+Uploading asset (discover-email-settings): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: discover-email-settings
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 11:58:20]   > Deployment command finished.[0m
+[0m[2026-02-28 11:58:20]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/discover-email-settings[0m
+[0;31m[2026-02-28 12:09:05]   > Health check WARNING (HTTP 000). Check logs.[0m
+[0m[2026-02-28 12:09:06] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:09:06] Processing: domains-register[0m
+[1;33m[2026-02-28 12:09:06]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:09:06]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: domains-register
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (domains-register): supabase/functions/import_map.json
+Uploading asset (domains-register): supabase/functions/domains-register/index.ts
+Uploading asset (domains-register): supabase/functions/_shared/auth.ts
+Uploading asset (domains-register): supabase/functions/_shared/logger.ts
+Uploading asset (domains-register): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: domains-register
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:09:12]   > Deployment command finished.[0m
+[0m[2026-02-28 12:09:12]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/domains-register[0m
+[0;31m[2026-02-28 12:10:27]   > Health check WARNING (HTTP 000). Check logs.[0m
+[0m[2026-02-28 12:10:27] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:10:27] Processing: domains-verify[0m
+[1;33m[2026-02-28 12:10:27]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:10:27]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: domains-verify
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (domains-verify): supabase/functions/import_map.json
+Uploading asset (domains-verify): supabase/functions/domains-verify/index.ts
+Uploading asset (domains-verify): supabase/functions/_shared/auth.ts
+Uploading asset (domains-verify): supabase/functions/_shared/logger.ts
+Uploading asset (domains-verify): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: domains-verify
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:10:32]   > Deployment command finished.[0m
+[0m[2026-02-28 12:10:32]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/domains-verify[0m
+[0;31m[2026-02-28 12:11:47]   > Health check WARNING (HTTP 000). Check logs.[0m
+[0m[2026-02-28 12:11:47] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:11:47] Processing: email-scan[0m
+[1;33m[2026-02-28 12:11:47]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:11:47]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: email-scan
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (email-scan): supabase/functions/import_map.json
+Uploading asset (email-scan): supabase/functions/email-scan/index.ts
+Uploading asset (email-scan): supabase/functions/_shared/logger.ts
+Uploading asset (email-scan): supabase/functions/_shared/auth.ts
+Uploading asset (email-scan): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: email-scan
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:11:49]   > Deployment command finished.[0m
+[0m[2026-02-28 12:11:49]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/email-scan[0m
+[0;31m[2026-02-28 12:13:04]   > Health check WARNING (HTTP 000). Check logs.[0m
+[0m[2026-02-28 12:13:04] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:13:04] Processing: email-stats[0m
+[1;33m[2026-02-28 12:13:04]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:13:04]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: email-stats
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (email-stats): supabase/functions/import_map.json
+Uploading asset (email-stats): supabase/functions/email-stats/index.ts
+Uploading asset (email-stats): supabase/functions/_shared/auth.ts
+Uploading asset (email-stats): supabase/functions/_shared/logger.ts
+Uploading asset (email-stats): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: email-stats
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:13:06]   > Deployment command finished.[0m
+[0m[2026-02-28 12:13:06]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/email-stats[0m
+[0;31m[2026-02-28 12:14:21]   > Health check WARNING (HTTP 000). Check logs.[0m
+[0m[2026-02-28 12:14:21] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:14:21] Processing: emit-event[0m
+[1;33m[2026-02-28 12:14:21]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:14:21]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: emit-event
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (emit-event): supabase/functions/import_map.json
+Uploading asset (emit-event): supabase/functions/emit-event/index.ts
+Uploading asset (emit-event): supabase/functions/_shared/cors.ts
+Uploading asset (emit-event): supabase/functions/_shared/logger.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: emit-event
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:14:23]   > Deployment command finished.[0m
+[0m[2026-02-28 12:14:23]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/emit-event[0m

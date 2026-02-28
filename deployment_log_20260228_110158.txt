@@ -1,0 +1,4 @@
+[0;32m[2026-02-28 11:01:58] Starting comprehensive re-deployment to project: gzhxgoigflftharcmdqj[0m
+[0m[2026-02-28 11:01:58] Log file: deployment_log_20260228_110158.txt[0m
+[1;33m[2026-02-28 11:01:59] 1. Pre-flight Checks...[0m
+[0;31m[2026-02-28 11:01:59] Error: supabase CLI could not be found.[0m

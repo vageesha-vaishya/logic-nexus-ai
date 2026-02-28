@@ -1,0 +1,1846 @@
+[0;32m[2026-02-28 12:18:15] Starting comprehensive re-deployment to project: gzhxgoigflftharcmdqj[0m
+[0m[2026-02-28 12:18:15] Log file: deployment_log_20260228_121815.txt[0m
+[1;33m[2026-02-28 12:18:15] 1. Pre-flight Checks...[0m
+[1;33m[2026-02-28 12:18:15] Warning: 'deno' command not found. Skipping local syntax check.[0m
+[0;32m[2026-02-28 12:18:15] Pre-flight checks passed (npm found).[0m
+[1;33m[2026-02-28 12:18:15] 2. Discovering Edge Functions...[0m
+[0m[2026-02-28 12:18:15] Found 90 functions to deploy.[0m
+[1;33m[2026-02-28 12:18:15] 3. Starting Verification and Deployment...[0m
+[0m[2026-02-28 12:18:15] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:18:15] Processing: admin-reset-password[0m
+[1;33m[2026-02-28 12:18:15]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:18:15]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: admin-reset-password
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (admin-reset-password): supabase/functions/import_map.json
+Uploading asset (admin-reset-password): supabase/functions/admin-reset-password/index.ts
+Uploading asset (admin-reset-password): supabase/functions/_shared/auth.ts
+Uploading asset (admin-reset-password): supabase/functions/_shared/logger.ts
+Uploading asset (admin-reset-password): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: admin-reset-password
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:18:18]   > Deployment command finished.[0m
+[0m[2026-02-28 12:18:18]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/admin-reset-password[0m
+curl: (28) Connection timed out after 5004 milliseconds
+[0;31m[2026-02-28 12:18:23]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:18:23] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:18:23] Processing: ai-advisor[0m
+[1;33m[2026-02-28 12:18:23]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:18:23]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: ai-advisor
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (ai-advisor): supabase/functions/import_map.json
+Uploading asset (ai-advisor): supabase/functions/ai-advisor/index.ts
+Uploading asset (ai-advisor): supabase/functions/_shared/logger.ts
+Uploading asset (ai-advisor): supabase/functions/_shared/audit.ts
+Uploading asset (ai-advisor): supabase/functions/_shared/pii-guard.ts
+Uploading asset (ai-advisor): supabase/functions/_shared/auth.ts
+Uploading asset (ai-advisor): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: ai-advisor
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:18:24]   > Deployment command finished.[0m
+[0m[2026-02-28 12:18:24]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/ai-advisor[0m
+curl: (28) Connection timed out after 5005 milliseconds
+[0;31m[2026-02-28 12:18:29]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:18:29] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:18:29] Processing: ai-agent[0m
+[1;33m[2026-02-28 12:18:29]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:18:29]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: ai-agent
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (ai-agent): supabase/functions/import_map.json
+Uploading asset (ai-agent): supabase/functions/ai-agent/index.ts
+Uploading asset (ai-agent): supabase/functions/_shared/logger.ts
+Uploading asset (ai-agent): supabase/functions/_shared/pii-guard.ts
+Uploading asset (ai-agent): supabase/functions/_shared/audit.ts
+Uploading asset (ai-agent): supabase/functions/_shared/auth.ts
+Uploading asset (ai-agent): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: ai-agent
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:18:31]   > Deployment command finished.[0m
+[0m[2026-02-28 12:18:31]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/ai-agent[0m
+curl: (28) Connection timed out after 5005 milliseconds
+[0;31m[2026-02-28 12:18:36]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:18:36] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:18:36] Processing: ai-message-assistant[0m
+[1;33m[2026-02-28 12:18:36]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:18:36]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: ai-message-assistant
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (ai-message-assistant): supabase/functions/import_map.json
+Uploading asset (ai-message-assistant): supabase/functions/ai-message-assistant/index.ts
+Uploading asset (ai-message-assistant): supabase/functions/_shared/auth.ts
+Uploading asset (ai-message-assistant): supabase/functions/_shared/logger.ts
+Uploading asset (ai-message-assistant): supabase/functions/_shared/audit.ts
+Uploading asset (ai-message-assistant): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: ai-message-assistant
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:18:38]   > Deployment command finished.[0m
+[0m[2026-02-28 12:18:38]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/ai-message-assistant[0m
+curl: (28) Connection timed out after 5004 milliseconds
+[0;31m[2026-02-28 12:18:43]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:18:43] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:18:43] Processing: alert-notifier[0m
+[1;33m[2026-02-28 12:18:43]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:18:43]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: alert-notifier
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (alert-notifier): supabase/functions/import_map.json
+Uploading asset (alert-notifier): supabase/functions/alert-notifier/index.ts
+Uploading asset (alert-notifier): supabase/functions/_shared/auth.ts
+Uploading asset (alert-notifier): supabase/functions/_shared/logger.ts
+Uploading asset (alert-notifier): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: alert-notifier
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:18:45]   > Deployment command finished.[0m
+[0m[2026-02-28 12:18:45]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/alert-notifier[0m
+curl: (28) Connection timed out after 5006 milliseconds
+[0;31m[2026-02-28 12:18:50]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:18:50] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:18:50] Processing: analyze-cargo-damage[0m
+[1;33m[2026-02-28 12:18:50]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:18:50]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: analyze-cargo-damage
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (analyze-cargo-damage): supabase/functions/import_map.json
+Uploading asset (analyze-cargo-damage): supabase/functions/analyze-cargo-damage/index.ts
+Uploading asset (analyze-cargo-damage): supabase/functions/_shared/auth.ts
+Uploading asset (analyze-cargo-damage): supabase/functions/_shared/logger.ts
+Uploading asset (analyze-cargo-damage): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: analyze-cargo-damage
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:18:52]   > Deployment command finished.[0m
+[0m[2026-02-28 12:18:52]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/analyze-cargo-damage[0m
+curl: (28) Connection timed out after 5006 milliseconds
+[0;31m[2026-02-28 12:18:57]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:18:57] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:18:57] Processing: analyze-email-threat[0m
+[1;33m[2026-02-28 12:18:57]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:18:57]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: analyze-email-threat
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (analyze-email-threat): supabase/functions/import_map.json
+Uploading asset (analyze-email-threat): supabase/functions/analyze-email-threat/index.ts
+Uploading asset (analyze-email-threat): supabase/functions/_shared/auth.ts
+Uploading asset (analyze-email-threat): supabase/functions/_shared/logger.ts
+Uploading asset (analyze-email-threat): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: analyze-email-threat
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:18:59]   > Deployment command finished.[0m
+[0m[2026-02-28 12:18:59]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/analyze-email-threat[0m
+curl: (28) Connection timed out after 5005 milliseconds
+[0;31m[2026-02-28 12:19:04]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:19:04] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:19:04] Processing: anomaly-detection[0m
+[1;33m[2026-02-28 12:19:04]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:19:04]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: anomaly-detection
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (anomaly-detection): supabase/functions/import_map.json
+Uploading asset (anomaly-detection): supabase/functions/anomaly-detection/index.ts
+Uploading asset (anomaly-detection): supabase/functions/_shared/audit.ts
+Uploading asset (anomaly-detection): supabase/functions/_shared/auth.ts
+Uploading asset (anomaly-detection): supabase/functions/_shared/logger.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: anomaly-detection
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:19:06]   > Deployment command finished.[0m
+[0m[2026-02-28 12:19:06]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/anomaly-detection[0m
+curl: (28) Connection timed out after 5005 milliseconds
+[0;31m[2026-02-28 12:19:11]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:19:11] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:19:11] Processing: anomaly-detector[0m
+[1;33m[2026-02-28 12:19:11]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:19:11]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: anomaly-detector
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (anomaly-detector): supabase/functions/import_map.json
+Uploading asset (anomaly-detector): supabase/functions/anomaly-detector/index.ts
+Uploading asset (anomaly-detector): supabase/functions/_shared/auth.ts
+Uploading asset (anomaly-detector): supabase/functions/_shared/logger.ts
+Uploading asset (anomaly-detector): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: anomaly-detector
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:19:12]   > Deployment command finished.[0m
+[0m[2026-02-28 12:19:12]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/anomaly-detector[0m
+curl: (28) Connection timed out after 5002 milliseconds
+[0;31m[2026-02-28 12:19:17]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:19:17] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:19:17] Processing: autonomous-email[0m
+[1;33m[2026-02-28 12:19:17]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:19:17]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: autonomous-email
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (autonomous-email): supabase/functions/import_map.json
+Uploading asset (autonomous-email): supabase/functions/autonomous-email/index.ts
+Uploading asset (autonomous-email): supabase/functions/_shared/pii-guard.ts
+Uploading asset (autonomous-email): supabase/functions/_shared/audit.ts
+Uploading asset (autonomous-email): supabase/functions/_shared/auth.ts
+Uploading asset (autonomous-email): supabase/functions/_shared/logger.ts
+Uploading asset (autonomous-email): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: autonomous-email
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:19:19]   > Deployment command finished.[0m
+[0m[2026-02-28 12:19:19]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/autonomous-email[0m
+curl: (28) Connection timed out after 5001 milliseconds
+[0;31m[2026-02-28 12:19:24]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:19:24] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:19:24] Processing: calculate-lead-score[0m
+[1;33m[2026-02-28 12:19:24]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:19:24]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: calculate-lead-score
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (calculate-lead-score): supabase/functions/import_map.json
+Uploading asset (calculate-lead-score): supabase/functions/calculate-lead-score/index.ts
+Uploading asset (calculate-lead-score): supabase/functions/_shared/auth.ts
+Uploading asset (calculate-lead-score): supabase/functions/_shared/logger.ts
+Uploading asset (calculate-lead-score): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: calculate-lead-score
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:19:25]   > Deployment command finished.[0m
+[0m[2026-02-28 12:19:25]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/calculate-lead-score[0m
+curl: (28) Connection timed out after 5006 milliseconds
+[0;31m[2026-02-28 12:19:31]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:19:31] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:19:31] Processing: calculate-quote-financials[0m
+[1;33m[2026-02-28 12:19:31]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:19:31]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: calculate-quote-financials
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (calculate-quote-financials): supabase/functions/import_map.json
+Uploading asset (calculate-quote-financials): supabase/functions/calculate-quote-financials/index.ts
+Uploading asset (calculate-quote-financials): supabase/functions/_shared/logger.ts
+Uploading asset (calculate-quote-financials): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: calculate-quote-financials
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:19:32]   > Deployment command finished.[0m
+[0m[2026-02-28 12:19:32]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/calculate-quote-financials[0m
+curl: (28) Connection timed out after 5006 milliseconds
+[0;31m[2026-02-28 12:19:37]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:19:37] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:19:37] Processing: carrier-scoring[0m
+[1;33m[2026-02-28 12:19:37]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:19:37]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: carrier-scoring
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (carrier-scoring): supabase/functions/import_map.json
+Uploading asset (carrier-scoring): supabase/functions/carrier-scoring/index.ts
+Uploading asset (carrier-scoring): supabase/functions/_shared/audit.ts
+Uploading asset (carrier-scoring): supabase/functions/_shared/auth.ts
+Uploading asset (carrier-scoring): supabase/functions/_shared/logger.ts
+Uploading asset (carrier-scoring): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: carrier-scoring
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:19:39]   > Deployment command finished.[0m
+[0m[2026-02-28 12:19:39]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/carrier-scoring[0m
+curl: (28) Connection timed out after 5008 milliseconds
+[0;31m[2026-02-28 12:19:44]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:19:44] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:19:44] Processing: categorize-document[0m
+[1;33m[2026-02-28 12:19:44]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:19:44]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: categorize-document
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (categorize-document): supabase/functions/import_map.json
+Uploading asset (categorize-document): supabase/functions/categorize-document/index.ts
+Uploading asset (categorize-document): supabase/functions/_shared/audit.ts
+Uploading asset (categorize-document): supabase/functions/_shared/auth.ts
+Uploading asset (categorize-document): supabase/functions/_shared/logger.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: categorize-document
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:19:45]   > Deployment command finished.[0m
+[0m[2026-02-28 12:19:45]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/categorize-document[0m
+curl: (28) Connection timed out after 5002 milliseconds
+[0;31m[2026-02-28 12:19:50]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:19:50] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:19:50] Processing: check-expiring-documents[0m
+[1;33m[2026-02-28 12:19:50]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:19:50]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: check-expiring-documents
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (check-expiring-documents): supabase/functions/import_map.json
+Uploading asset (check-expiring-documents): supabase/functions/check-expiring-documents/index.ts
+Uploading asset (check-expiring-documents): supabase/functions/_shared/logger.ts
+Uploading asset (check-expiring-documents): supabase/functions/_shared/auth.ts
+Uploading asset (check-expiring-documents): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: check-expiring-documents
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:19:52]   > Deployment command finished.[0m
+[0m[2026-02-28 12:19:52]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/check-expiring-documents[0m
+curl: (28) Connection timed out after 5005 milliseconds
+[0;31m[2026-02-28 12:19:57]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:19:57] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:19:57] Processing: classify-email[0m
+[1;33m[2026-02-28 12:19:57]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:19:57]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: classify-email
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (classify-email): supabase/functions/import_map.json
+Uploading asset (classify-email): supabase/functions/classify-email/index.ts
+Uploading asset (classify-email): supabase/functions/_shared/audit.ts
+Uploading asset (classify-email): supabase/functions/_shared/model-router.ts
+Uploading asset (classify-email): supabase/functions/_shared/pii-guard.ts
+Uploading asset (classify-email): supabase/functions/_shared/auth.ts
+Uploading asset (classify-email): supabase/functions/_shared/logger.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: classify-email
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:19:59]   > Deployment command finished.[0m
+[0m[2026-02-28 12:19:59]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/classify-email[0m
+curl: (28) Connection timed out after 5005 milliseconds
+[0;31m[2026-02-28 12:20:04]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:20:04] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:20:04] Processing: cleanup-logs[0m
+[1;33m[2026-02-28 12:20:04]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:20:04]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: cleanup-logs
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (cleanup-logs): supabase/functions/import_map.json
+Uploading asset (cleanup-logs): supabase/functions/cleanup-logs/index.ts
+Uploading asset (cleanup-logs): supabase/functions/_shared/auth.ts
+Uploading asset (cleanup-logs): supabase/functions/_shared/logger.ts
+Uploading asset (cleanup-logs): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: cleanup-logs
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:20:06]   > Deployment command finished.[0m
+[0m[2026-02-28 12:20:06]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/cleanup-logs[0m
+curl: (28) Connection timed out after 5002 milliseconds
+[0;31m[2026-02-28 12:20:11]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:20:11] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:20:11] Processing: container-demand[0m
+[1;33m[2026-02-28 12:20:11]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:20:11]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: container-demand
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (container-demand): supabase/functions/import_map.json
+Uploading asset (container-demand): supabase/functions/container-demand/index.ts
+Uploading asset (container-demand): supabase/functions/_shared/audit.ts
+Uploading asset (container-demand): supabase/functions/_shared/auth.ts
+Uploading asset (container-demand): supabase/functions/_shared/logger.ts
+Uploading asset (container-demand): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: container-demand
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:20:12]   > Deployment command finished.[0m
+[0m[2026-02-28 12:20:12]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/container-demand[0m
+curl: (28) Connection timed out after 5002 milliseconds
+[0;31m[2026-02-28 12:20:17]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:20:17] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:20:17] Processing: create-user[0m
+[1;33m[2026-02-28 12:20:17]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:20:17]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: create-user
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (create-user): supabase/functions/import_map.json
+Uploading asset (create-user): supabase/functions/create-user/index.ts
+Uploading asset (create-user): supabase/functions/_shared/logger.ts
+Uploading asset (create-user): supabase/functions/_shared/auth.ts
+Uploading asset (create-user): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: create-user
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:20:19]   > Deployment command finished.[0m
+[0m[2026-02-28 12:20:19]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/create-user[0m
+curl: (28) Connection timed out after 5004 milliseconds
+[0;31m[2026-02-28 12:20:24]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:20:24] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:20:24] Processing: delete-user[0m
+[1;33m[2026-02-28 12:20:24]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:20:24]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: delete-user
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (delete-user): supabase/functions/import_map.json
+Uploading asset (delete-user): supabase/functions/delete-user/index.ts
+Uploading asset (delete-user): supabase/functions/_shared/auth.ts
+Uploading asset (delete-user): supabase/functions/_shared/logger.ts
+Uploading asset (delete-user): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: delete-user
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:20:26]   > Deployment command finished.[0m
+[0m[2026-02-28 12:20:26]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/delete-user[0m
+curl: (28) Connection timed out after 5006 milliseconds
+[0;31m[2026-02-28 12:20:31]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:20:31] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:20:31] Processing: discover-email-settings[0m
+[1;33m[2026-02-28 12:20:31]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:20:31]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: discover-email-settings
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (discover-email-settings): supabase/functions/import_map.json
+Uploading asset (discover-email-settings): supabase/functions/discover-email-settings/index.ts
+Uploading asset (discover-email-settings): supabase/functions/_shared/logger.ts
+Uploading asset (discover-email-settings): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: discover-email-settings
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:20:33]   > Deployment command finished.[0m
+[0m[2026-02-28 12:20:33]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/discover-email-settings[0m
+curl: (28) Connection timed out after 5004 milliseconds
+[0;31m[2026-02-28 12:20:38]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:20:38] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:20:38] Processing: domains-register[0m
+[1;33m[2026-02-28 12:20:38]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:20:38]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: domains-register
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (domains-register): supabase/functions/import_map.json
+Uploading asset (domains-register): supabase/functions/domains-register/index.ts
+Uploading asset (domains-register): supabase/functions/_shared/auth.ts
+Uploading asset (domains-register): supabase/functions/_shared/logger.ts
+Uploading asset (domains-register): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: domains-register
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:20:43]   > Deployment command finished.[0m
+[0m[2026-02-28 12:20:43]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/domains-register[0m
+curl: (28) Connection timed out after 5006 milliseconds
+[0;31m[2026-02-28 12:20:48]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:20:49] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:20:49] Processing: domains-verify[0m
+[1;33m[2026-02-28 12:20:49]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:20:49]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: domains-verify
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (domains-verify): supabase/functions/import_map.json
+Uploading asset (domains-verify): supabase/functions/domains-verify/index.ts
+Uploading asset (domains-verify): supabase/functions/_shared/auth.ts
+Uploading asset (domains-verify): supabase/functions/_shared/logger.ts
+Uploading asset (domains-verify): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: domains-verify
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:20:55]   > Deployment command finished.[0m
+[0m[2026-02-28 12:20:55]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/domains-verify[0m
+curl: (28) Connection timed out after 5007 milliseconds
+[0;31m[2026-02-28 12:21:00]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:21:00] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:21:00] Processing: email-scan[0m
+[1;33m[2026-02-28 12:21:00]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:21:00]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: email-scan
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (email-scan): supabase/functions/import_map.json
+Uploading asset (email-scan): supabase/functions/email-scan/index.ts
+Uploading asset (email-scan): supabase/functions/_shared/logger.ts
+Uploading asset (email-scan): supabase/functions/_shared/auth.ts
+Uploading asset (email-scan): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: email-scan
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:21:01]   > Deployment command finished.[0m
+[0m[2026-02-28 12:21:01]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/email-scan[0m
+curl: (28) Connection timed out after 5006 milliseconds
+[0;31m[2026-02-28 12:21:06]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:21:06] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:21:06] Processing: email-stats[0m
+[1;33m[2026-02-28 12:21:06]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:21:06]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: email-stats
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (email-stats): supabase/functions/import_map.json
+Uploading asset (email-stats): supabase/functions/email-stats/index.ts
+Uploading asset (email-stats): supabase/functions/_shared/auth.ts
+Uploading asset (email-stats): supabase/functions/_shared/logger.ts
+Uploading asset (email-stats): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: email-stats
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:21:08]   > Deployment command finished.[0m
+[0m[2026-02-28 12:21:08]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/email-stats[0m
+curl: (28) Connection timed out after 5006 milliseconds
+[0;31m[2026-02-28 12:21:13]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:21:13] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:21:13] Processing: emit-event[0m
+[1;33m[2026-02-28 12:21:13]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:21:13]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: emit-event
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (emit-event): supabase/functions/import_map.json
+Uploading asset (emit-event): supabase/functions/emit-event/index.ts
+Uploading asset (emit-event): supabase/functions/_shared/cors.ts
+Uploading asset (emit-event): supabase/functions/_shared/logger.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: emit-event
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:21:14]   > Deployment command finished.[0m
+[0m[2026-02-28 12:21:14]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/emit-event[0m
+curl: (28) Connection timed out after 5003 milliseconds
+[0;31m[2026-02-28 12:21:19]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:21:19] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:21:19] Processing: ensemble-demand[0m
+[1;33m[2026-02-28 12:21:19]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:21:19]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: ensemble-demand
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (ensemble-demand): supabase/functions/import_map.json
+Uploading asset (ensemble-demand): supabase/functions/ensemble-demand/index.ts
+Uploading asset (ensemble-demand): supabase/functions/_shared/logger.ts
+Uploading asset (ensemble-demand): supabase/functions/_shared/pii-guard.ts
+Uploading asset (ensemble-demand): supabase/functions/_shared/audit.ts
+Uploading asset (ensemble-demand): supabase/functions/_shared/auth.ts
+Uploading asset (ensemble-demand): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: ensemble-demand
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:21:21]   > Deployment command finished.[0m
+[0m[2026-02-28 12:21:21]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/ensemble-demand[0m
+curl: (28) Connection timed out after 5002 milliseconds
+[0;31m[2026-02-28 12:21:26]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:21:26] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:21:26] Processing: escalate-message[0m
+[1;33m[2026-02-28 12:21:26]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:21:26]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: escalate-message
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (escalate-message): supabase/functions/import_map.json
+Uploading asset (escalate-message): supabase/functions/escalate-message/index.ts
+Uploading asset (escalate-message): supabase/functions/_shared/auth.ts
+Uploading asset (escalate-message): supabase/functions/_shared/logger.ts
+Uploading asset (escalate-message): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: escalate-message
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:21:27]   > Deployment command finished.[0m
+[0m[2026-02-28 12:21:27]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/escalate-message[0m
+curl: (28) Connection timed out after 5004 milliseconds
+[0;31m[2026-02-28 12:21:32]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:21:32] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:21:32] Processing: exchange-oauth-token[0m
+[1;33m[2026-02-28 12:21:32]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:21:32]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: exchange-oauth-token
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (exchange-oauth-token): supabase/functions/import_map.json
+Uploading asset (exchange-oauth-token): supabase/functions/exchange-oauth-token/index.ts
+Uploading asset (exchange-oauth-token): supabase/functions/_shared/logger.ts
+Uploading asset (exchange-oauth-token): supabase/functions/_shared/auth.ts
+Uploading asset (exchange-oauth-token): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: exchange-oauth-token
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:21:34]   > Deployment command finished.[0m
+[0m[2026-02-28 12:21:34]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/exchange-oauth-token[0m
+curl: (28) Connection timed out after 5002 milliseconds
+[0;31m[2026-02-28 12:21:39]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:21:39] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:21:39] Processing: execute-sql-external[0m
+[1;33m[2026-02-28 12:21:39]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:21:39]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: execute-sql-external
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (execute-sql-external): supabase/functions/import_map.json
+Uploading asset (execute-sql-external): supabase/functions/execute-sql-external/index.ts
+Uploading asset (execute-sql-external): supabase/functions/_shared/logger.ts
+Uploading asset (execute-sql-external): supabase/functions/_shared/auth.ts
+Uploading asset (execute-sql-external): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: execute-sql-external
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:21:42]   > Deployment command finished.[0m
+[0m[2026-02-28 12:21:42]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/execute-sql-external[0m
+curl: (28) Connection timed out after 5006 milliseconds
+[0;31m[2026-02-28 12:21:47]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:21:47] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:21:47] Processing: export-data[0m
+[1;33m[2026-02-28 12:21:47]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:21:47]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: export-data
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (export-data): supabase/functions/import_map.json
+Uploading asset (export-data): supabase/functions/export-data/index.ts
+Uploading asset (export-data): supabase/functions/_shared/auth.ts
+Uploading asset (export-data): supabase/functions/_shared/logger.ts
+Uploading asset (export-data): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: export-data
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:21:49]   > Deployment command finished.[0m
+[0m[2026-02-28 12:21:49]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/export-data[0m
+curl: (28) Connection timed out after 5006 milliseconds
+[0;31m[2026-02-28 12:21:54]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:21:54] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:21:54] Processing: extract-bol-fields[0m
+[1;33m[2026-02-28 12:21:54]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:21:54]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: extract-bol-fields
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (extract-bol-fields): supabase/functions/import_map.json
+Uploading asset (extract-bol-fields): supabase/functions/extract-bol-fields/index.ts
+Uploading asset (extract-bol-fields): supabase/functions/_shared/audit.ts
+Uploading asset (extract-bol-fields): supabase/functions/_shared/auth.ts
+Uploading asset (extract-bol-fields): supabase/functions/_shared/logger.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: extract-bol-fields
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:21:56]   > Deployment command finished.[0m
+[0m[2026-02-28 12:21:56]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/extract-bol-fields[0m
+curl: (28) Connection timed out after 5002 milliseconds
+[0;31m[2026-02-28 12:22:01]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:22:01] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:22:01] Processing: extract-invoice-items[0m
+[1;33m[2026-02-28 12:22:01]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:22:01]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: extract-invoice-items
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (extract-invoice-items): supabase/functions/import_map.json
+Uploading asset (extract-invoice-items): supabase/functions/extract-invoice-items/index.ts
+Uploading asset (extract-invoice-items): supabase/functions/_shared/logger.ts
+Uploading asset (extract-invoice-items): supabase/functions/_shared/auth.ts
+Uploading asset (extract-invoice-items): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: extract-invoice-items
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:22:02]   > Deployment command finished.[0m
+[0m[2026-02-28 12:22:02]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/extract-invoice-items[0m
+curl: (28) Connection timed out after 5005 milliseconds
+[0;31m[2026-02-28 12:22:07]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:22:07] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:22:07] Processing: fleet-utilization[0m
+[1;33m[2026-02-28 12:22:07]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:22:07]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: fleet-utilization
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (fleet-utilization): supabase/functions/import_map.json
+Uploading asset (fleet-utilization): supabase/functions/fleet-utilization/index.ts
+Uploading asset (fleet-utilization): supabase/functions/_shared/audit.ts
+Uploading asset (fleet-utilization): supabase/functions/_shared/auth.ts
+Uploading asset (fleet-utilization): supabase/functions/_shared/logger.ts
+Uploading asset (fleet-utilization): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: fleet-utilization
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:22:09]   > Deployment command finished.[0m
+[0m[2026-02-28 12:22:09]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/fleet-utilization[0m
+curl: (28) Connection timed out after 5005 milliseconds
+[0;31m[2026-02-28 12:22:14]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:22:14] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:22:14] Processing: forecast-demand[0m
+[1;33m[2026-02-28 12:22:14]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:22:14]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: forecast-demand
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (forecast-demand): supabase/functions/import_map.json
+Uploading asset (forecast-demand): supabase/functions/forecast-demand/index.ts
+Uploading asset (forecast-demand): supabase/functions/_shared/pii-guard.ts
+Uploading asset (forecast-demand): supabase/functions/_shared/audit.ts
+Uploading asset (forecast-demand): supabase/functions/_shared/auth.ts
+Uploading asset (forecast-demand): supabase/functions/_shared/logger.ts
+Uploading asset (forecast-demand): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: forecast-demand
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:22:16]   > Deployment command finished.[0m
+[0m[2026-02-28 12:22:16]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/forecast-demand[0m
+curl: (28) Connection timed out after 5005 milliseconds
+[0;31m[2026-02-28 12:22:21]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:22:21] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:22:21] Processing: generate-embedding[0m
+[1;33m[2026-02-28 12:22:21]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:22:21]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: generate-embedding
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (generate-embedding): supabase/functions/import_map.json
+Uploading asset (generate-embedding): supabase/functions/generate-embedding/index.ts
+Uploading asset (generate-embedding): supabase/functions/_shared/model-router.ts
+Uploading asset (generate-embedding): supabase/functions/_shared/logger.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: generate-embedding
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:22:23]   > Deployment command finished.[0m
+[0m[2026-02-28 12:22:23]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/generate-embedding[0m
+curl: (28) Connection timed out after 5002 milliseconds
+[0;31m[2026-02-28 12:22:28]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:22:28] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:22:28] Processing: generate-quote-pdf[0m
+[1;33m[2026-02-28 12:22:28]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:22:28]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: generate-quote-pdf
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (generate-quote-pdf): supabase/functions/import_map.json
+Uploading asset (generate-quote-pdf): supabase/functions/generate-quote-pdf/index.ts
+Uploading asset (generate-quote-pdf): supabase/functions/_shared/auth.ts
+Uploading asset (generate-quote-pdf): supabase/functions/_shared/logger.ts
+Uploading asset (generate-quote-pdf): supabase/functions/generate-quote-pdf/engine/template-service.ts
+Uploading asset (generate-quote-pdf): supabase/functions/generate-quote-pdf/engine/default_template.ts
+Uploading asset (generate-quote-pdf): supabase/functions/generate-quote-pdf/engine/schema.ts
+Uploading asset (generate-quote-pdf): supabase/functions/generate-quote-pdf/engine/context.ts
+Uploading asset (generate-quote-pdf): supabase/functions/generate-quote-pdf/engine/renderer.ts
+Uploading asset (generate-quote-pdf): supabase/functions/generate-quote-pdf/engine/i18n.ts
+Uploading asset (generate-quote-pdf): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: generate-quote-pdf
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:22:31]   > Deployment command finished.[0m
+[0m[2026-02-28 12:22:31]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/generate-quote-pdf[0m
+curl: (28) Connection timed out after 5006 milliseconds
+[0;31m[2026-02-28 12:22:36]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:22:36] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:22:36] Processing: get-account-label[0m
+[1;33m[2026-02-28 12:22:36]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:22:36]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: get-account-label
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (get-account-label): supabase/functions/import_map.json
+Uploading asset (get-account-label): supabase/functions/get-account-label/index.ts
+Uploading asset (get-account-label): supabase/functions/_shared/logger.ts
+Uploading asset (get-account-label): supabase/functions/_shared/auth.ts
+Uploading asset (get-account-label): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: get-account-label
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:22:38]   > Deployment command finished.[0m
+[0m[2026-02-28 12:22:38]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/get-account-label[0m
+curl: (28) Connection timed out after 5007 milliseconds
+[0;31m[2026-02-28 12:22:43]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:22:43] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:22:43] Processing: get-contact-label[0m
+[1;33m[2026-02-28 12:22:43]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:22:43]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: get-contact-label
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (get-contact-label): supabase/functions/import_map.json
+Uploading asset (get-contact-label): supabase/functions/get-contact-label/index.ts
+Uploading asset (get-contact-label): supabase/functions/_shared/logger.ts
+Uploading asset (get-contact-label): supabase/functions/_shared/auth.ts
+Uploading asset (get-contact-label): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: get-contact-label
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:22:45]   > Deployment command finished.[0m
+[0m[2026-02-28 12:22:45]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/get-contact-label[0m
+curl: (28) Connection timed out after 5006 milliseconds
+[0;31m[2026-02-28 12:22:50]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:22:50] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:22:50] Processing: get-opportunity-full[0m
+[1;33m[2026-02-28 12:22:50]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:22:50]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: get-opportunity-full
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (get-opportunity-full): supabase/functions/import_map.json
+Uploading asset (get-opportunity-full): supabase/functions/get-opportunity-full/index.ts
+Uploading asset (get-opportunity-full): supabase/functions/_shared/logger.ts
+Uploading asset (get-opportunity-full): supabase/functions/_shared/auth.ts
+Uploading asset (get-opportunity-full): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: get-opportunity-full
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:22:52]   > Deployment command finished.[0m
+[0m[2026-02-28 12:22:52]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/get-opportunity-full[0m
+curl: (28) Connection timed out after 5006 milliseconds
+[0;31m[2026-02-28 12:22:57]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:22:57] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:22:57] Processing: get-opportunity-label[0m
+[1;33m[2026-02-28 12:22:57]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:22:57]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: get-opportunity-label
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (get-opportunity-label): supabase/functions/import_map.json
+Uploading asset (get-opportunity-label): supabase/functions/get-opportunity-label/index.ts
+Uploading asset (get-opportunity-label): supabase/functions/_shared/logger.ts
+Uploading asset (get-opportunity-label): supabase/functions/_shared/auth.ts
+Uploading asset (get-opportunity-label): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: get-opportunity-label
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:22:59]   > Deployment command finished.[0m
+[0m[2026-02-28 12:22:59]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/get-opportunity-label[0m
+curl: (28) Connection timed out after 5006 milliseconds
+[0;31m[2026-02-28 12:23:04]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:23:04] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:23:04] Processing: get-service-label[0m
+[1;33m[2026-02-28 12:23:04]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:23:04]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: get-service-label
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (get-service-label): supabase/functions/import_map.json
+Uploading asset (get-service-label): supabase/functions/get-service-label/index.ts
+Uploading asset (get-service-label): supabase/functions/_shared/logger.ts
+Uploading asset (get-service-label): supabase/functions/_shared/auth.ts
+Uploading asset (get-service-label): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: get-service-label
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:23:06]   > Deployment command finished.[0m
+[0m[2026-02-28 12:23:06]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/get-service-label[0m
+curl: (28) Connection timed out after 5002 milliseconds
+[0;31m[2026-02-28 12:23:11]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:23:11] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:23:11] Processing: ingest-email[0m
+[1;33m[2026-02-28 12:23:11]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:23:11]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: ingest-email
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (ingest-email): supabase/functions/import_map.json
+Uploading asset (ingest-email): supabase/functions/ingest-email/index.ts
+Uploading asset (ingest-email): supabase/functions/_shared/audit.ts
+Uploading asset (ingest-email): supabase/functions/_shared/model-router.ts
+Uploading asset (ingest-email): supabase/functions/_shared/pii-guard.ts
+Uploading asset (ingest-email): supabase/functions/_shared/auth.ts
+Uploading asset (ingest-email): supabase/functions/_shared/logger.ts
+Uploading asset (ingest-email): supabase/functions/_shared/cors.ts
+Uploading asset (ingest-email): supabase/functions/_shared/routing-logic.ts
+Uploading asset (ingest-email): supabase/functions/_shared/classification-logic.ts
+Uploading asset (ingest-email): supabase/functions/ingest-email/utils.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: ingest-email
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:23:13]   > Deployment command finished.[0m
+[0m[2026-02-28 12:23:13]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/ingest-email[0m
+curl: (28) Connection timed out after 5005 milliseconds
+[0;31m[2026-02-28 12:23:18]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:23:18] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:23:18] Processing: ingest-linkedin[0m
+[1;33m[2026-02-28 12:23:18]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:23:18]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: ingest-linkedin
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (ingest-linkedin): supabase/functions/import_map.json
+Uploading asset (ingest-linkedin): supabase/functions/ingest-linkedin/index.ts
+Uploading asset (ingest-linkedin): supabase/functions/_shared/auth.ts
+Uploading asset (ingest-linkedin): supabase/functions/_shared/logger.ts
+Uploading asset (ingest-linkedin): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: ingest-linkedin
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:23:19]   > Deployment command finished.[0m
+[0m[2026-02-28 12:23:19]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/ingest-linkedin[0m
+curl: (28) Connection timed out after 5003 milliseconds
+[0;31m[2026-02-28 12:23:24]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:23:24] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:23:24] Processing: ingest-telegram[0m
+[1;33m[2026-02-28 12:23:24]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:23:24]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: ingest-telegram
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (ingest-telegram): supabase/functions/import_map.json
+Uploading asset (ingest-telegram): supabase/functions/ingest-telegram/index.ts
+Uploading asset (ingest-telegram): supabase/functions/_shared/auth.ts
+Uploading asset (ingest-telegram): supabase/functions/_shared/logger.ts
+Uploading asset (ingest-telegram): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: ingest-telegram
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:23:26]   > Deployment command finished.[0m
+[0m[2026-02-28 12:23:26]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/ingest-telegram[0m
+curl: (28) Connection timed out after 5004 milliseconds
+[0;31m[2026-02-28 12:23:31]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:23:31] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:23:31] Processing: ingest-web[0m
+[1;33m[2026-02-28 12:23:31]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:23:31]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: ingest-web
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (ingest-web): supabase/functions/import_map.json
+Uploading asset (ingest-web): supabase/functions/ingest-web/index.ts
+Uploading asset (ingest-web): supabase/functions/_shared/auth.ts
+Uploading asset (ingest-web): supabase/functions/_shared/logger.ts
+Uploading asset (ingest-web): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: ingest-web
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:23:33]   > Deployment command finished.[0m
+[0m[2026-02-28 12:23:33]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/ingest-web[0m
+curl: (28) Connection timed out after 5004 milliseconds
+[0;31m[2026-02-28 12:23:38]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:23:38] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:23:38] Processing: ingest-whatsapp[0m
+[1;33m[2026-02-28 12:23:38]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:23:38]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: ingest-whatsapp
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (ingest-whatsapp): supabase/functions/import_map.json
+Uploading asset (ingest-whatsapp): supabase/functions/ingest-whatsapp/index.ts
+Uploading asset (ingest-whatsapp): supabase/functions/_shared/cors.ts
+Uploading asset (ingest-whatsapp): supabase/functions/_shared/logger.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: ingest-whatsapp
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:23:40]   > Deployment command finished.[0m
+[0m[2026-02-28 12:23:40]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/ingest-whatsapp[0m
+curl: (28) Connection timed out after 5002 milliseconds
+[0;31m[2026-02-28 12:23:45]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:23:45] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:23:45] Processing: ingest-x[0m
+[1;33m[2026-02-28 12:23:45]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:23:45]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: ingest-x
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (ingest-x): supabase/functions/import_map.json
+Uploading asset (ingest-x): supabase/functions/ingest-x/index.ts
+Uploading asset (ingest-x): supabase/functions/_shared/cors.ts
+Uploading asset (ingest-x): supabase/functions/_shared/logger.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: ingest-x
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:23:46]   > Deployment command finished.[0m
+[0m[2026-02-28 12:23:46]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/ingest-x[0m
+curl: (28) Connection timed out after 5006 milliseconds
+[0;31m[2026-02-28 12:23:51]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:23:51] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:23:51] Processing: lead-event-webhook[0m
+[1;33m[2026-02-28 12:23:51]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:23:51]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: lead-event-webhook
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (lead-event-webhook): supabase/functions/import_map.json
+Uploading asset (lead-event-webhook): supabase/functions/lead-event-webhook/index.ts
+Uploading asset (lead-event-webhook): supabase/functions/_shared/logger.ts
+Uploading asset (lead-event-webhook): supabase/functions/_shared/auth.ts
+Uploading asset (lead-event-webhook): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: lead-event-webhook
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:23:55]   > Deployment command finished.[0m
+[0m[2026-02-28 12:23:55]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/lead-event-webhook[0m
+curl: (28) Connection timed out after 5002 milliseconds
+[0;31m[2026-02-28 12:24:00]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:24:00] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:24:00] Processing: lead-scoring[0m
+[1;33m[2026-02-28 12:24:00]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:24:00]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: lead-scoring
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (lead-scoring): supabase/functions/import_map.json
+Uploading asset (lead-scoring): supabase/functions/lead-scoring/index.ts
+Uploading asset (lead-scoring): supabase/functions/_shared/audit.ts
+Uploading asset (lead-scoring): supabase/functions/_shared/auth.ts
+Uploading asset (lead-scoring): supabase/functions/_shared/logger.ts
+Uploading asset (lead-scoring): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: lead-scoring
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:24:01]   > Deployment command finished.[0m
+[0m[2026-02-28 12:24:01]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/lead-scoring[0m
+curl: (28) Connection timed out after 5006 milliseconds
+[0;31m[2026-02-28 12:24:06]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:24:06] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:24:06] Processing: list-edge-functions[0m
+[1;33m[2026-02-28 12:24:06]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:24:06]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: list-edge-functions
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (list-edge-functions): supabase/functions/import_map.json
+Uploading asset (list-edge-functions): supabase/functions/list-edge-functions/index.ts
+Uploading asset (list-edge-functions): supabase/functions/_shared/logger.ts
+Uploading asset (list-edge-functions): supabase/functions/_shared/auth.ts
+Uploading asset (list-edge-functions): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: list-edge-functions
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:24:09]   > Deployment command finished.[0m
+[0m[2026-02-28 12:24:09]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/list-edge-functions[0m
+curl: (28) Connection timed out after 5005 milliseconds
+[0;31m[2026-02-28 12:24:14]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:24:14] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:24:14] Processing: margin-optimizer[0m
+[1;33m[2026-02-28 12:24:14]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:24:14]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: margin-optimizer
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (margin-optimizer): supabase/functions/import_map.json
+Uploading asset (margin-optimizer): supabase/functions/margin-optimizer/index.ts
+Uploading asset (margin-optimizer): supabase/functions/_shared/audit.ts
+Uploading asset (margin-optimizer): supabase/functions/_shared/auth.ts
+Uploading asset (margin-optimizer): supabase/functions/_shared/logger.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: margin-optimizer
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:24:16]   > Deployment command finished.[0m
+[0m[2026-02-28 12:24:16]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/margin-optimizer[0m
+curl: (28) Connection timed out after 5006 milliseconds
+[0;31m[2026-02-28 12:24:21]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:24:21] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:24:21] Processing: metrics-quotation[0m
+[1;33m[2026-02-28 12:24:21]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:24:21]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: metrics-quotation
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (metrics-quotation): supabase/functions/import_map.json
+Uploading asset (metrics-quotation): supabase/functions/metrics-quotation/index.ts
+Uploading asset (metrics-quotation): supabase/functions/_shared/auth.ts
+Uploading asset (metrics-quotation): supabase/functions/_shared/logger.ts
+Uploading asset (metrics-quotation): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: metrics-quotation
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:24:22]   > Deployment command finished.[0m
+[0m[2026-02-28 12:24:22]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/metrics-quotation[0m
+curl: (28) Connection timed out after 5005 milliseconds
+[0;31m[2026-02-28 12:24:27]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:24:27] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:24:27] Processing: moderate-message[0m
+[1;33m[2026-02-28 12:24:27]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:24:27]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: moderate-message
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (moderate-message): supabase/functions/import_map.json
+Uploading asset (moderate-message): supabase/functions/moderate-message/index.ts
+Uploading asset (moderate-message): supabase/functions/_shared/auth.ts
+Uploading asset (moderate-message): supabase/functions/_shared/logger.ts
+Uploading asset (moderate-message): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: moderate-message
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:24:29]   > Deployment command finished.[0m
+[0m[2026-02-28 12:24:29]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/moderate-message[0m
+curl: (28) Connection timed out after 5003 milliseconds
+[0;31m[2026-02-28 12:24:34]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:24:34] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:24:34] Processing: nexus-copilot[0m
+[1;33m[2026-02-28 12:24:34]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:24:34]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: nexus-copilot
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (nexus-copilot): supabase/functions/import_map.json
+Uploading asset (nexus-copilot): supabase/functions/nexus-copilot/index.ts
+Uploading asset (nexus-copilot): supabase/functions/_shared/audit.ts
+Uploading asset (nexus-copilot): supabase/functions/_shared/model-router.ts
+Uploading asset (nexus-copilot): supabase/functions/_shared/pii-guard.ts
+Uploading asset (nexus-copilot): supabase/functions/_shared/auth.ts
+Uploading asset (nexus-copilot): supabase/functions/_shared/logger.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: nexus-copilot
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:24:36]   > Deployment command finished.[0m
+[0m[2026-02-28 12:24:36]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/nexus-copilot[0m
+curl: (28) Connection timed out after 5006 milliseconds
+[0;31m[2026-02-28 12:24:41]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:24:41] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:24:41] Processing: plan-event-webhook[0m
+[1;33m[2026-02-28 12:24:41]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:24:41]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: plan-event-webhook
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (plan-event-webhook): supabase/functions/import_map.json
+Uploading asset (plan-event-webhook): supabase/functions/plan-event-webhook/index.ts
+Uploading asset (plan-event-webhook): supabase/functions/_shared/logger.ts
+Uploading asset (plan-event-webhook): supabase/functions/_shared/auth.ts
+Uploading asset (plan-event-webhook): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: plan-event-webhook
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:24:43]   > Deployment command finished.[0m
+[0m[2026-02-28 12:24:43]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/plan-event-webhook[0m
+curl: (28) Connection timed out after 5004 milliseconds
+[0;31m[2026-02-28 12:24:48]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:24:48] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:24:48] Processing: portal-chatbot[0m
+[1;33m[2026-02-28 12:24:48]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:24:48]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: portal-chatbot
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (portal-chatbot): supabase/functions/import_map.json
+Uploading asset (portal-chatbot): supabase/functions/portal-chatbot/index.ts
+Uploading asset (portal-chatbot): supabase/functions/_shared/pii-guard.ts
+Uploading asset (portal-chatbot): supabase/functions/_shared/audit.ts
+Uploading asset (portal-chatbot): supabase/functions/_shared/auth.ts
+Uploading asset (portal-chatbot): supabase/functions/_shared/logger.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: portal-chatbot
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:24:50]   > Deployment command finished.[0m
+[0m[2026-02-28 12:24:50]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/portal-chatbot[0m
+curl: (28) Connection timed out after 5006 milliseconds
+[0;31m[2026-02-28 12:24:55]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:24:55] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:24:55] Processing: predict-eta[0m
+[1;33m[2026-02-28 12:24:55]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:24:55]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: predict-eta
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (predict-eta): supabase/functions/import_map.json
+Uploading asset (predict-eta): supabase/functions/predict-eta/index.ts
+Uploading asset (predict-eta): supabase/functions/_shared/audit.ts
+Uploading asset (predict-eta): supabase/functions/_shared/auth.ts
+Uploading asset (predict-eta): supabase/functions/_shared/logger.ts
+Uploading asset (predict-eta): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: predict-eta
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:24:57]   > Deployment command finished.[0m
+[0m[2026-02-28 12:24:57]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/predict-eta[0m
+curl: (28) Connection timed out after 5009 milliseconds
+[0;31m[2026-02-28 12:25:02]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:25:02] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:25:02] Processing: process-email-retention[0m
+[1;33m[2026-02-28 12:25:02]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:25:02]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: process-email-retention
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (process-email-retention): supabase/functions/import_map.json
+Uploading asset (process-email-retention): supabase/functions/process-email-retention/index.ts
+Uploading asset (process-email-retention): supabase/functions/_shared/auth.ts
+Uploading asset (process-email-retention): supabase/functions/_shared/logger.ts
+Uploading asset (process-email-retention): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: process-email-retention
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:25:03]   > Deployment command finished.[0m
+[0m[2026-02-28 12:25:03]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/process-email-retention[0m
+curl: (28) Connection timed out after 5004 milliseconds
+[0;31m[2026-02-28 12:25:08]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:25:08] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:25:08] Processing: process-franchise-import[0m
+[1;33m[2026-02-28 12:25:08]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:25:08]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: process-franchise-import
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (process-franchise-import): supabase/functions/import_map.json
+Uploading asset (process-franchise-import): supabase/functions/process-franchise-import/index.ts
+Uploading asset (process-franchise-import): supabase/functions/_shared/auth.ts
+Uploading asset (process-franchise-import): supabase/functions/_shared/logger.ts
+Uploading asset (process-franchise-import): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: process-franchise-import
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:25:10]   > Deployment command finished.[0m
+[0m[2026-02-28 12:25:10]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/process-franchise-import[0m
+curl: (28) Connection timed out after 5005 milliseconds
+[0;31m[2026-02-28 12:25:15]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:25:15] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:25:15] Processing: process-lead-assignments[0m
+[1;33m[2026-02-28 12:25:15]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:25:15]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: process-lead-assignments
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (process-lead-assignments): supabase/functions/import_map.json
+Uploading asset (process-lead-assignments): supabase/functions/process-lead-assignments/index.ts
+Uploading asset (process-lead-assignments): supabase/functions/_shared/auth.ts
+Uploading asset (process-lead-assignments): supabase/functions/_shared/logger.ts
+Uploading asset (process-lead-assignments): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: process-lead-assignments
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:25:17]   > Deployment command finished.[0m
+[0m[2026-02-28 12:25:17]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/process-lead-assignments[0m
+curl: (28) Connection timed out after 5006 milliseconds
+[0;31m[2026-02-28 12:25:22]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:25:22] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:25:22] Processing: process-scheduled-emails[0m
+[1;33m[2026-02-28 12:25:22]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:25:22]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: process-scheduled-emails
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (process-scheduled-emails): supabase/functions/import_map.json
+Uploading asset (process-scheduled-emails): supabase/functions/process-scheduled-emails/index.ts
+Uploading asset (process-scheduled-emails): supabase/functions/_shared/auth.ts
+Uploading asset (process-scheduled-emails): supabase/functions/_shared/logger.ts
+Uploading asset (process-scheduled-emails): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: process-scheduled-emails
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:25:24]   > Deployment command finished.[0m
+[0m[2026-02-28 12:25:24]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/process-scheduled-emails[0m
+curl: (28) Connection timed out after 5006 milliseconds
+[0;31m[2026-02-28 12:25:29]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:25:29] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:25:29] Processing: process-sequences[0m
+[1;33m[2026-02-28 12:25:29]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:25:29]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: process-sequences
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (process-sequences): supabase/functions/import_map.json
+Uploading asset (process-sequences): supabase/functions/process-sequences/index.ts
+Uploading asset (process-sequences): supabase/functions/_shared/auth.ts
+Uploading asset (process-sequences): supabase/functions/_shared/logger.ts
+Uploading asset (process-sequences): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: process-sequences
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:25:30]   > Deployment command finished.[0m
+[0m[2026-02-28 12:25:30]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/process-sequences[0m
+curl: (28) Connection timed out after 5005 milliseconds
+[0;31m[2026-02-28 12:25:36]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:25:36] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:25:36] Processing: push-migrations-to-target[0m
+[1;33m[2026-02-28 12:25:36]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:25:36]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: push-migrations-to-target
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (push-migrations-to-target): supabase/functions/import_map.json
+Uploading asset (push-migrations-to-target): supabase/functions/push-migrations-to-target/index.ts
+Uploading asset (push-migrations-to-target): supabase/functions/_shared/auth.ts
+Uploading asset (push-migrations-to-target): supabase/functions/_shared/logger.ts
+Uploading asset (push-migrations-to-target): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: push-migrations-to-target
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:25:39]   > Deployment command finished.[0m
+[0m[2026-02-28 12:25:39]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/push-migrations-to-target[0m
+curl: (28) Connection timed out after 5005 milliseconds
+[0;31m[2026-02-28 12:25:44]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:25:44] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:25:44] Processing: quote-event-webhook[0m
+[1;33m[2026-02-28 12:25:44]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:25:44]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: quote-event-webhook
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (quote-event-webhook): supabase/functions/import_map.json
+Uploading asset (quote-event-webhook): supabase/functions/quote-event-webhook/index.ts
+Uploading asset (quote-event-webhook): supabase/functions/_shared/cors.ts
+Uploading asset (quote-event-webhook): supabase/functions/_shared/logger.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: quote-event-webhook
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:25:46]   > Deployment command finished.[0m
+[0m[2026-02-28 12:25:46]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/quote-event-webhook[0m
+curl: (28) Connection timed out after 5007 milliseconds
+[0;31m[2026-02-28 12:25:51]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:25:51] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:25:51] Processing: rate-engine[0m
+[1;33m[2026-02-28 12:25:51]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:25:51]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: rate-engine
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (rate-engine): supabase/functions/import_map.json
+Uploading asset (rate-engine): supabase/functions/rate-engine/index.ts
+Uploading asset (rate-engine): supabase/functions/_shared/logger.ts
+Uploading asset (rate-engine): supabase/functions/_shared/auth.ts
+Uploading asset (rate-engine): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: rate-engine
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:25:52]   > Deployment command finished.[0m
+[0m[2026-02-28 12:25:52]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/rate-engine[0m
+curl: (28) Connection timed out after 5005 milliseconds
+[0;31m[2026-02-28 12:25:57]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:25:57] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:25:57] Processing: reconcile-quote[0m
+[1;33m[2026-02-28 12:25:57]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:25:57]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: reconcile-quote
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (reconcile-quote): supabase/functions/import_map.json
+Uploading asset (reconcile-quote): supabase/functions/reconcile-quote/index.ts
+Uploading asset (reconcile-quote): supabase/functions/_shared/cors.ts
+Uploading asset (reconcile-quote): supabase/functions/_shared/logger.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: reconcile-quote
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:25:59]   > Deployment command finished.[0m
+[0m[2026-02-28 12:25:59]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/reconcile-quote[0m
+curl: (28) Connection timed out after 5005 milliseconds
+[0;31m[2026-02-28 12:26:04]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:26:04] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:26:04] Processing: remote-import[0m
+[1;33m[2026-02-28 12:26:04]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:26:04]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: remote-import
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (remote-import): supabase/functions/import_map.json
+Uploading asset (remote-import): supabase/functions/remote-import/index.ts
+Uploading asset (remote-import): supabase/functions/_shared/auth.ts
+Uploading asset (remote-import): supabase/functions/_shared/logger.ts
+Uploading asset (remote-import): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: remote-import
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:26:06]   > Deployment command finished.[0m
+[0m[2026-02-28 12:26:06]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/remote-import[0m
+curl: (28) Connection timed out after 5006 milliseconds
+[0;31m[2026-02-28 12:26:11]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:26:11] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:26:11] Processing: revenue-forecasting[0m
+[1;33m[2026-02-28 12:26:11]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:26:11]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: revenue-forecasting
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (revenue-forecasting): supabase/functions/import_map.json
+Uploading asset (revenue-forecasting): supabase/functions/revenue-forecasting/index.ts
+Uploading asset (revenue-forecasting): supabase/functions/_shared/audit.ts
+Uploading asset (revenue-forecasting): supabase/functions/_shared/auth.ts
+Uploading asset (revenue-forecasting): supabase/functions/_shared/logger.ts
+Uploading asset (revenue-forecasting): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: revenue-forecasting
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:26:13]   > Deployment command finished.[0m
+[0m[2026-02-28 12:26:13]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/revenue-forecasting[0m
+curl: (28) Connection timed out after 5005 milliseconds
+[0;31m[2026-02-28 12:26:18]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:26:18] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:26:18] Processing: risk-scoring[0m
+[1;33m[2026-02-28 12:26:18]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:26:18]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: risk-scoring
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (risk-scoring): supabase/functions/import_map.json
+Uploading asset (risk-scoring): supabase/functions/risk-scoring/index.ts
+Uploading asset (risk-scoring): supabase/functions/_shared/audit.ts
+Uploading asset (risk-scoring): supabase/functions/_shared/auth.ts
+Uploading asset (risk-scoring): supabase/functions/_shared/logger.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: risk-scoring
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:26:20]   > Deployment command finished.[0m
+[0m[2026-02-28 12:26:20]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/risk-scoring[0m
+curl: (28) Connection timed out after 5005 milliseconds
+[0;31m[2026-02-28 12:26:25]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:26:25] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:26:25] Processing: route-email[0m
+[1;33m[2026-02-28 12:26:25]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:26:25]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: route-email
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (route-email): supabase/functions/import_map.json
+Uploading asset (route-email): supabase/functions/route-email/index.ts
+Uploading asset (route-email): supabase/functions/_shared/auth.ts
+Uploading asset (route-email): supabase/functions/_shared/logger.ts
+Uploading asset (route-email): supabase/functions/_shared/cors.ts
+Uploading asset (route-email): supabase/functions/_shared/routing-logic.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: route-email
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:26:26]   > Deployment command finished.[0m
+[0m[2026-02-28 12:26:26]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/route-email[0m
+curl: (28) Connection timed out after 5005 milliseconds
+[0;31m[2026-02-28 12:26:31]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:26:31] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:26:31] Processing: route-optimization[0m
+[1;33m[2026-02-28 12:26:31]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:26:31]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: route-optimization
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (route-optimization): supabase/functions/import_map.json
+Uploading asset (route-optimization): supabase/functions/route-optimization/index.ts
+Uploading asset (route-optimization): supabase/functions/_shared/pii-guard.ts
+Uploading asset (route-optimization): supabase/functions/_shared/audit.ts
+Uploading asset (route-optimization): supabase/functions/_shared/auth.ts
+Uploading asset (route-optimization): supabase/functions/_shared/logger.ts
+Uploading asset (route-optimization): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: route-optimization
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:26:33]   > Deployment command finished.[0m
+[0m[2026-02-28 12:26:33]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/route-optimization[0m
+curl: (28) Connection timed out after 5004 milliseconds
+[0;31m[2026-02-28 12:26:38]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:26:38] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:26:38] Processing: salesforce-sync-opportunity[0m
+[1;33m[2026-02-28 12:26:38]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:26:38]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: salesforce-sync-opportunity
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (salesforce-sync-opportunity): supabase/functions/import_map.json
+Uploading asset (salesforce-sync-opportunity): supabase/functions/salesforce-sync-opportunity/index.ts
+Uploading asset (salesforce-sync-opportunity): supabase/functions/_shared/auth.ts
+Uploading asset (salesforce-sync-opportunity): supabase/functions/_shared/logger.ts
+Uploading asset (salesforce-sync-opportunity): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: salesforce-sync-opportunity
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:26:39]   > Deployment command finished.[0m
+[0m[2026-02-28 12:26:39]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/salesforce-sync-opportunity[0m
+curl: (28) Connection timed out after 5003 milliseconds
+[0;31m[2026-02-28 12:26:44]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:26:44] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:26:44] Processing: scheduled-reconcile[0m
+[1;33m[2026-02-28 12:26:44]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:26:44]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: scheduled-reconcile
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (scheduled-reconcile): supabase/functions/import_map.json
+Uploading asset (scheduled-reconcile): supabase/functions/scheduled-reconcile/index.ts
+Uploading asset (scheduled-reconcile): supabase/functions/_shared/cors.ts
+Uploading asset (scheduled-reconcile): supabase/functions/_shared/logger.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: scheduled-reconcile
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:26:45]   > Deployment command finished.[0m
+[0m[2026-02-28 12:26:45]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/scheduled-reconcile[0m
+curl: (28) Connection timed out after 5006 milliseconds
+[0;31m[2026-02-28 12:26:51]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:26:51] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:26:51] Processing: search-emails[0m
+[1;33m[2026-02-28 12:26:51]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:26:51]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: search-emails
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (search-emails): supabase/functions/import_map.json
+Uploading asset (search-emails): supabase/functions/search-emails/index.ts
+Uploading asset (search-emails): supabase/functions/_shared/auth.ts
+Uploading asset (search-emails): supabase/functions/_shared/logger.ts
+Uploading asset (search-emails): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: search-emails
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:26:53]   > Deployment command finished.[0m
+[0m[2026-02-28 12:26:53]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/search-emails[0m
+curl: (28) Connection timed out after 5005 milliseconds
+[0;31m[2026-02-28 12:26:58]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:26:58] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:26:58] Processing: seed-platform-admin[0m
+[1;33m[2026-02-28 12:26:58]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:26:58]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: seed-platform-admin
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (seed-platform-admin): supabase/functions/import_map.json
+Uploading asset (seed-platform-admin): supabase/functions/seed-platform-admin/index.ts
+Uploading asset (seed-platform-admin): supabase/functions/_shared/logger.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: seed-platform-admin
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:27:00]   > Deployment command finished.[0m
+[0m[2026-02-28 12:27:00]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/seed-platform-admin[0m
+curl: (28) Connection timed out after 5006 milliseconds
+[0;31m[2026-02-28 12:27:05]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:27:05] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:27:05] Processing: send-email[0m
+[1;33m[2026-02-28 12:27:05]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:27:05]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: send-email
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (send-email): supabase/functions/import_map.json
+Uploading asset (send-email): supabase/functions/send-email/index.ts
+Uploading asset (send-email): supabase/functions/_shared/logger.ts
+Uploading asset (send-email): supabase/functions/_shared/auth.ts
+Uploading asset (send-email): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: send-email
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:27:07]   > Deployment command finished.[0m
+[0m[2026-02-28 12:27:07]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/send-email[0m
+curl: (28) Connection timed out after 5002 milliseconds
+[0;31m[2026-02-28 12:27:12]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:27:12] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:27:12] Processing: send-web[0m
+[1;33m[2026-02-28 12:27:12]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:27:12]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: send-web
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (send-web): supabase/functions/import_map.json
+Uploading asset (send-web): supabase/functions/send-web/index.ts
+Uploading asset (send-web): supabase/functions/_shared/auth.ts
+Uploading asset (send-web): supabase/functions/_shared/logger.ts
+Uploading asset (send-web): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: send-web
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:27:13]   > Deployment command finished.[0m
+[0m[2026-02-28 12:27:13]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/send-web[0m
+curl: (28) Connection timed out after 5005 milliseconds
+[0;31m[2026-02-28 12:27:18]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:27:18] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:27:18] Processing: send-whatsapp[0m
+[1;33m[2026-02-28 12:27:18]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:27:18]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: send-whatsapp
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (send-whatsapp): supabase/functions/import_map.json
+Uploading asset (send-whatsapp): supabase/functions/send-whatsapp/index.ts
+Uploading asset (send-whatsapp): supabase/functions/_shared/auth.ts
+Uploading asset (send-whatsapp): supabase/functions/_shared/logger.ts
+Uploading asset (send-whatsapp): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: send-whatsapp
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:27:20]   > Deployment command finished.[0m
+[0m[2026-02-28 12:27:20]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/send-whatsapp[0m
+curl: (28) Connection timed out after 5006 milliseconds
+[0;31m[2026-02-28 12:27:25]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:27:25] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:27:25] Processing: smart-reply[0m
+[1;33m[2026-02-28 12:27:25]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:27:25]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: smart-reply
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (smart-reply): supabase/functions/import_map.json
+Uploading asset (smart-reply): supabase/functions/smart-reply/index.ts
+Uploading asset (smart-reply): supabase/functions/_shared/audit.ts
+Uploading asset (smart-reply): supabase/functions/_shared/pii-guard.ts
+Uploading asset (smart-reply): supabase/functions/_shared/auth.ts
+Uploading asset (smart-reply): supabase/functions/_shared/logger.ts
+Uploading asset (smart-reply): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: smart-reply
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:27:27]   > Deployment command finished.[0m
+[0m[2026-02-28 12:27:27]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/smart-reply[0m
+curl: (28) Connection timed out after 5003 milliseconds
+[0;31m[2026-02-28 12:27:33]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:27:33] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:27:33] Processing: subscription-plans[0m
+[1;33m[2026-02-28 12:27:33]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:27:33]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: subscription-plans
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (subscription-plans): supabase/functions/import_map.json
+Uploading asset (subscription-plans): supabase/functions/subscription-plans/index.ts
+Uploading asset (subscription-plans): supabase/functions/_shared/cors.ts
+Uploading asset (subscription-plans): supabase/functions/_shared/auth.ts
+Uploading asset (subscription-plans): supabase/functions/_shared/logger.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: subscription-plans
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:27:35]   > Deployment command finished.[0m
+[0m[2026-02-28 12:27:35]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/subscription-plans[0m
+curl: (28) Connection timed out after 5004 milliseconds
+[0;31m[2026-02-28 12:27:40]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:27:40] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:27:40] Processing: suggest-transport-mode[0m
+[1;33m[2026-02-28 12:27:40]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:27:40]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: suggest-transport-mode
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (suggest-transport-mode): supabase/functions/import_map.json
+Uploading asset (suggest-transport-mode): supabase/functions/suggest-transport-mode/index.ts
+Uploading asset (suggest-transport-mode): supabase/functions/_shared/auth.ts
+Uploading asset (suggest-transport-mode): supabase/functions/_shared/logger.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: suggest-transport-mode
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:27:42]   > Deployment command finished.[0m
+[0m[2026-02-28 12:27:42]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/suggest-transport-mode[0m
+curl: (28) Connection timed out after 5005 milliseconds
+[0;31m[2026-02-28 12:27:47]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:27:47] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:27:47] Processing: sync-all-mailboxes[0m
+[1;33m[2026-02-28 12:27:47]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:27:47]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: sync-all-mailboxes
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (sync-all-mailboxes): supabase/functions/import_map.json
+Uploading asset (sync-all-mailboxes): supabase/functions/sync-all-mailboxes/index.ts
+Uploading asset (sync-all-mailboxes): supabase/functions/_shared/auth.ts
+Uploading asset (sync-all-mailboxes): supabase/functions/_shared/logger.ts
+Uploading asset (sync-all-mailboxes): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: sync-all-mailboxes
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:27:49]   > Deployment command finished.[0m
+[0m[2026-02-28 12:27:49]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/sync-all-mailboxes[0m
+curl: (28) Connection timed out after 5006 milliseconds
+[0;31m[2026-02-28 12:27:54]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:27:54] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:27:54] Processing: sync-cn-hs-data[0m
+[1;33m[2026-02-28 12:27:54]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:27:54]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: sync-cn-hs-data
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (sync-cn-hs-data): supabase/functions/import_map.json
+Uploading asset (sync-cn-hs-data): supabase/functions/sync-cn-hs-data/index.ts
+Uploading asset (sync-cn-hs-data): supabase/functions/_shared/auth.ts
+Uploading asset (sync-cn-hs-data): supabase/functions/_shared/logger.ts
+Uploading asset (sync-cn-hs-data): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: sync-cn-hs-data
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:27:56]   > Deployment command finished.[0m
+[0m[2026-02-28 12:27:56]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/sync-cn-hs-data[0m
+curl: (28) Connection timed out after 5002 milliseconds
+[0;31m[2026-02-28 12:28:01]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:28:01] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:28:01] Processing: sync-emails[0m
+[1;33m[2026-02-28 12:28:01]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:28:01]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: sync-emails
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (sync-emails): supabase/functions/import_map.json
+Uploading asset (sync-emails): supabase/functions/sync-emails/index.ts
+Uploading asset (sync-emails): supabase/functions/_shared/auth.ts
+Uploading asset (sync-emails): supabase/functions/_shared/logger.ts
+Uploading asset (sync-emails): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: sync-emails
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:28:03]   > Deployment command finished.[0m
+[0m[2026-02-28 12:28:03]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/sync-emails[0m
+curl: (28) Connection timed out after 5003 milliseconds
+[0;31m[2026-02-28 12:28:08]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:28:08] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:28:08] Processing: sync-emails-v2[0m
+[1;33m[2026-02-28 12:28:08]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:28:08]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: sync-emails-v2
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (sync-emails-v2): supabase/functions/import_map.json
+Uploading asset (sync-emails-v2): supabase/functions/sync-emails-v2/index.ts
+Uploading asset (sync-emails-v2): supabase/functions/_shared/auth.ts
+Uploading asset (sync-emails-v2): supabase/functions/_shared/logger.ts
+Uploading asset (sync-emails-v2): supabase/functions/_shared/cors.ts
+Uploading asset (sync-emails-v2): supabase/functions/sync-emails-v2/utils/db.ts
+Uploading asset (sync-emails-v2): supabase/functions/sync-emails-v2/utils/parser.ts
+Uploading asset (sync-emails-v2): supabase/functions/sync-emails-v2/services/gmail.ts
+Uploading asset (sync-emails-v2): supabase/functions/sync-emails-v2/services/pop3.ts
+Uploading asset (sync-emails-v2): supabase/functions/sync-emails-v2/services/imap.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: sync-emails-v2
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:28:11]   > Deployment command finished.[0m
+[0m[2026-02-28 12:28:11]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/sync-emails-v2[0m
+curl: (28) Connection timed out after 5004 milliseconds
+[0;31m[2026-02-28 12:28:16]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:28:16] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:28:16] Processing: sync-hts-data[0m
+[1;33m[2026-02-28 12:28:16]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:28:16]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: sync-hts-data
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (sync-hts-data): supabase/functions/import_map.json
+Uploading asset (sync-hts-data): supabase/functions/sync-hts-data/index.ts
+Uploading asset (sync-hts-data): supabase/functions/_shared/auth.ts
+Uploading asset (sync-hts-data): supabase/functions/_shared/logger.ts
+Uploading asset (sync-hts-data): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: sync-hts-data
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:28:18]   > Deployment command finished.[0m
+[0m[2026-02-28 12:28:18]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/sync-hts-data[0m
+curl: (28) Connection timed out after 5004 milliseconds
+[0;31m[2026-02-28 12:28:23]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:28:23] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:28:23] Processing: track-email[0m
+[1;33m[2026-02-28 12:28:23]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:28:23]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: track-email
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (track-email): supabase/functions/import_map.json
+Uploading asset (track-email): supabase/functions/track-email/index.ts
+Uploading asset (track-email): supabase/functions/_shared/cors.ts
+Uploading asset (track-email): supabase/functions/_shared/logger.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: track-email
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:28:24]   > Deployment command finished.[0m
+[0m[2026-02-28 12:28:24]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/track-email[0m
+curl: (28) Connection timed out after 5002 milliseconds
+[0;31m[2026-02-28 12:28:29]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:28:29] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:28:29] Processing: verify-email-credentials[0m
+[1;33m[2026-02-28 12:28:29]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:28:29]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: verify-email-credentials
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (verify-email-credentials): supabase/functions/import_map.json
+Uploading asset (verify-email-credentials): supabase/functions/verify-email-credentials/index.ts
+Uploading asset (verify-email-credentials): supabase/functions/_shared/logger.ts
+Uploading asset (verify-email-credentials): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: verify-email-credentials
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:28:32]   > Deployment command finished.[0m
+[0m[2026-02-28 12:28:32]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/verify-email-credentials[0m
+curl: (28) Connection timed out after 5005 milliseconds
+[0;31m[2026-02-28 12:28:37]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:28:37] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:28:37] Processing: win-probability[0m
+[1;33m[2026-02-28 12:28:37]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-02-28 12:28:37]   > Deploying to gzhxgoigflftharcmdqj...[0m
+WARNING: Functions using fallback import map: win-probability
+Please use recommended per function dependency declaration  https://supabase.com/docs/guides/functions/import-maps
+WARNING: Docker is not running
+Uploading asset (win-probability): supabase/functions/import_map.json
+Uploading asset (win-probability): supabase/functions/win-probability/index.ts
+Uploading asset (win-probability): supabase/functions/_shared/pii-guard.ts
+Uploading asset (win-probability): supabase/functions/_shared/audit.ts
+Uploading asset (win-probability): supabase/functions/_shared/auth.ts
+Uploading asset (win-probability): supabase/functions/_shared/logger.ts
+Uploading asset (win-probability): supabase/functions/_shared/cors.ts
+Deployed Functions on project gzhxgoigflftharcmdqj: win-probability
+You can inspect your deployment in the Dashboard: https://supabase.com/dashboard/project/gzhxgoigflftharcmdqj/functions
+A new version of Supabase CLI is available: v2.75.0 (currently installed v2.72.8)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
+[0;32m[2026-02-28 12:28:39]   > Deployment command finished.[0m
+[0m[2026-02-28 12:28:39]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/win-probability[0m
+curl: (28) Connection timed out after 5003 milliseconds
+[0;31m[2026-02-28 12:28:44]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-02-28 12:28:44] --------------------------------------------------[0m
+[1;33m[2026-02-28 12:28:44] Deployment Summary[0m
+[0m[2026-02-28 12:28:44] Total Functions: 90[0m
+[0;32m[2026-02-28 12:28:44] Successful Deployments: 90[0m
+[0;31m[2026-02-28 12:28:44] Failed Deployments: 0[0m
+[0;32m[2026-02-28 12:28:44] All deployments successful.[0m
