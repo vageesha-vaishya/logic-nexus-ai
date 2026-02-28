@@ -31,10 +31,14 @@ export async function requireAuth(req: Request, logger?: Logger): Promise<AuthRe
   if (!supabaseUrl || !supabaseAnonKey) {
       const msg = '[requireAuth] Missing SUPABASE_URL or SUPABASE_ANON_KEY';
       if (logger) logger.error(msg);
+      // We cannot return a valid client, so we must return a dummy or throw.
+      // Since the interface requires supabaseClient, we will throw an error if this critical config is missing,
+      // or return a non-functional client.
+      // However, to keep the signature, we'll return a dummy client that will fail on use, or better, just fail here.
       return { 
         user: null, 
         error: 'Internal Server Error: Missing configuration', 
-        supabaseClient: null as any 
+        supabaseClient: createClient('https://invalid.supabase.co', 'invalid') 
       };
     }
 
@@ -42,16 +46,6 @@ export async function requireAuth(req: Request, logger?: Logger): Promise<AuthRe
     if (!authHeader) {
       const msg = '[requireAuth] Missing Authorization header';
       if (logger) logger.error(msg);
-      // We cannot create a client without the anon key if it's missing (though we checked above)
-      // But more importantly, we shouldn't create a client here if we want to enforce auth.
-      // However, the original logic tried to return a client even if auth header is missing? 
-      // Actually, if auth header is missing, we can't create a user-scoped client.
-      // We could return an admin client or anon client, but requireAuth implies we need a user.
-      // The original code created a client with just URL and Anon Key (Anon client).
-      // We will assume that if auth is missing, we just fail early or return anon client if that was the intent.
-      // But looking at the return type AuthResult, it expects `supabaseClient`.
-      // Let's create an anon client if strictly necessary, but preferably just error out.
-      // For now, to match previous behavior but avoid console.error:
       const client = createClient(supabaseUrl, supabaseAnonKey);
       return { user: null, error: 'Missing Authorization header', supabaseClient: client };
     }
@@ -66,7 +60,12 @@ export async function requireAuth(req: Request, logger?: Logger): Promise<AuthRe
 
   if (error || !user) {
     const msg = `[requireAuth] getUser failed: ${error?.message}`;
-    if (logger) logger.error(msg, { error }); else console.error(msg, error);
+    // Check for specific JWT errors
+    if (error?.message?.includes('jwt') || error?.message?.includes('signature')) {
+        if (logger) logger.warn(`[requireAuth] JWT Verification Failed: ${error.message}`);
+    } else {
+        if (logger) logger.error(msg, { error }); else console.error(msg, error);
+    }
     return { user: null, error: error?.message || 'Invalid or expired token', supabaseClient };
   }
 
