@@ -22,12 +22,12 @@ export function AppSidebar() {
   const { signOut, profile } = useAuth();
   
   // Force collapsed state on initial load
-  useEffect(() => {
-    // Ensure we start collapsed
-    if (state !== 'collapsed' && !isMobile) {
-      setOpen(false);
-    }
-  }, []);
+  // useEffect(() => {
+  //   // Ensure we start collapsed
+  //   if (state !== 'collapsed' && !isMobile) {
+  //     setOpen(false);
+  //   }
+  // }, []);
 
   const collapsed = state === 'collapsed';
   const location = useLocation();

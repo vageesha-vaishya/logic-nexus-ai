@@ -41,7 +41,7 @@ export interface FinalizeSectionProps {
     autoMargin: boolean;
     marginPercent: number;
   }) => void;
-  onRenameOption?: (newName: string) => void;
+  onRenameOption?: (optionId: string, newName: string) => void;
   referenceData?: {
     chargeCategories: any[];
     chargeBases: any[];
@@ -139,7 +139,7 @@ export function FinalizeSection({
 
   const handleNameSave = () => {
     if (tempName.trim() && onRenameOption) {
-      onRenameOption(tempName.trim());
+      onRenameOption(selectedOption.id, tempName.trim());
     }
     setIsEditingName(false);
   };

@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useForm, FormProvider } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { quoteComposerSchema, QuoteComposerValues } from './schema';
@@ -60,6 +61,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
   const { scopedDb, context, supabase } = useCRM();
   const { user } = useAuth();
   const { toast } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { containerTypes, containerSizes } = useContainerRefs();
   const { state: storeState, dispatch } = useQuoteStore();
   const { invokeAiAdvisor } = useAiAdvisor();
@@ -81,6 +83,17 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
     },
   });
 
+  // Local state
+  const [selectedOption, setSelectedOption] = useState<RateOption | null>(null);
+  const [visibleRateIds, setVisibleRateIds] = useState<string[]>([]);
+  const [isSmartMode, setIsSmartMode] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [complianceCheck, setComplianceCheck] = useState<{ compliant: boolean; issues: any[] } | null>(null);
+  const [lastFormData, setLastFormData] = useState<{ values: FormZoneValues; extended: ExtendedFormData } | null>(null);
+  const [manualOptions, setManualOptions] = useState<RateOption[]>([]);
+  const [deletedOptionIds, setDeletedOptionIds] = useState<string[]>([]);
+  const [optionDrafts, setOptionDrafts] = useState<Record<string, any>>({});
+
   // Rate fetching hook
   const rateFetching = useRateFetching();
   
@@ -88,19 +101,24 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
   useEffect(() => {
     if (rateFetching.loading) {
       setDeletedOptionIds([]);
+      setVisibleRateIds([]);
     }
   }, [rateFetching.loading]);
-  // No debug log
 
-
-  // Local state
-  const [selectedOption, setSelectedOption] = useState<RateOption | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [complianceCheck, setComplianceCheck] = useState<{ compliant: boolean; issues: any[] } | null>(null);
-  const [lastFormData, setLastFormData] = useState<{ values: FormZoneValues; extended: ExtendedFormData } | null>(null);
-  const [manualOptions, setManualOptions] = useState<RateOption[]>([]);
-  const [deletedOptionIds, setDeletedOptionIds] = useState<string[]>([]);
-  const [optionDrafts, setOptionDrafts] = useState<Record<string, any>>({});
+  // Initialize visible rates with a single default option when results arrive
+  useEffect(() => {
+    if (rateFetching.results && rateFetching.results.length > 0) {
+      // Only set default visible option if NOT in Smart Mode
+      // In Smart Mode, we start with no selected options (only AI Analysis + Available Rates)
+      if (!isSmartMode) {
+        // Select the first one (highest rank/priority from fetch) as default
+        setVisibleRateIds([rateFetching.results[0].id]);
+      } else {
+        // In Smart Mode, ensure no options are pre-selected
+        setVisibleRateIds([]);
+      }
+    }
+  }, [rateFetching.results, isSmartMode]);
   
   // CRM Data
    const [accounts, setAccounts] = useState<any[]>([]);
@@ -147,8 +165,8 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
   const handleAddManualOption = () => {
     const newOption: RateOption = {
       id: `manual-${Date.now()}`,
-      carrier: `Manual Quote ${manualOptions.length + 1}`,
-      name: 'Manual Quote',
+      carrier: '',
+      name: '',
       price: 0,
       currency: 'USD',
       transitTime: 'TBD',
@@ -159,15 +177,38 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
       charges: [],
     };
     setManualOptions(prev => [...prev, newOption]);
+    
+    // Initialize draft
+    setOptionDrafts(prev => ({
+        ...prev,
+        [newOption.id]: {
+            legs: [],
+            charges: [],
+            marginPercent: 15
+        }
+    }));
+    
     setSelectedOption(newOption);
   };
 
   // Combine results
   const combinedResults = useMemo(() => {
     const fetched = rateFetching.results || [];
-    const all = [...fetched, ...manualOptions];
+    // Only include fetched rates that are explicitly visible
+    const visibleFetched = fetched.filter(opt => visibleRateIds.includes(opt.id));
+    const all = [...visibleFetched, ...manualOptions];
     return all.filter(opt => !deletedOptionIds.includes(opt.id));
-  }, [rateFetching.results, manualOptions, deletedOptionIds]);
+  }, [rateFetching.results, manualOptions, deletedOptionIds, visibleRateIds]);
+
+  // Available options (fetched but not yet added/visible)
+  const availableOptions = useMemo(() => {
+    const fetched = rateFetching.results || [];
+    return fetched.filter(opt => !visibleRateIds.includes(opt.id) && !deletedOptionIds.includes(opt.id));
+  }, [rateFetching.results, visibleRateIds, deletedOptionIds]);
+
+  const handleAddRateOption = (optionId: string) => {
+    setVisibleRateIds(prev => [...prev, optionId]);
+  };
 
   const getTransitDays = (val?: string | null) => {
     if (!val) return null;
@@ -201,6 +242,17 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
   const handleRemoveOption = async (optionId: string) => {
     if (displayResults.length <= 1) {
       toast({ title: 'Cannot delete', description: 'At least one option is required.', variant: 'destructive' });
+      return;
+    }
+
+    // Check if it's a visible market rate
+    const isMarketRate = rateFetching.results?.some(r => r.id === optionId);
+    if (isMarketRate) {
+      setVisibleRateIds(prev => prev.filter(id => id !== optionId));
+      if (selectedOption?.id === optionId) {
+        const next = displayResults.find((o) => o.id !== optionId) || null;
+        setSelectedOption(next);
+      }
       return;
     }
 
@@ -254,14 +306,37 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
   const loadExistingQuote = async () => {
     if (!quoteId) return;
     setEditLoading(true);
+
+    // DEBUG: Log context to debug scoping issues
+    logger.info('[UnifiedComposer] loadExistingQuote context:', {
+      quoteId,
+      tenantId: context?.tenantId,
+      franchiseId: context?.franchiseId,
+      isPlatformAdmin: context?.isPlatformAdmin,
+      isTenantAdmin: context?.isTenantAdmin
+    });
+
     try {
       const tenantId = context?.tenantId || null;
       // Load quote
+      // REMOVED 'true' argument to enforce ScopedDataAccess
       const { data: quoteRow, error: quoteError } = await scopedDb
-        .from('quotes', true)
+        .from('quotes')
         .select('*, origin_location:origin_port_id(location_name, location_code), destination_location:destination_port_id(location_name, location_code)')
         .eq('id', quoteId)
         .maybeSingle();
+
+      if (quoteError) {
+        logger.error('[UnifiedComposer] Failed to load quote query error:', quoteError);
+      } else if (!quoteRow) {
+        logger.warn('[UnifiedComposer] Quote not found. Possible RLS/Scope mismatch.', { quoteId, contextTenant: tenantId });
+      } else {
+        logger.info('[UnifiedComposer] Quote loaded successfully:', { 
+          id: quoteRow.id, 
+          quoteTenant: (quoteRow as any).tenant_id,
+          quoteFranchise: (quoteRow as any).franchise_id 
+        });
+      }
 
       if (quoteError || !quoteRow) {
         toast({ title: 'Error', description: 'Failed to load quote', variant: 'destructive' });
@@ -320,7 +395,9 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
       });
 
       // Load existing option if present
-      if (versionId) {
+      const isValidUUID = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+      
+      if (versionId && isValidUUID(versionId)) {
         logger.info('[UnifiedComposer] Loading existing version', { versionId });
         // Fetch options
         const { data: optionRows, error: optError } = await scopedDb
@@ -673,12 +750,48 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
   };
 
   // ---------------------------------------------------------------------------
+  // Handle Composer Mode (Manual Only)
+  // ---------------------------------------------------------------------------
+
+  const handleComposerMode = useCallback(() => {
+    const newOption: RateOption = {
+        id: `manual-${Date.now()}`,
+        carrier: '',
+        name: '',
+        price: 0,
+        currency: 'USD',
+        transitTime: 'TBD',
+        tier: 'custom',
+        is_manual: true,
+        source_attribution: 'Manual Quote',
+        legs: [],
+        charges: [],
+    };
+    
+    setManualOptions([newOption]);
+    setVisibleRateIds([newOption.id]);
+    setSelectedOption(newOption);
+    setIsSmartMode(false);
+    setDeletedOptionIds([]);
+    
+    // Initialize draft
+    setOptionDrafts({
+        [newOption.id]: {
+            legs: [],
+            charges: [],
+            marginPercent: 15
+        }
+    });
+  }, []);
+
+  // ---------------------------------------------------------------------------
   // Handle "Get Rates"
   // ---------------------------------------------------------------------------
 
   const handleGetRates = async (formValues: FormZoneValues, extendedData: ExtendedFormData, smart: boolean) => {
     setComplianceCheck(null);
     setLastFormData({ values: formValues, extended: extendedData });
+    setIsSmartMode(smart);
 
     // Note: smart param is passed from FormZone but we might ignore it or use it if needed.
     // In rollback, we trust the FormZone to decide or we default to a standard behavior.
@@ -689,6 +802,12 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
     // Fire compliance in parallel (non-blocking)
     runComplianceCheck({ ...formValues, ...extendedData } as any);
 
+    // DISABLE AUTO MARKET RATE FETCHING
+    // Instead of fetching rates, we switch to Manual Composer Mode immediately.
+    // This ensures only the "Manual Quotation" option is shown.
+    handleComposerMode();
+
+    /*
     await rateFetching.fetchRates(
       {
         ...formValues,
@@ -699,6 +818,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
       } as any,
       containerResolver
     );
+    */
   };
 
   // ---------------------------------------------------------------------------
@@ -709,14 +829,17 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
     setSelectedOption(option);
   };
 
-  const handleRenameOption = (newName: string) => {
-    if (!selectedOption) return;
+  const handleRenameOption = (optionId: string, newName: string) => {
+    setManualOptions(prev => prev.map(opt => {
+        if (opt.id === optionId) {
+            return { ...opt, carrier: newName, name: newName };
+        }
+        return opt;
+    }));
     
-    const updatedOption = { ...selectedOption, carrier: newName };
-    setSelectedOption(updatedOption);
-
-    // Update manualOptions if it exists there
-    setManualOptions(prev => prev.map(opt => opt.id === selectedOption.id ? updatedOption : opt));
+    if (selectedOption?.id === optionId) {
+        setSelectedOption(prev => prev ? { ...prev, carrier: newName, name: newName } : null);
+    }
   };
 
   // ---------------------------------------------------------------------------
@@ -1103,9 +1226,11 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
            
            // Update URL without reloading if it's a new quote
            if (!quoteId) {
-             const newUrl = new URL(window.location.href);
-             newUrl.searchParams.set('id', savedId);
-             window.history.pushState({}, '', newUrl.toString());
+             setSearchParams((prev) => {
+                const newParams = new URLSearchParams(prev);
+                newParams.set('id', savedId);
+                return newParams;
+             });
            }
       }
 
@@ -1193,9 +1318,9 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
 
         {/* Results Zone */}
         <ResultsZone
-            results={(!lastFormData && displayResults.length === 0 && !rateFetching.loading) ? null : displayResults}
+            results={(!lastFormData && displayResults.length === 0 && !rateFetching.loading && !isSmartMode) ? null : displayResults}
             loading={rateFetching.loading}
-            // smartMode={false} // Removed or defaults to false
+            smartMode={isSmartMode}
             marketAnalysis={rateFetching.marketAnalysis}
             confidenceScore={rateFetching.confidenceScore}
             anomalies={rateFetching.anomalies}
@@ -1203,8 +1328,11 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
             onSelect={handleSelectOption}
             selectedOptionId={selectedOption?.id}
             onRerunRates={lastFormData ? handleRerunRates : undefined}
-            onAddManualOption={config?.multi_option_enabled ? handleAddManualOption : undefined}
-            onRemoveOption={config?.multi_option_enabled ? handleRemoveOption : undefined}
+            onAddManualOption={handleAddManualOption}
+            onRemoveOption={handleRemoveOption}
+            availableOptions={availableOptions}
+            onAddRateOption={handleAddRateOption}
+            onRenameOption={handleRenameOption}
         />
 
         {/* Finalize Section — shown when option selected */}

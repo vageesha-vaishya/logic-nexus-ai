@@ -79,6 +79,7 @@ interface FormZoneProps {
   opportunities?: any[];
   onChange?: (values: any) => void;
   onOpenSmartSettings?: () => void;
+  onEnterComposerMode?: () => void;
 }
 
 export function FormZone({ 
@@ -93,6 +94,7 @@ export function FormZone({
   opportunities = [],
   onChange,
   onOpenSmartSettings,
+  onEnterComposerMode,
 }: FormZoneProps) {
   const [smartMode, setSmartMode] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -1034,6 +1036,19 @@ export function FormZone({
               ) : (
                 <><FileText className="w-4 h-4 mr-2" /> Quotation Composer</>
               )}
+            </Button>
+          )}
+
+          {onEnterComposerMode && (
+            <Button 
+              type="button" 
+              variant="secondary" 
+              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white" 
+              disabled={loading} 
+              data-testid="composer-mode-btn"
+              onClick={onEnterComposerMode}
+            >
+              <FileText className="w-4 h-4 mr-2" /> Composer Mode
             </Button>
           )}
           

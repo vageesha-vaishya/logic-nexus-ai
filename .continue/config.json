@@ -1,0 +1,90 @@
+{
+  "models": [
+    {
+      "title": "DeepSeek Coder 6.7b",
+      "provider": "ollama",
+      "model": "deepseek-coder:6.7b",
+      "apiBase": "http://localhost:11434"
+    },
+    {
+      "title": "Llama 3",
+      "provider": "ollama",
+      "model": "llama3",
+      "apiBase": "http://localhost:11434"
+    },
+    {
+      "title": "Qwen2.5 Coder 7b",
+      "provider": "ollama",
+      "model": "qwen2.5-coder:7b",
+      "apiBase": "http://localhost:11434"
+    }
+  ],
+  "tabAutocompleteModel": {
+    "title": "StarCoder2 3b",
+    "provider": "ollama",
+    "model": "starcoder2:3b",
+    "apiBase": "http://localhost:11434"
+  },
+  "customCommands": [
+    {
+      "name": "test",
+      "prompt": "{{{ input }}}\n\nWrite a comprehensive set of unit tests for the selected code. It should setup, run, and teardown tests, and cover both happy paths and edge cases."
+    },
+    {
+      "name": "refactor",
+      "prompt": "{{{ input }}}\n\nRefactor this code to be more modular, efficient, and readable. Use modern best practices."
+    },
+    {
+      "name": "explain",
+      "prompt": "{{{ input }}}\n\nExplain how this code works in detail."
+    },
+    {
+      "name": "doc",
+      "prompt": "{{{ input }}}\n\nWrite JSDoc/TSDoc documentation for this code."
+    }
+  ],
+  "contextProviders": [
+    {
+      "name": "diff",
+      "params": {}
+    },
+    {
+      "name": "open",
+      "params": {}
+    },
+    {
+      "name": "terminal",
+      "params": {}
+    },
+    {
+      "name": "problems",
+      "params": {}
+    },
+    {
+      "name": "codebase",
+      "params": {}
+    },
+    {
+      "name": "folder",
+      "params": {}
+    }
+  ],
+  "slashCommands": [
+    {
+      "name": "edit",
+      "description": "Edit selected code"
+    },
+    {
+      "name": "comment",
+      "description": "Write comments for the selected code"
+    },
+    {
+      "name": "share",
+      "description": "Export the current chat session to markdown"
+    },
+    {
+      "name": "cmd",
+      "description": "Generate a shell command"
+    }
+  ]
+}

@@ -1,18 +1,24 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { UnifiedQuoteComposer } from '../UnifiedQuoteComposer';
 import { QuotationOptionCrudService } from '@/services/quotation/QuotationOptionCrudService';
 import { useToast } from '@/hooks/use-toast';
 
 // Mock useCRM
-const mockScopedDb = {
-  from: vi.fn().mockReturnThis(),
-  select: vi.fn().mockReturnThis(),
-  order: vi.fn().mockResolvedValue({ data: [], error: null }),
-  eq: vi.fn().mockReturnThis(),
-  maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-  rpc: vi.fn(),
-};
+const { mockScopedDb } = vi.hoisted(() => {
+  return {
+    mockScopedDb: {
+      from: vi.fn().mockReturnThis(),
+      select: vi.fn().mockReturnThis(),
+      order: vi.fn().mockResolvedValue({ data: [], error: null }),
+      eq: vi.fn().mockReturnThis(),
+      in: vi.fn().mockReturnThis(), // Added for in()
+      maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+      rpc: vi.fn(),
+    }
+  };
+});
 
 vi.mock('@/hooks/useCRM', () => ({
   useCRM: () => ({
@@ -123,8 +129,11 @@ vi.mock('@/components/sales/unified-composer/FinalizeSection', () => ({
 
 // Crucial: Mock ResultsZone to expose onRemoveOption
 vi.mock('@/components/sales/unified-composer/ResultsZone', () => ({
-  ResultsZone: ({ onRemoveOption, results }: any) => (
-    <div data-testid="results-zone" data-has-remove={!!onRemoveOption ? 'true' : 'false'}>
+  ResultsZone: ({ onRemoveOption, onAddRateOption, results, availableOptions }: any) => (
+    <div
+      data-testid="results-zone"
+      data-has-remove={String(!!onRemoveOption)}
+    >
       {(results || []).map((r: any) => (
         <button
           key={r.id}
@@ -136,6 +145,19 @@ vi.mock('@/components/sales/unified-composer/ResultsZone', () => ({
           }}
         >
           Delete {r.id}
+        </button>
+      ))}
+      {(availableOptions || []).map((r: any) => (
+        <button
+          key={r.id}
+          data-testid={`add-option-${r.id}`}
+          onClick={() => {
+            if (onAddRateOption) {
+              onAddRateOption(r.id);
+            }
+          }}
+        >
+          Add {r.id}
         </button>
       ))}
     </div>
@@ -191,15 +213,95 @@ vi.mock('@/components/sales/unified-composer/ResultsZone', () => ({
   });
 
   it('calls deleteOption service when an option is removed', async () => {
-    render(<UnifiedQuoteComposer />);
+    // Setup for this specific test
+    const quoteId = '00000000-0000-0000-0000-000000000001';
+    const versionId = '00000000-0000-0000-0000-000000000002';
+    const optionId = '11111111-1111-1111-1111-111111111111';
+    
+    // Ensure the option to be deleted is NOT in market results (so it's treated as a saved option)
+    rateFetchingStore.results = [
+       { id: 'market-rate-1', total_cost: 50, is_manual: false }
+    ];
 
-    // Wait for config to load
+    // Mock DB responses to load the saved option
+    const mockQuote = { id: quoteId, tenant_id: 'test-tenant' };
+    const mockOptions = [{ id: optionId, total_amount: 100, is_selected: true, currency: 'USD' }];
+    const mockLegs: any[] = [];
+    const mockCharges: any[] = [];
+
+    // Sophisticated mock for scopedDb to handle different tables
+     mockScopedDb.from.mockImplementation((table: string) => {
+         const chain = {
+             select: () => chain,
+             eq: () => chain,
+             in: () => chain,
+             order: () => chain,
+             maybeSingle: () => Promise.resolve({ data: null, error: null }),
+             then: (resolve: any) => resolve({ data: [], error: null }) // simplified promise
+         };
+
+         if (table === 'quotes') {
+             chain.maybeSingle = () => Promise.resolve({ data: mockQuote, error: null });
+         }
+         if (table === 'quotation_version_options') {
+              // The code calls .order() at the end
+              chain.order = () => Promise.resolve({ data: mockOptions, error: null }) as any;
+         }
+         if (table === 'quotation_version_option_legs') {
+              chain.order = () => Promise.resolve({ data: mockLegs, error: null }) as any;
+         }
+         if (table === 'quote_charges') {
+              chain.in = () => Promise.resolve({ data: mockCharges, error: null }) as any;
+         }
+         
+         return chain;
+     });
+
+    render(
+      <MemoryRouter>
+        <UnifiedQuoteComposer quoteId={quoteId} versionId={versionId} />
+      </MemoryRouter>
+    );
+
+    // Wait for the saved option to appear (it comes from loadExistingQuote)
     await waitFor(() => {
-      const zone = screen.getByTestId('results-zone');
-      expect(zone).toHaveAttribute('data-has-remove', 'true');
+        expect(screen.getByTestId(`delete-option-${optionId}`)).toBeInTheDocument();
     });
 
-    const deleteBtn = screen.getByTestId('delete-option-11111111-1111-1111-1111-111111111111');
+    // Also the market rate should be available (added via 'Add' or visible by default?)
+    // Market rate is in results. Component adds first result to visible by default IF not smart mode.
+    // But loadExistingQuote might override selection?
+    // "selected = reconstructedOptions.find(...) ... setSelectedOption(selected)"
+    // If a saved option is selected, it might displace the market rate visibility?
+    // No, visibleRateIds is independent of manualOptions.
+    // manualOptions are always visible in combinedResults.
+    
+    // So we should see both the saved option and the market option?
+    // Wait, visibleRateIds adds market rates. manualOptions adds saved rates.
+    // So both should be in combinedResults.
+    
+    // Let's verify we have 2 delete buttons
+    // The market rate 'market-rate-1' should be visible because of the useEffect logic for initial load.
+    
+    await waitFor(() => {
+       const zone = screen.getByTestId('results-zone');
+       // We expect optionId (saved) and market-rate-1 (market) to be visible.
+       expect(screen.getByTestId(`delete-option-${optionId}`)).toBeInTheDocument();
+       // Market rate might be visible or available.
+    });
+
+    // We need to make sure we have > 1 option visible to delete.
+    // If market rate is not visible, we add it.
+    const marketOptionId = 'market-rate-1';
+    const marketDeleteBtn = screen.queryByTestId(`delete-option-${marketOptionId}`);
+    
+    if (!marketDeleteBtn) {
+        const addBtn = screen.getByTestId(`add-option-${marketOptionId}`);
+        fireEvent.click(addBtn);
+    }
+    
+    // Now delete the saved option
+    const deleteBtn = screen.getByTestId(`delete-option-${optionId}`);
     fireEvent.click(deleteBtn);
 
     // Verify service instantiation and method call
@@ -209,7 +311,7 @@ vi.mock('@/components/sales/unified-composer/ResultsZone', () => ({
       expect(MockService).toHaveBeenCalled();
       const mockInstance = MockService.mock.instances[0];
       expect(mockInstance.deleteOption).toHaveBeenCalledWith(
-        '11111111-1111-1111-1111-111111111111',
+        optionId,
         'User removed option from composer'
       );
     });
@@ -222,12 +324,20 @@ vi.mock('@/components/sales/unified-composer/ResultsZone', () => ({
         { id: '22222222-2222-2222-2222-222222222222', total_cost: 200, is_manual: false },
     ];
     
-    render(<UnifiedQuoteComposer />);
+    render(
+      <MemoryRouter>
+        <UnifiedQuoteComposer quoteId="test-quote" versionId="test-version" />
+      </MemoryRouter>
+    );
 
     // Verify option is present
     await waitFor(() => {
       expect(screen.getByTestId('delete-option-ai-generated-1')).toBeInTheDocument();
     });
+
+    // Add the second option to ensure we have > 1 option
+    const addBtn = screen.getByTestId('add-option-22222222-2222-2222-2222-222222222222');
+    fireEvent.click(addBtn);
 
     const deleteBtn = screen.getByTestId('delete-option-ai-generated-1');
     fireEvent.click(deleteBtn);
@@ -248,7 +358,11 @@ vi.mock('@/components/sales/unified-composer/ResultsZone', () => ({
       { id: '11111111-1111-1111-1111-111111111111', total_cost: 100, is_manual: false },
     ];
 
-    render(<UnifiedQuoteComposer />);
+    render(
+      <MemoryRouter>
+        <UnifiedQuoteComposer quoteId="test-quote" versionId="test-version" />
+      </MemoryRouter>
+    );
     
     // Wait for config to load
     await waitFor(() => {

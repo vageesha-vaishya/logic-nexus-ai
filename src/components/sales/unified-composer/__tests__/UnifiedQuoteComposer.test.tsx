@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { UnifiedQuoteComposer } from '../UnifiedQuoteComposer';
 
 // ---------------------------------------------------------------------------
@@ -103,7 +104,11 @@ describe('UnifiedQuoteComposer', () => {
   });
 
   it('renders form zone with transport mode tabs', () => {
-    render(<UnifiedQuoteComposer />);
+    render(
+      <MemoryRouter>
+        <UnifiedQuoteComposer />
+      </MemoryRouter>
+    );
 
     expect(screen.getByTestId('form-zone')).toBeInTheDocument();
     expect(screen.getByText('FormZone')).toBeInTheDocument();
@@ -113,13 +118,21 @@ describe('UnifiedQuoteComposer', () => {
     // When quoteId and versionId are provided, the component sets editLoading=true
     // and calls loadExistingQuote. Since scopedDb.from returns a chain that resolves
     // to { data: null, error: null }, the loading spinner should appear initially.
-    render(<UnifiedQuoteComposer quoteId="test-id" versionId="test-ver" />);
+    render(
+      <MemoryRouter>
+        <UnifiedQuoteComposer quoteId="test-id" versionId="test-ver" />
+      </MemoryRouter>
+    );
 
     expect(screen.getByText('Loading quote...')).toBeInTheDocument();
   });
 
   it('renders results zone separator', () => {
-    const { container } = render(<UnifiedQuoteComposer />);
+    const { container } = render(
+      <MemoryRouter>
+        <UnifiedQuoteComposer />
+      </MemoryRouter>
+    );
 
     // Separator renders as an element with role="none" or role="separator"
     const separator = container.querySelector('[data-orientation]') || container.querySelector('div[role="none"]');
@@ -128,7 +141,11 @@ describe('UnifiedQuoteComposer', () => {
   });
 
   it('does not show finalize section initially', () => {
-    render(<UnifiedQuoteComposer />);
+    render(
+      <MemoryRouter>
+        <UnifiedQuoteComposer />
+      </MemoryRouter>
+    );
 
     expect(screen.queryByTestId('finalize-section')).not.toBeInTheDocument();
   });
@@ -143,7 +160,11 @@ describe('UnifiedQuoteComposer', () => {
       volume: 20,
     };
 
-    render(<UnifiedQuoteComposer initialData={initialData} />);
+    render(
+      <MemoryRouter>
+        <UnifiedQuoteComposer initialData={initialData} />
+      </MemoryRouter>
+    );
 
     const formZone = screen.getByTestId('form-zone');
     expect(formZone).toBeInTheDocument();

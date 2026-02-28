@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { 
   Search, 
   ChevronDown, 
@@ -47,6 +47,7 @@ export function CommandCenterNav() {
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
   const location = useLocation();
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   
   // Manage collapsible states with persistence
@@ -128,7 +129,7 @@ export function CommandCenterNav() {
     ];
 
     return [
-      { id: 'sales', label: 'CRM & Sales', items: salesItems, defaultOpen: true },
+      { id: 'sales', label: 'CRM & Sales', items: salesItems, defaultOpen: true as const },
       { id: 'financials', label: 'Financials', items: financialItems },
       { id: 'logistics', label: 'Logistics', items: logisticsItems },
       { id: 'admin', label: 'Administration', items: adminItems },
@@ -159,7 +160,19 @@ export function CommandCenterNav() {
     const node = (
       <SidebarMenuItem key={item.url}>
         <SidebarMenuButton asChild tooltip={collapsed ? item.title : undefined}>
-          <NavLink to={item.url} end={item.url === '/dashboard'} className={getNavClass}>
+          <NavLink 
+            to={item.url} 
+            end={item.url === '/dashboard'} 
+            className={getNavClass}
+            onClick={(e) => {
+              console.log('Navigating to:', item.url);
+              // Force navigation if default behavior fails or gets blocked
+              if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
+                e.preventDefault();
+                navigate(item.url);
+              }
+            }}
+          >
             <item.icon className="h-4 w-4 shrink-0" />
             {!collapsed && <span className="truncate">{item.title}</span>}
           </NavLink>
@@ -169,9 +182,9 @@ export function CommandCenterNav() {
 
     if (item.roles || item.permissions) {
       return (
-        <RoleGuard key={item.url} roles={item.roles || []} permissions={item.permissions}>
-          {node}
-        </RoleGuard>
+        <RoleGuard key={item.url} roles={(item.roles as any) || []} permissions={(item.permissions as any)}>
+        {node}
+      </RoleGuard>
       );
     }
     return node;
@@ -225,7 +238,7 @@ export function CommandCenterNav() {
                   </CollapsibleTrigger>
                 )}
               </SidebarGroupLabel>
-              <CollapsibleContent forceMount={isSearchActive || group.defaultOpen}>
+              <CollapsibleContent forceMount={isSearchActive || group.defaultOpen ? true : undefined}>
                 <SidebarGroupContent>
                   <SidebarMenu>
                     {group.items.map(renderMenuItem)}

@@ -4,7 +4,7 @@ import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList } from '@/co
 import { useCRM } from '@/hooks/useCRM';
 import { useAuth } from '@/hooks/useAuth';
 import { Loader2 } from 'lucide-react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { logger } from '@/lib/logger';
 import { useBenchmark } from '@/lib/benchmark';
 import { UnifiedQuoteComposer } from '@/components/sales/unified-composer/UnifiedQuoteComposer';
@@ -16,6 +16,7 @@ function QuoteNewInner() {
   const { user, loading: authLoading } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [createdQuoteId, setCreatedQuoteId] = useState<string | null>(null);
   const [versionId, setVersionId] = useState<string | null>(null);
   const [, setTenantId] = useState<string | null>(null);
@@ -43,7 +44,13 @@ function QuoteNewInner() {
   useEffect(() => {
     if (!authLoading && !initializedRef.current) {
         initializedRef.current = true;
-        createQuoteShell();
+        const urlId = searchParams.get('id');
+        if (urlId) {
+            setCreatedQuoteId(urlId);
+            setInitializing(false);
+        } else {
+            createQuoteShell();
+        }
     }
   }, [authLoading]);
 
@@ -104,6 +111,13 @@ function QuoteNewInner() {
 
       const quoteId = (quote as any).id;
       setCreatedQuoteId(quoteId);
+      
+      // Update URL so refresh works
+      setSearchParams(prev => {
+          const next = new URLSearchParams(prev);
+          next.set('id', quoteId);
+          return next;
+      });
 
       // Create version
       const { data: version, error: versionError } = await scopedDb
