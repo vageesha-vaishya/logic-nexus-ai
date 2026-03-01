@@ -1,0 +1,26 @@
+#!/usr/bin/expect -f
+set timeout 300
+set ip [lindex $argv 0]
+set user [lindex $argv 1]
+set password [lindex $argv 2]
+set cmd [lindex $argv 3]
+
+# Log to stdout which will be captured
+puts "Executing on $user@$ip: $cmd"
+
+spawn ssh -o StrictHostKeyChecking=no $user@$ip $cmd
+
+expect {
+    "password:" {
+        send "$password\r"
+        exp_continue
+    }
+    timeout {
+        puts "Timeout waiting for response"
+        exit 1
+    }
+    eof
+}
+
+catch wait result
+exit [lindex $result 3]

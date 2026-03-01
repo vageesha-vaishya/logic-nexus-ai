@@ -493,3 +493,59 @@ Integrated into the Jenkins Pipeline.
 
 **Issue: CORS Errors**
 *   **Fix**: Check Supabase Edge Function `cors.ts` headers. Ensure `OPTIONS` requests are handled.
+
+
+
+
+
+
+
+
+####
+Sarvesh 
+### Completed Actions
+1. Database Initialization :
+   - Created and executed scripts/apply_migrations_remote.sh .
+   - Result : Successfully applied 554 migration files to your remote Supabase database, resolving the schema errors.
+2. Automated Backups :
+   - Created scripts/backup_db.sh and configured a daily cron job (at 02:00 UTC) on the VPS.
+   - Result : Database backups are now automated and stored in /root/backups with a 7-day retention policy.
+3. System Monitoring :
+   - Installed glances (system monitoring) and fail2ban (security) on the VPS.
+   - Result : You can now monitor server health and have basic brute-force protection.
+4. Edge Function Deployment Script :
+   - Created scripts/deploy_functions_vps.sh to handle Edge Function deployment for your self-hosted setup (since the guide's deploy_functions_ci.sh is designed for Supabase Cloud).
+### Next Steps (User Action Required)
+The remaining steps in the DEPLOYMENT_GUIDE_HOSTINGER.md involve UI configuration in Coolify and Git operations, which require your access.
+ Step 1: Configure Coolify Applications (Guide Section 5)
+1. Log in to your Coolify dashboard (usually http://<your-vps-ip>:8000 ).
+2. Navigate to your Project/Environment.
+3. Add Environment Variables for your application (LogicNexus):
+   - VITE_SUPABASE_URL : Your Supabase URL.
+   - VITE_SUPABASE_ANON_KEY : Your Supabase Anon Key.
+   - DATABASE_URL : Your connection string.
+   - Refer to Section 5 of the guide for the full list. Step 2: Update Jenkinsfile (Optional but Recommended)
+If you are using the self-hosted Supabase instance, the default Jenkinsfile attempts to use deploy_functions_ci.sh which requires a Supabase Cloud Project ID.
+To use the new VPS deployment script, update the Deploy Edge Functions stage in your Jenkinsfile :
+
+```
+// Replace this line:
+sh "./scripts/deploy_functions_ci.sh ${PROJECT_REF} $
+{SUPABASE_ACCESS_TOKEN}"
+
+// With this (ensure you configure VPS_IP and credentials in Jenkins):
+sh "./scripts/deploy_functions_vps.sh ${VPS_IP} 'root' ${VPS_PASSWORD}"
+``` Step 3: Push Changes
+You need to commit and push the new scripts I created to your repository so Jenkins can access them:
+
+```
+git add scripts/deploy_functions_vps.sh scripts/backup_db.sh scripts/
+apply_migrations_remote.sh
+git commit -m "chore: add deployment and maintenance scripts"
+git push origin main
+``` Step 4: Finalize SSL & Domains (Guide Section 8)
+- In Coolify, go to your application settings and configure your custom domain (e.g., app.logicnexus.com ).
+- Enable "HTTPS" to let Coolify automatically provision SSL certificates via Let's Encrypt.
+You are now ready to proceed with the UI-based configuration steps in the guide. Let me know if you need help verifying the Coolify or SSL setup once you've configured them!
+
+######Sarvesh002
