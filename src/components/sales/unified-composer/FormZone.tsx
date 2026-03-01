@@ -13,7 +13,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuCheckboxItem } from '@/components/ui/dropdown-menu';
-import { Plane, Ship, Truck, Train, Timer, Sparkles, ChevronDown, Save, Settings2, Building2, User, FileText, Loader2, CheckCircle2, XCircle } from 'lucide-react';
+import { Plane, Ship, Truck, Train, Timer, Sparkles, ChevronDown, Save, Settings2, Building2, User, FileText, Loader2, CheckCircle2, XCircle, Paperclip, File as FileIcon, X } from 'lucide-react';
 import { LocationAutocomplete } from '@/components/common/LocationAutocomplete';
 import { SharedCargoInput } from '@/components/sales/shared/SharedCargoInput';
 import { CommoditySelection } from '@/components/logistics/SmartCargoInput';
@@ -26,6 +26,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useCRM } from '@/hooks/useCRM';
 import { logger } from '@/lib/logger';
 import { QuotationNumberService } from '@/services/quotation/QuotationNumberService';
+import { FileUpload } from '@/components/ui/file-upload';
 
 export type FormZoneValues = QuoteComposerValues;
 
@@ -46,6 +47,7 @@ export interface ExtendedFormData {
   incoterms: string;
   originDetails: any;
   destinationDetails: any;
+  attachments: any[]; // New field
 }
 
 const DEFAULT_EXTENDED: ExtendedFormData = {
@@ -65,6 +67,7 @@ const DEFAULT_EXTENDED: ExtendedFormData = {
   incoterms: '',
   originDetails: null,
   destinationDetails: null,
+  attachments: [],
 };
 
 interface FormZoneProps {
@@ -184,17 +187,65 @@ export function FormZone({
     return contacts.filter(c => c.account_id === accountId);
   }, [contacts, accountId]);
 
-  // Sync initial values to form context
+  // Sync initial values to form context and local cargoItem state
   useEffect(() => {
+    let hasUpdates = false;
+    
     if (initialValues) {
       Object.entries(initialValues).forEach(([key, value]) => {
         if (value !== undefined) form.setValue(key as any, value);
       });
+      hasUpdates = true;
     }
     if (initialExtended) {
       Object.entries(initialExtended).forEach(([key, value]) => {
         if (value !== undefined) form.setValue(key as any, value);
       });
+      hasUpdates = true;
+    }
+
+    // Initialize local cargoItem state from loaded data
+    if (hasUpdates) {
+       const newCargoItem: CargoItem = {
+         ...cargoItem,
+         commodity: { 
+              description: initialValues?.commodity || cargoItem.commodity?.description || '',
+              hts_code: initialExtended?.htsCode || cargoItem.commodity?.hts_code 
+          },
+          hazmat: initialExtended?.dangerousGoods 
+            ? (cargoItem.hazmat || { unNumber: '', class: '', packingGroup: 'I' }) 
+            : undefined,
+          weight: { value: Number(initialValues?.weight) || 0, unit: 'kg' },
+         volume: Number(initialValues?.volume) || 0,
+         quantity: Number(initialExtended?.containerQty) || 1,
+       };
+
+       // Determine type and container details
+       if (initialExtended?.containerCombos && initialExtended.containerCombos.length > 0) {
+          newCargoItem.type = 'container';
+          newCargoItem.containerCombos = initialExtended.containerCombos.map(c => ({
+              typeId: c.type,
+              sizeId: c.size,
+              quantity: c.qty
+          }));
+          // Set primary details from first combo
+          if (newCargoItem.containerCombos.length > 0) {
+              newCargoItem.containerDetails = {
+                  typeId: newCargoItem.containerCombos[0].typeId,
+                  sizeId: newCargoItem.containerCombos[0].sizeId
+              };
+              newCargoItem.quantity = newCargoItem.containerCombos[0].quantity;
+          }
+       } else if (initialExtended?.containerType && initialExtended?.containerSize) {
+           newCargoItem.type = 'container';
+           newCargoItem.containerDetails = {
+               typeId: initialExtended.containerType,
+               sizeId: initialExtended.containerSize
+           };
+           newCargoItem.quantity = Number(initialExtended.containerQty) || 1;
+       }
+
+       setCargoItem(newCargoItem);
     }
   }, [initialValues, initialExtended, form]);
 
@@ -326,6 +377,23 @@ export function FormZone({
   const onSubmit = (data: QuoteComposerValues) => {
     // Pass everything in data to onGetRates
     onGetRates(data as any, data as any, smartMode);
+  };
+
+  const attachments = form.watch('attachments' as any) || [];
+
+  const handleAddFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const newFiles = Array.from(e.target.files);
+      const current = form.getValues('attachments' as any) || [];
+      form.setValue('attachments' as any, [...current, ...newFiles]);
+    }
+  };
+
+  const removeAttachment = (index: number) => {
+    const current = form.getValues('attachments' as any) || [];
+    const next = [...current];
+    next.splice(index, 1);
+    form.setValue('attachments' as any, next);
   };
 
   return (
@@ -993,6 +1061,53 @@ export function FormZone({
             </div>
           </CollapsibleContent>
         </Collapsible>
+
+        {/* Attachments Section */}
+        <div className="space-y-2 p-3 border rounded-md bg-background">
+          <Label className="flex items-center gap-2 text-xs font-semibold">
+            <Paperclip className="w-3.5 h-3.5" /> Attachments
+          </Label>
+          
+          <div className="grid grid-cols-1 gap-2 mb-2">
+            {attachments.map((att: any, idx: number) => (
+              <div key={att.id || idx} className="flex items-center justify-between p-2 border rounded text-xs bg-muted/50">
+                <div className="flex items-center gap-2 overflow-hidden">
+                  <FileIcon className="w-3 h-3 flex-shrink-0" />
+                  <span className="truncate">{att.name || att.file_name || 'Unknown File'}</span>
+                  <span className="text-muted-foreground text-[10px]">
+                    {att.size ? `(${(att.size / 1024).toFixed(1)} KB)` : ''}
+                  </span>
+                </div>
+                <Button 
+                  type="button" 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-6 w-6 p-0 text-destructive hover:bg-destructive/10"
+                  onClick={() => removeAttachment(idx)}
+                  data-testid={`remove-attachment-${idx}`}
+                >
+                  <X className="w-3 h-3" />
+                </Button>
+              </div>
+            ))}
+            {attachments.length === 0 && (
+               <p className="text-[10px] text-muted-foreground italic">No files attached.</p>
+            )}
+          </div>
+
+          <div className="border-dashed border-2 rounded-md p-4 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-muted/5 transition-colors relative">
+             <input 
+               type="file" 
+               multiple 
+               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+               onChange={handleAddFiles}
+             />
+             <div className="flex flex-col items-center gap-1 pointer-events-none">
+                <Paperclip className="w-6 h-6 text-muted-foreground/50" />
+                <span className="text-xs text-muted-foreground">Click or drag files here to attach</span>
+             </div>
+          </div>
+        </div>
 
         {/* Smart Mode Toggle */}
         <div className="flex items-center justify-between bg-purple-50 dark:bg-purple-950/30 p-3 rounded-md border border-purple-100 dark:border-purple-900">

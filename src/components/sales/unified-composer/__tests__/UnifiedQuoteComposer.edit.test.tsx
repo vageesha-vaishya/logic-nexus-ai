@@ -142,7 +142,7 @@ describe('UnifiedQuoteComposer - Edit Mode', () => {
     vi.clearAllMocks();
   });
 
-  it('loads existing quote with multiple options and restores state', async () => {
+  it('loads existing quote with multiple options and restores state including cargo configs', async () => {
     const quoteId = '00000000-0000-0000-0000-000000000001';
     const versionId = '00000000-0000-0000-0000-000000000002';
     const option1Id = '11111111-1111-1111-1111-111111111111';
@@ -153,7 +153,10 @@ describe('UnifiedQuoteComposer - Edit Mode', () => {
       tenant_id: 'test-tenant',
       title: 'Test Quote',
       origin: 'Shanghai',
-      destination: 'Los Angeles'
+      destination: 'Los Angeles',
+      opportunity_id: 'test-opp-id',
+      total_weight: 0,
+      total_volume: 0
     };
 
     const mockOptions = [
@@ -163,6 +166,15 @@ describe('UnifiedQuoteComposer - Edit Mode', () => {
 
     const mockLegs: any[] = [];
     const mockCharges: any[] = [];
+    
+    const mockCargoConfigs = [
+        { container_type: '20', container_size: 'Standard', quantity: 5 }
+    ];
+    
+    const mockQuoteItems = [
+        { weight_kg: 1000, volume_cbm: 10, product_name: 'Electronics' },
+        { weight_kg: 500, volume_cbm: 5, product_name: 'Accessories' }
+    ];
 
     // Mock DB responses
     mockScopedDb.from.mockImplementation((table: string) => {
@@ -177,6 +189,12 @@ describe('UnifiedQuoteComposer - Edit Mode', () => {
 
       if (table === 'quotes') {
         chain.maybeSingle = () => Promise.resolve({ data: mockQuote, error: null });
+      }
+      if (table === 'quote_cargo_configurations') {
+         chain.then = (resolve: any) => resolve({ data: mockCargoConfigs, error: null });
+      }
+      if (table === 'quote_items') {
+         chain.then = (resolve: any) => resolve({ data: mockQuoteItems, error: null });
       }
       if (table === 'quotation_version_options') {
         chain.order = () => Promise.resolve({ data: mockOptions, error: null }) as any;
@@ -201,8 +219,15 @@ describe('UnifiedQuoteComposer - Edit Mode', () => {
     await waitFor(() => {
         const formZone = screen.getByTestId('form-zone');
         const initialValues = JSON.parse(formZone.getAttribute('data-initial-values') || '{}');
+        
         expect(initialValues.quoteTitle).toBe('Test Quote');
         expect(initialValues.origin).toBe('Shanghai');
+        expect(initialValues.opportunityId).toBe('test-opp-id');
+        
+        // Verify aggregated totals from quote_items
+        expect(initialValues.weight).toBe('1500');
+        expect(initialValues.volume).toBe('15');
+        expect(initialValues.commodity).toBe('Electronics');
     });
 
     // Wait for options to be loaded

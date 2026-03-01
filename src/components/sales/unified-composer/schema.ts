@@ -70,6 +70,12 @@ export const quoteComposerSchema = z.object({
   containerType: z.string().optional(),
   containerSize: z.string().optional(),
   containerQty: z.string().optional(),
+  containerCombos: z.array(z.object({
+    type: z.string(),
+    size: z.string(),
+    qty: z.number(),
+  })).optional(),
+  attachments: z.any().array().optional(),
   htsCode: z.string().optional(),
   dangerousGoods: z.boolean().default(false),
   pickupDate: z.string().optional(),

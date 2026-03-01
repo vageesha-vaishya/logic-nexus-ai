@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useReducer, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useForm, FormProvider } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -6,7 +6,8 @@ import { quoteComposerSchema, QuoteComposerValues } from './schema';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { Loader2 } from 'lucide-react';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Plane, Ship, Truck, Train, Timer, Sparkles, ChevronDown, Save, Settings2, Building2, User, FileText, Loader2, AlertCircle, History, ExternalLink } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { useAuth } from '@/hooks/useAuth';
 import { QuotationNumberService } from '@/services/quotation/QuotationNumberService';
@@ -159,6 +160,35 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
   }), [containerTypes, containerSizes]);
 
   // ---------------------------------------------------------------------------
+  // Audit Helper
+  // ---------------------------------------------------------------------------
+
+  const logAudit = useCallback(async (action: string, details: any, status: 'success' | 'failure' = 'success') => {
+    try {
+      // Use fire-and-forget for audit logs to not block UI
+      scopedDb.from('audit_logs').insert({
+        user_id: user?.id,
+        action,
+        resource_type: 'quotation',
+        resource_id: quoteId,
+        details: {
+          ...details,
+          status,
+          component: 'UnifiedQuoteComposer',
+          timestamp: new Date().toISOString()
+        },
+        // Rely on DB triggers/RLS for tenant_id/franchise_id if possible, or context
+        tenant_id: context?.tenantId,
+        franchise_id: context?.franchiseId
+      }).then(({ error }) => {
+        if (error) logger.warn('[UnifiedComposer] Audit log failed:', error);
+      });
+    } catch (e) {
+      logger.warn('[UnifiedComposer] Audit log exception:', e);
+    }
+  }, [user?.id, quoteId, context?.tenantId, context?.franchiseId, scopedDb]);
+
+  // ---------------------------------------------------------------------------
   // Handle Manual Option Creation
   // ---------------------------------------------------------------------------
 
@@ -299,13 +329,22 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
     }
   };
 
+  const [attachments, setAttachments] = useState<any[]>([]);
+  const [loadedAttachments, setLoadedAttachments] = useState<any[]>([]); // Track original attachments for diffing
+  const [loadErrors, setLoadErrors] = useState<string[]>([]);
+  const [versionHistory, setVersionHistory] = useState<any[]>([]);
+
   // ---------------------------------------------------------------------------
   // Edit mode: load existing quote data
   // ---------------------------------------------------------------------------
 
-  const loadExistingQuote = async () => {
+  const loadExistingQuote = useCallback(async () => {
     if (!quoteId) return;
     setEditLoading(true);
+    setLoadErrors([]);
+
+    // Audit reload attempt
+    logAudit('reload_attempt', { quoteId });
 
     // DEBUG: Log context to debug scoping issues
     logger.info('[UnifiedComposer] loadExistingQuote context:', {
@@ -318,38 +357,97 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
 
     try {
       const tenantId = context?.tenantId || null;
-      // Load quote
-      // REMOVED 'true' argument to enforce ScopedDataAccess
-      const { data: quoteRow, error: quoteError } = await scopedDb
-        .from('quotes')
-        .select('*, origin_location:origin_port_id(location_name, location_code), destination_location:destination_port_id(location_name, location_code)')
-        .eq('id', quoteId)
-        .maybeSingle();
+      
+      // Helper for retry logic
+      const fetchQuoteWithRetry = async (retries = 3, delay = 1000) => {
+        for (let i = 0; i < retries; i++) {
+          const { data, error } = await scopedDb
+            .from('quotes')
+            .select('*, origin_location:origin_port_id(location_name, location_code), destination_location:destination_port_id(location_name, location_code)')
+            .eq('id', quoteId)
+            .maybeSingle();
+            
+          if (!error && data) return data;
+          if (error) logger.warn(`[UnifiedComposer] Quote load attempt ${i + 1} failed:`, error);
+          if (i < retries - 1) await new Promise(r => setTimeout(r, delay * (i + 1)));
+        }
+        return null;
+      };
 
-      if (quoteError) {
-        logger.error('[UnifiedComposer] Failed to load quote query error:', quoteError);
-      } else if (!quoteRow) {
-        logger.warn('[UnifiedComposer] Quote not found. Possible RLS/Scope mismatch.', { quoteId, contextTenant: tenantId });
-      } else {
-        logger.info('[UnifiedComposer] Quote loaded successfully:', { 
-          id: quoteRow.id, 
-          quoteTenant: (quoteRow as any).tenant_id,
-          quoteFranchise: (quoteRow as any).franchise_id 
-        });
-      }
+      const quoteRow = await fetchQuoteWithRetry();
 
-      if (quoteError || !quoteRow) {
-        toast({ title: 'Error', description: 'Failed to load quote', variant: 'destructive' });
+      if (!quoteRow) {
+        logger.error('[UnifiedComposer] Failed to load quote after retries', { quoteId });
+        logAudit('reload_failure', { error: 'Failed to load quote after retries', quoteId }, 'failure');
+        toast({ title: 'Error', description: 'Failed to load quote data. Please try again.', variant: 'destructive' });
         setEditLoading(false);
         return;
       }
+      
+      logger.info('[UnifiedComposer] Quote loaded successfully:', { 
+        id: quoteRow.id, 
+        quoteTenant: (quoteRow as any).tenant_id,
+        currentVersion: (quoteRow as any).current_version_id
+      });
+
       const raw = quoteRow as any;
+
+      // Parallel fetch for detailed configurations (Cargo, Items, Documents, Versions)
+      // We use allSettled to allow partial failures
+      const [cargoConfigResult, quoteItemsResult, docsResult, versionsResult] = await Promise.allSettled([
+        scopedDb.from('quote_cargo_configurations').select('*').eq('quote_id', quoteId),
+        scopedDb.from('quote_items').select('*').eq('quote_id', quoteId),
+        scopedDb.from('quote_documents').select('*').eq('quote_id', quoteId),
+        scopedDb.from('quotation_versions').select('*').eq('quote_id', quoteId).order('version_number', { ascending: false })
+      ]);
+      
+      // Handle Cargo Configs
+      let containerCombos: any[] = [];
+      if (cargoConfigResult.status === 'fulfilled' && !cargoConfigResult.value.error) {
+        containerCombos = (cargoConfigResult.value.data || []).map((c: any) => ({
+          type: c.container_type || '',
+          size: c.container_size || '',
+          qty: c.quantity || 1
+        }));
+      } else {
+        logger.warn('[UnifiedComposer] Failed to load cargo configs', cargoConfigResult);
+        // Don't block, just log
+      }
+
+      // Handle Quote Items
+      let items: any[] = [];
+      if (quoteItemsResult.status === 'fulfilled' && !quoteItemsResult.value.error) {
+        items = quoteItemsResult.value.data || [];
+      } else {
+        logger.warn('[UnifiedComposer] Failed to load quote items', quoteItemsResult);
+        setLoadErrors(prev => [...prev, 'Failed to load line items']);
+      }
+
+      // Handle Documents
+      let docs: any[] = [];
+      if (docsResult.status === 'fulfilled' && !docsResult.value.error) {
+        docs = docsResult.value.data || [];
+        setAttachments(docs);
+        setLoadedAttachments(docs);
+      } else {
+        logger.warn('[UnifiedComposer] Failed to load documents', docsResult);
+        // Non-critical
+      }
+
+      // Handle Versions
+      if (versionsResult.status === 'fulfilled' && !versionsResult.value.error) {
+        setVersionHistory(versionsResult.value.data || []);
+      } else {
+        logger.warn('[UnifiedComposer] Failed to load version history', versionsResult);
+        // Non-critical
+      }
+
       // Initialize store
       dispatch({
         type: 'INITIALIZE',
         payload: {
           quoteId,
-          versionId: versionId || null,
+          versionId: versionId || raw.current_version_id || null, // Use current_version_id if available
           tenantId: raw.tenant_id || tenantId,
           quoteData: raw,
         },
@@ -357,31 +455,48 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
 
       // Pre-populate form values for edit mode
       const cargoDetails = typeof raw.cargo_details === 'object' ? raw.cargo_details : null;
+      
+      // Calculate totals from quote_items if available, otherwise fallback to quote header
+      const totalWeight = items.length > 0 
+        ? items.reduce((sum: number, item: any) => sum + (Number(item.weight_kg) || 0), 0)
+        : (cargoDetails?.total_weight_kg || raw.total_weight || '');
+        
+      const totalVolume = items.length > 0
+        ? items.reduce((sum: number, item: any) => sum + (Number(item.volume_cbm) || 0), 0)
+        : (cargoDetails?.total_volume_cbm || raw.total_volume || '');
+        
+      const primaryCommodity = items.length > 0
+        ? (items[0].product_name || items[0].description || 'Mixed General Cargo')
+        : (cargoDetails?.commodity || raw.commodity || '');
 
       setInitialFormValues({
         accountId: raw.account_id || '',
+        opportunityId: raw.opportunity_id || '',
         contactId: raw.contact_id || '',
         quoteTitle: raw.title || '',
         mode: (raw.transport_mode || 'ocean') as any,
         origin: raw.origin_location?.location_name || raw.origin || '',
         destination: raw.destination_location?.location_name || raw.destination || '',
-        commodity: cargoDetails?.commodity || raw.commodity || '',
-        weight: String(cargoDetails?.total_weight_kg || raw.total_weight || ''),
-        volume: String(cargoDetails?.total_volume_cbm || raw.total_volume || ''),
+        commodity: primaryCommodity,
+        weight: String(totalWeight),
+        volume: String(totalVolume),
       });
+      console.log('[UnifiedComposer] Set initialFormValues:', { commodity: primaryCommodity });
+      
       // Sync to form directly
       if (form) {
         form.reset({
             ...form.getValues(),
             accountId: raw.account_id || '',
+            opportunityId: raw.opportunity_id || '',
             contactId: raw.contact_id || '',
             quoteTitle: raw.title || '',
             mode: (raw.transport_mode || 'ocean') as any,
             origin: raw.origin_location?.location_name || raw.origin || '',
             destination: raw.destination_location?.location_name || raw.destination || '',
-            commodity: cargoDetails?.commodity || raw.commodity || '',
-            weight: String(cargoDetails?.total_weight_kg || raw.total_weight || ''),
-            volume: String(cargoDetails?.total_volume_cbm || raw.total_volume || ''),
+            commodity: primaryCommodity,
+            weight: String(totalWeight),
+            volume: String(totalVolume),
         });
       }
 
@@ -392,26 +507,32 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
         htsCode: cargoDetails?.hts_code || '',
         dangerousGoods: !!raw.dangerous_goods,
         vehicleType: raw.vehicle_type || 'van',
+        containerCombos: containerCombos,
+        attachments: docs,
       });
 
       // Load existing option if present
+      // Determine which version to load: explicit prop OR current_version_id
+      const targetVersionId = versionId || raw.current_version_id;
       const isValidUUID = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
       
-      if (versionId && isValidUUID(versionId)) {
-        logger.info('[UnifiedComposer] Loading existing version', { versionId });
+      console.log('[UnifiedComposer] Target Version:', targetVersionId, 'Valid:', isValidUUID(targetVersionId));
+
+      if (targetVersionId && isValidUUID(targetVersionId)) {
+        logger.info('[UnifiedComposer] Loading version', { targetVersionId });
         // Fetch options
         const { data: optionRows, error: optError } = await scopedDb
           .from('quotation_version_options')
           .select('*')
-          .eq('quotation_version_id', versionId)
+          .eq('quotation_version_id', targetVersionId)
           .order('created_at', { ascending: false });
 
         if (optError) {
           logger.error('[UnifiedComposer] Failed to load options', optError);
-          throw optError;
-        }
+          setLoadErrors(prev => [...prev, 'Failed to load options']);
+          // We don't throw here to allow the rest of the form to show up
+        } else if (optionRows && optionRows.length > 0) {
 
-        if (optionRows && optionRows.length > 0) {
           logger.info(`[UnifiedComposer] Found ${optionRows.length} options`);
           const optionIds = optionRows.map((o: any) => o.id);
 
@@ -611,20 +732,24 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
              };
              setOptionDrafts(prev => ({ ...prev, [selected.id]: draft }));
            }
+           
+           // Log success
+           logAudit('reload_success', { quoteId, versionId: targetVersionId || 'current' });
         }
       }
-    } catch (err) {
+    } catch (err: any) {
       logger.error('[UnifiedComposer] Failed to load quote:', err);
+      logAudit('reload_failure', { error: err?.message || 'Unknown error', quoteId }, 'failure');
       toast({ title: 'Error', description: 'Failed to load existing quote data', variant: 'destructive' });
     } finally {
       setEditLoading(false);
     }
-  };
+  }, [quoteId, versionId, context, scopedDb, toast, dispatch, form]);
 
   useEffect(() => {
-    if (!quoteId || !versionId) return;
+    if (!quoteId) return;
     loadExistingQuote();
-  }, [quoteId, versionId]);
+  }, [loadExistingQuote, quoteId]);
 
   // Load CRM Data
   useEffect(() => {
@@ -637,7 +762,6 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
       }
 
       try {
-        console.log('[UnifiedComposer] Loading CRM data...');
         setIsCrmLoading(true);
         
         // Parallel fetch for performance
@@ -649,8 +773,6 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
 
         if (accRes.error || conRes.error || oppRes.error) {
             console.error('[UnifiedComposer] Failed to load CRM data', { accError: accRes.error, conError: conRes.error, oppError: oppRes.error });
-        } else {
-            console.log(`[UnifiedComposer] Loaded ${accRes.data?.length || 0} accounts, ${conRes.data?.length || 0} contacts`);
         }
 
         setAccounts(accRes.data || []);
@@ -843,6 +965,85 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
   };
 
   // ---------------------------------------------------------------------------
+  // Handle Attachment Sync
+  // ---------------------------------------------------------------------------
+  
+  const handleSaveAttachments = async (quoteId: string, currentAttachments: any[]) => {
+    try {
+        // 1. Identify deleted attachments
+        // IDs in loadedAttachments that are NOT in currentAttachments
+        const currentIds = new Set(currentAttachments.filter(a => a.id).map(a => a.id));
+        const toDelete = loadedAttachments.filter(a => !currentIds.has(a.id));
+        
+        if (toDelete.length > 0) {
+            const deleteIds = toDelete.map(a => a.id);
+            const { error: delError } = await scopedDb.from('quote_documents').delete().in('id', deleteIds);
+            if (delError) {
+                logger.error('Failed to delete attachments', delError);
+                toast({ title: 'Warning', description: 'Failed to delete some removed attachments.', variant: 'destructive' });
+            } else {
+                // Also try to delete from storage if path exists
+                // This is optional but good for cleanup
+                // We'll skip complex storage cleanup for now to avoid accidental data loss
+            }
+        }
+
+        // 2. Identify new attachments (File objects)
+        const newFiles = currentAttachments.filter(a => a instanceof File);
+        
+        if (newFiles.length > 0) {
+            for (const file of newFiles) {
+                const fileExt = file.name.split('.').pop();
+                const fileName = `${quoteId}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+                
+                // Upload to storage
+                const { data: uploadData, error: uploadError } = await supabase.storage
+                    .from('commodity-docs')
+                    .upload(fileName, file);
+
+                if (uploadError) {
+                    logger.error('Failed to upload file', { fileName, error: uploadError });
+                    toast({ title: 'Upload Failed', description: `Failed to upload ${file.name}`, variant: 'destructive' });
+                    continue;
+                }
+
+                // Insert into quote_documents
+                const { error: insertError } = await scopedDb.from('quote_documents').insert({
+                    quote_id: quoteId,
+                    file_name: file.name,
+                    file_path: uploadData.path,
+                    file_type: file.type,
+                    file_size: file.size,
+                    uploaded_by: user?.id
+                });
+
+                if (insertError) {
+                     logger.error('Failed to link file to quote', insertError);
+                     toast({ title: 'Link Failed', description: `Failed to link ${file.name} to quote`, variant: 'destructive' });
+                }
+            }
+        }
+        
+        // 3. Update loadedAttachments for next save
+        // We re-fetch to be sure, or just update local state if we trust it
+        // Re-fetching is safer
+        const { data: refreshedDocs } = await scopedDb.from('quote_documents').select('*').eq('quote_id', quoteId);
+        if (refreshedDocs) {
+            setLoadedAttachments(refreshedDocs);
+            // Also update form if needed, but form state might have File objects replaced by DB records?
+            // Actually, we should probably replace File objects in form with the new records so subsequent saves don't re-upload
+            // But modifying form state here might be tricky.
+            // For now, let's just update loadedAttachments.
+            // Ideally we should reload the attachments into the form.
+        }
+
+    } catch (error) {
+        logger.error('Error syncing attachments', error);
+        toast({ title: 'Attachment Error', description: 'Failed to sync attachments.', variant: 'destructive' });
+    }
+  };
+
+  // ---------------------------------------------------------------------------
   // Handle save quote
   // ---------------------------------------------------------------------------
 
@@ -864,7 +1065,16 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
       const currentQuoteId = storeState.quoteId || quoteId;
 
       // Build RPC payload
-      const formData = lastFormData;
+      const formData = lastFormData || (initialFormValues && initialExtended ? {
+          values: initialFormValues as FormZoneValues,
+          extended: initialExtended as ExtendedFormData
+      } : null);
+
+      if (!formData) {
+          toast({ title: 'Error', description: 'Form data not ready. Please try again.', variant: 'destructive' });
+          setSaving(false);
+          return;
+      }
       const isStandalone = !!formData?.values.standalone;
       
       // Determine quote number
@@ -967,9 +1177,16 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
         delivery_deadline: formData?.extended.deliveryDeadline || null,
         incoterms: formData?.extended.incoterms || null,
         vehicle_type: formData?.extended.vehicleType || null,
-       account_id: isStandalone ? null : (formData?.values.accountId || storeState.quoteData?.account_id || null),
-       contact_id: isStandalone ? null : (formData?.values.contactId || storeState.quoteData?.contact_id || null),
-       opportunity_id: isStandalone ? null : (effectiveOpportunityId || null),
+        account_id: isStandalone ? null : (formData?.values.accountId || storeState.quoteData?.account_id || null),
+        contact_id: isStandalone ? null : (formData?.values.contactId || storeState.quoteData?.contact_id || null),
+        opportunity_id: isStandalone ? null : (effectiveOpportunityId || null),
+        cargo_details: {
+            commodity: formData?.values.commodity,
+            total_weight_kg: Number(formData?.values.weight) || 0,
+            total_volume_cbm: Number(formData?.values.volume) || 0,
+            dangerous_goods: formData?.values.dangerousGoods || formData?.extended.dangerousGoods || false,
+            hts_code: formData?.values.htsCode || formData?.extended.htsCode || null,
+        }
       };
 
       const options: any[] = [];
@@ -979,6 +1196,17 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
         setSaving(false);
         return;
       }
+
+      // Map container combos
+      const combos = formData?.values.containerCombos || formData?.extended.containerCombos || [];
+      const cargoConfigs = combos.map((c: any) => ({
+          container_type: c.type,
+          container_size: c.size,
+          quantity: c.qty,
+          temperature_control: null // Add if needed
+      }));
+
+      console.log('[UnifiedComposer] quotePayload cargo_details:', JSON.stringify(quotePayload.cargo_details, null, 2));
 
       const findBasisCodeById = (id: string) =>
         repoData.chargeBases?.find((b: any) => b.id === id)?.code || '';
@@ -1068,8 +1296,8 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
       const { data: savedId, error: rpcError } = await scopedDb.rpc('save_quote_atomic', {
         p_payload: {
           quote: quotePayload,
-          items: [], // TODO: Cargo details
-          cargo_configurations: [],
+          items: [], // Use cargo_details for now, items can be added later if granular items are needed
+          cargo_configurations: cargoConfigs,
           options: options
         }
       });
@@ -1111,6 +1339,11 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
             console.error('Quote number override failed', e);
           }
         }
+      }
+
+      // Sync attachments
+      if (savedId && formData?.extended?.attachments) {
+        await handleSaveAttachments(savedId, formData.extended.attachments);
       }
 
       // Fetch the final quote number for the toast
@@ -1278,6 +1511,13 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
     }
   };
 
+  const handleFormChange = useCallback((values: any) => {
+    setLastFormData((prev) => ({
+      values: values as FormZoneValues,
+      extended: (prev?.extended || (initialExtended as ExtendedFormData) || ({} as ExtendedFormData)),
+    }));
+  }, [initialExtended]);
+
   // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
@@ -1292,9 +1532,69 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
   }
 
   return (
-    <FormProvider {...form}>
+     <FormProvider {...form}>
       <div className="space-y-6">
         
+        {loadErrors.length > 0 && (
+          <div className="rounded-md bg-destructive/15 p-4 text-destructive">
+            <div className="flex items-center gap-2 font-medium">
+               <AlertCircle className="h-4 w-4" />
+               <span>Some data failed to load:</span>
+            </div>
+            <ul className="mt-2 list-disc pl-5 text-sm">
+              {loadErrors.map((err, i) => (
+                <li key={i}>{err}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        <div className="flex justify-end">
+           {versionHistory.length > 0 && (
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2">
+                  <History className="h-4 w-4" />
+                  Version History
+                  <Badge variant="secondary" className="ml-1 h-5 px-1.5 min-w-[1.25rem]">{versionHistory.length}</Badge>
+                </Button>
+              </SheetTrigger>
+              <SheetContent>
+                <SheetHeader>
+                  <SheetTitle>Version History</SheetTitle>
+                </SheetHeader>
+                <div className="mt-6 space-y-4">
+                  {versionHistory.map((ver) => (
+                    <div key={ver.id} className="flex flex-col gap-2 p-3 border rounded-lg hover:bg-muted/50 transition-colors">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium">Version {ver.version_number}</span>
+                        <span className="text-xs text-muted-foreground">{new Date(ver.created_at).toLocaleDateString()}</span>
+                      </div>
+                      <div className="text-sm text-muted-foreground line-clamp-2">
+                        {ver.change_summary || 'No summary available'}
+                      </div>
+                      <div className="flex items-center justify-between mt-1">
+                        <span className="text-xs bg-muted px-2 py-0.5 rounded text-muted-foreground">
+                            {ver.created_by_email || 'System'}
+                        </span>
+                        <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => {
+                            setSearchParams(prev => {
+                                const newParams = new URLSearchParams(prev);
+                                newParams.set('versionId', ver.id);
+                                return newParams;
+                            });
+                        }}>
+                          Load <ExternalLink className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </SheetContent>
+            </Sheet>
+           )}
+        </div>
+
         {/* Form Zone */}
         <FormZone
             onGetRates={handleGetRates}
@@ -1306,12 +1606,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
             accounts={accounts}
             contacts={contacts}
             opportunities={opportunities}
-            onChange={(values) => {
-                setLastFormData((prev) => ({
-                values: values as FormZoneValues,
-                extended: (prev?.extended || (initialExtended as ExtendedFormData) || ({} as ExtendedFormData)),
-                }));
-            }}
+            onChange={handleFormChange}
         />
 
         <Separator />

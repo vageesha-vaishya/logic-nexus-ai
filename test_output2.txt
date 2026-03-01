@@ -82,6 +82,12 @@ initialValues: {
     "attachments": []
   }
 }
+[UnifiedComposer] quotePayload cargo_details: {
+  "total_weight_kg": 0,
+  "total_volume_cbm": 0,
+  "dangerous_goods": false,
+  "hts_code": null
+}
 
 [90mstdout[2m | src/components/sales/unified-composer/__tests__/UnifiedQuoteComposer.integration.test.tsx[2m > [22m[2mUnifiedQuoteComposer Integration (API-to-UI)[2m > [22m[2mupdates composer state and persists changes when FormZone inputs change
 [22m[39m[Test Mock DB] Querying table: quote_documents
@@ -142,9 +148,9 @@ initialValues: {
   ]
 ]
 
- [31m❯[39m src/components/sales/unified-composer/__tests__/UnifiedQuoteComposer.integration.test.tsx [2m([22m[2m2 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[32m 118[2mms[22m[39m
-     [32m✓[39m populates FormZone inputs correctly from loaded quote data[32m 36[2mms[22m[39m
-[31m     [31m×[31m updates composer state and persists changes when FormZone inputs change[39m[32m 81[2mms[22m[39m
+ [31m❯[39m src/components/sales/unified-composer/__tests__/UnifiedQuoteComposer.integration.test.tsx [2m([22m[2m2 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[32m 120[2mms[22m[39m
+     [32m✓[39m populates FormZone inputs correctly from loaded quote data[32m 37[2mms[22m[39m
+[31m     [31m×[31m updates composer state and persists changes when FormZone inputs change[39m[32m 82[2mms[22m[39m
 
 [31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
 
@@ -232,6 +238,6 @@ Number of calls: [1m1[22m
 
 [2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
 [2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m1 passed[39m[22m[90m (2)[39m
-[2m   Start at [22m 14:00:57
-[2m   Duration [22m 1.11s[2m (transform 293ms, setup 128ms, import 475ms, tests 118ms, environment 260ms)[22m
+[2m   Start at [22m 14:01:30
+[2m   Duration [22m 1.31s[2m (transform 329ms, setup 126ms, import 552ms, tests 120ms, environment 277ms)[22m
 
