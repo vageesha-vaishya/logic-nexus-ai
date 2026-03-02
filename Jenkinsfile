@@ -67,7 +67,7 @@ pipeline {
                     // Run the Node.js deployment script
                     // VPS_IP and VPS_PASSWORD are already environment variables
                     withEnv(['VPS_USER=root']) {
-                        sh 'node scripts/deploy_vps.js'
+                        sh 'node scripts/deploy_vps.cjs'
                     }
                 }
             }
