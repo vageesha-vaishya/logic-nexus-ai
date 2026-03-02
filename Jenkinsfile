@@ -60,43 +60,15 @@ pipeline {
                     // Only deploy if tests pass
                     echo "Deploying Supabase Edge Functions to VPS (Self-Hosted)..."
                     
-                    // Attempt to install 'expect' if missing (required for password-based SSH)
-                    sh '''
-                        if ! command -v expect >/dev/null 2>&1; then
-                            echo "Installing expect..."
-                            if command -v apk >/dev/null 2>&1; then
-                                if [ "$(id -u)" -eq 0 ]; then
-                                    apk add --no-cache expect
-                                else
-                                    sudo apk add --no-cache expect
-                                fi
-                            elif command -v apt-get >/dev/null 2>&1; then
-                                if [ "$(id -u)" -eq 0 ]; then
-                                    apt-get update && apt-get install -y expect
-                                else
-                                    sudo apt-get update && sudo apt-get install -y expect
-                                fi
-                            elif command -v yum >/dev/null 2>&1; then
-                                if [ "$(id -u)" -eq 0 ]; then
-                                    yum install -y expect
-                                else
-                                    sudo yum install -y expect
-                                fi
-                            else
-                                echo "Package manager not found. Please install 'expect' manually on the Jenkins agent."
-                                exit 1
-                            fi
-                        fi
-                    '''
-
-                    // Make scripts executable
-                    sh "chmod +x ./scripts/deploy_functions_vps.sh"
-                    sh "chmod +x ./scripts/remote_scp.expect"
-                    sh "chmod +x ./scripts/remote_exec.expect"
+                    // Use Node.js script for deployment to avoid system dependency issues (expect/sudo)
+                    // Install ssh2 library in the current workspace (no-save to avoid modifying package.json)
+                    sh 'npm install --no-save ssh2'
                     
-                    // Deploy to VPS using credentials
-                    // Usage: ./deploy_functions_vps.sh <vps_ip> <vps_user> <vps_password>
-                    sh './scripts/deploy_functions_vps.sh "$VPS_IP" "root" "$VPS_PASSWORD"'
+                    // Run the Node.js deployment script
+                    // VPS_IP and VPS_PASSWORD are already environment variables
+                    withEnv(['VPS_USER=root']) {
+                        sh 'node scripts/deploy_vps.js'
+                    }
                 }
             }
         }
