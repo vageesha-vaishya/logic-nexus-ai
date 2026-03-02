@@ -66,7 +66,7 @@ pipeline {
                     
                     // Deploy to VPS using credentials
                     // Usage: ./deploy_functions_vps.sh <vps_ip> <vps_user> <vps_password>
-                    sh "./scripts/deploy_functions_vps.sh ${VPS_IP} 'root' ${VPS_PASSWORD}"
+                    sh './scripts/deploy_functions_vps.sh "$VPS_IP" "root" "$VPS_PASSWORD"'
                 }
             }
         }
