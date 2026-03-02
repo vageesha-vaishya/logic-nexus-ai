@@ -36,6 +36,7 @@ export default function Settings() {
         if (!active) return;
         setStandaloneEnabled(Boolean(data?.setting_value));
       } catch {
+        // ignore
       } finally {
         if (active) setLoadingStandalone(false);
       }

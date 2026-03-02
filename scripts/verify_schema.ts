@@ -32,7 +32,9 @@ async function checkSchema() {
     // Direct query to information_schema is often blocked or requires SQL editor
     // But we can try via PostgREST if exposed, usually not.
     // So let's try to insert/select with expected columns.
-  } catch (e) {}
+  } catch (e) {
+    // ignore
+  }
 
   // Better Method: RPC call to inspect or just try to select known columns
   // If we select 'major', and it errors, we know.

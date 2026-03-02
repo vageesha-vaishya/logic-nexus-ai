@@ -18,7 +18,7 @@ import { useCRM } from '@/hooks/useCRM';
 import { normalizeModeCode } from '@/lib/mode-utils';
 import { CarrierSelect } from './CarrierSelect';
 
-interface LegsConfigurationStepProps {}
+
 
 function LocationAutocomplete({ 
   value, 
@@ -114,7 +114,7 @@ function LocationAutocomplete({
   );
 }
 
-export function LegsConfigurationStep({}: LegsConfigurationStepProps) {
+export function LegsConfigurationStep() {
   const { state, dispatch } = useQuoteStore();
   const { legs, validationErrors, referenceData, options, optionId } = state;
   const { serviceTypes = [], carriers = [], serviceLegCategories: serviceCategories = [] } = referenceData || {};

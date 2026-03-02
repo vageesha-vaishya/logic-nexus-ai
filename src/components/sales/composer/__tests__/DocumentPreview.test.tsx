@@ -5,8 +5,8 @@ import { DocumentPreview } from '../DocumentPreview';
 import { LandedCostService } from '@/services/quotation/LandedCostService';
 
 // Mock dependencies
-vi.mock('@/components/ui/tabs', () => {
-  const React = require('react');
+vi.mock('@/components/ui/tabs', async () => {
+  const React: any = await vi.importActual('react');
   const TabsContext = React.createContext({ value: 'quote', setValue: (v: string) => {} });
 
   return {
@@ -24,9 +24,9 @@ vi.mock('@/components/ui/tabs', () => {
       return (
         <button 
           className={className}
-          onClick={(e) => {
+          onClick={(e: any) => {
             context.setValue(value);
-            onClick && onClick(e);
+            onClick?.(e);
           }}
           role="tab"
           aria-selected={context.value === value}

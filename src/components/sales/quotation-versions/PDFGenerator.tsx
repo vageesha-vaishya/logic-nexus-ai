@@ -56,9 +56,9 @@ export function PDFGenerator({ versionId, versionNumber, quoteId }: PDFGenerator
                     .eq('id', quote.destination_port_id)
                     .single();
                 
-                // @ts-ignore
+                // @ts-ignore -- Country code property might not be inferred correctly
                 if (port?.countries?.code_iso2) {
-                    // @ts-ignore
+                    // @ts-ignore -- Country code property might not be inferred correctly
                     destCountry = port.countries.code_iso2;
                 }
             } else if (quote.destination) {

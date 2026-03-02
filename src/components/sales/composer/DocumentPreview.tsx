@@ -547,7 +547,7 @@ export function DocumentPreview({ quoteData, legs, combinedCharges = [], templat
               return renderSection('shipment_info', props);
           case 'rates_matrix':
               return renderSection('dynamic_table', props);
-          case 'cargo_details':
+          case 'cargo_details': {
                // Specialized view for LCL/Air
                const chargeableWeight = Math.max(
                    Number(quoteData.total_weight || 0), 
@@ -576,6 +576,7 @@ export function DocumentPreview({ quoteData, legs, combinedCharges = [], templat
                     </div>
                 </div>
                );
+          }
           case 'route_info':
               return (
                 <div className="mb-8">
@@ -628,7 +629,7 @@ export function DocumentPreview({ quoteData, legs, combinedCharges = [], templat
                 </div>
                );
           case 'rates_table':
-          case 'local_charges_table':
+          case 'local_charges_table': {
               const showCols = props?.columns || ['carrier', 'transit_time', 'frequency', 'price'];
               return (
                 <div className="mb-8">
@@ -684,6 +685,7 @@ export function DocumentPreview({ quoteData, legs, combinedCharges = [], templat
                     </table>
                 </div>
               );
+          }
           case 'terms':
               return (
                   <div className="mb-8 border-t pt-6">

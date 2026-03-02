@@ -25,7 +25,7 @@ interface TransportModeForm {
 export default function TransportModes() {
   const { toast } = useToast();
   const { scopedDb, supabase } = useCRM();
-  const { data: modes, refetch } = useTransportModes();
+  const { modes, refetch } = useTransportModes();
   
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -56,7 +56,7 @@ export default function TransportModes() {
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
 
   const isValidModeCode = (v: string) =>
-    /^[a-z][a-z0-9_\-]{1,31}$/.test(v);
+    /^[a-z][a-z0-9_-]{1,31}$/.test(v);
 
   const handleCreate = async () => {
     if (!formData.name || !formData.code || !formData.icon_name) {

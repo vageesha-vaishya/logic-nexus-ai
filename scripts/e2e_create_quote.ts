@@ -31,11 +31,13 @@ async function main() {
   console.log('Fetching master data...');
   
   // Get Container Type
-  let { data: containerTypes, error: ctError } = await supabase
+  const { data: ctData, error: ctError } = await supabase
     .from('container_types')
     .select('*')
     .eq('code', '40ST') 
     .maybeSingle();
+    
+  let containerTypes = ctData;
 
   if (!containerTypes) {
     console.log('40ST not found, fetching any container type...');
@@ -51,12 +53,14 @@ async function main() {
   const containerTypeId = containerTypes.id;
 
   // Get Container Size
-  let { data: containerSizes, error: csError } = await supabase
+  const { data: csData, error: csError } = await supabase
     .from('container_sizes')
     .select('id, name, code')
     .or('name.eq.40,code.eq.40')
     .limit(1)
     .maybeSingle();
+    
+  let containerSizes = csData;
     
   if (!containerSizes) {
       console.log('40 size not found, fetching any container size...');

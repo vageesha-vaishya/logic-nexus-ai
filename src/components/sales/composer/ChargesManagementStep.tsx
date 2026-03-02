@@ -18,9 +18,7 @@ import { mapOptionToQuote } from '@/lib/quote-mapper';
 import { calculateChargeableWeight, TransportMode } from '@/utils/freightCalculations';
 import { logger } from '@/lib/logger';
 
-interface ChargesManagementStepProps {}
-
-export function ChargesManagementStep({}: ChargesManagementStepProps) {
+export function ChargesManagementStep() {
   const { state, dispatch } = useQuoteStore();
   const { scopedDb } = useCRM();
   const { invokeAiAdvisor } = useAiAdvisor();

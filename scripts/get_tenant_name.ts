@@ -25,11 +25,13 @@ async function main() {
   console.log(`Searching for quote: ${quoteNumber}`);
 
   // Try finding by quote_number
-  let { data: quote, error } = await supabase
+  const { data: quoteData, error } = await supabase
     .from('quotes')
     .select('id, tenant_id, quote_number')
     .eq('quote_number', quoteNumber)
     .maybeSingle();
+    
+  let quote = quoteData;
 
   if (error) {
      console.error('Error finding quote by quote_number:', error);

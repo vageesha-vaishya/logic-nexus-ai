@@ -359,7 +359,7 @@ describe('QuoteFormRefactored', () => {
   });
 
   it('updates logistics fields correctly', async () => {
-    const user = require('@testing-library/user-event').default.setup();
+    const user = userEvent.setup();
     renderComponent();
     
     // 1. Select Service Type

@@ -65,7 +65,7 @@ async function verifyEnterpriseArchitecture() {
 
   console.log(`   ✅ Found ${vendors.length} Linked Vendor(s):`);
   vendors.forEach(v => {
-    // @ts-ignore
+    // @ts-ignore -- Vendors property is joined and might not be typed correctly
     console.log(`      - ${v.vendors.name} (${v.vendors.type}) | Preferred: ${v.is_preferred}`);
     console.log(`        Cost Structure: ${JSON.stringify(v.cost_structure)}`);
   });

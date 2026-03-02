@@ -6,7 +6,7 @@ import tseslint from "typescript-eslint";
 import * as mdx from "eslint-plugin-mdx";
 
 export default tseslint.config(
-  { ignores: ["dist", "storybook-static", "test-results"] },
+  { ignores: ["dist", "storybook-static", "test-results", "docs/plans/2026-02-16-multi-channel-communications.md"] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],
