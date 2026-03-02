@@ -62,14 +62,26 @@ pipeline {
                     
                     // Attempt to install 'expect' if missing (required for password-based SSH)
                     sh '''
-                        if ! command -v expect &> /dev/null; then
+                        if ! command -v expect >/dev/null 2>&1; then
                             echo "Installing expect..."
-                            if command -v apk &> /dev/null; then
-                                sudo apk add --no-cache expect || apk add --no-cache expect
-                            elif command -v apt-get &> /dev/null; then
-                                sudo apt-get update && sudo apt-get install -y expect || (apt-get update && apt-get install -y expect)
-                            elif command -v yum &> /dev/null; then
-                                sudo yum install -y expect || yum install -y expect
+                            if command -v apk >/dev/null 2>&1; then
+                                if [ "$(id -u)" -eq 0 ]; then
+                                    apk add --no-cache expect
+                                else
+                                    sudo apk add --no-cache expect
+                                fi
+                            elif command -v apt-get >/dev/null 2>&1; then
+                                if [ "$(id -u)" -eq 0 ]; then
+                                    apt-get update && apt-get install -y expect
+                                else
+                                    sudo apt-get update && sudo apt-get install -y expect
+                                fi
+                            elif command -v yum >/dev/null 2>&1; then
+                                if [ "$(id -u)" -eq 0 ]; then
+                                    yum install -y expect
+                                else
+                                    sudo yum install -y expect
+                                fi
                             else
                                 echo "Package manager not found. Please install 'expect' manually on the Jenkins agent."
                                 exit 1
