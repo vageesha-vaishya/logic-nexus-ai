@@ -698,6 +698,7 @@ export default function MasterDataSubscriptionPlans() {
                       const parsed = JSON.parse(e.target.value || '{}');
                       setPlanForm({ ...planForm, features: parsed });
                     } catch {
+                      // ignore
                     }
                   }}
                 />

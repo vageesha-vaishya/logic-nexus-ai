@@ -137,12 +137,12 @@ export async function invokeFunction<T = any>(
     const getHeaders = (t?: string) => {
         // Do not explicitly add apikey here as Supabase SDK adds it automatically.
         // Adding it manually might cause duplication or override issues.
-        const headers: any = { ...customHeaders };
+        const headers: Record<string, string> = { ...customHeaders };
         if (t) headers.Authorization = `Bearer ${t}`;
         return headers;
     };
 
-    let resultInvoke = await supabase.functions.invoke(functionName, {
+    const resultInvoke = await supabase.functions.invoke(functionName, {
       body: enrichPayload(options.body),
       headers: getHeaders(token),
       method: options.method || 'POST',

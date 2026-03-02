@@ -1,3 +1,5 @@
+import { SupabaseClient } from '@supabase/supabase-js';
+
 export type QuoteNumberConfig = {
   prefix: string;        // e.g., "QT-"
   dateFormat: 'YYYYMM' | 'YYYYMMDD' | 'YYMM' | 'YYYY' | 'NONE';
@@ -32,7 +34,7 @@ export const DEFAULT_CONFIG: QuoteNumberConfig = {
 };
 
 export class QuotationNumberService {
-  static async getConfig(scopedDb: any, tenantId: string): Promise<QuoteNumberConfig> {
+  static async getConfig(scopedDb: SupabaseClient, tenantId: string): Promise<QuoteNumberConfig> {
     try {
       // Use maybeSingle to avoid 406 on empty result set (PostgREST quirk)
       const { data } = await scopedDb
@@ -67,7 +69,7 @@ export class QuotationNumberService {
     return config.suffix ? `${core}${config.suffix}` : core;
   }
 
-  static async isUnique(scopedDb: any, tenantId: string, quoteNumber: string): Promise<boolean> {
+  static async isUnique(scopedDb: SupabaseClient, tenantId: string, quoteNumber: string): Promise<boolean> {
     // Try RPC first
     try {
       const { data, error } = await scopedDb.rpc('check_quote_number_availability', { p_quote_number: quoteNumber });
@@ -97,7 +99,7 @@ export class QuotationNumberService {
     return count === 0;
   }
 
-  static async generateNext(scopedDb: any, tenantId: string, config: QuoteNumberConfig): Promise<string> {
+  static async generateNext(scopedDb: SupabaseClient, tenantId: string, config: QuoteNumberConfig): Promise<string> {
     const date = new Date();
     // Try server RPC first (for concurrency safety)
     try {

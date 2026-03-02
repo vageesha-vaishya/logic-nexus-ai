@@ -12,10 +12,13 @@ export class EcommerceQuotationEngine implements IQuotationEngine {
   async calculate(context: RequestContext, items: LineItem[]): Promise<QuoteResult> {
     this.debug.info('Calculating quote...');
     let total = 0;
-    const breakdown: any[] = [];
+    const breakdownItems: Record<string, unknown>[] = [];
 
     for (const item of items) {
-      const { platform, sku_count, monthly_orders, fulfillment_model } = item.attributes;
+      const platform = item.attributes.platform as string;
+      const sku_count = item.attributes.sku_count;
+      const monthly_orders = item.attributes.monthly_orders;
+      const fulfillment_model = item.attributes.fulfillment_model;
       
       const skus = Number(sku_count) || 0;
       const orders = Number(monthly_orders) || 0;
@@ -34,7 +37,7 @@ export class EcommerceQuotationEngine implements IQuotationEngine {
       const totalMonthlyCost = platformFee + (orders * fulfillmentFeePerOrder) + storageFee;
 
       total += totalMonthlyCost;
-      breakdown.push({
+      breakdownItems.push({
         description: item.description || `Store Setup (${platform})`,
         platform_fee: platformFee,
         fulfillment_costs: orders * fulfillmentFeePerOrder,
@@ -46,7 +49,7 @@ export class EcommerceQuotationEngine implements IQuotationEngine {
     return {
       totalAmount: total,
       currency: context.currency || 'USD',
-      breakdown: breakdown,
+      breakdown: { items: breakdownItems },
       metadata: {
         engine: 'EcommerceQuotationEngine',
         timestamp: new Date().toISOString()

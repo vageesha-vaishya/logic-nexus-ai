@@ -1,5 +1,5 @@
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, Mock } from 'vitest';
 import { CoreQuoteService } from './CoreQuoteService';
 import { DomainService } from '../DomainService';
 import { RequestContext, LineItem } from './types';
@@ -23,7 +23,7 @@ describe('CoreQuoteService', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    (DomainService.getAllDomains as any).mockResolvedValue(mockDomains);
+    (DomainService.getAllDomains as Mock).mockResolvedValue(mockDomains);
   });
 
   it('should delegate to Logistics engine for logistics domain', async () => {

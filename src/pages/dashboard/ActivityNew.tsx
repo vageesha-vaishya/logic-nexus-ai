@@ -149,6 +149,7 @@ export default function ActivityNew() {
               const parsed = typeof ctx === 'string' ? JSON.parse(ctx) : ctx;
               sendMessage = parsed?.error || parsed?.message || sendMessage;
             } catch {
+              // ignore
             }
           }
           throw new Error(sendMessage);

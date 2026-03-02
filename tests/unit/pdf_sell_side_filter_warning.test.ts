@@ -1,16 +1,16 @@
 import { describe, it, expect, vi } from 'vitest';
 
-let capturedHandler: any;
+let capturedHandler: (...args: unknown[]) => Promise<Response>;
 
 vi.mock('../../supabase/functions/_shared/logger.ts', () => ({
-  serveWithLogger: (handler: any) => {
+  serveWithLogger: (handler: (...args: unknown[]) => Promise<Response>) => {
     capturedHandler = handler;
   },
 }));
 
 describe('generate-quote-pdf sell-side charge filter', () => {
   it('logs a warning when sell-side filter returns zero charges for an option', async () => {
-    (globalThis as any).Deno = {
+    (globalThis as unknown as { Deno: unknown }).Deno = {
       env: {
         get: vi.fn().mockReturnValue(''),
       },
@@ -131,7 +131,7 @@ describe('generate-quote-pdf sell-side charge filter', () => {
         }
 
         if (table === 'quote_charges') {
-          const chargesBuilder: any = {
+          const chargesBuilder: Record<string, unknown> = {
             eq: (column: string) => {
               if (column === 'charge_side_id') {
                 return Promise.resolve({
@@ -152,7 +152,7 @@ describe('generate-quote-pdf sell-side charge filter', () => {
       },
     };
 
-    await capturedHandler(req, logger as any, supabaseClient as any);
+    await capturedHandler(req, logger, supabaseClient);
 
     const warningMessages = logger.warn.mock.calls.map((c) => String(c[0]));
 

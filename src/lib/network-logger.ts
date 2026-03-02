@@ -140,7 +140,7 @@ export const initNetworkLogger = () => {
           if (url.includes('.supabase.co/rest/v1/')) {
              isDatabase = true;
              // Extract table: .../rest/v1/tablename?params
-             const match = url.match(/\/rest\/v1\/([^\?]+)/);
+             const match = url.match(/\/rest\/v1\/([^?]+)/);
              if (match) {
                  const path = match[1];
                  if (path.startsWith('rpc/')) {

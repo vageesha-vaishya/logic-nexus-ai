@@ -110,15 +110,18 @@ serveWithLogger(async (req, logger, adminSupabase) => {
     }
 
     return new Response(JSON.stringify({ error: "Unsupported action" }), { status: 400, headers: corsHeaders });
-  } catch (e: any) {
-    logger.error("AI Assistant Error", { error: e });
+  } catch (e: unknown) {
+    const error = e as Error;
+    logger.error("AI Assistant Error", { error });
     try {
       await logAiCall(adminSupabase, {
         function_name: "ai-message-assistant",
         model_used: Deno.env.get("GOOGLE_API_KEY") ? "gemini-2.5-flash" : "fallback",
-        error_message: e?.message || String(e),
+        error_message: error.message || String(e),
       });
-    } catch {}
-    return new Response(JSON.stringify({ error: e?.message || "Unhandled" }), { status: 500, headers: corsHeaders });
+    } catch {
+      // ignore logging errors
+    }
+    return new Response(JSON.stringify({ error: error.message || "Unhandled" }), { status: 500, headers: corsHeaders });
   }
 }, "ai-message-assistant");

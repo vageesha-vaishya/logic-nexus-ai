@@ -115,7 +115,7 @@ export function LeadForm({ initialData, onSubmit, onCancel, suggestedService, is
     if (suggestedService) {
       console.log("LeadForm received suggestedService update:", suggestedService);
       // Clean the suggestion (remove brackets if present)
-      const term = suggestedService.replace(/[\[\]]/g, '').trim();
+      const term = suggestedService.replace(/[[\]]/g, '').trim();
       
       // Set the free-text value directly
       if (term) {

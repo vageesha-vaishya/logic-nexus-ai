@@ -96,6 +96,7 @@ export default function DataManagement() {
         setRemoteProfiles(parsed);
       }
     } catch {
+      // ignore
     }
   }, []);
 
@@ -104,6 +105,7 @@ export default function DataManagement() {
     try {
       localStorage.setItem('remoteImportProfiles', JSON.stringify(profiles));
     } catch {
+      // ignore
     }
   };
 

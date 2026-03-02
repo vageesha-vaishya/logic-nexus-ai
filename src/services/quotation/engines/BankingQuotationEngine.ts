@@ -5,7 +5,7 @@ import { BankingMockService } from '../../banking/BankingMockService';
 import { createDebugLogger } from '@/lib/debug-logger';
 
 export class BankingQuotationEngine implements IQuotationEngine {
-  private debug;
+  private debug: ReturnType<typeof createDebugLogger>;
 
   constructor() {
     this.debug = createDebugLogger('QuotationEngine', 'Banking');
@@ -18,7 +18,7 @@ export class BankingQuotationEngine implements IQuotationEngine {
     // We assume LineItems represent loan requests or service fee inquiries
     
     let totalInterest = 0;
-    const breakdown: Record<string, any> = { offers: [] };
+    const breakdown: { offers: Record<string, unknown>[] } = { offers: [] };
 
     for (const item of items) {
       if (item.attributes?.type === 'LOAN_APPLICATION') {
@@ -26,11 +26,11 @@ export class BankingQuotationEngine implements IQuotationEngine {
           const loanOffer = await BankingMockService.applyForLoan(context.tenantId, {
             applicantName: context.userId || 'Anonymous',
             amount: item.quantity, // Using quantity as loan amount for simplicity
-            termMonths: item.attributes.termMonths || 12,
+            termMonths: Number(item.attributes.termMonths) || 12,
             purpose: item.description
           });
 
-          breakdown.offers.push(loanOffer);
+          breakdown.offers.push(loanOffer as unknown as Record<string, unknown>);
           
           if (loanOffer.status === 'APPROVED' && loanOffer.interestRate) {
              // Mock calculation of total interest payable
@@ -46,7 +46,7 @@ export class BankingQuotationEngine implements IQuotationEngine {
     return {
       totalAmount: totalInterest, // In this context, the "Quote Amount" is the cost of borrowing
       currency: context.currency || 'USD',
-      breakdown,
+      breakdown: breakdown as unknown as Record<string, unknown>,
       validUntil: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours validity for rates
     };
   }

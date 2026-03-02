@@ -15,7 +15,7 @@ export interface LandedCostResult {
     hs_code: string;
     duty_amount: number;
     rate_found: boolean;
-    rate_details: any;
+    rate_details: Record<string, unknown>;
   }[];
   summary: {
     total_value: number;
@@ -31,7 +31,7 @@ export const LandedCostService = {
   async calculate(items: LandedCostItem[], destinationCountry: string = 'US'): Promise<LandedCostResult | null> {
     try {
       const { data, error } = await supabase.rpc('calculate_landed_cost', {
-        items: items as any, // Supabase expects JSONB, cast as any to bypass strict type check if needed or define proper Json type
+        items: items as unknown as Record<string, unknown>[], // Supabase expects JSONB, cast as any to bypass strict type check if needed or define proper Json type
         destination_country: destinationCountry
       });
 

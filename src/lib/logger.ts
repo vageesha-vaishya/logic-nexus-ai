@@ -134,7 +134,7 @@ class LoggerService {
   private maskPII(text: string): string {
     if (!text) return text;
     // Email masking
-    let masked = text.replace(/\b[\w\.-]+@[\w\.-]+\.\w{2,4}\b/g, '***@***.***');
+    let masked = text.replace(/\b[\w.-]+@[\w.-]+\.\w{2,4}\b/g, '***@***.***');
     // Phone masking (simple US/International format)
     masked = masked.replace(/\b(?:\+?1[-. ]?)?\(?([0-9]{3})\)?[-. ]?([0-9]{3})[-. ]?([0-9]{4})\b/g, '***-***-$3');
     // Credit Card (simple 13-16 digit)

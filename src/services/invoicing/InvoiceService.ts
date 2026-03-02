@@ -114,7 +114,7 @@ export const InvoiceService = {
       });
 
       const { error: itemsError } = await scopedDb
-        .from('invoice_line_items' as any)
+        .from('invoice_line_items')
         .insert(itemsToInsert);
 
       if (itemsError) throw itemsError;

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import { SupabaseClient } from '@supabase/supabase-js';
 import { QuotationNumberService, DEFAULT_CONFIG } from '../QuotationNumberService';
 
 describe('QuotationNumberService', () => {
@@ -15,9 +16,10 @@ describe('QuotationNumberService', () => {
       select: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
       limit: vi.fn().mockReturnThis(),
+      rpc: vi.fn().mockRejectedValue(new Error('RPC not found')),
     };
-    (scopedDb as any).select.mockResolvedValueOnce({ data: [] });
-    const ok = await QuotationNumberService.isUnique(scopedDb, 'tenant-1', 'QT-202502-0001');
+    scopedDb.select.mockResolvedValueOnce({ data: [] });
+    const ok = await QuotationNumberService.isUnique(scopedDb as unknown as SupabaseClient, 'tenant-1', 'QT-202502-0001');
     expect(ok).toBe(true);
   });
 
@@ -27,9 +29,10 @@ describe('QuotationNumberService', () => {
       select: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
       limit: vi.fn().mockReturnThis(),
+      rpc: vi.fn().mockRejectedValue(new Error('RPC not found')),
     };
-    (scopedDb as any).select.mockResolvedValueOnce({ data: [{ id: 'q1' }] });
-    const ok = await QuotationNumberService.isUnique(scopedDb, 'tenant-1', 'QT-202502-0001');
+    scopedDb.select.mockResolvedValueOnce({ data: [{ id: 'q1' }] });
+    const ok = await QuotationNumberService.isUnique(scopedDb as unknown as SupabaseClient, 'tenant-1', 'QT-202502-0001');
     expect(ok).toBe(false);
   });
 });

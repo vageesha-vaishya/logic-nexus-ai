@@ -15,7 +15,7 @@ export interface InvoiceLineItem {
   tax_rate: number;
   tax_amount: number;
   charge_id?: string | null;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   created_at?: string;
   updated_at?: string;
 }
@@ -41,10 +41,10 @@ export interface Invoice {
   notes?: string | null;
   terms?: string | null;
   
-  billing_address?: Record<string, any> | null;
-  shipping_address?: Record<string, any> | null;
+  billing_address?: Record<string, unknown> | null;
+  shipping_address?: Record<string, unknown> | null;
   
-  metadata?: Record<string, any> | null;
+  metadata?: Record<string, unknown> | null;
   
   // Relations
   invoice_line_items?: InvoiceLineItem[];
@@ -71,7 +71,7 @@ export interface CreateInvoiceRequest {
     unit_price: number;
     tax_code_id?: string;
     charge_id?: string;
-    metadata?: Record<string, any>;
+    metadata?: Record<string, unknown>;
   }[];
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }

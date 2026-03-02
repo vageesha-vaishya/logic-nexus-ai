@@ -161,14 +161,14 @@ runTests('Enhanced Container Logic Integration', () => {
 
     // View query
     const { data: rawViewData, error: viewError } = await supabase
-      .from('view_container_inventory_summary' as any)
+      .from('view_container_inventory_summary')
       .select('*')
       .eq('size_id', sizeId);
 
     expect(viewError).toBeNull();
     expect(rawViewData).toBeDefined();
     
-    const viewData = rawViewData as any[];
+    const viewData = rawViewData as { total_quantity: number; total_teu: number }[];
     expect(viewData.length).toBeGreaterThan(0);
 
     const record = viewData[0];

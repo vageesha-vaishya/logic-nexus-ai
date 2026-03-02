@@ -1,20 +1,21 @@
 
-export function downloadCSV(data: any[], filename: string) {
+export function downloadCSV(data: unknown[], filename: string) {
   if (!data || !data.length) return;
 
-  const flattenObject = (obj: any, prefix = ''): any => {
-    return Object.keys(obj).reduce((acc: any, k: string) => {
+  const flattenObject = (obj: Record<string, unknown>, prefix = ''): Record<string, unknown> => {
+    return Object.keys(obj).reduce((acc: Record<string, unknown>, k: string) => {
+      const value = obj[k];
       const pre = prefix.length ? prefix + '.' : '';
-      if (typeof obj[k] === 'object' && obj[k] !== null && !Array.isArray(obj[k]) && !(obj[k] instanceof Date)) {
-        Object.assign(acc, flattenObject(obj[k], pre + k));
+      if (typeof value === 'object' && value !== null && !Array.isArray(value) && !(value instanceof Date)) {
+        Object.assign(acc, flattenObject(value as Record<string, unknown>, pre + k));
       } else {
-        acc[pre + k] = obj[k];
+        acc[pre + k] = value;
       }
       return acc;
     }, {});
   };
 
-  const flatData = data.map(item => flattenObject(item));
+  const flatData = data.map(item => flattenObject(item as Record<string, unknown>));
   const headers = Array.from(new Set(flatData.flatMap(Object.keys)));
 
   const csvContent = [

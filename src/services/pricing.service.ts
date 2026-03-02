@@ -25,7 +25,7 @@ export interface PricingResult {
 export interface MarginRule {
   id: string;
   name: string;
-  condition_json: Record<string, any>;
+  condition_json: Record<string, unknown>;
   adjustment_type: 'percent' | 'fixed';
   adjustment_value: number;
   priority: number;
@@ -37,12 +37,14 @@ export interface MarginRule {
  */
 export class PricingService {
   private supabase: SupabaseClient;
-  private debug;
-  private static cache = new Map<string, { data: any, timestamp: number }>();
+  private debug: ReturnType<typeof createDebugLogger>;
+  private static marginRulesCache = new Map<string, { data: MarginRule[], timestamp: number }>();
+  private static financialsCache = new Map<string, { data: { sellPrice: number; buyPrice: number; marginAmount: number; marginPercent: number }, timestamp: number }>();
   private static CACHE_TTL = 5 * 60 * 1000; // 5 minutes in milliseconds
 
   static clearCache() {
-    PricingService.cache.clear();
+    PricingService.marginRulesCache.clear();
+    PricingService.financialsCache.clear();
   }
 
   /**
@@ -53,8 +55,8 @@ export class PricingService {
     const cacheKey = 'margin_rules';
     const now = Date.now();
 
-    if (PricingService.cache.has(cacheKey)) {
-      const entry = PricingService.cache.get(cacheKey)!;
+    if (PricingService.marginRulesCache.has(cacheKey)) {
+      const entry = PricingService.marginRulesCache.get(cacheKey)!;
       if (now - entry.timestamp < PricingService.CACHE_TTL) {
         return entry.data;
       }
@@ -71,7 +73,7 @@ export class PricingService {
     }
 
     const rules = data || [];
-    PricingService.cache.set(cacheKey, { data: rules, timestamp: now });
+    PricingService.marginRulesCache.set(cacheKey, { data: rules, timestamp: now });
     return rules;
   }
 
@@ -79,7 +81,7 @@ export class PricingService {
    * Resolve Applicable Margin Rules
    * Filters rules based on provided context matching condition_json.
    */
-  async resolveMarginRules(context: Record<string, any>): Promise<MarginRule[]> {
+  async resolveMarginRules(context: Record<string, unknown>): Promise<MarginRule[]> {
     const rules = await this.getMarginRules();
     const applicableRules: MarginRule[] = [];
 
@@ -106,7 +108,7 @@ export class PricingService {
    * Applies margin rules to a base cost to determine sell price.
    * Returns details about applied rules.
    */
-  async calculatePriceWithRules(cost: number, context: Record<string, any>): Promise<{
+  async calculatePriceWithRules(cost: number, context: Record<string, unknown>): Promise<{
     sellPrice: number;
     buyPrice: number;
     marginAmount: number;
@@ -277,12 +279,12 @@ export class PricingService {
     const now = Date.now();
 
     // 1. Check Cache with TTL
-    if (PricingService.cache.has(cacheKey)) {
-      const entry = PricingService.cache.get(cacheKey)!;
+    if (PricingService.financialsCache.has(cacheKey)) {
+      const entry = PricingService.financialsCache.get(cacheKey)!;
       if (now - entry.timestamp < PricingService.CACHE_TTL) {
         return entry.data;
       } else {
-        PricingService.cache.delete(cacheKey);
+        PricingService.financialsCache.delete(cacheKey);
       }
     }
 
@@ -318,7 +320,7 @@ export class PricingService {
       };
 
       // 2. Set Cache
-      PricingService.cache.set(cacheKey, { data: result, timestamp: now });
+      PricingService.financialsCache.set(cacheKey, { data: result, timestamp: now });
 
       return result;
     } catch (error) {

@@ -1,5 +1,7 @@
+import { SupabaseClient } from '@supabase/supabase-js';
+
 export class QuotationOptionCrudService {
-  constructor(private db: any) {}
+  constructor(private db: SupabaseClient) {}
 
   async deleteOption(optionId: string, reason?: string): Promise<{ reselectedOptionId?: string | null }> {
     const { data, error } = await this.db.rpc('delete_quote_option_safe', {

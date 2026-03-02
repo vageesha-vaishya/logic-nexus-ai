@@ -417,29 +417,14 @@ export default function DebugConsole() {
     }
 
     if (!filter) return result;
-    const lower = filter.toLowerCase();
+    
     return result.filter(l => {
-      if (l.type === 'data-flow') {
-        return (
-          safeString(l.source).toLowerCase().includes(lower) ||
-          safeString(l.operation).toLowerCase().includes(lower) ||
-          safeString(l.target).toLowerCase().includes(lower)
-        );
+      try {
+        const re = new RegExp(filter, 'i');
+        return re.test(JSON.stringify(l));
+      } catch {
+        return JSON.stringify(l).toLowerCase().includes(filter.toLowerCase());
       }
-      if (l.type === 'app') {
-        return (
-          safeString(l.module).toLowerCase().includes(lower) ||
-          (l.form && safeString(l.form).toLowerCase().includes(lower)) ||
-          safeString(l.message).toLowerCase().includes(lower) ||
-          safeString(l.level).toLowerCase().includes(lower)
-        );
-      }
-      // Network
-      return (
-        (l.url && safeString(l.url).toLowerCase().includes(lower)) || 
-        (l.method && safeString(l.method).toLowerCase().includes(lower)) ||
-        String(l.status).includes(lower)
-      );
     });
   }, [logs, filter, activeTab]);
 

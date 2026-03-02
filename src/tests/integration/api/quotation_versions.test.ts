@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, Mock } from 'vitest';
 import { createMocks } from 'node-mocks-http';
 
 // Mock Supabase client
@@ -30,8 +30,7 @@ describe('API: /quotations/[id]/versions', () => {
     });
 
     const mockVersions = [{ id: 'v1', version_number: 1 }];
-    // @ts-ignore: Mocking method on prototype for testing purposes
-    QuotationVersionService.prototype.listVersions.mockResolvedValue({ data: mockVersions, count: 1 });
+    (QuotationVersionService.prototype.listVersions as Mock).mockResolvedValue({ data: mockVersions, count: 1 });
 
     await handler(req, res);
 
@@ -55,8 +54,7 @@ describe('API: /quotations/[id]/versions', () => {
     });
 
     const mockVersion = { id: 'v2', version_number: 2 };
-    // @ts-ignore: Mocking method on prototype for testing purposes
-    QuotationVersionService.prototype.saveVersion.mockResolvedValue(mockVersion);
+    (QuotationVersionService.prototype.saveVersion as Mock).mockResolvedValue(mockVersion);
 
     await handler(req, res);
 
@@ -76,7 +74,7 @@ describe('API: /quotations/[id]/versions', () => {
     });
     
     // @ts-ignore: Mocking method on prototype for testing purposes
-    QuotationVersionService.prototype.deleteVersion.mockResolvedValue(true);
+    (QuotationVersionService.prototype.deleteVersion as Mock).mockResolvedValue(true);
 
     await handler(req, res);
 

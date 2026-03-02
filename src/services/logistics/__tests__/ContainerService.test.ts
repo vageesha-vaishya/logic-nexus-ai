@@ -2,7 +2,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ContainerService } from '../ContainerService';
 
 describe('ContainerService', () => {
-  let mockDb: any;
+  let mockDb: {
+    from: ReturnType<typeof vi.fn>;
+    select: ReturnType<typeof vi.fn>;
+    eq: ReturnType<typeof vi.fn>;
+    single: ReturnType<typeof vi.fn>;
+  };
   let service: ContainerService;
 
   beforeEach(() => {
@@ -50,10 +55,10 @@ describe('ContainerService', () => {
       // We need to bypass the cache for this test to ensure it calls DB
       // Access private property or just assume first run.
       // TypeScript might complain about private property access.
-      // @ts-ignore
+      // @ts-ignore: Accessing private property for testing
       service.containerCache = null;
 
-      const result = await service.getAllContainers(mockDb);
+      const result = await service.getAllContainers(mockDb as any);
 
       expect(result).toHaveLength(1);
       expect(result[0].code).toBe('20GP');
@@ -75,16 +80,17 @@ describe('ContainerService', () => {
             return { select: vi.fn() };
         });
   
-        // @ts-ignore
+        // @ts-ignore: Accessing private property for testing
         service.containerCache = null;
   
-        const result = await service.getAllContainers(mockDb);
+        const result = await service.getAllContainers(mockDb as any);
         expect(result).toHaveLength(1); // Should filter out t2
         expect(result[0].code).toBe('20GP');
     });
   });
 
   describe('validateCargoFit', () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const mockContainer: any = {
       code: '20GP',
       specifications: {

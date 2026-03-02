@@ -4,6 +4,7 @@ const RateLegSchema = z.object({
   id: z.string().optional(),
   mode: z.string().optional(),
   transport_mode: z.string().optional(),
+  carrier: z.string().optional(),
   origin: z.string().optional(),
   destination: z.string().optional(),
   transit_time: z.union([z.string(), z.number()]).optional(),

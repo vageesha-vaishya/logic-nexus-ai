@@ -134,14 +134,14 @@ describe('AI Quote Transfer Integration', () => {
         ]);
 
         const mockMapper = {
-            getCatId: (code: string) => categories?.find((c: any) => c.code === code || c.name === code)?.id || categories?.[0]?.id,
-            getSideId: (code: string) => sides?.find((s: any) => s.code === code || s.name === code)?.id || sides?.[0]?.id,
-            getBasisId: (code: string) => bases?.find((b: any) => b.code === code || b.name === code)?.id || bases?.[0]?.id,
-            getCurrId: (code: string) => currencies?.find((c: any) => c.code === code)?.id || currencies?.[0]?.id,
+            getCatId: (code: string) => categories?.find((c: { id: string, code: string, name: string }) => c.code === code || c.name === code)?.id || categories?.[0]?.id,
+            getSideId: (code: string) => sides?.find((s: { id: string, code: string, name: string }) => s.code === code || s.name === code)?.id || sides?.[0]?.id,
+            getBasisId: (code: string) => bases?.find((b: { id: string, code: string, name: string }) => b.code === code || b.name === code)?.id || bases?.[0]?.id,
+            getCurrId: (code: string) => currencies?.find((c: { id: string, code: string }) => c.code === code)?.id || currencies?.[0]?.id,
             getServiceTypeId: (mode: string, tier: string) => serviceTypes?.[0]?.id,
-            getModeId: (code: string) => serviceModes?.find((m: any) => m.code === code || m.name === code)?.id || serviceModes?.[0]?.id,
-            getProviderId: (name: string) => carriers?.find((c: any) => c.carrier_name === name)?.id || carriers?.[0]?.id,
-            getSideIdByCode: (code: string) => sides?.find((s: any) => s.code === code)?.id
+            getModeId: (code: string) => serviceModes?.find((m: { id: string, code: string, name: string }) => m.code === code || m.name === code)?.id || serviceModes?.[0]?.id,
+            getProviderId: (name: string) => carriers?.find((c: { id: string, carrier_name: string, scac: string }) => c.carrier_name === name)?.id || carriers?.[0]?.id,
+            getSideIdByCode: (code: string) => sides?.find((s: { id: string, code: string }) => s.code === code)?.id
         };
 
         const quoteOptionService = new QuoteOptionService(supabase);
@@ -236,7 +236,16 @@ describe('AI Quote Transfer Integration', () => {
 
         const validated = QuoteTransferSchema.parse(transferPayload);
 
-        const masterData: any = {
+interface MasterData {
+    serviceTypes: { id: string; name: string; code: string }[];
+    carriers: { id: string; carrier_name: string; scac?: string; carrier_type?: string | null }[];
+    ports?: { id: string; location_name: string; location_code?: string; country?: string }[];
+    containerTypes?: { id: string; name: string; code: string }[];
+    containerSizes?: { id: string; name: string; code: string }[];
+    shippingTerms?: { id: string; code: string; name: string }[];
+}
+
+        const masterData: MasterData = {
             serviceTypes: [{ id: 'st1', name: 'Standard', code: 'STD' }],
             carriers: [{ id: 'c1', carrier_name: 'COSCO', scac: 'COSU' }],
             ports: [
@@ -263,13 +272,15 @@ describe('AI Quote Transfer Integration', () => {
 
         // Items mapping: for this simple payload, we still expect at least one item
         expect(Array.isArray(form.items)).toBe(true);
-        expect((form.items as any[]).length).toBeGreaterThanOrEqual(1);
+        expect(form.items?.length).toBeGreaterThanOrEqual(1);
 
-        const option = form.options?.[0] as any;
-        expect(option.total_amount).toBe(1500);
-        expect(option.legs && option.legs.length).toBe(1);
-        expect(option.legs?.[0].charges && option.legs?.[0].charges.length).toBe(2);
-        expect(option.legs?.[0].charges?.[0]).toMatchObject({
+        const option = form.options?.[0];
+        expect(option).toBeDefined();
+        
+        expect(option?.total_amount).toBe(1500);
+        expect(option?.legs?.length).toBe(1);
+        expect(option?.legs?.[0].charges?.length).toBe(2);
+        expect(option?.legs?.[0].charges?.[0]).toMatchObject({
             description: 'Ocean Freight',
             amount: 1200,
             currency: 'USD'

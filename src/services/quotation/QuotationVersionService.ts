@@ -5,7 +5,7 @@ export interface VersionMetadata {
   created_at: string;
   change_reason?: string;
   source?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface QuotationVersion {
@@ -46,7 +46,7 @@ export class QuotationVersionService {
   async saveVersion(
     quoteId: string,
     tenantId: string,
-    data: any, // The full quote data payload to snapshot
+    data: Record<string, unknown>, // The full quote data payload to snapshot
     type: 'draft' | 'minor' | 'major' = 'minor',
     userId: string,
     reason?: string
@@ -174,7 +174,7 @@ export class QuotationVersionService {
     return data as number;
   }
 
-  private async logAudit(versionId: string, action: string, userId: string, details: any) {
+  private async logAudit(versionId: string, action: string, userId: string, details: Record<string, unknown>) {
     await this.db.from('quotation_version_audit_logs').insert({
       quotation_version_id: versionId,
       action,

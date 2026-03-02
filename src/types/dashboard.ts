@@ -55,7 +55,7 @@ export interface WidgetConfig {
   title: string;
   size: WidgetSize;
   order: number;
-  settings?: Record<string, any>; // Specific settings per widget type (e.g., limit, filter)
+  settings?: Record<string, unknown>; // Specific settings per widget type (e.g., limit, filter)
 }
 
 export interface WidgetProps {
@@ -71,5 +71,5 @@ export interface WidgetDefinition {
   description: string;
   defaultSize: WidgetSize;
   component: React.ComponentType<WidgetProps>;
-  defaultSettings?: Record<string, any>;
+  defaultSettings?: Record<string, unknown>;
 }

@@ -3,15 +3,15 @@ import { QuotationOptionCrudService } from '../QuotationOptionCrudService';
 
 describe('QuotationOptionCrudService', () => {
   let service: QuotationOptionCrudService;
-  let mockDb: any;
-  let mockRpc: any;
+  let mockDb: { rpc: ReturnType<typeof vi.fn> };
+  let mockRpc: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     mockRpc = vi.fn();
     mockDb = {
       rpc: mockRpc,
     };
-    service = new QuotationOptionCrudService(mockDb);
+    service = new QuotationOptionCrudService(mockDb as any);
   });
 
   it('should call delete_quote_option_safe RPC with correct parameters', async () => {

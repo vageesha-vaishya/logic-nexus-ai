@@ -75,7 +75,7 @@ export function EmailClient({ entityType, entityId, emailAddress, className }: E
         const jsonFilter = JSON.stringify([targetEmail]);
         const jsonFilterObj = JSON.stringify([{ email: targetEmail }]);
 
-        let query = supabase
+        const query = supabase
           .from("emails")
           .select("*")
           .or([

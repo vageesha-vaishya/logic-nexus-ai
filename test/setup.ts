@@ -57,7 +57,7 @@ const mockSupabaseChain = () => ({
   abortSignal: vi.fn().mockReturnThis(),
   single: vi.fn().mockResolvedValue({ data: null, error: null }),
   maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-  then: vi.fn((cb: any) => cb({ data: [], error: null })),
+  then: vi.fn((cb: (result: { data: unknown[]; error: null }) => unknown) => cb({ data: [], error: null })),
 });
 
 vi.mock('@/integrations/supabase/client', () => ({

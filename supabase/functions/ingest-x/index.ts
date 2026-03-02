@@ -1,3 +1,4 @@
+// eslint-disable-next-line @typescript-eslint/triple-slash-reference
 /// <reference path="../types.d.ts" />
 import { serveWithLogger } from "../_shared/logger.ts";
 import { corsHeaders, preflight } from "../_shared/cors.ts";

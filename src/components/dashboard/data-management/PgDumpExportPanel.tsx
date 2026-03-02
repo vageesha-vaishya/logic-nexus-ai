@@ -76,7 +76,9 @@ export function PgDumpExportPanel() {
     try {
       const raw = localStorage.getItem("pgdump.categories");
       if (raw) return JSON.parse(raw);
-    } catch {}
+    } catch (error) {
+      void error;
+    }
     return {
       all: true,
       schema: true,
@@ -94,7 +96,9 @@ export function PgDumpExportPanel() {
     try {
       const raw = localStorage.getItem("pgdump.general");
       if (raw) return JSON.parse(raw);
-    } catch {}
+    } catch (error) {
+      void error;
+    }
     return {
       outputMode: "insert",
       includeDropStatements: defaultPgDumpOptions.includeDropStatements,
@@ -221,13 +225,17 @@ export function PgDumpExportPanel() {
   useEffect(() => {
     try {
       localStorage.setItem("pgdump.categories", JSON.stringify(categories));
-    } catch {}
+    } catch (error) {
+      void error;
+    }
   }, [categories]);
 
   useEffect(() => {
     try {
       localStorage.setItem("pgdump.general", JSON.stringify(general));
-    } catch {}
+    } catch (error) {
+      void error;
+    }
   }, [general]);
 
   const runExport = useCallback(async () => {
