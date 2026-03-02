@@ -10,6 +10,10 @@ pipeline {
         // Credentials binding for Supabase
         SUPABASE_ACCESS_TOKEN = credentials('supabase-access-token')
         
+        // VPS Credentials for Deployment
+        VPS_PASSWORD = credentials('vps-root-password')
+        VPS_IP = '72.61.249.111'
+
         // Define Project Ref based on branch
         PROJECT_REF = "${env.BRANCH_NAME == 'main' ? 'prod-ref-id' : (env.BRANCH_NAME == 'staging' ? 'staging-ref-id' : 'dev-ref-id')}"
         
@@ -59,9 +63,15 @@ pipeline {
             steps {
                 script {
                     // Only deploy if tests pass
-                    echo "Deploying Supabase Edge Functions to ${env.BRANCH_NAME} environment..."
-                    sh "chmod +x ./scripts/deploy_functions_ci.sh"
-                    sh "./scripts/deploy_functions_ci.sh ${PROJECT_REF} ${SUPABASE_ACCESS_TOKEN}"
+                    echo "Deploying Supabase Edge Functions to VPS (Self-Hosted)..."
+                    // Make scripts executable
+                    sh "chmod +x ./scripts/deploy_functions_vps.sh"
+                    sh "chmod +x ./scripts/remote_scp.expect"
+                    sh "chmod +x ./scripts/remote_exec.expect"
+                    
+                    // Deploy to VPS using credentials
+                    // Usage: ./deploy_functions_vps.sh <vps_ip> <vps_user> <vps_password>
+                    sh "./scripts/deploy_functions_vps.sh ${VPS_IP} 'root' ${VPS_PASSWORD}"
                 }
             }
         }
