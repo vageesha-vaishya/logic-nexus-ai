@@ -1,4 +1,4 @@
-#!/usr/bin/expect -f
+#!/usr/bin/env expect
 set timeout -1
 set local_file [lindex $argv 0]
 set remote_user [lindex $argv 1]
