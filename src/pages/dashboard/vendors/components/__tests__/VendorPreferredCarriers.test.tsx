@@ -19,7 +19,7 @@ describe('VendorPreferredCarriers', () => {
   });
 
   it('renders loading state initially', () => {
-    (supabase.rpc as any).mockResolvedValueOnce({ data: [], error: null });
+    (supabase.rpc as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ data: [], error: null });
     render(<VendorPreferredCarriers vendorId={mockVendorId} />);
     // Note: Loading state might be too fast to catch without specific setup, 
     // but we can check if it calls RPC
@@ -29,7 +29,7 @@ describe('VendorPreferredCarriers', () => {
   });
 
   it('renders empty state when no carriers found', async () => {
-    (supabase.rpc as any).mockResolvedValueOnce({ data: [], error: null });
+    (supabase.rpc as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ data: [], error: null });
     
     render(<VendorPreferredCarriers vendorId={mockVendorId} />);
     
@@ -46,7 +46,7 @@ describe('VendorPreferredCarriers', () => {
       { carrier_id: '4', carrier_name: 'Ocean Carrier D', mode: 'ocean', is_preferred: true },
     ];
 
-    (supabase.rpc as any).mockResolvedValueOnce({ data: mockData, error: null });
+    (supabase.rpc as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ data: mockData, error: null });
     
     render(<VendorPreferredCarriers vendorId={mockVendorId} />);
     
@@ -73,7 +73,7 @@ describe('VendorPreferredCarriers', () => {
       { carrier_id: '1', carrier_name: 'Carrier A', mode: 'ocean', is_preferred: true }, // Duplicate
     ];
 
-    (supabase.rpc as any).mockResolvedValueOnce({ data: mockData, error: null });
+    (supabase.rpc as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ data: mockData, error: null });
     
     render(<VendorPreferredCarriers vendorId={mockVendorId} />);
     

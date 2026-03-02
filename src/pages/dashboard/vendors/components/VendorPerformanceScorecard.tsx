@@ -18,7 +18,7 @@ interface VendorPerformanceScorecardProps {
     late_shipments?: number;
     total_claims_value?: number;
   } | null;
-  history: any[];
+  history: Record<string, any>[];
   onRefresh: () => void;
 }
 

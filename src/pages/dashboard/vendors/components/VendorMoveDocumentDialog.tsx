@@ -36,12 +36,14 @@ const moveSchema = z.object({
 
 type MoveFormValues = z.infer<typeof moveSchema>;
 
+import { VendorFolder } from '@/types/vendor';
+
 interface VendorMoveDocumentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   vendorId: string;
   documentIds: string[];
-  folders: any[];
+  folders: VendorFolder[];
   onSuccess: () => void;
 }
 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -57,7 +57,7 @@ export function VendorDocumentVersionDialog({
   const { supabase } = useCRM();
   const [loading, setLoading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [versions, setVersions] = useState<any[]>([]);
+  const [versions, setVersions] = useState<Record<string, any>[]>([]);
   const [loadingVersions, setLoadingVersions] = useState(false);
 
   const form = useForm<VersionFormValues>({
@@ -67,13 +67,7 @@ export function VendorDocumentVersionDialog({
     },
   });
 
-  useEffect(() => {
-    if (open && documentId) {
-      fetchVersions();
-    }
-  }, [open, documentId]);
-
-  const fetchVersions = async () => {
+  const fetchVersions = useCallback(async () => {
     setLoadingVersions(true);
     try {
       const { data, error } = await supabase
@@ -90,7 +84,13 @@ export function VendorDocumentVersionDialog({
     } finally {
       setLoadingVersions(false);
     }
-  };
+  }, [supabase, documentId]);
+
+  useEffect(() => {
+    if (open && documentId) {
+      fetchVersions();
+    }
+  }, [open, documentId, fetchVersions]);
 
   const handleDownloadVersion = async (version: any) => {
     try {
@@ -186,9 +186,10 @@ export function VendorDocumentVersionDialog({
       setSelectedFile(null);
       fetchVersions();
       onSuccess();
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error uploading version:', error);
-      toast.error('Failed to upload version');
+      const message = error instanceof Error ? error.message : 'Failed to upload version';
+      toast.error(message);
     } finally {
       setLoading(false);
     }

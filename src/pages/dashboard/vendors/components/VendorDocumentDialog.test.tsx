@@ -63,7 +63,7 @@ describe('VendorDocumentDialog', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.spyOn(useCRMHook, 'useCRM').mockReturnValue({ supabase: mockSupabase } as any);
+    vi.spyOn(useCRMHook, 'useCRM').mockReturnValue({ supabase: mockSupabase } as unknown as ReturnType<typeof useCRMHook.useCRM>);
   });
 
   afterEach(() => {
@@ -71,8 +71,8 @@ describe('VendorDocumentDialog', () => {
   });
 
   const folders = [
-    { id: 'f1', name: 'Legal' },
-    { id: 'f2', name: 'Financial' },
+    { id: 'f1', name: 'Legal', vendor_id: 'v1', created_at: '2023-01-01' },
+    { id: 'f2', name: 'Financial', vendor_id: 'v1', created_at: '2023-01-01' },
   ];
 
   it('renders correctly when open', () => {
@@ -113,12 +113,12 @@ describe('VendorDocumentDialog', () => {
   it('handles successful file upload and virus scan simulation', async () => {
     // Custom spy for setTimeout to run long timers immediately but keep short ones (for waitFor)
     const originalSetTimeout = global.setTimeout;
-    const setTimeoutSpy = vi.spyOn(global, 'setTimeout').mockImplementation((cb: any, delay?: number, ...args: any[]) => {
+    const setTimeoutSpy = vi.spyOn(global, 'setTimeout').mockImplementation((cb: (args: void) => void, delay?: number) => {
       if (delay && delay > 1000) {
-        cb(...args);
-        return 0 as any;
+        cb();
+        return 0 as unknown as NodeJS.Timeout;
       }
-      return originalSetTimeout(cb, delay, ...args);
+      return originalSetTimeout(cb, delay);
     });
 
     // Mock quota check

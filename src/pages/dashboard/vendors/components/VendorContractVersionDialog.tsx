@@ -56,7 +56,7 @@ export function VendorContractVersionDialog({
   const { supabase } = useCRM();
   const [loading, setLoading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [versions, setVersions] = useState<any[]>([]);
+  const [versions, setVersions] = useState<Record<string, any>[]>([]);
   const [loadingVersions, setLoadingVersions] = useState(false);
 
   const form = useForm<VersionFormValues>({
@@ -112,9 +112,9 @@ export function VendorContractVersionDialog({
             }
         });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error downloading version:', error);
-      toast.error('Failed to download file');
+      toast.error(error.message || 'Failed to download file');
     }
   };
 

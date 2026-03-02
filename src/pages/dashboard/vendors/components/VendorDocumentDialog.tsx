@@ -46,7 +46,7 @@ interface VendorDocumentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   vendorId: string;
-  folders?: any[];
+  folders?: VendorFolder[];
   defaultFolder?: string;
   onSuccess: () => void;
 }
@@ -212,9 +212,10 @@ export function VendorDocumentDialog({ open, onOpenChange, vendorId, folders = [
       setSelectedFile(null);
       onSuccess();
       onOpenChange(false);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error adding document:', error);
-      toast.error(error.message || 'Failed to add document');
+      const message = error instanceof Error ? error.message : 'Failed to add document';
+      toast.error(message);
     } finally {
       setLoading(false);
     }
