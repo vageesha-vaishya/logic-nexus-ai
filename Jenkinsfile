@@ -59,6 +59,24 @@ pipeline {
                 script {
                     // Only deploy if tests pass
                     echo "Deploying Supabase Edge Functions to VPS (Self-Hosted)..."
+                    
+                    // Attempt to install 'expect' if missing (required for password-based SSH)
+                    sh '''
+                        if ! command -v expect &> /dev/null; then
+                            echo "Installing expect..."
+                            if command -v apk &> /dev/null; then
+                                sudo apk add --no-cache expect || apk add --no-cache expect
+                            elif command -v apt-get &> /dev/null; then
+                                sudo apt-get update && sudo apt-get install -y expect || (apt-get update && apt-get install -y expect)
+                            elif command -v yum &> /dev/null; then
+                                sudo yum install -y expect || yum install -y expect
+                            else
+                                echo "Package manager not found. Please install 'expect' manually on the Jenkins agent."
+                                exit 1
+                            fi
+                        fi
+                    '''
+
                     // Make scripts executable
                     sh "chmod +x ./scripts/deploy_functions_vps.sh"
                     sh "chmod +x ./scripts/remote_scp.expect"
