@@ -18,7 +18,7 @@ describe('API: /quotations/[id]/versions', () => {
     });
 
     const mockVersions = [{ id: 'v1', version_number: 1 }];
-    // @ts-ignore
+    // @ts-ignore: Mocking method on prototype for testing purposes
     QuotationVersionService.prototype.listVersions.mockResolvedValue({ data: mockVersions, count: 1 });
 
     await handler(req, res);
@@ -43,7 +43,7 @@ describe('API: /quotations/[id]/versions', () => {
     });
 
     const mockVersion = { id: 'v2', version_number: 2 };
-    // @ts-ignore
+    // @ts-ignore: Mocking method on prototype for testing purposes
     QuotationVersionService.prototype.saveVersion.mockResolvedValue(mockVersion);
 
     await handler(req, res);
@@ -62,8 +62,8 @@ describe('API: /quotations/[id]/versions', () => {
       body: { versionId: 'v1' },
       headers: { 'x-user-id': 'u1' }
     });
-
-    // @ts-ignore
+    
+    // @ts-ignore: Mocking method on prototype for testing purposes
     QuotationVersionService.prototype.deleteVersion.mockResolvedValue(true);
 
     await handler(req, res);
