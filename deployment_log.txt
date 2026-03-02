@@ -7688,3 +7688,7 @@ spawn ssh -o StrictHostKeyChecking=no root@72.61.249.111 docker logs --tail 50 s
 2026-03-01T15:22:52Z INFO: Configured backup cron job (daily at 02:00).
 2026-03-01T15:22:52Z INFO: Installed monitoring tools (glances, fail2ban).
 2026-03-01T15:22:52Z INFO: Created scripts/deploy_functions_vps.sh for self-hosted function deployment.
+2026-03-02T00:52:29Z INFO: Updated Jenkinsfile to use scripts/deploy_functions_vps.sh for self-hosted deployment.
+2026-03-02T04:49:12Z INFO: Verified firewall (ports 80, 443, 22, 8080 open).
+2026-03-02T04:49:12Z INFO: Verified database backup (manual execution successful).
+2026-03-02T04:49:12Z WARN: Found 6 tables without RLS enabled (security risk).

@@ -1,10 +1,5 @@
 pipeline {
-    agent any
-    
-    tools {
-        // Requires NodeJS plugin installed and configured with name 'node-20'
-        nodejs 'node-20'
-    }
+    agent none
     
     environment {
         // Credentials binding for Supabase
@@ -26,18 +21,31 @@ pipeline {
     
     stages {
         stage('Checkout') {
+            agent any
             steps {
                 checkout scm
             }
         }
         
         stage('Install Dependencies') {
+            agent {
+                docker {
+                    image 'node:22-alpine'
+                    args '-u root'
+                }
+            }
             steps {
                 sh 'npm ci'
             }
         }
         
         stage('Code Quality Checks') {
+            agent {
+                docker {
+                    image 'node:22-alpine'
+                    args '-u root'
+                }
+            }
             parallel {
                 stage('Lint') {
                     steps {
@@ -53,6 +61,12 @@ pipeline {
         }
         
         stage('Unit Tests') {
+            agent {
+                docker {
+                    image 'node:22-alpine'
+                    args '-u root'
+                }
+            }
             steps {
                 // Run tests using Vitest
                 sh 'npm run test'
@@ -60,6 +74,7 @@ pipeline {
         }
         
         stage('Deploy Edge Functions') {
+            agent any
             steps {
                 script {
                     // Only deploy if tests pass
@@ -77,6 +92,7 @@ pipeline {
         }
         
         stage('Trigger App Deployment') {
+            agent any
             steps {
                 script {
                     echo "Triggering Coolify Deployment..."
