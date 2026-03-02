@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useCRM } from '@/hooks/useCRM';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -15,12 +15,17 @@ interface VendorComplianceProps {
   vendorCountry?: string;
 }
 
+interface ScreeningMatch {
+  matched_name: string;
+  [key: string]: unknown;
+}
+
 interface ScreeningRecord {
   id: string;
   screening_type: string;
   status: 'PASSED' | 'WARNING' | 'FAILED' | 'PENDING';
   screened_at: string;
-  details: any;
+  details: unknown;
 }
 
 export function VendorCompliance({ vendorId, vendorName, vendorCountry }: VendorComplianceProps) {
@@ -29,11 +34,7 @@ export function VendorCompliance({ vendorId, vendorName, vendorCountry }: Vendor
   const [loading, setLoading] = useState(false);
   const [screeningLoading, setScreeningLoading] = useState(false);
 
-  useEffect(() => {
-    fetchScreenings();
-  }, [vendorId]);
-
-  const fetchScreenings = async () => {
+  const fetchScreenings = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase
       .from('compliance_screenings')
@@ -49,7 +50,11 @@ export function VendorCompliance({ vendorId, vendorName, vendorCountry }: Vendor
       setScreenings(data || []);
     }
     setLoading(false);
-  };
+  }, [supabase, vendorId]);
+
+  useEffect(() => {
+    fetchScreenings();
+  }, [fetchScreenings]);
 
   const runScreening = async () => {
     setScreeningLoading(true);
@@ -92,7 +97,7 @@ export function VendorCompliance({ vendorId, vendorName, vendorCountry }: Vendor
         screening_type: 'RPS',
         status: status,
         details: matchDetails
-      } as any); // Type assertion to bypass strict typing for now if needed
+      } as Record<string, unknown>);
 
       if (insertError) {
         // If it fails on tenant_id, I'll need to fetch it.
@@ -102,11 +107,11 @@ export function VendorCompliance({ vendorId, vendorName, vendorCountry }: Vendor
       }
 
       toast.success(matchFound ? 'Screening completed: Matches Found!' : 'Screening passed: No matches found.');
-      fetchScreenings();
+      await fetchScreenings();
 
-    } catch (err: any) {
+    } catch (err) {
       console.error('Screening failed:', err);
-      toast.error('Screening failed: ' + err.message);
+      toast.error('Screening failed: ' + (err as Error).message);
     } finally {
       setScreeningLoading(false);
     }
@@ -163,7 +168,7 @@ export function VendorCompliance({ vendorId, vendorName, vendorCountry }: Vendor
                   <TableCell className="max-w-md truncate">
                     {scan.status === 'FAILED' && Array.isArray(scan.details) ? (
                       <div className="text-sm text-red-600">
-                        Matches: {scan.details.map((d: any) => d.matched_name).join(', ')}
+                        Matches: {(scan.details as ScreeningMatch[]).map((d) => d.matched_name).join(', ')}
                       </div>
                     ) : (
                       <span className="text-muted-foreground text-sm">No issues detected</span>

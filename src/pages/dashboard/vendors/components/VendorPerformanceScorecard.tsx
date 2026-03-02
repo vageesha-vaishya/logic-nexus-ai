@@ -6,6 +6,16 @@ import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tool
 import { format } from 'date-fns';
 import { ArrowUp, ArrowDown, Minus } from 'lucide-react';
 
+interface PerformanceHistoryItem {
+  snapshot_date: string;
+  total_score: number;
+  on_time_delivery_score: number;
+  quality_score: number;
+  cost_score: number;
+  responsiveness_score: number;
+  [key: string]: unknown;
+}
+
 interface VendorPerformanceScorecardProps {
   metrics: {
     total_score: number;
@@ -18,7 +28,7 @@ interface VendorPerformanceScorecardProps {
     late_shipments?: number;
     total_claims_value?: number;
   } | null;
-  history: Record<string, any>[];
+  history: PerformanceHistoryItem[];
   onRefresh: () => void;
 }
 

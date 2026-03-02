@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -25,6 +25,11 @@ type QuoteRecord = {
   notes?: string | null;
 };
 
+type QuoteRpcResponse = {
+  error?: string;
+  quote?: QuoteRecord;
+};
+
 export default function QuotePortal() {
   const { token } = useParams();
   const [loading, setLoading] = useState(true);
@@ -36,7 +41,7 @@ export default function QuotePortal() {
   const [email, setEmail] = useState('');
   const [accepting, setAccepting] = useState(false);
 
-  const fetchQuote = async (tkn?: string) => {
+  const fetchQuote = useCallback(async (tkn?: string) => {
     const useToken = tkn ?? token;
     if (!useToken) {
       setError('Missing access token');
@@ -45,29 +50,33 @@ export default function QuotePortal() {
     }
     try {
       setError(null);
-      const { data, error: rpcError } = await (supabase as any).rpc('get_quote_by_token', { p_token: useToken });
+      // @ts-ignore - supabase rpc types might not be fully inferred
+      const { data, error: rpcError } = await supabase.rpc('get_quote_by_token', { p_token: useToken });
       if (rpcError) throw rpcError;
-      if (!data || (data as any).error) {
-        const message = (data as any)?.error || 'Unable to load quote';
+      
+      const response = data as QuoteRpcResponse;
+      if (!response || response.error) {
+        const message = response?.error || 'Unable to load quote';
         setError(message);
         setQuote(null);
       } else {
-        const q = (data as any).quote as QuoteRecord;
+        const q = response.quote as QuoteRecord;
         setQuote(q);
       }
-    } catch (e: any) {
+    } catch (e) {
+      const message = (e as Error).message || 'An error occurred';
       logger.error('Error fetching quote by token', {
-        error: e.message,
-        stack: e.stack,
+        error: message,
+        stack: (e as Error).stack,
         token: useToken,
         component: 'QuotePortal'
       });
-      setError(e.message || 'An error occurred');
+      setError(message);
       setQuote(null);
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
 
   useEffect(() => {
     const last = sessionStorage.getItem(`portal_last_${token}`);
@@ -79,7 +88,7 @@ export default function QuotePortal() {
       setError('Please wait a moment before refreshing');
       setLoading(false);
     }
-  }, [token]);
+  }, [token, fetchQuote]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -103,7 +112,8 @@ export default function QuotePortal() {
     try {
       const ip = await getClientIp();
       const ua = navigator.userAgent;
-      const { data, error: rpcError } = await (supabase as any).rpc('accept_quote_by_token', {
+      // @ts-ignore - supabase rpc types might not be fully inferred
+      const { data, error: rpcError } = await supabase.rpc('accept_quote_by_token', {
         p_token: token,
         p_decision: 'accepted',
         p_name: name || null,
@@ -112,16 +122,18 @@ export default function QuotePortal() {
         p_user_agent: ua || null
       });
       if (rpcError) throw rpcError;
-      if (data?.error) {
-        setError(data.error);
+      
+      const response = data as { error?: string };
+      if (response?.error) {
+        setError(response.error);
       } else {
         await fetchQuote(token);
         setAcceptOpen(false);
         setName('');
         setEmail('');
       }
-    } catch (e: any) {
-      setError(e.message || 'Failed to submit decision');
+    } catch (e) {
+      setError((e as Error).message || 'Failed to submit decision');
     } finally {
       setAccepting(false);
     }

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -69,7 +69,7 @@ export function ClauseLibraryDialog({ open, onOpenChange }: ClauseLibraryDialogP
     },
   });
 
-  const fetchClauses = async () => {
+  const fetchClauses = useCallback(async () => {
     setLoading(true);
     try {
       const { data, error } = await supabase
@@ -80,12 +80,12 @@ export function ClauseLibraryDialog({ open, onOpenChange }: ClauseLibraryDialogP
 
       if (error) throw error;
       setClauses(data || []);
-    } catch (error: any) {
+    } catch (error) {
       toast.error('Failed to load clauses');
     } finally {
       setLoading(false);
     }
-  };
+  }, [supabase]);
 
   useEffect(() => {
     if (open) {
@@ -93,7 +93,7 @@ export function ClauseLibraryDialog({ open, onOpenChange }: ClauseLibraryDialogP
       setView('list');
       setEditingClause(null);
     }
-  }, [open]);
+  }, [open, fetchClauses]);
 
   const handleSubmit = async (values: ClauseFormValues) => {
     setLoading(true);
@@ -116,7 +116,8 @@ export function ClauseLibraryDialog({ open, onOpenChange }: ClauseLibraryDialogP
       setView('list');
       setEditingClause(null);
       fetchClauses();
-    } catch (error: any) {
+    } catch (error) {
+      console.error('Error saving clause:', error);
       toast.error('Failed to save clause');
     } finally {
       setLoading(false);
@@ -141,7 +142,7 @@ export function ClauseLibraryDialog({ open, onOpenChange }: ClauseLibraryDialogP
       if (error) throw error;
       toast.success('Clause deleted');
       fetchClauses();
-    } catch (error: any) {
+    } catch (error) {
       toast.error('Failed to delete clause');
     }
   };

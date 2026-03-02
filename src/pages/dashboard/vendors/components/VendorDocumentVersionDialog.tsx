@@ -37,6 +37,19 @@ const versionSchema = z.object({
 
 type VersionFormValues = z.infer<typeof versionSchema>;
 
+interface VendorDocumentVersion {
+  id: string;
+  document_id: string;
+  version_number: number;
+  file_path: string;
+  file_name: string;
+  file_size: number;
+  mime_type: string;
+  uploaded_by?: string;
+  comments?: string;
+  created_at: string;
+}
+
 interface VendorDocumentVersionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -57,7 +70,7 @@ export function VendorDocumentVersionDialog({
   const { supabase } = useCRM();
   const [loading, setLoading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [versions, setVersions] = useState<Record<string, any>[]>([]);
+  const [versions, setVersions] = useState<VendorDocumentVersion[]>([]);
   const [loadingVersions, setLoadingVersions] = useState(false);
 
   const form = useForm<VersionFormValues>({
@@ -92,7 +105,7 @@ export function VendorDocumentVersionDialog({
     }
   }, [open, documentId, fetchVersions]);
 
-  const handleDownloadVersion = async (version: any) => {
+  const handleDownloadVersion = async (version: VendorDocumentVersion) => {
     try {
       const { data, error } = await supabase.storage
         .from('vendor-documents')
@@ -113,7 +126,7 @@ export function VendorDocumentVersionDialog({
             }
         });
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error downloading version:', error);
       toast.error('Failed to access file');
     }

@@ -2,19 +2,24 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { VendorDocumentDialog } from './VendorDocumentDialog';
 import * as useCRMHook from '@/hooks/useCRM';
+import { PropsWithChildren } from 'react';
 
 // Mock UI components
 vi.mock('@/components/ui/dialog', () => ({
-  Dialog: ({ children, open }: any) => (open ? <div>{children}</div> : null),
-  DialogContent: ({ children }: any) => <div>{children}</div>,
-  DialogHeader: ({ children }: any) => <div>{children}</div>,
-  DialogTitle: ({ children }: any) => <h1>{children}</h1>,
-  DialogDescription: ({ children }: any) => <p>{children}</p>,
-  DialogFooter: ({ children }: any) => <div>{children}</div>,
+  Dialog: ({ children, open }: PropsWithChildren<{ open: boolean }>) => (open ? <div>{children}</div> : null),
+  DialogContent: ({ children }: PropsWithChildren) => <div>{children}</div>,
+  DialogHeader: ({ children }: PropsWithChildren) => <div>{children}</div>,
+  DialogTitle: ({ children }: PropsWithChildren) => <h1>{children}</h1>,
+  DialogDescription: ({ children }: PropsWithChildren) => <p>{children}</p>,
+  DialogFooter: ({ children }: PropsWithChildren) => <div>{children}</div>,
 }));
 
+interface FileUploadProps {
+  onFileSelect: (file: File) => void;
+}
+
 vi.mock('@/components/common/FileUpload', () => ({
-  FileUpload: ({ onFileSelect }: any) => (
+  FileUpload: ({ onFileSelect }: FileUploadProps) => (
     <input 
       data-testid="file-upload" 
       type="file" 
