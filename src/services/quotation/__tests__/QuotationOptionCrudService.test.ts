@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { QuotationOptionCrudService } from '../QuotationOptionCrudService';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 describe('QuotationOptionCrudService', () => {
   let service: QuotationOptionCrudService;
@@ -11,7 +12,7 @@ describe('QuotationOptionCrudService', () => {
     mockDb = {
       rpc: mockRpc,
     };
-    service = new QuotationOptionCrudService(mockDb as any);
+    service = new QuotationOptionCrudService(mockDb as unknown as SupabaseClient);
   });
 
   it('should call delete_quote_option_safe RPC with correct parameters', async () => {

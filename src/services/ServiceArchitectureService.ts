@@ -137,7 +137,7 @@ export const ServiceArchitectureService = {
   /**
    * Get all services linked to a specific service type
    */
-  async getServicesByType(typeId: string): Promise<any[]> {
+  async getServicesByType(typeId: string): Promise<Record<string, unknown>[]> {
     const { data, error } = await supabase
       .from('services')
       .select('id, service_name, service_code, is_active, base_price, pricing_unit, tenant_id')
@@ -145,6 +145,6 @@ export const ServiceArchitectureService = {
       .order('service_name', { ascending: true });
 
     if (error) throw error;
-    return data || [];
+    return (data || []) as Record<string, unknown>[];
   }
 };

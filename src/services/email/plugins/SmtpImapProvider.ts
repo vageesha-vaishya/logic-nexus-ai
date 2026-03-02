@@ -97,10 +97,10 @@ export class SmtpImapProvider implements IEmailProvider {
     ];
   }
 
-  async validateConfig(config: any): Promise<{ isValid: boolean; error?: string }> {
+  async validateConfig(config: Record<string, unknown>): Promise<{ isValid: boolean; error?: string }> {
     // In a real implementation, we would call an edge function to test the connection
     // For now, just check required fields
-    if (!config.email_address || !config.smtp_host) {
+    if (!config['email_address'] || !config['smtp_host']) {
       return { isValid: false, error: 'Missing required fields' };
     }
     return { isValid: true };

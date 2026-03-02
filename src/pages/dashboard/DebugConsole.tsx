@@ -88,7 +88,7 @@ const SyntaxHighlighter = ({ data }: { data: any }) => {
   }
   
   // Basic syntax highlighting
-  const html = json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, (match) => {
+  const html = json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?)/g, (match) => {
     let cls = 'text-orange-600 dark:text-orange-400'; // number
     if (/^"/.test(match)) {
       if (/:$/.test(match)) {

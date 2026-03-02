@@ -106,8 +106,7 @@ export const TableBasic: StoryObj<typeof EnterpriseTable> = {
   ),
 };
 
-export const TableWithSorting: StoryObj<typeof EnterpriseTable> = {
-  render: () => {
+const TableWithSortingComponent = () => {
     const [sortBy, setSortBy] = useState<string>('name');
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
@@ -150,7 +149,10 @@ export const TableWithSorting: StoryObj<typeof EnterpriseTable> = {
         }}
       />
     );
-  },
+};
+
+export const TableWithSorting: StoryObj<typeof EnterpriseTable> = {
+  render: () => <TableWithSortingComponent />,
 };
 
 export const TableLoading: StoryObj<typeof EnterpriseTable> = {
@@ -292,8 +294,7 @@ export const TableNoStriped: StoryObj<typeof EnterpriseTable> = {
   ),
 };
 
-export const TableWithRowClick: StoryObj<typeof EnterpriseTable> = {
-  render: () => {
+const TableWithRowClickComponent = () => {
     const [selectedRow, setSelectedRow] = useState<Account | null>(null);
 
     return (
@@ -333,7 +334,10 @@ export const TableWithRowClick: StoryObj<typeof EnterpriseTable> = {
         )}
       </div>
     );
-  },
+};
+
+export const TableWithRowClick: StoryObj<typeof EnterpriseTable> = {
+  render: () => <TableWithRowClickComponent />,
 };
 
 // ============================================================================
@@ -450,8 +454,7 @@ export const CardElevated: CardStory = {
   ),
 };
 
-export const CardClickable: CardStory = {
-  render: () => {
+const CardClickableComponent = () => {
     const [clicked, setClicked] = useState(false);
 
     return (
@@ -469,7 +472,10 @@ export const CardClickable: CardStory = {
         )}
       </EnterpriseCard>
     );
-  },
+};
+
+export const CardClickable: CardStory = {
+  render: () => <CardClickableComponent />,
 };
 
 // ============================================================================
@@ -702,8 +708,7 @@ const modalMeta: Meta<typeof EnterpriseModal> = {
 
 type ModalStory = StoryObj<typeof EnterpriseModal>;
 
-export const ModalSmall: ModalStory = {
-  render: () => {
+const ModalSmallComponent = () => {
     const [isOpen, setIsOpen] = useState(true);
 
     return (
@@ -723,11 +728,13 @@ export const ModalSmall: ModalStory = {
         </EnterpriseModal>
       </>
     );
-  },
 };
 
-export const ModalMedium: ModalStory = {
-  render: () => {
+export const ModalSmall: ModalStory = {
+  render: () => <ModalSmallComponent />,
+};
+
+const ModalMediumComponent = () => {
     const [isOpen, setIsOpen] = useState(true);
 
     return (
@@ -764,11 +771,13 @@ export const ModalMedium: ModalStory = {
         </EnterpriseModal>
       </>
     );
-  },
 };
 
-export const ModalLarge: ModalStory = {
-  render: () => {
+export const ModalMedium: ModalStory = {
+  render: () => <ModalMediumComponent />,
+};
+
+const ModalLargeComponent = () => {
     const [isOpen, setIsOpen] = useState(true);
 
     return (
@@ -806,11 +815,13 @@ export const ModalLarge: ModalStory = {
         </EnterpriseModal>
       </>
     );
-  },
 };
 
-export const ModalExtraLarge: ModalStory = {
-  render: () => {
+export const ModalLarge: ModalStory = {
+  render: () => <ModalLargeComponent />,
+};
+
+const ModalExtraLargeComponent = () => {
     const [isOpen, setIsOpen] = useState(true);
 
     return (
@@ -855,11 +866,13 @@ export const ModalExtraLarge: ModalStory = {
         </EnterpriseModal>
       </>
     );
-  },
 };
 
-export const ModalWithFooter: ModalStory = {
-  render: () => {
+export const ModalExtraLarge: ModalStory = {
+  render: () => <ModalExtraLargeComponent />,
+};
+
+const ModalWithFooterComponent = () => {
     const [isOpen, setIsOpen] = useState(true);
 
     return (
@@ -896,7 +909,10 @@ export const ModalWithFooter: ModalStory = {
         </EnterpriseModal>
       </>
     );
-  },
+};
+
+export const ModalWithFooter: ModalStory = {
+  render: () => <ModalWithFooterComponent />,
 };
 
 // ============================================================================
@@ -1087,8 +1103,7 @@ export const FormMultipleSections: FormStory = {
   ),
 };
 
-export const FormWithValidation: FormStory = {
-  render: () => {
+const FormWithValidationComponent = () => {
     const [errors, setErrors] = useState<Record<string, string>>({});
 
     const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -1133,7 +1148,10 @@ export const FormWithValidation: FormStory = {
         </div>
       </EnterpriseForm>
     );
-  },
+};
+
+export const FormWithValidation: FormStory = {
+  render: () => <FormWithValidationComponent />,
 };
 
 export const FormComplex: FormStory = {

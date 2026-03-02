@@ -34,6 +34,7 @@ describe('DomainService', () => {
         select: vi.fn().mockReturnThis(),
         order: vi.fn().mockResolvedValue({ data: mockDomains, error: null }),
       };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (supabase.from as any).mockReturnValue(mockChain);
 
       const result = await DomainService.getAllDomains();
@@ -50,11 +51,13 @@ describe('DomainService', () => {
         select: vi.fn().mockReturnThis(),
         order: vi.fn().mockResolvedValue({ data: mockDomains, error: null }),
       };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (supabase.from as any).mockReturnValue(mockChain);
 
       await DomainService.getAllDomains();
       
       // Clear mock to ensure it's not called again
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (supabase.from as any).mockClear();
 
       // Second call should use cache
@@ -70,6 +73,7 @@ describe('DomainService', () => {
         select: vi.fn().mockReturnThis(),
         order: vi.fn().mockResolvedValue({ data: mockDomains, error: null }),
       };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (supabase.from as any).mockReturnValue(mockChain);
 
       await DomainService.getAllDomains();
@@ -86,6 +90,7 @@ describe('DomainService', () => {
         select: vi.fn().mockReturnThis(),
         order: vi.fn().mockResolvedValue({ data: null, error: mockError }),
       };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (supabase.from as any).mockReturnValue(mockChain);
 
       await expect(DomainService.getAllDomains()).rejects.toEqual(mockError);
@@ -98,6 +103,7 @@ describe('DomainService', () => {
         select: vi.fn().mockReturnThis(),
         order: vi.fn().mockResolvedValue({ data: mockDomains, error: null }),
       };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (supabase.from as any).mockReturnValue(mockChain);
 
       const result = await DomainService.getDomainByCode('logistics');
@@ -109,6 +115,7 @@ describe('DomainService', () => {
         select: vi.fn().mockReturnThis(),
         order: vi.fn().mockResolvedValue({ data: mockDomains, error: null }),
       };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (supabase.from as any).mockReturnValue(mockChain);
 
       const result = await DomainService.getDomainByCode('unknown');
@@ -126,6 +133,7 @@ describe('DomainService', () => {
         select: vi.fn().mockReturnThis(),
         single: vi.fn().mockResolvedValue({ data: createdDomain, error: null }),
       };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (supabase.from as any).mockReturnValue(mockChain);
 
       // Pre-populate cache to test invalidation
@@ -153,6 +161,7 @@ describe('DomainService', () => {
         select: vi.fn().mockReturnThis(),
         single: vi.fn().mockResolvedValue({ data: updatedDomain, error: null }),
       };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (supabase.from as any).mockReturnValue(mockChain);
 
       const spyInvalidate = vi.spyOn(DomainService, 'invalidateCache');
@@ -173,6 +182,7 @@ describe('DomainService', () => {
         delete: vi.fn().mockReturnThis(),
         eq: vi.fn().mockResolvedValue({ error: null }),
       };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (supabase.from as any).mockReturnValue(mockChain);
 
       const spyInvalidate = vi.spyOn(DomainService, 'invalidateCache');

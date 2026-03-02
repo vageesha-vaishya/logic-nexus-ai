@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { QuotationVersionService } from '../QuotationVersionService';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 describe('QuotationVersionService', () => {
   let mockDb: {
@@ -31,7 +32,7 @@ describe('QuotationVersionService', () => {
       maybeSingle: vi.fn(),
       rpc: vi.fn(),
     };
-    service = new QuotationVersionService(mockDb as any);
+    service = new QuotationVersionService(mockDb as unknown as SupabaseClient);
   });
 
   describe('saveVersion', () => {

@@ -96,7 +96,7 @@ export function QuoteComparisonView({
         enrichOptions();
     }, [rawOptions, scopedDb, supabase]);
 
-    if (!options || options.length === 0) return <div className="p-4 text-center text-muted-foreground">No options to compare.</div>;
+    const hasOptions = options.length > 0;
 
     // Helper to calculate bifurcated totals for an option
     const getBifurcatedTotals = (opt: RateOption) => {
@@ -132,13 +132,26 @@ export function QuoteComparisonView({
             // ...
         }
 
-        // Bifurcate
-        const buckets = bifurcateCharges(allCharges, opt.legs || []);
+        const bifurcated = bifurcateCharges(allCharges, opt.legs || []);
+
+        const originCharges = bifurcated.filter(c => {
+            const lt = (c.assignedLegType || '').toLowerCase();
+            return lt === 'origin' || lt === 'pickup' || lt === 'pre-carriage';
+        });
+        const destinationCharges = bifurcated.filter(c => {
+            const lt = (c.assignedLegType || '').toLowerCase();
+            return lt === 'destination' || lt === 'delivery' || lt === 'on-carriage';
+        });
+        const freightCharges = bifurcated.filter(c => {
+            const lt = (c.assignedLegType || '').toLowerCase();
+            return lt === 'transport' || lt === 'main' || lt === 'freight';
+        });
+        const otherCharges = bifurcated.filter(c => !originCharges.includes(c) && !destinationCharges.includes(c) && !freightCharges.includes(c));
         
-        totals.origin = buckets.origin.reduce((sum, c) => sum + (c.amount || 0), 0);
-        totals.freight = buckets.freight.reduce((sum, c) => sum + (c.amount || 0), 0);
-        totals.destination = buckets.destination.reduce((sum, c) => sum + (c.amount || 0), 0);
-        totals.other = buckets.other.reduce((sum, c) => sum + (c.amount || 0), 0);
+        totals.origin = originCharges.reduce((sum, c) => sum + (c.amount || 0), 0);
+        totals.freight = freightCharges.reduce((sum, c) => sum + (c.amount || 0), 0);
+        totals.destination = destinationCharges.reduce((sum, c) => sum + (c.amount || 0), 0);
+        totals.other = otherCharges.reduce((sum, c) => sum + (c.amount || 0), 0);
 
         return totals;
     };
@@ -149,6 +162,8 @@ export function QuoteComparisonView({
             return acc;
         }, {} as Record<string, ReturnType<typeof getBifurcatedTotals>>);
     }, [options]);
+
+    if (!hasOptions) return <div className="p-4 text-center text-muted-foreground">No options to compare.</div>;
 
     return (
         <div className="overflow-x-auto border rounded-md bg-background shadow-sm">

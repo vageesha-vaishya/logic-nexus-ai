@@ -2,8 +2,40 @@ import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 
+interface TemplateColumn {
+  align?: 'left' | 'center' | 'right';
+  label: string;
+  field: string;
+}
+
+interface TemplateSection {
+  type: 'header' | 'footer' | 'static_block' | 'dynamic_table';
+  title?: string;
+  content?: {
+    text?: string;
+  };
+  table_config?: {
+    columns: TemplateColumn[];
+    show_subtotals?: boolean;
+  };
+}
+
+interface TemplateConfig {
+  margins?: {
+    top: number;
+    bottom: number;
+    left: number;
+    right: number;
+  };
+}
+
+interface Template {
+  sections?: TemplateSection[];
+  config?: TemplateConfig;
+}
+
 interface VisualTemplatePreviewProps {
-  template: any;
+  template: Template;
   className?: string;
 }
 
@@ -22,7 +54,7 @@ export function VisualTemplatePreview({ template, className }: VisualTemplatePre
       .replace(/{{quote.expiry}}/g, '2024-03-12');
   };
 
-  const renderSection = (section: any, index: number) => {
+  const renderSection = (section: TemplateSection, index: number) => {
     switch (section.type) {
       case 'header':
         return (
@@ -51,20 +83,20 @@ export function VisualTemplatePreview({ template, className }: VisualTemplatePre
             {resolve(section.content?.text || '')}
           </div>
         );
-      case 'dynamic_table':
+      case 'dynamic_table': {
         const columns = section.table_config?.columns || [];
         return (
           <div key={index} className="mb-4">
              <h3 className="text-sm font-semibold mb-2 bg-muted p-1">{section.title || 'Table'}</h3>
              <div className="border rounded-sm overflow-hidden">
                 <div className="grid bg-muted/50 text-xs font-medium p-2" style={{ gridTemplateColumns: `repeat(${columns.length}, 1fr)` }}>
-                  {columns.map((col: any, i: number) => (
+                  {columns.map((col: TemplateColumn, i: number) => (
                     <div key={i} className={col.align === 'right' ? 'text-right' : ''}>{col.label}</div>
                   ))}
                 </div>
                 {/* Mock Row 1 */}
                 <div className="grid text-xs p-2 border-t" style={{ gridTemplateColumns: `repeat(${columns.length}, 1fr)` }}>
-                  {columns.map((col: any, i: number) => (
+                  {columns.map((col: TemplateColumn, i: number) => (
                      <div key={i} className={col.align === 'right' ? 'text-right' : ''}>
                         {col.field.includes('amount') ? '$1,200.00' : 'Sample Data'}
                      </div>
@@ -72,7 +104,7 @@ export function VisualTemplatePreview({ template, className }: VisualTemplatePre
                 </div>
                 {/* Mock Row 2 */}
                 <div className="grid text-xs p-2 border-t" style={{ gridTemplateColumns: `repeat(${columns.length}, 1fr)` }}>
-                   {columns.map((col: any, i: number) => (
+                   {columns.map((col: TemplateColumn, i: number) => (
                      <div key={i} className={col.align === 'right' ? 'text-right' : ''}>
                         {col.field.includes('amount') ? '$450.00' : 'Sample Data'}
                      </div>
@@ -86,6 +118,7 @@ export function VisualTemplatePreview({ template, className }: VisualTemplatePre
              )}
           </div>
         );
+      }
       default:
         return (
           <div key={index} className="mb-4 p-2 border border-dashed rounded text-xs text-muted-foreground">
@@ -111,7 +144,7 @@ export function VisualTemplatePreview({ template, className }: VisualTemplatePre
              paddingRight: margins.right,
            }}
          >
-            {sections.map((section: any, idx: number) => renderSection(section, idx))}
+            {sections.map((section: TemplateSection, idx: number) => renderSection(section, idx))}
          </div>
       </div>
     </div>

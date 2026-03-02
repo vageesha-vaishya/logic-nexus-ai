@@ -1106,7 +1106,8 @@ export function useQuoteRepositoryForm(opts: {
             anomalies: [...currentAnomalies, anomaly],
           })
           .eq('id', (data as any).id);
-      } catch {
+      } catch (e) {
+        void e;
       }
     }
   };
