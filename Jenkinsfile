@@ -13,7 +13,7 @@ pipeline {
         PROJECT_REF = "${env.BRANCH_NAME == 'main' ? 'prod-ref-id' : (env.BRANCH_NAME == 'staging' ? 'staging-ref-id' : 'dev-ref-id')}"
         
         // Define Coolify Webhook based on branch
-        COOLIFY_WEBHOOK = "${env.BRANCH_NAME == 'main' ? 'https://coolify.api/webhooks/prod' : (env.BRANCH_NAME == 'staging' ? 'https://coolify.api/webhooks/staging' : 'https://coolify.api/webhooks/dev')}"
+        COOLIFY_WEBHOOK = "${env.BRANCH_NAME == 'main' ? 'http://72.61.249.111:8000/webhooks/prod' : (env.BRANCH_NAME == 'staging' ? 'http://72.61.249.111:8000/webhooks/staging' : 'http://72.61.249.111:8000/webhooks/dev')}"
         
         // Coolify Token
         COOLIFY_TOKEN = credentials('coolify-token')
@@ -78,7 +78,8 @@ pipeline {
                 script {
                     echo "Triggering Coolify Deployment..."
                     // Webhook tells Coolify to pull the latest image/code and redeploy the frontend container
-                    sh "curl -X POST ${COOLIFY_WEBHOOK} -H 'Authorization: Bearer ${COOLIFY_TOKEN}'"
+                    // Use single quotes for the command and double quotes for variables to prevent Groovy interpolation of the secret
+                    sh 'curl -X POST "$COOLIFY_WEBHOOK" -H "Authorization: Bearer $COOLIFY_TOKEN"'
                 }
             }
         }
