@@ -3,11 +3,14 @@ FROM node:20-alpine as builder
 
 WORKDIR /app
 
+# System dependencies required for building certain npm packages on Alpine
+RUN apk add --no-cache python3 make g++ git libc6-compat
+
 # Copy package files
 COPY package*.json ./
 
 # Install dependencies
-RUN npm ci
+RUN npm ci --no-audit --progress=false --legacy-peer-deps
 
 # Copy source code
 COPY . .
