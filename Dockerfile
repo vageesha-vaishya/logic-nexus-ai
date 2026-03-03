@@ -1,10 +1,14 @@
 # Stage 1: Build the application
-FROM node:20-alpine as builder
+# FROM node:20-alpine as builder
+FROM node:20-bullseye-slim AS builder
 
 WORKDIR /app
 
 # System dependencies required for building certain npm packages on Alpine
-RUN apk add --no-cache python3 make g++ git libc6-compat
+# RUN apk add --no-cache python3 make g++ git libc6-compat
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 make g++ git \
+  && rm -rf /var/lib/apt/lists/*
 
 # Copy package files
 COPY package*.json ./
@@ -25,7 +29,8 @@ ENV VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY
 RUN npm run build
 
 # Stage 2: Serve with Nginx
-FROM nginx:alpine
+# FROM nginx:alpine
+FROM nginx:stable
 
 # Copy build artifacts
 COPY --from=builder /app/dist /usr/share/nginx/html
