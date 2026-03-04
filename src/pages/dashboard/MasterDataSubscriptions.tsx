@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -22,8 +22,8 @@ interface Plan {
   price_monthly: number;
   price_annual: number | null;
   tier: string | null;
-  features: any;
-  limits: any;
+  features: Record<string, unknown> | unknown[];
+  limits: Record<string, unknown>;
   billing_period: string;
   is_active: boolean;
   plan_type: string;
@@ -41,6 +41,22 @@ interface Subscription {
   subscription_plans: Plan;
 }
 
+interface PlanForm {
+  name: string;
+  slug: string;
+  description: string;
+  price_monthly: string;
+  price_annual: string;
+  tier: string;
+  billing_period: string;
+  plan_type: string;
+  currency: string;
+  is_active: boolean;
+  sort_order: string;
+  features: string;
+  limits: string;
+}
+
 export default function MasterDataSubscriptions() {
   const { scopedDb, context, user } = useCRM();
   const { toast } = useToast();
@@ -49,7 +65,7 @@ export default function MasterDataSubscriptions() {
   const [loadingPlans, setLoadingPlans] = useState(false);
   const [showPlanDialog, setShowPlanDialog] = useState(false);
   const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
-  const [planForm, setPlanForm] = useState<any>({
+  const [planForm, setPlanForm] = useState<PlanForm>({
     name: '',
     slug: '',
     description: '',
@@ -71,16 +87,6 @@ export default function MasterDataSubscriptions() {
   const [availablePlans, setAvailablePlans] = useState<Plan[]>([]);
   const [loadingTenant, setLoadingTenant] = useState(false);
 
-  useEffect(() => {
-    loadPlans();
-  }, []);
-
-  useEffect(() => {
-    if (tab === 'tenant') {
-      loadTenantScopeData();
-    }
-  }, [tab, selectedTenantId, context.tenantId, context.isPlatformAdmin]);
-
   const resetPlanForm = () => {
     setEditingPlan(null);
     setPlanForm({
@@ -100,7 +106,7 @@ export default function MasterDataSubscriptions() {
     });
   };
 
-  const loadPlans = async () => {
+  const loadPlans = useCallback(async () => {
     setLoadingPlans(true);
     try {
       const { data, error } = await scopedDb
@@ -110,12 +116,71 @@ export default function MasterDataSubscriptions() {
         .order('price_monthly', { ascending: true });
       if (error) throw error;
       setPlans((data || []) as Plan[]);
-    } catch (error: any) {
-      toast({ title: 'Failed to load plans', description: error?.message || 'Error loading subscription plans', variant: 'destructive' });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Error loading subscription plans';
+      toast({ title: 'Failed to load plans', description: message, variant: 'destructive' });
     } finally {
       setLoadingPlans(false);
     }
-  };
+  }, [scopedDb, toast]);
+
+  const loadTenantScopeData = useCallback(async () => {
+    setLoadingTenant(true);
+    try {
+      const { data: planRows, error: planError } = await scopedDb
+        .from('subscription_plans', true)
+        .select('*')
+        .eq('is_active', true)
+        .eq('plan_type', 'crm_base')
+        .order('price_monthly');
+      if (planError) throw planError;
+      setAvailablePlans((planRows || []) as Plan[]);
+
+      if (context.isPlatformAdmin) {
+        const { data: tenantRows, error: tenantError } = await scopedDb
+          .from('tenants', true)
+          .select('id, name')
+          .eq('is_active', true)
+          .order('name');
+        if (tenantError) throw tenantError;
+        setTenants(tenantRows || []);
+      }
+
+      const tenantScope = context.isPlatformAdmin ? selectedTenantId : context.tenantId;
+      if (tenantScope) {
+        const { data: subData, error: subError } = await scopedDb
+          .from('tenant_subscriptions')
+          .select('*, subscription_plans(*)')
+          .eq('tenant_id', tenantScope)
+          .eq('status', 'active')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (subError) {
+          setCurrentSubscription(null);
+        } else {
+          setCurrentSubscription(subData as unknown as Subscription);
+        }
+      } else {
+        setCurrentSubscription(null);
+      }
+    } catch (error) {
+      setAvailablePlans([]);
+      setCurrentSubscription(null);
+    } finally {
+      setLoadingTenant(false);
+    }
+  }, [scopedDb, context.isPlatformAdmin, context.tenantId, selectedTenantId]);
+
+  useEffect(() => {
+    loadPlans();
+  }, [loadPlans]);
+
+  useEffect(() => {
+    if (tab === 'tenant') {
+      loadTenantScopeData();
+    }
+  }, [tab, loadTenantScopeData]);
 
   const openCreatePlan = () => {
     resetPlanForm();
@@ -142,7 +207,7 @@ export default function MasterDataSubscriptions() {
     setShowPlanDialog(true);
   };
 
-  const parseJsonField = (value: string, fallback: any) => {
+  const parseJsonField = (value: string, fallback: unknown) => {
     if (!value || !value.trim()) return fallback;
     try {
       return JSON.parse(value);
@@ -153,7 +218,7 @@ export default function MasterDataSubscriptions() {
 
   const handleSavePlan = async () => {
     try {
-      const payload: any = {
+      const payload = {
         name: planForm.name.trim(),
         slug: planForm.slug.trim(),
         description: planForm.description.trim() || null,
@@ -201,16 +266,18 @@ export default function MasterDataSubscriptions() {
           description: editingPlan ? `Plan ${payload.name} updated` : `Plan ${payload.name} created`,
           tenant_id: actorTenantId,
           franchise_id: null,
-        } as any);
+        } as Record<string, unknown>);
       } catch {
+        // ignore
       }
 
       toast({ title: 'Success', description: editingPlan ? 'Plan updated' : 'Plan created' });
       setShowPlanDialog(false);
       resetPlanForm();
       loadPlans();
-    } catch (error: any) {
-      toast({ title: 'Save failed', description: error?.message || 'Error saving plan', variant: 'destructive' });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Error saving plan';
+      toast({ title: 'Save failed', description: message, variant: 'destructive' });
     }
   };
 
@@ -233,62 +300,16 @@ export default function MasterDataSubscriptions() {
           description: `Plan ${plan.name} deleted`,
           tenant_id: actorTenantId,
           franchise_id: null,
-        } as any);
+        } as Record<string, unknown>);
       } catch {
+        // ignore
       }
 
       toast({ title: 'Deleted', description: 'Plan deleted successfully' });
       loadPlans();
-    } catch (error: any) {
-      toast({ title: 'Delete failed', description: error?.message || 'Error deleting plan', variant: 'destructive' });
-    }
-  };
-
-  const loadTenantScopeData = async () => {
-    setLoadingTenant(true);
-    try {
-      const { data: planRows, error: planError } = await scopedDb
-        .from('subscription_plans', true)
-        .select('*')
-        .eq('is_active', true)
-        .eq('plan_type', 'crm_base')
-        .order('price_monthly');
-      if (planError) throw planError;
-      setAvailablePlans((planRows || []) as Plan[]);
-
-      if (context.isPlatformAdmin) {
-        const { data: tenantRows, error: tenantError } = await scopedDb
-          .from('tenants', true)
-          .select('id, name')
-          .eq('is_active', true)
-          .order('name');
-        if (tenantError) throw tenantError;
-        setTenants(tenantRows || []);
-      }
-
-      const tenantScope = context.isPlatformAdmin ? selectedTenantId : context.tenantId;
-      if (tenantScope) {
-        const { data: subData, error: subError } = await scopedDb
-          .from('tenant_subscriptions')
-          .select('*, subscription_plans(*)')
-          .eq('tenant_id', tenantScope)
-          .eq('status', 'active')
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if (subError) {
-          setCurrentSubscription(null);
-        } else {
-          setCurrentSubscription(subData as any);
-        }
-      } else {
-        setCurrentSubscription(null);
-      }
     } catch (error) {
-      setAvailablePlans([]);
-      setCurrentSubscription(null);
-    } finally {
-      setLoadingTenant(false);
+      const message = error instanceof Error ? error.message : 'Error deleting plan';
+      toast({ title: 'Delete failed', description: message, variant: 'destructive' });
     }
   };
 
@@ -345,6 +366,7 @@ export default function MasterDataSubscriptions() {
           .update({ subscription_tier: derivedTier })
           .eq('id', effectiveTenantId);
       } catch {
+        // ignore
       }
 
       try {
@@ -356,14 +378,16 @@ export default function MasterDataSubscriptions() {
           description: `Tenant subscription changed to plan ${selectedPlan.name}`,
           tenant_id: effectiveTenantId,
           franchise_id: null,
-        } as any);
+        } as Record<string, unknown>);
       } catch {
+        // ignore
       }
 
       toast({ title: 'Plan assigned', description: 'Subscription updated successfully' });
       loadTenantScopeData();
-    } catch (error: any) {
-      toast({ title: 'Assignment failed', description: error?.message || 'Error assigning subscription plan', variant: 'destructive' });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Error assigning subscription plan';
+      toast({ title: 'Assignment failed', description: message, variant: 'destructive' });
     }
   };
 

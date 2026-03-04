@@ -12,7 +12,7 @@ export function startSpan(name: string, attrs: Record<string, any> = {}): Span {
       const duration = Date.now() - start
       // Hook this to real OpenTelemetry SDK later
       // For now, emit a console log for observability
-      try { console.log(`[otel-lite] span ${name} (${id})`, { duration, ...attrs }) } catch {}
+      try { console.log(`[otel-lite] span ${name} (${id})`, { duration, ...attrs }) } catch { /* ignore */ }
     }
   }
   return span

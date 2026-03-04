@@ -46,7 +46,7 @@ export interface ZipManifest {
   schemaFiles: string[];
   dataFiles: string[];
   functionFiles: string[];
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface SchemaComparisonResult {

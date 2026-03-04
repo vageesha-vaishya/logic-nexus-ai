@@ -4,7 +4,7 @@ export interface EmailProviderConfigField {
   type: 'text' | 'password' | 'number' | 'boolean' | 'select';
   options?: { label: string; value: string }[]; // For select
   required?: boolean;
-  defaultValue?: any;
+  defaultValue?: unknown;
   placeholder?: string;
   helperText?: string;
 }
@@ -25,5 +25,5 @@ export interface IEmailProvider {
    * For SMTP, checks connection.
    * For OAuth, might just verify the token format or readiness.
    */
-  validateConfig(config: any): Promise<{ isValid: boolean; error?: string }>;
+  validateConfig(config: Record<string, unknown>): Promise<{ isValid: boolean; error?: string }>;
 }

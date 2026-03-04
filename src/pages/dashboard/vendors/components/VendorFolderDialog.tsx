@@ -20,6 +20,8 @@ import { toast } from 'sonner';
 import { logger } from '@/lib/logger';
 import { auditLogger } from '@/lib/audit';
 
+import { VendorFolder } from '@/types/vendor';
+
 const folderSchema = z.object({
   name: z.string().min(1, 'Folder name is required'),
   read_access: z.string(),
@@ -32,8 +34,8 @@ interface VendorFolderDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   vendorId: string;
-  folder?: any; // If provided, we are editing
   onSuccess: () => void;
+  folder?: VendorFolder;
 }
 
 export function VendorFolderDialog({ open, onOpenChange, vendorId, folder, onSuccess }: VendorFolderDialogProps) {
@@ -126,9 +128,9 @@ export function VendorFolderDialog({ open, onOpenChange, vendorId, folder, onSuc
 
       onSuccess();
       onOpenChange(false);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error saving folder:', error);
-      toast.error(error.message || 'Failed to save folder');
+      toast.error((error as Error).message || 'Failed to save folder');
     } finally {
       setLoading(false);
     }

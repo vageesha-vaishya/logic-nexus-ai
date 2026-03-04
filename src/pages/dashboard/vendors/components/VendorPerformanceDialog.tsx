@@ -74,9 +74,10 @@ export function VendorPerformanceDialog({ open, onOpenChange, vendorId, onSucces
       form.reset();
       onSuccess();
       onOpenChange(false);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error recording performance review:', error);
-      toast.error(error.message || 'Failed to record review');
+      const message = error instanceof Error ? error.message : 'Failed to record review';
+      toast.error(message);
     } finally {
       setLoading(false);
     }

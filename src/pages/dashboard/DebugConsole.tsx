@@ -88,7 +88,7 @@ const SyntaxHighlighter = ({ data }: { data: any }) => {
   }
   
   // Basic syntax highlighting
-  const html = json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, (match) => {
+  const html = json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?)/g, (match) => {
     let cls = 'text-orange-600 dark:text-orange-400'; // number
     if (/^"/.test(match)) {
       if (/:$/.test(match)) {
@@ -417,29 +417,14 @@ export default function DebugConsole() {
     }
 
     if (!filter) return result;
-    const lower = filter.toLowerCase();
+    
     return result.filter(l => {
-      if (l.type === 'data-flow') {
-        return (
-          safeString(l.source).toLowerCase().includes(lower) ||
-          safeString(l.operation).toLowerCase().includes(lower) ||
-          safeString(l.target).toLowerCase().includes(lower)
-        );
+      try {
+        const re = new RegExp(filter, 'i');
+        return re.test(JSON.stringify(l));
+      } catch {
+        return JSON.stringify(l).toLowerCase().includes(filter.toLowerCase());
       }
-      if (l.type === 'app') {
-        return (
-          safeString(l.module).toLowerCase().includes(lower) ||
-          (l.form && safeString(l.form).toLowerCase().includes(lower)) ||
-          safeString(l.message).toLowerCase().includes(lower) ||
-          safeString(l.level).toLowerCase().includes(lower)
-        );
-      }
-      // Network
-      return (
-        (l.url && safeString(l.url).toLowerCase().includes(lower)) || 
-        (l.method && safeString(l.method).toLowerCase().includes(lower)) ||
-        String(l.status).includes(lower)
-      );
     });
   }, [logs, filter, activeTab]);
 

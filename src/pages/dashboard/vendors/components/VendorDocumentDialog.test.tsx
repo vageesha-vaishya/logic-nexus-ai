@@ -2,19 +2,24 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { VendorDocumentDialog } from './VendorDocumentDialog';
 import * as useCRMHook from '@/hooks/useCRM';
+import { PropsWithChildren } from 'react';
 
 // Mock UI components
 vi.mock('@/components/ui/dialog', () => ({
-  Dialog: ({ children, open }: any) => (open ? <div>{children}</div> : null),
-  DialogContent: ({ children }: any) => <div>{children}</div>,
-  DialogHeader: ({ children }: any) => <div>{children}</div>,
-  DialogTitle: ({ children }: any) => <h1>{children}</h1>,
-  DialogDescription: ({ children }: any) => <p>{children}</p>,
-  DialogFooter: ({ children }: any) => <div>{children}</div>,
+  Dialog: ({ children, open }: PropsWithChildren<{ open: boolean }>) => (open ? <div>{children}</div> : null),
+  DialogContent: ({ children }: PropsWithChildren) => <div>{children}</div>,
+  DialogHeader: ({ children }: PropsWithChildren) => <div>{children}</div>,
+  DialogTitle: ({ children }: PropsWithChildren) => <h1>{children}</h1>,
+  DialogDescription: ({ children }: PropsWithChildren) => <p>{children}</p>,
+  DialogFooter: ({ children }: PropsWithChildren) => <div>{children}</div>,
 }));
 
+interface FileUploadProps {
+  onFileSelect: (file: File) => void;
+}
+
 vi.mock('@/components/common/FileUpload', () => ({
-  FileUpload: ({ onFileSelect }: any) => (
+  FileUpload: ({ onFileSelect }: FileUploadProps) => (
     <input 
       data-testid="file-upload" 
       type="file" 
@@ -63,7 +68,7 @@ describe('VendorDocumentDialog', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.spyOn(useCRMHook, 'useCRM').mockReturnValue({ supabase: mockSupabase } as any);
+    vi.spyOn(useCRMHook, 'useCRM').mockReturnValue({ supabase: mockSupabase } as unknown as ReturnType<typeof useCRMHook.useCRM>);
   });
 
   afterEach(() => {
@@ -71,8 +76,8 @@ describe('VendorDocumentDialog', () => {
   });
 
   const folders = [
-    { id: 'f1', name: 'Legal' },
-    { id: 'f2', name: 'Financial' },
+    { id: 'f1', name: 'Legal', vendor_id: 'v1', created_at: '2023-01-01' },
+    { id: 'f2', name: 'Financial', vendor_id: 'v1', created_at: '2023-01-01' },
   ];
 
   it('renders correctly when open', () => {
@@ -113,12 +118,12 @@ describe('VendorDocumentDialog', () => {
   it('handles successful file upload and virus scan simulation', async () => {
     // Custom spy for setTimeout to run long timers immediately but keep short ones (for waitFor)
     const originalSetTimeout = global.setTimeout;
-    const setTimeoutSpy = vi.spyOn(global, 'setTimeout').mockImplementation((cb: any, delay?: number, ...args: any[]) => {
+    const setTimeoutSpy = vi.spyOn(global, 'setTimeout').mockImplementation((cb: (args: void) => void, delay?: number) => {
       if (delay && delay > 1000) {
-        cb(...args);
-        return 0 as any;
+        cb();
+        return 0 as unknown as NodeJS.Timeout;
       }
-      return originalSetTimeout(cb, delay, ...args);
+      return originalSetTimeout(cb, delay);
     });
 
     // Mock quota check

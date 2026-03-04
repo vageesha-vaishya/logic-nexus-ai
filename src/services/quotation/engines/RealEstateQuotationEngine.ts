@@ -12,10 +12,12 @@ export class RealEstateQuotationEngine implements IQuotationEngine {
   async calculate(context: RequestContext, items: LineItem[]): Promise<QuoteResult> {
     this.debug.info('Calculating quote...');
     let total = 0;
-    const breakdown: any[] = [];
+    const breakdownItems: Record<string, unknown>[] = [];
 
     for (const item of items) {
-      const { property_type, listing_type, area_sqft } = item.attributes;
+      const property_type = item.attributes.property_type;
+      const listing_type = item.attributes.listing_type;
+      const area_sqft = item.attributes.area_sqft;
       
       // Mock market rates per sqft
       let ratePerSqFt = 0;
@@ -35,7 +37,7 @@ export class RealEstateQuotationEngine implements IQuotationEngine {
         : estimatedValue; // 1 month rent
 
       total += commission;
-      breakdown.push({
+      breakdownItems.push({
         description: item.description || `${property_type} (${listing_type})`,
         area: area,
         market_value_estimate: estimatedValue,
@@ -47,7 +49,7 @@ export class RealEstateQuotationEngine implements IQuotationEngine {
     return {
       totalAmount: total, // Returning the Commission/Fee amount as the quote total
       currency: context.currency || 'USD',
-      breakdown: breakdown,
+      breakdown: { items: breakdownItems },
       metadata: {
         engine: 'RealEstateQuotationEngine',
         timestamp: new Date().toISOString()

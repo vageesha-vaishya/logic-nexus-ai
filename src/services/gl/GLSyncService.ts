@@ -52,8 +52,9 @@ export class GLSyncService {
       if (updateError) throw updateError;
       console.log(`Successfully synced ${type} ${referenceId} to GL.`);
 
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('GL Sync failed', err);
+      const message = err instanceof Error ? err.message : 'Unknown error';
       
       // Update status to FAILED
       await supabase
@@ -61,7 +62,7 @@ export class GLSyncService {
         .from('journal_entries')
         .update({
           sync_status: 'FAILED',
-          error_message: err.message || 'Unknown error'
+          error_message: message
         })
         .eq('id', journalEntry.id);
         

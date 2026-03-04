@@ -52,6 +52,12 @@ export function classifyPgDumpError(message: string): PgDumpErrorClassification 
   let severity: PgDumpErrorSeverity = 'error';
 
   if (
+    /session_replication_role/i.test(text) &&
+    (/must be superuser/i.test(text) || /permission denied/i.test(text))
+  ) {
+    category = PgDumpErrorCategory.PERMISSION_DENIED;
+    severity = 'error';
+  } else if (
     /could not connect to server/i.test(text) ||
     /connection refused/i.test(text) ||
     /connection reset/i.test(text)
@@ -147,12 +153,6 @@ export function classifyPgDumpError(message: string): PgDumpErrorClassification 
     severity = 'error';
   } else if (/duplicate key value violates unique constraint/i.test(text)) {
     category = PgDumpErrorCategory.CONSTRAINT_VIOLATION;
-    severity = 'error';
-  } else if (
-    /session_replication_role/i.test(text) &&
-    (/must be superuser/i.test(text) || /permission denied/i.test(text))
-  ) {
-    category = PgDumpErrorCategory.PERMISSION_DENIED;
     severity = 'error';
   } else if (/cannot alter type/i.test(text)) {
     category = PgDumpErrorCategory.INVALID_DEFINITION;
@@ -539,7 +539,9 @@ export function usePgDumpImport(): UsePgDumpImportReturn {
       if (typeof window !== 'undefined') {
         localStorage.setItem('pgdump.import.checkpoint', JSON.stringify(payload));
       }
-    } catch {}
+    } catch {
+      // ignore
+    }
   }, []);
 
   const persistCheckpoint = useCallback(async (phase: ImportProgress['currentPhase'], batch: number, totalBatches: number) => {
@@ -558,7 +560,9 @@ export function usePgDumpImport(): UsePgDumpImportReturn {
         failed_count: progress?.statementsFailed ?? null,
         created_at: new Date().toISOString(),
       });
-    } catch {}
+    } catch {
+      // ignore
+    }
   }, []);
   const validateAndPrepareSchema = useCallback(async (
     parsed: ParsedSqlFile,
@@ -2646,7 +2650,9 @@ export function usePgDumpImport(): UsePgDumpImportReturn {
         localStorage.removeItem('pgdump.import.checkpoint');
       }
       addLog('info', 'Local checkpoints cleared');
-    } catch {}
+    } catch {
+      // ignore
+    }
   }, [addLog]);
 
   const rollbackAlignment = useCallback(async (connection: ExternalDbConnection) => {

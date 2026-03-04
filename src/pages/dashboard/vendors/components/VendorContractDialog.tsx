@@ -219,9 +219,10 @@ export function VendorContractDialog({ open, onOpenChange, vendorId, folders = [
       setSelectedFile(null);
       onSuccess();
       onOpenChange(false);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error creating contract:', error);
-      toast.error(error.message || 'Failed to create contract');
+      const message = error instanceof Error ? error.message : 'Failed to create contract';
+      toast.error(message);
     } finally {
       setLoading(false);
     }

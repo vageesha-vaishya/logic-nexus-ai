@@ -79,9 +79,10 @@ export function VendorRiskDialog({ open, onOpenChange, vendorId, onSuccess }: Ve
       form.reset();
       onSuccess();
       onOpenChange(false);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error recording risk assessment:', error);
-      toast.error(error.message || 'Failed to record assessment');
+      const message = error instanceof Error ? error.message : 'Failed to record assessment';
+      toast.error(message);
     } finally {
       setLoading(false);
     }

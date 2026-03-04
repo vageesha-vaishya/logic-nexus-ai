@@ -136,7 +136,7 @@ export default function ServiceTypeMappings() {
 
   const fetchServices = async () => {
     try {
-      let query = scopedDb
+      const query = scopedDb
         .from('services')
         .select('id, service_name, service_type, tenant_id, is_active');
       

@@ -21,7 +21,7 @@ if (!supabaseUrl || !supabaseServiceKey) {
 }
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
-const quoteOptionService = new QuoteOptionService(supabase as any);
+const quoteOptionService = new QuoteOptionService(supabase);
 
 describe('Smart Quote Integration (Service Layer)', () => {
   let tenantId: string;

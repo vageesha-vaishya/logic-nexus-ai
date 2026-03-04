@@ -1,11 +1,29 @@
+export interface MasterDataItem {
+  id: string;
+  code: string;
+  name: string;
+}
+
+export interface ServiceType extends MasterDataItem {
+  transport_modes?: {
+    code: string;
+  };
+}
+
+export interface Carrier {
+  id: string;
+  carrier_name: string;
+  scac?: string;
+}
+
 export interface MasterData {
-  categories: any[];
-  sides: any[];
-  bases: any[];
-  currencies: any[];
-  serviceTypes: any[];
-  serviceModes: any[];
-  carriers: any[];
+  categories: MasterDataItem[];
+  sides: Partial<MasterDataItem>[];
+  bases: Partial<MasterDataItem>[];
+  currencies: Partial<MasterDataItem>[];
+  serviceTypes: Partial<ServiceType>[];
+  serviceModes: MasterDataItem[];
+  carriers: Carrier[];
 }
 
 export class LogisticsRateMapper {
@@ -15,7 +33,7 @@ export class LogisticsRateMapper {
     const { categories } = this.masterData;
     if (!categories) return null;
     const normalizedCode = code.toUpperCase().replace(/_/g, ' ');
-    const exact = categories.find((c: any) => c.code === code || c.name.toUpperCase() === normalizedCode)?.id;
+    const exact = categories.find((c) => c.code === code || c.name.toUpperCase() === normalizedCode)?.id;
     if (exact) return exact;
     
     const mappings: Record<string, string> = {
@@ -28,27 +46,27 @@ export class LogisticsRateMapper {
     };
     const mappedCode = mappings[code] || mappings[normalizedCode];
     if (mappedCode) {
-         const mapped = categories.find((c: any) => c.code === mappedCode || c.name.toUpperCase() === mappedCode)?.id;
+         const mapped = categories.find((c) => c.code === mappedCode || c.name.toUpperCase() === mappedCode)?.id;
          if (mapped) return mapped;
     }
-    const keywordMatch = categories.find((c: any) => c.name.toUpperCase().includes(normalizedCode) || c.code.includes(code))?.id;
+    const keywordMatch = categories.find((c) => c.name.toUpperCase().includes(normalizedCode) || c.code.includes(code))?.id;
     if (keywordMatch) return keywordMatch;
-    return categories.find((c: any) => c.code === 'SURCHARGE')?.id || categories?.[0]?.id;
+    return categories.find((c) => c.code === 'SURCHARGE')?.id || categories?.[0]?.id;
   }
 
   getSideId(code: string) {
     const { sides } = this.masterData;
-    return sides?.find((s: any) => s.code?.toLowerCase() === code.toLowerCase() || s.name?.toLowerCase() === code.toLowerCase())?.id;
+    return sides?.find((s) => s.code?.toLowerCase() === code.toLowerCase() || s.name?.toLowerCase() === code.toLowerCase())?.id;
   }
 
   getBasisId(code: string) {
     const { bases } = this.masterData;
-    return bases?.find((b: any) => b.code?.toLowerCase() === code.toLowerCase())?.id || bases?.find((b: any) => b.code === 'shipment' || b.name === 'Per Shipment')?.id;
+    return bases?.find((b) => b.code?.toLowerCase() === code.toLowerCase())?.id || bases?.find((b) => b.code === 'shipment' || b.name === 'Per Shipment')?.id;
   }
 
   getCurrId(code: string) {
     const { currencies } = this.masterData;
-    return currencies?.find((c: any) => c.code === code)?.id || currencies?.find((c: any) => c.code === 'USD')?.id;
+    return currencies?.find((c) => c.code === code)?.id || currencies?.find((c) => c.code === 'USD')?.id;
   }
 
   getServiceTypeId(mode: string, tier?: string) {
@@ -59,7 +77,7 @@ export class LogisticsRateMapper {
     const tierKey = (tier || '').toLowerCase();
 
     if (tierKey) {
-        const tierMatch = serviceTypes.find((st: any) => 
+        const tierMatch = serviceTypes.find((st) => 
             st.code?.toLowerCase() === tierKey || 
             st.name?.toLowerCase() === tierKey
         );
@@ -67,7 +85,7 @@ export class LogisticsRateMapper {
     }
 
     // Try exact mode match
-    let modeMatch = serviceTypes.find((st: any) => st.transport_modes?.code?.toLowerCase() === modeKey);
+    let modeMatch = serviceTypes.find((st) => st.transport_modes?.code?.toLowerCase() === modeKey);
     if (modeMatch) return modeMatch.id;
 
     // Try split mode match (e.g. "Ocean - FCL" -> "sea")
@@ -75,7 +93,7 @@ export class LogisticsRateMapper {
     const map: Record<string, string> = { 'ocean': 'sea', 'truck': 'road' };
     const target = map[splitMode] || splitMode;
 
-    modeMatch = serviceTypes.find((st: any) => st.transport_modes?.code?.toLowerCase() === target);
+    modeMatch = serviceTypes.find((st) => st.transport_modes?.code?.toLowerCase() === target);
     return modeMatch?.id || serviceTypes[0]?.id;
   }
 
@@ -88,17 +106,17 @@ export class LogisticsRateMapper {
     
     // 1. Try exact/mapped match
      let target = map[normalized] || normalized;
-     let match = serviceModes?.find((m: any) => m.code.toLowerCase() === target || m.name.toLowerCase() === target);
+     let match = serviceModes?.find((m) => m.code.toLowerCase() === target || m.name.toLowerCase() === target);
      if (match) return match.id;
      
      // 2. Try split match
      const split = normalized.split(/[\s-]+/)[0];
      target = map[split] || split;
-     match = serviceModes?.find((m: any) => m.code.toLowerCase() === target || m.name.toLowerCase() === target);
+     match = serviceModes?.find((m) => m.code.toLowerCase() === target || m.name.toLowerCase() === target);
      if (match) return match.id;
 
      // 3. Fallback to sea/ocean if reasonable default needed, or null
-     return serviceModes?.find((m: any) => m.code.toLowerCase() === 'sea')?.id || null;
+     return serviceModes?.find((m) => m.code.toLowerCase() === 'sea')?.id || null;
   }
 
   getProviderId(carrierName: string) {
@@ -109,23 +127,23 @@ export class LogisticsRateMapper {
      if (!normalizedSearch) return null;
 
      // 1. Exact Name Match (case-insensitive)
-     let match = carriers.find((c: any) => c.carrier_name.toLowerCase() === normalizedSearch);
+     let match = carriers.find((c) => c.carrier_name.toLowerCase() === normalizedSearch);
 
      // 2. SCAC Match
      if (!match) {
-         match = carriers.find((c: any) => c.scac?.toLowerCase() === normalizedSearch);
+         match = carriers.find((c) => c.scac?.toLowerCase() === normalizedSearch);
      }
 
      // 3. Includes Check (Bidirectional) - Prioritize explicit name match over generic
      if (!match) {
          // Try to find where DB name contains search name (e.g. "Evergreen Marine" contains "Evergreen")
-         match = carriers.find((c: any) => c.carrier_name.toLowerCase().includes(normalizedSearch));
+         match = carriers.find((c) => c.carrier_name.toLowerCase().includes(normalizedSearch));
      }
      
      if (!match) {
          // Try reverse: Search name contains DB name (e.g. "Evergreen Line" contains "Evergreen")
          // Be careful with short names like "ONE" matching "None" etc.
-         match = carriers.find((c: any) => normalizedSearch.includes(c.carrier_name.toLowerCase()) && c.carrier_name.length > 2);
+         match = carriers.find((c) => normalizedSearch.includes(c.carrier_name.toLowerCase()) && c.carrier_name.length > 2);
      }
 
      // 4. Hardcoded Aliases for common mismatches
@@ -146,7 +164,7 @@ export class LogisticsRateMapper {
          for (const [key, variants] of Object.entries(aliases)) {
              if (normalizedSearch.includes(key) || variants.some(v => normalizedSearch.includes(v))) {
                  // Find the canonical carrier in masterData
-                 match = carriers.find((c: any) => 
+                 match = carriers.find((c) => 
                      c.carrier_name.toLowerCase().includes(key) || 
                      (c.scac && c.scac.toLowerCase() === key)
                  );

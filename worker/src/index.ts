@@ -1,4 +1,4 @@
-import { Queue, Worker, QueueEvents } from 'bullmq';
+import { Queue, Worker, QueueEvents, Job } from 'bullmq';
 import IORedis from 'ioredis';
 import { supabase } from './lib/supabase';
 import dotenv from 'dotenv';
@@ -42,7 +42,7 @@ pollDueSteps();
 
 
 // 3. Worker: Processes the jobs
-const worker = new Worker('email-sequences', async (job) => {
+const worker = new Worker('email-sequences', async (job: Job) => {
   const item = job.data;
   console.log(`[Worker] Processing Step ${item.step_order} for Enrollment ${item.enrollment_id}`);
 
@@ -92,7 +92,7 @@ const worker = new Worker('email-sequences', async (job) => {
         .eq('step_order', item.step_order + 1)
         .single();
 
-      const updates: any = {
+      const updates: Record<string, unknown> = {
         current_step_order: item.step_order,
         last_step_completed_at: now.toISOString(),
       };
@@ -125,18 +125,19 @@ const worker = new Worker('email-sequences', async (job) => {
       console.log(`[Worker] Completed Step ${item.step_order} for Enrollment ${item.enrollment_id}`);
     }
 
-  } catch (err: any) {
-    console.error(`[Worker] Failed Step ${item.step_order}:`, err.message);
-    throw err; // BullMQ will retry
+  } catch (err) {
+    const error = err as Error;
+    console.error(`[Worker] Failed Step ${item.step_order}:`, error.message);
+    throw error; // BullMQ will retry
   }
 
 }, { connection });
 
-worker.on('completed', job => {
+worker.on('completed', (job: Job) => {
   console.log(`[Worker] Job ${job.id} has completed!`);
 });
 
-worker.on('failed', (job, err) => {
+worker.on('failed', (job: Job | undefined, err: Error) => {
   console.log(`[Worker] Job ${job?.id} has failed with ${err.message}`);
 });
 

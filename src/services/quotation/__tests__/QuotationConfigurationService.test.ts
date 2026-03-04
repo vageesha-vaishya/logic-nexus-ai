@@ -1,8 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { QuotationConfigurationService } from '../QuotationConfigurationService';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 describe('QuotationConfigurationService', () => {
-  let mockDb: any;
+  let mockDb: {
+    from: ReturnType<typeof vi.fn>;
+    select: ReturnType<typeof vi.fn>;
+    update: ReturnType<typeof vi.fn>;
+    insert: ReturnType<typeof vi.fn>;
+    eq: ReturnType<typeof vi.fn>;
+    maybeSingle: ReturnType<typeof vi.fn>;
+    single: ReturnType<typeof vi.fn>;
+  };
   let service: QuotationConfigurationService;
 
   beforeEach(() => {
@@ -15,7 +24,7 @@ describe('QuotationConfigurationService', () => {
       maybeSingle: vi.fn(),
       single: vi.fn(),
     };
-    service = new QuotationConfigurationService(mockDb);
+    service = new QuotationConfigurationService(mockDb as unknown as SupabaseClient);
   });
 
   describe('getConfiguration', () => {

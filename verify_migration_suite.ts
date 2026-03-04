@@ -1,4 +1,5 @@
 
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-nocheck
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.8";
 import { load } from "https://deno.land/std@0.218.0/dotenv/mod.ts";
@@ -83,7 +84,7 @@ async function run() {
   console.log("---------------------------------------------------");
 
   // Optional: Try to get a user token if email/pass provided
-  let userToken = "";
+  const userToken = "";
   // Placeholder for login logic if we had credentials
   // const { data } = await supabase.auth.signInWithPassword(...)
 

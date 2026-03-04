@@ -1,5 +1,6 @@
 
 import { SupabaseClient } from '@supabase/supabase-js';
+import { Database } from '@/integrations/supabase/types';
 import { PricingService } from './pricing.service';
 import { createDebugLogger } from '@/lib/debug-logger';
 import { mapOptionToQuote } from '@/lib/quote-mapper';
@@ -9,23 +10,138 @@ import { logger } from '@/lib/logger';
 import { QuoteTransformService } from '@/lib/services/quote-transform.service';
 import { parseTransitTimeToDays, parseTransitTimeToHours } from '@/lib/transit-time';
 
+interface RateLeg {
+    mode?: string;
+    sequence?: number;
+    leg_order?: number;
+    carrier?: string;
+    provider?: string;
+    from?: string;
+    origin?: string;
+    pol?: string;
+    to?: string;
+    destination?: string;
+    pod?: string;
+    transit_time?: string;
+    co2_emission?: number;
+    co2?: number;
+    voyage_number?: string;
+    voyage?: string;
+    charges?: Record<string, unknown>[];
+    [key: string]: unknown;
+}
+
+interface RateOption {
+    id?: string;
+    carrier_rate_id?: string;
+    total_amount?: number;
+    price?: number;
+    buyPrice?: number;
+    marginAmount?: number;
+    markupPercent?: number;
+    co2_kg?: number;
+    legs?: RateLeg[];
+    name?: string;
+    carrier?: string;
+    tier?: string;
+    currency?: string;
+    transitTime?: string;
+    validUntil?: string;
+    container_size_id?: string;
+    container_size?: { id: string };
+    container_type_id?: string;
+    container_type?: { id: string };
+    reliability_score?: number;
+    reliability?: { score: number };
+    ai_generated?: boolean;
+    source_attribution?: string;
+    ai_explanation?: string;
+    source?: string;
+    provider?: string;
+    marginPercent?: number;
+    margin_percent?: number;
+    carrier_name?: string;
+    mode?: string;
+    charges?: Record<string, unknown>[];
+    price_breakdown?: Record<string, unknown>;
+    [key: string]: unknown;
+}
+
+interface RateMapper {
+    getCurrId: (currency: string) => string;
+    getServiceTypeId: (mode: string, tier?: string) => string | null;
+    getProviderId: (name: string) => string | null;
+    getModeId: (mode: string) => string | null;
+    getSideId: (side: string) => string | null;
+    getCatId: (cat: string) => string | null;
+    getBasisId: (basis: string) => string | null;
+}
+
+interface ServiceContextServiceType {
+    id: string;
+    name: string;
+    code: string;
+    transport_modes?: { code?: string | null } | null;
+}
+
+interface ServiceContextCarrier {
+    id: string;
+    carrier_name: string;
+    scac?: string;
+    carrier_type?: string | null;
+}
+
+interface ServiceContextPort {
+    id: string;
+    location_name: string;
+    location_code?: string;
+    country?: string;
+}
+
+interface ServiceContextCategory {
+    id: string;
+    [key: string]: unknown;
+}
+
+interface ServiceContext {
+    origin?: string;
+    destination?: string;
+    originDetails?: Record<string, unknown>;
+    destinationDetails?: Record<string, unknown>;
+    ports?: ServiceContextPort[];
+    categories?: ServiceContextCategory[];
+    carriers?: ServiceContextCarrier[];
+    serviceTypes?: ServiceContextServiceType[];
+}
+
 export interface AddOptionParams {
     tenantId: string;
     versionId: string;
-    rate: any; // The RateOption object or raw rate
-    rateMapper: any; // The logistics plugin rate mapper
+    rate: RateOption; // The RateOption object or raw rate
+    rateMapper: RateMapper; // The logistics plugin rate mapper
     source?: 'quick_quote' | 'smart_quote' | 'ai_generated' | 'manual';
-    context?: {
-        origin?: string;
-        destination?: string;
-        originDetails?: any;
-        destinationDetails?: any;
-        ports?: any[];
-        categories?: any[];
-        carriers?: any[];
-        serviceTypes?: any[];
-    };
+    context?: ServiceContext;
 }
+
+type Financials = {
+    buyPrice: number;
+    marginAmount: number;
+    markupPercent: number;
+    sellPrice?: number;
+};
+
+type LegRowMinimal = {
+    id: string;
+    sort_order: number;
+    leg_type?: string | null;
+    mode?: string | null;
+    mode_id?: string | null;
+};
+
+type ChargeRowMinimal = {
+    charge_side_id: string;
+    amount?: number;
+} & Record<string, unknown>;
 
 export class QuoteOptionService {
     private supabase: SupabaseClient;
@@ -43,7 +159,7 @@ export class QuoteOptionService {
      * Handles financial calculations, mapping, AI field persistence, legs, and charges.
      */
     async addOptionToVersion(params: AddOptionParams): Promise<string> {
-        const { tenantId, versionId, rate: rawRate, rateMapper, source = 'manual', context = {} } = params;
+        const { tenantId, versionId, rate: rawRate, rateMapper, source = 'manual', context = {} as ServiceContext } = params;
 
         // 1. Normalize rate using centralized mapper
         const rate = mapOptionToQuote(rawRate);
@@ -51,7 +167,7 @@ export class QuoteOptionService {
         // 2. Calculate Financials
         const sellPrice = rate.total_amount || rate.price || 0;
         
-        let financials;
+        let financials: Financials;
         if (rate.buyPrice !== undefined && rate.marginAmount !== undefined) {
             financials = { buyPrice: rate.buyPrice, marginAmount: rate.marginAmount, markupPercent: rate.markupPercent };
         } else {
@@ -70,6 +186,7 @@ export class QuoteOptionService {
                 markupPercent: Number(markup.toFixed(2))
             };
         }
+        financials.sellPrice = sellPrice;
             
         const { buyPrice, marginAmount, markupPercent } = financials;
         
@@ -81,7 +198,7 @@ export class QuoteOptionService {
         const isUUID = typeof candidateCarrierRateId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(candidateCarrierRateId);
 
         // Calculate total CO2
-        const totalCo2 = rate.co2_kg || (rate.legs?.reduce((acc: number, leg: any) => acc + (Number(leg.co2_emission) || Number(leg.co2) || 0), 0)) || 0;
+        const totalCo2 = rate.co2_kg || (rate.legs?.reduce((acc: number, leg: RateLeg) => acc + (Number(leg.co2_emission) || Number(leg.co2) || 0), 0)) || 0;
 
         // 3. Insert Option Header
         const { data: optionData, error: optionError } = await this.supabase
@@ -135,19 +252,19 @@ export class QuoteOptionService {
         return optionId;
     }
 
-    private async insertLegs(tenantId: string, optionId: string, rate: any, rateMapper: any, context: any) {
-        const isUuid = (v: any) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
-        const legsToInsert: any[] = [];
+    private async insertLegs(tenantId: string, optionId: string, rate: RateOption, rateMapper: RateMapper, context: ServiceContext) {
+        const isUuid = (v: unknown) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+        const legsToInsert: Database['public']['Tables']['quotation_version_option_legs']['Insert'][] = [];
         const baseMode = rate.mode || 'ocean';
         const rateLegs = (rate.legs && rate.legs.length > 0) ? rate.legs : [{ mode: baseMode }];
 
-        if (rateLegs.length > 1 && rateLegs.every((l: any) => typeof l.sequence === 'number' || typeof l.leg_order === 'number')) {
-            rateLegs.sort((a: any, b: any) => (a.sequence || a.leg_order || 0) - (b.sequence || b.leg_order || 0));
+        if (rateLegs.length > 1 && rateLegs.every((l: RateLeg) => typeof l.sequence === 'number' || typeof l.leg_order === 'number')) {
+            rateLegs.sort((a: RateLeg, b: RateLeg) => (a.sequence || a.leg_order || 0) - (b.sequence || b.leg_order || 0));
         }
 
-        rateLegs.forEach((leg: any, index: number) => {
+        rateLegs.forEach((leg: RateLeg, index: number) => {
             const legMode = leg.mode || baseMode;
-            const carrierName = leg.carrier || rate.carrier_name || rate.carrier || rate.provider;
+            const carrierName = leg.carrier || rate.carrier_name || rate.carrier || rate.provider || 'Unknown';
             
             // Try to use rateMapper first, then fallback to robust resolution if context is available
             let serviceTypeId = rateMapper.getServiceTypeId(legMode, rate.tier);
@@ -163,7 +280,7 @@ export class QuoteOptionService {
             if (!providerId && context.carriers) {
                 // Construct a minimal rate object for resolution
                 const mockRate = { carrier: carrierName, carrier_name: carrierName };
-                providerId = QuoteTransformService.resolveCarrierId(mockRate as any, context.carriers);
+                providerId = QuoteTransformService.resolveCarrierId(mockRate as unknown as RateOption, context.carriers);
             }
             if (!isUuid(providerId)) {
                 providerId = null;
@@ -192,12 +309,12 @@ export class QuoteOptionService {
 
             let origin = leg.from || leg.origin || leg.pol;
             if (!origin && isFirstLeg) {
-                origin = context.originDetails?.formatted_address || context.origin;
+                origin = (context.originDetails?.formatted_address as string) || context.origin;
             }
 
             let destination = leg.to || leg.destination || leg.pod;
             if (!destination && isLastLeg) {
-                destination = context.destinationDetails?.formatted_address || context.destination;
+                destination = (context.destinationDetails?.formatted_address as string) || context.destination;
             }
 
             if (!origin && !isFirstLeg && legsToInsert[index - 1]?.destination_location) {
@@ -242,7 +359,7 @@ export class QuoteOptionService {
 
         if (legError) throw legError;
 
-        legData?.sort((a: any, b: any) => a.sort_order - b.sort_order);
+        legData?.sort((a: { sort_order: number }, b: { sort_order: number }) => a.sort_order - b.sort_order);
         return legData;
     }
 
@@ -250,11 +367,11 @@ export class QuoteOptionService {
         tenantId: string, 
         optionId: string, 
         versionId: string,
-        rate: any, 
-        legData: any[], 
-        rateMapper: any,
-        financials: any,
-        context?: any
+        rate: RateOption, 
+        legData: LegRowMinimal[], 
+        rateMapper: RateMapper,
+        financials: Financials,
+        context?: ServiceContext
     ) {
         const legsToInsert = legData.map(l => ({
             id: l.id,
@@ -274,12 +391,12 @@ export class QuoteOptionService {
         
         const baseMode = rate.mode || 'ocean';
         const rateLegs = (rate.legs && rate.legs.length > 0) ? rate.legs : [{ mode: baseMode }];
-        if (rateLegs.length > 1 && rateLegs.every((l: any) => typeof l.sequence === 'number' || typeof l.leg_order === 'number')) {
-            rateLegs.sort((a: any, b: any) => (a.sequence || a.leg_order || 0) - (b.sequence || b.leg_order || 0));
+        if (rateLegs.length > 1 && rateLegs.every((l: RateLeg) => typeof l.sequence === 'number' || typeof l.leg_order === 'number')) {
+            rateLegs.sort((a: RateLeg, b: RateLeg) => (a.sequence || a.leg_order || 0) - (b.sequence || b.leg_order || 0));
         }
 
-        const legsForMatching: TransportLeg[] = legData.map((l: any, i: number) => {
-            const originalLeg = rateLegs[i];
+        const legsForMatching: TransportLeg[] = legData.map((l: LegRowMinimal, i: number) => {
+            const originalLeg: RateLeg | undefined = rateLegs[i];
             return {
                 id: l.id,
                 leg_type: l.leg_type || 'transport',
@@ -295,10 +412,10 @@ export class QuoteOptionService {
         
         // If the target mode doesn't match any leg, try to infer the main mode from the legs
         // This handles cases where transport_mode is default (ocean) but legs are Air/Road
-        if (!legData?.some((l: any) => l.mode_id === targetModeId)) {
+        if (!legData?.some((l: LegRowMinimal) => l.mode_id === targetModeId)) {
             // Find the most significant leg (Air > Ocean > Rail > Road)
             // Or simply find a leg marked as 'main' or 'transport'
-            const mainLegCandidate = legData?.find((l: any) => 
+            const mainLegCandidate = legData?.find((l: LegRowMinimal) => 
                 l.leg_type === 'main' || 
                 l.leg_type === 'transport' || 
                 (l.mode && ['air', 'ocean', 'rail'].includes(l.mode.toLowerCase()))
@@ -309,21 +426,21 @@ export class QuoteOptionService {
             }
         }
 
-        const mainLeg = legData?.find((l: any) => 
+        const mainLeg = legData?.find((l: LegRowMinimal) => 
             (l.mode_id === targetModeId) && 
             (l.leg_type === 'transport' || l.leg_type === 'main')
-        ) || legData?.find((l: any) => l.leg_type === 'main') || legData?.[0];
+        ) || legData?.find((l: LegRowMinimal) => l.leg_type === 'main') || legData?.[0];
         
         const mainLegId = mainLeg?.id;
 
-        const chargesToInsert: any[] = [];
+        const chargesToInsert: ChargeRowMinimal[] = [];
         let totalInsertedSellAmount = 0;
         
         const buySideId = rateMapper.getSideId('buy') || rateMapper.getSideId('cost');
         const sellSideId = rateMapper.getSideId('sell') || rateMapper.getSideId('revenue');
 
         const addChargePair = async (categoryKey: string, amount: number, note: string, targetLegId: string | null, basisCode?: string, chargeUnit?: string): Promise<boolean> => {
-            const isUuid = (v: any) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+            const isUuid = (v: unknown) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
             let catId = rateMapper.getCatId(categoryKey);
             
             // Fallback: Try to find a generic category if specific mapping fails
@@ -426,10 +543,10 @@ export class QuoteOptionService {
                         for (const charge of leg.charges) {
                             const amount = Number(charge.amount || charge.price || charge.total || 0);
                             if (amount !== 0) {
-                                const categoryKey = charge.category || charge.description || charge.name || charge.code || 'Charge';
-                                const desc = charge.description || charge.name || charge.code || charge.category || 'Charge';
-                                const unit = charge.unit || charge.basis;
-                                const note = charge.note || desc;
+                                const categoryKey = (charge.category || charge.description || charge.name || charge.code || 'Charge') as string;
+                                const desc = (charge.description || charge.name || charge.code || charge.category || 'Charge') as string;
+                                const unit = (charge.unit || charge.basis) as string;
+                                const note = (charge.note || desc) as string;
 
                                 if (await addChargePair(categoryKey, amount, note, targetLegId, unit, unit)) {
                                     chargesFound = true;
@@ -446,11 +563,11 @@ export class QuoteOptionService {
             for (const charge of rate.charges) {
                 const amount = Number(charge.amount || charge.price || charge.total || 0);
                 if (amount !== 0) {
-                    const categoryKey = charge.category || charge.description || charge.name || charge.code || 'Charge';
-                    const desc = charge.description || charge.name || charge.code || charge.category || 'Charge';
+                    const categoryKey = (charge.category || charge.description || charge.name || charge.code || 'Charge') as string;
+                    const desc = (charge.description || charge.name || charge.code || charge.category || 'Charge') as string;
                     const legId = getLegIdForCharge(desc);
-                    const unit = charge.unit || charge.basis;
-                    const note = charge.note || desc;
+                    const unit = (charge.unit || charge.basis) as string;
+                    const note = (charge.note || desc) as string;
                     
                     if (await addChargePair(categoryKey, amount, note, legId, unit, unit)) {
                         chargesFound = true;
@@ -463,7 +580,7 @@ export class QuoteOptionService {
         if (!chargesFound) {
             const breakdown = rate.price_breakdown || { base_fare: rate.total_amount || rate.price || 0 };
             
-            const processCharge = async (key: string, value: any, parentKey: string = '') => {
+            const processCharge = async (key: string, value: unknown, parentKey: string = '') => {
                 if (['total', 'total_amount', 'total_price', 'subtotal', 'currency', 'currency_code', 'exchange_rate', 'symbol'].includes(key.toLowerCase())) {
                     return;
                 }
@@ -475,26 +592,27 @@ export class QuoteOptionService {
                         const match = parentKey.match(/legs?_?\[?(\d+)\]?/i);
                         if (match) explicitIndex = parseInt(match[1]);
                     }
-
+ 
                     const legId = getLegIdForCharge(compositeKey, explicitIndex);
                     const formatNote = (str: string) => str.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-                    await addChargePair(key, value, formatNote(compositeKey), legId);
+                    await addChargePair(key, value as number, formatNote(compositeKey), legId);
                     return;
                 } 
                 
                 if (typeof value === 'object' && value !== null) {
-                    const amountKey = ['amount', 'price', 'value', 'total'].find(k => typeof value[k] === 'number');
-                    const codeKey = ['code', 'name', 'type', 'description', 'id', 'charge_code'].find(k => typeof value[k] === 'string');
-
+                    const obj = value as Record<string, unknown>;
+                    const amountKey = ['amount', 'price', 'value', 'total'].find(k => typeof obj[k] === 'number');
+                    const codeKey = ['code', 'name', 'type', 'description', 'id', 'charge_code'].find(k => typeof obj[k] === 'string');
+ 
                     if (amountKey) {
-                        const amount = value[amountKey];
-                        const code = codeKey ? value[codeKey] : key;
-                        const unitKey = ['unit', 'basis', 'per'].find(k => typeof value[k] === 'string');
-                        const unit = unitKey ? value[unitKey] : undefined;
+                        const amount = obj[amountKey] as number;
+                        const code = codeKey ? (obj[codeKey] as string) : key;
+                        const unitKey = ['unit', 'basis', 'per'].find(k => typeof obj[k] === 'string');
+                        const unit = unitKey ? (obj[unitKey] as string) : undefined;
                         
-                        const legIndexKey = ['leg_index', 'leg_id', 'segment_index'].find(k => typeof value[k] === 'number');
-                        const explicitIndex = legIndexKey ? value[legIndexKey] : undefined;
-
+                        const legIndexKey = ['leg_index', 'leg_id', 'segment_index'].find(k => typeof obj[k] === 'number');
+                        const explicitIndex = legIndexKey ? (obj[legIndexKey] as number) : undefined;
+ 
                         const compositeKey = parentKey ? `${parentKey}_${code}` : code;
                         const legId = getLegIdForCharge(compositeKey, explicitIndex);
                         const formatNote = (str: string) => str.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
@@ -502,9 +620,9 @@ export class QuoteOptionService {
                         await addChargePair(code, amount, formatNote(compositeKey), legId, unit, unit);
                         return;
                     }
-
+ 
                     const newParentKey = parentKey ? `${parentKey}_${key}` : key;
-                    for (const [k, v] of Object.entries(value)) {
+                    for (const [k, v] of Object.entries(obj)) {
                         await processCharge(k, v, newParentKey);
                     }
                 }
@@ -533,12 +651,12 @@ export class QuoteOptionService {
 
             // RECONCILIATION
             const finalTotalBuy = chargesToInsert
-                .filter((c: any) => c.charge_side_id === buySideId)
-                .reduce((sum: number, c: any) => sum + (c.amount || 0), 0);
+                .filter((c) => c.charge_side_id === buySideId)
+                .reduce((sum: number, c) => sum + (c.amount || 0), 0);
                 
             const finalTotalSell = chargesToInsert
-                .filter((c: any) => c.charge_side_id === sellSideId)
-                .reduce((sum: number, c: any) => sum + (c.amount || 0), 0);
+                .filter((c) => c.charge_side_id === sellSideId)
+                .reduce((sum: number, c) => sum + (c.amount || 0), 0);
                 
             const finalMargin = finalTotalSell - finalTotalBuy;
             const finalMarkup = finalTotalBuy > 0 ? (finalMargin / finalTotalBuy) * 100 : 0;

@@ -52,7 +52,7 @@ export interface Email {
   // AI Threat Detection (Phase 2)
   threat_level?: 'safe' | 'suspicious' | 'malicious';
   threat_score?: number;
-  threat_details?: any;
+  threat_details?: Record<string, unknown>;
 }
 
 export interface EmailAccount {

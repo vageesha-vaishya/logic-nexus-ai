@@ -17,7 +17,7 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
   const isServiceRole = authHeader && serviceKey && authHeader.includes(serviceKey);
   
   let user: any = null;
-  let supabase = supabaseAdmin;
+  const supabase = supabaseAdmin;
 
   if (!isServiceRole) {
     const { user: authUser, error: authError } = await requireAuth(req);

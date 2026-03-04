@@ -93,7 +93,9 @@ export function PgDumpImportWizard() {
       if (raw === 'custom' || raw === 'safe_audit' || raw === 'prod_upsert' || raw === 'dev_reset') {
         return raw;
       }
-    } catch {}
+    } catch (error) {
+      void error;
+    }
     return 'custom';
   });
   const [activePreset, setActivePreset] = useState<ImportPresetId | null>(null);
@@ -103,7 +105,9 @@ export function PgDumpImportWizard() {
     try {
       const raw = localStorage.getItem("pgdump.import.categories");
       if (raw) return JSON.parse(raw);
-    } catch {}
+    } catch (error) {
+      void error;
+    }
     return {
       all: true,
       schema: true,
@@ -121,7 +125,9 @@ export function PgDumpImportWizard() {
     try {
       const raw = localStorage.getItem("pgdump.import.general");
       if (raw) return JSON.parse(raw);
-    } catch {}
+    } catch (error) {
+      void error;
+    }
     return {
       outputMode: "insert",
       includeDropStatements: false,
@@ -244,7 +250,9 @@ export function PgDumpImportWizard() {
   useEffect(() => {
     try {
       localStorage.setItem('pgdump.import.preset', preset);
-    } catch {}
+    } catch (error) {
+      void error;
+    }
   }, [preset]);
 
   const applyPreset = (id: ImportPresetId, base: ImportOptions): ImportOptions => {
@@ -341,13 +349,17 @@ export function PgDumpImportWizard() {
   useEffect(() => {
     try {
       localStorage.setItem("pgdump.import.categories", JSON.stringify(categories));
-    } catch {}
+    } catch (error) {
+      void error;
+    }
   }, [categories]);
 
   useEffect(() => {
     try {
       localStorage.setItem("pgdump.import.general", JSON.stringify(general));
-    } catch {}
+    } catch (error) {
+      void error;
+    }
   }, [general]);
 
   useEffect(() => {

@@ -2,6 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { InvoiceService } from './InvoiceService';
 import { CreateInvoiceRequest } from './types';
+import type { ScopedDataAccess } from '@/lib/db/access';
 
 // Mock Supabase (still needed for auth.getUser)
 const mockUser = { id: 'user-123' };
@@ -18,7 +19,17 @@ vi.mock('@/integrations/supabase/client', () => ({
 }));
 
 // Create a mock ScopedDataAccess
-function createMockScopedDb(overrides: Record<string, any> = {}) {
+type MockScopedDb = Pick<ScopedDataAccess, 'from' | 'rpc' | 'accessContext' | 'client'> & {
+  _mocks: {
+    mockFrom: ReturnType<typeof vi.fn>;
+    mockSelect: ReturnType<typeof vi.fn>;
+    mockInsert: ReturnType<typeof vi.fn>;
+    mockUpdate: ReturnType<typeof vi.fn>;
+    mockRpc: ReturnType<typeof vi.fn>;
+  };
+};
+
+function createMockScopedDb(overrides: Partial<MockScopedDb> = {}): MockScopedDb {
   const mockSelect = vi.fn().mockReturnValue({
     order: vi.fn().mockResolvedValue({ data: [mockInvoice], error: null }),
     eq: vi.fn().mockReturnValue({
@@ -62,7 +73,7 @@ function createMockScopedDb(overrides: Record<string, any> = {}) {
     ...overrides,
     // Expose mocks for assertions
     _mocks: { mockFrom, mockSelect, mockInsert, mockUpdate, mockRpc }
-  } as any;
+  } as unknown as MockScopedDb;
 }
 
 describe('InvoiceService', () => {
@@ -73,7 +84,7 @@ describe('InvoiceService', () => {
   it('should list invoices using scoped query', async () => {
     const scopedDb = createMockScopedDb();
 
-    const result = await InvoiceService.listInvoices(scopedDb);
+    const result = await InvoiceService.listInvoices(scopedDb as unknown as ScopedDataAccess);
 
     expect(scopedDb.from).toHaveBeenCalledWith('invoices');
     expect(result).toEqual([mockInvoice]);
@@ -82,7 +93,7 @@ describe('InvoiceService', () => {
   it('should get a single invoice by ID using scoped query', async () => {
     const scopedDb = createMockScopedDb();
 
-    const result = await InvoiceService.getInvoice('invoice-123', scopedDb);
+    const result = await InvoiceService.getInvoice('invoice-123', scopedDb as unknown as ScopedDataAccess);
 
     expect(scopedDb.from).toHaveBeenCalledWith('invoices');
     expect(result).toEqual(mockInvoice);
@@ -132,7 +143,7 @@ describe('InvoiceService', () => {
       ]
     };
 
-    const result = await InvoiceService.createInvoice(request, scopedDb);
+    await InvoiceService.createInvoice(request, scopedDb as unknown as ScopedDataAccess);
 
     // Verify scoped insert was used (not raw supabase)
     expect(mockFrom).toHaveBeenCalledWith('invoices');
@@ -155,6 +166,6 @@ describe('InvoiceService', () => {
       items: [{ description: 'Test', quantity: 1, unit_price: 50 }]
     };
 
-    await expect(InvoiceService.createInvoice(request, scopedDb)).rejects.toThrow('Tenant ID not found in scope context');
+    await expect(InvoiceService.createInvoice(request, scopedDb as unknown as ScopedDataAccess)).rejects.toThrow('Tenant ID not found in scope context');
   });
 });

@@ -1,8 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { QuotationVersionService } from '../QuotationVersionService';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 describe('QuotationVersionService', () => {
-  let mockDb: any;
+  let mockDb: {
+    from: ReturnType<typeof vi.fn>;
+    select: ReturnType<typeof vi.fn>;
+    insert: ReturnType<typeof vi.fn>;
+    update: ReturnType<typeof vi.fn>;
+    eq: ReturnType<typeof vi.fn>;
+    order: ReturnType<typeof vi.fn>;
+    limit: ReturnType<typeof vi.fn>;
+    range: ReturnType<typeof vi.fn>;
+    single: ReturnType<typeof vi.fn>;
+    maybeSingle: ReturnType<typeof vi.fn>;
+    rpc: ReturnType<typeof vi.fn>;
+  };
   let service: QuotationVersionService;
 
   beforeEach(() => {
@@ -19,7 +32,7 @@ describe('QuotationVersionService', () => {
       maybeSingle: vi.fn(),
       rpc: vi.fn(),
     };
-    service = new QuotationVersionService(mockDb);
+    service = new QuotationVersionService(mockDb as unknown as SupabaseClient);
   });
 
   describe('saveVersion', () => {

@@ -215,7 +215,7 @@ describe('pgDumpExport validation', () => {
           column_default: `'USER'::account_type`,
           is_primary_key: false,
           udt_name: 'account_type',
-        } as any,
+        } as unknown as { column_name: string; data_type: string; is_nullable: boolean; column_default: string; is_primary_key: boolean; },
       ],
       true
     );
@@ -243,7 +243,7 @@ describe('pgDumpExport validation', () => {
           column_default: null,
           is_primary_key: false,
           udt_name: '_text',
-        } as any,
+        } as unknown as { column_name: string; data_type: string; is_nullable: boolean; column_default: string | null; is_primary_key: boolean; },
       ],
       true
     );
@@ -270,7 +270,7 @@ describe('pgDumpExport validation', () => {
           is_nullable: true,
           column_default: null,
           is_primary_key: false,
-        } as any,
+        } as unknown as { column_name: string; data_type: string; is_nullable: boolean; column_default: string | null; is_primary_key: boolean; },
       ],
       false
     );
@@ -289,7 +289,7 @@ describe('pgDumpExport validation', () => {
         constraint_details: 'id',
       },
       {
-        schema_name: null as any,
+        schema_name: null as unknown as string,
         table_name: 'users',
         constraint_name: 'users_email_key',
         constraint_type: 'UNIQUE',

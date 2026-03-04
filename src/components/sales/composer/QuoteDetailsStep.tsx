@@ -15,9 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { useIncoterms } from '@/hooks/useIncoterms';
 
-interface QuoteDetailsStepProps {}
-
-export function QuoteDetailsStep({}: QuoteDetailsStepProps) {
+export function QuoteDetailsStep() {
   const { state, dispatch } = useQuoteStore();
   const {
     quoteData,

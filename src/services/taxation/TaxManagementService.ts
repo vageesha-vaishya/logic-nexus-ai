@@ -62,7 +62,7 @@ export const TaxManagementService = {
   },
 
   async updateJurisdiction(id: string, updates: Partial<Omit<TaxJurisdiction, 'id'>>): Promise<TaxJurisdiction> {
-    const dbUpdates: any = {};
+    const dbUpdates: Record<string, unknown> = {};
     if (updates.code) dbUpdates.code = updates.code;
     if (updates.name) dbUpdates.name = updates.name;
     if (updates.type) dbUpdates.type = updates.type;
@@ -161,7 +161,7 @@ export const TaxManagementService = {
   },
 
   async updateTaxRule(id: string, updates: Partial<Omit<TaxRule, 'id'>>): Promise<TaxRule> {
-    const dbUpdates: any = {};
+    const dbUpdates: Record<string, unknown> = {};
     if (updates.jurisdictionId) dbUpdates.jurisdiction_id = updates.jurisdictionId;
     if (updates.taxCodeId !== undefined) dbUpdates.tax_code_id = updates.taxCodeId || null;
     if (updates.rate !== undefined) dbUpdates.rate = updates.rate;
@@ -196,26 +196,26 @@ export const TaxManagementService = {
   // Mappers
   // ==========================================
 
-  mapJurisdiction(data: any): TaxJurisdiction {
+  mapJurisdiction(data: Record<string, unknown>): TaxJurisdiction {
     return {
-      id: data.id,
-      code: data.code,
-      name: data.name,
-      type: data.type,
-      parentId: data.parent_id
+      id: data.id as string,
+      code: data.code as string,
+      name: data.name as string,
+      type: data.type as TaxJurisdiction['type'],
+      parentId: data.parent_id as string | undefined
     };
   },
 
-  mapTaxRule(data: any): TaxRule {
+  mapTaxRule(data: Record<string, unknown>): TaxRule {
     return {
-      id: data.id,
-      jurisdictionId: data.jurisdiction_id,
-      taxCodeId: data.tax_code_id,
+      id: data.id as string,
+      jurisdictionId: data.jurisdiction_id as string,
+      taxCodeId: data.tax_code_id as string | undefined,
       rate: Number(data.rate),
-      priority: data.priority,
-      effectiveFrom: new Date(data.effective_from),
-      effectiveTo: data.effective_to ? new Date(data.effective_to) : undefined,
-      ruleType: data.rule_type
+      priority: data.priority as number,
+      effectiveFrom: new Date(data.effective_from as string | number | Date),
+      effectiveTo: data.effective_to ? new Date(data.effective_to as string | number | Date) : undefined,
+      ruleType: data.rule_type as TaxRule['ruleType']
     };
   }
 };

@@ -90,6 +90,7 @@ export function QuoteComparisonView({
         enrichOptions();
     }, [rawOptions, scopedDb, supabase]);
 
+    const hasOptions = options.length > 0;
     // Helper to calculate bifurcated totals for an option
     const getBifurcatedTotals = (opt: RateOption) => {
         const totals = {
@@ -123,18 +124,25 @@ export function QuoteComparisonView({
             // ...
         }
 
-        // Bifurcate
         const bifurcated = bifurcateCharges(allCharges, opt.legs || []);
-        
-        // Group into buckets
-        const originCharges = bifurcated.filter(c => ['origin', 'pickup'].includes(c.assignedLegType?.toLowerCase() || ''));
-        const freightCharges = bifurcated.filter(c => ['main', 'transport', 'freight'].includes(c.assignedLegType?.toLowerCase() || ''));
-        const destCharges = bifurcated.filter(c => ['destination', 'delivery'].includes(c.assignedLegType?.toLowerCase() || ''));
-        const otherCharges = bifurcated.filter(c => !['origin', 'pickup', 'main', 'transport', 'freight', 'destination', 'delivery'].includes(c.assignedLegType?.toLowerCase() || ''));
 
+        const originCharges = bifurcated.filter(c => {
+            const lt = (c.assignedLegType || '').toLowerCase();
+            return lt === 'origin' || lt === 'pickup' || lt === 'pre-carriage';
+        });
+        const destinationCharges = bifurcated.filter(c => {
+            const lt = (c.assignedLegType || '').toLowerCase();
+            return lt === 'destination' || lt === 'delivery' || lt === 'on-carriage';
+        });
+        const freightCharges = bifurcated.filter(c => {
+            const lt = (c.assignedLegType || '').toLowerCase();
+            return lt === 'transport' || lt === 'main' || lt === 'freight';
+        });
+        const otherCharges = bifurcated.filter(c => !originCharges.includes(c) && !destinationCharges.includes(c) && !freightCharges.includes(c));
+        
         totals.origin = originCharges.reduce((sum, c) => sum + (c.amount || 0), 0);
         totals.freight = freightCharges.reduce((sum, c) => sum + (c.amount || 0), 0);
-        totals.destination = destCharges.reduce((sum, c) => sum + (c.amount || 0), 0);
+        totals.destination = destinationCharges.reduce((sum, c) => sum + (c.amount || 0), 0);
         totals.other = otherCharges.reduce((sum, c) => sum + (c.amount || 0), 0);
 
         return totals;
@@ -148,7 +156,7 @@ export function QuoteComparisonView({
         }, {} as Record<string, ReturnType<typeof getBifurcatedTotals>>);
     }, [options]);
 
-    if (!options || options.length === 0) return <div className="p-4 text-center text-muted-foreground">No options to compare.</div>;
+    if (!hasOptions) return <div className="p-4 text-center text-muted-foreground">No options to compare.</div>;
 
     return (
         <div className="overflow-x-auto border rounded-md bg-background shadow-sm" data-testid="quote-comparison-view">

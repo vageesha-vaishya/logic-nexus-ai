@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -36,6 +36,19 @@ const versionSchema = z.object({
 
 type VersionFormValues = z.infer<typeof versionSchema>;
 
+interface VendorContractVersion {
+  id: string;
+  contract_id: string;
+  version_number: number;
+  file_path: string;
+  file_name: string;
+  file_size: number;
+  mime_type: string;
+  comments?: string;
+  uploaded_by?: string;
+  created_at: string;
+}
+
 interface VendorContractVersionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -56,7 +69,7 @@ export function VendorContractVersionDialog({
   const { supabase } = useCRM();
   const [loading, setLoading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [versions, setVersions] = useState<any[]>([]);
+  const [versions, setVersions] = useState<VendorContractVersion[]>([]);
   const [loadingVersions, setLoadingVersions] = useState(false);
 
   const form = useForm<VersionFormValues>({
@@ -66,13 +79,7 @@ export function VendorContractVersionDialog({
     },
   });
 
-  useEffect(() => {
-    if (open && contractId) {
-      fetchVersions();
-    }
-  }, [open, contractId]);
-
-  const fetchVersions = async () => {
+  const fetchVersions = useCallback(async () => {
     setLoadingVersions(true);
     try {
       const { data, error } = await supabase
@@ -89,9 +96,15 @@ export function VendorContractVersionDialog({
     } finally {
       setLoadingVersions(false);
     }
-  };
+  }, [contractId, supabase]);
 
-  const handleDownloadVersion = async (version: any) => {
+  useEffect(() => {
+    if (open && contractId) {
+      fetchVersions();
+    }
+  }, [open, contractId, fetchVersions]);
+
+  const handleDownloadVersion = async (version: VendorContractVersion) => {
     try {
       const { data, error } = await supabase.storage
         .from('vendor-documents')
@@ -114,7 +127,7 @@ export function VendorContractVersionDialog({
       }
     } catch (error) {
       console.error('Error downloading version:', error);
-      toast.error('Failed to download file');
+      toast.error(error instanceof Error ? error.message : 'Failed to download file');
     }
   };
 
@@ -195,9 +208,9 @@ export function VendorContractVersionDialog({
       setSelectedFile(null);
       fetchVersions(); // Refresh list
       onSuccess();
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error uploading version:', error);
-      toast.error(error.message || 'Failed to upload version');
+      toast.error(error instanceof Error ? error.message : 'Failed to upload version');
     } finally {
       setLoading(false);
     }

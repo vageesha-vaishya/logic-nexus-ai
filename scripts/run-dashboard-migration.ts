@@ -56,7 +56,7 @@ async function executeSql(sql: string): Promise<{ success: boolean; message: str
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${SUPABASE_KEY}`,
-        'apikey': SUPABASE_KEY,
+        'apikey': SUPABASE_KEY as string,
       },
       body: JSON.stringify({ query: sql }),
     });
@@ -117,7 +117,7 @@ async function runMigration(): Promise<boolean> {
     },
   ];
 
-  let allSuccess = true;
+  const allSuccess = true;
 
   for (const migration of migrations) {
     process.stdout.write(`⏳ ${migration.name}... `);

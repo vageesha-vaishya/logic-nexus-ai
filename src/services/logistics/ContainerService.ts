@@ -1,5 +1,6 @@
 import { ContainerConfiguration, ContainerType, ContainerSize } from '@/types/container';
 import { useCRM } from '@/hooks/useCRM';
+import { SupabaseClient } from '@supabase/supabase-js';
 
 /**
  * Service for managing container configurations and retrieving specifications.
@@ -24,7 +25,7 @@ export class ContainerService {
    * Retrieves all available container configurations, including type details and size specifications.
    * Joins `container_types` and `container_sizes`.
    */
-  public async getAllContainers(db: any): Promise<ContainerConfiguration[]> {
+  public async getAllContainers(db: SupabaseClient): Promise<ContainerConfiguration[]> {
     if (this.containerCache) {
       return this.containerCache;
     }
@@ -45,12 +46,12 @@ export class ContainerService {
       if (sizesError) throw sizesError;
 
       // Map and join in memory
-      const configurations: ContainerConfiguration[] = types.map((type: any) => {
+      const configurations: ContainerConfiguration[] = types.map((type: ContainerType) => {
         // Find the matching size. For simplicity, we assume one primary size per type for now,
         // or we pick the default/first one if multiple exist.
         // The schema allows multiple sizes per type (e.g. High Cube vs Standard for same type code if needed),
         // but typically the type code (40HC) implies the size.
-        const size = sizes.find((s: any) => s.container_type_id === type.id);
+        const size = sizes.find((s: ContainerSize) => s.container_type_id === type.id);
         
         // If no size found (data integrity issue), return a partial or skip
         if (!size) {
@@ -77,7 +78,7 @@ export class ContainerService {
   /**
    * Retrieves a specific container configuration by its ISO code (e.g., "40HC").
    */
-  public async getContainerByCode(db: any, code: string): Promise<ContainerConfiguration | null> {
+  public async getContainerByCode(db: SupabaseClient, code: string): Promise<ContainerConfiguration | null> {
     // If cache exists, look there first
     if (this.containerCache) {
       return this.containerCache.find(c => c.code === code) || null;
@@ -104,7 +105,7 @@ export class ContainerService {
         return {
             ...type,
             specifications: size
-        };
+        } as ContainerConfiguration;
 
     } catch (error) {
         console.error(`Error fetching container ${code}:`, error);

@@ -6,7 +6,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { normalizeModeCode, type ModeCarrierTypeMap, DEFAULT_MODE_CARRIER_TYPE_MAP, carrierValidationMessages } from '@/lib/mode-utils';
 
 interface MasterData {
-    serviceTypes: { id: string; name: string; code: string }[];
+    serviceTypes: { id: string; name: string; code: string; transport_modes?: { code?: string | null } | null }[];
     carriers: { id: string; carrier_name: string; scac?: string; carrier_type?: string | null }[];
     ports?: { id: string; location_name: string; location_code?: string; country?: string }[];
     containerTypes?: { id: string; name: string; code: string }[];
@@ -33,7 +33,7 @@ export class QuoteTransformService {
             status: 'success' | 'failure';
             userId: string;
             resourceId?: string;
-            details?: any;
+            details?: Record<string, unknown>;
         }
     ) {
         try {
@@ -163,7 +163,7 @@ export class QuoteTransformService {
             const carrierValidation = this.validateCarrierMode(
                 carrierId,
                 data.mode,
-                masterData.carriers as any
+                masterData.carriers
             );
             if (!carrierValidation.valid && carrierValidation.error) {
                 throw new Error(carrierValidation.error);
@@ -239,7 +239,10 @@ export class QuoteTransformService {
         };
     }
 
-    private static mapToQuoteOptions(rates: RateOption[], masterData: MasterData, transferData: QuoteTransferData): any[] {
+    private static mapToQuoteOptions(rates: RateOption[], masterData: MasterData, transferData: QuoteTransferData): QuoteFormValues['options'] {
+        type QuoteOption = QuoteFormValues['options'][number];
+        type QuoteLeg = QuoteOption['legs'][number];
+
         return rates.map((rate, index) => {
             const isPrimary = index === 0;
             const carrierId = this.resolveCarrierId(rate, masterData.carriers);
@@ -253,7 +256,7 @@ export class QuoteTransformService {
 
             // Map Charges if present (flattened structure often used in Quick Quote)
             // If rate has specific charges array, use it. Otherwise, create a single 'Freight' charge.
-            const charges = rate.charges?.map(c => {
+            const charges: QuoteLeg['charges'] = rate.charges?.map(c => {
                 // Map common codes to standard DB codes
                 let code = c.code || 'freight';
                 if (code === 'FRT') code = 'freight';
@@ -280,11 +283,11 @@ export class QuoteTransformService {
             }];
 
             // Create a default leg if none exist
-            const legs = rate.legs?.length ? rate.legs.map((leg, i) => ({
+            const legs: QuoteOption['legs'] = rate.legs?.length ? rate.legs.map((leg, i) => ({
                 id: leg.id,
                 sequence_number: i + 1,
                 transport_mode: (leg.mode || transferData.mode || 'ocean').toLowerCase(),
-                carrier_id: (leg as any).carrier ? this.resolveCarrierId({ carrier_name: (leg as any).carrier } as any, masterData.carriers) : carrierId,
+                carrier_id: leg.carrier ? this.resolveCarrierId({ ...rate, carrier_name: leg.carrier }, masterData.carriers) : carrierId,
                 origin_location_name: leg.origin 
                     || (i === 0 ? (transferData.originDetails?.name || transferData.origin) : undefined),
                 destination_location_name: leg.destination 
@@ -301,8 +304,8 @@ export class QuoteTransformService {
                     i === (rate.legs?.length || 0) - 1 ? transferData.destinationDetails?.code : undefined, 
                     i === (rate.legs?.length || 0) - 1 ? transferData.destinationDetails?.id : undefined
                 ),
-                transit_time: leg.transit_time,
-                charges: [] // Legs might have their own charges, but usually we attach to the option or the first leg
+                transit_time: leg.transit_time != null ? String(leg.transit_time) : undefined,
+                charges: [] as QuoteLeg['charges'] // Legs might have their own charges, but usually we attach to the option or the first leg
             })) : [{
                 sequence_number: 1,
                 transport_mode: (transferData.mode || 'ocean').toLowerCase(),
@@ -331,7 +334,7 @@ export class QuoteTransformService {
                  legs[0].charges = charges;
             }
 
-            return {
+            const option: QuoteOption = {
                 id: rate.id, // Preserve ID if possible, though new quote might generate new IDs
                 is_primary: isPrimary,
                 total_amount: rate.price ?? rate.total_amount ?? 0,
@@ -339,6 +342,7 @@ export class QuoteTransformService {
                 transit_time_days: transitDays,
                 legs: legs
             };
+            return option;
         });
     }
 
@@ -362,7 +366,7 @@ export class QuoteTransformService {
         if (!targetKey) return undefined;
 
         for (const st of serviceTypes) {
-            const tm = (st as any).transport_modes;
+            const tm = st.transport_modes;
             const codeKey = normalizeModeKey(tm?.code);
             if (codeKey && codeKey === targetKey) {
                 return st.id;

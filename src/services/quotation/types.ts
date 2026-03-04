@@ -4,7 +4,7 @@ export interface RequestContext {
   domainId: string; // From platform_domains
   userId?: string;
   currency: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface LineItem {
@@ -13,16 +13,16 @@ export interface LineItem {
   quantity: number;
   unit?: string;
   // Dynamic attributes for domain-specific data (e.g., weight/volume for logistics, loan amount/term for banking)
-  attributes: Record<string, any>; 
+  attributes: Record<string, unknown>; 
 }
 
 export interface QuoteResult {
   quoteId?: string;
   totalAmount: number;
   currency: string;
-  breakdown: Record<string, any>; // Flexible structure for domain-specific breakdown
+  breakdown: Record<string, unknown>; // Flexible structure for domain-specific breakdown
   validUntil?: Date;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface ValidationResult {

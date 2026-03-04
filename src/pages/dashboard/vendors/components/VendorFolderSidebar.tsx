@@ -1,10 +1,18 @@
 import { Button } from '@/components/ui/button';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Folder, MoreVertical, Pencil, Trash2, Plus, Edit, Trash } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
-import { Edit, Folder, Plus, Trash } from 'lucide-react';
+import { VendorFolder } from '@/types/vendor';
 
 interface VendorFolderSidebarProps {
-  folders: any[];
+  folders: VendorFolder[];
   currentFolder: string;
   onSelectFolder: (folderName: string) => void;
   onCreateFolder: () => void;

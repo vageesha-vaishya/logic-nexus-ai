@@ -50,7 +50,7 @@ const filterFields: FilterField[] = [
   },
 ];
 
-const RenderWithState = (args: any) => {
+const RenderWithState = (args: React.ComponentProps<typeof AdvancedFilter>) => {
   const [presets, setPresets] = useState([
     { 
       id: 'p1', 

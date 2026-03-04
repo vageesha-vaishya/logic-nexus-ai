@@ -152,7 +152,7 @@ export const generateCreateTableStatement = (
 /**
  * Resolves column type for CREATE TABLE statements
  */
-const resolveColumnType = (col: any): string => {
+const resolveColumnType = (col: { data_type?: string; udt_name?: string; character_maximum_length?: number }): string => {
   const rawType = (col.data_type || '').toString();
   const dt = rawType.toUpperCase();
   const udt = (col.udt_name || '').toString();
@@ -185,7 +185,7 @@ export const generateInsertStatements = (
   schemaName: string,
   tableName: string,
   columns: string[],
-  rows: any[],
+  rows: Record<string, unknown>[],
   typeMap: Record<string, string>
 ): string => {
   if (rows.length === 0) return '';
@@ -227,7 +227,7 @@ export const generateCopyStatements = (
   schemaName: string,
   tableName: string,
   columns: string[],
-  rows: any[],
+  rows: Record<string, unknown>[],
   typeMap: Record<string, string>
 ): string => {
   if (rows.length === 0) return '';
@@ -268,7 +268,7 @@ export const generateConstraintStatements = (
   if (constraints.length === 0) return '';
   
   // Helper to resolve schema (fallback to public if missing/undefined)
-  const resolveSchema = (s: any) => {
+  const resolveSchema = (s: unknown) => {
     const str = String(s || '').trim();
     if (!str || str === 'undefined' || str === 'null') return 'public';
     return str;

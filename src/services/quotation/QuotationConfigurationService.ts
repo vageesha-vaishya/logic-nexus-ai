@@ -5,13 +5,13 @@ export interface QuotationConfiguration {
   tenant_id: string;
   default_module: 'composer' | 'legacy' | 'smart';
   smart_mode_enabled: boolean;
-  smart_mode_settings: Record<string, any>;
+  smart_mode_settings: Record<string, unknown>;
   multi_option_enabled: boolean;
   auto_ranking_criteria: Record<string, number>;
 }
 
 export class QuotationConfigurationService {
-  constructor(private db: any) {}
+  constructor(private db: SupabaseClient) {}
 
   /**
    * Get the quotation configuration for the current tenant.

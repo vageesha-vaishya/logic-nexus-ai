@@ -33,12 +33,13 @@ export class PortsService {
       }
 
       const rows = Array.isArray(data) ? data : [];
-      const active = rows.filter((p: any) => p.is_active !== false);
+      const active = rows.filter((p: PortLocation) => p.is_active !== false);
 
       console.log(`[PortsService] Fetched ${active.length} ports.`);
-      return active as any[];
-    } catch (e: any) {
-      console.error('[PortsService] Exception during ports fetch:', e?.message || e);
+      return active;
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : String(e);
+      console.error('[PortsService] Exception during ports fetch:', message);
       return [];
     }
   }
@@ -66,7 +67,9 @@ export class PortsService {
    */
   async createPort(port: PortLocationInsert): Promise<PortLocation> {
     // Ensure no scoping fields are set
-    const { tenant_id, franchise_id, ...cleanPort } = port as any;
+    const { ...cleanPort } = port;
+    if ('tenant_id' in cleanPort) delete (cleanPort as Record<string, unknown>)['tenant_id'];
+    if ('franchise_id' in cleanPort) delete (cleanPort as Record<string, unknown>)['franchise_id'];
     
     const { data, error } = await this.db.from('ports_locations', true)
       .insert(cleanPort)
@@ -86,7 +89,9 @@ export class PortsService {
    */
   async updatePort(id: string, updates: PortLocationUpdate): Promise<PortLocation> {
     // Ensure no scoping fields are set
-    const { tenant_id, franchise_id, ...cleanUpdates } = updates as any;
+    const { ...cleanUpdates } = updates;
+    if ('tenant_id' in cleanUpdates) delete (cleanUpdates as Record<string, unknown>)['tenant_id'];
+    if ('franchise_id' in cleanUpdates) delete (cleanUpdates as Record<string, unknown>)['franchise_id'];
 
     const { data, error } = await this.db.from('ports_locations', true)
       .update(cleanUpdates)

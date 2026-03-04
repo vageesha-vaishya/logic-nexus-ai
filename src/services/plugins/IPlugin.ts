@@ -33,8 +33,8 @@ export interface FormField {
   type: 'text' | 'number' | 'select' | 'date' | 'checkbox' | 'complex' | 'location';
   label: string;
   required?: boolean;
-  options?: { label: string; value: any }[]; // For select
-  defaultValue?: any;
-  validation?: any; // Zod schema or similar
+  options?: { label: string; value: unknown }[]; // For select
+  defaultValue?: unknown;
+  validation?: unknown; // Zod schema or similar
   hidden?: boolean;
 }

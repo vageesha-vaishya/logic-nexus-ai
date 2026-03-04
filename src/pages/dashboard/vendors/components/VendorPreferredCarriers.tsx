@@ -27,11 +27,13 @@ export function VendorPreferredCarriers({ vendorId }: VendorPreferredCarriersPro
         setLoading(true);
         // Using any cast for RPC as types might be outdated
         const { data, error } = await supabase.rpc('get_vendor_preferred_carriers', {
-          p_vendor_id: vendorId
-        } as any);
+        p_vendor_id: vendorId
+      });
 
-        if (error) throw error;
-        setCarriers((data as any) || []);
+      if (error) throw error;
+      
+      // Use type assertion compatible with the expected data structure
+      setCarriers((data as unknown as PreferredCarrier[]) || []);
       } catch (err) {
         console.error('Failed to fetch preferred carriers:', err);
       } finally {

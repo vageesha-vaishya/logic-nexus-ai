@@ -12,7 +12,7 @@ import { mockLeads, mockUsers } from './mock-data';
 import { Lead } from '@/pages/dashboard/leads-data';
 
 // Component Implementation for the Story
-const ProfileHeader = ({ lead, user }: { lead: Lead; user: any }) => {
+const ProfileHeader = ({ lead, user }: { lead: Lead; user: { name: string; avatar: string } | null }) => {
   const initials = `${lead.first_name[0]}${lead.last_name[0]}`;
   const statusColor = 
     lead.status === 'won' ? 'bg-green-100 text-green-700 border-green-200' :

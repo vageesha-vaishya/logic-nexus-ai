@@ -23,7 +23,7 @@ import { LocationAutocomplete } from '@/components/common/LocationAutocomplete';
 interface LegsConfigurationStepProps {}
 
 
-export function LegsConfigurationStep({}: LegsConfigurationStepProps) {
+export function LegsConfigurationStep() {
   const { state, dispatch } = useQuoteStore();
   const { legs, validationErrors, referenceData, options, optionId } = state;
   const { serviceTypes = [], carriers = [], serviceLegCategories: serviceCategories = [], ports = [] } = referenceData || {};

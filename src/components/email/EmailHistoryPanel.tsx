@@ -61,7 +61,7 @@ export function EmailHistoryPanel({ emailAddress, entityType, entityId, tenantId
       const jsonFilter = JSON.stringify([targetEmail]);
       const jsonFilterObj = JSON.stringify([{ email: targetEmail }]);
 
-      let query = supabase
+      const query = supabase
         .from("emails")
         .select("*")
         .or([

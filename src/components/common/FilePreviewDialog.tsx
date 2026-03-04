@@ -20,19 +20,20 @@ export function FilePreviewDialog({ open, onOpenChange, file }: FilePreviewDialo
   const [content, setContent] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  if (!file) return null;
+  const fileUrl = file?.url ?? null;
+  const fileMimeType = file?.mimeType;
 
-  const isImage = file.mimeType?.startsWith('image/') || file.url?.match(/\.(jpg|jpeg|png|gif|webp)$/i);
-  const isPdf = file.mimeType === 'application/pdf' || file.url?.match(/\.pdf$/i);
-  const isAudio = file.mimeType?.startsWith('audio/') || file.url?.match(/\.(mp3|wav|ogg)$/i);
-  const isVideo = file.mimeType?.startsWith('video/') || file.url?.match(/\.(mp4|webm|mov)$/i);
-  const isText = file.mimeType?.startsWith('text/') || file.mimeType === 'application/json' || file.url?.match(/\.(txt|json|csv|md|log)$/i);
+  const isImage = fileMimeType?.startsWith('image/') || fileUrl?.match(/\.(jpg|jpeg|png|gif|webp)$/i);
+  const isPdf = fileMimeType === 'application/pdf' || fileUrl?.match(/\.pdf$/i);
+  const isAudio = fileMimeType?.startsWith('audio/') || fileUrl?.match(/\.(mp3|wav|ogg)$/i);
+  const isVideo = fileMimeType?.startsWith('video/') || fileUrl?.match(/\.(mp4|webm|mov)$/i);
+  const isText = fileMimeType?.startsWith('text/') || fileMimeType === 'application/json' || fileUrl?.match(/\.(txt|json|csv|md|log)$/i);
 
   // Attempt to fetch text content for small text files
   useEffect(() => {
-    if (open && isText && file.url) {
+    if (open && isText && fileUrl) {
       setLoading(true);
-      fetch(file.url)
+      fetch(fileUrl)
         .then(res => {
             if (res.ok) return res.text();
             throw new Error('Failed to fetch');
@@ -43,7 +44,9 @@ export function FilePreviewDialog({ open, onOpenChange, file }: FilePreviewDialo
     } else {
       setContent(null);
     }
-  }, [open, file.url, isText]);
+  }, [open, fileUrl, isText]);
+
+  if (!file) return null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

@@ -26,7 +26,15 @@ export class LogisticsQuotationEngine implements IQuotationEngine {
     const currency = context.currency || 'USD';
 
     let totalFreight = 0;
-    const itemBreakdowns: any[] = [];
+    interface ItemBreakdown {
+      description: string;
+      quantity: number;
+      chargeableWeight: number;
+      rate: number;
+      total: number;
+      unit: string;
+    }
+    const itemBreakdowns: ItemBreakdown[] = [];
 
     // 2. Process Line Items
     for (const item of items) {
@@ -67,29 +75,32 @@ export class LogisticsQuotationEngine implements IQuotationEngine {
       } else {
           // Standard Weight/Volume Calculation (LCL/Breakbulk)
           switch (mode.toLowerCase()) {
-            case 'air':
+            case 'air': {
               // Standard Air conversion: 1 CBM = 167 KG
               const volumetricWeightAir = volume * 167;
               chargeableWeight = Math.max(weight, volumetricWeightAir);
               ratePerUnit = 2.50; // Mock Rate per KG
               unit = 'kg';
               break;
-            case 'road':
+            }
+            case 'road': {
               // Standard Road conversion: 1 CBM = 333 KG
               const volumetricWeightRoad = volume * 333;
               chargeableWeight = Math.max(weight, volumetricWeightRoad);
               ratePerUnit = 0.80; // Mock Rate per KG
               unit = 'kg';
               break;
-            case 'rail':
+            }
+            case 'rail': {
               // Standard Rail conversion: 1 CBM = 500 KG
               const volumetricWeightRail = volume * 500;
               chargeableWeight = Math.max(weight, volumetricWeightRail);
               ratePerUnit = 0.60; // Mock Rate per KG (typically cheaper than road)
               unit = 'kg';
               break;
+            }
             case 'ocean':
-            default:
+            default: {
               // Ocean: 1 CBM = 1 Ton (1000 KG)
               // Revenue Ton (w/m)
               const weightInTons = weight / 1000;
@@ -97,6 +108,7 @@ export class LogisticsQuotationEngine implements IQuotationEngine {
               ratePerUnit = 150.00; // Mock Rate per w/m (CBM/Ton)
               unit = 'w/m';
               break;
+            }
           }
 
           const totalLineWeight = chargeableWeight * quantity;
@@ -179,7 +191,7 @@ export class LogisticsQuotationEngine implements IQuotationEngine {
       }
       
       // Logistics specific validation
-      if ((!item.attributes?.weight || item.attributes.weight <= 0) && (!item.attributes?.volume || item.attributes.volume <= 0)) {
+      if ((!item.attributes?.weight || Number(item.attributes.weight) <= 0) && (!item.attributes?.volume || Number(item.attributes.volume) <= 0)) {
            errors.push({
             code: 'MISSING_DIMENSIONS',
             message: `Item at index ${index} must have weight or volume specified.`,

@@ -65,7 +65,9 @@ export default function ContactDetail() {
     try {
       const { data } = await scopedDb.from('segment_members' as any).select('segment:segment_id(id, name)').eq('entity_id', contactId);
       if (data) setActiveSegments(data.map((d: any) => d.segment));
-    } catch (e) {}
+    } catch (e) {
+      // ignore
+    }
   };
 
   const handleUpdate = async (formData: any) => {

@@ -22,7 +22,7 @@ export interface WidgetInstance {
   title: string;
   size: WidgetSize;
   position: number;
-  settings?: Record<string, any>;
+  settings?: Record<string, unknown>;
 }
 
 export interface DashboardTemplate {

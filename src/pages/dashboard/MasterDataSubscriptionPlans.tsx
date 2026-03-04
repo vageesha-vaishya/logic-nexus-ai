@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -29,13 +29,13 @@ interface SubscriptionPlan {
   price_quarterly: number | null;
   price_annual: number | null;
   currency: string;
-  features: any;
-  limits: any;
+  features: Record<string, unknown>;
+  limits: Record<string, unknown>;
   trial_period_days: number | null;
   deployment_model: string | null;
   supported_currencies: string[] | null;
   supported_languages: string[] | null;
-  metadata: any;
+  metadata: Record<string, unknown>;
   is_active: boolean;
   user_scaling_factor: number;
   min_users: number;
@@ -78,14 +78,7 @@ export default function MasterDataSubscriptionPlans() {
   const [previewUsers, setPreviewUsers] = useState<number>(10);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    if (!context.isPlatformAdmin) {
-      return;
-    }
-    loadPlans();
-  }, [context.isPlatformAdmin]);
-
-  const loadPlans = async () => {
+  const loadPlans = useCallback(async () => {
     setLoading(true);
     try {
       const { data, error } = await scopedDb
@@ -94,12 +87,20 @@ export default function MasterDataSubscriptionPlans() {
         .order('sort_order', { ascending: true });
       if (error) throw error;
       setPlans((data || []) as SubscriptionPlan[]);
-    } catch (err: any) {
-      toast({ title: 'Load failed', description: err?.message || 'Error loading subscription plans', variant: 'destructive' });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Error loading subscription plans';
+      toast({ title: 'Load failed', description: message, variant: 'destructive' });
     } finally {
       setLoading(false);
     }
-  };
+  }, [scopedDb, toast]);
+
+  useEffect(() => {
+    if (!context.isPlatformAdmin) {
+      return;
+    }
+    loadPlans();
+  }, [context.isPlatformAdmin, loadPlans]);
 
   const openCreate = () => {
     setEditingPlan(null);
@@ -177,7 +178,7 @@ export default function MasterDataSubscriptionPlans() {
           .select('id')
           .single();
         if (error) throw error;
-        const createdId = (data as any)?.id;
+        const createdId = (data as { id: string })?.id;
         if (createdId) {
           await scopedDb.from('audit_logs').insert({
             action: 'create',
@@ -190,8 +191,9 @@ export default function MasterDataSubscriptionPlans() {
       }
       setShowEdit(false);
       loadPlans();
-    } catch (err: any) {
-      toast({ title: 'Save failed', description: err?.message || 'Error saving plan', variant: 'destructive' });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Error saving plan';
+      toast({ title: 'Save failed', description: message, variant: 'destructive' });
     } finally {
       setSaving(false);
     }
@@ -212,8 +214,9 @@ export default function MasterDataSubscriptionPlans() {
       });
       toast({ title: 'Plan deleted' });
       loadPlans();
-    } catch (err: any) {
-      toast({ title: 'Delete failed', description: err?.message || 'Error deleting plan', variant: 'destructive' });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Error deleting plan';
+      toast({ title: 'Delete failed', description: message, variant: 'destructive' });
     }
   };
 
@@ -661,7 +664,7 @@ export default function MasterDataSubscriptionPlans() {
                   </div>
                   <div className="flex-1">
                     {(() => {
-                      const result = calculateScaledPrice(planForm as any, previewUsers);
+                      const result = calculateScaledPrice(planForm as SubscriptionPlan, previewUsers);
                       return (
                         <div className={`text-sm ${result.valid ? '' : 'text-destructive'}`}>
                           {result.valid ? (
@@ -697,7 +700,8 @@ export default function MasterDataSubscriptionPlans() {
                     try {
                       const parsed = JSON.parse(e.target.value || '{}');
                       setPlanForm({ ...planForm, features: parsed });
-                    } catch {
+                    } catch (err) {
+                      // ignore
                     }
                   }}
                 />
@@ -713,7 +717,8 @@ export default function MasterDataSubscriptionPlans() {
                     try {
                       const parsed = JSON.parse(e.target.value || '{}');
                       setPlanForm({ ...planForm, limits: parsed });
-                    } catch {
+                    } catch (err) {
+                      // ignore
                     }
                   }}
                 />
@@ -729,7 +734,8 @@ export default function MasterDataSubscriptionPlans() {
                     try {
                       const parsed = JSON.parse(e.target.value || '{}');
                       setPlanForm({ ...planForm, metadata: parsed });
-                    } catch {
+                    } catch (err) {
+                      // ignore
                     }
                   }}
                 />

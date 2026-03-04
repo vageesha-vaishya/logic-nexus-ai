@@ -36,12 +36,14 @@ const moveSchema = z.object({
 
 type MoveFormValues = z.infer<typeof moveSchema>;
 
+import { VendorFolder } from '@/types/vendor';
+
 interface VendorMoveDocumentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   vendorId: string;
   documentIds: string[];
-  folders: any[];
+  folders: VendorFolder[];
   onSuccess: () => void;
 }
 
@@ -97,9 +99,9 @@ export function VendorMoveDocumentDialog({
       form.reset();
       onSuccess();
       onOpenChange(false);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error moving documents:', error);
-      toast.error(error.message || 'Failed to move documents');
+      toast.error((error as Error).message || 'Failed to move documents');
     } finally {
       setLoading(false);
     }

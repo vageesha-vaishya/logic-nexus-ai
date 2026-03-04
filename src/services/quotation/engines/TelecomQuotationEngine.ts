@@ -25,10 +25,12 @@ export class TelecomQuotationEngine implements IQuotationEngine {
   async calculate(context: RequestContext, items: LineItem[]): Promise<QuoteResult> {
     this.debug.info('Calculating quote...');
     let total = 0;
-    const breakdown: any[] = [];
+    const breakdownItems: Record<string, unknown>[] = [];
 
     for (const item of items) {
-      const { service_type, bandwidth, contract_duration } = item.attributes;
+      const service_type = item.attributes.service_type as string;
+      const bandwidth = item.attributes.bandwidth as string;
+      const contract_duration = item.attributes.contract_duration;
       
       const baseRate = this.baseRates[service_type] || 50;
       const multiplier = this.bandwidthMultipliers[bandwidth] || 1;
@@ -38,7 +40,7 @@ export class TelecomQuotationEngine implements IQuotationEngine {
       const itemTotal = monthlyCost * duration;
 
       total += itemTotal;
-      breakdown.push({
+      breakdownItems.push({
         description: item.description || `${service_type} ${bandwidth}`,
         monthly_cost: monthlyCost,
         duration_months: duration,
@@ -49,7 +51,7 @@ export class TelecomQuotationEngine implements IQuotationEngine {
     return {
       totalAmount: total,
       currency: context.currency || 'USD',
-      breakdown: breakdown,
+      breakdown: { items: breakdownItems },
       metadata: {
         engine: 'TelecomQuotationEngine',
         timestamp: new Date().toISOString()

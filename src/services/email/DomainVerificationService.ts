@@ -12,7 +12,7 @@ export interface TenantDomain {
   dkim_verified: boolean;
   dmarc_record?: string;
   dmarc_verified: boolean;
-  provider_metadata?: any;
+  provider_metadata?: Record<string, unknown>;
   created_at: string;
   updated_at: string;
 }
@@ -34,19 +34,20 @@ export const DomainVerificationService = {
    * Fetch all domains for the current tenant scope
    */
   async getDomains(): Promise<TenantDomain[]> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data, error } = await (supabase as any)
       .from('tenant_domains')
       .select('*')
       .order('domain_name');
 
     if (error) throw error;
-    return data || [];
+    return (data || []) as TenantDomain[];
   },
 
   /**
    * Add a new domain via Edge Function (handles provider registration)
    */
-  async addDomain(domainName: string, tenantId: string): Promise<{ domain: TenantDomain; dkim_tokens: string[]; instructions: any }> {
+  async addDomain(domainName: string, tenantId: string): Promise<{ domain: TenantDomain; dkim_tokens: string[]; instructions: Record<string, unknown> }> {
     const { data, error } = await invokeFunction('domains-register', {
       body: { domain_name: domainName, tenant_id: tenantId }
     });
@@ -55,13 +56,14 @@ export const DomainVerificationService = {
     // invokeFunction returns { data: T, error: any }, so data contains the success/error payload
     if (data?.error) throw new Error(data.error);
     
-    return data;
+    return data as { domain: TenantDomain; dkim_tokens: string[]; instructions: Record<string, unknown> };
   },
 
   /**
    * Delete a domain
    */
   async deleteDomain(id: string): Promise<void> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await (supabase as any)
       .from('tenant_domains')
       .delete()

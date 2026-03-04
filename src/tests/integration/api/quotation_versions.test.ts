@@ -1,5 +1,17 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, Mock } from 'vitest';
 import { createMocks } from 'node-mocks-http';
+
+// Mock Supabase client
+vi.mock('@supabase/supabase-js', () => ({
+  createClient: vi.fn(() => ({
+    from: vi.fn().mockReturnThis(),
+    select: vi.fn().mockReturnThis(),
+    insert: vi.fn().mockReturnThis(),
+    update: vi.fn().mockReturnThis(),
+    delete: vi.fn().mockReturnThis(),
+  })),
+}));
+
 import handler from '../../../pages/api/v1/quotations/[id]/versions';
 import { QuotationVersionService } from '@/services/quotation/QuotationVersionService';
 
@@ -18,8 +30,7 @@ describe('API: /quotations/[id]/versions', () => {
     });
 
     const mockVersions = [{ id: 'v1', version_number: 1 }];
-    // @ts-ignore
-    QuotationVersionService.prototype.listVersions.mockResolvedValue({ data: mockVersions, count: 1 });
+    (QuotationVersionService.prototype.listVersions as Mock).mockResolvedValue({ data: mockVersions, count: 1 });
 
     await handler(req, res);
 
@@ -43,8 +54,7 @@ describe('API: /quotations/[id]/versions', () => {
     });
 
     const mockVersion = { id: 'v2', version_number: 2 };
-    // @ts-ignore
-    QuotationVersionService.prototype.saveVersion.mockResolvedValue(mockVersion);
+    (QuotationVersionService.prototype.saveVersion as Mock).mockResolvedValue(mockVersion);
 
     await handler(req, res);
 
@@ -62,9 +72,9 @@ describe('API: /quotations/[id]/versions', () => {
       body: { versionId: 'v1' },
       headers: { 'x-user-id': 'u1' }
     });
-
-    // @ts-ignore
-    QuotationVersionService.prototype.deleteVersion.mockResolvedValue(true);
+    
+    // @ts-ignore: Mocking method on prototype for testing purposes
+    (QuotationVersionService.prototype.deleteVersion as Mock).mockResolvedValue(true);
 
     await handler(req, res);
 

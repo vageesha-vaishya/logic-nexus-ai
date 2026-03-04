@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -65,9 +65,9 @@ export function ContractManagementDialog({ open, onOpenChange, contract, vendor,
       fetchClauses();
       setSignatureStatus(contract.signature_status || 'pending');
     }
-  }, [open, contract]);
+  }, [open, contract, fetchComments, fetchClauses]);
 
-  const fetchComments = async () => {
+  const fetchComments = useCallback(async () => {
     if (!contract) return;
     try {
       const { data, error } = await supabase
@@ -81,7 +81,7 @@ export function ContractManagementDialog({ open, onOpenChange, contract, vendor,
 
       if (error) throw error;
       
-      const formattedComments = data.map((c: any) => ({
+      const formattedComments = data.map((c) => ({
         ...c,
         user_email: c.user?.email
       }));
@@ -90,9 +90,9 @@ export function ContractManagementDialog({ open, onOpenChange, contract, vendor,
     } catch (error) {
       console.error('Error fetching comments:', error);
     }
-  };
+  }, [contract, supabase]);
 
-  const fetchClauses = async () => {
+  const fetchClauses = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('contract_clauses')
@@ -104,7 +104,7 @@ export function ContractManagementDialog({ open, onOpenChange, contract, vendor,
     } catch (error) {
       console.error('Error fetching clauses:', error);
     }
-  };
+  }, [supabase]);
 
   const handleSendComment = async () => {
     if (!newComment.trim() || !contract) return;
@@ -167,7 +167,7 @@ export function ContractManagementDialog({ open, onOpenChange, contract, vendor,
     if (!contract || !vendor) return;
     setLoading(true);
     try {
-      await eSignatureService.simulateSigning(contract.id, vendor.primary_contact || vendor.name);
+      await eSignatureService.simulateSigning(contract.id, vendor.contact_info.primary_contact || vendor.name);
       setSignatureStatus('signed');
       toast.success('Contract signed successfully (Simulation)');
       onUpdate();

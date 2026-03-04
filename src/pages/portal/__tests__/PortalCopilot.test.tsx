@@ -11,7 +11,7 @@ describe("PortalCopilot", () => {
     vi.spyOn(global, "fetch").mockResolvedValueOnce({
       ok: true,
       json: async () => ({ ok: true, answer: "This is a test answer.", actions: [] }),
-    } as any);
+    } as unknown as Response);
 
     render(<PortalCopilot token="test-token" />);
 

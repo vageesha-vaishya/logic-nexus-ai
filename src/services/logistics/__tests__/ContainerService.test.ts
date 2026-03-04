@@ -1,8 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ContainerService } from '../ContainerService';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import type { ContainerConfiguration } from '@/types/container';
 
 describe('ContainerService', () => {
-  let mockDb: any;
+  let mockDb: {
+    from: ReturnType<typeof vi.fn>;
+    select: ReturnType<typeof vi.fn>;
+    eq: ReturnType<typeof vi.fn>;
+    single: ReturnType<typeof vi.fn>;
+  };
   let service: ContainerService;
 
   beforeEach(() => {
@@ -50,10 +57,10 @@ describe('ContainerService', () => {
       // We need to bypass the cache for this test to ensure it calls DB
       // Access private property or just assume first run.
       // TypeScript might complain about private property access.
-      // @ts-ignore
+      // @ts-ignore: Accessing private property for testing
       service.containerCache = null;
 
-      const result = await service.getAllContainers(mockDb);
+      const result = await service.getAllContainers(mockDb as unknown as SupabaseClient);
 
       expect(result).toHaveLength(1);
       expect(result[0].code).toBe('20GP');
@@ -75,21 +82,35 @@ describe('ContainerService', () => {
             return { select: vi.fn() };
         });
   
-        // @ts-ignore
+        // @ts-ignore: Accessing private property for testing
         service.containerCache = null;
   
-        const result = await service.getAllContainers(mockDb);
+        const result = await service.getAllContainers(mockDb as unknown as SupabaseClient);
         expect(result).toHaveLength(1); // Should filter out t2
         expect(result[0].code).toBe('20GP');
     });
   });
 
   describe('validateCargoFit', () => {
-    const mockContainer: any = {
+    const mockContainer: ContainerConfiguration = {
+      id: 't1',
       code: '20GP',
+      name: '20ft General',
+      category: 'Standard',
       specifications: {
+        id: 's1',
+        container_type_id: 't1',
+        length_ft: 20,
+        internal_length_mm: 5898,
+        internal_width_mm: 2352,
+        internal_height_mm: 2393,
+        door_width_mm: 2340,
+        door_height_mm: 2280,
         max_payload_kg: 28000,
-        capacity_cbm: 33
+        capacity_cbm: 33,
+        tare_weight_kg: 2200,
+        is_high_cube: false,
+        is_pallet_wide: false
       }
     };
 

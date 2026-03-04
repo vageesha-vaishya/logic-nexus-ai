@@ -1,6 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, Mock } from 'vitest';
 import { AccountService } from '../../src/services/account-service';
 import { SupabaseClient } from '@supabase/supabase-js';
+import { AccountInput } from '../../src/lib/account-validation';
 
 // Mock Supabase Client
 const mockSupabase = {
@@ -34,9 +35,9 @@ describe('AccountService', () => {
     };
 
     const mockResponse = { data: { account_id: '123', status: 'success' }, error: null };
-    (mockSupabase.rpc as any).mockResolvedValue(mockResponse);
+    (mockSupabase.rpc as Mock).mockResolvedValue(mockResponse);
 
-    const result = await accountService.createOrUpdateAccount(validData, 'tenant-1');
+    const result = await accountService.createOrUpdateAccount(validData as AccountInput, 'tenant-1');
     
     // Check RPC call structure
     expect(mockSupabase.rpc).toHaveBeenCalledWith('manage_account', expect.objectContaining({
@@ -58,7 +59,7 @@ describe('AccountService', () => {
       }
     };
     
-    await expect(accountService.createOrUpdateAccount(invalidData as any, 'tenant-1'))
+    await expect(accountService.createOrUpdateAccount(invalidData as AccountInput, 'tenant-1'))
       .rejects.toThrow('Validation Failed');
   });
 
@@ -68,16 +69,16 @@ describe('AccountService', () => {
       tax_id: 'US123456789',
     };
 
-    (mockSupabase.rpc as any).mockResolvedValue({
+    (mockSupabase.rpc as Mock).mockResolvedValue({
       data: null,
       error: { message: 'Duplicate Account detected with Tax ID: US123456789' }
     });
     
     // We expect the service to wrap/throw this error
     try {
-        await accountService.createOrUpdateAccount(validData as any, 'tenant-1');
-    } catch (e: any) {
-        expect(e.message).toContain('Conflict');
+        await accountService.createOrUpdateAccount(validData as AccountInput, 'tenant-1');
+    } catch (e) {
+        expect((e as Error).message).toContain('Conflict');
     }
   });
 });

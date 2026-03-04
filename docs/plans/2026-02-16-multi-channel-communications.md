@@ -1,6 +1,10 @@
+---
+title: Multi-Channel Communications Expansion Plan
+---
 
+# Multi-Channel Communications Expansion Plan (WhatsApp, X, Telegram, LinkedIn, Web, etc.)
 
-Highlights
+## Highlights
 
 - Benchmarks against Salesforce, HubSpot, Zoho CRM, Freshsales, and Pipedrive.
 - Detailed gaps vs. current app and how to extend it without breaking email features.
@@ -8,18 +12,15 @@ Highlights
 - Strict tenant/franchise RLS policies and webhook security measures.
 - Agentic AI for triage, suggested replies, summaries, automation, and compliance.
 - Phase-wise roadmap with risks, mitigations, KPIs, and deliverables.
-Relevant References
+
+## Relevant References
 
 - Email routing rules UI: QueueRulesManager.tsx
 - Inbox and detail: EmailInbox.tsx , EmailDetailView.tsx
 - Queue management: QueueManagement.tsx
 - RLS and routing migrations: supabase/migrations
+
 If you want, I can begin Phase 1 by adding the schema migrations and a generalized routing trigger for messages, then scaffold the “Communications Hub” UI to coexist with the current Email Management without disruptions.
-
-
-
-
-# Multi-Channel Communications Expansion Plan (WhatsApp, X, Telegram, LinkedIn, Web, etc.)
 
 ## 1. Executive Summary
 

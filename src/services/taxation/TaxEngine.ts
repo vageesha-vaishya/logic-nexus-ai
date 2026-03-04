@@ -82,12 +82,16 @@ export class TaxEngine {
 
       // If item has a specific tax code, check for overrides
       if (item.taxCode) {
+        // Find rule where tax_code_id is not null and matches
+        // Note: Supabase response for related tables can be array or object depending on relationship (one-to-one or one-to-many)
         const specificRule = rules?.find(r => {
-          // tax_codes is returned as an array by Supabase client for this relationship
-          const taxCodes = r.tax_codes as any;
-          const code = Array.isArray(taxCodes) ? taxCodes[0]?.code : taxCodes?.code;
+          const taxCodes = r.tax_codes as unknown as { code: string } | { code: string }[];
+          if (!taxCodes) return false;
+          
+          const code = Array.isArray(taxCodes) ? taxCodes[0]?.code : taxCodes.code;
           return code === item.taxCode;
         });
+        
         if (specificRule) {
           applicableRate = Number(specificRule.rate);
         }
@@ -143,6 +147,11 @@ export class TaxEngine {
     }
 
     // Map the nested result to just the jurisdiction codes
-    return (data || []).map((item: any) => item.tax_jurisdictions?.code).filter(Boolean);
+    return (data || []).map((item) => {
+      // Supabase returns related data as object or array depending on relationship
+      const jurisdiction = item.tax_jurisdictions as unknown as { code: string } | { code: string }[];
+      if (Array.isArray(jurisdiction)) return jurisdiction[0]?.code;
+      return jurisdiction?.code;
+    }).filter((code): code is string => Boolean(code));
   }
 }

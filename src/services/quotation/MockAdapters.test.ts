@@ -13,14 +13,14 @@ vi.mock('../DomainService', () => ({
 
 describe('Mock Adapters Integration (Multi-Tenancy)', () => {
   const mockDomains = [
-    { id: 'domain-logistics', code: 'LOGISTICS', name: 'Logistics' },
-    { id: 'domain-banking', code: 'BANKING', name: 'Banking' },
-    { id: 'domain-telecom', code: 'TELECOM', name: 'Telecom' },
+    { id: 'domain-logistics', code: 'LOGISTICS', name: 'Logistics', description: 'Logistics Domain', is_active: true },
+    { id: 'domain-banking', code: 'BANKING', name: 'Banking', description: 'Banking Domain', is_active: true },
+    { id: 'domain-telecom', code: 'TELECOM', name: 'Telecom', description: 'Telecom Domain', is_active: true },
   ];
 
   beforeEach(() => {
     vi.clearAllMocks();
-    (DomainService.getAllDomains as any).mockResolvedValue(mockDomains);
+    vi.mocked(DomainService.getAllDomains).mockResolvedValue(mockDomains);
   });
 
   describe('Banking Adapter', () => {
@@ -43,9 +43,10 @@ describe('Mock Adapters Integration (Multi-Tenancy)', () => {
       const result = await CoreQuoteService.calculate(context, items);
 
       expect(result.currency).toBe('USD');
-      expect(result.breakdown.offers).toHaveLength(1);
+      const breakdown = result.breakdown as { offers: { status: string; amount: number }[] };
+      expect(breakdown.offers).toHaveLength(1);
       
-      const offer = result.breakdown.offers[0];
+      const offer = breakdown.offers[0];
       expect(offer.status).toBeDefined();
       expect(offer.amount).toBe(25000);
       
@@ -73,7 +74,8 @@ describe('Mock Adapters Integration (Multi-Tenancy)', () => {
       ];
 
       const result = await CoreQuoteService.calculate(context, items);
-      const offer = result.breakdown.offers[0];
+      const breakdown = result.breakdown as { offers: { status: string }[] };
+      const offer = breakdown.offers[0];
       expect(offer.status).toBe('REJECTED');
     });
   });
@@ -122,8 +124,9 @@ describe('Mock Adapters Integration (Multi-Tenancy)', () => {
       ];
 
       const result = await CoreQuoteService.calculate(context, items);
+      const breakdown = result.breakdown as { plans: { error?: string }[] };
 
-      expect(result.breakdown.plans[0].error).toBeDefined();
+      expect(breakdown.plans[0].error).toBeDefined();
     });
   });
 });

@@ -31,7 +31,7 @@ export class Office365Provider implements IEmailProvider {
     ];
   }
 
-  async validateConfig(config: any): Promise<{ isValid: boolean; error?: string }> {
+  async validateConfig(config: Record<string, unknown>): Promise<{ isValid: boolean; error?: string }> {
     return { isValid: true };
   }
 }

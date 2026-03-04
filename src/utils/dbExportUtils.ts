@@ -55,7 +55,7 @@ export const validateSQL = (sql: string, context: string, validateReservedWords:
 
 export const escapeStr = (s: string) => s.replace(/'/g, "''");
 
-export const formatArray = (arr: any[], baseType?: string): string => {
+export const formatArray = (arr: unknown[], baseType?: string): string => {
     const numericTypes = ["integer", "bigint", "smallint", "numeric", "real", "double precision"];
     const items = arr.map((v) => {
         if (v === null) return "NULL";
@@ -68,7 +68,7 @@ export const formatArray = (arr: any[], baseType?: string): string => {
     return baseType ? `'${literal}'::${baseType}[]` : `'${literal}'`;
 };
 
-export const formatValue = (value: any, dataType?: string) => {
+export const formatValue = (value: unknown, dataType?: string) => {
     if (value === undefined || value === null) return "NULL";
     
     if (dataType === "json" || dataType === "jsonb") {
@@ -93,7 +93,7 @@ export const formatValue = (value: any, dataType?: string) => {
     return `'${escapeStr(String(value))}'`;
 };
 
-export const resolveDataTypeForValue = (col: any) => {
+export const resolveDataTypeForValue = (col: { data_type?: string; udt_name?: string }) => {
     const dt = (col.data_type || '').toString();
     const udt = (col.udt_name || '').toString();
     if (dt.toUpperCase() === 'ARRAY' && udt) {
@@ -182,8 +182,8 @@ export interface DetailedProgress {
  * @param columns Array of column definitions
  * @returns Hash string of the schema signature
  */
-export const calculateSchemaSignature = (columns: any[]) => {
-  const sorted = [...columns].sort((a, b) => a.column_name.localeCompare(b.column_name));
+export const calculateSchemaSignature = (columns: Record<string, unknown>[]) => {
+  const sorted = [...columns].sort((a, b) => (a.column_name as string).localeCompare(b.column_name as string));
   const signatureString = sorted.map(c => 
       `${c.column_name}:${c.data_type}:${c.is_nullable === true || c.is_nullable === 'YES'}:${c.is_primary_key}`
   ).join('|');
@@ -198,7 +198,7 @@ export const calculateSchemaSignature = (columns: any[]) => {
  * - Truncates strings to 10000 chars
  * @param value The value to sanitize
  */
-export const sanitizeValue = (value: any): any => {
+export const sanitizeValue = (value: unknown): unknown => {
     if (value === undefined || value === null) {
         return null;
     }

@@ -53,7 +53,7 @@ export interface RateOption {
     transitTime: string;
     tier: 'contract' | 'spot' | 'market' | 'best_value' | 'cheapest' | 'fastest' | 'greenest' | 'reliable' | string;
     legs?: TransportLeg[]; // More specific type than any[]
-    price_breakdown?: any;
+    price_breakdown?: Record<string, unknown>;
     reliability?: { score: number; on_time_performance: string };
     environmental?: { co2_emissions: string; rating: string };
     source_attribution?: string;
@@ -85,6 +85,6 @@ export interface RateOption {
 }
 
 // Helper to check if an object is a RateBreakdown
-export const isRateBreakdown = (obj: any): obj is RateBreakdown => {
-    return obj && Array.isArray(obj.legs) && typeof obj.total === 'number';
+export const isRateBreakdown = (obj: unknown): obj is RateBreakdown => {
+    return !!(obj && typeof obj === 'object' && 'legs' in obj && Array.isArray((obj as RateBreakdown).legs) && 'total' in obj && typeof (obj as RateBreakdown).total === 'number');
 };

@@ -44,11 +44,11 @@ export interface Vendor {
       state?: string;
       zip?: string;
       country?: string;
-      [key: string]: any;
+      [key: string]: unknown;
     };
     primary_contact?: string;
   };
-  compliance_data: Record<string, any>;
+  compliance_data: Record<string, unknown>;
   created_at: string;
   updated_at: string;
 }
