@@ -83,7 +83,8 @@ pipeline {
             steps {
                 script {
                     echo "Setting up Supabase gateway reverse proxy on VPS..."
-                    sh 'bash scripts/setup_supabase_gateway_vps.sh "$VPS_IP" "$VPS_USER" "$VPS_PASSWORD" "$GATEWAY_PORT"'
+                    sh 'npm install --no-save ssh2'
+                    sh 'node scripts/setup_supabase_gateway_vps.cjs'
                 }
             }
         }
@@ -92,7 +93,7 @@ pipeline {
             steps {
                 script {
                     echo "Building and running LogicPro web on VPS..."
-                    sh 'bash scripts/deploy_web_app_vps.sh "$VPS_IP" "$VPS_USER" "$VPS_PASSWORD" "$GATEWAY_PORT" "$APP_PORT" "$SUPABASE_ANON_KEY"'
+                    sh 'node scripts/deploy_web_app_vps.cjs'
                 }
             }
         }
