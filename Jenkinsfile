@@ -83,7 +83,7 @@ pipeline {
             steps {
                 script {
                     echo "Setting up Supabase gateway reverse proxy on VPS..."
-                    sh "bash scripts/setup_supabase_gateway_vps.sh ${env.VPS_IP} ${env.VPS_USER} ${env.VPS_PASSWORD} ${env.GATEWAY_PORT}"
+                    sh 'bash scripts/setup_supabase_gateway_vps.sh "$VPS_IP" "$VPS_USER" "$VPS_PASSWORD" "$GATEWAY_PORT"'
                 }
             }
         }
@@ -92,7 +92,7 @@ pipeline {
             steps {
                 script {
                     echo "Building and running LogicPro web on VPS..."
-                    sh "bash scripts/deploy_web_app_vps.sh ${env.VPS_IP} ${env.VPS_USER} ${env.VPS_PASSWORD} ${env.GATEWAY_PORT} ${env.APP_PORT} '${env.SUPABASE_ANON_KEY}'"
+                    sh 'bash scripts/deploy_web_app_vps.sh "$VPS_IP" "$VPS_USER" "$VPS_PASSWORD" "$GATEWAY_PORT" "$APP_PORT" "$SUPABASE_ANON_KEY"'
                 }
             }
         }
