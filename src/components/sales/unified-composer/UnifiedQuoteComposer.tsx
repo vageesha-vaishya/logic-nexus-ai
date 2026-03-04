@@ -21,6 +21,7 @@ import { PortsService } from '@/services/PortsService';
 import { RateOption } from '@/types/quote-breakdown';
 import { invokeAnonymous, enrichPayload } from '@/lib/supabase-functions';
 import { logger } from '@/lib/logger';
+import { supabase } from '@/integrations/supabase/client';
 
 import { QuoteStoreProvider, useQuoteStore } from '@/components/sales/composer/store/QuoteStore';
 import { useQuoteRepositoryContext } from '@/components/sales/quote-form/useQuoteRepository';
@@ -100,6 +101,8 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
   const [manualOptions, setManualOptions] = useState<RateOption[]>([]);
   const [deletedOptionIds, setDeletedOptionIds] = useState<string[]>([]);
   const [optionDrafts, setOptionDrafts] = useState<Record<string, any>>({});
+  const [networkStatus, setNetworkStatus] = useState<'online' | 'offline' | 'checking'>('online');
+  const [showNetworkWarning, setShowNetworkWarning] = useState(false);
 
   // Rate fetching hook
   const rateFetching = useRateFetching();
@@ -250,6 +253,105 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
       logger.warn('[UnifiedComposer] Audit log exception:', e);
     }
   }, [user?.id, quoteId, context?.tenantId, context?.franchiseId, scopedDb]);
+
+  // ---------------------------------------------------------------------------
+  // Network Connectivity Check
+  // ---------------------------------------------------------------------------
+
+  const checkNetworkConnectivity = async (): Promise<boolean> => {
+    try {
+      // Simple check: try to access Supabase REST API health endpoint
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/rest/v1/`, {
+        method: 'HEAD',
+        headers: {
+          'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          'Content-Type': 'application/json'
+        },
+        signal: AbortSignal.timeout(5000) // 5 second timeout
+      });
+      
+      return response.ok;
+    } catch (err) {
+      // Only consider it offline if it's a genuine network error
+      if (err.name === 'AbortError' || err.message?.includes('fetch')) {
+        logger.warn('[UnifiedComposer] Genuine network connectivity issue detected', err);
+        return false;
+      }
+      
+      // For other errors (permissions, etc.), assume we're online
+      return true;
+    }
+  };
+
+  const saveWithRetry = async (
+    operation: () => Promise<any>, 
+    maxRetries = 2,
+    delay = 1000
+  ): Promise<any> => {
+    for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
+      try {
+        // Check connectivity before attempting
+        const isOnline = await checkNetworkConnectivity();
+        if (!isOnline && attempt > 1) {
+          throw new Error('Network connection unavailable');
+        }
+        
+        const result = await operation();
+        return result;
+      } catch (err: any) {
+        const isNetworkError = (
+          err.message?.includes('Failed to fetch') ||
+          err.message?.includes('NetworkError') ||
+          err.message?.includes('fetch') ||
+          err.name === 'TypeError' ||
+          err.code === 'NETWORK_ERROR' ||
+          err.status === 0
+        );
+        
+        if (attempt === maxRetries + 1 || !isNetworkError) {
+          throw err;
+        }
+        
+        logger.warn(`[UnifiedComposer] Save attempt ${attempt} failed, retrying...`, err);
+        await new Promise(resolve => setTimeout(resolve, delay * attempt));
+      }
+    }
+  };
+
+  // ---------------------------------------------------------------------------
+  // Network Status Monitoring
+  // ---------------------------------------------------------------------------
+
+  useEffect(() => {
+    const checkConnection = async () => {
+      setNetworkStatus('checking');
+      const isOnline = await checkNetworkConnectivity();
+      setNetworkStatus(isOnline ? 'online' : 'offline');
+      // Don't show warning automatically - only on actual save failures
+    };
+
+    // Check on initial load
+    checkConnection();
+
+    // Set up less frequent checks (every 2 minutes instead of 30 seconds)
+    const interval = setInterval(checkConnection, 120000);
+
+    // Listen for browser online/offline events
+    const handleOnline = () => {
+      setNetworkStatus('online');
+      setShowNetworkWarning(false); // Hide warning when back online
+    };
+    const handleOffline = () => setNetworkStatus('offline');
+    
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [checkNetworkConnectivity]);
 
   // ---------------------------------------------------------------------------
   // Handle Manual Option Creation
@@ -1614,8 +1716,10 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
 
       // logger.info('[UnifiedComposer] Sending save_quote_atomic payload', { payload: rpcPayload });
 
-      const { data: savedId, error: rpcError } = await scopedDb.rpc('save_quote_atomic', {
-        p_payload: rpcPayload
+      const { data: savedId, error: rpcError } = await saveWithRetry(async () => {
+        return scopedDb.rpc('save_quote_atomic', {
+          p_payload: rpcPayload
+        });
       });
 
       if (rpcError) {
@@ -1695,15 +1799,46 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
       logger.error('[UnifiedComposer] Save failed:', err);
       
       let errorMessage = err.message || 'An error occurred while saving the quotation.';
-      if (err.message?.includes('Failed to fetch') || err.name === 'TypeError') {
+      
+      // More specific network error detection
+      const isNetworkError = (
+        err.message?.includes('Failed to fetch') ||
+        err.message?.includes('NetworkError') ||
+        err.message?.includes('fetch') ||
+        err.name === 'TypeError' ||
+        err.code === 'NETWORK_ERROR' ||
+        err.status === 0 ||
+        (err instanceof TypeError && err.message.includes('fetch'))
+      );
+      
+      // Check for Supabase specific errors
+      const isSupabaseError = (
+        err.code?.startsWith('PGRST') ||
+        err.message?.includes('supabase') ||
+        err.message?.includes('JWT') ||
+        err.message?.includes('permission')
+      );
+      
+      if (isNetworkError) {
         errorMessage = 'Network connection issue. Please check your internet connection and try again.';
+        logger.warn('[UnifiedComposer] Network error detected', { error: err, message: err.message });
+        setShowNetworkWarning(true); // Show network warning only on actual network errors
+      } else if (isSupabaseError) {
+        errorMessage = 'Database connection error. Please try again or contact support if the issue persists.';
+        logger.warn('[UnifiedComposer] Supabase error detected', { error: err, code: err.code });
       } else if (err.code === 'PGRST116') {
         errorMessage = 'Database error: The quotation could not be verified after saving.';
+      } else if (err.message?.includes('permission') || err.message?.includes('unauthorized')) {
+        errorMessage = 'Permission denied. You may not have the required permissions to save quotes.';
+      } else if (err.message?.includes('timeout')) {
+        errorMessage = 'Request timeout. The save operation took too long. Please try again.';
       }
 
       logAudit('save_quote_failure', {
         quoteId: quoteId || 'new',
         error: errorMessage,
+        originalError: err.message,
+        errorType: isNetworkError ? 'network' : isSupabaseError ? 'database' : 'application',
         stack: err.stack
       }, 'failure');
 
@@ -1711,7 +1846,14 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
         title: 'Save Failed', 
         description: errorMessage, 
         variant: 'destructive',
-        duration: 5000 
+        duration: 5000,
+        action: isNetworkError ? {
+          label: 'Retry',
+          onClick: () => {
+            // Auto-retry for network errors
+            handleSaveQuote(charges, marginPercent, notes);
+          }
+        } : undefined
       });
     } finally {
       setSaving(false);
@@ -1769,8 +1911,10 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
         created_by: user?.id || null,
       };
 
-      const { data: savedId, error: rpcError } = await scopedDb.rpc('save_quote_atomic', {
-        p_payload: { quote: quotePayload, items: [], cargo_configurations: [], options: [] },
+      const { data: savedId, error: rpcError } = await saveWithRetry(async () => {
+        return scopedDb.rpc('save_quote_atomic', {
+          p_payload: { quote: quotePayload, items: [], cargo_configurations: [], options: [] },
+        });
       });
 
       if (rpcError) throw new Error(rpcError.message || 'Failed to save draft');
@@ -1939,6 +2083,31 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
                   <li key={i}>{err}</li>
                 ))}
               </ul>
+            </div>
+          )}
+
+          {/* Network Status Indicator */}
+          {showNetworkWarning && networkStatus === 'offline' && (
+            <div className="rounded-md bg-amber-50 border border-amber-200 p-3">
+              <div className="flex items-center gap-2 text-amber-800">
+                <AlertCircle className="h-4 w-4" />
+                <span className="font-medium">Network Offline</span>
+              </div>
+              <p className="mt-1 text-sm text-amber-700">
+                You appear to be offline. Save functionality may be limited until your connection is restored.
+              </p>
+            </div>
+          )}
+
+          {networkStatus === 'checking' && (
+            <div className="rounded-md bg-blue-50 border border-blue-200 p-3">
+              <div className="flex items-center gap-2 text-blue-800">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="font-medium">Checking Connection</span>
+              </div>
+              <p className="mt-1 text-sm text-blue-700">
+                Verifying network connectivity...
+              </p>
             </div>
           )}
 
