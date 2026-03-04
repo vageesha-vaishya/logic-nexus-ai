@@ -49,7 +49,7 @@ conn.on('ready', () => {
       .stderr.on('data', d => process.stderr.write(d));
   });
 }).on('error', fail)
-  .connect({ host, username, password });
+  .connect({ host, username, password, readyTimeout: 200000});
 
 function fail(err) {
   console.error('Error:', err && err.message ? err.message : err);

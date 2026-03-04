@@ -1,5 +1,9 @@
 pipeline {
     agent any
+    options {
+        timestamps()
+        ansiColor('xterm')
+    }
     
     environment {
         // Credentials binding for Supabase
@@ -84,7 +88,10 @@ pipeline {
                 script {
                     echo "Setting up Supabase gateway reverse proxy on VPS..."
                     sh 'npm install --no-save ssh2'
-                    sh 'node scripts/setup_supabase_gateway_vps.cjs'
+                    timeout(time: 10, unit: 'MINUTES') {
+                        echo "Gateway Port: ${env.GATEWAY_PORT}, VPS: ${env.VPS_IP}"
+                        sh 'node scripts/setup_supabase_gateway_vps.cjs'
+                    }
                 }
             }
         }
@@ -93,7 +100,10 @@ pipeline {
             steps {
                 script {
                     echo "Building and running LogicPro web on VPS..."
-                    sh 'node scripts/deploy_web_app_vps.cjs'
+                    timeout(time: 15, unit: 'MINUTES') {
+                        echo "App Port: ${env.APP_PORT}, Supabase URL will be http://${env.VPS_IP}:${env.GATEWAY_PORT}"
+                        sh 'node scripts/deploy_web_app_vps.cjs'
+                    }
                 }
             }
         }

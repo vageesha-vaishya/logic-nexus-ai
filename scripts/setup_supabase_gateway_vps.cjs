@@ -70,7 +70,7 @@ conn.on('ready', () => {
     });
   });
 }).on('error', fail)
-  .connect({ host, username, password });
+  .connect({ host, username, password, readyTimeout: 200000 });
 
 function fail(err) {
   console.error('Error:', err && err.message ? err.message : err);
