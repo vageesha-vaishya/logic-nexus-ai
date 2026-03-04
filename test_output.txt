@@ -1,237 +1,133 @@
 
 > vite_react_shadcn_ts@0.0.0 test
-> vitest run src/components/sales/unified-composer/__tests__/UnifiedQuoteComposer.integration.test.tsx
+> vitest run src/components/sales/unified-composer/__tests__/UnifiedQuoteComposer.smart.test.tsx
 
 
 [1m[46m RUN [49m[22m [36mv4.0.16 [39m[90m/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai[39m
 
-[90mstderr[2m | src/components/sales/unified-composer/__tests__/UnifiedQuoteComposer.integration.test.tsx[2m > [22m[2mUnifiedQuoteComposer Integration (API-to-UI)[2m > [22m[2mpopulates FormZone inputs correctly from loaded quote data
+[90mstderr[2m | src/components/sales/unified-composer/__tests__/UnifiedQuoteComposer.smart.test.tsx[2m > [22m[2mUnifiedQuoteComposer Smart Mode[2m > [22m[2mhandles "Get Rates" with Smart Mode enabled
 [22m[39m⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
 ⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.
 
-[90mstdout[2m | src/components/sales/unified-composer/__tests__/UnifiedQuoteComposer.integration.test.tsx[2m > [22m[2mUnifiedQuoteComposer Integration (API-to-UI)[2m > [22m[2mupdates composer state and persists changes when FormZone inputs change
-[22m[39m[Test Mock DB] Querying table: quotes
-[Test Mock DB] Querying table: accounts
-[Test Mock DB] Querying table: contacts
-[Test Mock DB] Querying table: opportunities
-
-[90mstdout[2m | src/components/sales/unified-composer/__tests__/UnifiedQuoteComposer.integration.test.tsx[2m > [22m[2mUnifiedQuoteComposer Integration (API-to-UI)[2m > [22m[2mupdates composer state and persists changes when FormZone inputs change
-[22m[39m[Test Mock DB] Querying table: quote_cargo_configurations
-[Test Mock DB] Querying table: quote_items
-[Test Mock DB] Querying table: quote_documents
-[Test Mock DB] Querying table: quotation_versions
-
-[90mstdout[2m | src/components/sales/unified-composer/__tests__/UnifiedQuoteComposer.integration.test.tsx[2m > [22m[2mUnifiedQuoteComposer Integration (API-to-UI)[2m > [22m[2mupdates composer state and persists changes when FormZone inputs change
-[22m[39m[Test Mock DB] Querying table: quotation_version_options
-
-[90mstdout[2m | src/components/sales/unified-composer/__tests__/UnifiedQuoteComposer.integration.test.tsx[2m > [22m[2mUnifiedQuoteComposer Integration (API-to-UI)[2m > [22m[2mupdates composer state and persists changes when FormZone inputs change
-[22m[39m[Test Mock DB] Querying table: quotation_version_option_legs
-
-[90mstdout[2m | src/components/sales/unified-composer/__tests__/UnifiedQuoteComposer.integration.test.tsx[2m > [22m[2mUnifiedQuoteComposer Integration (API-to-UI)[2m > [22m[2mupdates composer state and persists changes when FormZone inputs change
-[22m[39m[Test Mock DB] Querying table: quote_charges
-
-[90mstdout[2m | src/components/sales/unified-composer/__tests__/UnifiedQuoteComposer.integration.test.tsx[2m > [22m[2mUnifiedQuoteComposer Integration (API-to-UI)[2m > [22m[2mupdates composer state and persists changes when FormZone inputs change
-[22m[39mFormZone onChange called with: Updated Electronics
-initialValues: {
-  accountId: [32m''[39m,
-  opportunityId: [32m''[39m,
-  contactId: [32m''[39m,
-  quoteTitle: [32m''[39m,
-  mode: [32m'ocean'[39m,
-  origin: [32m''[39m,
-  destination: [32m''[39m,
-  commodity: [32m'Initial'[39m,
-  weight: [32m'100'[39m,
-  volume: [32m''[39m
-}
-
-[90mstdout[2m | src/components/sales/unified-composer/__tests__/UnifiedQuoteComposer.integration.test.tsx[2m > [22m[2mUnifiedQuoteComposer Integration (API-to-UI)[2m > [22m[2mupdates composer state and persists changes when FormZone inputs change
-[22m[39m[UnifiedComposer] handleSaveQuote formData: {
-  "values": {
-    "values": {
-      "accountId": "",
-      "opportunityId": "",
-      "contactId": "",
-      "quoteTitle": "",
-      "mode": "ocean",
-      "origin": "",
-      "destination": "",
-      "commodity": "HARDCODED_VALUE",
-      "weight": "100",
-      "volume": ""
-    },
-    "extended": {
-      "incoterms": "",
-      "pickupDate": "",
-      "deliveryDeadline": "",
-      "htsCode": "",
-      "dangerousGoods": false,
-      "vehicleType": "van",
-      "containerCombos": [],
-      "attachments": []
-    }
-  },
-  "extended": {
-    "incoterms": "",
-    "pickupDate": "",
-    "deliveryDeadline": "",
-    "htsCode": "",
-    "dangerousGoods": false,
-    "vehicleType": "van",
-    "containerCombos": [],
-    "attachments": []
-  }
-}
-
-[90mstdout[2m | src/components/sales/unified-composer/__tests__/UnifiedQuoteComposer.integration.test.tsx[2m > [22m[2mUnifiedQuoteComposer Integration (API-to-UI)[2m > [22m[2mupdates composer state and persists changes when FormZone inputs change
-[22m[39m[Test Mock DB] Querying table: quote_documents
-
-[90mstdout[2m | src/components/sales/unified-composer/__tests__/UnifiedQuoteComposer.integration.test.tsx[2m > [22m[2mUnifiedQuoteComposer Integration (API-to-UI)[2m > [22m[2mupdates composer state and persists changes when FormZone inputs change
-[22m[39m[Test Mock DB] Querying table: quotes
-
-[90mstdout[2m | src/components/sales/unified-composer/__tests__/UnifiedQuoteComposer.integration.test.tsx[2m > [22m[2mUnifiedQuoteComposer Integration (API-to-UI)[2m > [22m[2mupdates composer state and persists changes when FormZone inputs change
-[22m[39mRPC Calls: [
-  [
-    "save_quote_atomic",
-    {
-      "p_payload": {
-        "quote": {
-          "id": "123e4567-e89b-12d3-a456-426614174000",
-          "title": "Quote -  to ",
-          "transport_mode": "ocean",
-          "origin": "",
-          "destination": "",
-          "status": "draft",
-          "tenant_id": "test-tenant",
-          "notes": null,
-          "terms_conditions": null,
-          "billing_address": null,
-          "pickup_date": null,
-          "delivery_deadline": null,
-          "incoterms": null,
-          "vehicle_type": "van",
-          "account_id": null,
-          "contact_id": null,
-          "opportunity_id": null,
-          "cargo_details": {
-            "total_weight_kg": 0,
-            "total_volume_cbm": 0,
-            "dangerous_goods": false,
-            "hts_code": null
-          }
-        },
-        "items": [],
-        "cargo_configurations": [],
-        "options": [
-          {
-            "id": "123e4567-e89b-12d3-a456-426614174002",
-            "option_name": "Test Option",
-            "is_selected": true,
-            "source": "unified_composer",
-            "source_attribution": "Saved Quote",
-            "ai_generated": false,
-            "margin_percent": 15,
-            "currency": "USD",
-            "transit_time_days": null,
-            "legs": [],
-            "combined_charges": []
-          }
-        ]
-      }
-    }
-  ]
-]
-
- [31m❯[39m src/components/sales/unified-composer/__tests__/UnifiedQuoteComposer.integration.test.tsx [2m([22m[2m2 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[32m 118[2mms[22m[39m
-     [32m✓[39m populates FormZone inputs correctly from loaded quote data[32m 36[2mms[22m[39m
-[31m     [31m×[31m updates composer state and persists changes when FormZone inputs change[39m[32m 81[2mms[22m[39m
+ [31m❯[39m src/components/sales/unified-composer/__tests__/UnifiedQuoteComposer.smart.test.tsx [2m([22m[2m2 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[33m 1057[2mms[22m[39m
+     [32m✓[39m handles "Get Rates" with Smart Mode enabled[32m 32[2mms[22m[39m
+[31m     [31m×[31m saves a quote selected from Smart Mode results[39m[33m 1024[2mms[22m[39m
 
 [31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
 
-[41m[1m FAIL [22m[49m src/components/sales/unified-composer/__tests__/UnifiedQuoteComposer.integration.test.tsx[2m > [22mUnifiedQuoteComposer Integration (API-to-UI)[2m > [22mupdates composer state and persists changes when FormZone inputs change
+[41m[1m FAIL [22m[49m src/components/sales/unified-composer/__tests__/UnifiedQuoteComposer.smart.test.tsx[2m > [22mUnifiedQuoteComposer Smart Mode[2m > [22msaves a quote selected from Smart Mode results
 [31m[1mAssertionError[22m: expected "vi.fn()" to be called with arguments: [ 'save_quote_atomic', …(1) ][90m
 
-Received: 
+Number of calls: [1m0[22m
+[31m
 
-[1m  1st vi.fn() call:
-
-[22m[2m  [[22m
-[2m    "save_quote_atomic",[22m
-[32m-   ObjectContaining {[90m
-[32m-     "p_payload": ObjectContaining {[90m
-[32m-       "quote": ObjectContaining {[90m
-[32m-         "cargo_details": ObjectContaining {[90m
-[32m-           "commodity": "Updated Electronics",[90m
-[31m+   {[90m
-[31m+     "p_payload": {[90m
-[31m+       "cargo_configurations": [],[90m
-[31m+       "items": [],[90m
-[31m+       "options": [[90m
-[31m+         {[90m
-[31m+           "ai_generated": false,[90m
-[31m+           "combined_charges": [],[90m
-[31m+           "currency": "USD",[90m
-[31m+           "id": "123e4567-e89b-12d3-a456-426614174002",[90m
-[31m+           "is_recommended": undefined,[90m
-[31m+           "is_selected": true,[90m
-[31m+           "legs": [],[90m
-[31m+           "margin_percent": 15,[90m
-[31m+           "option_name": "Test Option",[90m
-[31m+           "rank_details": undefined,[90m
-[31m+           "rank_score": undefined,[90m
-[31m+           "recommendation_reason": undefined,[90m
-[31m+           "source": "unified_composer",[90m
-[31m+           "source_attribution": "Saved Quote",[90m
-[31m+           "transit_time_days": null,[90m
-[31m+         },[90m
-[31m+       ],[90m
-[31m+       "quote": {[90m
-[31m+         "account_id": null,[90m
-[31m+         "billing_address": null,[90m
-[31m+         "cargo_details": {[90m
-[31m+           "commodity": undefined,[90m
-[31m+           "dangerous_goods": false,[90m
-[31m+           "hts_code": null,[90m
-[31m+           "total_volume_cbm": 0,[90m
-[31m+           "total_weight_kg": 0,[90m
-[2m          },[22m
-[31m+         "contact_id": null,[90m
-[31m+         "delivery_deadline": null,[90m
-[31m+         "destination": "",[90m
-[31m+         "id": "123e4567-e89b-12d3-a456-426614174000",[90m
-[31m+         "incoterms": null,[90m
-[31m+         "notes": null,[90m
-[31m+         "opportunity_id": null,[90m
-[31m+         "origin": "",[90m
-[31m+         "pickup_date": null,[90m
-[31m+         "quote_number": undefined,[90m
-[31m+         "status": "draft",[90m
-[31m+         "tenant_id": "test-tenant",[90m
-[31m+         "terms_conditions": null,[90m
-[31m+         "title": "Quote -  to ",[90m
-[31m+         "transport_mode": "ocean",[90m
-[31m+         "vehicle_type": "van",[90m
-[2m        },[22m
-[2m      },[22m
-[2m    },[22m
-[2m  ][22m
-[31m[90m
-
-Number of calls: [1m1[22m
-[31m[39m
-[36m [2m❯[22m src/components/sales/unified-composer/__tests__/UnifiedQuoteComposer.integration.test.tsx:[2m532:34[22m[39m
-    [90m530| [39m        console.log('RPC Calls:', JSON.stringify(mockScopedDb.rpc.mock…
-    [90m531| [39m
-    [90m532| [39m        [34mexpect[39m(mockScopedDb[33m.[39mrpc)[33m.[39m[34mtoHaveBeenCalledWith[39m(
+Ignored nodes: comments, script, style
+[36m<html>[31m
+  [36m<head />[31m
+  [36m<body>[31m
+    [36m<div>[31m
+      [36m<div[31m
+        [33mdata-testid[31m=[32m"quote-store-provider"[31m
+      [36m>[31m
+        [36m<div[31m
+          [33mdata-testid[31m=[32m"enterprise-layout"[31m
+        [36m>[31m
+          [36m<h1>[31m
+            [0mNew Quotation[0m
+          [36m</h1>[31m
+          [36m<div>[31m
+            [36m<div[31m
+              [33mclass[31m=[32m"flex items-center gap-2"[31m
+            [36m/>[31m
+          [36m</div>[31m
+          [36m<div[31m
+            [33mclass[31m=[32m"space-y-6 w-full max-w-full"[31m
+          [36m>[31m
+            [36m<div[31m
+              [33mdata-testid[31m=[32m"form-zone"[31m
+            [36m>[31m
+              [36m<button[31m
+                [33mdata-testid[31m=[32m"get-rates-btn"[31m
+              [36m>[31m
+                [0mGet Rates[0m
+              [36m</button>[31m
+            [36m</div>[31m
+            [36m<div[31m
+              [33mdata-testid[31m=[32m"separator"[31m
+            [36m/>[31m
+            [36m<div[31m
+              [33mdata-testid[31m=[32m"results-zone"[31m
+            [36m>[31m
+              [36m<div>[31m
+                [0mSmart Results Active[0m
+              [36m</div>[31m
+              [36m<div>[31m
+                [0mAI Analysis Ready[0m
+              [36m</div>[31m
+              [36m<ul>[31m
+                [36m<li[31m
+                  [33mdata-testid[31m=[32m"rate-option"[31m
+                [36m>[31m
+                  [0mAI Carrier[0m
+                  [0m - [0m
+                  [0m1000[0m
+                  [36m<button[31m
+                    [33mdata-testid[31m=[32m"select-option-ai-1"[31m
+                  [36m>[31m
+                    [0mSelect[0m
+                  [36m</button>[31m
+                [36m</li>[31m
+              [36m</ul>[31m
+              [36m<div[31m
+                [33mdata-testid[31m=[32m"available-options"[31m
+              [36m>[31m
+                [36m<div>[31m
+                  [0mMarket Carrier[0m
+                  [0m - [0m
+                  [0m1200[0m
+                  [36m<button[31m
+                    [33mdata-testid[31m=[32m"add-option-mkt-1"[31m
+                  [36m>[31m
+                    [0mAdd[0m
+                  [36m</button>[31m
+                [36m</div>[31m
+              [36m</div>[31m
+            [36m</div>[31m
+            [36m<div[31m
+              [33mdata-testid[31m=[32m"separator"[31m
+            [36m/>[31m
+            [36m<div[31m
+              [33mdata-testid[31m=[32m"finalize-section"[31m
+            [36m>[31m
+              [0mFinalize Section[0m
+              [36m<button[31m
+                [33mdata-testid[31m=[32m"save-quote-btn"[31m
+              [36m>[31m
+                [0mSave Quote[0m
+              [36m</button>[31m
+            [36m</div>[31m
+          [36m</div>[31m
+        [36m</div>[31m
+      [36m</div>[31m
+    [36m</div>[31m
+  [36m</body>[31m
+[36m</html>[31m...[39m
+[36m [2m❯[22m src/components/sales/unified-composer/__tests__/UnifiedQuoteComposer.smart.test.tsx:[2m448:34[22m[39m
+    [90m446| [39m    [90m// Assert Payload[39m
+    [90m447| [39m    [35mawait[39m [34mwaitFor[39m(() [33m=>[39m {
+    [90m448| [39m        [34mexpect[39m(mockScopedDb[33m.[39mrpc)[33m.[39m[34mtoHaveBeenCalledWith[39m(
     [90m   | [39m                                 [31m^[39m
-    [90m533| [39m            [32m'save_quote_atomic'[39m[33m,[39m
-    [90m534| [39m            expect[33m.[39m[34mobjectContaining[39m({
+    [90m449| [39m            [32m'save_quote_atomic'[39m[33m,[39m
+    [90m450| [39m            expect[33m.[39m[34mobjectContaining[39m({
+[90m [2m❯[22m runWithExpensiveErrorDiagnosticsDisabled node_modules/@testing-library/dom/dist/config.js:[2m47:12[22m[39m
+[90m [2m❯[22m checkCallback node_modules/@testing-library/dom/dist/wait-for.js:[2m124:77[22m[39m
+[90m [2m❯[22m Timeout.checkRealTimersCallback node_modules/@testing-library/dom/dist/wait-for.js:[2m118:16[22m[39m
 
 [31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
 
 
 [2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
 [2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m1 passed[39m[22m[90m (2)[39m
-[2m   Start at [22m 14:00:57
-[2m   Duration [22m 1.11s[2m (transform 293ms, setup 128ms, import 475ms, tests 118ms, environment 260ms)[22m
+[2m   Start at [22m 07:27:53
+[2m   Duration [22m 2.19s[2m (transform 275ms, setup 177ms, import 403ms, tests 1.06s, environment 401ms)[22m
 

@@ -358,7 +358,7 @@ export function QuotationVersionHistory({ quoteId }: { quoteId: string }) {
       });
 
       // Navigate to the composer with the new option
-      navigate(`/dashboard/multimodal-quote?quoteId=${quoteId}&versionId=${versionId}&optionId=${optionId}`);
+      navigate(`/dashboard/quotes/${quoteId}?versionId=${versionId}&optionId=${optionId}`);
     } catch (error) {
       console.error('Failed to create option:', error);
       toast({
@@ -412,7 +412,7 @@ export function QuotationVersionHistory({ quoteId }: { quoteId: string }) {
                 quoteId={quoteId}
                 onCreateOption={createNewOption}
                 onEditOption={(vId, optId) =>
-                  navigate(`/dashboard/multimodal-quote?quoteId=${quoteId}&versionId=${vId}&optionId=${optId}`)
+                  navigate(`/dashboard/quotes/${quoteId}?versionId=${vId}&optionId=${optId}`)
                 }
                 onSelectOption={selectOption}
                 onDeleteVersion={deleteVersion}

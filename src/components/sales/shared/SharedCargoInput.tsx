@@ -40,7 +40,7 @@ export function SharedCargoInput({ value, onChange, onRemove, className, errors,
         };
         
         // Only update if we have valid IDs to avoid infinite loops
-        if (initialCombo.typeId && initialCombo.sizeId) {
+        if (initialCombo.typeId) {
             onChange({
                 ...value,
                 containerCombos: [initialCombo]
@@ -267,7 +267,7 @@ export function SharedCargoInput({ value, onChange, onRemove, className, errors,
                                     <SelectTrigger className="h-8 text-xs bg-white"><SelectValue placeholder="Size" /></SelectTrigger>
                                     <SelectContent>
                                         {containerSizes
-                                            .filter(s => !combo.typeId || s.type_id === combo.typeId)
+                                            .filter(s => !combo.typeId || !s.type_id || s.type_id === combo.typeId)
                                             .map(s => (
                                                 <SelectItem key={s.id} value={s.id}>{formatSize(s.name)}</SelectItem>
                                             ))}

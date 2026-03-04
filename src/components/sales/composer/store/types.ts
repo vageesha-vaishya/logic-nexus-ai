@@ -29,6 +29,7 @@ export interface QuoteState {
   versionId: string | null;
   optionId: string | null;
   tenantId: string | null;
+  franchiseId: string | null;
   marketAnalysis: string | null;
   confidenceScore: number | null;
   anomalies: any[];

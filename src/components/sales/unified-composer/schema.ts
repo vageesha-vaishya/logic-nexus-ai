@@ -51,7 +51,9 @@ export const quoteComposerSchema = z.object({
   // Phase 1: FormZone fields
   mode: z.enum(['air', 'ocean', 'road', 'rail']),
   origin: z.string().min(2, 'Origin is required'),
+  originId: z.string().min(1, 'Please select a valid origin from the list'),
   destination: z.string().min(2, 'Destination is required'),
+  destinationId: z.string().min(1, 'Please select a valid destination from the list'),
   commodity: z.string().min(2, 'Commodity is required'),
   preferredCarriers: z.array(z.string()).optional(),
   weight: z.string().optional().refine((val) => {

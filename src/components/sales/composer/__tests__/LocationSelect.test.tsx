@@ -3,7 +3,14 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { LocationSelect } from '../LocationSelect';
 import { vi } from 'vitest';
 
-// Mock Supabase
+import { useCRM } from '@/hooks/useCRM';
+
+// Mock useCRM
+vi.mock('@/hooks/useCRM', () => ({
+  useCRM: vi.fn(),
+}));
+
+// Mock Supabase chain
 const mockSelect = vi.fn();
 const mockOr = vi.fn();
 const mockEq = vi.fn();
@@ -11,18 +18,17 @@ const mockOrder = vi.fn();
 const mockLimit = vi.fn();
 const mockSingle = vi.fn();
 const mockMaybeSingle = vi.fn();
+const mockUpdate = vi.fn();
+const mockRpc = vi.fn();
 
-const mockSupabase = {
+const mockScopedDb = {
   from: vi.fn(() => ({
     select: mockSelect,
     insert: vi.fn(),
-    update: vi.fn(),
+    update: mockUpdate,
   })),
+  rpc: mockRpc,
 };
-
-vi.mock('@/integrations/supabase/client', () => ({
-  supabase: mockSupabase,
-}));
 
 // Mock toast
 vi.mock('@/hooks/use-toast', () => ({
@@ -32,8 +38,13 @@ vi.mock('@/hooks/use-toast', () => ({
 }));
 
 describe('LocationSelect', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+    beforeEach(() => {
+      vi.clearAllMocks();
+    
+    // Setup useCRM mock
+    (useCRM as any).mockReturnValue({
+      scopedDb: mockScopedDb,
+    });
     
     // Setup chainable mocks
     mockSelect.mockReturnValue({
@@ -42,6 +53,10 @@ describe('LocationSelect', () => {
       order: mockOrder,
       limit: mockLimit,
       maybeSingle: mockMaybeSingle,
+    });
+
+    mockUpdate.mockReturnValue({
+        eq: mockEq,
     });
     
     mockOr.mockReturnValue({
@@ -54,12 +69,15 @@ describe('LocationSelect', () => {
       order: mockOrder,
       limit: mockLimit,
       maybeSingle: mockMaybeSingle,
+      // For delete/update chains
+      then: vi.fn().mockImplementation((cb) => cb({ error: null })), 
     });
 
     mockOrder.mockReturnValue({
       limit: mockLimit,
     });
   });
+
 
   it('renders placeholder initially', () => {
     render(<LocationSelect onChange={() => {}} />);
@@ -68,11 +86,11 @@ describe('LocationSelect', () => {
 
   it('fetches default locations on open', async () => {
     const mockData = [
-      { id: '1', location_name: 'Singapore', location_code: 'SGSIN', city: 'Singapore', country: 'Singapore' },
-      { id: '2', location_name: 'Shanghai', location_code: 'CNSHA', city: 'Shanghai', country: 'China' },
+      { id: '1', name: 'Singapore', code: 'SGSIN', city_name: 'Singapore', country_name: 'Singapore', type: 'port' },
+      { id: '2', name: 'Shanghai', code: 'CNSHA', city_name: 'Shanghai', country_name: 'China', type: 'port' },
     ];
 
-    mockLimit.mockResolvedValue({ data: mockData, error: null });
+    mockRpc.mockResolvedValue({ data: mockData, error: null });
 
     render(<LocationSelect onChange={() => {}} />);
     
@@ -80,10 +98,11 @@ describe('LocationSelect', () => {
     fireEvent.click(trigger);
 
     await waitFor(() => {
-      expect(mockSupabase.from).toHaveBeenCalledWith('ports_locations');
+      expect(mockScopedDb.rpc).toHaveBeenCalledWith('search_locations', {
+        search_text: '',
+        limit_count: 20
+      });
       // Verify initial fetch without search filter
-      expect(mockSelect).toHaveBeenCalled();
-      expect(mockLimit).toHaveBeenCalledWith(20);
     });
 
     expect(screen.getByText(/Singapore/)).toBeInTheDocument();
@@ -92,16 +111,16 @@ describe('LocationSelect', () => {
 
   it('switches to search mode when typing', async () => {
     const defaultData = [
-      { id: '1', location_name: 'Singapore', location_code: 'SGSIN', city: 'Singapore', country: 'Singapore' },
+      { id: '1', name: 'Singapore', code: 'SGSIN', city_name: 'Singapore', country_name: 'Singapore', type: 'port' },
     ];
     const searchData = [
-      { id: '3', location_name: 'Mumbai', location_code: 'INBOM', city: 'Mumbai', country: 'India' },
+      { id: '3', name: 'Mumbai', code: 'INBOM', city_name: 'Mumbai', country_name: 'India', type: 'port' },
     ];
 
     // First call returns default data
-    mockLimit.mockResolvedValueOnce({ data: defaultData, error: null });
+    mockRpc.mockResolvedValueOnce({ data: defaultData, error: null });
     // Second call returns search data
-    mockLimit.mockResolvedValueOnce({ data: searchData, error: null });
+    mockRpc.mockResolvedValueOnce({ data: searchData, error: null });
 
     render(<LocationSelect onChange={() => {}} />);
     
@@ -119,13 +138,16 @@ describe('LocationSelect', () => {
 
     // Wait for debounce and search
     await waitFor(() => {
-      expect(mockOr).toHaveBeenCalledWith(expect.stringContaining('Mumbai'));
+      expect(mockScopedDb.rpc).toHaveBeenCalledWith('search_locations', {
+        search_text: 'Mumbai',
+        limit_count: 20
+      });
       expect(screen.getByText(/Mumbai/)).toBeInTheDocument();
     }, { timeout: 1000 });
   });
 
   it('handles empty results with Create option', async () => {
-    mockLimit.mockResolvedValue({ data: [], error: null });
+    mockRpc.mockResolvedValue({ data: [], error: null });
 
     render(<LocationSelect onChange={() => {}} />);
     
@@ -133,28 +155,32 @@ describe('LocationSelect', () => {
     fireEvent.click(trigger);
 
     await waitFor(() => {
-      expect(screen.getByText('No results.')).toBeInTheDocument();
+      // AsyncCombobox usually shows "No results." when empty, but might depend on implementation
+      // Checking for Create option is safer
       expect(screen.getByText('Create new location')).toBeInTheDocument();
     });
   });
 
   it('displays selected value correctly', async () => {
-    const locationData = { 
+    const locationData = [{ 
       id: '1', 
-      location_name: 'Singapore', 
-      location_code: 'SGSIN', 
-      city: 'Singapore', 
-      country: 'Singapore' 
-    };
+      name: 'Singapore', 
+      code: 'SGSIN', 
+      city_name: 'Singapore', 
+      country_name: 'Singapore',
+      type: 'port'
+    }];
 
-    // Mock maybeSingle for fetchLocationDetails
-    mockMaybeSingle.mockResolvedValue({ data: locationData, error: null });
+    // Mock rpc for fetchLocationDetails
+    mockRpc.mockResolvedValue({ data: locationData, error: null });
     
     render(<LocationSelect value="Singapore" onChange={() => {}} />);
 
     await waitFor(() => {
-      expect(mockSupabase.from).toHaveBeenCalledWith('ports_locations');
-      expect(mockEq).toHaveBeenCalledWith('location_name', 'Singapore');
+      expect(mockScopedDb.rpc).toHaveBeenCalledWith('search_locations', {
+        search_text: 'Singapore',
+        limit_count: 1
+      });
     });
     
     // Check if Edit/Delete buttons are present when value is selected

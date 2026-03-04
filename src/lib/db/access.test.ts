@@ -156,6 +156,73 @@ describe('ScopedDataAccess', () => {
       });
     });
 
+    it('should not apply franchise filter for master_commodities (tenant-scoped only)', () => {
+      const context: DataAccessContext = {
+        isPlatformAdmin: false,
+        isTenantAdmin: false,
+        isFranchiseAdmin: true,
+        tenantId: 'tenant-123',
+        franchiseId: 'franchise-456',
+      };
+
+      const dao = new ScopedDataAccess(mockSupabase, context);
+      dao.from('master_commodities').select();
+
+      expect(mockQueryBuilder.eq).toHaveBeenCalledWith('tenant_id', 'tenant-123');
+      expect(mockQueryBuilder.eq).not.toHaveBeenCalledWith('franchise_id', 'franchise-456');
+    });
+
+    it('should not inject franchise_id for master_commodities inserts', () => {
+      const context: DataAccessContext = {
+        isPlatformAdmin: false,
+        isTenantAdmin: false,
+        isFranchiseAdmin: true,
+        tenantId: 'tenant-123',
+        franchiseId: 'franchise-456',
+        userId: 'user-1',
+      };
+
+      const dao = new ScopedDataAccess(mockSupabase, context);
+      dao.from('master_commodities').insert({ name: 'Widget' });
+
+      expect(mockQueryBuilder.insert).toHaveBeenCalledWith({
+        name: 'Widget',
+        tenant_id: 'tenant-123',
+      });
+    });
+
+    it('should treat contacts as tenant-scoped only (no franchise filter)', () => {
+      const context: DataAccessContext = {
+        isPlatformAdmin: false,
+        isTenantAdmin: true,
+        isFranchiseAdmin: false,
+        tenantId: 'tenant-abc',
+        franchiseId: 'franchise-xyz',
+      };
+      const dao = new ScopedDataAccess(mockSupabase, context);
+      dao.from('contacts').select();
+      expect(mockQueryBuilder.eq).toHaveBeenCalledWith('tenant_id', 'tenant-abc');
+      expect(mockQueryBuilder.eq).not.toHaveBeenCalledWith('franchise_id', 'franchise-xyz');
+    });
+
+    it('should not inject franchise_id on contacts insert', () => {
+      const context: DataAccessContext = {
+        isPlatformAdmin: false,
+        isTenantAdmin: false,
+        isFranchiseAdmin: true,
+        tenantId: 'tenant-abc',
+        franchiseId: 'franchise-xyz',
+        userId: 'user-2',
+      };
+      const dao = new ScopedDataAccess(mockSupabase, context);
+      dao.from('contacts').insert({ first_name: 'John', last_name: 'Doe' });
+      expect(mockQueryBuilder.insert).toHaveBeenCalledWith({
+        first_name: 'John',
+        last_name: 'Doe',
+        tenant_id: 'tenant-abc',
+      });
+    });
+
     it('should apply no filter for Platform Admin with override enabled but no tenant selected (All Tenants)', () => {
       const context: DataAccessContext = {
         isPlatformAdmin: true,

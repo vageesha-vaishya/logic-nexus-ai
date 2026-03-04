@@ -17,6 +17,7 @@ import { useRateFetching, ContainerResolver } from '@/hooks/useRateFetching';
 import { useAiAdvisor } from '@/hooks/useAiAdvisor';
 import { PricingService } from '@/services/pricing.service';
 import { QuoteOptionService } from '@/services/QuoteOptionService';
+import { PortsService } from '@/services/PortsService';
 import { RateOption } from '@/types/quote-breakdown';
 import { invokeAnonymous, enrichPayload } from '@/lib/supabase-functions';
 import { logger } from '@/lib/logger';
@@ -31,6 +32,7 @@ import { QuotationConfigurationService } from '@/services/quotation/QuotationCon
 import { QuotationOptionCrudService } from '@/services/quotation/QuotationOptionCrudService';
 import { QuotationRankingService } from '@/services/quotation/QuotationRankingService';
 import { showQuotationSuccessToast } from '@/components/notifications/QuotationSuccessToast';
+import { EnterpriseFormLayout } from '@/components/ui/enterprise';
 
 // ---------------------------------------------------------------------------
 // Props
@@ -47,6 +49,7 @@ interface UnifiedQuoteComposerProps {
 // ---------------------------------------------------------------------------
 
 export function UnifiedQuoteComposer(props: UnifiedQuoteComposerProps) {
+  // console.log('[UnifiedComposer] Rendering with props:', props);
   return (
     <QuoteStoreProvider>
       <UnifiedQuoteComposerContent {...props} />
@@ -59,6 +62,7 @@ export function UnifiedQuoteComposer(props: UnifiedQuoteComposerProps) {
 // ---------------------------------------------------------------------------
 
 function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: UnifiedQuoteComposerProps) {
+  logger.debug('[UnifiedComposer] Render Content', { quoteId, versionId });
   const { scopedDb, context, supabase } = useCRM();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -74,6 +78,8 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
       mode: 'ocean',
       origin: '',
       destination: '',
+      originId: '',
+      destinationId: '',
       commodity: '',
       marginPercent: 15,
       autoMargin: true,
@@ -122,10 +128,67 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
   }, [rateFetching.results, isSmartMode]);
   
   // CRM Data
-   const [accounts, setAccounts] = useState<any[]>([]);
-   const [contacts, setContacts] = useState<any[]>([]);
-   const [opportunities, setOpportunities] = useState<any[]>([]);
-   const [isCrmLoading, setIsCrmLoading] = useState(false);
+  const [accounts, setAccounts] = useState<any[]>([]);
+  const [contacts, setContacts] = useState<any[]>([]);
+  const [opportunities, setOpportunities] = useState<any[]>([]);
+  const [isCrmLoading, setIsCrmLoading] = useState(false);
+
+  // Load CRM Data and Ports
+  useEffect(() => {
+    // Retry helper with exponential backoff
+    const retryFetch = async <T,>(fn: () => Promise<T>, retries = 3, delay = 500): Promise<T> => {
+      try {
+        return await fn();
+      } catch (err) {
+        if (retries <= 0) throw err;
+        await new Promise(res => setTimeout(res, delay));
+        return retryFetch(fn, retries - 1, delay * 2);
+      }
+    };
+
+    const loadCrmData = async () => {
+      logger.debug('loadCrmData started');
+      setIsCrmLoading(true);
+      try {
+        const portsService = new PortsService(scopedDb);
+        logger.debug('Fetching CRM data and ports');
+        
+        // Execute parallel fetch with retry mechanism
+        const [accRes, conRes, oppRes, ports] = await retryFetch(() => Promise.all([
+          scopedDb.from('accounts').select('id, name').order('name'),
+          scopedDb.from('contacts').select('id, first_name, last_name').order('last_name'),
+          scopedDb.from('opportunities').select('id, name').order('name'),
+          portsService.getAllPorts()
+        ]));
+
+        logger.debug('CRM data and ports loaded successfully', { 
+            portsLength: ports?.length,
+            accountsLength: accRes.data?.length 
+        });
+
+        if (accRes.data) setAccounts(accRes.data);
+        if (conRes.data) setContacts(conRes.data);
+        if (oppRes.data) setOpportunities(oppRes.data);
+
+        // Populate store reference data
+        dispatch({
+          type: 'SET_REFERENCE_DATA',
+          payload: {
+            accounts: accRes.data || [],
+            contacts: conRes.data || [],
+            ports: ports || []
+          }
+        });
+      } catch (err) {
+        logger.error('Failed to load CRM data after retries', { error: err });
+        // Optional: Show toast error here
+      } finally {
+        setIsCrmLoading(false);
+      }
+    };
+
+    loadCrmData();
+  }, [scopedDb, dispatch]);
    const { profile } = useAuth();
    // Temporary override: Allow all users to override quote numbers during development
    const canOverrideQuoteNumber = true; 
@@ -134,7 +197,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
 
   // Edit mode state
   const [isEditMode] = useState(() => !!quoteId);
-  const [editLoading, setEditLoading] = useState(false);
+  const [editLoading, setEditLoading] = useState(() => !!quoteId);
   const [initialFormValues, setInitialFormValues] = useState<Partial<FormZoneValues> | undefined>(undefined);
   const [initialExtended, setInitialExtended] = useState<Partial<ExtendedFormData> | undefined>(undefined);
   const [config, setConfig] = useState<any>(null);
@@ -340,24 +403,24 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
 
   const loadExistingQuote = useCallback(async () => {
     if (!quoteId) return;
+    
+    // Validate UUID format to prevent Postgres errors
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(quoteId);
+    if (!isUuid) {
+        logger.warn('[UnifiedComposer] Invalid quoteId format (expected UUID)', { quoteId });
+        return;
+    }
+
     setEditLoading(true);
     setLoadErrors([]);
 
     // Audit reload attempt
-    logAudit('reload_attempt', { quoteId });
-
-    // DEBUG: Log context to debug scoping issues
-    logger.info('[UnifiedComposer] loadExistingQuote context:', {
-      quoteId,
-      tenantId: context?.tenantId,
-      franchiseId: context?.franchiseId,
-      isPlatformAdmin: context?.isPlatformAdmin,
-      isTenantAdmin: context?.isTenantAdmin
-    });
+    // logAudit('reload_attempt', { quoteId });
 
     try {
       const tenantId = context?.tenantId || null;
       
+      /*
       // Helper for retry logic
       const fetchQuoteWithRetry = async (retries = 3, delay = 1000) => {
         for (let i = 0; i < retries; i++) {
@@ -375,6 +438,25 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
       };
 
       const quoteRow = await fetchQuoteWithRetry();
+      */
+      
+      const { data: quoteRow, error: quoteError } = await scopedDb
+        .from('quotes')
+        .select('*, origin_port_data:origin_port_id(location_name, location_code), destination_port_data:destination_port_id(location_name, location_code)')
+        .eq('id', quoteId)
+        .maybeSingle();
+     
+      /*
+      const { data: quoteRow, error: quoteError } = await scopedDb
+        .from('quotes')
+        .select('*')
+        .eq('id', quoteId)
+        .maybeSingle();
+      */
+
+      if (quoteError) {
+         logger.error('[UnifiedComposer] Failed to load quote:', quoteError);
+      }
 
       if (!quoteRow) {
         logger.error('[UnifiedComposer] Failed to load quote after retries', { quoteId });
@@ -387,9 +469,11 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
       logger.info('[UnifiedComposer] Quote loaded successfully:', { 
         id: quoteRow.id, 
         quoteTenant: (quoteRow as any).tenant_id,
-        currentVersion: (quoteRow as any).current_version_id
+        currentVersion: (quoteRow as any).current_version_id,
+        origin: (quoteRow as any).origin_port_data?.location_name,
+        destination: (quoteRow as any).destination_port_data?.location_name
       });
-
+      
       const raw = quoteRow as any;
 
       // Parallel fetch for detailed configurations (Cargo, Items, Documents, Versions)
@@ -419,8 +503,24 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
       if (quoteItemsResult.status === 'fulfilled' && !quoteItemsResult.value.error) {
         items = quoteItemsResult.value.data || [];
       } else {
-        logger.warn('[UnifiedComposer] Failed to load quote items', quoteItemsResult);
-        setLoadErrors(prev => [...prev, 'Failed to load line items']);
+        // Try fallback to quote_items_core if quote_items fails (e.g. view missing)
+        logger.warn('[UnifiedComposer] Failed to load quote items, trying quote_items_core fallback', quoteItemsResult);
+        try {
+            const { data: coreItems, error: coreError } = await scopedDb
+                .from('quote_items_core')
+                .select('*')
+                .eq('quote_id', quoteId);
+                
+            if (!coreError && coreItems) {
+                items = coreItems;
+                logger.info(`[UnifiedComposer] Loaded ${items.length} items from quote_items_core fallback`);
+            } else {
+                logger.warn('[UnifiedComposer] Failed to load quote items from core fallback', coreError);
+            }
+        } catch (e) {
+            logger.error('[UnifiedComposer] Error loading quote items fallback', e);
+        }
+        // Do NOT add to loadErrors to avoid alarming the user for non-critical missing data
       }
 
       // Handle Documents
@@ -449,6 +549,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
           quoteId,
           versionId: versionId || raw.current_version_id || null, // Use current_version_id if available
           tenantId: raw.tenant_id || tenantId,
+          franchiseId: raw.franchise_id || context?.franchiseId || null,
           quoteData: raw,
         },
       });
@@ -456,12 +557,14 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
       // Pre-populate form values for edit mode
       const cargoDetails = typeof raw.cargo_details === 'object' ? raw.cargo_details : null;
       
-      // Calculate totals from quote_items if available, otherwise fallback to quote header
-      const totalWeight = items.length > 0 
+      // Calculate totals from quote_items if available AND they have weight/volume data
+      // otherwise fallback to quote header/cargo details.
+      // Note: quote_items_core fallback does not have weight/volume, so we must check for presence.
+      const totalWeight = items.length > 0 && items.some((i: any) => Number(i.weight_kg) > 0)
         ? items.reduce((sum: number, item: any) => sum + (Number(item.weight_kg) || 0), 0)
         : (cargoDetails?.total_weight_kg || raw.total_weight || '');
         
-      const totalVolume = items.length > 0
+      const totalVolume = items.length > 0 && items.some((i: any) => Number(i.volume_cbm) > 0)
         ? items.reduce((sum: number, item: any) => sum + (Number(item.volume_cbm) || 0), 0)
         : (cargoDetails?.total_volume_cbm || raw.total_volume || '');
         
@@ -475,13 +578,14 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
         contactId: raw.contact_id || '',
         quoteTitle: raw.title || '',
         mode: (raw.transport_mode || 'ocean') as any,
-        origin: raw.origin_location?.location_name || raw.origin || '',
-        destination: raw.destination_location?.location_name || raw.destination || '',
+        origin: raw.origin_port_data?.location_name || raw.origin || '',
+        destination: raw.destination_port_data?.location_name || raw.destination || '',
+        originId: raw.origin_port_id || '',
+        destinationId: raw.destination_port_id || '',
         commodity: primaryCommodity,
         weight: String(totalWeight),
         volume: String(totalVolume),
       });
-      console.log('[UnifiedComposer] Set initialFormValues:', { commodity: primaryCommodity });
       
       // Sync to form directly
       if (form) {
@@ -492,8 +596,10 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
             contactId: raw.contact_id || '',
             quoteTitle: raw.title || '',
             mode: (raw.transport_mode || 'ocean') as any,
-            origin: raw.origin_location?.location_name || raw.origin || '',
-            destination: raw.destination_location?.location_name || raw.destination || '',
+            origin: raw.origin_port_data?.location_name || raw.origin || '',
+            destination: raw.destination_port_data?.location_name || raw.destination || '',
+            originId: raw.origin_port_id || '',
+            destinationId: raw.destination_port_id || '',
             commodity: primaryCommodity,
             weight: String(totalWeight),
             volume: String(totalVolume),
@@ -510,17 +616,29 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
         containerCombos: containerCombos,
         attachments: docs,
       });
-
+      
       // Load existing option if present
       // Determine which version to load: explicit prop OR current_version_id
-      const targetVersionId = versionId || raw.current_version_id;
+      let targetVersionId = versionId || raw.current_version_id;
+      
+      // Fallback: if no target version determined, try to use the latest version from history
+      if (!targetVersionId) {
+         // We can't rely on versionsResult being ready here since we are in the same scope,
+         // but we can query it quickly or check if we already fetched it?
+         // Actually we fetched it in parallel above. We can access the result.
+         if (versionsResult.status === 'fulfilled' && versionsResult.value.data && versionsResult.value.data.length > 0) {
+            // versions are ordered by version_number desc (see query above)
+            targetVersionId = versionsResult.value.data[0].id;
+            logger.info('[UnifiedComposer] No current_version_id, falling back to latest version', { targetVersionId });
+         }
+      }
+
       const isValidUUID = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
       
-      console.log('[UnifiedComposer] Target Version:', targetVersionId, 'Valid:', isValidUUID(targetVersionId));
-
       if (targetVersionId && isValidUUID(targetVersionId)) {
         logger.info('[UnifiedComposer] Loading version', { targetVersionId });
-        // Fetch options
+        // Fetch options with enriched data
+        // We fetch carrier_rates and carriers separately to avoid join failures if FK is missing/broken
         const { data: optionRows, error: optError } = await scopedDb
           .from('quotation_version_options')
           .select('*')
@@ -536,10 +654,14 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
           logger.info(`[UnifiedComposer] Found ${optionRows.length} options`);
           const optionIds = optionRows.map((o: any) => o.id);
 
-          // Fetch legs for these options
+          // Fetch legs for these options (without joins first)
           const { data: legRows, error: legError } = await scopedDb
             .from('quotation_version_option_legs')
-            .select('*')
+            .select(`
+                *,
+                origin_loc:origin_location_id(location_name),
+                dest_loc:destination_location_id(location_name)
+            `)
             .in('quotation_version_option_id', optionIds)
             .order('sort_order');
 
@@ -548,6 +670,58 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
             throw legError;
           }
           logger.info(`[UnifiedComposer] Found ${legRows?.length || 0} legs`);
+
+          // Collect all related IDs for manual hydration
+          const carrierRateIds = optionRows
+            .map((o: any) => o.carrier_rate_id)
+            .filter((id: any) => id && isValidUUID(id));
+          
+          const carrierIds = new Set<string>();
+          optionRows.forEach((o: any) => {
+             if (o.carrier_id && isValidUUID(o.carrier_id)) carrierIds.add(o.carrier_id);
+          });
+          legRows?.forEach((l: any) => {
+             if (l.carrier_id && isValidUUID(l.carrier_id)) carrierIds.add(l.carrier_id);
+          });
+
+          // Fetch Carrier Rates
+          const carrierRatesMap: Record<string, any> = {};
+          if (carrierRateIds.length > 0) {
+             const { data: rates, error: ratesError } = await scopedDb
+               .from('carrier_rates')
+               .select(`
+                  id,
+                  currency,
+                  carrier_id
+               `)
+               .in('id', carrierRateIds);
+               
+             if (!ratesError && rates) {
+                rates.forEach((r: any) => {
+                   carrierRatesMap[r.id] = r;
+                   if (r.carrier_id && isValidUUID(r.carrier_id)) carrierIds.add(r.carrier_id);
+                });
+             } else {
+                logger.warn('[UnifiedComposer] Failed to load carrier rates details', ratesError);
+             }
+          }
+
+          // Fetch Carriers
+          const carriersMap: Record<string, any> = {};
+          if (carrierIds.size > 0) {
+             const { data: carriers, error: carriersError } = await scopedDb
+                .from('carriers')
+                .select('id, carrier_name')
+                .in('id', Array.from(carrierIds));
+                
+             if (!carriersError && carriers) {
+                carriers.forEach((c: any) => {
+                   carriersMap[c.id] = c;
+                });
+             } else {
+                logger.warn('[UnifiedComposer] Failed to load carriers', carriersError);
+             }
+          }
 
           // Fetch charges for these options
           const { data: chargeRows, error: chargeError } = await scopedDb
@@ -593,6 +767,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
                      pairs.push({
                          id: buy.id, 
                          leg_id: buy.leg_id,
+                         legId: buy.leg_id,
                          category_id: buy.category_id,
                          basis_id: buy.basis_id,
                          currency_id: buy.currency_id,
@@ -621,6 +796,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
                      pairs.push({
                          id: sell.id,
                          leg_id: sell.leg_id,
+                         legId: sell.leg_id,
                          category_id: sell.category_id,
                          basis_id: sell.basis_id,
                          currency_id: sell.currency_id,
@@ -644,6 +820,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
                  pairs.push({
                      id: buy.id,
                      leg_id: buy.leg_id,
+                     legId: buy.leg_id,
                      category_id: buy.category_id,
                      basis_id: buy.basis_id,
                      currency_id: buy.currency_id,
@@ -674,15 +851,18 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
                 // Get charges for this leg
                 const legChargesRaw = (chargeRows || []).filter((c: any) => c.leg_id === l.id);
                 const legCharges = groupCharges(legChargesRaw);
+                
+                // Resolve carrier name
+                const carrierName = carriersMap[l.carrier_id]?.carrier_name || l.carrier_name || 'Unknown Carrier';
 
                 return {
                     id: l.id,
                     mode: l.transport_mode || 'ocean',
                     leg_type: 'transport',
-                    carrier: undefined,
+                    carrier: carrierName,
                     carrier_id: l.carrier_id,
-                    origin: l.origin_location || '',
-                    destination: l.destination_location || '',
+                    origin: l.origin_loc?.location_name || l.origin_location || '',
+                    destination: l.dest_loc?.location_name || l.destination_location || '',
                     transit_time: l.transit_time_hours ? `${Math.ceil(l.transit_time_hours / 24)} days` : 'TBD',
                     departure_date: l.departure_date,
                     arrival_date: l.arrival_date,
@@ -696,14 +876,45 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
             // Filter global charges (no leg_id)
             const globalChargesRaw = (chargeRows || []).filter((c: any) => c.quote_option_id === opt.id && !c.leg_id);
             const globalCharges = groupCharges(globalChargesRaw);
+            
+            // Calculate total price from all charges (legs + global)
+            const legChargesTotal = myLegs.reduce((sum: number, leg: any) => {
+                return sum + (leg.charges || []).reduce((s: number, c: any) => s + (Number(c.sell?.amount) || 0), 0);
+            }, 0);
+            
+            const globalChargesTotal = globalCharges.reduce((sum: number, c: any) => {
+                return sum + (Number(c.sell?.amount) || 0);
+            }, 0);
+            
+            const totalPrice = legChargesTotal + globalChargesTotal;
+            
+            // Resolve carrier rate from map
+            const carrierRate = opt.carrier_rate_id ? carrierRatesMap[opt.carrier_rate_id] : null;
+
+            // Resolve carrier name from option or related carrier rate
+            let resolvedCarrierName = carriersMap[opt.carrier_id]?.carrier_name;
+            
+            if (!resolvedCarrierName && carrierRate?.carrier_id) {
+               resolvedCarrierName = carriersMap[carrierRate.carrier_id]?.carrier_name;
+            }
+            
+            if (!resolvedCarrierName) {
+               resolvedCarrierName = opt.option_name || 'Saved Option';
+            }
+            
+            // Resolve currency
+            const resolvedCurrency = opt.currency || carrierRate?.currency || 'USD';
+            // Resolve transit time
+            const resolvedTransitTime = opt.transit_time || 
+                (opt.transit_time_days ? `${opt.transit_time_days} days` : 'TBD');
 
             return {
                id: opt.id,
-               carrier: opt.option_name || 'Saved Option',
-               name: opt.option_name || 'Saved Option',
-               price: opt.total_amount,
-               currency: opt.currency,
-               transitTime: opt.transit_time_days ? `${opt.transit_time_days} days` : 'TBD',
+               carrier: resolvedCarrierName,
+               name: resolvedCarrierName,
+               price: totalPrice || opt.total_amount || 0,
+               currency: resolvedCurrency,
+               transitTime: resolvedTransitTime,
                tier: 'custom',
                is_manual: true, // Treat loaded options as manual so they are editable
                source_attribution: 'Saved Quote',
@@ -711,20 +922,28 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
                charges: globalCharges,
                // Other fields
                is_selected: opt.is_selected,
-               total_amount: opt.total_amount,
+               total_amount: totalPrice || opt.total_amount || 0,
                marginPercent: opt.margin_percentage,
+               rank_score: opt.rank_score, // Preserve rank score
+               rank_details: opt.rank_details // Preserve rank details
              } as RateOption;
            });
  
            setManualOptions(reconstructedOptions);
            
            // Find selected option
-           const selected = reconstructedOptions.find(o => (o as any).is_selected) || reconstructedOptions[0];
+           // Priority: 1. optionId from URL, 2. is_selected flag, 3. first available
+           const paramOptionId = searchParams.get('optionId');
+           const selected = reconstructedOptions.find(o => o.id === paramOptionId) 
+             || reconstructedOptions.find(o => (o as any).is_selected) 
+             || reconstructedOptions[0];
+
            if (selected) {
              setSelectedOption(selected);
              dispatch({ type: 'INITIALIZE', payload: { optionId: selected.id } });
              
              // Also update optionDrafts so the edit form works
+             // This ensures that when the user edits, they start with the saved values
              const draft: any = {
                  legs: selected.legs,
                  charges: [...(selected.charges || []), ...((selected.legs || []).flatMap((l: any) => l.charges || []))],
@@ -744,7 +963,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
     } finally {
       setEditLoading(false);
     }
-  }, [quoteId, versionId, context, scopedDb, toast, dispatch, form]);
+  }, [quoteId, versionId]);
 
   useEffect(() => {
     if (!quoteId) return;
@@ -821,11 +1040,16 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
           quoteTitle: initialData.quoteTitle || '',
           mode: (initialData.mode || 'ocean') as any,
           origin: initialData.origin || '',
+          originId: initialData.originId || '',
           destination: initialData.destination || '',
+          destinationId: initialData.destinationId || '',
           commodity: initialData.commodity || initialData.commodity_description || '',
           weight: initialData.weight ? String(initialData.weight) : undefined,
           volume: initialData.volume ? String(initialData.volume) : undefined,
           preferredCarriers: initialData.preferredCarriers,
+          containerType: initialData.containerType || '',
+          containerSize: initialData.containerSize || '',
+          containerQty: initialData.containerQty ? String(initialData.containerQty) : '1',
       });
     }
 
@@ -924,23 +1148,39 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
     // Fire compliance in parallel (non-blocking)
     runComplianceCheck({ ...formValues, ...extendedData } as any);
 
-    // DISABLE AUTO MARKET RATE FETCHING
-    // Instead of fetching rates, we switch to Manual Composer Mode immediately.
-    // This ensures only the "Manual Quotation" option is shown.
-    handleComposerMode();
+    // Determine behavior based on Smart Mode and tenant configuration
+    const smartEnabled = config?.smart_mode_enabled ?? true;
 
-    /*
-    await rateFetching.fetchRates(
-      {
-        ...formValues,
-        ...extendedData,
-        mode: (formValues.mode || 'ocean') as any,
-        smartMode: smart,
-        account_id: storeState.quoteData?.account_id,
-      } as any,
-      containerResolver
-    );
-    */
+    if (smart) {
+      // Smart Mode requested
+      if (smartEnabled) {
+        await rateFetching.fetchRates(
+          {
+            ...formValues,
+            ...extendedData,
+            mode: (formValues.mode || 'ocean') as any,
+            smartMode: true,
+            account_id: storeState.quoteData?.account_id,
+          } as any,
+          containerResolver
+        );
+      } else {
+        // Tenant has Smart Mode disabled: fallback to Manual Composer
+        handleComposerMode();
+      }
+    } else {
+      // Standard Mode: fetch market rates and show highest-ranked by default
+      await rateFetching.fetchRates(
+        {
+          ...formValues,
+          ...extendedData,
+          mode: (formValues.mode || 'ocean') as any,
+          smartMode: false,
+          account_id: storeState.quoteData?.account_id,
+        } as any,
+        containerResolver
+      );
+    }
   };
 
   // ---------------------------------------------------------------------------
@@ -1052,6 +1292,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
 
   const handleSaveQuote = async (charges: any[], marginPercent: number, notes: string) => {
     setSaving(true);
+    logAudit('save_quote_attempt', { quoteId: quoteId || 'new' });
 
     try {
       const tenantId = storeState.tenantId || context?.tenantId;
@@ -1064,11 +1305,34 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
       const currentVersionId = storeState.versionId || versionId;
       const currentQuoteId = storeState.quoteId || quoteId;
 
-      // Build RPC payload
-      const formData = lastFormData || (initialFormValues && initialExtended ? {
-          values: initialFormValues as FormZoneValues,
-          extended: initialExtended as ExtendedFormData
-      } : null);
+      // Validate form before saving
+      const isValid = await form.trigger();
+      
+      if (!isValid) {
+        console.error('Validation Errors:', JSON.stringify(form.formState.errors, null, 2));
+        toast({ title: 'Validation Error', description: 'Please check the form for errors.', variant: 'destructive' });
+        setSaving(false);
+        return;
+      }
+
+      // Build RPC payload using current form values
+      const currentFormValues = form.getValues();
+      const formData = {
+          values: currentFormValues,
+          extended: {
+             containerType: currentFormValues.containerType,
+             containerSize: currentFormValues.containerSize,
+             containerQty: currentFormValues.containerQty,
+             containerCombos: currentFormValues.containerCombos,
+             htsCode: currentFormValues.htsCode,
+             dangerousGoods: currentFormValues.dangerousGoods,
+             pickupDate: currentFormValues.pickupDate,
+             deliveryDeadline: currentFormValues.deliveryDeadline,
+             incoterms: currentFormValues.incoterms,
+             vehicleType: currentFormValues.vehicleType,
+             attachments: currentFormValues.attachments
+          }
+      };
 
       if (!formData) {
           toast({ title: 'Error', description: 'Form data not ready. Please try again.', variant: 'destructive' });
@@ -1121,6 +1385,9 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
         }
       }
 
+      // Log start of save operation
+      // logger.info('[UnifiedComposer] Starting saveQuote...', { tenantId, quoteId: currentQuoteId });
+
       // Build guest billing details in standalone mode
       const billingForStandalone = isStandalone ? {
         company: formData?.values.guestCompany || null,
@@ -1160,6 +1427,23 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
         }
       }
 
+      // Resolve additional required IDs
+      const selectedCurrencyCode = selectedOption?.currency || 'USD';
+      const currencyId = repoData.currencies?.find((c: any) => c.code === selectedCurrencyCode)?.id 
+        || repoData.currencies?.find((c: any) => c.code === 'USD')?.id;
+
+      // Determine Service (based on mode)
+      const currentMode = formData?.values.mode || 'ocean';
+      let serviceName = 'Ocean Freight';
+      if (currentMode === 'air') serviceName = 'Air Freight';
+      else if (currentMode === 'road') serviceName = 'Road Freight';
+      else if (currentMode === 'rail') serviceName = 'Rail Freight';
+      
+      const serviceId = repoData.services?.find((s: any) => s.name === serviceName || s.code === currentMode.toUpperCase())?.id;
+      
+      // Determine Service Type (default to Export)
+      const serviceTypeId = repoData.serviceTypes?.find((s: any) => s.name === 'Export' || s.code === 'EXP')?.id;
+
       const quotePayload: any = {
         id: isUUID(currentQuoteId) ? currentQuoteId : undefined,
         quote_number: finalQuoteNumber,
@@ -1167,10 +1451,15 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
         transport_mode: formData?.values.mode || 'ocean',
         origin: formData?.values.origin || '',
         destination: formData?.values.destination || '',
+        origin_port_id: isUUID(formData?.values.originId) ? formData?.values.originId : null,
+        destination_port_id: isUUID(formData?.values.destinationId) ? formData?.values.destinationId : null,
         status: 'draft',
         tenant_id: tenantId,
-        // franchise_id: storeState.franchiseId || context?.franchiseId, // Removed for rollback
-        notes: [notes, formData?.values.internalNotes, formData?.values.specialInstructions, formData?.values.notesText].filter(Boolean).join('\n\n') || null,
+          currency_id: currencyId || null,
+          service_id: serviceId || null,
+          service_type_id: serviceTypeId || null,
+          franchise_id: storeState.franchiseId ?? context?.franchiseId ?? null,
+          notes: [notes, formData?.values.internalNotes, formData?.values.specialInstructions, formData?.values.notesText].filter(Boolean).join('\n\n') || null,
         terms_conditions: formData?.values.termsConditions || null,
         billing_address: billingForStandalone,
         pickup_date: formData?.extended.pickupDate || null,
@@ -1180,6 +1469,8 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
         account_id: isStandalone ? null : (formData?.values.accountId || storeState.quoteData?.account_id || null),
         contact_id: isStandalone ? null : (formData?.values.contactId || storeState.quoteData?.contact_id || null),
         opportunity_id: isStandalone ? null : (effectiveOpportunityId || null),
+        owner_id: user?.id || null,
+        created_by: user?.id || null,
         cargo_details: {
             commodity: formData?.values.commodity,
             total_weight_kg: Number(formData?.values.weight) || 0,
@@ -1199,14 +1490,21 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
 
       // Map container combos
       const combos = formData?.values.containerCombos || formData?.extended.containerCombos || [];
-      const cargoConfigs = combos.map((c: any) => ({
-          container_type: c.type,
-          container_size: c.size,
-          quantity: c.qty,
-          temperature_control: null // Add if needed
-      }));
+      const cargoConfigs = combos.map((c: any) => {
+          const typeObj = containerTypes.find(t => t.id === c.type);
+          const sizeObj = containerSizes.find(s => s.id === c.size);
+          
+          return {
+              container_type: typeObj?.name || c.type,
+              container_size: sizeObj?.name || c.size,
+              container_type_id: isUUID(c.type) ? c.type : null,
+              container_size_id: isUUID(c.size) ? c.size : null,
+              quantity: c.qty,
+              temperature_control: null
+          };
+      });
 
-      console.log('[UnifiedComposer] quotePayload cargo_details:', JSON.stringify(quotePayload.cargo_details, null, 2));
+      // console.log('[UnifiedComposer] quotePayload cargo_details:', JSON.stringify(quotePayload.cargo_details, null, 2));
 
       const findBasisCodeById = (id: string) =>
         repoData.chargeBases?.find((b: any) => b.id === id)?.code || '';
@@ -1233,24 +1531,38 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
       };
 
       const selectedId = selectedOption.id;
+      
+      const optionsSource = displayResults.some((o) => o.id === selectedOption.id)
+        ? displayResults
+        : [...displayResults, selectedOption];
 
-      for (const opt of displayResults) {
+      for (const opt of optionsSource) {
         const isSelected = opt.id === selectedId;
         const draft = optionDrafts[opt.id];
-        const draftLegs = (draft?.legs || opt.legs || []) as any[];
-        const draftCharges = (draft?.charges || (isSelected ? charges : [])) as any[];
+        const draftLegsSource = draft?.legs || opt.legs;
+        const draftLegs = (Array.isArray(draftLegsSource) ? draftLegsSource : []) as any[];
+        
+        // Fix: Use charges from args if selected, otherwise fallback to draft or original option charges
+        // This prevents unselected options from losing their charges
+        const draftChargesSource = draft?.charges || (isSelected ? charges : (opt.charges || []));
+        const draftCharges = (Array.isArray(draftChargesSource) ? draftChargesSource : []) as any[];
         const mp = draft?.marginPercent ?? marginPercent;
 
         const chargesByLegId: Record<string, any[]> = {};
         const combinedCharges: any[] = [];
-        for (const c of draftCharges) {
-          const legKey = c.legId || 'combined';
-          if (legKey === 'combined' || !c.legId) {
-            combinedCharges.push(c);
-          } else {
-            if (!chargesByLegId[legKey]) chargesByLegId[legKey] = [];
-            chargesByLegId[legKey].push(c);
+        
+        if (Array.isArray(draftCharges)) {
+          for (const c of draftCharges) {
+            const legKey = c.legId || c.leg_id || 'combined';
+            if (legKey === 'combined' || (!c.legId && !c.leg_id)) {
+              combinedCharges.push(c);
+            } else {
+              if (!chargesByLegId[legKey]) chargesByLegId[legKey] = [];
+              chargesByLegId[legKey].push(c);
+            }
           }
+        } else {
+             console.warn('[UnifiedComposer] draftCharges is not iterable for option', opt.id);
         }
 
         const legsPayload = draftLegs.map((leg: any) => ({
@@ -1293,18 +1605,25 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
         });
       }
 
+      const rpcPayload = {
+        quote: quotePayload,
+        items: [], // Use cargo_details for now, items can be added later if granular items are needed
+        cargo_configurations: cargoConfigs,
+        options: options
+      };
+
+      // logger.info('[UnifiedComposer] Sending save_quote_atomic payload', { payload: rpcPayload });
+
       const { data: savedId, error: rpcError } = await scopedDb.rpc('save_quote_atomic', {
-        p_payload: {
-          quote: quotePayload,
-          items: [], // Use cargo_details for now, items can be added later if granular items are needed
-          cargo_configurations: cargoConfigs,
-          options: options
-        }
+        p_payload: rpcPayload
       });
 
       if (rpcError) {
+        logger.error('[UnifiedComposer] save_quote_atomic RPC Error', { error: rpcError });
         throw new Error(rpcError.message || 'Failed to save quotation');
       }
+
+      // logger.info('[UnifiedComposer] save_quote_atomic success', { savedId });
 
       // Update store
       if (savedId) {
@@ -1361,18 +1680,11 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
       }
 
       // Log success
-      try {
-        logger.info('Quotation saved successfully', {
-            component: 'UnifiedQuoteComposer',
-            action: 'save_quote',
-            quoteId: savedId,
-            quoteNumber: displayQuoteNumber,
-            userId: user?.id,
-            timestamp: new Date().toISOString(),
-        });
-      } catch (e) {
-        console.warn('Failed to log success', e);
-      }
+      logAudit('save_quote_success', {
+        quoteId: savedId,
+        quoteNumber: displayQuoteNumber,
+        timestamp: new Date().toISOString()
+      }, 'success');
 
       if (displayQuoteNumber) {
         showQuotationSuccessToast(displayQuoteNumber);
@@ -1388,6 +1700,12 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
       } else if (err.code === 'PGRST116') {
         errorMessage = 'Database error: The quotation could not be verified after saving.';
       }
+
+      logAudit('save_quote_failure', {
+        quoteId: quoteId || 'new',
+        error: errorMessage,
+        stack: err.stack
+      }, 'failure');
 
       toast({ 
         title: 'Save Failed', 
@@ -1427,6 +1745,8 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
       return;
     }
 
+    logAudit('save_draft_attempt', { quoteId: quoteId || 'new' });
+
     try {
       setSaving(true);
       const formData = lastFormData;
@@ -1438,13 +1758,15 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
         destination: formData.values.destination || '',
         status: 'draft',
         tenant_id: tenantId,
-        // franchise_id: storeState.franchiseId || context?.franchiseId, // Removed
+        franchise_id: storeState.franchiseId || context?.franchiseId || null,
         pickup_date: formData.extended.pickupDate || null,
         delivery_deadline: formData.extended.deliveryDeadline || null,
         incoterms: formData.extended.incoterms || null,
         account_id: formData.values.accountId || storeState.quoteData?.account_id || null,
         contact_id: formData.values.contactId || storeState.quoteData?.contact_id || null,
         opportunity_id: formData.values.opportunityId || null,
+        owner_id: user?.id || null,
+        created_by: user?.id || null,
       };
 
       const { data: savedId, error: rpcError } = await scopedDb.rpc('save_quote_atomic', {
@@ -1467,9 +1789,11 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
            }
       }
 
+      logAudit('save_draft_success', { quoteId: savedId }, 'success');
       toast({ title: 'Draft saved', description: 'Your quote draft has been saved.' });
     } catch (err: any) {
       logger.error('[UnifiedComposer] Draft save failed:', err);
+      logAudit('save_draft_failure', { quoteId: quoteId || 'new', error: err.message, stack: err.stack }, 'failure');
       toast({ title: 'Save Failed', description: err.message || 'Could not save draft', variant: 'destructive' });
     } finally {
       setSaving(false);
@@ -1487,6 +1811,9 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
       toast({ title: 'Save First', description: 'Please save the quote before generating a PDF.', variant: 'destructive' });
       return;
     }
+    
+    logAudit('generate_pdf_attempt', { quoteId: currentQuoteId });
+
     try {
       const payload = { quoteId: currentQuoteId, versionId: currentVersionId, engine_v2: true, source: 'unified_composer', action: 'generate-pdf' };
       const response = await invokeAnonymous('generate-quote-pdf', enrichPayload(payload));
@@ -1504,9 +1831,12 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
       link.download = `Quote-${currentQuoteId.slice(0, 8)}.pdf`;
       link.click();
       URL.revokeObjectURL(url);
+      
+      logAudit('generate_pdf_success', { quoteId: currentQuoteId }, 'success');
       toast({ title: 'PDF Generated', description: 'PDF has been downloaded.' });
     } catch (err: any) {
       logger.error('[UnifiedComposer] PDF generation failed:', err);
+      logAudit('generate_pdf_failure', { quoteId: currentQuoteId, error: err.message, stack: err.stack }, 'failure');
       toast({ title: 'PDF Failed', description: err.message || 'Could not generate PDF', variant: 'destructive' });
     }
   };
@@ -1522,6 +1852,16 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
   // Render
   // ---------------------------------------------------------------------------
 
+  const breadcrumbs = [
+    { label: 'Sales', href: '/sales' },
+    { label: 'Quotations', href: '/sales/quotations' },
+    { label: isEditMode ? 'Edit Quotation' : 'New Quotation', active: true }
+  ];
+
+  const pageTitle = isEditMode 
+    ? `Edit Quotation ${storeState.quoteData?.quote_number ? `- ${storeState.quoteData.quote_number}` : ''}`
+    : 'New Quotation';
+
   if (editLoading) {
     return (
       <div className="flex items-center justify-center py-24">
@@ -1531,129 +1871,137 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
     );
   }
 
-  return (
-     <FormProvider {...form}>
-      <div className="space-y-6">
-        
-        {loadErrors.length > 0 && (
-          <div className="rounded-md bg-destructive/15 p-4 text-destructive">
-            <div className="flex items-center gap-2 font-medium">
-               <AlertCircle className="h-4 w-4" />
-               <span>Some data failed to load:</span>
-            </div>
-            <ul className="mt-2 list-disc pl-5 text-sm">
-              {loadErrors.map((err, i) => (
-                <li key={i}>{err}</li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        <div className="flex justify-end">
-           {versionHistory.length > 0 && (
-            <Sheet>
-              <SheetTrigger asChild>
-                <Button variant="outline" size="sm" className="gap-2">
-                  <History className="h-4 w-4" />
-                  Version History
-                  <Badge variant="secondary" className="ml-1 h-5 px-1.5 min-w-[1.25rem]">{versionHistory.length}</Badge>
-                </Button>
-              </SheetTrigger>
-              <SheetContent>
-                <SheetHeader>
-                  <SheetTitle>Version History</SheetTitle>
-                </SheetHeader>
-                <div className="mt-6 space-y-4">
-                  {versionHistory.map((ver) => (
-                    <div key={ver.id} className="flex flex-col gap-2 p-3 border rounded-lg hover:bg-muted/50 transition-colors">
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium">Version {ver.version_number}</span>
-                        <span className="text-xs text-muted-foreground">{new Date(ver.created_at).toLocaleDateString()}</span>
-                      </div>
-                      <div className="text-sm text-muted-foreground line-clamp-2">
-                        {ver.change_summary || 'No summary available'}
-                      </div>
-                      <div className="flex items-center justify-between mt-1">
-                        <span className="text-xs bg-muted px-2 py-0.5 rounded text-muted-foreground">
-                            {ver.created_by_email || 'System'}
-                        </span>
-                        <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => {
-                            setSearchParams(prev => {
-                                const newParams = new URLSearchParams(prev);
-                                newParams.set('versionId', ver.id);
-                                return newParams;
-                            });
-                        }}>
-                          Load <ExternalLink className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+  const actions = (
+    <div className="flex items-center gap-2">
+       {versionHistory.length > 0 && (
+        <Sheet>
+          <SheetTrigger asChild>
+            <Button variant="outline" size="sm" className="gap-2">
+              <History className="h-4 w-4" />
+              Version History
+              <Badge variant="secondary" className="ml-1 h-5 px-1.5 min-w-[1.25rem]">{versionHistory.length}</Badge>
+            </Button>
+          </SheetTrigger>
+          <SheetContent>
+            <SheetHeader>
+              <SheetTitle>Version History</SheetTitle>
+            </SheetHeader>
+            <div className="mt-6 space-y-4">
+              {versionHistory.map((ver) => (
+                <div key={ver.id} className="flex flex-col gap-2 p-3 border rounded-lg hover:bg-muted/50 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">Version {ver.version_number}</span>
+                    <span className="text-xs text-muted-foreground">{new Date(ver.created_at).toLocaleDateString()}</span>
+                  </div>
+                  <div className="text-sm text-muted-foreground line-clamp-2">
+                    {ver.change_summary || 'No summary available'}
+                  </div>
+                  <div className="flex items-center justify-between mt-1">
+                    <span className="text-xs bg-muted px-2 py-0.5 rounded text-muted-foreground">
+                        {ver.created_by_email || 'System'}
+                    </span>
+                    <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => {
+                        setSearchParams(prev => {
+                            const newParams = new URLSearchParams(prev);
+                            newParams.set('versionId', ver.id);
+                            return newParams;
+                        });
+                    }}>
+                      Load <ExternalLink className="h-3 w-3" />
+                    </Button>
+                  </div>
                 </div>
-              </SheetContent>
-            </Sheet>
-           )}
-        </div>
+              ))}
+            </div>
+          </SheetContent>
+        </Sheet>
+       )}
+    </div>
+  );
 
-        {/* Form Zone */}
-        <FormZone
-            onGetRates={handleGetRates}
-            onSaveDraft={handleSaveDraft}
-            loading={rateFetching.loading}
-            crmLoading={isCrmLoading}
-            initialValues={initialFormValues}
-            initialExtended={initialExtended}
-            accounts={accounts}
-            contacts={contacts}
-            opportunities={opportunities}
-            onChange={handleFormChange}
-        />
+  return (
+    <EnterpriseFormLayout
+      breadcrumbs={breadcrumbs}
+      title={pageTitle}
+      actions={actions}
+    >
+       <FormProvider {...form}>
+        <div className="space-y-6 w-full max-w-full">
+          
+          {loadErrors.length > 0 && (
+            <div className="rounded-md bg-destructive/15 p-4 text-destructive">
+              <div className="flex items-center gap-2 font-medium">
+                 <AlertCircle className="h-4 w-4" />
+                 <span>Some data failed to load:</span>
+              </div>
+              <ul className="mt-2 list-disc pl-5 text-sm">
+                {loadErrors.map((err, i) => (
+                  <li key={i}>{err}</li>
+                ))}
+              </ul>
+            </div>
+          )}
 
-        <Separator />
+          {/* Form Zone */}
+          <FormZone
+              onGetRates={handleGetRates}
+              onSaveDraft={handleSaveDraft}
+              loading={rateFetching.loading}
+              crmLoading={isCrmLoading}
+              initialValues={initialFormValues}
+              initialExtended={initialExtended}
+              accounts={accounts}
+              contacts={contacts}
+              opportunities={opportunities}
+              onChange={handleFormChange}
+          />
 
-        {/* Results Zone */}
-        <ResultsZone
-            results={(!lastFormData && displayResults.length === 0 && !rateFetching.loading && !isSmartMode) ? null : displayResults}
-            loading={rateFetching.loading}
-            smartMode={isSmartMode}
-            marketAnalysis={rateFetching.marketAnalysis}
-            confidenceScore={rateFetching.confidenceScore}
-            anomalies={rateFetching.anomalies}
-            complianceCheck={complianceCheck}
-            onSelect={handleSelectOption}
-            selectedOptionId={selectedOption?.id}
-            onRerunRates={lastFormData ? handleRerunRates : undefined}
-            onAddManualOption={handleAddManualOption}
-            onRemoveOption={handleRemoveOption}
-            availableOptions={availableOptions}
-            onAddRateOption={handleAddRateOption}
-            onRenameOption={handleRenameOption}
-        />
+          <Separator />
 
-        {/* Finalize Section — shown when option selected */}
-        {selectedOption && (
-          <>
-            <Separator />
-            <FinalizeSection
-              selectedOption={selectedOption}
-              onSaveQuote={handleSaveQuote}
-              onGeneratePdf={handleGeneratePdf}
-              saving={saving}
-              draft={optionDrafts[selectedOption.id]}
-              onDraftChange={(draft) =>
-                setOptionDrafts((prev) => ({ ...prev, [selectedOption.id]: draft }))
-              }
+          {/* Results Zone */}
+          <ResultsZone
+              results={(!lastFormData && displayResults.length === 0 && !rateFetching.loading && !editLoading && !isSmartMode && !quoteId) ? null : displayResults}
+              loading={rateFetching.loading || editLoading}
+              smartMode={isSmartMode}
+              marketAnalysis={rateFetching.marketAnalysis}
+              confidenceScore={rateFetching.confidenceScore}
+              anomalies={rateFetching.anomalies}
+              complianceCheck={complianceCheck}
+              onSelect={handleSelectOption}
+              selectedOptionId={selectedOption?.id}
+              onRerunRates={lastFormData ? handleRerunRates : undefined}
+              onAddManualOption={handleAddManualOption}
+              onRemoveOption={handleRemoveOption}
+              availableOptions={availableOptions}
+              onAddRateOption={handleAddRateOption}
               onRenameOption={handleRenameOption}
-              referenceData={{
-                chargeCategories: repoData.chargeCategories || [],
-                chargeBases: repoData.chargeBases || [],
-                currencies: repoData.currencies || [],
-                chargeSides: repoData.chargeSides || [],
-              }}
-            />
-          </>
-        )}
-      </div>
-    </FormProvider>
+          />
+
+          {/* Finalize Section — shown when option selected */}
+          {selectedOption && (
+            <>
+              <Separator />
+              <FinalizeSection
+                selectedOption={selectedOption}
+                onSaveQuote={handleSaveQuote}
+                onGeneratePdf={handleGeneratePdf}
+                saving={saving}
+                draft={optionDrafts[selectedOption.id]}
+                onDraftChange={(draft) =>
+                  setOptionDrafts((prev) => ({ ...prev, [selectedOption.id]: draft }))
+                }
+                onRenameOption={handleRenameOption}
+                referenceData={{
+                  chargeCategories: repoData.chargeCategories || [],
+                  chargeBases: repoData.chargeBases || [],
+                  currencies: repoData.currencies || [],
+                  chargeSides: repoData.chargeSides || [],
+                }}
+              />
+            </>
+          )}
+        </div>
+      </FormProvider>
+    </EnterpriseFormLayout>
   );
 }

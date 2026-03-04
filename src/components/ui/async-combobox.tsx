@@ -138,7 +138,7 @@ export function AsyncCombobox({
                 </CommandItem>
               ))}
             </CommandGroup>
-            {onCreate && (
+            {onCreate && options.length > 0 && (
               <>
                 <CommandSeparator />
                 <CommandGroup>

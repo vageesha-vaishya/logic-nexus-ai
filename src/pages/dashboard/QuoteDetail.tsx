@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { VersionHistoryPanel } from '@/components/sales/quotation-versions/VersionHistoryPanel';
 import { SaveVersionDialog } from '@/components/sales/quotation-versions/SaveVersionDialog';
@@ -16,16 +16,19 @@ import { useDebug } from '@/hooks/useDebug';
 import { Button } from "@/components/ui/button";
 import { DetailScreenTemplate } from '@/components/system/DetailScreenTemplate';
 import { QuotationConfigurationService } from '@/services/quotation/QuotationConfigurationService';
+import { QuotationRankingService } from '@/services/quotation/QuotationRankingService';
 
 export default function QuoteDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const urlVersionId = searchParams.get('versionId');
   const { supabase, context, scopedDb } = useCRM();
   const debug = useDebug('Sales', 'QuoteDetail');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [resolvedId, setResolvedId] = useState<string | null>(null);
-  const [versionId, setVersionId] = useState<string | null>(null);
+  const [versionId, setVersionId] = useState<string | null>(urlVersionId || null);
   const [tenantId, setTenantId] = useState<string | null>(null);
   const [quoteNumber, setQuoteNumber] = useState<string | null>(null);
   const [showSaveVersion, setShowSaveVersion] = useState(false);
@@ -42,15 +45,132 @@ export default function QuoteDetail() {
 
   // Load comparison options if multi-option enabled
   useEffect(() => {
-    if (config?.multi_option_enabled && versionId) {
-        scopedDb.from('quotation_version_options')
-            .select('*')
-            .eq('quotation_version_id', versionId)
-            .then(({ data }) => setComparisonOptions(data || []));
+    if (versionId) {
+        // Clear previous options to avoid stale data during version switch
+        setComparisonOptions([]);
+        
+        const fetchOptions = async () => {
+          // Fetch options (without joins to be robust)
+           const { data: optionRows, error } = await scopedDb
+             .from('quotation_version_options')
+             .select('*')
+             .eq('quotation_version_id', versionId);
+ 
+           if (error) {
+             console.error('Error fetching options:', error);
+             return;
+           }
+ 
+           if (!optionRows || optionRows.length === 0) {
+             setComparisonOptions([]);
+             return;
+           }
+
+           // Collect IDs for hydration
+           const carrierIds = new Set<string>();
+           const carrierRateIds = new Set<string>();
+           const currencyIds = new Set<string>();
+
+           optionRows.forEach((opt: any) => {
+               if (opt.carrier_id) carrierIds.add(opt.carrier_id);
+               if (opt.carrier_rate_id) carrierRateIds.add(opt.carrier_rate_id);
+               if (opt.currency_id) currencyIds.add(opt.currency_id);
+           });
+
+           // Fetch Carrier Rates
+           let carrierRatesMap: Record<string, any> = {};
+           if (carrierRateIds.size > 0) {
+               const { data: rates } = await scopedDb
+                   .from('carrier_rates')
+                   .select('id, currency, carrier_id')
+                   .in('id', Array.from(carrierRateIds));
+                
+               rates?.forEach((r: any) => {
+                   carrierRatesMap[r.id] = r;
+                   if (r.carrier_id) carrierIds.add(r.carrier_id);
+               });
+           }
+
+           // Fetch Carriers
+           let carriersMap: Record<string, any> = {};
+           if (carrierIds.size > 0) {
+               const { data: carriers } = await scopedDb
+                   .from('carriers')
+                   .select('id, carrier_name')
+                   .in('id', Array.from(carrierIds));
+                
+               carriers?.forEach((c: any) => {
+                   carriersMap[c.id] = c;
+               });
+           }
+
+           // Fetch Currencies
+           let currenciesMap: Record<string, any> = {};
+           if (currencyIds.size > 0) {
+               const { data: currencies } = await scopedDb
+                   .from('currencies')
+                   .select('id, code')
+                   .in('id', Array.from(currencyIds));
+                
+               currencies?.forEach((c: any) => {
+                   currenciesMap[c.id] = c;
+               });
+           }
+ 
+           // Map to RankableOption
+           const rankableOptions = optionRows.map((opt: any) => {
+             // Resolve carrier rate
+             const carrierRate = opt.carrier_rate_id ? carrierRatesMap[opt.carrier_rate_id] : null;
+
+             // Resolve carrier name
+             let carrierName = carriersMap[opt.carrier_id]?.carrier_name;
+             if (!carrierName && carrierRate?.carrier_id) {
+                 carrierName = carriersMap[carrierRate.carrier_id]?.carrier_name;
+             }
+             if (!carrierName) carrierName = 'Unknown Carrier';
+             
+             // Resolve transit time
+             let transitTime = opt.transit_days;
+             if (!transitTime && opt.transit_time) {
+                // Parse transit_time string if needed, e.g. "25 days"
+                const match = String(opt.transit_time).match(/(\d+)/);
+                if (match) transitTime = parseInt(match[1], 10);
+             }
+
+             // Resolve currency
+             const currencyCode = currenciesMap[opt.currency_id]?.code;
+             const currency = currencyCode || opt.currency || carrierRate?.currency || 'USD';
+ 
+             return {
+               ...opt,
+               carrier_name: carrierName, // Enhance with resolved name
+               total_amount: Number(opt.total_amount || opt.sell_subtotal || 0),
+               currency,
+               transit_time_days: transitTime,
+               reliability_score: opt.reliability_score || 0.5, // Default to neutral if not stored
+             };
+           });
+
+          // Rank options
+          const criteria = config?.auto_ranking_criteria || { cost: 0.4, transit_time: 0.3, reliability: 0.3 };
+          const ranked = QuotationRankingService.rankOptions(rankableOptions, criteria);
+          
+          setComparisonOptions(ranked);
+        };
+
+        fetchOptions();
     }
-  }, [config, versionId]);
+  }, [versionId, config]);
 
   useEffect(() => {
+    // Reset state when ID changes to prevent data mismatch during transition
+    setResolvedId(null);
+    setVersionId(null);
+    setTenantId(null);
+    setQuoteNumber(null);
+    setComparisonOptions([]);
+    setLoading(true);
+
     const checkQuote = async () => {
       try {
         setError(null);
@@ -97,12 +217,35 @@ export default function QuoteDetail() {
     const loadLatestVersion = async () => {
       if (!resolvedId) return;
       
-      debug.info('Loading latest version', { quoteId: resolvedId });
+      debug.info('Loading version', { quoteId: resolvedId, urlVersionId });
       
       try {
         if (versionAbortRef.current) versionAbortRef.current.abort();
         versionAbortRef.current = new AbortController();
         const signal = versionAbortRef.current.signal;
+
+        // If URL has versionId, try to load that specific version first
+        if (urlVersionId) {
+          const { data: v, error: vError } = await scopedDb
+            .from('quotation_versions')
+            .select('id, version_number, tenant_id')
+            .eq('id', urlVersionId)
+            .maybeSingle()
+            .abortSignal(signal);
+
+          if (!vError && v) {
+            debug.log('Found requested version', { versionId: v.id });
+            setVersionId(String(v.id));
+            if (!tenantId && v.tenant_id) {
+               setTenantId(v.tenant_id);
+            }
+            setLoading(false);
+            return;
+          } else {
+             debug.warn('Requested version not found or error, falling back to latest', { urlVersionId, error: vError });
+          }
+        }
+
         const { data, error } = await (scopedDb
           .from('quotation_versions')
           .select('id, version_number, tenant_id') as any)
@@ -225,7 +368,7 @@ export default function QuoteDetail() {
     return () => {
       if (versionAbortRef.current) versionAbortRef.current.abort();
     };
-  }, [resolvedId]);
+  }, [resolvedId, urlVersionId]);
 
   const handleSaveVersion = async (type: 'minor' | 'major', reason: string) => {
     if (!resolvedId) return;
@@ -369,14 +512,24 @@ export default function QuoteDetail() {
             />
           )}
           
-          <UnifiedQuoteComposer
-              quoteId={resolvedId ?? id}
-              versionId={versionId || undefined}
-          />
-          <QuotationVersionHistory 
-              quoteId={resolvedId ?? (id as string)} 
-              key={versionId} // Force reload when version is resolved/created
-          />
+          {resolvedId ? (
+            <>
+              <UnifiedQuoteComposer
+                  key={resolvedId} // Force re-mount when quote changes
+                  quoteId={resolvedId}
+                  versionId={versionId || undefined}
+              />
+              <QuotationVersionHistory 
+                  quoteId={resolvedId} 
+                  key={versionId} // Force reload when version is resolved/created
+              />
+            </>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+              <Loader2 className="w-8 h-8 animate-spin mb-4" />
+              <p>Loading quote details...</p>
+            </div>
+          )}
           <VersionHistoryPanel
             quoteId={resolvedId ?? (id as string)}
             onRestore={handleRestoreVersion}

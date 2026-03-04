@@ -153,7 +153,9 @@ describe('UnifiedQuoteComposer Load Logic', () => {
       tenant_id: 'test-tenant',
       title: 'Test Quote',
       origin: 'Shanghai',
-      destination: 'Los Angeles'
+      destination: 'Los Angeles',
+      origin_port_data: { location_name: 'Shanghai', location_code: 'SHA' },
+      destination_port_data: { location_name: 'Los Angeles', location_code: 'LAX' }
     };
 
     const mockOptions = [

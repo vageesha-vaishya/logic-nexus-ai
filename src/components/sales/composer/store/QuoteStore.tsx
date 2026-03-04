@@ -6,6 +6,7 @@ const initialState: QuoteState = {
   versionId: null,
   optionId: null,
   tenantId: null,
+  franchiseId: null,
   marketAnalysis: null,
   confidenceScore: null,
   anomalies: [],

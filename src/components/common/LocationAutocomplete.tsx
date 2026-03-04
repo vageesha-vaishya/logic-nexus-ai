@@ -32,11 +32,11 @@ interface Location {
 // RPC Result Interface
 interface RPCLocation {
   id: string;
-  name: string;
-  code: string;
-  type: string;
-  country_name: string;
-  city_name: string;
+  location_name: string;
+  location_code: string;
+  location_type: string;
+  country: string;
+  city: string;
 }
 
 interface LocationAutocompleteProps {
@@ -45,6 +45,7 @@ interface LocationAutocompleteProps {
   placeholder?: string;
   className?: string;
   disabled?: boolean;
+  preloadedLocations?: Location[];
 }
 
 export function LocationAutocomplete({
@@ -52,7 +53,8 @@ export function LocationAutocomplete({
   onChange,
   placeholder = "Search location...",
   className,
-  disabled = false
+  disabled = false,
+  preloadedLocations
 }: LocationAutocompleteProps) {
   const [open, setOpen] = React.useState(false)
   const [inputValue, setInputValue] = React.useState("")
@@ -61,13 +63,38 @@ export function LocationAutocomplete({
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null)
   const [selectedLocation, setSelectedLocation] = React.useState<Location | null>(null)
   const inputRef = React.useRef<HTMLInputElement>(null)
+  const isSelecting = React.useRef(false)
   
-  const { supabase } = useCRM()
+  const { scopedDb, user } = useCRM()
   const debouncedSearch = useDebounce(inputValue, 300)
   const [cache, setCache] = React.useState<Record<string, Location[]>>({})
   const PAGE_SIZE = 50
   const [page, setPage] = React.useState(0)
   const [hasMore, setHasMore] = React.useState(false)
+
+  const normalizeLocation = React.useCallback((item: any): Location | null => {
+    if (!item) return null
+
+    const id = String(item.id || '').trim()
+    const location_name = String(
+      item.location_name ?? item.locationName ?? item.name ?? item.city ?? ''
+    ).trim()
+    if (!location_name || location_name === 'undefined' || location_name === 'null') return null
+
+    const location_code = String(item.location_code ?? item.locationCode ?? item.code ?? '').trim()
+    const location_type = String(item.location_type ?? item.locationType ?? item.type ?? 'unknown').trim()
+    const country = String(item.country ?? item.country_name ?? item.countryName ?? '').trim()
+    const city = String(item.city ?? item.city_name ?? item.cityName ?? '').trim()
+
+    return {
+      id: id || `${location_name}-${location_code}`,
+      location_name,
+      location_code,
+      location_type,
+      country,
+      city,
+    }
+  }, [])
 
   React.useEffect(() => {
     if (!open) {
@@ -83,15 +110,154 @@ export function LocationAutocomplete({
     }
   }, [open])
 
+  // Sync selectedLocation with value prop
+  React.useEffect(() => {
+    let isMounted = true;
+
+    const syncLocation = async () => {
+      const valueTrimmed = String(value || '').trim()
+      const valueLower = valueTrimmed.toLowerCase()
+
+      const codeFromLabel = valueTrimmed.match(/\(([^)]+)\)\s*$/)?.[1]?.trim() || ''
+      const codeLower = codeFromLabel.toLowerCase()
+      const nameFromLabel = valueTrimmed.replace(/\s*\([^)]+\)\s*$/, '').trim()
+      const nameFromLabelLower = nameFromLabel.toLowerCase()
+
+      const isUuid =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+          valueTrimmed
+        )
+
+      if (valueTrimmed) {
+        if (isUuid) {
+          if (selectedLocation?.id && selectedLocation.id.trim().toLowerCase() === valueLower) return
+
+          try {
+            const { data, error } = await scopedDb
+              .from('ports_locations', true)
+              .select('id, location_name, location_code, location_type, country, city')
+              .in('id', [valueTrimmed])
+              .maybeSingle()
+
+            if (error) {
+              Sentry.captureException(error, {
+                tags: { feature: 'quick_quote', component: 'LocationAutocomplete', stage: 'sync-by-id' },
+              })
+              return
+            }
+
+            const normalized = normalizeLocation(data)
+            if (isMounted && normalized) {
+              setSelectedLocation(normalized)
+            }
+            return
+          } catch (e) {
+            if (isMounted) {
+              Sentry.captureException(e, {
+                tags: { feature: 'quick_quote', component: 'LocationAutocomplete', stage: 'sync-by-id' },
+              })
+            }
+            return
+          }
+        }
+
+        // 1. Check preloaded locations (fastest)
+        if (preloadedLocations && preloadedLocations.length > 0) {
+          const match = preloadedLocations.find((l: any) => {
+            const normalized = normalizeLocation(l)
+            if (!normalized) return false
+            const nLower = normalized.location_name.toLowerCase()
+            const cLower = normalized.location_code.toLowerCase()
+            if (nameFromLabelLower && nLower === nameFromLabelLower) return true
+            if (valueLower && nLower === valueLower) return true
+            if (codeLower && cLower === codeLower) return true
+            if (valueLower && cLower === valueLower) return true
+            return false
+          }) as any;
+          if (match) {
+            const normalized = normalizeLocation(match)
+            if (isMounted && normalized) {
+              const isSame =
+                selectedLocation &&
+                selectedLocation.location_name.toLowerCase() === normalized.location_name.toLowerCase() &&
+                selectedLocation.location_code.toLowerCase() === normalized.location_code.toLowerCase()
+              if (!isSame) setSelectedLocation(normalized)
+            }
+            return;
+          }
+        }
+        
+        // 2. If not in preloaded and no selectedLocation (or mismatch), fetch via RPC
+        if (!selectedLocation || selectedLocation.location_name.toLowerCase() !== valueLower) {
+             try {
+                 // Only fetch if value looks like a real location (e.g. > 2 chars)
+                 if (valueTrimmed.length < 2) return;
+
+                 const { data, error } = await scopedDb.rpc('search_locations', {
+                     search_text: valueTrimmed,
+                     limit_count: 1
+                 });
+                 
+                 if (error) {
+                   Sentry.captureException(error, {
+                     tags: { feature: 'quick_quote', component: 'LocationAutocomplete', stage: 'sync-by-rpc' },
+                   })
+                   return
+                 }
+
+                 if (isMounted && data && data.length > 0) {
+                     const normalized = normalizeLocation(data[0]);
+                     if (!normalized) return
+
+                     const nLower = normalized.location_name.toLowerCase()
+                     const cLower = normalized.location_code.toLowerCase()
+                     const isStrictMatch =
+                       (nameFromLabelLower && nLower === nameFromLabelLower) ||
+                       (valueLower && nLower === valueLower) ||
+                       (codeLower && cLower === codeLower) ||
+                       (valueLower && cLower === valueLower)
+
+                     if (isStrictMatch) setSelectedLocation(normalized);
+                 }
+             } catch (e) {
+                 if (isMounted) {
+                    Sentry.captureException(e, { tags: { feature: 'quick_quote', component: 'LocationAutocomplete', stage: 'sync-by-rpc' } })
+                 }
+             }
+        }
+      } else if (!value && selectedLocation) {
+          if (isSelecting.current) {
+              isSelecting.current = false;
+          } else {
+              if (isMounted) setSelectedLocation(null);
+          }
+      }
+    };
+
+    syncLocation();
+    
+    return () => {
+        isMounted = false;
+    };
+  }, [value, preloadedLocations, selectedLocation, scopedDb, normalizeLocation]);
+
   // Initial load when dropdown opens with empty search
   React.useEffect(() => {
     const initialLoad = async () => {
       if (!open || (inputValue && inputValue.length >= 2)) return
+      
+      if (preloadedLocations && preloadedLocations.length > 0) {
+        setLocations(preloadedLocations.slice(0, PAGE_SIZE));
+        setHasMore(preloadedLocations.length > PAGE_SIZE);
+        setPage(1);
+        return;
+      }
+      
       setLoading(true)
       setErrorMsg(null)
       try {
-        const { data, error } = await supabase
-          .from('ports_locations')
+        const { data, error } = await scopedDb
+          .from('ports_locations', true)
           .select('id, location_name, location_code, location_type, country, city')
           .order('location_name', { ascending: true })
           .range(0, PAGE_SIZE - 1)
@@ -118,7 +284,7 @@ export function LocationAutocomplete({
       }
     }
     initialLoad()
-  }, [open, inputValue, supabase])
+  }, [open, inputValue, scopedDb, preloadedLocations])
 
   React.useEffect(() => {
     const fetchLocations = async () => {
@@ -134,85 +300,138 @@ export function LocationAutocomplete({
         return
       }
 
+      if (preloadedLocations && preloadedLocations.length > 0) {
+        const searchLower = debouncedSearch.toLowerCase();
+        const filtered = preloadedLocations.filter(loc => 
+          (loc.location_name && loc.location_name.toLowerCase().includes(searchLower)) ||
+          (loc.location_code && loc.location_code.toLowerCase().includes(searchLower)) ||
+          (loc.city && loc.city.toLowerCase().includes(searchLower)) ||
+          (loc.country && loc.country.toLowerCase().includes(searchLower))
+        ).slice(0, 50); // Limit results for performance
+        
+        if (filtered.length > 0) {
+            setLocations(filtered);
+            setHasMore(false); // No pagination for filtered results
+            setCache(prev => ({ ...prev, [debouncedSearch]: filtered }));
+            return;
+        }
+        // If no matches in preloaded, fall through to RPC/DB search
+      }
+
       setLoading(true)
       setErrorMsg(null)
       try {
-        const { data, error } = await supabase
-          .rpc('search_locations', { search_text: debouncedSearch, limit_count: 10 })
+        // Run both RPC and direct query in parallel for best results
+        const [rpcResponse, fallbackResponse] = await Promise.all([
+          scopedDb.rpc('search_locations', { search_text: debouncedSearch, limit_count: 10 }),
+          scopedDb
+            .from('ports_locations', true)
+            .select('id, location_name, location_code, location_type, country, city')
+            .or(`location_name.ilike.%${debouncedSearch}%,location_code.ilike.%${debouncedSearch}%,city.ilike.%${debouncedSearch}%`)
+            .limit(10)
+        ]);
 
-        if (error) {
-          console.error('Error fetching locations:', error)
-          setErrorMsg('Error fetching locations. Showing fallback results.')
+        const { data: rpcData, error: rpcError } = rpcResponse;
+        const { data: fallbackData, error: fbError } = fallbackResponse;
+
+        if (rpcError) {
+          console.error('Error fetching locations via RPC:', rpcError)
+          // Don't fail completely if RPC fails, just rely on fallback
           Sentry.captureMessage('Location search RPC failed', {
             level: 'warning',
             tags: { feature: 'quick_quote', component: 'LocationAutocomplete' },
           })
-          const { data: fallback, error: fbError } = await supabase
-            .from('ports_locations')
-            .select('id, location_name, location_code, location_type, country, city')
-            .or(`location_name.ilike.%${debouncedSearch}%,location_code.ilike.%${debouncedSearch}%`)
-            .limit(10)
-          if (fbError) {
-            console.error('Fallback query failed:', fbError)
-            setLocations([])
-            return
-          }
-          setLocations((fallback || []) as Location[])
-          return
         }
 
-        if (Array.isArray(data) && data.length > 0) {
-          // Map RPC result to Location interface
-          const mappedLocations: Location[] = (data as RPCLocation[]).map(item => ({
-            id: item.id,
-            location_name: item.name,
-            location_code: item.code,
-            location_type: item.type,
-            country: item.country_name,
-            city: item.city_name
-          }))
+        if (fbError) {
+             console.error('Fallback query failed:', fbError)
+        }
 
-          setLocations(mappedLocations)
-          setCache(prev => ({ ...prev, [debouncedSearch]: mappedLocations }))
+        // Combine results
+        const combinedResults: Location[] = [];
+        const seenIds = new Set<string>();
+
+        // Helper to add unique locations
+        const addLocation = (item: any) => {
+             const id = item.id;
+             // Handle potential different casing or missing fields
+             let locName = item.location_name || item.locationName || item.name || item.city || '';
+             
+             // Explicit check for "undefined" string or null
+             if (!locName || locName === 'undefined' || locName === 'null') {
+                // Try to construct from city/country if name is missing
+                if (item.city) {
+                    locName = item.city;
+                    if (item.country) locName += `, ${item.country}`;
+                } else {
+                    return; // Skip invalid items
+                }
+             }
+             
+             const locCode = item.location_code || item.locationCode || item.code || '';
+             const locType = item.location_type || item.locationType || item.type || 'unknown';
+             const country = item.country || item.country_name || '';
+             const city = item.city || item.city_name || '';
+
+             // Use a composite key of name+code to deduplicate if ID is missing or generated
+             const key = id || `${locName}-${locCode}`;
+             
+             if (!seenIds.has(key)) {
+                 seenIds.add(key);
+                 combinedResults.push({
+                    id: item.id || key, // Fallback ID
+                    location_name: locName,
+                    location_code: locCode,
+                    location_type: locType,
+                    country: country,
+                    city: city
+                 });
+             }
+        };
+
+        if (rpcData && Array.isArray(rpcData)) rpcData.forEach(addLocation);
+        if (fallbackData && Array.isArray(fallbackData)) fallbackData.forEach(addLocation);
+        
+        setLocations(combinedResults);
+        
+        if (combinedResults.length === 0) {
+            setErrorMsg(null); // No results found, but no error
         } else {
-          const { data: fallback } = await supabase
-            .from('ports_locations')
-            .select('id, location_name, location_code, location_type, country, city')
-            .or(`location_name.ilike.%${debouncedSearch}%,location_code.ilike.%${debouncedSearch}%`)
-            .limit(10)
-          if (!fallback || fallback.length === 0) {
-            setErrorMsg(null)
-          }
-          if (!Array.isArray(data) || data.length === 0) {
-            Sentry.captureMessage('Location search RPC returned empty, using fallback', {
-              level: 'info',
-              tags: { feature: 'quick_quote', component: 'LocationAutocomplete' },
-            })
-          }
-          setLocations((fallback || []) as Location[])
+             setCache(prev => ({ ...prev, [debouncedSearch]: combinedResults }));
         }
+
       } catch (err) {
         console.error('Failed to fetch locations:', err)
         setErrorMsg('Network error. Showing fallback results if available.')
         Sentry.captureException(err, {
           tags: { feature: 'quick_quote', component: 'LocationAutocomplete' },
         })
-        const { data: fallback } = await supabase
-          .from('ports_locations')
+        const { data: fallback } = await scopedDb
+          .from('ports_locations', true)
           .select('id, location_name, location_code, location_type, country, city')
-          .or(`location_name.ilike.%${debouncedSearch}%,location_code.ilike.%${debouncedSearch}%`)
+          .or(`location_name.ilike.%${debouncedSearch}%,location_code.ilike.%${debouncedSearch}%,city.ilike.%${debouncedSearch}%`)
           .limit(10)
-        setLocations((fallback || []) as Location[])
+          
+        const mappedFallback: Location[] = (fallback || []).map((item: any) => ({
+             id: item.id,
+             location_name: item.location_name || item.name || 'Unknown Location',
+             location_code: item.location_code || item.code || '',
+             location_type: item.location_type || item.type || 'unknown',
+             country: item.country || item.country_name || '',
+             city: item.city || item.city_name || ''
+        }))
+        setLocations(mappedFallback)
       } finally {
         setLoading(false)
       }
     }
 
     fetchLocations()
-  }, [debouncedSearch, supabase])
+  }, [debouncedSearch, scopedDb, user, preloadedLocations])
 
   const getLocationIcon = (type: string) => {
-    switch (type?.toLowerCase()) {
+    const safeType = String(type || '').toLowerCase();
+    switch (safeType) {
       case 'seaport': return <Ship className="h-4 w-4" />
       case 'airport': return <Plane className="h-4 w-4" />
       case 'inland_port': return <Truck className="h-4 w-4" />
@@ -224,8 +443,22 @@ export function LocationAutocomplete({
   }
 
   // Display logic: Use selectedLocation if available and matches value, otherwise just show value
-  const displayValue = selectedLocation && selectedLocation.location_name === value
-    ? `${selectedLocation.location_name} ${selectedLocation.location_code ? `(${selectedLocation.location_code})` : ''}`
+  const selectedNameLower = (selectedLocation?.location_name || '').trim().toLowerCase()
+  const selectedCodeLower = (selectedLocation?.location_code || '').trim().toLowerCase()
+  const valueLower = (value || '').trim().toLowerCase()
+
+  const valueLooksUuid =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      valueLower
+    )
+
+  const shouldUseSelected =
+    (!!selectedLocation && !valueLower) ||
+    (!!selectedLocation && valueLooksUuid) ||
+    (!!selectedLocation && (valueLower === selectedNameLower || valueLower === selectedCodeLower))
+
+  const displayValue = shouldUseSelected
+    ? `${selectedLocation!.location_name} ${selectedLocation!.location_code ? `(${selectedLocation!.location_code})` : ''}`
     : value || ""
 
   return (
@@ -235,7 +468,7 @@ export function LocationAutocomplete({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className={cn("w-full justify-between text-left font-normal", !value && "text-muted-foreground", className)}
+          className={cn("w-full justify-between text-left font-normal", !value && !selectedLocation && "text-muted-foreground", className)}
           disabled={disabled}
           onFocus={() => setOpen(true)}
           onKeyDown={(e) => {
@@ -274,7 +507,13 @@ export function LocationAutocomplete({
           <CommandInput 
             placeholder="Search port, airport, city..." 
             value={inputValue}
-            onValueChange={setInputValue}
+            onValueChange={(val) => {
+              setInputValue(val)
+              // Allow free text input by propagating change immediately
+              // If a location is selected later, onSelect will overwrite this
+              onChange(val, undefined)
+              setSelectedLocation(null)
+            }}
             ref={inputRef as any}
           />
           <CommandList>
@@ -292,11 +531,12 @@ export function LocationAutocomplete({
                 </div>
             )}
             <CommandGroup>
-              {locations.map((location) => (
+              {locations.map((location, index) => (
                 <CommandItem
-                  key={location.id}
-                  value={location.location_name}
+                  key={location.id || index}
+                  value={location.location_name || 'Unknown'}
                   onSelect={() => {
+                    isSelecting.current = true
                     setSelectedLocation(location)
                     onChange(location.location_name, location)
                     setOpen(false)
@@ -306,7 +546,7 @@ export function LocationAutocomplete({
                     {getLocationIcon(location.location_type)}
                     <div className="flex flex-col flex-1 overflow-hidden">
                         <div className="flex items-center gap-2">
-                            <span className="font-medium truncate">{location.location_name}</span>
+                            <span className="font-medium truncate">{location.location_name || 'Unknown Location'}</span>
                             {location.location_code && (
                                 <Badge variant="secondary" className="text-[10px] px-1 py-0 h-5">
                                     {location.location_code}
@@ -323,13 +563,15 @@ export function LocationAutocomplete({
                         </span>
                     </div>
                     <Badge variant="outline" className="text-[10px] capitalize shrink-0">
-                        {location.location_type.replace('_', ' ')}
+                        {String(location.location_type || 'unknown').replace('_', ' ')}
                     </Badge>
                   </div>
                   <Check
                     className={cn(
                       "ml-2 h-4 w-4",
-                      value === location.location_name ? "opacity-100" : "opacity-0"
+                      (value || '').trim().toLowerCase() === (location.location_name || '').trim().toLowerCase()
+                        ? "opacity-100"
+                        : "opacity-0"
                     )}
                   />
                 </CommandItem>
@@ -343,8 +585,8 @@ export function LocationAutocomplete({
                       setLoading(true)
                       const start = page * PAGE_SIZE
                       const end = start + PAGE_SIZE - 1
-                      const { data, error } = await supabase
-                        .from('ports_locations')
+                      const { data, error } = await scopedDb
+                        .from('ports_locations', true)
                         .select('id, location_name, location_code, location_type, country, city')
                         .order('location_name', { ascending: true })
                         .range(start, end)

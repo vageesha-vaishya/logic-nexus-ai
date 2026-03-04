@@ -36,6 +36,10 @@ class ResizeObserver {
 }
 window.ResizeObserver = ResizeObserver;
 
+// Mock scrollIntoView for Radix UI / cmdk
+Element.prototype.scrollIntoView = vi.fn();
+HTMLElement.prototype.scrollIntoView = vi.fn();
+
 // ---------------------------------------------------------------------------
 // Global mocks for hooks and services used pervasively across components.
 // Individual test files can override these with their own vi.mock() calls.

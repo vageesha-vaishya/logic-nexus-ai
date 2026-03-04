@@ -1,0 +1,112 @@
+import { describe, it, expect, vi } from 'vitest';
+import { render, waitFor } from '@testing-library/react';
+import { QuoteComparisonView } from '../QuoteComparisonView';
+import { RateOption } from '@/types/quote-breakdown';
+
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string, options?: any) => options?.defaultValue || key,
+  }),
+}));
+
+vi.mock('@/hooks/useCRM', () => ({
+  useCRM: () =>
+    ({
+      user: { id: 'test-user' },
+      context: {
+        isPlatformAdmin: false,
+        isTenantAdmin: true,
+        isFranchiseAdmin: false,
+        isUser: true,
+        tenantId: 'test-tenant',
+        franchiseId: null,
+        adminOverrideEnabled: false,
+        userId: 'test-user',
+        _version: 1,
+      },
+      supabase: {},
+      scopedDb: {},
+      preferences: null,
+      loadingPreferences: false,
+      setScopePreference: vi.fn(),
+      setAdminOverride: vi.fn(),
+      setFranchisePreference: vi.fn(),
+    }) as any,
+}));
+
+vi.mock('@/components/ui/table', () => ({
+  Table: ({ children }: any) => <table>{children}</table>,
+  TableBody: ({ children }: any) => <tbody>{children}</tbody>,
+  TableCell: ({ children }: any) => <td>{children}</td>,
+  TableHead: ({ children }: any) => <th>{children}</th>,
+  TableHeader: ({ children }: any) => <thead>{children}</thead>,
+  TableRow: ({ children }: any) => <tr>{children}</tr>,
+}));
+
+vi.mock('@/components/ui/badge', () => ({
+  Badge: ({ children }: any) => <span>{children}</span>,
+}));
+
+vi.mock('@/components/ui/button', () => ({
+  Button: ({ children, onClick }: any) => <button onClick={onClick}>{children}</button>,
+}));
+
+vi.mock('@/lib/utils', () => ({
+  cn: (...args: any[]) => args.join(' '),
+  formatCurrency: (amount: number, currency: string) => `${currency} ${amount}`,
+}));
+
+vi.mock('@/services/pricing.service', () => {
+  return {
+    PricingService: class {
+      constructor(_db: any) {}
+      async calculateFinancials(total: number) {
+        return {
+          buyPrice: total * 0.8,
+          marginAmount: total * 0.2,
+          markupPercent: 25,
+          marginPercent: 20,
+        };
+      }
+    },
+  };
+});
+
+describe('QuoteComparisonView', () => {
+  const mockRateOption: RateOption = {
+    id: 'opt-1',
+    carrier: 'Test Carrier',
+    name: 'Test Option',
+    price: 1000,
+    currency: 'USD',
+    transitTime: '20 days',
+    tier: 'standard',
+    legs: [
+      {
+        id: 'leg-1',
+        mode: 'ocean',
+        leg_type: 'transport',
+        origin: 'Shanghai',
+        destination: 'Los Angeles',
+        charges: [{ category: 'Freight', amount: 800, currency: 'USD', name: 'Ocean Freight' }],
+      },
+    ],
+    charges: [{ category: 'Fee', amount: 200, currency: 'USD', name: 'Doc Fee' }],
+  };
+
+  it('renders options correctly', async () => {
+    const { getByText } = render(<QuoteComparisonView options={[mockRateOption]} onSelect={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(getByText('USD 1000')).toBeDefined();
+    });
+  });
+
+  it('bifurcates charges correctly', async () => {
+    const { getByText } = render(<QuoteComparisonView options={[mockRateOption]} onSelect={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(getByText('$1,000.00')).toBeDefined();
+    });
+  });
+});

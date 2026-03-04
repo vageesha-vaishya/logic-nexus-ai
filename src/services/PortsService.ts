@@ -20,11 +20,12 @@ export class PortsService {
   async getAllPorts(): Promise<PortLocation[]> {
     console.log('[PortsService] Fetching all ports (global scope)...');
     try {
-      // Use raw client to ensure no scoping interference for this global table
-      const { data, error } = await this.db.client
-        .from('ports_locations')
-        .select('id, location_name, location_code, country, is_active')
-        .order('location_name');
+      // Use scopedDb with global flag to ensure consistent access pattern
+      // Select all necessary fields for LocationSelect and increase limit to ensure we get all ports
+      const { data, error } = await this.db.from('ports_locations', true)
+        .select('id, location_name, location_code, country, city, location_type, is_active')
+        .order('location_name')
+        .limit(5000);
 
       if (error) {
         console.error('[PortsService] Error fetching ports:', error);

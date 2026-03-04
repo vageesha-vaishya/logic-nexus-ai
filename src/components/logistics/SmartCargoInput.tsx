@@ -39,7 +39,7 @@ interface SmartCargoInputProps {
 }
 
 export function SmartCargoInput({ onSelect, className, placeholder = "Search commodities or HTS codes..." }: SmartCargoInputProps) {
-  const { supabase } = useCRM();
+  const { scopedDb } = useCRM();
   const [open, setOpen] = useState(false);
   const [browserOpen, setBrowserOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -53,11 +53,11 @@ export function SmartCargoInput({ onSelect, className, placeholder = "Search com
   }, [searchTerm]);
 
   // Query Master Commodities (Tenant Catalog)
-  const { data: masterCommodities, isLoading: loadingMaster } = useQuery({
+  const { data: masterCommodities, isFetching: loadingMaster } = useQuery({
     queryKey: ['master_commodities', debouncedSearch],
     queryFn: async () => {
-      if (!debouncedSearch) return [];
-      const { data, error } = await supabase
+      if (debouncedSearch.length < 2) return [];
+      const { data, error } = await scopedDb
         .from('master_commodities')
         .select('id, name, sku, description, aes_hts_id, default_cargo_type_id, unit_value, hazmat_class, aes_hts_codes(hts_code)')
         .or(`name.ilike.%${debouncedSearch}%,sku.ilike.%${debouncedSearch}%`)
@@ -69,17 +69,17 @@ export function SmartCargoInput({ onSelect, className, placeholder = "Search com
       }
       return data;
     },
-    enabled: debouncedSearch.length > 1,
+    enabled: debouncedSearch.length >= 2,
   });
 
   // Query HTS Codes (Global Dictionary)
-  const { data: htsCodes, isLoading: loadingHTS } = useQuery({
+  const { data: htsCodes, isFetching: loadingHTS } = useQuery({
     queryKey: ['hts_codes', debouncedSearch],
     queryFn: async () => {
-      if (!debouncedSearch) return [];
+      if (debouncedSearch.length < 2) return [];
       
       // Use the Smart Search RPC (Fuzzy Matching)
-      const { data, error } = await supabase.rpc('search_hts_codes_smart', {
+      const { data, error } = await scopedDb.rpc('search_hts_codes_smart', {
         p_search_term: debouncedSearch,
         p_limit: 10
       });
@@ -88,8 +88,8 @@ export function SmartCargoInput({ onSelect, className, placeholder = "Search com
         console.warn('Smart search failed, falling back to simple search:', error);
         
         // Fallback to simple ILIKE search
-        const { data: fallbackData, error: fallbackError } = await supabase
-          .from('aes_hts_codes')
+        const { data: fallbackData, error: fallbackError } = await scopedDb
+          .from('aes_hts_codes', true)
           .select('id, hts_code, description, category')
           .or(`hts_code.ilike.%${debouncedSearch}%,description.ilike.%${debouncedSearch}%`)
           .limit(10);
@@ -103,7 +103,7 @@ export function SmartCargoInput({ onSelect, className, placeholder = "Search com
       
       return data;
     },
-    enabled: debouncedSearch.length > 1,
+    enabled: debouncedSearch.length >= 2,
   });
 
   const handleSelectMaster = (item: any) => {
@@ -192,27 +192,35 @@ export function SmartCargoInput({ onSelect, className, placeholder = "Search com
               ref={inputRef as any}
             />
             <CommandList>
-              <CommandEmpty className="py-2 px-4 text-sm">
-                {debouncedSearch.length < 2 ? (
-                  "Type at least 2 characters..."
-                ) : (
-                  <div className="flex flex-col gap-2">
-                    <p className="text-muted-foreground">No results found.</p>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="w-full justify-start"
-                      onClick={() => {
-                        onSelect({ description: searchTerm });
-                        setOpen(false);
-                      }}
-                    >
-                      <Check className="mr-2 h-4 w-4" />
-                      Use "{searchTerm}"
-                    </Button>
-                  </div>
-                )}
-              </CommandEmpty>
+              {(loadingMaster || loadingHTS) && (
+                <div className="py-6 text-center text-sm text-muted-foreground">
+                  Searching catalog...
+                </div>
+              )}
+              
+              {!loadingMaster && !loadingHTS && (
+                <CommandEmpty className="py-2 px-4 text-sm">
+                  {debouncedSearch.length < 2 ? (
+                    "Type at least 2 characters..."
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      <p className="text-muted-foreground">No results found.</p>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="w-full justify-start"
+                        onClick={() => {
+                          onSelect({ description: searchTerm });
+                          setOpen(false);
+                        }}
+                      >
+                        <Check className="mr-2 h-4 w-4" />
+                        Use "{searchTerm}"
+                      </Button>
+                    </div>
+                  )}
+                </CommandEmpty>
+              )}
               
               {masterCommodities && masterCommodities.length > 0 && (
                 <CommandGroup heading="My Catalog (Master Commodities)">

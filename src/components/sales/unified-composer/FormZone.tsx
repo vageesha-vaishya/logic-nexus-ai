@@ -24,6 +24,7 @@ import { carrierValidationMessages } from '@/lib/mode-utils';
 import { useAiAdvisor } from '@/hooks/useAiAdvisor';
 import { useToast } from '@/hooks/use-toast';
 import { useCRM } from '@/hooks/useCRM';
+import { useQuoteStore } from '@/components/sales/composer/store/QuoteStore';
 import { logger } from '@/lib/logger';
 import { QuotationNumberService } from '@/services/quotation/QuotationNumberService';
 import { FileUpload } from '@/components/ui/file-upload';
@@ -108,6 +109,8 @@ export function FormZone({
   const { invokeAiAdvisor } = useAiAdvisor();
   const { toast } = useToast();
   const { supabase, scopedDb, context } = useCRM();
+  const { state: { referenceData } } = useQuoteStore();
+  const ports = referenceData.ports || [];
 
   const form = useFormContext<QuoteComposerValues>();
 
@@ -345,8 +348,13 @@ export function FormZone({
   }, [cargoItem, mode]);
 
   const handleLocationChange = (field: 'origin' | 'destination', value: string, location?: any) => {
-    form.setValue(field, value);
-    // Note: originDetails/destinationDetails are not currently in schema but could be added
+    form.setValue(field, value, { shouldValidate: true, shouldDirty: true });
+    // Update the corresponding ID field
+    if (field === 'origin') {
+      form.setValue('originId', location?.id || '', { shouldValidate: true, shouldDirty: true });
+    } else {
+      form.setValue('destinationId', location?.id || '', { shouldValidate: true, shouldDirty: true });
+    }
   };
 
   const handleCommoditySelect = (selection: CommoditySelection) => {
@@ -908,12 +916,14 @@ export function FormZone({
             <Label className="flex justify-between">
               Origin
               {form.formState.errors.origin && <span className="text-destructive text-xs">{form.formState.errors.origin.message}</span>}
+              {!form.formState.errors.origin && form.formState.errors.originId && <span className="text-destructive text-xs">{form.formState.errors.originId.message}</span>}
             </Label>
             <LocationAutocomplete
               data-testid="location-origin"
               placeholder="Search origin..."
               value={origin}
               onChange={(value, location) => handleLocationChange('origin', value, location)}
+              preloadedLocations={ports}
             />
             <input type="hidden" {...form.register('origin')} />
           </div>
@@ -921,12 +931,14 @@ export function FormZone({
             <Label className="flex justify-between">
               Destination
               {form.formState.errors.destination && <span className="text-destructive text-xs">{form.formState.errors.destination.message}</span>}
+              {!form.formState.errors.destination && form.formState.errors.destinationId && <span className="text-destructive text-xs">{form.formState.errors.destinationId.message}</span>}
             </Label>
             <LocationAutocomplete
               data-testid="location-destination"
               placeholder="Search destination..."
               value={destination}
               onChange={(value, location) => handleLocationChange('destination', value, location)}
+              preloadedLocations={ports}
             />
             <input type="hidden" {...form.register('destination')} />
           </div>

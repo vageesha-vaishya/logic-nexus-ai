@@ -9,6 +9,7 @@ import { TransportLeg } from '@/types/quote-breakdown';
 import { Badge } from '@/components/ui/badge';
 import { CarrierSelect } from './CarrierSelect';
 import { LocationSelect } from './LocationSelect';
+import { useQuoteStore } from './store/QuoteStore';
 
 interface LegManagerProps {
   legs: TransportLeg[];
@@ -16,6 +17,7 @@ interface LegManagerProps {
 }
 
 export function LegManager({ legs, onChange }: LegManagerProps) {
+  const { state } = useQuoteStore();
 
   const addLeg = () => {
     const lastLeg = legs[legs.length - 1];
@@ -23,7 +25,9 @@ export function LegManager({ legs, onChange }: LegManagerProps) {
       id: crypto.randomUUID(),
       mode: 'ocean',
       origin: lastLeg ? lastLeg.destination : '', // Auto-fill origin from previous destination
+      origin_location_id: lastLeg ? lastLeg.destination_location_id : undefined, // Auto-fill ID
       destination: '',
+      destination_location_id: undefined,
       carrier: '',
       voyage: '',
       service_type: 'Standard',
@@ -121,9 +125,10 @@ export function LegManager({ legs, onChange }: LegManagerProps) {
                     <Label className="text-[10px] uppercase text-muted-foreground mb-1">Origin</Label>
                     <LocationSelect 
                       value={leg.origin} 
-                      onChange={(val) => updateLeg(leg.id, { origin: val })}
+                      onChange={(val, loc) => updateLeg(leg.id, { origin: val, origin_location_id: loc?.id })}
                       className="h-8 text-xs" 
                       placeholder="City/Port"
+                      preloadedPorts={state.referenceData?.ports}
                     />
                   </div>
                   <ArrowRight className="w-4 h-4 text-muted-foreground mb-2 flex-shrink-0" />
@@ -131,9 +136,10 @@ export function LegManager({ legs, onChange }: LegManagerProps) {
                     <Label className="text-[10px] uppercase text-muted-foreground mb-1">Destination</Label>
                     <LocationSelect 
                       value={leg.destination} 
-                      onChange={(val) => updateLeg(leg.id, { destination: val })}
+                      onChange={(val, loc) => updateLeg(leg.id, { destination: val, destination_location_id: loc?.id })}
                       className="h-8 text-xs" 
                       placeholder="City/Port"
+                      preloadedPorts={state.referenceData?.ports}
                     />
                   </div>
                 </div>

@@ -18,106 +18,15 @@ import { useCRM } from '@/hooks/useCRM';
 import { normalizeModeCode } from '@/lib/mode-utils';
 import { CarrierSelect } from './CarrierSelect';
 
+import { LocationAutocomplete } from '@/components/common/LocationAutocomplete';
+
 interface LegsConfigurationStepProps {}
 
-function LocationAutocomplete({ 
-  value, 
-  onChange, 
-  placeholder, 
-  mode 
-}: { 
-  value: string; 
-  onChange: (val: string) => void; 
-  placeholder: string; 
-  mode: string; 
-}) {
-  const [open, setOpen] = useState(false);
-  const [suggestions, setSuggestions] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const { invokeAiAdvisor } = useAiAdvisor();
-
-  useEffect(() => {
-    if (!open || value.length < 3) return;
-    
-    const timer = setTimeout(async () => {
-        setLoading(true);
-        const { data } = await invokeAiAdvisor({
-            action: 'lookup_codes', payload: { query: value, mode: mode || 'ocean' }
-        });
-        if (data?.suggestions) {
-            setSuggestions(data.suggestions);
-        }
-        setLoading(false);
-    }, 800);
-    
-    return () => clearTimeout(timer);
-  }, [value, open, mode]);
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <div className="relative">
-            <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground z-10" />
-            <Input
-                value={value}
-                onChange={(e) => {
-                    onChange(e.target.value);
-                    setOpen(true);
-                }}
-                placeholder={placeholder}
-                className="pl-9"
-                onFocus={() => setOpen(true)}
-            />
-        </div>
-      </PopoverTrigger>
-      <PopoverContent className="p-0 w-[300px]" align="start">
-        <Command>
-            <CommandList>
-                {loading && <div className="p-2 text-xs text-center text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin inline mr-1"/> Searching...</div>}
-                {!loading && suggestions.length === 0 && <div className="p-2 text-xs text-center text-muted-foreground">Type to search locations...</div>}
-                {suggestions.map((suggestion, i) => (
-                    <CommandItem 
-                        key={i} 
-                        value={suggestion.label}
-                        onSelect={() => {
-                            onChange(suggestion.label);
-                            setOpen(false);
-                        }}
-                        className="cursor-pointer"
-                    >
-                        <div className="flex flex-col w-full">
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium">{suggestion.label}</span>
-                              {suggestion?.details?.code && (
-                                <span className="text-[10px] px-1 py-0 h-5 bg-muted rounded">
-                                  {suggestion.details.code}
-                                </span>
-                              )}
-                              {suggestion?.details?.id && (
-                                <span className="text-[10px] px-1 py-0 h-5 border rounded">
-                                  ID verified
-                                </span>
-                              )}
-                            </div>
-                            <span className="text-xs text-muted-foreground truncate">
-                              {typeof suggestion.details === 'string' 
-                                ? suggestion.details 
-                                : [suggestion?.details?.city, suggestion?.details?.country].filter(Boolean).join(', ')}
-                            </span>
-                        </div>
-                    </CommandItem>
-                ))}
-            </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
-  );
-}
 
 export function LegsConfigurationStep({}: LegsConfigurationStepProps) {
   const { state, dispatch } = useQuoteStore();
   const { legs, validationErrors, referenceData, options, optionId } = state;
-  const { serviceTypes = [], carriers = [], serviceLegCategories: serviceCategories = [] } = referenceData || {};
+  const { serviceTypes = [], carriers = [], serviceLegCategories: serviceCategories = [], ports = [] } = referenceData || {};
   const { scopedDb } = useCRM();
   const { enabled: multiLegAutoFillEnabled } = useAppFeatureFlag(FEATURE_FLAGS.COMPOSER_MULTI_LEG_AUTOFILL, false);
 
@@ -361,18 +270,17 @@ export function LegsConfigurationStep({}: LegsConfigurationStepProps) {
                         <div>
                           <Label className="text-sm font-medium mb-2 block">Preferred Carrier</Label>
                           <CarrierSelect
-                            mode={leg.mode}
-                            value={leg.carrierId || null}
-                            onChange={(id, name) =>
-                              onUpdateLeg(leg.id, {
-                                carrierId: id || undefined,
-                                carrierName: name || undefined,
-                              })
-                            }
-                            placeholder="Select carrier"
-                            showPreferred
-                            clearable
-                          />
+              mode={leg.mode}
+              value={leg.carrierId || null}
+              onChange={(id, name) =>
+                onUpdateLeg(leg.id, {
+                  carrierId: id || undefined,
+                  carrierName: name || undefined,
+                })
+              }
+              placeholder="Select carrier"
+              showPreferred
+            />
                         </div>
 
                         <div>
@@ -412,24 +320,24 @@ export function LegsConfigurationStep({}: LegsConfigurationStepProps) {
                         </div>
 
                         <div>
-                          <Label className="text-sm font-medium mb-2 block">Origin *</Label>
-                          <LocationAutocomplete
-                            value={leg.origin}
-                            onChange={(val) => onUpdateLeg(leg.id, { origin: val })}
-                            placeholder="e.g., Shanghai Port"
-                            mode={leg.mode}
-                          />
-                        </div>
-
-                        <div>
-                          <Label className="text-sm font-medium mb-2 block">Destination *</Label>
-                          <LocationAutocomplete
-                            value={leg.destination}
-                            onChange={(val) => onUpdateLeg(leg.id, { destination: val })}
-                            placeholder="e.g., Los Angeles Port"
-                            mode={leg.mode}
-                          />
-                        </div>
+            <Label className="text-sm font-medium mb-2 block">Origin *</Label>
+            <LocationAutocomplete
+              value={leg.origin}
+              onChange={(val) => onUpdateLeg(leg.id, { origin: val })}
+              placeholder="e.g., Shanghai Port"
+              preloadedLocations={ports}
+            />
+          </div>
+          
+          <div>
+            <Label className="text-sm font-medium mb-2 block">Destination *</Label>
+            <LocationAutocomplete
+              value={leg.destination}
+              onChange={(val) => onUpdateLeg(leg.id, { destination: val })}
+              placeholder="e.g., Los Angeles Port"
+              preloadedLocations={ports}
+            />
+          </div>
                       </div>
                     )}
                   </CardContent>

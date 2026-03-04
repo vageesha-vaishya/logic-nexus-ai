@@ -2,7 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
-## \[Unreleased]
+## [Unreleased]
+
+### Fixed
+
+* Resolved Origin/Destination field loading failure in `UnifiedQuoteComposer` by:
+  * Migrating `LocationAutocomplete` and `LocationSelect` to use `scopedDb` instead of raw Supabase client, ensuring compliance with `logic-nexus-ai` data access patterns.
+  * Adding stable user session handling in `LocationAutocomplete` to prevent infinite re-renders and ensure correct RLS context.
+  * Fixing `LocationAutocomplete` and `LocationSelect` unit tests to properly mock `scopedDb` and user session, and resolving `cmdk` scrollIntoView errors.
+  * Explicitly marking `ports_locations` queries as global (`isGlobal: true`) to align with multi-tenancy architecture.
 
 ### Changed
 

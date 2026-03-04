@@ -1,12 +1,12 @@
-require('dotenv').config();
+require('dotenv').config({ path: '.env' });
 const { Client } = require('pg');
 const fs = require('fs');
 const path = require('path');
 
 async function run() {
-  const connectionString = process.env.DIRECT_URL;
+  const connectionString = process.env.DATABASE_URL; // Using DATABASE_URL as per .env
   if (!connectionString) {
-    console.error('DIRECT_URL not found in .env');
+    console.error('DATABASE_URL not found in .env');
     process.exit(1);
   }
 
@@ -29,7 +29,7 @@ async function run() {
     await client.connect();
     console.log('Connected!');
 
-    const migrationPath = path.join(__dirname, '../supabase/migrations/20260227000003_fix_quote_numbering_permissions.sql');
+    const migrationPath = path.join(__dirname, '../supabase/migrations/20260302120000_fix_search_locations_security.sql');
     const sql = fs.readFileSync(migrationPath, 'utf8');
 
     console.log('Running migration...');

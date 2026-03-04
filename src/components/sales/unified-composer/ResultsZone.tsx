@@ -201,9 +201,8 @@ export function ResultsZone({
         </>
       )}
 
-      {/* Available Market Rates - REMOVED PER USER REQUEST */}
-      {/* 
-      {availableOptions && availableOptions.length > 0 && (
+      {/* Available Market Rates */}
+      {hasAvailable && (
         <div className="mt-8 pt-4 border-t">
           <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
             <Package className="w-4 h-4 text-muted-foreground" />
@@ -241,7 +240,6 @@ export function ResultsZone({
           </div>
         </div>
       )}
-      */}
     </div>
   );
 }

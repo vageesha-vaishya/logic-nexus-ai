@@ -15,14 +15,14 @@ vi.mock('@/hooks/useCRM', () => ({
 
 vi.mock('@/services/pricing.service', () => {
   return {
-    PricingService: vi.fn().mockImplementation(() => ({
-      calculateFinancials: vi.fn().mockResolvedValue({
+    PricingService: class {
+      calculateFinancials = vi.fn().mockResolvedValue({
         buyPrice: 800,
         marginAmount: 200,
         sellPrice: 1000,
-        appliedRules: []
-      })
-    }))
+        appliedRules: [],
+      });
+    },
   };
 });
 

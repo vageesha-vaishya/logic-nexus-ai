@@ -1,0 +1,38 @@
+
+> vite_react_shadcn_ts@0.0.0 test
+> vitest run src/components/sales/unified-composer/__tests__/UnifiedQuoteComposer.smart.test.tsx
+
+
+[1m[46m RUN [49m[22m [36mv4.0.16 [39m[90m/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai[39m
+
+
+[31m⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Suites 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m src/components/sales/unified-composer/__tests__/UnifiedQuoteComposer.smart.test.tsx[2m [ src/components/sales/unified-composer/__tests__/UnifiedQuoteComposer.smart.test.tsx ][22m
+[31m[1mError[22m: Transform failed with 1 error:
+/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/src/components/sales/unified-composer/UnifiedQuoteComposer.tsx:1712:3: ERROR: Expected "finally" but found ";"[39m
+  Plugin: [35mvite:esbuild[39m
+  File: [36m/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/src/components/sales/unified-composer/UnifiedQuoteComposer.tsx[39m:1712:3
+[33m  
+  Expected "finally" but found ";"
+  1710 |        setSaving(false);
+  1711 |      }
+  1712 |    };
+       |     ^
+  1713 |  
+  1714 |    // ---------------------------------------------------------------------------
+  [39m
+[90m [2m❯[22m failureErrorWithLog node_modules/vitest/node_modules/esbuild/lib/main.js:[2m1467:15[22m[39m
+[90m [2m❯[22m node_modules/vitest/node_modules/esbuild/lib/main.js:[2m736:50[22m[39m
+[90m [2m❯[22m responseCallbacks.<computed> node_modules/vitest/node_modules/esbuild/lib/main.js:[2m603:9[22m[39m
+[90m [2m❯[22m handleIncomingPacket node_modules/vitest/node_modules/esbuild/lib/main.js:[2m658:12[22m[39m
+[90m [2m❯[22m Socket.readFromStdout node_modules/vitest/node_modules/esbuild/lib/main.js:[2m581:7[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [2mno tests[22m
+[2m   Start at [22m 07:30:32
+[2m   Duration [22m 775ms[2m (transform 54ms, setup 187ms, import 0ms, tests 0ms, environment 421ms)[22m
+

@@ -25,7 +25,9 @@ export interface TransportLeg {
     carrier_id?: string;
     voyage?: string; // Vessel/Voyage or Flight No
     origin: string;
+    origin_location_id?: string;
     destination: string;
+    destination_location_id?: string;
     departure_date?: string; // ISO Date
     arrival_date?: string; // ISO Date
     transit_time?: string;

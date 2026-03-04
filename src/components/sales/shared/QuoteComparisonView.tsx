@@ -3,18 +3,12 @@ import { useTranslation } from 'react-i18next';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Check, X, Info, ChevronDown, ChevronUp, Eye, Sparkles } from 'lucide-react';
+import { Check, Info, Eye, Sparkles } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { bifurcateCharges } from '@/lib/charge-bifurcation';
-import { Charge, TransportLeg, RateOption } from '@/types/quote-breakdown';
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible"
+import { Charge, RateOption } from '@/types/quote-breakdown';
 import {
   getTierBadge,
-  getModeIcon,
   getReliabilityColor
 } from '../shared/quote-badges';
 import { cn, formatCurrency } from '@/lib/utils';
@@ -44,7 +38,6 @@ export function QuoteComparisonView({
     const { t } = useTranslation();
     const manualQuoteLabel = t('quotation.manualQuote', { defaultValue: 'Manual Quotation' });
     const { scopedDb, supabase } = useCRM();
-    const [showBreakdown, setShowBreakdown] = React.useState(false);
     const [viewDetailsOption, setViewDetailsOption] = React.useState<RateOption | null>(null);
     const [options, setOptions] = useState<RateOption[]>([]);
     const viewDetailsOptionForRender = viewDetailsOption
@@ -90,13 +83,12 @@ export function QuoteComparisonView({
                 return mapped;
             }));
             
+            // console.log('Enriched options:', enriched.length);
             setOptions(enriched.filter(Boolean) as RateOption[]);
         };
         
         enrichOptions();
     }, [rawOptions, scopedDb, supabase]);
-
-    if (!options || options.length === 0) return <div className="p-4 text-center text-muted-foreground">No options to compare.</div>;
 
     // Helper to calculate bifurcated totals for an option
     const getBifurcatedTotals = (opt: RateOption) => {
@@ -113,7 +105,6 @@ export function QuoteComparisonView({
         // Collect leg charges
         if (opt.legs) {
             opt.legs.forEach(leg => {
-                const legType = leg.leg_type || 'transport';
                 if (leg.charges) {
                     leg.charges.forEach(c => {
                         allCharges.push({ ...c, leg_id: leg.id, mode: leg.mode });
@@ -133,25 +124,34 @@ export function QuoteComparisonView({
         }
 
         // Bifurcate
-        const buckets = bifurcateCharges(allCharges, opt.legs || []);
+        const bifurcated = bifurcateCharges(allCharges, opt.legs || []);
         
-        totals.origin = buckets.origin.reduce((sum, c) => sum + (c.amount || 0), 0);
-        totals.freight = buckets.freight.reduce((sum, c) => sum + (c.amount || 0), 0);
-        totals.destination = buckets.destination.reduce((sum, c) => sum + (c.amount || 0), 0);
-        totals.other = buckets.other.reduce((sum, c) => sum + (c.amount || 0), 0);
+        // Group into buckets
+        const originCharges = bifurcated.filter(c => ['origin', 'pickup'].includes(c.assignedLegType?.toLowerCase() || ''));
+        const freightCharges = bifurcated.filter(c => ['main', 'transport', 'freight'].includes(c.assignedLegType?.toLowerCase() || ''));
+        const destCharges = bifurcated.filter(c => ['destination', 'delivery'].includes(c.assignedLegType?.toLowerCase() || ''));
+        const otherCharges = bifurcated.filter(c => !['origin', 'pickup', 'main', 'transport', 'freight', 'destination', 'delivery'].includes(c.assignedLegType?.toLowerCase() || ''));
+
+        totals.origin = originCharges.reduce((sum, c) => sum + (c.amount || 0), 0);
+        totals.freight = freightCharges.reduce((sum, c) => sum + (c.amount || 0), 0);
+        totals.destination = destCharges.reduce((sum, c) => sum + (c.amount || 0), 0);
+        totals.other = otherCharges.reduce((sum, c) => sum + (c.amount || 0), 0);
 
         return totals;
     };
 
     const bifurcatedData = useMemo(() => {
         return options.reduce((acc, opt) => {
+            if (!opt?.id) return acc;
             acc[opt.id] = getBifurcatedTotals(opt);
             return acc;
         }, {} as Record<string, ReturnType<typeof getBifurcatedTotals>>);
     }, [options]);
 
+    if (!options || options.length === 0) return <div className="p-4 text-center text-muted-foreground">No options to compare.</div>;
+
     return (
-        <div className="overflow-x-auto border rounded-md bg-background shadow-sm">
+        <div className="overflow-x-auto border rounded-md bg-background shadow-sm" data-testid="quote-comparison-view">
             {onGenerateSmartOptions && (
                 <div className="p-4 border-b flex justify-end">
                     <Button 
@@ -170,6 +170,7 @@ export function QuoteComparisonView({
                     <TableRow className="hover:bg-transparent">
                         <TableHead className="w-[180px] bg-muted/30">Feature</TableHead>
                         {options.map(opt => {
+                            if (!opt?.id) return null;
                             const isSelected = selectedIds.includes(opt.id);
                             // Highlight logic
                             const isBestValue = opt.tier === 'best_value';
@@ -215,7 +216,7 @@ export function QuoteComparisonView({
                             <TableCell key={opt.id} className="text-center">
                                 <div className="flex flex-col items-center">
                                     <span className="font-bold text-xl text-foreground">
-                                        {formatCurrency(opt.price, opt.currency)}
+                                        {formatCurrency(opt.price, opt.currency || 'USD')}
                                     </span>
                                     {(opt.markupPercent !== undefined || opt.marginAmount !== undefined) && (
                                         <div className="flex flex-col items-center gap-0.5 mt-1">
@@ -226,7 +227,7 @@ export function QuoteComparisonView({
                                             )}
                                             {opt.marginAmount !== undefined && (
                                                 <span className="text-[10px] text-green-600 font-medium">
-                                                    +{formatCurrency(opt.marginAmount, opt.currency)}
+                                                    +{formatCurrency(opt.marginAmount, opt.currency || 'USD')}
                                                 </span>
                                             )}
                                         </div>
@@ -241,7 +242,7 @@ export function QuoteComparisonView({
                         <TableCell className="font-medium pl-6 text-muted-foreground text-sm">Origin Charges</TableCell>
                         {options.map(opt => (
                             <TableCell key={opt.id} className="text-center text-sm text-muted-foreground">
-                                {new Intl.NumberFormat('en-US', { style: 'currency', currency: opt.currency }).format(bifurcatedData[opt.id].origin)}
+                                {new Intl.NumberFormat('en-US', { style: 'currency', currency: opt.currency || 'USD' }).format(bifurcatedData[opt.id]?.origin || 0)}
                             </TableCell>
                         ))}
                     </TableRow>
@@ -249,7 +250,7 @@ export function QuoteComparisonView({
                         <TableCell className="font-medium pl-6 text-muted-foreground text-sm">Freight Charges</TableCell>
                         {options.map(opt => (
                             <TableCell key={opt.id} className="text-center text-sm text-muted-foreground">
-                                {new Intl.NumberFormat('en-US', { style: 'currency', currency: opt.currency }).format(bifurcatedData[opt.id].freight)}
+                                {new Intl.NumberFormat('en-US', { style: 'currency', currency: opt.currency || 'USD' }).format(bifurcatedData[opt.id]?.freight || 0)}
                             </TableCell>
                         ))}
                     </TableRow>
@@ -257,7 +258,7 @@ export function QuoteComparisonView({
                         <TableCell className="font-medium pl-6 text-muted-foreground text-sm">Destination Charges</TableCell>
                         {options.map(opt => (
                             <TableCell key={opt.id} className="text-center text-sm text-muted-foreground">
-                                {new Intl.NumberFormat('en-US', { style: 'currency', currency: opt.currency }).format(bifurcatedData[opt.id].destination)}
+                                {new Intl.NumberFormat('en-US', { style: 'currency', currency: opt.currency || 'USD' }).format(bifurcatedData[opt.id]?.destination || 0)}
                             </TableCell>
                         ))}
                     </TableRow>

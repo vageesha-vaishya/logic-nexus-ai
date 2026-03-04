@@ -121,6 +121,14 @@ export const mapOptionToQuote = (opt: any) => {
     }
 
     let charges = normalized.charges || [];
+    // Hoist sell amount for global charges if available
+    charges = charges.map((c: any) => {
+        if (c.sell?.amount !== undefined) {
+            return { ...c, amount: Number(c.sell.amount) };
+        }
+        return c;
+    });
+
     if ((!normalized.charges || normalized.charges.length === 0) && (!normalized.legs || !normalized.legs.some((l: any) => l.charges && l.charges.length > 0))) {
         const currency = price_breakdown.currency || normalized.currency || 'USD';
         
@@ -163,6 +171,11 @@ export const mapOptionToQuote = (opt: any) => {
             origin: leg.origin || (index === 0 ? normalized.origin : undefined) || 'Origin',
             destination: leg.destination || (index === legs.length - 1 ? normalized.destination : undefined) || 'Destination',
             charges: (leg.charges || []).map((c: any) => {
+                // Hoist sell amount if available (fixes issue with Saved Quotes loaded as pairs)
+                if (c.sell?.amount !== undefined) {
+                    c = { ...c, amount: Number(c.sell.amount) };
+                }
+
                 if (!c.category && !c.charge_categories?.name) {
                     const name = (c.name || '').toLowerCase();
                     if (name.includes('freight')) c.category = 'Freight';

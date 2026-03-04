@@ -12,7 +12,7 @@ export interface DataAccessContext {
   adminOverrideEnabled?: boolean;
 }
 
-type TableName = keyof Database['public']['Tables'];
+type TableName = string;
 
 /**
  * Applies mandatory scope filters to a Supabase query based on user context.
@@ -234,6 +234,22 @@ export class ScopedDataAccess {
       return query;
     }
 
+    // Master Commodities are tenant-scoped only (no franchise column)
+    if (table === 'master_commodities' as TableName) {
+      if (ctx.tenantId) {
+        query = query.eq('tenant_id', ctx.tenantId);
+      }
+      return query;
+    }
+
+    // CRM Core: Contacts and Accounts default to tenant-scoped (legacy datasets may not have franchise_id)
+    if (table === 'contacts' as TableName || table === 'accounts' as TableName) {
+      if (ctx.tenantId) {
+        query = query.eq('tenant_id', ctx.tenantId);
+      }
+      return query;
+    }
+
     // Admin Override Logic - Platform Admin with override enabled
     if (ctx.isPlatformAdmin && ctx.adminOverrideEnabled) {
       if (typeof import.meta !== 'undefined' && import.meta.env?.DEV) {
@@ -319,7 +335,12 @@ export class ScopedDataAccess {
       }
       if (this.context.franchiseId && !newValue.franchise_id) {
         // Special-case: franchises table does not have franchise_id
-        if (table !== 'franchises') {
+        if (
+          table !== 'franchises' &&
+          table !== ('master_commodities' as TableName) &&
+          table !== ('contacts' as TableName) &&
+          table !== ('accounts' as TableName)
+        ) {
           newValue.franchise_id = this.context.franchiseId;
         }
       }
