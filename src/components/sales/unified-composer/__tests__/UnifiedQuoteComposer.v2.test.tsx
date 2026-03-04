@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { render, screen, act } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { UnifiedQuoteComposer } from '../UnifiedQuoteComposer';
@@ -123,7 +123,6 @@ const mockFrom = vi.fn();
 // This prevents infinite loops in useEffect dependencies inside the component
 vi.mock('@/hooks/useCRM', () => ({
   useCRM: () => {
-    const { useMemo } = require('react');
     return {
       scopedDb: useMemo(() => ({ from: mockFrom }), []),
       context: useMemo(() => ({ tenantId: 'tenant-1' }), []),

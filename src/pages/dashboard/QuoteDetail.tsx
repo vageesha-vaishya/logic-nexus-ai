@@ -39,7 +39,7 @@ export default function QuoteDetail() {
   // Load configuration
   useEffect(() => {
     if (context.tenantId) {
-      new QuotationConfigurationService(scopedDb).getConfiguration(context.tenantId).then(setConfig);
+      new QuotationConfigurationService(supabase).getConfiguration(context.tenantId).then(setConfig);
     }
   }, [context.tenantId]);
 
@@ -78,7 +78,7 @@ export default function QuoteDetail() {
            });
 
            // Fetch Carrier Rates
-           let carrierRatesMap: Record<string, any> = {};
+           const carrierRatesMap: Record<string, any> = {};
            if (carrierRateIds.size > 0) {
                const { data: rates } = await scopedDb
                    .from('carrier_rates')
@@ -92,7 +92,7 @@ export default function QuoteDetail() {
            }
 
            // Fetch Carriers
-           let carriersMap: Record<string, any> = {};
+           const carriersMap: Record<string, any> = {};
            if (carrierIds.size > 0) {
                const { data: carriers } = await scopedDb
                    .from('carriers')
@@ -105,7 +105,7 @@ export default function QuoteDetail() {
            }
 
            // Fetch Currencies
-           let currenciesMap: Record<string, any> = {};
+           const currenciesMap: Record<string, any> = {};
            if (currencyIds.size > 0) {
                const { data: currencies } = await scopedDb
                    .from('currencies')

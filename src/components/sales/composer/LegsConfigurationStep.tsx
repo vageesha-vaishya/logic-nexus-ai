@@ -20,8 +20,6 @@ import { CarrierSelect } from './CarrierSelect';
 
 import { LocationAutocomplete } from '@/components/common/LocationAutocomplete';
 
-interface LegsConfigurationStepProps {}
-
 
 export function LegsConfigurationStep() {
   const { state, dispatch } = useQuoteStore();
