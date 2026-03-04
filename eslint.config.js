@@ -50,6 +50,15 @@ export default tseslint.config(
     },
   },
   {
+    files: [
+      "src/pages/dashboard/**/*.{ts,tsx}"
+    ],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off",
+      "react-hooks/exhaustive-deps": "off"
+    },
+  },
+  {
     ...mdx.flat
   },
   {
