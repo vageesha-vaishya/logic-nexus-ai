@@ -4,10 +4,16 @@ pipeline {
     environment {
         // Credentials binding for Supabase
         SUPABASE_ACCESS_TOKEN = credentials('supabase-access-token')
+        SUPABASE_ANON_KEY = credentials('supabase-anon-key')
         
         // VPS Credentials for Deployment
         VPS_PASSWORD = credentials('vps-root-password')
         VPS_IP = '72.61.249.111'
+        VPS_USER = 'root'
+
+        // Ports
+        GATEWAY_PORT = '8100'
+        APP_PORT = '8099'
 
         // Define Project Ref based on branch
         PROJECT_REF = "${env.BRANCH_NAME == 'main' ? 'prod-ref-id' : (env.BRANCH_NAME == 'staging' ? 'staging-ref-id' : 'dev-ref-id')}"
@@ -66,9 +72,27 @@ pipeline {
                     
                     // Run the Node.js deployment script
                     // VPS_IP and VPS_PASSWORD are already environment variables
-                    withEnv(['VPS_USER=root']) {
+                    withEnv(["VPS_USER=${env.VPS_USER}"]) {
                         sh 'node scripts/deploy_vps.cjs'
                     }
+                }
+            }
+        }
+
+        stage('Setup Supabase Gateway') {
+            steps {
+                script {
+                    echo "Setting up Supabase gateway reverse proxy on VPS..."
+                    sh "bash scripts/setup_supabase_gateway_vps.sh ${env.VPS_IP} ${env.VPS_USER} ${env.VPS_PASSWORD} ${env.GATEWAY_PORT}"
+                }
+            }
+        }
+
+        stage('Deploy LogicPro Web to VPS') {
+            steps {
+                script {
+                    echo "Building and running LogicPro web on VPS..."
+                    sh "bash scripts/deploy_web_app_vps.sh ${env.VPS_IP} ${env.VPS_USER} ${env.VPS_PASSWORD} ${env.GATEWAY_PORT} ${env.APP_PORT} '${env.SUPABASE_ANON_KEY}'"
                 }
             }
         }
