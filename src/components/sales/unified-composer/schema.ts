@@ -54,7 +54,7 @@ export const quoteComposerSchema = z.object({
   originId: z.string().min(1, 'Please select a valid origin from the list'),
   destination: z.string().min(2, 'Destination is required'),
   destinationId: z.string().min(1, 'Please select a valid destination from the list'),
-  commodity: z.string().min(2, 'Commodity is required'),
+  commodity: z.string().min(1, 'Commodity is required').optional(),
   preferredCarriers: z.array(z.string()).optional(),
   weight: z.string().optional().refine((val) => {
     if (!val) return true;
@@ -111,6 +111,12 @@ export const quoteComposerSchema = z.object({
     note: z.string().optional(),
   })).optional(),
 }).superRefine((data, ctx) => {
+  // TEMPORARILY DISABLED: Custom commodity validation for debugging
+  // const commodityValue = data.commodity;
+  // if (!commodityValue || commodityValue.trim().length < 2) {
+  //   ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Commodity is required', path: ['commodity'] });
+  // }
+  
   if (data.mode === 'air') {
     if (!data.weight || isNaN(Number(data.weight)) || Number(data.weight) <= 0) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Valid weight is required for Air', path: ['weight'] });

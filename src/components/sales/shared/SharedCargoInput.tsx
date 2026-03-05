@@ -51,6 +51,7 @@ export function SharedCargoInput({ value, onChange, onRemove, className, errors,
   }, [value.type, value.containerCombos?.length, containerTypes, containerSizes]); // Dependencies carefully chosen
 
   const handleCommoditySelect = (selection: CommoditySelection) => {
+    console.log('[SharedCargoInput] Commodity selected:', selection);
     const updated = {
       ...value,
       commodity: {
@@ -71,6 +72,7 @@ export function SharedCargoInput({ value, onChange, onRemove, className, errors,
       setShowHazmat(true);
     }
 
+    console.log('[SharedCargoInput] Calling onChange with updated cargo item:', updated);
     onChange(updated);
   };
 

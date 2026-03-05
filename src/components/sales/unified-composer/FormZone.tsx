@@ -283,46 +283,51 @@ export function FormZone({
 
   // Initialize CargoItem from props
   useEffect(() => {
-    if (initialValues || initialExtended) {
-      const isContainer = initialExtended?.containerType || initialValues?.mode === 'ocean' || initialValues?.mode === 'rail';
-      
-      setCargoItem(prev => ({
-        ...prev,
-        type: isContainer ? 'container' : 'package',
-        quantity: Number(initialExtended?.containerQty || initialValues?.containerQty || 1),
-        weight: {
-          value: Number(initialValues?.weight || 0),
-          unit: 'kg' // Defaulting to kg as unit is not always persisted
-        },
-        volume: Number(initialValues?.volume || 0),
-        commodity: initialValues?.commodity ? {
-          description: initialValues.commodity,
-          hts_code: initialExtended?.htsCode || ''
-        } : undefined,
-        hazmat: (initialExtended?.dangerousGoods || initialValues?.dangerousGoods) ? {
-          unNumber: '', // Not fully persisted
-          class: '',
-          packingGroup: 'I'
-        } : undefined,
-        containerDetails: {
-          typeId: initialExtended?.containerType || '',
-          sizeId: initialExtended?.containerSize || ''
-        },
-        containerCombos: initialExtended?.containerCombos?.map(c => ({
-          id: uuidv4(),
-          typeId: c.type,
-          sizeId: c.size,
-          quantity: c.qty
-        })) || []
-      }));
-    }
+    setCargoItem({
+      id: 'main',
+      type: mode === 'ocean' || mode === 'rail' ? 'container' : 'loose',
+      quantity: 1,
+      weight: { value: 0, unit: 'kg' },
+      volume: 0,
+      dimensions: { l: 0, w: 0, h: 0, unit: 'cm' },
+      commodity: initialValues?.commodity ? {
+        description: initialValues.commodity,
+        hts_code: initialExtended?.htsCode || ''
+      } : undefined,
+      hazmat: (initialExtended?.dangerousGoods || initialValues?.dangerousGoods) ? {
+        class: '',
+        unNumber: '',
+        packingGroup: 'II'
+      } : undefined,
+      containerCombos: [],
+      containerDetails: undefined,
+      stackable: false
+    });
   }, [initialValues, initialExtended]);
 
   // Sync CargoItem → form/extended
   useEffect(() => {
     // Sync commodity description and trigger validation
     const description = cargoItem.commodity?.description || '';
-    form.setValue('commodity', description, { shouldValidate: true, shouldDirty: true });
+    
+    // Debug logging
+    console.log('[FormZone] Commodity sync debug:', {
+      cargoItemCommodity: cargoItem.commodity,
+      description,
+      currentFormValue: form.getValues('commodity')
+    });
+    
+    // Only update if the value has actually changed to avoid infinite loops
+    const currentValue = form.getValues('commodity');
+    if (currentValue !== description) {
+      console.log('[FormZone] Updating commodity from', currentValue, 'to', description);
+      form.setValue('commodity', description, { shouldValidate: true, shouldDirty: true });
+      
+      // Trigger validation explicitly to ensure the error state is updated
+      setTimeout(() => {
+        form.trigger('commodity');
+      }, 0);
+    }
     
     // Sync HTS code if available
     if (cargoItem.commodity?.hts_code) {
@@ -364,7 +369,22 @@ export function FormZone({
 
   const handleCommoditySelect = (selection: CommoditySelection) => {
     const displayValue = selection.hts_code ? `${selection.description} - ${selection.hts_code}` : selection.description;
-    form.setValue('commodity', displayValue);
+    console.log('[FormZone] handleCommoditySelect called with:', selection, 'displayValue:', displayValue);
+    
+    // Set the form value directly and immediately
+    form.setValue('commodity', displayValue, { shouldValidate: true, shouldDirty: true });
+    
+    // Also update the cargo item for consistency
+    setCargoItem(prev => ({
+      ...prev,
+      commodity: {
+        description: selection.description,
+        hts_code: selection.hts_code,
+        id: selection.master_commodity_id,
+        aes_hts_id: selection.aes_hts_id,
+      },
+    }));
+    
     if (selection.hts_code) form.setValue('htsCode', selection.hts_code);
   };
 
@@ -959,6 +979,29 @@ export function FormZone({
           </Label>
           <SharedCargoInput value={cargoItem} onChange={setCargoItem} errors={form.formState.errors as any} />
           <input type="hidden" {...form.register('commodity')} />
+          
+          {/* Backup commodity input for direct entry */}
+          <div className="mt-2">
+            <Input
+              type="text"
+              placeholder="Or enter commodity description directly..."
+              {...form.register('commodity')}
+              className="text-sm"
+              onBlur={(e) => {
+                const value = e.target.value;
+                if (value && value.trim().length >= 2) {
+                  // Update cargo item when direct input is used
+                  setCargoItem(prev => ({
+                    ...prev,
+                    commodity: {
+                      description: value.trim(),
+                      hts_code: prev.commodity?.hts_code || ''
+                    }
+                  }));
+                }
+              }}
+            />
+          </div>
         </div>
 
         {/* Road-specific fields */}
