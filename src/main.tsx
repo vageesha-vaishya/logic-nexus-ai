@@ -10,9 +10,17 @@ import { initGlobalErrorHandlers } from "./lib/global-error-handler";
 import { initNetworkLogger } from "./lib/network-logger";
 import { initPerformanceMonitoring } from "./lib/performance-logger";
 import { supabase } from "./integrations/supabase/client";
+import { v4 as uuidv4 } from "uuid";
 
 // Initialize core services
 logger.info("Platform Startup: Pre-loading", { component: "Main" });
+
+if (typeof globalThis !== "undefined" && typeof (globalThis as any).crypto !== "undefined") {
+  const c = (globalThis as any).crypto;
+  if (typeof c.randomUUID !== "function") {
+    c.randomUUID = () => uuidv4();
+  }
+}
 
 initSentry();
 initPostHog();

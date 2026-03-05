@@ -106,8 +106,21 @@ pipeline {
                 script {
                     echo "Building and running LogicPro web on VPS..."
                     timeout(time: 15, unit: 'MINUTES') {
+                        sh 'npm install --no-save ssh2'
                         echo "App Port: ${env.APP_PORT}, Supabase URL will be http://${env.VPS_IP}:${env.GATEWAY_PORT}"
                         sh 'node scripts/deploy_web_app_vps.cjs'
+                    }
+                }
+            }
+        }
+        
+        stage('Verify Containers') {
+            steps {
+                script {
+                    echo "Verifying supabase-gateway and logicpro-web containers on VPS..."
+                    sh 'npm install --no-save ssh2'
+                    timeout(time: 5, unit: 'MINUTES') {
+                        sh 'node scripts/verify_vps_containers.cjs'
                     }
                 }
             }
