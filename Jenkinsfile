@@ -58,8 +58,12 @@ pipeline {
         
         stage('Unit Tests') {
             steps {
-                // Run tests using Vitest
-                sh 'npm run test'
+                script {
+                    echo "Running unit tests (Vitest CI mode with bail and timeout)..."
+                    timeout(time: 10, unit: 'MINUTES') {
+                        sh 'npm run test:ci'
+                    }
+                }
             }
         }
         

@@ -7,15 +7,29 @@ import { useToast } from '@/hooks/use-toast';
 
 // Mock useCRM
 const { mockScopedDb } = vi.hoisted(() => {
+  const createChain = (data: any = [], error: any = null) => {
+    const chain: any = {
+      then: (resolve: any) => {
+        resolve({ data, error });
+        return Promise.resolve({ data, error });
+      }
+    };
+    chain.select = vi.fn(() => chain);
+    chain.eq = vi.fn(() => chain);
+    chain.in = vi.fn(() => chain);
+    chain.order = vi.fn(() => chain);
+    chain.limit = vi.fn(() => chain);
+    chain.single = vi.fn(() => chain);
+    chain.maybeSingle = vi.fn(() => chain);
+    chain.insert = vi.fn(() => chain);
+    chain.update = vi.fn(() => chain);
+    chain.delete = vi.fn(() => chain);
+    chain.rpc = vi.fn(() => chain);
+    return chain;
+  };
   return {
     mockScopedDb: {
-      from: vi.fn().mockReturnThis(),
-      select: vi.fn().mockReturnThis(),
-      order: vi.fn().mockResolvedValue({ data: [], error: null }),
-      eq: vi.fn().mockReturnThis(),
-      in: vi.fn().mockReturnThis(), // Added for in()
-      maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-      rpc: vi.fn(),
+      from: vi.fn((..._args: any[]) => createChain([])) as any,
     }
   };
 });
