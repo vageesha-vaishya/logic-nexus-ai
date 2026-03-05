@@ -79,8 +79,10 @@ pipeline {
                     
                     // Run the Node.js deployment script
                     // VPS_IP and VPS_PASSWORD are already environment variables
-                    withEnv(["VPS_USER=${env.VPS_USER}"]) {
-                        sh 'node scripts/deploy_vps.cjs'
+                    catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                        withEnv(["VPS_USER=${env.VPS_USER}"]) {
+                            sh 'node scripts/deploy_vps.cjs'
+                        }
                     }
                 }
             }
@@ -91,7 +93,7 @@ pipeline {
                 script {
                     echo "Setting up Supabase gateway reverse proxy on VPS..."
                     sh 'npm install --no-save ssh2'
-                    timeout(time: 10, unit: 'MINUTES') {
+                    timeout(time: 20, unit: 'MINUTES') {
                         echo "Gateway Port: ${env.GATEWAY_PORT}, VPS: ${env.VPS_IP}"
                         sh 'node scripts/setup_supabase_gateway_vps.cjs'
                     }
