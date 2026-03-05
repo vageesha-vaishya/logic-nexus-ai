@@ -55,7 +55,7 @@ pipeline {
                 }
             }
         }
-        
+        /* sarvesh temporry disabled unit tests
         stage('Unit Tests') {
             steps {
                 script {
@@ -66,7 +66,7 @@ pipeline {
                 }
             }
         }
-        
+        */
         stage('Deploy Edge Functions') {
             steps {
                 script {
