@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { render, screen, act } from '@testing-library/react';
+import { render, screen, act, waitFor } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { UnifiedQuoteComposer } from '../UnifiedQuoteComposer';
 
@@ -33,6 +33,9 @@ vi.mock('lucide-react', () => ({
   Timer: () => <span>Timer</span>,
   Sparkles: () => <span>Sparkles</span>,
   ChevronDown: () => <span>ChevronDown</span>,
+  ChevronRight: () => <span>ChevronRight</span>,
+  Search: () => <span>Search</span>,
+  ChevronLeft: () => <span>ChevronLeft</span>,
   Save: () => <span>Save</span>,
   Settings2: () => <span>Settings2</span>,
   Building2: () => <span>Building2</span>,
@@ -41,7 +44,8 @@ vi.mock('lucide-react', () => ({
   Loader2: () => <span>Loader2</span>,
   AlertCircle: () => <span>AlertCircle</span>,
   History: () => <span>History</span>,
-  ExternalLink: () => <span>ExternalLink</span>
+  ExternalLink: () => <span>ExternalLink</span>,
+  LayoutGrid: () => <span>LayoutGrid</span>,
 }));
 
 // Mock hooks
@@ -126,7 +130,10 @@ vi.mock('@/hooks/useCRM', () => ({
     return {
       scopedDb: useMemo(() => ({ from: mockFrom }), []),
       context: useMemo(() => ({ tenantId: 'tenant-1' }), []),
-      supabase: useMemo(() => ({ auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null }) } }), [])
+      supabase: useMemo(() => ({
+        auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null }) },
+        from: (table: string) => mockFrom(table)
+      }), [])
     };
   }
 }));
@@ -250,19 +257,21 @@ describe('UnifiedQuoteComposer V2', () => {
 
   it('initializes with optionId from URL', async () => {
     // Setup URL params
-    mockSearchParams.set('optionId', 'opt-123');
-    mockSearchParams.set('versionId', 'ver-456');
+    const optionUUID = '00000000-0000-0000-0000-000000001234';
+    const versionUUID = '00000000-0000-0000-0000-000000004564';
+    mockSearchParams.set('optionId', optionUUID);
+    mockSearchParams.set('versionId', versionUUID);
 
     // Setup mock data for loadExistingQuote
     const mockQuote = {
-      id: 'quote-123',
-      current_version_id: 'ver-456',
+      id: '00000000-0000-0000-0000-000000000123',
+      current_version_id: versionUUID,
       tenant_id: 'tenant-1'
     };
     
     const mockOption = {
-      id: 'opt-123',
-      quotation_version_id: 'ver-456',
+      id: optionUUID,
+      quotation_version_id: versionUUID,
       total_amount: 1000,
       currency: 'USD',
       option_name: 'Test Option',
@@ -282,35 +291,36 @@ describe('UnifiedQuoteComposer V2', () => {
     });
 
     await act(async () => {
-      render(<UnifiedQuoteComposer quoteId="quote-123" versionId="ver-456" />);
+      render(<UnifiedQuoteComposer quoteId={mockQuote.id} versionId={versionUUID} />);
     });
-    
-    // Verify dispatch was called with optionId
-    // The component calls dispatch({ type: 'INITIALIZE', payload: { ... } })
-    // It should contain optionId: 'opt-123'
-    expect(mockDispatch).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'INITIALIZE',
-      payload: expect.objectContaining({
-        optionId: 'opt-123'
-      })
-    }));
+    await waitFor(() => {
+      expect(mockDispatch).toHaveBeenCalledWith(expect.objectContaining({
+        type: 'INITIALIZE',
+        payload: expect.objectContaining({
+          optionId: optionUUID
+        })
+      }));
+    });
   });
 
   it('prioritizes optionId from URL over is_selected flag', async () => {
     // Setup URL params
-    mockSearchParams.set('optionId', 'opt-123');
-    mockSearchParams.set('versionId', 'ver-456');
+    const optionUUID = '00000000-0000-0000-0000-000000009999';
+    const urlOptionUUID = '00000000-0000-0000-0000-000000001234';
+    const versionUUID = '00000000-0000-0000-0000-000000004564';
+    mockSearchParams.set('optionId', urlOptionUUID);
+    mockSearchParams.set('versionId', versionUUID);
 
     // Setup mock data for loadExistingQuote
     const mockQuote = {
-      id: 'quote-123',
-      current_version_id: 'ver-456',
+      id: '00000000-0000-0000-0000-000000000123',
+      current_version_id: versionUUID,
       tenant_id: 'tenant-1'
     };
     
     const mockOption1 = {
-      id: 'opt-123', // This one matches URL
-      quotation_version_id: 'ver-456',
+      id: urlOptionUUID, // This one matches URL
+      quotation_version_id: versionUUID,
       total_amount: 1000,
       currency: 'USD',
       option_name: 'URL Option',
@@ -318,8 +328,8 @@ describe('UnifiedQuoteComposer V2', () => {
     };
 
     const mockOption2 = {
-      id: 'opt-999', // This one is selected in DB
-      quotation_version_id: 'ver-456',
+      id: optionUUID, // This one is selected in DB
+      quotation_version_id: versionUUID,
       total_amount: 2000,
       currency: 'USD',
       option_name: 'Selected Option',
@@ -339,15 +349,15 @@ describe('UnifiedQuoteComposer V2', () => {
     });
 
     await act(async () => {
-      render(<UnifiedQuoteComposer quoteId="quote-123" versionId="ver-456" />);
+      render(<UnifiedQuoteComposer quoteId={mockQuote.id} versionId={versionUUID} />);
     });
-    
-    // Verify dispatch was called with optionId from URL (opt-123)
-    expect(mockDispatch).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'INITIALIZE',
-      payload: expect.objectContaining({
-        optionId: 'opt-123'
-      })
-    }));
+    await waitFor(() => {
+      expect(mockDispatch).toHaveBeenCalledWith(expect.objectContaining({
+        type: 'INITIALIZE',
+        payload: expect.objectContaining({
+          optionId: urlOptionUUID
+        })
+      }));
+    });
   });
 });
