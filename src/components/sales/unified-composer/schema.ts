@@ -112,10 +112,10 @@ export const quoteComposerSchema = z.object({
   })).optional(),
 }).superRefine((data, ctx) => {
   // TEMPORARILY DISABLED: Custom commodity validation for debugging
-  // const commodityValue = data.commodity;
-  // if (!commodityValue || commodityValue.trim().length < 2) {
-  //   ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Commodity is required', path: ['commodity'] });
-  // }
+  const commodityValue = data.commodity;
+  if (!commodityValue || commodityValue.trim().length < 2) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Commodity is required', path: ['commodity'] });
+  }
   
   if (data.mode === 'air') {
     if (!data.weight || isNaN(Number(data.weight)) || Number(data.weight) <= 0) {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useFormContext } from 'react-hook-form';
 import { QuoteComposerValues } from './schema';
 import { Button } from '@/components/ui/button';
@@ -29,6 +29,7 @@ import { logger } from '@/lib/logger';
 import { QuotationNumberService } from '@/services/quotation/QuotationNumberService';
 import { FileUpload } from '@/components/ui/file-upload';
 import { v4 as uuidv4 } from 'uuid';
+import { cn } from '@/lib/utils';
 
 export type FormZoneValues = QuoteComposerValues;
 
@@ -50,6 +51,7 @@ export interface ExtendedFormData {
   originDetails: any;
   destinationDetails: any;
   attachments: any[]; // New field
+  cargoItem?: CargoItem | null;
 }
 
 const DEFAULT_EXTENDED: ExtendedFormData = {
@@ -70,6 +72,18 @@ const DEFAULT_EXTENDED: ExtendedFormData = {
   originDetails: null,
   destinationDetails: null,
   attachments: [],
+  cargoItem: null,
+};
+
+const formatCommodityDisplay = (commodity?: { description?: string; hts_code?: string }) => {
+  if (!commodity) return '';
+  const description = (commodity.description || '').trim();
+  const htsCode = (commodity.hts_code || '').trim();
+  if (description && htsCode) {
+    return `${description} - ${htsCode}`;
+  }
+  if (description) return description;
+  return htsCode;
 };
 
 interface FormZoneProps {
@@ -198,6 +212,12 @@ export function FormZone({
   const origin = form.watch('origin');
   const destination = form.watch('destination');
   const accountId = form.watch('accountId' as any);
+  const initialDataKey = useMemo(
+    () => JSON.stringify({ initialValues: initialValues ?? null, initialExtended: initialExtended ?? null }),
+    [initialValues, initialExtended]
+  );
+  const appliedInitialDataKeyRef = useRef<string | null>(null);
+  const cargoInitDataKeyRef = useRef<string | null>(null);
 
   const filteredContacts = useMemo(() => {
     if (!accountId) return contacts;
@@ -206,22 +226,16 @@ export function FormZone({
 
   // Sync initial values to form context and local cargoItem state
   useEffect(() => {
-    let hasUpdates = false;
+    if (!initialValues && !initialExtended) return;
+    if (appliedInitialDataKeyRef.current === initialDataKey) return;
     
-    if (initialValues) {
-      Object.entries(initialValues).forEach(([key, value]) => {
-        if (value !== undefined) form.setValue(key as any, value);
-      });
-      hasUpdates = true;
-    }
-    if (initialExtended) {
-      Object.entries(initialExtended).forEach(([key, value]) => {
-        if (value !== undefined) form.setValue(key as any, value);
-      });
-      hasUpdates = true;
-    }
-
-  }, [initialValues, initialExtended, form]);
+    form.reset({
+      ...form.getValues(),
+      ...(initialValues || {}),
+      ...(initialExtended || {}),
+    } as any);
+    appliedInitialDataKeyRef.current = initialDataKey;
+  }, [initialValues, initialExtended, initialDataKey]);
 
   // Auto-expand "More options" if optional fields are populated (edit mode)
   useEffect(() => {
@@ -283,50 +297,76 @@ export function FormZone({
 
   // Initialize CargoItem from props
   useEffect(() => {
-    setCargoItem({
-      id: 'main',
-      type: mode === 'ocean' || mode === 'rail' ? 'container' : 'loose',
-      quantity: 1,
-      weight: { value: 0, unit: 'kg' },
-      volume: 0,
-      dimensions: { l: 0, w: 0, h: 0, unit: 'cm' },
-      commodity: initialValues?.commodity ? {
-        description: initialValues.commodity,
-        hts_code: initialExtended?.htsCode || ''
-      } : undefined,
-      hazmat: (initialExtended?.dangerousGoods || initialValues?.dangerousGoods) ? {
-        class: '',
-        unNumber: '',
-        packingGroup: 'II'
-      } : undefined,
-      containerCombos: [],
-      containerDetails: undefined,
-      stackable: false
-    });
-  }, [initialValues, initialExtended]);
+    if (appliedInitialDataKeyRef.current !== initialDataKey) return;
+    if (cargoInitDataKeyRef.current === initialDataKey) return;
+    const initialCargo = initialExtended?.cargoItem;
+    if (initialCargo && typeof initialCargo === 'object') {
+      setCargoItem({
+        id: initialCargo.id || 'main',
+        type: initialCargo.type || 'loose',
+        quantity: Number(initialCargo.quantity) > 0 ? Number(initialCargo.quantity) : 1,
+        weight: {
+          value: Number(initialCargo.weight?.value) || 0,
+          unit: initialCargo.weight?.unit === 'lb' ? 'lb' : 'kg',
+        },
+        volume: Number(initialCargo.volume) || 0,
+        dimensions: {
+          l: Number(initialCargo.dimensions?.l) || 0,
+          w: Number(initialCargo.dimensions?.w) || 0,
+          h: Number(initialCargo.dimensions?.h) || 0,
+          unit: initialCargo.dimensions?.unit === 'in' ? 'in' : 'cm',
+        },
+        commodity: initialCargo.commodity,
+        hazmat: initialCargo.hazmat,
+        containerCombos: initialCargo.containerCombos || [],
+        containerDetails: initialCargo.containerDetails,
+        stackable: !!initialCargo.stackable,
+      });
+    } else {
+      const effectiveMode = (initialValues?.mode ?? form.getValues('mode')) as any;
+      const initialQty = Number(initialExtended?.containerQty || 1);
+      const safeQty = Number.isFinite(initialQty) && initialQty > 0 ? initialQty : 1;
+      const initialWeight = Number(initialValues?.weight || 0);
+      const initialVolume = Number(initialValues?.volume || 0);
+      setCargoItem({
+        id: 'main',
+        type: effectiveMode === 'ocean' || effectiveMode === 'rail' ? 'container' : 'loose',
+        quantity: safeQty,
+        weight: { value: Number.isFinite(initialWeight) ? initialWeight : 0, unit: 'kg' },
+        volume: Number.isFinite(initialVolume) ? initialVolume : 0,
+        dimensions: { l: 0, w: 0, h: 0, unit: 'cm' },
+        commodity: initialValues?.commodity ? {
+          description: initialValues.commodity,
+          hts_code: initialExtended?.htsCode || ''
+        } : undefined,
+        hazmat: (initialExtended?.dangerousGoods || initialValues?.dangerousGoods) ? {
+          class: '',
+          unNumber: '',
+          packingGroup: 'II'
+        } : undefined,
+        containerCombos: initialExtended?.containerCombos
+          ? (initialExtended.containerCombos as any[]).map((c: any) => ({
+              typeId: c.type,
+              sizeId: c.size,
+              quantity: c.qty,
+            }))
+          : [],
+        containerDetails: undefined,
+        stackable: false
+      });
+    }
+    cargoInitDataKeyRef.current = initialDataKey;
+  }, [initialValues, initialExtended, initialDataKey]);
 
   // Sync CargoItem → form/extended
   useEffect(() => {
-    // Sync commodity description and trigger validation
-    const description = cargoItem.commodity?.description || '';
-    
-    // Debug logging
-    console.log('[FormZone] Commodity sync debug:', {
-      cargoItemCommodity: cargoItem.commodity,
-      description,
-      currentFormValue: form.getValues('commodity')
-    });
-    
-    // Only update if the value has actually changed to avoid infinite loops
+    // Sync commodity description to form, but avoid clearing a valid form value
+    // during unrelated cargo updates (e.g. container combo changes).
+    const displayValue = formatCommodityDisplay(cargoItem.commodity);
+
     const currentValue = form.getValues('commodity');
-    if (currentValue !== description) {
-      console.log('[FormZone] Updating commodity from', currentValue, 'to', description);
-      form.setValue('commodity', description, { shouldValidate: true, shouldDirty: true });
-      
-      // Trigger validation explicitly to ensure the error state is updated
-      setTimeout(() => {
-        form.trigger('commodity');
-      }, 0);
+    if (displayValue && currentValue !== displayValue) {
+      form.setValue('commodity', displayValue, { shouldValidate: true, shouldDirty: true });
     }
     
     // Sync HTS code if available
@@ -335,6 +375,11 @@ export function FormZone({
     }
 
     form.setValue('dangerousGoods', !!cargoItem.hazmat, { shouldDirty: true });
+    form.setValue('cargoItem' as any, cargoItem as any, { shouldDirty: true });
+
+    // Weight/volume are entered in SharedCargoInput for all modes, so keep form values synced always.
+    form.setValue('weight', String(cargoItem.weight.value || 0), { shouldValidate: true, shouldDirty: true });
+    form.setValue('volume', String(cargoItem.volume || 0), { shouldValidate: true, shouldDirty: true });
 
     if (mode === 'ocean' || mode === 'rail') {
       if (cargoItem.type === 'container') {
@@ -344,15 +389,20 @@ export function FormZone({
         } else if (cargoItem.containerDetails?.typeId && cargoItem.containerDetails?.sizeId) {
           combos = [{ type: cargoItem.containerDetails.typeId, size: cargoItem.containerDetails.sizeId, qty: cargoItem.quantity }];
         }
+        form.setValue('containerCombos', combos as any, { shouldValidate: true, shouldDirty: true });
         if (combos.length > 0) {
           form.setValue('containerType', combos[0].type, { shouldValidate: true });
           form.setValue('containerSize', combos[0].size, { shouldValidate: true });
           form.setValue('containerQty', String(cargoItem.quantity), { shouldValidate: true });
         }
+        if (combos.length === 0) {
+          form.setValue('containerType', '', { shouldValidate: true });
+          form.setValue('containerSize', '', { shouldValidate: true });
+          form.setValue('containerQty', '1', { shouldValidate: true });
+        }
       }
     } else {
-      form.setValue('weight', String(cargoItem.weight.value), { shouldValidate: true });
-      form.setValue('volume', String(cargoItem.volume || 0), { shouldValidate: true });
+      form.setValue('containerCombos', [] as any, { shouldValidate: false, shouldDirty: true });
       form.setValue('containerQty', String(cargoItem.quantity), { shouldValidate: true });
     }
   }, [cargoItem, mode]);
@@ -368,9 +418,11 @@ export function FormZone({
   };
 
   const handleCommoditySelect = (selection: CommoditySelection) => {
-    const displayValue = selection.hts_code ? `${selection.description} - ${selection.hts_code}` : selection.description;
-    console.log('[FormZone] handleCommoditySelect called with:', selection, 'displayValue:', displayValue);
-    
+    const displayValue = formatCommodityDisplay({
+      description: selection.description,
+      hts_code: selection.hts_code,
+    });
+
     // Set the form value directly and immediately
     form.setValue('commodity', displayValue, { shouldValidate: true, shouldDirty: true });
     
@@ -378,7 +430,7 @@ export function FormZone({
     setCargoItem(prev => ({
       ...prev,
       commodity: {
-        description: selection.description,
+        description: selection.description?.trim() || '',
         hts_code: selection.hts_code,
         id: selection.master_commodity_id,
         aes_hts_id: selection.aes_hts_id,
@@ -408,8 +460,11 @@ export function FormZone({
   };
 
   const onSubmit = (data: QuoteComposerValues) => {
-    // Pass everything in data to onGetRates
-    onGetRates(data as any, data as any, smartMode);
+    const extendedData: ExtendedFormData = {
+      ...(data as any),
+      cargoItem,
+    };
+    onGetRates(data as any, extendedData, smartMode);
   };
 
   const attachments = form.watch('attachments' as any) || [];
@@ -937,7 +992,14 @@ export function FormZone({
 
         {/* Origin / Destination */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
+          <div
+            className={cn(
+              "space-y-2 rounded-md transition-colors",
+              (form.formState.errors.origin || form.formState.errors.originId) && "bg-destructive/5 ring-1 ring-destructive p-2"
+            )}
+            data-field-name="origin"
+            aria-invalid={!!(form.formState.errors.origin || form.formState.errors.originId)}
+          >
             <Label className="flex justify-between">
               Origin
               {form.formState.errors.origin && <span className="text-destructive text-xs">{form.formState.errors.origin.message}</span>}
@@ -952,7 +1014,14 @@ export function FormZone({
             />
             <input type="hidden" {...form.register('origin')} />
           </div>
-          <div className="space-y-2">
+          <div
+            className={cn(
+              "space-y-2 rounded-md transition-colors",
+              (form.formState.errors.destination || form.formState.errors.destinationId) && "bg-destructive/5 ring-1 ring-destructive p-2"
+            )}
+            data-field-name="destination"
+            aria-invalid={!!(form.formState.errors.destination || form.formState.errors.destinationId)}
+          >
             <Label className="flex justify-between">
               Destination
               {form.formState.errors.destination && <span className="text-destructive text-xs">{form.formState.errors.destination.message}</span>}
@@ -970,35 +1039,49 @@ export function FormZone({
         </div>
 
         {/* Commodity & Cargo */}
-        <div className="space-y-2">
+        <div
+          className={cn(
+            "space-y-2 rounded-md transition-colors",
+            form.formState.errors.commodity && "bg-destructive/5 ring-1 ring-destructive p-2"
+          )}
+          data-field-name="commodity"
+          aria-invalid={!!form.formState.errors.commodity}
+        >
           <Label className="flex justify-between">
             <span>Commodity & Cargo {form.formState.errors.commodity && <span className="text-destructive text-xs ml-2">{form.formState.errors.commodity.message}</span>}</span>
             <button type="button" onClick={handleAiSuggest} className="text-xs text-primary flex items-center gap-1 hover:underline">
               <Sparkles className="w-3 h-3" /> AI Analyze
             </button>
           </Label>
-          <SharedCargoInput value={cargoItem} onChange={setCargoItem} errors={form.formState.errors as any} />
-          <input type="hidden" {...form.register('commodity')} />
+          <SharedCargoInput
+            value={cargoItem}
+            onChange={setCargoItem}
+            onCommodityChange={(value) => form.setValue('commodity', value, { shouldValidate: true, shouldDirty: true })}
+            errors={form.formState.errors as any}
+          />
           
           {/* Backup commodity input for direct entry */}
           <div className="mt-2">
             <Input
               type="text"
               placeholder="Or enter commodity description directly..."
-              {...form.register('commodity')}
+              data-testid="commodity-input"
+              name="commodity"
+              value={commodity || ''}
               className="text-sm"
-              onBlur={(e) => {
+              aria-invalid={!!form.formState.errors.commodity}
+              onChange={(e) => {
                 const value = e.target.value;
-                if (value && value.trim().length >= 2) {
-                  // Update cargo item when direct input is used
-                  setCargoItem(prev => ({
-                    ...prev,
-                    commodity: {
-                      description: value.trim(),
-                      hts_code: prev.commodity?.hts_code || ''
-                    }
-                  }));
-                }
+                form.setValue('commodity', value, { shouldValidate: true, shouldDirty: true });
+                setCargoItem(prev => ({
+                  ...prev,
+                  commodity: value
+                    ? {
+                        description: value,
+                        hts_code: prev.commodity?.hts_code || ''
+                      }
+                    : undefined
+                }));
               }}
             />
           </div>

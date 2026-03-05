@@ -244,4 +244,56 @@ describe('UnifiedQuoteComposer Load Logic', () => {
     // Verify correct option is selected (Option 2 was is_selected: true)
     expect(screen.getByTestId('selected-option-id')).toHaveTextContent(option2Id);
   });
+
+  it('restores commodity from quotes.cargo_details when reopening a saved quote', async () => {
+    const quoteId = '00000000-0000-0000-0000-0000000000aa';
+
+    const mockQuote = {
+      id: quoteId,
+      tenant_id: 'test-tenant',
+      title: 'Saved Quote With Commodity',
+      transport_mode: 'ocean',
+      origin: 'Nhava Sheva',
+      destination: 'New York',
+      origin_port_data: { location_name: 'Nhava Sheva', location_code: 'INNSA' },
+      destination_port_data: { location_name: 'New York', location_code: 'USNYC' },
+      cargo_details: {
+        commodity: 'PARTS OF BABY CARRIAGES - 8715.00.00.40',
+        total_weight_kg: 980,
+        total_volume_cbm: 11.2,
+        hts_code: '8715.00.00.40'
+      }
+    };
+
+    mockScopedDb.from.mockImplementation((table: string) => {
+      const chain: any = {
+        select: () => chain,
+        eq: () => chain,
+        in: () => chain,
+        order: () => chain,
+        maybeSingle: () => Promise.resolve({ data: null, error: null }),
+        then: (resolve: any) => resolve({ data: [], error: null })
+      };
+
+      if (table === 'quotes') {
+        chain.maybeSingle = () => Promise.resolve({ data: mockQuote, error: null });
+      }
+
+      return chain;
+    });
+
+    render(
+      <MemoryRouter>
+        <UnifiedQuoteComposer quoteId={quoteId} />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      const formZone = screen.getByTestId('form-zone');
+      const initialValues = JSON.parse(formZone.getAttribute('data-initial-values') || '{}');
+      expect(initialValues.commodity).toBe('PARTS OF BABY CARRIAGES - 8715.00.00.40');
+      expect(initialValues.weight).toBe('980');
+      expect(initialValues.volume).toBe('11.2');
+    });
+  });
 });

@@ -21,7 +21,9 @@ const defaultContainerRefs = {
   containerTypes: mockContainerTypes,
   containerSizes: mockContainerSizes,
   formatSize: (name: string) => name,
-  loading: false
+  loading: false,
+  error: null,
+  retry: vi.fn(),
 };
 
 vi.mock('@/hooks/useContainerRefs', () => ({
@@ -145,8 +147,8 @@ describe('SharedCargoInput', () => {
     console.log('Call args:', JSON.stringify(callArgs, null, 2));
     
     expect(callArgs.containerCombos).toHaveLength(1);
-    expect(callArgs.containerCombos[0].typeId).toBe('dry'); // Defaults to first type
-    expect(callArgs.containerCombos[0].sizeId).toBe('20ft'); // Defaults to matching size
+    expect(callArgs.containerCombos[0].typeId).toBe(''); // Explicit selection required
+    expect(callArgs.containerCombos[0].sizeId).toBe(''); // Explicit selection required
   });
 
   it('renders container configuration when combos exist', () => {
@@ -163,9 +165,28 @@ describe('SharedCargoInput', () => {
     // Use getAllByText for Type and Size because they appear as Label and Select placeholder
     expect(screen.getAllByText('Type').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Size').length).toBeGreaterThan(0);
+    expect(screen.getByText('Please select container type')).toBeInTheDocument();
+    expect(screen.getByText('Please select container size')).toBeInTheDocument();
     
     // Check if options are rendered (our mock renders SelectContent immediately)
     expect(screen.getByText('20ft')).toBeInTheDocument();
+  });
+
+  it('resolves saved type/size names to dropdown IDs for display', () => {
+    const valueWithNamedCombos: CargoItem = {
+      ...defaultValue,
+      containerCombos: [
+        { id: '1', typeId: 'Dry Standard', sizeId: '20ft', quantity: 4 }
+      ]
+    };
+
+    const { getAllByTestId } = render(<SharedCargoInput value={valueWithNamedCombos} onChange={() => {}} />);
+    const roots = getAllByTestId('select-root');
+
+    // Type select should resolve name -> id
+    expect(roots[0].getAttribute('data-value')).toBe('dry');
+    // Size select should resolve name -> id
+    expect(roots[1].getAttribute('data-value')).toBe('20ft');
   });
 
   // Bug reproduction: Combo initialization without matching size
@@ -177,7 +198,9 @@ describe('SharedCargoInput', () => {
       containerTypes: bugContainerTypes,
       containerSizes: bugContainerSizes,
       formatSize: (name: string) => name,
-      loading: false
+      loading: false,
+      error: null,
+      retry: vi.fn(),
     });
 
     const onChange = vi.fn();
@@ -188,13 +211,13 @@ describe('SharedCargoInput', () => {
     });
 
     const callArgs = onChange.mock.calls[0][0];
-    expect(callArgs.containerCombos[0].typeId).toBe('weird_type');
-    // Expect sizeId to be empty because no match found
+    expect(callArgs.containerCombos[0].typeId).toBe('');
+    // size stays empty until user selects a type
     expect(callArgs.containerCombos[0].sizeId).toBe('');
   });
 
-  // New test case: Orphan sizes (missing type_id) should be visible
-  it('shows orphan sizes (missing type_id) in dropdown', async () => {
+  // Size list should be constrained by selected type
+  it('shows only sizes mapped to selected type in dropdown', async () => {
     const types = [{ id: 'type1', name: 'Type 1', code: 'T1' }];
     const sizes = [
       { id: 'size1', name: 'Size 1', iso_code: 'S1', type_id: 'type1' }, // Matching
@@ -205,7 +228,9 @@ describe('SharedCargoInput', () => {
       containerTypes: types,
       containerSizes: sizes,
       formatSize: (name: string) => name,
-      loading: false
+      loading: false,
+      error: null,
+      retry: vi.fn(),
     });
 
     const valueWithCombo = {
@@ -222,7 +247,7 @@ describe('SharedCargoInput', () => {
     // So we should see "Size 1" and "Size 2" in the DOM if they are rendered.
 
     expect(getAllByText('Size 1')).toBeDefined();
-    expect(getAllByText('Size 2')).toBeDefined();
+    expect(screen.queryByText('Size 2')).not.toBeInTheDocument();
   });
 
   it('renders nothing for container config if combos are empty', () => {
@@ -234,5 +259,32 @@ describe('SharedCargoInput', () => {
      
      render(<SharedCargoInput value={looseValue} onChange={() => {}} />);
      expect(screen.queryByText('Container Configuration')).not.toBeInTheDocument();
+  });
+
+  it('auto-calculates total volume from dimensions and quantity', () => {
+    const looseValue: CargoItem = {
+      ...defaultValue,
+      type: 'loose',
+      quantity: 2,
+      dimensions: { l: 0, w: 0, h: 0, unit: 'cm' },
+      volume: 0,
+    };
+    let current = looseValue;
+    const onChange = vi.fn((next: CargoItem) => {
+      current = next;
+      rerender(<SharedCargoInput value={current} onChange={onChange} />);
+    });
+
+    const { rerender } = render(<SharedCargoInput value={current} onChange={onChange} />);
+
+    const lengthInput = screen.getByPlaceholderText('L');
+    const widthInput = screen.getByPlaceholderText('W');
+    const heightInput = screen.getByPlaceholderText('H');
+
+    fireEvent.change(lengthInput, { target: { value: '10' } });
+    fireEvent.change(widthInput, { target: { value: '10' } });
+    fireEvent.change(heightInput, { target: { value: '10' } });
+
+    expect(current.volume).toBe(0.002);
   });
 });

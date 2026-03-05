@@ -46,6 +46,12 @@ interface UnifiedQuoteComposerProps {
   initialData?: any; // Pre-population from QuickQuoteHistory / navigation state
 }
 
+type ValidationIssue = {
+  path: string;
+  label: string;
+  message: string;
+};
+
 // ---------------------------------------------------------------------------
 // Wrapped export (provides QuoteStoreProvider)
 // ---------------------------------------------------------------------------
@@ -104,6 +110,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
   const [optionDrafts, setOptionDrafts] = useState<Record<string, any>>({});
   const [networkStatus, setNetworkStatus] = useState<'online' | 'offline' | 'checking'>('online');
   const [showNetworkWarning, setShowNetworkWarning] = useState(false);
+  const [showValidationSummary, setShowValidationSummary] = useState(false);
 
   // Rate fetching hook
   const rateFetching = useRateFetching();
@@ -254,6 +261,93 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
       logger.warn('[UnifiedComposer] Audit log exception:', e);
     }
   }, [user?.id, quoteId, context?.tenantId, context?.franchiseId, scopedDb]);
+
+  const normalizeFieldLabel = useCallback((path: string): string => {
+    const customLabels: Record<string, string> = {
+      origin: 'Origin',
+      originId: 'Origin',
+      destination: 'Destination',
+      destinationId: 'Destination',
+      commodity: 'Commodity',
+      quoteTitle: 'Quote Reference',
+      accountId: 'Account',
+      contactId: 'Contact',
+      opportunityId: 'Opportunity',
+      guestCompany: 'Company Name',
+      guestName: 'Full Name',
+      guestEmail: 'Email Address',
+      containerType: 'Container Type',
+      containerSize: 'Container Size',
+      containerQty: 'Container Quantity',
+      weight: 'Weight',
+      volume: 'Volume',
+    };
+    if (customLabels[path]) return customLabels[path];
+    const token = path.split('.').pop() || path;
+    return token
+      .replace(/\[(\d+)\]/g, ' $1 ')
+      .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+      .replace(/_/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .replace(/^./, (s) => s.toUpperCase());
+  }, []);
+
+  const flattenValidationErrors = useCallback((errors: any, parentPath = ''): ValidationIssue[] => {
+    if (!errors || typeof errors !== 'object') return [];
+    const issues: ValidationIssue[] = [];
+    Object.entries(errors).forEach(([key, value]: [string, any]) => {
+      if (!value) return;
+      const path = parentPath ? `${parentPath}.${key}` : key;
+      if (typeof value?.message === 'string' && value.message.trim()) {
+        issues.push({
+          path,
+          label: normalizeFieldLabel(path),
+          message: value.message.trim(),
+        });
+      }
+      if (typeof value === 'object') {
+        issues.push(...flattenValidationErrors(value, path));
+      }
+    });
+    return issues;
+  }, [normalizeFieldLabel]);
+
+  const validationIssues = useMemo(() => {
+    const unique = new Map<string, ValidationIssue>();
+    flattenValidationErrors(form.formState.errors).forEach((issue) => {
+      if (!unique.has(issue.path)) unique.set(issue.path, issue);
+    });
+    return Array.from(unique.values());
+  }, [form.formState.errors, flattenValidationErrors]);
+
+  const scrollToField = useCallback((path: string) => {
+    if (typeof document === 'undefined') return;
+    const pathCandidates = [path, path.replace(/^root\./, ''), path.split('.')[0]].filter(Boolean);
+    const allNamed = Array.from(document.querySelectorAll<HTMLElement>('[name]'));
+    const targetByName = pathCandidates
+      .map((candidate) => allNamed.find((node) => node.getAttribute('name') === candidate))
+      .find(Boolean) as HTMLElement | undefined;
+    const targetByAnchor = pathCandidates
+      .map((candidate) => document.querySelector<HTMLElement>(`[data-field-name="${candidate}"]`))
+      .find(Boolean) as HTMLElement | undefined;
+    const target = targetByName || targetByAnchor;
+    if (!target) return;
+    const container = target.closest('[data-field-name]') as HTMLElement | null;
+    const scrollTarget = container || target;
+    scrollTarget.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (typeof (target as any).focus === 'function') {
+      (target as any).focus({ preventScroll: true });
+    } else if (typeof (scrollTarget as any).focus === 'function') {
+      (scrollTarget as any).focus({ preventScroll: true });
+    }
+  }, []);
+
+  useEffect(() => {
+    if (validationIssues.length === 0 && showValidationSummary) {
+      setShowValidationSummary(false);
+    }
+  }, [validationIssues.length, showValidationSummary]);
 
   // ---------------------------------------------------------------------------
   // Network Connectivity Check
@@ -508,6 +602,108 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
   const [loadErrors, setLoadErrors] = useState<string[]>([]);
   const [versionHistory, setVersionHistory] = useState<any[]>([]);
 
+  const parseJsonObject = useCallback((value: any): Record<string, any> | null => {
+    if (!value) return null;
+    if (typeof value === 'object') return value as Record<string, any>;
+    if (typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value);
+        return typeof parsed === 'object' && parsed ? parsed : null;
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }, []);
+
+  const normalizeCommodityText = useCallback((commodity: any): string => {
+    if (!commodity) return '';
+    if (typeof commodity === 'string') return commodity;
+    if (typeof commodity === 'object') {
+      return String(commodity.description || commodity.name || '').trim();
+    }
+    return String(commodity).trim();
+  }, []);
+
+  const buildCargoSnapshot = useCallback((values: any, extended: any) => {
+    const cargoItem = (extended?.cargoItem || values?.cargoItem || null) as any;
+    const commodityFromCargoItem = normalizeCommodityText(cargoItem?.commodity);
+    const rawCommodity = (normalizeCommodityText(values?.commodity) || commodityFromCargoItem || '').trim();
+    const hazmat = cargoItem?.hazmat;
+    const dangerousGoods = Boolean(values?.dangerousGoods || extended?.dangerousGoods || hazmat);
+    const totalWeightKg = Number(values?.weight ?? cargoItem?.weight?.value ?? 0) || 0;
+    const totalVolumeCbm = Number(values?.volume ?? cargoItem?.volume ?? 0) || 0;
+    return {
+      commodity: rawCommodity || null,
+      total_weight_kg: totalWeightKg,
+      total_volume_cbm: totalVolumeCbm,
+      dangerous_goods: dangerousGoods,
+      hts_code: values?.htsCode || extended?.htsCode || cargoItem?.commodity?.hts_code || null,
+      cargo_type: cargoItem?.type || null,
+      quantity: Number(cargoItem?.quantity) || null,
+      weight_unit: cargoItem?.weight?.unit || null,
+      dimensions: cargoItem?.dimensions || null,
+      stackable: typeof cargoItem?.stackable === 'boolean' ? cargoItem.stackable : null,
+      commodity_details: cargoItem?.commodity || null,
+      hazmat_details: hazmat || null,
+      container_combos: cargoItem?.containerCombos || null,
+    };
+  }, [normalizeCommodityText]);
+
+  const flattenOptionCharges = useCallback((option: RateOption | null | undefined): any[] => {
+    if (!option) return [];
+    const globalCharges = Array.isArray(option.charges) ? option.charges : [];
+    const legCharges = (Array.isArray(option.legs) ? option.legs : []).flatMap((leg: any) => {
+      const charges = Array.isArray(leg?.charges) ? leg.charges : [];
+      return charges.map((charge: any) => ({
+        ...charge,
+        legId: charge?.legId || charge?.leg_id || leg.id || null,
+        leg_id: charge?.leg_id || charge?.legId || leg.id || null,
+      }));
+    });
+    return [...globalCharges, ...legCharges];
+  }, []);
+
+  const extractContainerCombos = useCallback((values: any, extended: any) => {
+    const direct = Array.isArray(values?.containerCombos) ? values.containerCombos : [];
+    if (direct.length > 0) return direct;
+
+    const ext = Array.isArray(extended?.containerCombos) ? extended.containerCombos : [];
+    if (ext.length > 0) return ext;
+
+    const cargoCombos = Array.isArray(extended?.cargoItem?.containerCombos)
+      ? extended.cargoItem.containerCombos
+      : (Array.isArray(values?.cargoItem?.containerCombos) ? values.cargoItem.containerCombos : []);
+
+    if (cargoCombos.length > 0) {
+      return cargoCombos.map((c: any) => ({
+        type: c.type || c.typeId || '',
+        size: c.size || c.sizeId || '',
+        qty: Number(c.qty ?? c.quantity ?? 1) || 1,
+      }));
+    }
+
+    return [];
+  }, []);
+
+  const syncQuoteCargoDetails = useCallback(async (savedQuoteId: string, cargoSnapshot: Record<string, any>) => {
+    try {
+      const quoteQuery = scopedDb.from('quotes') as any;
+      if (typeof quoteQuery?.update !== 'function') {
+        logger.warn('[UnifiedComposer] Post-save cargo_details sync skipped: update() unavailable', { savedQuoteId });
+        return;
+      }
+      const { error } = await quoteQuery
+        .update({ cargo_details: cargoSnapshot } as any)
+        .eq('id', savedQuoteId);
+      if (error) {
+        logger.warn('[UnifiedComposer] Post-save cargo_details sync failed', { savedQuoteId, error });
+      }
+    } catch (error) {
+      logger.warn('[UnifiedComposer] Post-save cargo_details sync threw', { savedQuoteId, error });
+    }
+  }, [scopedDb]);
+
   // ---------------------------------------------------------------------------
   // Edit mode: load existing quote data
   // ---------------------------------------------------------------------------
@@ -587,6 +783,8 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
       
       const raw = quoteRow as any;
 
+      const cargoDetails = parseJsonObject(raw.cargo_details);
+
       // Parallel fetch for detailed configurations (Cargo, Items, Documents, Versions)
       // We use allSettled to allow partial failures
       const [cargoConfigResult, quoteItemsResult, docsResult, versionsResult] = await Promise.allSettled([
@@ -600,13 +798,27 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
       let containerCombos: any[] = [];
       if (cargoConfigResult.status === 'fulfilled' && !cargoConfigResult.value.error) {
         containerCombos = (cargoConfigResult.value.data || []).map((c: any) => ({
-          type: c.container_type || '',
-          size: c.container_size || '',
+          type: c.container_type_id || c.container_type || '',
+          size: c.container_size_id || c.container_size || '',
           qty: c.quantity || 1
         }));
       } else {
         logger.warn('[UnifiedComposer] Failed to load cargo configs', cargoConfigResult);
         // Don't block, just log
+      }
+      if (containerCombos.length === 0) {
+        const snapshotCombos = Array.isArray(cargoDetails?.container_combos) ? cargoDetails.container_combos : [];
+        if (snapshotCombos.length > 0) {
+          containerCombos = snapshotCombos.map((c: any) => ({
+            type: c.type || c.typeId || c.container_type_id || c.container_type || '',
+            size: c.size || c.sizeId || c.container_size_id || c.container_size || '',
+            qty: Number(c.qty ?? c.quantity ?? 1) || 1,
+          }));
+          logger.info('[UnifiedComposer] Loaded container combos from cargo_details snapshot fallback', {
+            quoteId,
+            count: containerCombos.length,
+          });
+        }
       }
 
       // Handle Quote Items
@@ -666,7 +878,6 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
       });
 
       // Pre-populate form values for edit mode
-      const cargoDetails = typeof raw.cargo_details === 'object' ? raw.cargo_details : null;
       
       // Calculate totals from quote_items if available AND they have weight/volume data
       // otherwise fallback to quote header/cargo details.
@@ -679,9 +890,51 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
         ? items.reduce((sum: number, item: any) => sum + (Number(item.volume_cbm) || 0), 0)
         : (cargoDetails?.total_volume_cbm || raw.total_volume || '');
         
-      const primaryCommodity = items.length > 0
-        ? (items[0].product_name || items[0].description || 'Mixed General Cargo')
-        : (cargoDetails?.commodity || raw.commodity || '');
+      const itemCommodity = items.find((i: any) => i?.product_name || i?.description);
+      const primaryCommodity = (
+        itemCommodity?.product_name ||
+        itemCommodity?.description ||
+        normalizeCommodityText(cargoDetails?.commodity) ||
+        normalizeCommodityText(cargoDetails?.commodity_details) ||
+        raw.commodity ||
+        ''
+      );
+      const cargoHazmat = cargoDetails?.hazmat_details && typeof cargoDetails.hazmat_details === 'object'
+        ? cargoDetails.hazmat_details
+        : ((cargoDetails?.dangerous_goods || raw.dangerous_goods) ? {
+            class: cargoDetails?.hazmat_class || '',
+            unNumber: cargoDetails?.hazmat_un_number || '',
+            packingGroup: 'II',
+          } : undefined);
+      const cargoItemFromSnapshot = {
+        id: 'main',
+        type: (cargoDetails?.cargo_type || ((raw.transport_mode === 'ocean' || raw.transport_mode === 'rail') ? 'container' : 'loose')) as any,
+        quantity: Number(cargoDetails?.quantity || containerCombos.reduce((sum: number, c: any) => sum + (Number(c.qty) || 0), 0) || 1),
+        weight: {
+          value: Number(totalWeight) || 0,
+          unit: cargoDetails?.weight_unit === 'lb' ? 'lb' : 'kg',
+        },
+        volume: Number(totalVolume) || 0,
+        dimensions: {
+          l: Number(cargoDetails?.dimensions?.l) || 0,
+          w: Number(cargoDetails?.dimensions?.w) || 0,
+          h: Number(cargoDetails?.dimensions?.h) || 0,
+          unit: cargoDetails?.dimensions?.unit === 'in' ? 'in' : 'cm',
+        },
+        stackable: !!cargoDetails?.stackable,
+        commodity: (cargoDetails?.commodity_details && typeof cargoDetails.commodity_details === 'object')
+          ? cargoDetails.commodity_details
+          : (primaryCommodity ? { description: primaryCommodity, hts_code: cargoDetails?.hts_code || '' } : undefined),
+        hazmat: cargoHazmat,
+        containerCombos: containerCombos.map((c: any) => ({
+          typeId: c.type,
+          sizeId: c.size,
+          quantity: c.qty,
+        })),
+        containerDetails: containerCombos[0]
+          ? { typeId: containerCombos[0].type, sizeId: containerCombos[0].size }
+          : undefined,
+      };
 
       setInitialFormValues({
         accountId: raw.account_id || '',
@@ -722,11 +975,16 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
         pickupDate: raw.pickup_date ? new Date(raw.pickup_date).toISOString().split('T')[0] : '',
         deliveryDeadline: raw.delivery_deadline ? new Date(raw.delivery_deadline).toISOString().split('T')[0] : '',
         htsCode: cargoDetails?.hts_code || '',
-        dangerousGoods: !!raw.dangerous_goods,
+        dangerousGoods: !!(raw.dangerous_goods || cargoDetails?.dangerous_goods || cargoHazmat),
         vehicleType: raw.vehicle_type || 'van',
         containerCombos: containerCombos,
         attachments: docs,
+        cargoItem: cargoItemFromSnapshot as any,
       });
+
+      if (!primaryCommodity) {
+        logger.warn('[UnifiedComposer] Commodity missing during reload', { quoteId, source: 'quotes.cargo_details/items' });
+      }
       
       // Load existing option if present
       // Determine which version to load: explicit prop OR current_version_id
@@ -1052,16 +1310,21 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
            if (selected) {
              setSelectedOption(selected);
              dispatch({ type: 'INITIALIZE', payload: { optionId: selected.id } });
-             
-             // Also update optionDrafts so the edit form works
-             // This ensures that when the user edits, they start with the saved values
-             const draft: any = {
-                 legs: selected.legs,
-                 charges: [...(selected.charges || []), ...((selected.legs || []).flatMap((l: any) => l.charges || []))],
-                 marginPercent: (selected as any).marginPercent || form.getValues('marginPercent') || 15
-             };
-             setOptionDrafts(prev => ({ ...prev, [selected.id]: draft }));
            }
+
+           // Seed drafts for every loaded option so each option has independent, complete charge state.
+           setOptionDrafts((prev) => {
+             const next = { ...prev };
+             reconstructedOptions.forEach((opt) => {
+               next[opt.id] = {
+                 ...(next[opt.id] || {}),
+                 legs: Array.isArray(opt.legs) ? opt.legs : [],
+                 charges: flattenOptionCharges(opt),
+                 marginPercent: (opt as any).marginPercent || form.getValues('marginPercent') || 15,
+               };
+             });
+             return next;
+           });
            
            // Log success
            logAudit('reload_success', { quoteId, versionId: targetVersionId || 'current' });
@@ -1074,7 +1337,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
     } finally {
       setEditLoading(false);
     }
-  }, [quoteId, versionId]);
+  }, [quoteId, versionId, normalizeCommodityText, flattenOptionCharges]);
 
   useEffect(() => {
     if (!quoteId) return;
@@ -1387,100 +1650,29 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
       const currentVersionId = storeState.versionId || versionId;
       const currentQuoteId = storeState.quoteId || quoteId;
 
-      // Special check for commodity field - ensure it has a valid value
-      const commodityValue = form.getValues('commodity');
-      
-      // Debug logging to see what's happening
-      console.log('[UnifiedComposer] Commodity validation debug:', {
-        commodityValue,
-        commodityValueType: typeof commodityValue,
-        commodityValueLength: commodityValue?.length,
-        commodityValueTrimmed: commodityValue?.trim(),
-        commodityValueTrimmedLength: commodityValue?.trim().length,
-        allFormValues: form.getValues()
-      });
-      
-      // Try multiple approaches to get the commodity value
-      let finalCommodityValue = commodityValue;
-      
-      // 1. Try hidden input
-      const hiddenCommodityInput = document.querySelector('input[name="commodity"]') as HTMLInputElement;
-      const hiddenValue = hiddenCommodityInput?.value;
-      console.log('[UnifiedComposer] Hidden commodity input value:', hiddenValue);
-      
-      if (hiddenValue && hiddenValue.trim().length >= 2 && (!finalCommodityValue || finalCommodityValue.trim().length < 2)) {
-        console.log('[UnifiedComposer] Syncing commodity from hidden input:', hiddenValue);
-        form.setValue('commodity', hiddenValue, { shouldValidate: true, shouldDirty: true });
-        finalCommodityValue = hiddenValue;
-      }
-      
-      // 2. Try to extract from any cargo-related data in form
-      if (!finalCommodityValue || finalCommodityValue.trim().length < 2) {
-        const formValues = form.getValues();
-        console.log('[UnifiedComposer] Checking form values for commodity data:', formValues);
-        
-        // Look for commodity in any possible field
-        const possibleCommodityFields = ['commodity', 'cargoDescription', 'description', 'itemDescription'];
-        for (const field of possibleCommodityFields) {
-          if (formValues[field] && typeof formValues[field] === 'string' && formValues[field].trim().length >= 2) {
-            console.log('[UnifiedComposer] Found commodity in field:', field, formValues[field]);
-            form.setValue('commodity', formValues[field], { shouldValidate: true, shouldDirty: true });
-            finalCommodityValue = formValues[field];
-            break;
-          }
-        }
-      }
-      
-      // 3. Last resort - if user typed "PARTS OF BABY CARRIAGES" but it's not syncing, set it manually
-      if (!finalCommodityValue || finalCommodityValue.trim().length < 2) {
-        // Check if there's any text input that might contain the commodity
-        const allInputs = document.querySelectorAll('input[type="text"]');
-        for (const input of allInputs) {
-          const value = (input as HTMLInputElement).value;
-          if (value && value.includes('PARTS') && value.includes('BABY') && value.includes('CARRIAGES')) {
-            console.log('[UnifiedComposer] Found commodity text in input:', value);
-            form.setValue('commodity', value, { shouldValidate: true, shouldDirty: true });
-            finalCommodityValue = value;
-            break;
-          }
-        }
-      }
-      
-      // Get the updated value after all attempts
-      finalCommodityValue = form.getValues('commodity');
-      
-      // TEMPORARY: Allow save to proceed even if commodity validation fails for debugging
-      if (!finalCommodityValue || finalCommodityValue.trim().length < 2) {
-        console.warn('[UnifiedComposer] Commodity validation failed, but allowing save for debugging');
-        logger.warn('[UnifiedComposer] Commodity validation failed, but allowing save for debugging', { 
-          originalValue: commodityValue, 
-          hiddenValue, 
-          finalValue: finalCommodityValue 
-        });
-        // Don't return error - allow save to continue
-        // toast({ title: 'Validation Error', description: 'Commodity is required. Please enter a commodity description.', variant: 'destructive' });
-        // setSaving(false);
-        // return;
-      }
-      
-      // Clear any existing commodity error if it's valid
-      if (finalCommodityValue && finalCommodityValue.trim().length >= 2) {
-        form.clearErrors('commodity');
-      }
-      
-      // Validate form before saving - TEMPORARILY DISABLED FOR DEBUGGING
-      // const isValid = await form.trigger();
-      const isValid = true; // Force validation to pass for debugging
+      // Validate form before saving
+      const isValid = await form.trigger();
       
       if (!isValid) {
+        setShowValidationSummary(true);
         logger.error('[UnifiedComposer] Validation failed', { 
           errors: sanitizePayload(form.formState.errors),
-          commodityValue: finalCommodityValue
         });
-        toast({ title: 'Validation Error', description: 'Please check the form for errors.', variant: 'destructive' });
+        const firstIssue = validationIssues[0];
+        if (firstIssue) {
+          setTimeout(() => scrollToField(firstIssue.path), 0);
+        }
+        toast({
+          title: 'Validation Error',
+          description: firstIssue
+            ? `${firstIssue.label}: ${firstIssue.message}`
+            : 'Please check the highlighted fields.',
+          variant: 'destructive'
+        });
         setSaving(false);
         return;
       }
+      setShowValidationSummary(false);
 
       // Build RPC payload using current form values
       const currentFormValues = form.getValues();
@@ -1497,7 +1689,8 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
              deliveryDeadline: currentFormValues.deliveryDeadline,
              incoterms: currentFormValues.incoterms,
              vehicleType: currentFormValues.vehicleType,
-             attachments: currentFormValues.attachments
+             attachments: currentFormValues.attachments,
+             cargoItem: (currentFormValues as any).cargoItem || null,
           }
       };
 
@@ -1534,7 +1727,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
       let effectiveOpportunityId = formData?.values.opportunityId || null;
       if (!isStandalone && (formData?.values.accountId) && !effectiveOpportunityId) {
         try {
-          const { data: createdOpp, error: oppErr } = await scopedDb
+          let { data: createdOpp, error: oppErr } = await scopedDb
             .from('opportunities')
             .insert({
               name: formData?.values.quoteTitle || 'New Quotation',
@@ -1544,11 +1737,36 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
             })
             .select('id')
             .single();
+
+          // Some deployments use legacy opportunity schemas (e.g., title/opportunity_name + stage).
+          if (oppErr && /column\s+"?name"?\s+does not exist/i.test(String(oppErr.message || ''))) {
+            const fallbackTitle = formData?.values.quoteTitle || 'New Quotation';
+            const fallbackPayloads = [
+              { title: fallbackTitle, account_id: formData?.values.accountId, tenant_id: tenantId, stage: 'prospecting' },
+              { opportunity_name: fallbackTitle, account_id: formData?.values.accountId, tenant_id: tenantId, stage: 'prospecting' },
+            ];
+            for (const payload of fallbackPayloads) {
+              const fallbackRes = await (scopedDb as any)
+                .from('opportunities')
+                .insert(payload)
+                .select('id')
+                .single();
+              if (!fallbackRes.error && fallbackRes.data?.id) {
+                createdOpp = fallbackRes.data;
+                oppErr = null;
+                break;
+              }
+            }
+          }
+
+          if (oppErr) {
+            logger.warn('[UnifiedComposer] Auto-opportunity create skipped', { error: oppErr.message });
+          }
           if (!oppErr && createdOpp?.id) {
             effectiveOpportunityId = createdOpp.id;
           }
-        } catch {
-          // non-blocking
+        } catch (error) {
+          logger.warn('[UnifiedComposer] Auto-opportunity create threw', { error });
         }
       }
 
@@ -1611,6 +1829,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
       // Determine Service Type (default to Export)
       const serviceTypeId = repoData.serviceTypes?.find((s: any) => s.name === 'Export' || s.code === 'EXP')?.id;
 
+      const cargoSnapshot = buildCargoSnapshot(formData?.values, formData?.extended);
       const quotePayload: any = {
         id: isUUID(currentQuoteId) ? currentQuoteId : undefined,
         quote_number: finalQuoteNumber,
@@ -1638,13 +1857,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
         opportunity_id: isStandalone ? null : (effectiveOpportunityId || null),
         owner_id: user?.id || null,
         created_by: user?.id || null,
-        cargo_details: {
-            commodity: formData?.values.commodity,
-            total_weight_kg: Number(formData?.values.weight) || 0,
-            total_volume_cbm: Number(formData?.values.volume) || 0,
-            dangerous_goods: formData?.values.dangerousGoods || formData?.extended.dangerousGoods || false,
-            hts_code: formData?.values.htsCode || formData?.extended.htsCode || null,
-        }
+        cargo_details: cargoSnapshot
       };
 
       const options: any[] = [];
@@ -1656,7 +1869,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
       }
 
       // Map container combos
-      const combos = formData?.values.containerCombos || formData?.extended.containerCombos || [];
+      const combos = extractContainerCombos(formData?.values, formData?.extended);
       const cargoConfigs = combos.map((c: any) => {
           const typeObj = containerTypes.find(t => t.id === c.type);
           const sizeObj = containerSizes.find(s => s.id === c.size);
@@ -1723,9 +1936,11 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
         const draftLegsSource = draft?.legs || opt.legs;
         const draftLegs = (Array.isArray(draftLegsSource) ? draftLegsSource : []) as any[];
         
-        // Fix: Use charges from args if selected, otherwise fallback to draft or original option charges
-        // This prevents unselected options from losing their charges
-        const draftChargesSource = draft?.charges || (isSelected ? charges : (opt.charges || []));
+        // Keep charges scoped per option and include leg-level charges for unselected options.
+        const optionChargesSource = flattenOptionCharges(opt);
+        const draftChargesSource = isSelected
+          ? charges
+          : (Array.isArray(draft?.charges) ? draft.charges : optionChargesSource);
         const draftCharges = (Array.isArray(draftChargesSource) ? draftChargesSource : []) as any[];
         const mp = draft?.marginPercent ?? marginPercent;
 
@@ -1798,11 +2013,28 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
       // Sanitize payload to remove circular references and DOM nodes
       const safePayload = sanitizePayload(rpcPayload);
 
-      const { data: savedId, error: rpcError } = await saveWithRetry(async () => {
+      let { data: savedId, error: rpcError } = await saveWithRetry(async () => {
         return scopedDb.rpc('save_quote_atomic', {
           p_payload: safePayload
         });
       });
+
+      if (rpcError && /column\s+"?name"?\s+does not exist/i.test(String(rpcError.message || ''))) {
+        logger.warn('[UnifiedComposer] save fallback: retrying without cargo_configurations due to legacy DB schema', {
+          error: rpcError.message,
+        });
+        const fallbackPayload = sanitizePayload({
+          ...rpcPayload,
+          cargo_configurations: [],
+        });
+        const fallback = await saveWithRetry(async () => {
+          return scopedDb.rpc('save_quote_atomic', {
+            p_payload: fallbackPayload
+          });
+        });
+        savedId = fallback.data;
+        rpcError = fallback.error;
+      }
 
       if (rpcError) {
         logger.error('[UnifiedComposer] save_quote_atomic RPC Error', { error: rpcError });
@@ -1814,6 +2046,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
       // Update store
       if (savedId) {
         dispatch({ type: 'INITIALIZE', payload: { quoteId: savedId } });
+        await syncQuoteCargoDetails(savedId, cargoSnapshot);
 
         // Apply manual quote number override with audit if provided
         const manualNo = formData?.values.quoteNumber?.trim();
@@ -1907,6 +2140,12 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
         errorMessage = 'Network connection issue. Please check your internet connection and try again.';
         logger.warn('[UnifiedComposer] Network error detected', { error: err, message: err.message });
         setShowNetworkWarning(true); // Show network warning only on actual network errors
+      } else if (
+        err.message?.includes('relation "quotation_legs" does not exist') ||
+        err.message?.includes('relation "quotation_charges" does not exist')
+      ) {
+        errorMessage = 'Database migration missing. Please apply latest Supabase migrations for save_quote_atomic and try again.';
+        logger.error('[UnifiedComposer] Outdated save_quote_atomic function detected', { error: err.message });
       } else if (isSupabaseError) {
         errorMessage = 'Database connection error. Please try again or contact support if the issue persists.';
         logger.warn('[UnifiedComposer] Supabase error detected', { error: err, code: err.code });
@@ -1952,13 +2191,18 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
     optionDrafts,
     containerTypes,
     containerSizes,
+    validationIssues,
+    scrollToField,
     saveWithRetry,
     dispatch,
     handleSaveAttachments,
     showQuotationSuccessToast,
     toast,
     setShowNetworkWarning,
-    logAudit
+    logAudit,
+    buildCargoSnapshot,
+    syncQuoteCargoDetails,
+    flattenOptionCharges
   ]);
 
   // ---------------------------------------------------------------------------
@@ -1993,6 +2237,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
     try {
       setSaving(true);
       const formData = lastFormData;
+      const cargoSnapshot = buildCargoSnapshot(formData.values, formData.extended);
       const quotePayload: any = {
         id: isUUID(storeState.quoteId) ? storeState.quoteId : (isUUID(quoteId) ? quoteId : undefined),
         title: (formData.values.quoteTitle || storeState.quoteData?.title) || `Draft - ${formData.values.origin || ''} to ${formData.values.destination || ''}`,
@@ -2010,17 +2255,11 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
         opportunity_id: formData.values.opportunityId || null,
         owner_id: user?.id || null,
         created_by: user?.id || null,
-        cargo_details: {
-          commodity: formData.values.commodity,
-          total_weight_kg: Number(formData.values.weight) || 0,
-          total_volume_cbm: Number(formData.values.volume) || 0,
-          dangerous_goods: formData.values.dangerousGoods || formData.extended.dangerousGoods || false,
-          hts_code: formData.values.htsCode || formData.extended.htsCode || null,
-        }
+        cargo_details: cargoSnapshot
       };
 
       // Map container combos for draft
-      const combos = formData.values.containerCombos || formData.extended.containerCombos || [];
+      const combos = extractContainerCombos(formData.values, formData.extended);
       const cargoConfigs = combos.map((c: any) => {
           const typeObj = containerTypes.find(t => t.id === c.type);
           const sizeObj = containerSizes.find(s => s.id === c.size);
@@ -2044,17 +2283,35 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
 
       const safePayload = sanitizePayload(rpcPayload);
 
-      const { data: savedId, error: rpcError } = await saveWithRetry(async () => {
+      let { data: savedId, error: rpcError } = await saveWithRetry(async () => {
         return scopedDb.rpc('save_quote_atomic', {
           p_payload: safePayload,
         });
       });
+
+      if (rpcError && /column\s+"?name"?\s+does not exist/i.test(String(rpcError.message || ''))) {
+        logger.warn('[UnifiedComposer] draft-save fallback: retrying without cargo_configurations due to legacy DB schema', {
+          error: rpcError.message,
+        });
+        const fallbackPayload = sanitizePayload({
+          ...rpcPayload,
+          cargo_configurations: [],
+        });
+        const fallback = await saveWithRetry(async () => {
+          return scopedDb.rpc('save_quote_atomic', {
+            p_payload: fallbackPayload,
+          });
+        });
+        savedId = fallback.data;
+        rpcError = fallback.error;
+      }
 
       if (rpcError) throw new Error(rpcError.message || 'Failed to save draft');
 
       if (savedId) {
            // Simplified success handling (removed versionId fetching for auto-save)
            dispatch({ type: 'INITIALIZE', payload: { quoteId: savedId } });
+           await syncQuoteCargoDetails(savedId, cargoSnapshot);
            
            // Update URL without reloading if it's a new quote
            if (!quoteId) {
@@ -2075,7 +2332,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
     } finally {
       setSaving(false);
     }
-  }, [lastFormData, storeState, context, quoteId, user, scopedDb, toast, dispatch, setSearchParams, logAudit]);
+  }, [lastFormData, storeState, context, quoteId, user, scopedDb, toast, dispatch, setSearchParams, logAudit, buildCargoSnapshot, syncQuoteCargoDetails, extractContainerCombos]);
 
   // ---------------------------------------------------------------------------
   // PDF Generation
@@ -2219,7 +2476,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
       title={pageTitle}
       actions={actions}
     >
-       <FormProvider {...form}>
+      <FormProvider {...form}>
         <div className="space-y-6 w-full max-w-full">
           
           {loadErrors.length > 0 && (
@@ -2258,6 +2515,33 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
               <p className="mt-1 text-sm text-blue-700">
                 Verifying network connectivity...
               </p>
+            </div>
+          )}
+
+          {showValidationSummary && validationIssues.length > 0 && (
+            <div
+              className="rounded-md border border-destructive/40 bg-destructive/10 p-4"
+              role="alert"
+              aria-live="assertive"
+              data-testid="validation-summary"
+            >
+              <div className="flex items-center gap-2 font-medium text-destructive">
+                <AlertCircle className="h-4 w-4" />
+                <span>Please fix the highlighted fields before saving.</span>
+              </div>
+              <ul className="mt-3 space-y-2 text-sm">
+                {validationIssues.map((issue) => (
+                  <li key={issue.path}>
+                    <button
+                      type="button"
+                      className="text-left underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive rounded-sm"
+                      onClick={() => scrollToField(issue.path)}
+                    >
+                      <span className="font-medium">{issue.label}:</span> {issue.message}
+                    </button>
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
 

@@ -217,6 +217,100 @@ vi.mock('../FormZone', async () => {
                            sync();
                        }}
                    />
+                   <button
+                       type="button"
+                       data-testid="set-cargo-advanced"
+                       onClick={() => {
+                           setValue('commodity', 'Lithium Batteries');
+                           setValue('weight', '555');
+                           setValue('volume', '22.7');
+                           setValue('dangerousGoods', true);
+                           setValue('htsCode', '8507.60');
+                           setValue('containerType', 'ct-1');
+                           setValue('containerSize', 'cs-1');
+                           setValue('containerQty', '2');
+                           setValue('containerCombos', [{ type: 'ct-1', size: 'cs-1', qty: 2 }]);
+                           setValue('cargoItem', {
+                               id: 'main',
+                               type: 'container',
+                               quantity: 2,
+                               dimensions: { l: 120, w: 80, h: 140, unit: 'cm' },
+                               weight: { value: 555, unit: 'kg' },
+                               volume: 22.7,
+                               stackable: true,
+                               commodity: { description: 'Lithium Batteries', hts_code: '8507.60' },
+                               hazmat: { class: '9', unNumber: '3480', packingGroup: 'II' },
+                               containerCombos: [{ typeId: 'ct-1', sizeId: 'cs-1', quantity: 2 }],
+                               containerDetails: { typeId: 'ct-1', sizeId: 'cs-1' },
+                           });
+                           sync();
+                       }}
+                   >
+                       Set Cargo Advanced
+                   </button>
+                   <button
+                       type="button"
+                       data-testid="set-cargo-edited"
+                       onClick={() => {
+                           setValue('commodity', 'Consumer Electronics');
+                           setValue('weight', '600');
+                           setValue('volume', '24.2');
+                           setValue('dangerousGoods', false);
+                           setValue('htsCode', '8517.12');
+                           setValue('containerType', 'ct-1');
+                           setValue('containerSize', 'cs-1');
+                           setValue('containerQty', '3');
+                           setValue('containerCombos', [{ type: 'ct-1', size: 'cs-1', qty: 3 }]);
+                           setValue('cargoItem', {
+                               id: 'main',
+                               type: 'container',
+                               quantity: 3,
+                               dimensions: { l: 130, w: 90, h: 150, unit: 'cm' },
+                               weight: { value: 600, unit: 'kg' },
+                               volume: 24.2,
+                               stackable: false,
+                               commodity: { description: 'Consumer Electronics', hts_code: '8517.12' },
+                               containerCombos: [{ typeId: 'ct-1', sizeId: 'cs-1', quantity: 3 }],
+                               containerDetails: { typeId: 'ct-1', sizeId: 'cs-1' },
+                           });
+                           sync();
+                       }}
+                   >
+                       Set Cargo Edited
+                   </button>
+                   <button
+                       type="button"
+                       data-testid="set-multi-container-combos"
+                       onClick={() => {
+                           setValue('commodity', 'Machinery');
+                           setValue('weight', '900');
+                           setValue('volume', '40');
+                           setValue('containerType', 'ct-1');
+                           setValue('containerSize', 'cs-1');
+                           setValue('containerQty', '4');
+                           setValue('containerCombos', [
+                               { type: 'ct-1', size: 'cs-1', qty: 2 },
+                               { type: 'ct-1', size: 'cs-1', qty: 2 },
+                           ]);
+                           setValue('cargoItem', {
+                               id: 'main',
+                               type: 'container',
+                               quantity: 4,
+                               dimensions: { l: 100, w: 100, h: 100, unit: 'cm' },
+                               weight: { value: 900, unit: 'kg' },
+                               volume: 40,
+                               stackable: true,
+                               commodity: { description: 'Machinery', hts_code: '8408.90' },
+                               containerCombos: [
+                                   { typeId: 'ct-1', sizeId: 'cs-1', quantity: 2 },
+                                   { typeId: 'ct-1', sizeId: 'cs-1', quantity: 2 },
+                               ],
+                           });
+                           sync();
+                       }}
+                   >
+                       Set Multi Containers
+                   </button>
                </div>
            );
        }
@@ -515,6 +609,78 @@ describe('UnifiedQuoteComposer Integration (API-to-UI)', () => {
         expect(screen.getByTestId('cargo-volume')).toHaveValue('5');
     });
 
+    it('normalizes object commodity payload on reload', async () => {
+        const QUOTE_ID = '123e4567-e89b-12d3-a456-426614174100';
+
+        mockScopedDb.from.mockImplementation((table: string) => {
+            if (table === 'quotes') {
+                return createMockChain({
+                    id: QUOTE_ID,
+                    quote_number: 'Q-2001',
+                    status: 'draft',
+                    tenant_id: 'test-tenant',
+                    origin: 'Mumbai',
+                    destination: 'Hamburg',
+                    current_version_id: 'v1',
+                    cargo_details: {
+                        commodity: { description: 'Pharma API', hts_code: '3003.90' },
+                        total_weight_kg: 250,
+                        total_volume_cbm: 3.5,
+                        hts_code: '3003.90'
+                    }
+                });
+            } else if (table === 'quotation_versions') {
+                return createMockChain([{ id: 'v1', version_number: 1 }]);
+            } else if (table === 'quote_documents' || table === 'quote_cargo_configurations') {
+                return createMockChain([]);
+            }
+            return createMockChain([]);
+        });
+
+        mockSupabase.from.mockImplementation((table: string) => {
+            if (table === 'quotes') {
+                return createMockChain({
+                    id: QUOTE_ID,
+                    quote_number: 'Q-2001',
+                    status: 'draft',
+                    tenant_id: 'test-tenant',
+                    origin: 'Mumbai',
+                    destination: 'Hamburg',
+                    current_version_id: 'v1',
+                    cargo_details: {
+                        commodity: { description: 'Pharma API', hts_code: '3003.90' },
+                        total_weight_kg: 250,
+                        total_volume_cbm: 3.5,
+                        hts_code: '3003.90'
+                    }
+                });
+            } else if (table === 'quotation_versions') {
+                return createMockChain([{ id: 'v1', version_number: 1 }]);
+            } else if (table === 'quote_documents' || table === 'quote_cargo_configurations') {
+                return createMockChain([]);
+            }
+            return createMockChain([]);
+        });
+
+        const queryClient = new QueryClient({
+            defaultOptions: { queries: { retry: false } },
+        });
+
+        render(
+            <QueryClientProvider client={queryClient}>
+                <MemoryRouter initialEntries={[`/quotes/edit/${QUOTE_ID}`]}>
+                    <Routes>
+                        <Route path="/quotes/edit/:quoteId" element={<UnifiedQuoteComposer quoteId={QUOTE_ID} />} />
+                    </Routes>
+                </MemoryRouter>
+            </QueryClientProvider>
+        );
+
+        await waitFor(() => {
+            expect(screen.getByTestId('commodity-input')).toHaveValue('Pharma API');
+        }, { timeout: 3000 });
+    });
+
     it('updates composer state and persists changes when FormZone inputs change', async () => {
         const QUOTE_ID = '123e4567-e89b-12d3-a456-426614174000';
         const VERSION_ID = '123e4567-e89b-12d3-a456-426614174001';
@@ -706,5 +872,354 @@ describe('UnifiedQuoteComposer Integration (API-to-UI)', () => {
 
         expect(mockScopedDb.rpc).not.toHaveBeenCalled();
         expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ title: 'Validation Error' }));
+    });
+
+    it('persists cargo snapshot across save -> reopen -> edit -> resave', async () => {
+        const QUOTE_ID = '123e4567-e89b-12d3-a456-426614174200';
+        const VERSION_ID = '123e4567-e89b-12d3-a456-426614174201';
+        const OPTION_ID = '123e4567-e89b-12d3-a456-426614174202';
+        const user = userEvent.setup();
+        let storedCargoDetails: any = {
+            commodity: 'Initial Commodity',
+            total_weight_kg: 100,
+            total_volume_cbm: 10,
+            hts_code: '1111.11',
+            dangerous_goods: false,
+        };
+
+        mockScopedDb.from.mockImplementation((table: string) => {
+            if (table === 'quotes') {
+                return createMockChain({
+                    id: QUOTE_ID,
+                    quote_number: 'Q-3001',
+                    transport_mode: 'ocean',
+                    origin: 'Shanghai',
+                    destination: 'Los Angeles',
+                    origin_port_id: 'port-origin-1',
+                    destination_port_id: 'port-dest-1',
+                    current_version_id: VERSION_ID,
+                    tenant_id: 'test-tenant',
+                    account_id: 'acc-1',
+                    cargo_details: storedCargoDetails,
+                });
+            } else if (table === 'quotation_versions') {
+                return createMockChain([{ id: VERSION_ID, version_number: 1 }]);
+            } else if (table === 'quotation_version_options') {
+                return createMockChain([{
+                    id: OPTION_ID,
+                    quotation_version_id: VERSION_ID,
+                    is_selected: true,
+                    option_name: 'Test Ocean Option',
+                    total_amount: 1500,
+                    currency: 'USD'
+                }]);
+            } else if (table === 'quotation_version_option_legs' || table === 'quote_charges' || table === 'quote_items' || table === 'quote_documents' || table === 'quote_cargo_configurations') {
+                return createMockChain([]);
+            }
+            return createMockChain([]);
+        });
+
+        mockScopedDb.rpc.mockImplementation(async (fn: string, payload: any) => {
+            if (fn === 'save_quote_atomic') {
+                storedCargoDetails = payload?.p_payload?.quote?.cargo_details || storedCargoDetails;
+                return { data: QUOTE_ID, error: null };
+            }
+            return { data: null, error: null };
+        });
+
+        const firstClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+        const { unmount } = render(
+            <QueryClientProvider client={firstClient}>
+                <MemoryRouter initialEntries={[`/quotes/edit/${QUOTE_ID}`]}>
+                    <Routes>
+                        <Route path="/quotes/edit/:quoteId" element={<UnifiedQuoteComposer quoteId={QUOTE_ID} />} />
+                    </Routes>
+                </MemoryRouter>
+            </QueryClientProvider>
+        );
+
+        await waitFor(() => {
+            expect(screen.getByTestId('commodity-input')).toHaveValue('Initial Commodity');
+        });
+
+        await user.click(screen.getByTestId('set-cargo-advanced'));
+        await user.click(screen.getByTestId('save-quote-button'));
+
+        await waitFor(() => {
+            expect(mockScopedDb.rpc).toHaveBeenCalledWith(
+                'save_quote_atomic',
+                expect.objectContaining({
+                    p_payload: expect.objectContaining({
+                        quote: expect.objectContaining({
+                            cargo_details: expect.objectContaining({
+                                commodity: 'Lithium Batteries',
+                                dangerous_goods: true,
+                                stackable: true,
+                                dimensions: expect.objectContaining({ l: 120, w: 80, h: 140, unit: 'cm' }),
+                                hazmat_details: expect.objectContaining({ class: '9', unNumber: '3480' }),
+                            }),
+                        }),
+                    }),
+                })
+            );
+        });
+
+        unmount();
+
+        const secondClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+        render(
+            <QueryClientProvider client={secondClient}>
+                <MemoryRouter initialEntries={[`/quotes/edit/${QUOTE_ID}`]}>
+                    <Routes>
+                        <Route path="/quotes/edit/:quoteId" element={<UnifiedQuoteComposer quoteId={QUOTE_ID} />} />
+                    </Routes>
+                </MemoryRouter>
+            </QueryClientProvider>
+        );
+
+        await waitFor(() => {
+            expect(screen.getByTestId('commodity-input')).toHaveValue('Lithium Batteries');
+        });
+
+        await user.click(screen.getByTestId('set-cargo-edited'));
+        await user.click(screen.getByTestId('save-quote-button'));
+
+        await waitFor(() => {
+            const calls = mockScopedDb.rpc.mock.calls.filter((c: any[]) => c[0] === 'save_quote_atomic');
+            const lastPayload = calls[calls.length - 1][1];
+            expect(lastPayload.p_payload.quote.cargo_details).toEqual(
+                expect.objectContaining({
+                    commodity: 'Consumer Electronics',
+                    dangerous_goods: false,
+                    stackable: false,
+                    dimensions: expect.objectContaining({ l: 130, w: 90, h: 150, unit: 'cm' }),
+                })
+            );
+            expect(lastPayload.p_payload.quote.cargo_details.hazmat_details).toBeNull();
+        });
+    });
+
+    it('saves all container combo rows with quantities', async () => {
+        const QUOTE_ID = '123e4567-e89b-12d3-a456-426614174300';
+        const VERSION_ID = '123e4567-e89b-12d3-a456-426614174301';
+        const OPTION_ID = '123e4567-e89b-12d3-a456-426614174302';
+        const user = userEvent.setup();
+
+        mockScopedDb.from.mockImplementation((table: string) => {
+            if (table === 'quotes') {
+                return createMockChain({
+                    id: QUOTE_ID,
+                    quote_number: 'Q-4001',
+                    transport_mode: 'ocean',
+                    origin: 'Dubai',
+                    destination: 'Rotterdam',
+                    origin_port_id: 'port-origin-1',
+                    destination_port_id: 'port-dest-1',
+                    current_version_id: VERSION_ID,
+                    tenant_id: 'test-tenant',
+                    account_id: 'acc-1',
+                    cargo_details: { commodity: 'Initial', total_weight_kg: 100, total_volume_cbm: 10 }
+                });
+            } else if (table === 'quotation_versions') {
+                return createMockChain([{ id: VERSION_ID, version_number: 1 }]);
+            } else if (table === 'quotation_version_options') {
+                return createMockChain([{
+                    id: OPTION_ID,
+                    quotation_version_id: VERSION_ID,
+                    is_selected: true,
+                    option_name: 'Test Option',
+                    total_amount: 2000,
+                    currency: 'USD'
+                }]);
+            } else if (table === 'quotation_version_option_legs' || table === 'quote_charges' || table === 'quote_items' || table === 'quote_documents' || table === 'quote_cargo_configurations') {
+                return createMockChain([]);
+            }
+            return createMockChain([]);
+        });
+        mockScopedDb.rpc.mockResolvedValue({ data: QUOTE_ID, error: null });
+
+        const queryClient = new QueryClient({
+            defaultOptions: { queries: { retry: false } },
+        });
+
+        render(
+            <QueryClientProvider client={queryClient}>
+                <MemoryRouter initialEntries={[`/quotes/edit/${QUOTE_ID}`]}>
+                    <Routes>
+                        <Route path="/quotes/edit/:quoteId" element={<UnifiedQuoteComposer quoteId={QUOTE_ID} />} />
+                    </Routes>
+                </MemoryRouter>
+            </QueryClientProvider>
+        );
+
+        await waitFor(() => {
+            expect(screen.getByTestId('commodity-input')).toHaveValue('Initial');
+        });
+
+        await user.click(screen.getByTestId('set-multi-container-combos'));
+        await user.click(screen.getByTestId('save-quote-button'));
+
+        await waitFor(() => {
+            expect(mockScopedDb.rpc).toHaveBeenCalledWith(
+                'save_quote_atomic',
+                expect.objectContaining({
+                    p_payload: expect.objectContaining({
+                        cargo_configurations: expect.arrayContaining([
+                            expect.objectContaining({ quantity: 2 }),
+                            expect.objectContaining({ quantity: 2 }),
+                        ]),
+                    }),
+                })
+            );
+        });
+    });
+
+    it('persists ocean-mode volume and weight from cargo item snapshot', async () => {
+        const QUOTE_ID = '123e4567-e89b-12d3-a456-426614174500';
+        const VERSION_ID = '123e4567-e89b-12d3-a456-426614174501';
+        const OPTION_ID = '123e4567-e89b-12d3-a456-426614174502';
+        const user = userEvent.setup();
+
+        mockScopedDb.from.mockImplementation((table: string) => {
+            if (table === 'quotes') {
+                return createMockChain({
+                    id: QUOTE_ID,
+                    quote_number: 'Q-6001',
+                    transport_mode: 'ocean',
+                    origin: 'Chennai',
+                    destination: 'Antwerp',
+                    origin_port_id: 'port-origin-1',
+                    destination_port_id: 'port-dest-1',
+                    current_version_id: VERSION_ID,
+                    tenant_id: 'test-tenant',
+                    account_id: 'acc-1',
+                    cargo_details: { commodity: 'Initial', total_weight_kg: 100, total_volume_cbm: 10 }
+                });
+            } else if (table === 'quotation_versions') {
+                return createMockChain([{ id: VERSION_ID, version_number: 1 }]);
+            } else if (table === 'quotation_version_options') {
+                return createMockChain([{
+                    id: OPTION_ID,
+                    quotation_version_id: VERSION_ID,
+                    is_selected: true,
+                    option_name: 'Ocean Option',
+                    total_amount: 1900,
+                    currency: 'USD'
+                }]);
+            } else if (table === 'quotation_version_option_legs' || table === 'quote_charges' || table === 'quote_items' || table === 'quote_documents' || table === 'quote_cargo_configurations') {
+                return createMockChain([]);
+            }
+            return createMockChain([]);
+        });
+        mockScopedDb.rpc.mockResolvedValue({ data: QUOTE_ID, error: null });
+
+        const queryClient = new QueryClient({
+            defaultOptions: { queries: { retry: false } },
+        });
+
+        render(
+            <QueryClientProvider client={queryClient}>
+                <MemoryRouter initialEntries={[`/quotes/edit/${QUOTE_ID}`]}>
+                    <Routes>
+                        <Route path="/quotes/edit/:quoteId" element={<UnifiedQuoteComposer quoteId={QUOTE_ID} />} />
+                    </Routes>
+                </MemoryRouter>
+            </QueryClientProvider>
+        );
+
+        await waitFor(() => {
+            expect(screen.getByTestId('commodity-input')).toHaveValue('Initial');
+        });
+
+        await user.click(screen.getByTestId('set-cargo-advanced'));
+        await user.click(screen.getByTestId('save-quote-button'));
+
+        await waitFor(() => {
+            expect(mockScopedDb.rpc).toHaveBeenCalledWith(
+                'save_quote_atomic',
+                expect.objectContaining({
+                    p_payload: expect.objectContaining({
+                        quote: expect.objectContaining({
+                            cargo_details: expect.objectContaining({
+                                total_weight_kg: 555,
+                                total_volume_cbm: 22.7,
+                            }),
+                        }),
+                    }),
+                })
+            );
+        });
+    });
+
+    it('retries save without cargo_configurations when DB returns legacy name-column error', async () => {
+        const QUOTE_ID = '123e4567-e89b-12d3-a456-426614174400';
+        const VERSION_ID = '123e4567-e89b-12d3-a456-426614174401';
+        const OPTION_ID = '123e4567-e89b-12d3-a456-426614174402';
+        const user = userEvent.setup();
+
+        mockScopedDb.from.mockImplementation((table: string) => {
+            if (table === 'quotes') {
+                return createMockChain({
+                    id: QUOTE_ID,
+                    quote_number: 'Q-5001',
+                    transport_mode: 'ocean',
+                    origin: 'Singapore',
+                    destination: 'Jebel Ali',
+                    origin_port_id: 'port-origin-1',
+                    destination_port_id: 'port-dest-1',
+                    current_version_id: VERSION_ID,
+                    tenant_id: 'test-tenant',
+                    account_id: 'acc-1',
+                    cargo_details: { commodity: 'Initial', total_weight_kg: 100, total_volume_cbm: 10 }
+                });
+            } else if (table === 'quotation_versions') {
+                return createMockChain([{ id: VERSION_ID, version_number: 1 }]);
+            } else if (table === 'quotation_version_options') {
+                return createMockChain([{
+                    id: OPTION_ID,
+                    quotation_version_id: VERSION_ID,
+                    is_selected: true,
+                    option_name: 'Test Option',
+                    total_amount: 1200,
+                    currency: 'USD'
+                }]);
+            } else if (table === 'quotation_version_option_legs' || table === 'quote_charges' || table === 'quote_items' || table === 'quote_documents' || table === 'quote_cargo_configurations') {
+                return createMockChain([]);
+            }
+            return createMockChain([]);
+        });
+
+        mockScopedDb.rpc
+            .mockResolvedValueOnce({ data: null, error: { message: 'column "name" does not exist' } })
+            .mockResolvedValueOnce({ data: QUOTE_ID, error: null });
+
+        const queryClient = new QueryClient({
+            defaultOptions: { queries: { retry: false } },
+        });
+
+        render(
+            <QueryClientProvider client={queryClient}>
+                <MemoryRouter initialEntries={[`/quotes/edit/${QUOTE_ID}`]}>
+                    <Routes>
+                        <Route path="/quotes/edit/:quoteId" element={<UnifiedQuoteComposer quoteId={QUOTE_ID} />} />
+                    </Routes>
+                </MemoryRouter>
+            </QueryClientProvider>
+        );
+
+        await waitFor(() => {
+            expect(screen.getByTestId('commodity-input')).toHaveValue('Initial');
+        });
+
+        await user.click(screen.getByTestId('set-multi-container-combos'));
+        await user.click(screen.getByTestId('save-quote-button'));
+
+        await waitFor(() => {
+            const saveCalls = mockScopedDb.rpc.mock.calls.filter((c: any[]) => c[0] === 'save_quote_atomic');
+            expect(saveCalls.length).toBeGreaterThanOrEqual(2);
+            const secondPayload = saveCalls[1][1]?.p_payload;
+            expect(Array.isArray(secondPayload?.cargo_configurations)).toBe(true);
+            expect(secondPayload.cargo_configurations).toHaveLength(0);
+        });
     });
 });

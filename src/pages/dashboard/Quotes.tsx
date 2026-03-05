@@ -84,6 +84,8 @@ export default function Quotes() {
     try {
       const from = (Number(filters.page) - 1) * Number(filters.pageSize);
       const to = from + Number(filters.pageSize) - 1;
+      const sortableQuoteFields = new Set(['quote_number', 'sell_price', 'status', 'created_at', 'updated_at', 'title']);
+      const safeSorts = activeSorts.filter((s) => sortableQuoteFields.has(s.field));
 
       // Determine if we need !inner join for account filtering
       const hasAccountFilter = activeFilters.some(f => f.field === 'account_name');
@@ -136,8 +138,8 @@ export default function Quotes() {
         });
       }
 
-      if (activeSorts.length > 0) {
-        activeSorts.forEach((s) => {
+      if (safeSorts.length > 0) {
+        safeSorts.forEach((s) => {
           query = query.order(s.field, { ascending: s.direction === 'asc' });
         });
       } else {
@@ -145,39 +147,181 @@ export default function Quotes() {
       }
       query = query.range(from, to);
 
-      const { data, error, count } = await query;
-      
-      if (error) throw error;
+      let data: any[] | null = null;
+      let count: number | null = 0;
+
+      const primaryResult = await query;
+      if (primaryResult.error) {
+        logger.warn('Primary quotes query with relations failed; using fallback query', primaryResult.error);
+
+        let fallbackQuery = scopedDb
+          .from('quotes')
+          .select('*', { count: 'exact' });
+
+        if (filters.status !== 'any') {
+          fallbackQuery = fallbackQuery.eq('status', filters.status);
+        }
+
+        if (filters.q) {
+          fallbackQuery = fallbackQuery.or(`quote_number.ilike.%${filters.q}%,title.ilike.%${filters.q}%`);
+        }
+
+        // Apply filters that can be evaluated directly on quotes.
+        const nonAccountFilters = activeFilters.filter((f) => f.field !== 'account_name');
+        nonAccountFilters.forEach((filter) => {
+          const { field, operator, value } = filter;
+          if (!value) return;
+          switch (operator) {
+            case 'equals':
+              fallbackQuery = fallbackQuery.eq(field, value);
+              break;
+            case 'contains':
+              fallbackQuery = fallbackQuery.ilike(field, `%${value}%`);
+              break;
+            case 'starts_with':
+              fallbackQuery = fallbackQuery.ilike(field, `${value}%`);
+              break;
+            case 'gt':
+              fallbackQuery = fallbackQuery.gt(field, value);
+              break;
+            case 'lt':
+              fallbackQuery = fallbackQuery.lt(field, value);
+              break;
+          }
+        });
+
+        // Account name filter fallback: resolve matching account IDs first.
+        const accountNameFilter = activeFilters.find((f) => f.field === 'account_name' && f.value);
+        if (accountNameFilter) {
+          let accountsQuery = scopedDb.from('accounts').select('id');
+          switch (accountNameFilter.operator) {
+            case 'equals':
+              accountsQuery = accountsQuery.eq('name', accountNameFilter.value);
+              break;
+            case 'starts_with':
+              accountsQuery = accountsQuery.ilike('name', `${accountNameFilter.value}%`);
+              break;
+            case 'contains':
+            default:
+              accountsQuery = accountsQuery.ilike('name', `%${accountNameFilter.value}%`);
+              break;
+          }
+          const { data: accountRows, error: accountFilterError } = await accountsQuery;
+          if (accountFilterError) {
+            throw accountFilterError;
+          }
+          const accountIds = (accountRows || []).map((a: any) => a.id);
+          if (accountIds.length === 0) {
+            setQuotes([]);
+            setTotalCount(0);
+            return;
+          }
+          fallbackQuery = fallbackQuery.in('account_id', accountIds);
+        }
+
+        if (safeSorts.length > 0) {
+          safeSorts.forEach((s) => {
+            fallbackQuery = fallbackQuery.order(s.field, { ascending: s.direction === 'asc' });
+          });
+        } else {
+          fallbackQuery = fallbackQuery.order('created_at', { ascending: false });
+        }
+        fallbackQuery = fallbackQuery.range(from, to);
+
+        const fallbackResult = await fallbackQuery;
+        if (fallbackResult.error) {
+          throw fallbackResult.error;
+        }
+        data = fallbackResult.data || [];
+        count = fallbackResult.count || 0;
+      } else {
+        data = primaryResult.data || [];
+        count = primaryResult.count || 0;
+      }
 
       // Manual Carrier Join (Schema Cache Workaround)
       // The schema cache might be missing the foreign key relationship for carriers:carrier_id
       // so we fetch carriers manually and map them.
       let quotesData = (data || []) as QuoteWithRelations[];
-      const carrierIds = [...new Set(quotesData.map((q: any) => q.carrier_id).filter(Boolean))];
-      
-      if (carrierIds.length > 0) {
-        const { data: carriers, error: carrierError } = await scopedDb
-          .from('carriers')
-          .select('id, carrier_name')
-          .in('id', carrierIds);
-          
-        if (!carrierError && carriers) {
-          const carrierMap = new Map(carriers.map((c: any) => [c.id, c]));
-          quotesData = quotesData.map(q => ({
-            ...q,
-            carriers: (q as any).carrier_id ? carrierMap.get((q as any).carrier_id) : undefined
-          }));
-        } else if (carrierError) {
-          console.warn('Failed to fetch carriers manually:', carrierError);
-        }
+      const carrierIds = [...new Set(quotesData.map((q: any) => q.carrier_id).filter(Boolean))] as string[];
+      const accountIds = [...new Set(quotesData.map((q: any) => q.account_id).filter(Boolean))] as string[];
+      const contactIds = [...new Set(quotesData.map((q: any) => q.contact_id).filter(Boolean))] as string[];
+      const opportunityIds = [...new Set(quotesData.map((q: any) => q.opportunity_id).filter(Boolean))] as string[];
+
+      const [carriersRes, accountsRes, contactsRes, opportunitiesRes] = await Promise.all([
+        carrierIds.length > 0
+          ? scopedDb.from('carriers').select('id, carrier_name').in('id', carrierIds)
+          : Promise.resolve({ data: [], error: null } as any),
+        accountIds.length > 0
+          ? scopedDb.from('accounts').select('id, name').in('id', accountIds)
+          : Promise.resolve({ data: [], error: null } as any),
+        contactIds.length > 0
+          ? scopedDb.from('contacts').select('id, first_name, last_name').in('id', contactIds)
+          : Promise.resolve({ data: [], error: null } as any),
+        opportunityIds.length > 0
+          ? scopedDb.from('opportunities').select('id, name').in('id', opportunityIds)
+          : Promise.resolve({ data: [], error: null } as any),
+      ]);
+
+      if (carriersRes.error) {
+        logger.warn('Failed to fetch carriers manually', carriersRes.error);
       }
+      if (accountsRes.error) {
+        logger.warn('Failed to fetch accounts manually', accountsRes.error);
+      }
+      if (contactsRes.error) {
+        logger.warn('Failed to fetch contacts manually', contactsRes.error);
+      }
+      if (opportunitiesRes.error) {
+        logger.warn('Failed to fetch opportunities manually', opportunitiesRes.error);
+      }
+
+      const carrierMap = new Map((carriersRes.data || []).map((c: any) => [c.id, c]));
+      const accountMap = new Map((accountsRes.data || []).map((a: any) => [a.id, a]));
+      const contactMap = new Map((contactsRes.data || []).map((c: any) => [c.id, c]));
+      const opportunityMap = new Map((opportunitiesRes.data || []).map((o: any) => [o.id, o]));
+
+      quotesData = quotesData.map((q: any) => ({
+        ...q,
+        carriers: q.carrier_id ? carrierMap.get(q.carrier_id) : q.carriers,
+        accounts: q.account_id ? accountMap.get(q.account_id) : q.accounts,
+        contacts: q.contact_id ? contactMap.get(q.contact_id) : q.contacts,
+        opportunities: q.opportunity_id ? opportunityMap.get(q.opportunity_id) : q.opportunities,
+      }));
 
       setQuotes(quotesData);
       setTotalCount(count || 0);
     } catch (error: any) {
       console.error('Failed to fetch quotes:', error);
-      setError(error);
-      toast.error('Failed to load quotes');
+      // Last-resort compatibility mode: load quotes without relational joins.
+      try {
+        const from = (Number(filters.page) - 1) * Number(filters.pageSize);
+        const to = from + Number(filters.pageSize) - 1;
+
+        let minimalQuery = scopedDb
+          .from('quotes')
+          .select('id, quote_number, title, status, created_at, updated_at, sell_price, account_id, contact_id, opportunity_id, carrier_id', { count: 'exact' });
+
+        if (filters.status !== 'any') {
+          minimalQuery = minimalQuery.eq('status', filters.status);
+        }
+        if (filters.q) {
+          minimalQuery = minimalQuery.or(`quote_number.ilike.%${filters.q}%,title.ilike.%${filters.q}%`);
+        }
+
+        minimalQuery = minimalQuery.order('created_at', { ascending: false }).range(from, to);
+        const minimalRes = await minimalQuery;
+        if (minimalRes.error) throw minimalRes.error;
+
+        setQuotes((minimalRes.data || []) as QuoteWithRelations[]);
+        setTotalCount(minimalRes.count || 0);
+        setError(null);
+        toast.error('Loaded quotes in compatibility mode');
+        logger.warn('Quotes loaded in compatibility mode after fetch failure', error);
+      } catch (minimalError: any) {
+        setError(minimalError || error);
+        toast.error('Failed to load quotes');
+      }
     } finally {
       setLoading(false);
     }

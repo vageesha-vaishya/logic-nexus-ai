@@ -18,37 +18,43 @@ import { v4 as uuidv4 } from 'uuid';
 interface SharedCargoInputProps {
   value: CargoItem;
   onChange: (value: CargoItem) => void;
+  onCommodityChange?: (value: string) => void;
   onRemove?: () => void;
   className?: string;
   errors?: Record<string, string>;
   disableMultiContainer?: boolean;
 }
 
-export function SharedCargoInput({ value, onChange, onRemove, className, errors, disableMultiContainer }: SharedCargoInputProps) {
+export function SharedCargoInput({ value, onChange, onCommodityChange, onRemove, className, errors, disableMultiContainer }: SharedCargoInputProps) {
   const [showHazmat, setShowHazmat] = useState(!!value.hazmat);
   const [showWizard, setShowWizard] = useState(false);
-  const { containerTypes, containerSizes, formatSize } = useContainerRefs();
+  const { containerTypes, containerSizes, formatSize, loading: containerRefsLoading, error: containerRefsError, retry: retryContainerRefs } = useContainerRefs();
 
   // Initialize container combos if in container mode but combos missing
   React.useEffect(() => {
     if (value.type === 'container' && (!value.containerCombos || value.containerCombos.length === 0)) {
-        // Create initial combo from existing single fields or defaults
+        // Create initial combo from existing single fields (if present) or force explicit selection.
         const initialCombo = {
             id: uuidv4(),
-            typeId: value.containerDetails?.typeId || containerTypes[0]?.id || '',
-            sizeId: value.containerDetails?.sizeId || containerSizes.find(s => s.type_id === (value.containerDetails?.typeId || containerTypes[0]?.id))?.id || '',
+            typeId: value.containerDetails?.typeId || '',
+            sizeId: value.containerDetails?.sizeId || '',
             quantity: value.quantity || 1
         };
-        
-        // Only update if we have valid IDs to avoid infinite loops
-        if (initialCombo.typeId) {
-            onChange({
-                ...value,
-                containerCombos: [initialCombo]
-            });
-        }
+
+        onChange({
+            ...value,
+            containerCombos: [initialCombo]
+        });
     }
   }, [value.type, value.containerCombos?.length, containerTypes, containerSizes]); // Dependencies carefully chosen
+
+  const computeTotalVolume = (dims: CargoItem['dimensions'], quantity: number) => {
+    if (!dims || dims.l <= 0 || dims.w <= 0 || dims.h <= 0) return value.volume;
+    const factor = dims.unit === 'cm' ? 1000000 : 61023.7;
+    const perUnitCbm = (dims.l * dims.w * dims.h) / factor;
+    const totalCbm = perUnitCbm * Math.max(1, Number(quantity) || 1);
+    return parseFloat(totalCbm.toFixed(3));
+  };
 
   const handleCommoditySelect = (selection: CommoditySelection) => {
     console.log('[SharedCargoInput] Commodity selected:', selection);
@@ -74,15 +80,43 @@ export function SharedCargoInput({ value, onChange, onRemove, className, errors,
 
     console.log('[SharedCargoInput] Calling onChange with updated cargo item:', updated);
     onChange(updated);
+    onCommodityChange?.(selection.description || '');
+  };
+
+  const handleCommodityInputChange = (description: string) => {
+    const currentDescription = value.commodity?.description || '';
+    if (description === currentDescription) return;
+    onChange({
+      ...value,
+      commodity: description
+        ? {
+            ...value.commodity,
+            description,
+            hts_code: value.commodity?.hts_code || '',
+          }
+        : undefined,
+    });
+    onCommodityChange?.(description || '');
   };
 
   const updateField = <K extends keyof CargoItem>(field: K, val: CargoItem[K]) => {
+    if (field === 'quantity') {
+      const quantity = Number(val) || 1;
+      const nextVolume = computeTotalVolume(value.dimensions, quantity);
+      onChange({ ...value, [field]: val, volume: nextVolume });
+      return;
+    }
     onChange({ ...value, [field]: val });
   };
 
   const updateCombo = (index: number, field: 'typeId' | 'sizeId' | 'quantity', val: any) => {
     const newCombos = [...(value.containerCombos || [])];
-    newCombos[index] = { ...newCombos[index], [field]: val };
+    const existingCombo = newCombos[index] || { typeId: '', sizeId: '', quantity: 1 };
+    const nextCombo = { ...existingCombo, [field]: val };
+    if (field === 'typeId') {
+      nextCombo.sizeId = '';
+    }
+    newCombos[index] = nextCombo;
     
     // Recalculate total quantity
     const totalQty = newCombos.reduce((sum, c) => sum + (Number(c.quantity) || 0), 0);
@@ -103,8 +137,8 @@ export function SharedCargoInput({ value, onChange, onRemove, className, errors,
   const addCombo = () => {
     const newCombo = {
         id: uuidv4(),
-        typeId: containerTypes[0]?.id || '',
-        sizeId: containerSizes.find(s => s.type_id === containerTypes[0]?.id)?.id || '',
+        typeId: '',
+        sizeId: '',
         quantity: 1
     };
     
@@ -133,12 +167,7 @@ export function SharedCargoInput({ value, onChange, onRemove, className, errors,
     const num = parseFloat(val) || 0;
     const newDims = { ...value.dimensions, [field]: num };
     
-    // Auto-calc volume if all dims are present
-    let vol = value.volume;
-    if (newDims.l > 0 && newDims.w > 0 && newDims.h > 0) {
-        const factor = newDims.unit === 'cm' ? 1000000 : 61023.7;
-        vol = parseFloat(((newDims.l * newDims.w * newDims.h) / factor).toFixed(3));
-    }
+    const vol = computeTotalVolume(newDims, value.quantity);
     
     onChange({
       ...value,
@@ -149,11 +178,7 @@ export function SharedCargoInput({ value, onChange, onRemove, className, errors,
 
   const updateDimensionUnit = (unit: 'cm' | 'in') => {
       const newDims = { ...value.dimensions, unit };
-      let vol = value.volume;
-       if (newDims.l > 0 && newDims.w > 0 && newDims.h > 0) {
-        const factor = unit === 'cm' ? 1000000 : 61023.7;
-        vol = parseFloat(((newDims.l * newDims.w * newDims.h) / factor).toFixed(3));
-       }
+      const vol = computeTotalVolume(newDims, value.quantity);
        onChange({ ...value, dimensions: newDims, volume: vol });
   }
 
@@ -207,7 +232,7 @@ export function SharedCargoInput({ value, onChange, onRemove, className, errors,
             </TabsList>
           </Tabs>
           {onRemove && (
-            <Button variant="ghost" size="icon" onClick={onRemove} className="text-muted-foreground hover:text-destructive">
+            <Button type="button" variant="ghost" size="icon" onClick={onRemove} className="text-muted-foreground hover:text-destructive">
               <span className="sr-only">Remove</span>
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -233,7 +258,8 @@ export function SharedCargoInput({ value, onChange, onRemove, className, errors,
                 <div className="flex items-center justify-between">
                     <Label className="text-xs font-medium text-blue-900">Container Configuration</Label>
                     {!disableMultiContainer && (
-                        <Button 
+                        <Button
+                            type="button"
                             variant="ghost" 
                             size="sm" 
                             onClick={addCombo}
@@ -245,18 +271,53 @@ export function SharedCargoInput({ value, onChange, onRemove, className, errors,
                 </div>
                 
                 <div className="space-y-2">
+                    {containerRefsError && (
+                      <div className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-800 flex items-center justify-between">
+                        <span>Unable to load container metadata.</span>
+                        <Button type="button" variant="ghost" size="sm" onClick={() => retryContainerRefs?.()} className="h-6 px-2 text-xs">
+                          Retry
+                        </Button>
+                      </div>
+                    )}
                     {value.containerCombos?.map((combo, idx) => (
+                        (() => {
+                          const matchedType = containerTypes.find(
+                            (t: any) =>
+                              t.id === combo.typeId ||
+                              String(t.name || '').toLowerCase() === String(combo.typeId || '').toLowerCase() ||
+                              String(t.code || '').toLowerCase() === String(combo.typeId || '').toLowerCase()
+                          );
+                          const resolvedTypeId = matchedType?.id || combo.typeId;
+                          const strictSizes = containerSizes.filter(
+                            (s: any) =>
+                              !resolvedTypeId ||
+                              s.type_id === resolvedTypeId ||
+                              s.container_type_id === resolvedTypeId
+                          );
+                          // Some datasets don't backfill type links for all size rows.
+                          // If strict mapping yields none, show all active sizes from metadata.
+                          const sizeOptions = strictSizes.length > 0 ? strictSizes : containerSizes;
+                          const matchedSize = sizeOptions.find(
+                            (s: any) =>
+                              s.id === combo.sizeId ||
+                              String(s.name || '').toLowerCase() === String(combo.sizeId || '').toLowerCase() ||
+                              String(s.iso_code || '').toLowerCase() === String(combo.sizeId || '').toLowerCase()
+                          );
+                          const resolvedSizeId = matchedSize?.id || combo.sizeId;
+                          return (
                         <div key={combo.id || idx} className="grid grid-cols-12 gap-2 items-end">
                             <div className="col-span-5 space-y-1">
                                 <Label className="text-[10px] text-muted-foreground">Type</Label>
                                 <Select 
-                                    value={combo.typeId} 
+                                    value={resolvedTypeId} 
                                     onValueChange={(v) => updateCombo(idx, 'typeId', v)}
                                 >
-                                    <SelectTrigger className="h-8 text-xs bg-white"><SelectValue placeholder="Type" /></SelectTrigger>
-                                    <SelectContent>
+                                    <SelectTrigger aria-label={`Container type ${idx + 1}`} className="h-8 text-xs bg-white">
+                                      <SelectValue placeholder="Please select container type" />
+                                    </SelectTrigger>
+                                    <SelectContent role="listbox" aria-label={`Container type options ${idx + 1}`}>
                                         {containerTypes.map(t => (
-                                            <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                                            <SelectItem key={t.id} value={t.id} aria-selected={resolvedTypeId === t.id}>{t.name}</SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
@@ -264,15 +325,16 @@ export function SharedCargoInput({ value, onChange, onRemove, className, errors,
                             <div className="col-span-4 space-y-1">
                                 <Label className="text-[10px] text-muted-foreground">Size</Label>
                                 <Select 
-                                    value={combo.sizeId} 
+                                    value={resolvedSizeId} 
                                     onValueChange={(v) => updateCombo(idx, 'sizeId', v)}
+                                    disabled={!resolvedTypeId}
                                 >
-                                    <SelectTrigger className="h-8 text-xs bg-white"><SelectValue placeholder="Size" /></SelectTrigger>
-                                    <SelectContent>
-                                        {containerSizes
-                                            .filter(s => !combo.typeId || !s.type_id || s.type_id === combo.typeId)
-                                            .map(s => (
-                                                <SelectItem key={s.id} value={s.id}>{formatSize(s.name)}</SelectItem>
+                                    <SelectTrigger aria-label={`Container size ${idx + 1}`} className="h-8 text-xs bg-white">
+                                      <SelectValue placeholder="Please select container size" />
+                                    </SelectTrigger>
+                                    <SelectContent role="listbox" aria-label={`Container size options ${idx + 1}`}>
+                                        {sizeOptions.map((s: any) => (
+                                                <SelectItem key={s.id} value={s.id} aria-selected={resolvedSizeId === s.id}>{formatSize(s.name)}</SelectItem>
                                             ))}
                                     </SelectContent>
                                 </Select>
@@ -290,6 +352,7 @@ export function SharedCargoInput({ value, onChange, onRemove, className, errors,
                             <div className="col-span-1 pb-1">
                                 {!disableMultiContainer && (
                                     <Button
+                                        type="button"
                                         variant="ghost"
                                         size="icon"
                                         onClick={() => removeCombo(idx)}
@@ -301,7 +364,12 @@ export function SharedCargoInput({ value, onChange, onRemove, className, errors,
                                 )}
                             </div>
                         </div>
+                          );
+                        })()
                     ))}
+                    {containerRefsLoading && (
+                      <div className="text-[11px] text-muted-foreground">Loading container metadata...</div>
+                    )}
                 </div>
              </div>
         )}
@@ -313,6 +381,7 @@ export function SharedCargoInput({ value, onChange, onRemove, className, errors,
             <Label className="text-xs text-muted-foreground">Commodity</Label>
             <SmartCargoInput
               onSelect={handleCommoditySelect}
+              onInputChange={handleCommodityInputChange}
               placeholder="Search commodity or HTS code..."
               className={errors?.commodity ? "border-red-500" : ""}
               value={value.commodity?.description}

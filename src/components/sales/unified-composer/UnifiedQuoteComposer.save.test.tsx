@@ -320,6 +320,12 @@ vi.mock('@/components/notifications/QuotationSuccessToast', () => ({
 vi.mock('./FormZone', () => ({
     FormZone: ({ onGetRates }: any) => (
         <div data-testid="form-zone">
+            <div data-field-name="origin">
+                <input name="origin" data-testid="origin-field" />
+            </div>
+            <div data-field-name="commodity">
+                <input name="commodity" data-testid="commodity-field" />
+            </div>
             <button
                 data-testid="search-btn"
                 onClick={() => onGetRates(
@@ -476,6 +482,8 @@ vi.mock('react-hook-form', async () => {
 describe('UnifiedQuoteComposer - Save Functionality', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        mockFormReturn.trigger.mockResolvedValue(true);
+        mockFormReturn.formState.errors = {};
         mockScopedDb.from.mockImplementation(() => createSafeChain('default', []));
         mockScopedDb.rpc.mockResolvedValue({ data: 'new-quote-id', error: null });
         mockConfig.smart_mode_enabled = false; // Reset to default
@@ -692,5 +700,106 @@ describe('UnifiedQuoteComposer - Save Functionality', () => {
                 })
             );
         });
+    });
+
+    it('persists commodity inside quote.cargo_details when saving', async () => {
+        const initialData = {
+            mode: 'ocean',
+            origin: 'Origin',
+            destination: 'Dest',
+            originId: 'origin-uuid',
+            destinationId: 'dest-uuid',
+            commodity: 'PARTS OF BABY CARRIAGES - 8715.00.00.40',
+            weight: '1250',
+            volume: '14.5',
+            containerType: '00000000-0000-0000-0000-000000000001',
+            containerSize: '00000000-0000-0000-0000-000000000002',
+            containerQty: '1',
+            htsCode: '8715.00.00.40'
+        };
+
+        mockFormReturn.getValues.mockReturnValue({
+            ...mockFormReturn.getValues(),
+            ...initialData,
+            containerCombos: [
+              {
+                type: '00000000-0000-0000-0000-000000000001',
+                size: '00000000-0000-0000-0000-000000000002',
+                qty: 1,
+              },
+            ],
+        });
+
+        render(
+            <MemoryRouter>
+                <UnifiedQuoteComposer initialData={initialData} />
+            </MemoryRouter>
+        );
+
+        const selectBtn = await screen.findByTestId('select-option-btn');
+        fireEvent.click(selectBtn);
+
+        const saveBtn = await screen.findByTestId('save-quote-btn');
+        fireEvent.click(saveBtn);
+
+        await waitFor(() => {
+            expect(mockScopedDb.rpc).toHaveBeenCalledWith(
+                'save_quote_atomic',
+                expect.objectContaining({
+                    p_payload: expect.objectContaining({
+                        quote: expect.objectContaining({
+                            cargo_details: expect.objectContaining({
+                                commodity: 'PARTS OF BABY CARRIAGES - 8715.00.00.40',
+                                total_weight_kg: 1250,
+                                total_volume_cbm: 14.5,
+                                hts_code: '8715.00.00.40',
+                            }),
+                        }),
+                    }),
+                })
+            );
+        });
+
+        const rpcPayload = (mockScopedDb.rpc as any).mock.calls.at(-1)?.[1]?.p_payload;
+        expect(rpcPayload?.cargo_configurations?.[0]).toEqual(
+          expect.objectContaining({
+            container_type_id: '00000000-0000-0000-0000-000000000001',
+            container_size_id: '00000000-0000-0000-0000-000000000002',
+          })
+        );
+    });
+
+    it('shows validation summary and blocks save when form has errors', async () => {
+        const scrollSpy = vi.fn();
+        Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+            configurable: true,
+            value: scrollSpy,
+        });
+
+        mockFormReturn.trigger.mockResolvedValue(false);
+        mockFormReturn.formState.errors = {
+            commodity: { message: 'Commodity is required' },
+            origin: { message: 'Origin is required' },
+        };
+
+        render(
+            <MemoryRouter>
+                <UnifiedQuoteComposer initialData={{ mode: 'ocean' }} />
+            </MemoryRouter>
+        );
+
+        const selectBtn = await screen.findByTestId('select-option-btn');
+        fireEvent.click(selectBtn);
+
+        const saveBtn = await screen.findByTestId('save-quote-btn');
+        fireEvent.click(saveBtn);
+
+        expect(await screen.findByTestId('validation-summary')).toBeInTheDocument();
+        expect(screen.getByText(/Commodity: Commodity is required/i)).toBeInTheDocument();
+        expect(screen.getByText(/Origin: Origin is required/i)).toBeInTheDocument();
+        expect(mockScopedDb.rpc).not.toHaveBeenCalled();
+
+        fireEvent.click(screen.getByText(/Commodity: Commodity is required/i));
+        expect(scrollSpy).toHaveBeenCalled();
     });
 });

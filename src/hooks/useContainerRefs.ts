@@ -2,6 +2,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { useCRM } from '@/hooks/useCRM';
 import { formatContainerSize } from '@/lib/container-utils';
+import { useAuth } from '@/hooks/useAuth';
+import { fetchContainerSizesApi, fetchContainerTypesApi, logContainerMetadataError } from '@/lib/api/containerMetadata';
 
 export interface ContainerType {
   id: string;
@@ -32,21 +34,56 @@ const FALLBACK_SIZES: ContainerSize[] = [
 ];
 
 export function useContainerRefs() {
-  const { scopedDb } = useCRM();
+  const { scopedDb, context } = useCRM();
+  const { user } = useAuth();
+  const tenantId = context?.tenantId || '';
 
   const { data: containerTypes = FALLBACK_TYPES, isLoading: loadingTypes } = useQuery({
-    queryKey: ['container_types'],
+    queryKey: ['container_types', tenantId],
     queryFn: async () => {
+      try {
+        const apiData = await fetchContainerTypesApi(tenantId, user?.id);
+        if (apiData.length) {
+          return apiData
+            .filter((item) => item.isActive !== false)
+            .map((item) => ({
+              id: item.sourceId || String(item.id),
+              name: item.name,
+              code: item.code || '',
+            }));
+        }
+      } catch (apiError) {
+        logContainerMetadataError('fetchContainerTypesApi', apiError);
+      }
+
       const { data, error } = await scopedDb.from('container_types').select('id, name, code').order('name');
       if (error || !data?.length) return FALLBACK_TYPES;
-      return data;
+      return data as ContainerType[];
     },
     staleTime: 1000 * 60 * 60, // 1 hour
+    retry: 2,
   });
 
-  const { data: containerSizes = FALLBACK_SIZES, isLoading: loadingSizes } = useQuery({
-    queryKey: ['container_sizes'],
+  const { data: containerSizes = FALLBACK_SIZES, isLoading: loadingSizes, error: containerError, refetch } = useQuery({
+    queryKey: ['container_sizes', tenantId],
     queryFn: async () => {
+      try {
+        const apiData = await fetchContainerSizesApi(tenantId, undefined, user?.id);
+        if (apiData.length) {
+          return apiData
+            .filter((item) => item.isActive !== false)
+            .map((row) => ({
+            id: row.sourceId || String(row.id),
+            name: row.name,
+            iso_code: row.isoCode || '',
+            type_id: row.containerTypeSourceId,
+            container_type_id: row.containerTypeSourceId,
+          })) as ContainerSize[];
+        }
+      } catch (apiError) {
+        logContainerMetadataError('fetchContainerSizesApi', apiError);
+      }
+
       const { data, error } = await scopedDb
         .from('container_sizes', true)
         .select('id, name, iso_code, container_type_id, type_id')
@@ -60,12 +97,15 @@ export function useContainerRefs() {
       })) as ContainerSize[];
     },
     staleTime: 1000 * 60 * 60, // 1 hour
+    retry: 2,
   });
 
   return {
     containerTypes,
     containerSizes,
     loading: loadingTypes || loadingSizes,
+    error: containerError ? 'Failed to load container metadata' : null,
+    retry: refetch,
     formatSize: formatContainerSize
   };
 }

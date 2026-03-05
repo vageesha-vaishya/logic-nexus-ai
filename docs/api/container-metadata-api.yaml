@@ -1,0 +1,133 @@
+openapi: 3.0.3
+info:
+  title: Container Metadata API
+  version: 1.0.0
+  description: Endpoints for container type/size dropdown metadata used by Add Container.
+servers:
+  - url: /api/v1
+security:
+  - bearerAuth: []
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    TenantHeader:
+      in: header
+      name: x-tenant-id
+      required: true
+      schema:
+        type: string
+    UserHeader:
+      in: header
+      name: x-user-id
+      required: false
+      schema:
+        type: string
+  schemas:
+    ContainerTypeDTO:
+      type: object
+      required: [id, sourceId, name, description, isActive]
+      properties:
+        id:
+          type: integer
+        sourceId:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        isActive:
+          type: boolean
+        code:
+          type: string
+    ContainerSizeDTO:
+      type: object
+      required: [id, sourceId, containerTypeSourceId, name, description, isActive]
+      properties:
+        id:
+          type: integer
+        sourceId:
+          type: string
+        containerTypeSourceId:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        isActive:
+          type: boolean
+        isoCode:
+          type: string
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+paths:
+  /container-types:
+    get:
+      summary: List container types
+      parameters:
+        - $ref: '#/components/parameters/TenantHeader'
+        - $ref: '#/components/parameters/UserHeader'
+      responses:
+        '200':
+          description: Container types
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ContainerTypeDTO'
+        '400':
+          description: Missing tenant header
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+        '404':
+          description: No data found
+        '500':
+          description: Server/database failure
+  /container-sizes:
+    get:
+      summary: List container sizes
+      parameters:
+        - $ref: '#/components/parameters/TenantHeader'
+        - $ref: '#/components/parameters/UserHeader'
+        - in: query
+          name: typeId
+          required: false
+          schema:
+            type: string
+            pattern: '^[a-zA-Z0-9_-]{1,64}$'
+      responses:
+        '200':
+          description: Container sizes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ContainerSizeDTO'
+        '400':
+          description: Invalid typeId or missing tenant header
+        '401':
+          description: Unauthorized
+        '404':
+          description: No data found
+        '500':
+          description: Server/database failure

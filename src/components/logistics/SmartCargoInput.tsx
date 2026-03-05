@@ -37,9 +37,10 @@ interface SmartCargoInputProps {
   className?: string;
   placeholder?: string;
   value?: string;
+  onInputChange?: (value: string) => void;
 }
 
-export function SmartCargoInput({ onSelect, className, placeholder = "Search commodities or HTS codes...", value }: SmartCargoInputProps) {
+export function SmartCargoInput({ onSelect, className, placeholder = "Search commodities or HTS codes...", value, onInputChange }: SmartCargoInputProps) {
   const { scopedDb } = useCRM();
   const [open, setOpen] = useState(false);
   const [browserOpen, setBrowserOpen] = useState(false);
@@ -49,10 +50,15 @@ export function SmartCargoInput({ onSelect, className, placeholder = "Search com
 
   // Sync internal state with external value prop
   useEffect(() => {
-    if (value !== undefined && value !== searchTerm) {
+    if (!open && value !== undefined && value !== searchTerm) {
       setSearchTerm(value);
     }
-  }, [value]);
+  }, [value, open, searchTerm]);
+
+  const updateSearchTerm = (nextValue: string) => {
+    setSearchTerm(nextValue);
+    onInputChange?.(nextValue);
+  };
 
   // Debounce search term
   useEffect(() => {
@@ -66,15 +72,35 @@ export function SmartCargoInput({ onSelect, className, placeholder = "Search com
     queryFn: async () => {
       if (debouncedSearch.length < 2) return [];
 
-      // Use the optimized RPC for master commodities
+      const fetchMasterFallback = async () => {
+        const { data: fallbackData, error: fallbackError } = await scopedDb
+          .from('master_commodities')
+          .select('id, name, sku, description, aes_hts_id, default_cargo_type_id, unit_value, hazmat_class, aes_hts_codes(hts_code)')
+          .or(`name.ilike.%${debouncedSearch}%,sku.ilike.%${debouncedSearch}%,description.ilike.%${debouncedSearch}%`)
+          .limit(5);
+
+        if (fallbackError) {
+          console.error('Master commodity fallback failed:', fallbackError);
+          throw fallbackError;
+        }
+
+        return (fallbackData || []).map((item: any) => ({
+          ...item,
+          hts_code: item.aes_hts_codes?.hts_code
+        }));
+      };
+
       const { data, error } = await scopedDb.rpc('search_master_commodities', {
         p_search_term: debouncedSearch,
         p_limit: 5
       });
-
       if (error) {
-        console.warn('Master commodity search failed:', error);
-        throw error;
+        console.warn('Master commodity RPC failed, falling back to table search:', error);
+        return fetchMasterFallback();
+      }
+
+      if (!Array.isArray(data) || data.length === 0) {
+        return fetchMasterFallback();
       }
 
       return data;
@@ -89,30 +115,37 @@ export function SmartCargoInput({ onSelect, className, placeholder = "Search com
     queryKey: ['hts_codes', debouncedSearch],
     queryFn: async () => {
       if (debouncedSearch.length < 2) return [];
-      
+
+      const fetchHtsFallback = async () => {
+        const { data: fallbackData, error: fallbackError } = await scopedDb
+          .from('aes_hts_codes')
+          .select('id, hts_code, description, category')
+          .or(`hts_code.ilike.%${debouncedSearch}%,description.ilike.%${debouncedSearch}%`)
+          .limit(10);
+
+        if (fallbackError) {
+          console.error('Fallback search failed:', fallbackError);
+          throw fallbackError;
+        }
+
+        return fallbackData || [];
+      };
+
       // Use the Smart Search RPC (Fuzzy Matching)
       const { data, error } = await scopedDb.rpc('search_hts_codes_smart', {
         p_search_term: debouncedSearch,
         p_limit: 10
       });
-      
+
       if (error) {
         console.warn('Smart search failed, falling back to simple search:', error);
-        
-        // Fallback to simple ILIKE search (optimized with Trigram index)
-        const { data: fallbackData, error: fallbackError } = await scopedDb
-          .from('aes_hts_codes', true)
-          .select('id, hts_code, description, category')
-          .or(`hts_code.ilike.%${debouncedSearch}%,description.ilike.%${debouncedSearch}%`)
-          .limit(10);
-          
-        if (fallbackError) {
-          console.error('Fallback search failed:', fallbackError);
-          throw fallbackError; // Throw to trigger isError
-        }
-        return fallbackData;
+        return fetchHtsFallback();
       }
-      
+
+      if (!Array.isArray(data) || data.length === 0) {
+        return fetchHtsFallback();
+      }
+
       return data;
     },
     enabled: debouncedSearch.length >= 2,
@@ -130,7 +163,7 @@ export function SmartCargoInput({ onSelect, className, placeholder = "Search com
       hazmat_class: item.hazmat_class,
       master_commodity_id: item.id,
     });
-    setSearchTerm(item.name);
+    updateSearchTerm(item.name);
     setOpen(false);
   };
 
@@ -140,7 +173,7 @@ export function SmartCargoInput({ onSelect, className, placeholder = "Search com
       aes_hts_id: item.id,
       hts_code: item.hts_code,
     });
-    setSearchTerm(`${item.description} - ${item.hts_code}`);
+    updateSearchTerm(`${item.description} - ${item.hts_code}`);
     setOpen(false);
   };
 
@@ -151,7 +184,7 @@ export function SmartCargoInput({ onSelect, className, placeholder = "Search com
       hts_code: selection.code,
     });
     setBrowserOpen(false);
-    setSearchTerm(`${selection.description} - ${selection.code}`);
+    updateSearchTerm(`${selection.description} - ${selection.code}`);
   };
 
   useEffect(() => {
@@ -180,11 +213,11 @@ export function SmartCargoInput({ onSelect, className, placeholder = "Search com
               const isPrintable = e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey;
               if (isPrintable) {
                 setOpen(true);
-                setSearchTerm((prev) => prev + e.key);
+                updateSearchTerm(searchTerm + e.key);
                 e.preventDefault();
               } else if (e.key === 'Backspace') {
                 setOpen(true);
-                setSearchTerm((prev) => prev.slice(0, Math.max(0, prev.length - 1)));
+                updateSearchTerm(searchTerm.slice(0, Math.max(0, searchTerm.length - 1)));
                 e.preventDefault();
               } else if (e.key === 'Escape') {
                 setOpen(false);
@@ -194,7 +227,7 @@ export function SmartCargoInput({ onSelect, className, placeholder = "Search com
               const text = e.clipboardData.getData('text');
               if (text) {
                 setOpen(true);
-                setSearchTerm(text);
+                updateSearchTerm(text);
                 e.preventDefault();
               }
             }}
@@ -208,7 +241,7 @@ export function SmartCargoInput({ onSelect, className, placeholder = "Search com
             <CommandInput 
               placeholder="Type to search..." 
               value={searchTerm}
-              onValueChange={setSearchTerm}
+              onValueChange={updateSearchTerm}
               ref={inputRef as any}
             />
             <CommandList>

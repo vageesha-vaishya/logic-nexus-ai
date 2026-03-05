@@ -98,4 +98,55 @@ describe('FormZone Initialization', () => {
       expect(value.type).toBe('container');
     });
   });
+
+  it('rehydrates cargoItem from initialExtended snapshot when provided', async () => {
+    const initialValues = {
+      commodity: 'Fallback Commodity',
+      weight: '10',
+      volume: '1',
+      mode: 'ocean',
+    };
+
+    const initialExtended = {
+      htsCode: '9999.00',
+      cargoItem: {
+        id: 'main',
+        type: 'container',
+        quantity: 3,
+        dimensions: { l: 10, w: 20, h: 30, unit: 'cm' as const },
+        weight: { value: 321, unit: 'lb' as const },
+        volume: 12,
+        stackable: true,
+        commodity: { description: 'Reloaded Commodity', hts_code: '8501.00' },
+        hazmat: { class: '3', unNumber: '1263', packingGroup: 'II' as const },
+        containerCombos: [{ typeId: 'reefer', sizeId: '40hc', quantity: 3 }],
+        containerDetails: { typeId: 'reefer', sizeId: '40hc' },
+      },
+    };
+
+    render(
+      <TestWrapper defaultValues={initialValues}>
+        <FormZone
+          onGetRates={vi.fn()}
+          initialValues={initialValues}
+          initialExtended={initialExtended as any}
+        />
+      </TestWrapper>
+    );
+
+    await waitFor(() => {
+      const cargoInput = screen.getByTestId('cargo-input');
+      const value = JSON.parse(cargoInput.getAttribute('data-value') || '{}');
+
+      expect(value.commodity?.description).toBe('Reloaded Commodity');
+      expect(value.commodity?.hts_code).toBe('8501.00');
+      expect(value.weight.value).toBe(321);
+      expect(value.weight.unit).toBe('lb');
+      expect(value.stackable).toBe(true);
+      expect(value.hazmat?.unNumber).toBe('1263');
+      expect(value.containerCombos?.[0]?.typeId).toBe('reefer');
+      expect(value.containerCombos?.[0]?.sizeId).toBe('40hc');
+      expect(value.quantity).toBe(3);
+    });
+  });
 });

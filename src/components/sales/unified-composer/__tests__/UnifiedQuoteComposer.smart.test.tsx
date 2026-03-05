@@ -562,4 +562,102 @@ describe('UnifiedQuoteComposer Smart Mode', () => {
       expect(mockShowSuccess).toHaveBeenCalled();
     });
   });
+
+  it('saves leg-level charges for unselected second option (multi-option regression)', async () => {
+    const option1 = {
+      id: 'rate-a',
+      carrier: 'Carrier A',
+      price: 1000,
+      charges: [],
+      legs: [],
+    };
+    const option2 = {
+      id: 'rate-b',
+      carrier: 'Carrier B',
+      price: 2000,
+      charges: [],
+      legs: [{
+        id: 'leg-b-1',
+        mode: 'ocean',
+        origin: 'Origin B',
+        destination: 'Destination B',
+        charges: [{
+          id: 'leg-charge-b1',
+          category_id: '00000000-0000-0000-0000-000000000011',
+          basis_id: '00000000-0000-0000-0000-000000000012',
+          currency_id: '00000000-0000-0000-0000-000000000013',
+          unit: 'container',
+          buy: { quantity: 2, rate: 900, amount: 1800 },
+          sell: { quantity: 2, rate: 1000, amount: 2000 },
+          note: 'Leg freight',
+        }]
+      }],
+    };
+
+    mockResults.length = 0;
+    mockResults.push(option1 as any, option2 as any);
+
+    render(
+      <MemoryRouter>
+        <UnifiedQuoteComposer initialData={{
+          accountId: 'cust-123',
+          mode: 'ocean',
+          origin: 'Origin Name',
+          originId: 'origin-123',
+          destination: 'Dest Name',
+          destinationId: 'dest-123',
+          commodity: 'Test Commodity',
+          weight: '1000',
+          volume: '10',
+          containerType: 'CT',
+          containerSize: '40HC',
+          containerQty: '1'
+        }} />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => { expect(mockGetConfiguration).toHaveBeenCalled(); });
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('get-rates-btn'));
+    });
+
+    await act(async () => {
+      fireEvent.click(await screen.findByTestId('add-option-rate-a'));
+      fireEvent.click(await screen.findByTestId('add-option-rate-b'));
+    });
+
+    await act(async () => {
+      fireEvent.click(await screen.findByTestId('select-option-rate-a'));
+    });
+
+    const saveBtn = await screen.findByTestId('save-quote-btn');
+    await act(async () => {
+      fireEvent.click(saveBtn);
+    });
+
+    await waitFor(() => {
+      expect(mockScopedDb.rpc).toHaveBeenCalledWith(
+        'save_quote_atomic',
+        expect.objectContaining({
+          p_payload: expect.objectContaining({
+            options: expect.arrayContaining([
+              expect.objectContaining({
+                option_name: 'Carrier B',
+                is_selected: false,
+                legs: expect.arrayContaining([
+                  expect.objectContaining({
+                    charges: expect.arrayContaining([
+                      expect.objectContaining({ side: 'buy', quantity: 2, unit_price: 900, amount: 1800 }),
+                      expect.objectContaining({ side: 'sell', quantity: 2, unit_price: 1000, amount: 2000 }),
+                    ]),
+                  }),
+                ]),
+              }),
+            ]),
+          }),
+        })
+      );
+    });
+  });
 });
