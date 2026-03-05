@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 
+
 function b64url(input) {
   const b64 = Buffer.isBuffer(input) ? input.toString('base64') : Buffer.from(String(input)).toString('base64');
   return b64.replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
