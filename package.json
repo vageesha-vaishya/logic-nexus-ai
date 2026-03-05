@@ -18,6 +18,7 @@
     "lint:remark": "remark . --frail",
     "lint:remark:fix": "remark . -o",
     "test": "vitest run",
+    "test:ci": "vitest run --reporter=dot --bail=1 --test-timeout=30000",
     "test:e2e": "vitest run --config vitest.config.e2e.ts",
     "ci:lint": "eslint src --ext .ts,.tsx,.mdx",
     "preview": "vite preview",

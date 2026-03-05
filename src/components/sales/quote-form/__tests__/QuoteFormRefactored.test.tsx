@@ -1,11 +1,21 @@
 
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { QuoteFormRefactored } from '../QuoteFormRefactored';
 import { vi, describe, it, expect, beforeAll } from 'vitest';
 import { BrowserRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import fs from 'fs';
 import path from 'path';
+
+// Mock react-virtual to always render at least one row
+vi.mock('@tanstack/react-virtual', () => ({
+  useVirtualizer: () => ({
+    getVirtualItems: () => [{ key: 0, index: 0, start: 0 }],
+    getTotalSize: () => 400,
+    measureElement: () => {},
+  }),
+}));
 
 // Mock UI Select component
 vi.mock('@/components/ui/select', async () => {
@@ -272,17 +282,18 @@ describe('QuoteFormRefactored', () => {
 
   it('allows adding line items with discount field', async () => {
     renderComponent();
+    await screen.findByText('Cargo Details');
 
     // Find "Add Item" button - prefer the one in empty state if visible, or header
     // The empty state button text is "Add First Item"
+    await waitFor(() => {
+      const firstBtn = screen.queryByText('Add First Item');
+      const addBtn = screen.queryByText('Add Item');
+      expect(firstBtn || addBtn).toBeTruthy();
+    });
     const addFirstItemButton = screen.queryByText('Add First Item');
-    
-    if (addFirstItemButton) {
-        fireEvent.click(addFirstItemButton);
-    } else {
-        const addItemButton = screen.getByText('Add Item');
-        fireEvent.click(addItemButton);
-    }
+    const addItemButton = screen.queryByText('Add Item');
+    fireEvent.click(addFirstItemButton || addItemButton!);
 
     // Check if item fields appear
     await waitFor(() => {
@@ -323,34 +334,29 @@ describe('QuoteFormRefactored', () => {
 
   it('submits form with valid data', async () => {
     renderComponent();
+    await screen.findByText('Cargo Details');
 
     // Fill Title
     const titleInput = screen.getByLabelText(/Title/i);
     fireEvent.change(titleInput, { target: { value: 'Test Quote' } });
 
     // Add Item
-    const addFirstItemButton = screen.queryByText('Add First Item');
-    if (addFirstItemButton) {
-        fireEvent.click(addFirstItemButton);
-    } else {
-        const addItemButton = screen.getByText('Add Item');
-        fireEvent.click(addItemButton);
-    }
-
-    // Fill Item Details (using mocked SharedCargoInput)
     await waitFor(() => {
-        expect(screen.getByTestId('mock-cargo-input')).toBeInTheDocument();
+      const firstBtn = screen.queryByText('Add First Item');
+      const addBtn = screen.queryByText('Add Item');
+      expect(firstBtn || addBtn).toBeTruthy();
     });
-    
-    const cargoInput = screen.getByTestId('mock-cargo-input');
-    fireEvent.change(cargoInput, { target: { value: 'Test Commodity' } });
+    const addFirstItemButton = screen.queryByText('Add First Item');
+    const addItemButton = screen.queryByText('Add Item');
+    fireEvent.click(addFirstItemButton || addItemButton!);
 
-    // Fill other item fields if necessary (Quantity defaults to 1, Price defaults to 0)
-    // But schema says price min 0.
-    
+    // Fill Item Details via mocked SharedCargoInput to satisfy schema (product_name required)
+    const cargoInput = await screen.findByTestId('mock-cargo-input');
+    fireEvent.change(cargoInput, { target: { value: 'Test Commodity' } });
     // Submit
     const saveButton = screen.getByText(/Save Quote/i);
     fireEvent.click(saveButton);
+
 
     // Check if saveQuote was called
     await waitFor(() => {

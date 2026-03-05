@@ -39,7 +39,7 @@ export default function QuoteDetail() {
   // Load configuration
   useEffect(() => {
     if (context.tenantId) {
-      new QuotationConfigurationService(scopedDb).getConfiguration(context.tenantId).then(setConfig);
+      new QuotationConfigurationService(supabase).getConfiguration(context.tenantId).then(setConfig);
     }
   }, [context.tenantId]);
 

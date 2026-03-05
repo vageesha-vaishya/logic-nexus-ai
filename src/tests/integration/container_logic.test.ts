@@ -51,14 +51,15 @@ runTests('Enhanced Container Logic Integration', () => {
   let sizeId: string;
   
   // Data
+  const shortSuffix = String(timestamp).slice(-6);
   const testType = { 
-    code: `TEST_LOGIC_${timestamp}`, 
+    code: `TL${shortSuffix}`, 
     name: `Test Logic Type ${timestamp}`
   };
   
   const testSize = {
-    name: `40FT Logic Test ${timestamp}`,
-    code: `40LOGIC_${timestamp}`,
+    name: `40FT Logic ${shortSuffix}`,
+    code: `40${shortSuffix}`,
     teu_factor: 2.0,
     iso_code: '42G1'
   };

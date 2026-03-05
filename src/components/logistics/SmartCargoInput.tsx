@@ -162,7 +162,13 @@ export function SmartCargoInput({ onSelect, className, placeholder = "Search com
 
   return (
     <div className={cn("flex gap-2 w-full", className)}>
-      <Popover open={open} onOpenChange={setOpen}>
+      <Popover open={open} onOpenChange={(isOpen) => {
+        // If closing and search term has changed, commit it as a custom selection
+        if (!isOpen && searchTerm !== value) {
+          onSelect({ description: searchTerm });
+        }
+        setOpen(isOpen);
+      }}>
         <PopoverTrigger asChild>
           <Button
             variant="outline"

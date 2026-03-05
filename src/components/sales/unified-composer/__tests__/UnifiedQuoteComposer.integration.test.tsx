@@ -10,7 +10,7 @@ import userEvent from '@testing-library/user-event';
 // Hoisted Mocks
 // ---------------------------------------------------------------------------
 
-const { mockScopedDb, mockSupabase, mockToast } = vi.hoisted(() => {
+const { mockScopedDb, mockSupabase, mockToast, mockShowSuccess } = vi.hoisted(() => {
     const mockStorageFrom = vi.fn(() => ({
         upload: vi.fn().mockResolvedValue({ data: { path: 'test/path' }, error: null }),
         remove: vi.fn().mockResolvedValue({ data: [], error: null }),
@@ -47,6 +47,7 @@ const { mockScopedDb, mockSupabase, mockToast } = vi.hoisted(() => {
 
     return {
         mockToast: vi.fn(),
+        mockShowSuccess: vi.fn(),
         mockScopedDb: {
             from: vi.fn((...args: any[]) => createChain([])),
             rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
@@ -59,6 +60,8 @@ const { mockScopedDb, mockSupabase, mockToast } = vi.hoisted(() => {
         }
     };
 });
+
+
 
 // ---------------------------------------------------------------------------
 // Component Mocks (Leaf Nodes)
@@ -155,7 +158,8 @@ vi.mock('@/components/sales/shared/AiMarketAnalysis', () => ({
 
 
 vi.mock('../FormZone', async () => {
-   const { useFormContext } = await vi.importActual<typeof import('react-hook-form')>('react-hook-form');
+   // Use the mocked version of react-hook-form
+   const { useFormContext } = await import('react-hook-form');
 
    return {
        FormZone: ({ onChange }: any) => {
@@ -281,6 +285,10 @@ vi.mock('@/hooks/useRateFetching', () => {
         ContainerResolver: {},
     };
 });
+
+vi.mock('@/components/notifications/QuotationSuccessToast', () => ({
+    showQuotationSuccessToast: mockShowSuccess
+}));
 
 vi.mock('@/hooks/useContainerRefs', () => {
     const stableRefs = { 
@@ -453,6 +461,34 @@ describe('UnifiedQuoteComposer Integration (API-to-UI)', () => {
             }
             return createMockChain([]);
         });
+        
+        // Align supabase mock with the same data to satisfy loaders that use supabase
+        mockSupabase.from.mockImplementation((table: string) => {
+            if (table === 'quotes') {
+                return createMockChain({
+                    id: QUOTE_ID,
+                    quote_number: 'Q-1001',
+                    status: 'draft',
+                    tenant_id: 'test-tenant',
+                    origin: 'New York',
+                    destination: 'London',
+                    current_version_id: 'v1',
+                    cargo_details: {
+                        commodity: 'Electronics',
+                        total_weight_kg: 500,
+                        total_volume_cbm: 5,
+                        hts_code: '8500.00'
+                    }
+                });
+            } else if (table === 'quotation_versions') {
+                return createMockChain([{ id: 'v1', version_number: 1 }]);
+            } else if (table === 'quote_documents') {
+                return createMockChain([]);
+            } else if (table === 'quote_cargo_configurations') {
+                return createMockChain([]);
+            }
+            return createMockChain([]);
+        });
 
         const queryClient = new QueryClient({
             defaultOptions: { queries: { retry: false } },
@@ -571,26 +607,28 @@ describe('UnifiedQuoteComposer Integration (API-to-UI)', () => {
         await user.click(saveButton);
 
         // Verify save call
-        expect(mockScopedDb.rpc).toHaveBeenCalledWith(
-            'save_quote_atomic',
-            expect.objectContaining({
-                p_payload: expect.objectContaining({
-                    quote: expect.objectContaining({
-                        id: QUOTE_ID,
-                        status: 'draft',
-                        origin: 'New York',
-                        destination: 'London',
-                        transport_mode: 'air',
-                        cargo_details: expect.objectContaining({
-                            commodity: 'Updated Electronics',
-                            total_weight_kg: 100,
-                            total_volume_cbm: 0
-                        })
-                    }),
-                    cargo_configurations: expect.any(Array)
+        await waitFor(() => {
+            expect(mockScopedDb.rpc).toHaveBeenCalledWith(
+                'save_quote_atomic',
+                expect.objectContaining({
+                    p_payload: expect.objectContaining({
+                        quote: expect.objectContaining({
+                            id: QUOTE_ID,
+                            status: 'draft',
+                            origin: 'New York',
+                            destination: 'London',
+                            transport_mode: 'air',
+                            cargo_details: expect.objectContaining({
+                                commodity: 'Updated Electronics',
+                                total_weight_kg: 100,
+                                total_volume_cbm: 0
+                            })
+                        }),
+                        cargo_configurations: expect.any(Array)
+                    })
                 })
-            })
-        );
+            );
+        });
     });
 
     it('does not crash when save is attempted with invalid form values', async () => {

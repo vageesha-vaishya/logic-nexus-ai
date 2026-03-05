@@ -178,6 +178,19 @@ describe('QuoteDetail Reproduction', () => {
         ]);
       }
       
+      if (table === 'carrier_rates') {
+        // Provide minimal rate info used by hydration
+        return createMockChain([
+          { id: 'rate-1', currency: 'USD', carrier_id: 'carrier-1' }
+        ]);
+      }
+      
+      if (table === 'carriers') {
+        return createMockChain([
+          { id: 'carrier-1', carrier_name: 'Maersk' }
+        ]);
+      }
+      
       return createMockChain([]);
     });
 
@@ -260,7 +273,9 @@ describe('QuoteDetail Reproduction', () => {
           });
           
           // Verify composer is present
-          expect(screen.getByTestId('unified-quote-composer')).toBeInTheDocument();
+          await waitFor(() => {
+            expect(screen.getByTestId('unified-quote-composer')).toBeInTheDocument();
+          });
 
           // Simulate navigation to Quote 2
           mocks.useParams.mockReturnValue({ id: 'quote-2' });
