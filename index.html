@@ -21,6 +21,22 @@
 
   <body>
     <div id="root"></div>
+    <script>
+      (function () {
+        var g = (typeof globalThis !== 'undefined') ? globalThis : (typeof window !== 'undefined' ? window : this);
+        if (!g.crypto) g.crypto = {};
+        if (typeof g.crypto.randomUUID !== 'function') {
+          g.crypto.randomUUID = function () {
+            var s = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx';
+            return s.replace(/[xy]/g, function (c) {
+              var r = Math.random() * 16 | 0;
+              var v = c === 'x' ? r : (r & 0x3 | 0x8);
+              return v.toString(16);
+            });
+          };
+        }
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

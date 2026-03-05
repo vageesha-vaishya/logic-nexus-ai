@@ -28,7 +28,7 @@ conn.on('ready', () => {
   const buildCmd = [
     `cd ${REMOTE_APP_DIR}`,
     `test -f ${REMOTE_APP_DIR}/Dockerfile || (echo "Missing Dockerfile at ${REMOTE_APP_DIR}/Dockerfile" && exit 1)`,
-    `docker build -t logicpro-web --build-arg VITE_SUPABASE_URL='${SUPABASE_URL}' --build-arg VITE_SUPABASE_ANON_KEY='${escapedAnon}' -f ${REMOTE_APP_DIR}/Dockerfile ${REMOTE_APP_DIR}`,
+    `docker build -t logicpro-web --build-arg VITE_SUPABASE_URL='${SUPABASE_URL}' --build-arg VITE_SUPABASE_ANON_KEY='${escapedAnon}' --build-arg VITE_SUPABASE_PUBLISHABLE_KEY='${escapedAnon}' -f ${REMOTE_APP_DIR}/Dockerfile ${REMOTE_APP_DIR}`,
     `(docker ps -a --format '{{.Names}}' | grep -q '^logicpro-web$' && docker rm -f logicpro-web || true)`,
     `docker run -d --name logicpro-web --restart unless-stopped -p ${appPort}:80 logicpro-web`
   ].join(' && ');
