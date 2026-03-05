@@ -47,7 +47,7 @@ interface CarrierSelectProps {
   error?: boolean;
 }
 
-export function CarrierSelect({
+export const CarrierSelect = React.memo(function CarrierSelect({
   mode,
   value,
   onChange,
@@ -66,7 +66,8 @@ export function CarrierSelect({
 
   const carriers = React.useMemo(() => {
     if (!mode) return [];
-    return getCarriersForMode(mode);
+    const normalizedMode = normalizeModeCode(mode);
+    return getCarriersForMode(normalizedMode);
   }, [mode, getCarriersForMode]);
 
   const selectedCarrier = React.useMemo(
@@ -302,4 +303,4 @@ export function CarrierSelect({
     </AlertDialog>
     </>
   );
-}
+});

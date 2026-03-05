@@ -13,6 +13,7 @@ import { CargoItem } from '@/types/cargo';
 import { cn } from '@/lib/utils';
 import { useContainerRefs } from '@/hooks/useContainerRefs';
 import { HazmatWizard } from './HazmatWizard';
+import { v4 as uuidv4 } from 'uuid';
 
 interface SharedCargoInputProps {
   value: CargoItem;
@@ -33,7 +34,7 @@ export function SharedCargoInput({ value, onChange, onRemove, className, errors,
     if (value.type === 'container' && (!value.containerCombos || value.containerCombos.length === 0)) {
         // Create initial combo from existing single fields or defaults
         const initialCombo = {
-            id: crypto.randomUUID(),
+            id: uuidv4(),
             typeId: value.containerDetails?.typeId || containerTypes[0]?.id || '',
             sizeId: value.containerDetails?.sizeId || containerSizes.find(s => s.type_id === (value.containerDetails?.typeId || containerTypes[0]?.id))?.id || '',
             quantity: value.quantity || 1
@@ -99,7 +100,7 @@ export function SharedCargoInput({ value, onChange, onRemove, className, errors,
 
   const addCombo = () => {
     const newCombo = {
-        id: crypto.randomUUID(),
+        id: uuidv4(),
         typeId: containerTypes[0]?.id || '',
         sizeId: containerSizes.find(s => s.type_id === containerTypes[0]?.id)?.id || '',
         quantity: 1
@@ -312,12 +313,8 @@ export function SharedCargoInput({ value, onChange, onRemove, className, errors,
               onSelect={handleCommoditySelect}
               placeholder="Search commodity or HTS code..."
               className={errors?.commodity ? "border-red-500" : ""}
+              value={value.commodity?.description}
             />
-            {value.commodity?.description && (
-              <p className="text-xs text-muted-foreground truncate">
-                Selected: {value.commodity.description} {value.commodity.hts_code && `(${value.commodity.hts_code})`}
-              </p>
-            )}
           </div>
 
           {/* Secondary Fields Row */}

@@ -6,6 +6,7 @@ import { Printer, FileText, Package, Box, Calculator } from 'lucide-react';
 import { LandedCostService, LandedCostResult } from '@/services/quotation/LandedCostService';
 import { supabase } from '@/integrations/supabase/client';
 import { usePipelineInterceptor } from '@/components/debug/pipeline/usePipelineInterceptor';
+import { getSafeName } from './utils';
 
 interface DocumentPreviewProps {
   quoteData: any;
@@ -14,7 +15,7 @@ interface DocumentPreviewProps {
   templateId?: string;
 }
 
-export function DocumentPreview({ quoteData, legs, combinedCharges = [], templateId }: DocumentPreviewProps) {
+export const DocumentPreview = React.memo(function DocumentPreview({ quoteData, legs, combinedCharges = [], templateId }: DocumentPreviewProps) {
   const [landedCost, setLandedCost] = useState<LandedCostResult | null>(null);
   const [template, setTemplate] = useState<any>(null);
 
@@ -116,16 +117,6 @@ export function DocumentPreview({ quoteData, legs, combinedCharges = [], templat
     window.print();
   };
 
-  const getSafeString = (val: any, fallback: string = '') => {
-    if (val === null || val === undefined) return fallback;
-    if (typeof val === 'string') return val;
-    if (typeof val === 'number') return String(val);
-    if (typeof val === 'object') {
-       return val.name || val.code || val.details || val.description || fallback;
-    }
-    return String(val);
-  };
-
   const today = new Date().toLocaleDateString();
 
   const currency = quoteData.currency || 'USD';
@@ -138,7 +129,7 @@ export function DocumentPreview({ quoteData, legs, combinedCharges = [], templat
           type: 'Cargo',
           qty: 1,
           quantity: 1,
-          commodity: getSafeString(quoteData.commodity, 'General Cargo'),
+          commodity: getSafeName(quoteData.commodity, 'General Cargo'),
           details: `${quoteData.total_weight || 0} kg / ${quoteData.total_volume || 0} cbm`,
         },
       ];
@@ -155,7 +146,7 @@ export function DocumentPreview({ quoteData, legs, combinedCharges = [], templat
           : quoteData.total_volume || 0;
       const qty = Number(item.quantity || 1);
       const type = item.type || item.container_type || 'Cargo';
-      const commodity = item.product_name || getSafeString(quoteData.commodity, 'General Cargo');
+      const commodity = item.product_name || getSafeName(quoteData.commodity, 'General Cargo');
 
       return {
         type,
@@ -176,7 +167,7 @@ export function DocumentPreview({ quoteData, legs, combinedCharges = [], templat
         const qty = c?.sell?.quantity || 1;
         const rate = c?.sell?.rate || 0;
         const amount = qty * rate;
-        const desc = getSafeString(c?.category, 'Charge');
+        const desc = getSafeName(c?.category, 'Charge');
         const curr = c?.sell?.currency || currency;
 
         rows.push({
@@ -197,7 +188,7 @@ export function DocumentPreview({ quoteData, legs, combinedCharges = [], templat
       const qty = c?.sell?.quantity || 1;
       const rate = c?.sell?.rate || 0;
       const amount = qty * rate;
-      const desc = getSafeString(c?.description, 'Combined Charge');
+      const desc = getSafeName(c?.description, 'Combined Charge');
       const curr = c?.sell?.currency || currency;
 
       rows.push({
@@ -219,17 +210,17 @@ export function DocumentPreview({ quoteData, legs, combinedCharges = [], templat
   const buildLegsTableData = () => {
     return (legs || []).map((leg: any) => ({
       seq: typeof leg.sequence === 'number' ? leg.sequence : legs.indexOf(leg) + 1,
-      mode: getSafeString(leg.mode),
-      origin: getSafeString(
+      mode: getSafeName(leg.mode),
+      origin: getSafeName(
         leg.origin || leg.origin_location_name || leg.origin_location_id,
         'Origin'
       ),
-      destination: getSafeString(
+      destination: getSafeName(
         leg.destination || leg.destination_location_name || leg.destination_location_id,
         'Destination'
       ),
-      carrier_name: getSafeString(leg.carrierName || leg.carrier_id, 'Carrier'),
-      carrier: getSafeString(leg.carrierName || leg.carrier_id, 'Carrier'),
+      carrier_name: getSafeName(leg.carrierName || leg.carrier_id, 'Carrier'),
+      carrier: getSafeName(leg.carrierName || leg.carrier_id, 'Carrier'),
       transit_time: leg.transit_time || '',
     }));
   };
@@ -253,11 +244,11 @@ export function DocumentPreview({ quoteData, legs, combinedCharges = [], templat
         incoterms: quoteData.incoterms,
       },
       customer: {
-        name: quoteData.accounts?.name || getSafeString(quoteData.account_id, 'Client Name'),
+        name: quoteData.accounts?.name || getSafeName(quoteData.account_id, 'Client Name'),
         contact: quoteData.contacts
           ? `${quoteData.contacts.first_name || ''} ${quoteData.contacts.last_name || ''}`.trim()
-          : getSafeString(quoteData.contact_id, 'Contact Person'),
-        destination: getSafeString(quoteData.destination, ''),
+          : getSafeName(quoteData.contact_id, 'Contact Person'),
+        destination: getSafeName(quoteData.destination, ''),
       },
       shipment: {
         total_weight: quoteData.total_weight,
@@ -466,13 +457,13 @@ export function DocumentPreview({ quoteData, legs, combinedCharges = [], templat
                     <div>
                         <h3 className="text-xs font-bold uppercase text-slate-400 mb-2">Prepared For</h3>
                         <div className="text-sm font-medium">
-                            <p className="font-bold text-lg">{quoteData.accounts?.name || getSafeString(quoteData.account_id, 'Client Name')}</p>
+                            <p className="font-bold text-lg">{quoteData.accounts?.name || getSafeName(quoteData.account_id, 'Client Name')}</p>
                             <p className="text-slate-500">
                                 {quoteData.contacts 
                                     ? `${quoteData.contacts.first_name || ''} ${quoteData.contacts.last_name || ''}`.trim() 
-                                    : getSafeString(quoteData.contact_id, 'Contact Person')}
+                                    : getSafeName(quoteData.contact_id, 'Contact Person')}
                             </p>
-                            <p className="text-slate-500 mt-1">{getSafeString(quoteData.destination, 'Client Address')}</p>
+                            <p className="text-slate-500 mt-1">{getSafeName(quoteData.destination, 'Client Address')}</p>
                         </div>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
@@ -482,11 +473,11 @@ export function DocumentPreview({ quoteData, legs, combinedCharges = [], templat
                         </div>
                         <div>
                             <h3 className="text-xs font-bold uppercase text-slate-400 mb-2">Valid Until</h3>
-                            <p className="text-sm font-medium">{getSafeString(quoteData.validUntil, '30 Days from Date')}</p>
+                            <p className="text-sm font-medium">{getSafeName(quoteData.validUntil, '30 Days from Date')}</p>
                         </div>
                         <div>
                             <h3 className="text-xs font-bold uppercase text-slate-400 mb-2">Incoterms</h3>
-                            <p className="text-sm font-medium">{getSafeString(quoteData.incoterms, 'Ex Works (EXW)')}</p>
+                            <p className="text-sm font-medium">{getSafeName(quoteData.incoterms, 'Ex Works (EXW)')}</p>
                         </div>
                         <div>
                              <h3 className="text-xs font-bold uppercase text-slate-400 mb-2">Currency</h3>
@@ -510,7 +501,7 @@ export function DocumentPreview({ quoteData, legs, combinedCharges = [], templat
                          </div>
                          <div>
                             <span className="text-slate-500 block text-xs">Description</span>
-                            <span className="font-medium">{getSafeString(quoteData.commodity, 'General Cargo')}</span>
+                            <span className="font-medium">{getSafeName(quoteData.commodity, 'General Cargo')}</span>
                          </div>
                     </div>
                 </div>
@@ -536,7 +527,7 @@ export function DocumentPreview({ quoteData, legs, combinedCharges = [], templat
                          </div>
                          <div>
                             <span className="text-blue-500 block text-xs">Commodity</span>
-                            <span className="font-medium text-blue-900">{getSafeString(quoteData.commodity, 'General Cargo')}</span>
+                            <span className="font-medium text-blue-900">{getSafeName(quoteData.commodity, 'General Cargo')}</span>
                          </div>
                     </div>
                 </div>
@@ -585,14 +576,14 @@ export function DocumentPreview({ quoteData, legs, combinedCharges = [], templat
                         {legs.map((leg, i) => (
                              <div key={leg.id} className="flex items-center text-sm border p-3 rounded-md">
                                 <span className="font-bold text-slate-400 mr-4 w-6">0{i+1}</span>
-                                <span className="font-semibold uppercase w-24 px-2 py-1 bg-slate-100 rounded text-center text-xs mr-4">{getSafeString(leg.mode)}</span>
+                                <span className="font-semibold uppercase w-24 px-2 py-1 bg-slate-100 rounded text-center text-xs mr-4">{getSafeName(leg.mode)}</span>
                                 <div className="flex-1 flex items-center gap-2">
-                                    <span className="font-medium">{getSafeString(leg.origin || leg.origin_location_id, 'Origin')}</span>
+                                    <span className="font-medium">{getSafeName(leg.origin || leg.origin_location_id, 'Origin')}</span>
                                     <span className="text-slate-400">→</span>
-                                    <span className="font-medium">{getSafeString(leg.destination || leg.destination_location_id, 'Destination')}</span>
+                                    <span className="font-medium">{getSafeName(leg.destination || leg.destination_location_id, 'Destination')}</span>
                                 </div>
                                 <div className="text-xs text-slate-500">
-                                    {props?.fields?.includes('flight_no') && leg.flight_number ? `Flight: ${leg.flight_number}` : getSafeString(leg.carrierName, 'TBD')}
+                                    {props?.fields?.includes('flight_no') && leg.flight_number ? `Flight: ${leg.flight_number}` : getSafeName(leg.carrierName, 'TBD')}
                                 </div>
                              </div>
                         ))}
@@ -604,11 +595,11 @@ export function DocumentPreview({ quoteData, legs, combinedCharges = [], templat
                  <div className="mb-8 grid grid-cols-2 gap-6 bg-slate-50 p-4 rounded border">
                     <div>
                         <h3 className="font-bold text-xs uppercase text-slate-400 mb-2">Pickup Address</h3>
-                        <p className="text-sm">{getSafeString(legs[0]?.origin, 'Origin Location')}</p>
+                        <p className="text-sm">{getSafeName(legs[0]?.origin, 'Origin Location')}</p>
                     </div>
                     <div>
                         <h3 className="font-bold text-xs uppercase text-slate-400 mb-2">Delivery Address</h3>
-                        <p className="text-sm">{getSafeString(legs[legs.length-1]?.destination, 'Destination Location')}</p>
+                        <p className="text-sm">{getSafeName(legs[legs.length-1]?.destination, 'Destination Location')}</p>
                     </div>
                  </div>
               );
@@ -648,8 +639,8 @@ export function DocumentPreview({ quoteData, legs, combinedCharges = [], templat
                             {legs.flatMap(l => l.charges).map((c: any, i: number) => (
                                 <tr key={i}>
                                     <td className="p-3">
-                                        <div className="font-medium">{getSafeString(c.category, 'Charge')}</div>
-                                        <div className="text-xs text-slate-500">{getSafeString(c.note || c.name, '-')}</div>
+                                        <div className="font-medium">{getSafeName(c.category, 'Charge')}</div>
+                                        <div className="text-xs text-slate-500">{getSafeName(c.note || c.name, '-')}</div>
                                     </td>
                                     {showCols.includes('transit_time') && <td className="p-3 text-center text-slate-500">{legs.find(l => l.id === c.leg_id)?.transit_time || '-'}</td>}
                                     <td className="p-3 text-right text-slate-600">{c.sell?.quantity || 1}</td>
@@ -661,8 +652,8 @@ export function DocumentPreview({ quoteData, legs, combinedCharges = [], templat
                             {type === 'rates_table' && combinedCharges.map((c: any, i: number) => (
                                 <tr key={`combined-${i}`}>
                                     <td className="p-3">
-                                        <div className="font-medium">{getSafeString(c.description, 'Combined Charge')}</div>
-                                        <div className="text-xs text-slate-500">{getSafeString(c.category, 'Additional')}</div>
+                                        <div className="font-medium">{getSafeName(c.description, 'Combined Charge')}</div>
+                                        <div className="text-xs text-slate-500">{getSafeName(c.category, 'Additional')}</div>
                                     </td>
                                     {showCols.includes('transit_time') && <td className="p-3 text-center">-</td>}
                                     <td className="p-3 text-right text-slate-600">{c.sell?.quantity || 1}</td>
@@ -761,7 +752,7 @@ export function DocumentPreview({ quoteData, legs, combinedCharges = [], templat
                 <div className="flex justify-between items-start border-b pb-6 mb-6">
                     <div>
                         <h1 className="text-3xl font-bold text-slate-800">QUOTATION</h1>
-                        <p className="text-slate-500 mt-1">Reference: {getSafeString(quoteData.reference, 'DRAFT')}</p>
+                        <p className="text-slate-500 mt-1">Reference: {getSafeName(quoteData.reference, 'DRAFT')}</p>
                     </div>
                     {(!template || template.header?.show_logo !== false) && (
                         <div className="text-right">
@@ -849,7 +840,7 @@ export function DocumentPreview({ quoteData, legs, combinedCharges = [], templat
                         <div className="font-medium text-sm">
                             {quoteData.origin ? (
                                 <>
-                                    <p>Shipper at {getSafeString(quoteData.origin)}</p>
+                                    <p>Shipper at {getSafeName(quoteData.origin)}</p>
                                     <p className="text-slate-500 text-xs mt-1">Address on file</p>
                                 </>
                             ) : 'TBD'}
@@ -857,7 +848,7 @@ export function DocumentPreview({ quoteData, legs, combinedCharges = [], templat
                     </div>
                     <div className="border-b border-slate-300 p-4 min-h-[120px]">
                         <span className="block font-bold text-xs uppercase text-slate-400 mb-1">Booking No.</span>
-                        <p className="font-mono text-lg">{getSafeString(quoteData.reference, 'DRAFT-001')}</p>
+                        <p className="font-mono text-lg">{getSafeName(quoteData.reference, 'DRAFT-001')}</p>
                         <div className="mt-4">
                             <span className="block font-bold text-xs uppercase text-slate-400 mb-1">Export References</span>
                             <p className="text-sm">Ref: {new Date().getFullYear()}-{Math.floor(Math.random()*1000)}</p>
@@ -869,7 +860,7 @@ export function DocumentPreview({ quoteData, legs, combinedCharges = [], templat
                         <div className="font-medium text-sm">
                             {quoteData.destination ? (
                                 <>
-                                    <p>Consignee at {getSafeString(quoteData.destination)}</p>
+                                    <p>Consignee at {getSafeName(quoteData.destination)}</p>
                                     <p className="text-slate-500 text-xs mt-1">Address on file</p>
                                 </>
                             ) : 'TBD'}
@@ -890,14 +881,14 @@ export function DocumentPreview({ quoteData, legs, combinedCharges = [], templat
                     </div>
                     <div className="grid grid-cols-4 min-h-[200px] text-sm">
                          <div className="p-4 border-r border-slate-300 font-mono">
-                            {getSafeString(quoteData.reference, 'N/A')}<br/>
+                            {getSafeName(quoteData.reference, 'N/A')}<br/>
                             1/1
                          </div>
                          <div className="p-4 border-r border-slate-300 col-span-2">
-                            <p className="font-bold mb-2">{getSafeString(quoteData.commodity, 'General Cargo')}</p>
+                            <p className="font-bold mb-2">{getSafeName(quoteData.commodity, 'General Cargo')}</p>
                             <p className="text-xs text-slate-500">
                                 Total Volume: {quoteData.total_volume || '0'} CBM<br/>
-                                Transport Mode: {getSafeString(quoteData.mode).toUpperCase() || 'OCEAN'}
+                                Transport Mode: {getSafeName(quoteData.mode).toUpperCase() || 'OCEAN'}
                             </p>
                          </div>
                          <div className="p-4 font-mono text-right">
@@ -996,4 +987,4 @@ export function DocumentPreview({ quoteData, legs, combinedCharges = [], templat
       </DialogContent>
     </Dialog>
   );
-}
+});

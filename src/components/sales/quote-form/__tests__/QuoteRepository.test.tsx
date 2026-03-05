@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, Mock } from 'vitest';
 import { buildMissingOptionsOrChargesAnomaly, useQuoteRepositoryForm } from '../useQuoteRepository';
 import { renderHook } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -340,7 +340,7 @@ describe('useQuoteRepository', () => {
   it('validateSavedQuote triggers toast and anomaly update when options or charges are missing', async () => {
     process.env.NODE_ENV = 'development';
 
-    const mockFlag = useAppFeatureFlag as unknown as vi.Mock;
+    const mockFlag = useAppFeatureFlag as unknown as Mock;
     mockFlag.mockReturnValue({
       enabled: false,
       isLoading: false,
@@ -392,7 +392,7 @@ describe('useQuoteRepository', () => {
   it('uses phase 2 guard feature flag to escalate anomaly severity to ERROR', async () => {
     process.env.NODE_ENV = 'development';
 
-    const mockFlag = useAppFeatureFlag as unknown as vi.Mock;
+    const mockFlag = useAppFeatureFlag as unknown as Mock;
     mockFlag.mockReturnValue({
       enabled: true,
       isLoading: false,
@@ -433,6 +433,31 @@ describe('useQuoteRepository', () => {
       quote_id: 'new-quote-id',
       severity: 'ERROR',
     });
+  });
+
+  it('sanitizes circular references from payload before calling RPC', async () => {
+    const mockForm = { reset: vi.fn() } as any;
+    const { result } = renderHook(() => useQuoteRepositoryForm({ form: mockForm }), { wrapper });
+
+    const circularObj: any = { name: 'Circular' };
+    circularObj.self = circularObj;
+
+    const quoteData = {
+      title: 'Circular Quote',
+      items: [],
+      shipping_address: circularObj,
+    } as any;
+
+    await result.current.saveQuote({ data: quoteData });
+
+    expect(mockRpc).toHaveBeenCalledWith('save_quote_atomic', expect.objectContaining({
+        p_payload: expect.objectContaining({
+            quote: expect.objectContaining({
+                title: 'Circular Quote',
+                shipping_address: { name: 'Circular' }
+            })
+        })
+    }));
   });
 
   it('buildMissingOptionsOrChargesAnomaly builds enriched anomaly payload shape', () => {

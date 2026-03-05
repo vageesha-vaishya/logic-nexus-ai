@@ -1,12 +1,12 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, Globe, Loader2 } from 'lucide-react';
+import { LegChargesTabContent } from './LegChargesTabContent';
 import { VirtualChargesList } from './VirtualChargesList';
-import { ChargeRow } from './ChargeRow';
 import { HelpTooltip } from './HelpTooltip';
 import { useQuoteStore } from './store/QuoteStore';
 import { Leg } from './store/types';
@@ -15,8 +15,10 @@ import { useAiAdvisor } from '@/hooks/useAiAdvisor';
 import { useToast } from '@/hooks/use-toast';
 import { PricingService } from '@/services/pricing.service';
 import { mapOptionToQuote } from '@/lib/quote-mapper';
+import { normalizeModeCode } from '@/lib/mode-utils';
 import { calculateChargeableWeight, TransportMode } from '@/utils/freightCalculations';
 import { logger } from '@/lib/logger';
+import { getSafeName } from './utils';
 
 export function ChargesManagementStep() {
   const { state, dispatch } = useQuoteStore();
@@ -37,6 +39,26 @@ export function ChargesManagementStep() {
     referenceData
   } = state;
 
+  const autoMargin = quoteData.autoMargin || false;
+  const marginPercent = quoteData.marginPercent || 15;
+
+  // Refs for stable callbacks
+  const legsRef = useRef(legs);
+  const combinedChargesRef = useRef(combinedCharges);
+  const autoMarginRef = useRef(autoMargin);
+  const marginPercentRef = useRef(marginPercent);
+  const quoteDataRef = useRef(quoteData);
+  const referenceDataRef = useRef(referenceData);
+
+  useEffect(() => {
+    legsRef.current = legs;
+    combinedChargesRef.current = combinedCharges;
+    autoMarginRef.current = autoMargin;
+    marginPercentRef.current = marginPercent;
+    quoteDataRef.current = quoteData;
+    referenceDataRef.current = referenceData;
+  }, [legs, combinedCharges, autoMargin, marginPercent, quoteData, referenceData]);
+
   const isPricingCalculating = isGlobalLoading || fetchingRatesFor !== null;
 
   const {
@@ -46,27 +68,11 @@ export function ChargesManagementStep() {
     serviceTypes
   } = referenceData;
 
-  if (!legs || legs.length === 0) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Charges Management</CardTitle>
-          <CardDescription>Configure charges for each leg of the journey.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col items-center justify-center p-8 text-center text-muted-foreground border-2 border-dashed rounded-lg">
-            <p className="mb-2 font-medium">No Transport Legs Configured</p>
-            <p className="text-sm">Please go back to the "Transport Legs" step and add at least one leg to configure charges.</p>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
+  const handleFetchRates = useCallback(async (legId: string) => {
+    const legs = legsRef.current;
+    const quoteData = quoteDataRef.current;
+    const { chargeCategories, chargeBases, currencies } = referenceDataRef.current;
 
-  const autoMargin = quoteData.autoMargin || false;
-  const marginPercent = quoteData.marginPercent || 15;
-
-  const handleFetchRates = async (legId: string) => {
     const leg = legs.find(l => l.id === legId);
     if (!leg) return;
 
@@ -84,7 +90,7 @@ export function ChargesManagementStep() {
         origin: leg.origin,
         destination: leg.destination,
         commodity: quoteData.commodity || 'General Cargo',
-        mode: leg.mode.toLowerCase(),
+        mode: normalizeModeCode(leg.mode || ''),
         // Add context if available
         container_type: quoteData.container_type,
         weight: quoteData.total_weight,
@@ -145,28 +151,28 @@ export function ChargesManagementStep() {
       const newCharges = await Promise.all(extractedCharges.map(async (chg) => {
         // Find matching IDs from master data
         const catName = chg.category || chg.name || 'Freight';
-        const cat = chargeCategories.find(c => 
+        const cat = chargeCategories.find((c: any) => 
           (c.name && c.name.toLowerCase() === catName.toLowerCase()) || 
           (c.code && c.code.toLowerCase() === catName.toLowerCase())
-        ) || chargeCategories.find(c => c.code === 'FRT') || chargeCategories[0];
+        ) || chargeCategories.find((c: any) => c.code === 'FRT') || chargeCategories[0];
 
         // Basis mapping
         const basisName = chg.unit || 'per_shipment';
         // Try to match basis code or name
-        let basis = chargeBases.find(b => 
+        let basis = chargeBases.find((b: any) => 
           (b.code && b.code.toLowerCase() === basisName.toLowerCase()) ||
           (b.name && b.name.toLowerCase() === basisName.toLowerCase())
         );
         
         // Fallback for common units
         if (!basis) {
-            if (basisName.includes('kg')) basis = chargeBases.find(b => b.code === 'kg');
-            else if (basisName.includes('cbm')) basis = chargeBases.find(b => b.code === 'cbm');
-            else if (basisName.includes('cont') || basisName.includes('box')) basis = chargeBases.find(b => b.code === 'container');
-            else basis = chargeBases.find(b => b.code === 'shipment'); // Default
+            if (basisName.includes('kg')) basis = chargeBases.find((b: any) => b.code === 'kg');
+            else if (basisName.includes('cbm')) basis = chargeBases.find((b: any) => b.code === 'cbm');
+            else if (basisName.includes('cont') || basisName.includes('box')) basis = chargeBases.find((b: any) => b.code === 'container');
+            else basis = chargeBases.find((b: any) => b.code === 'shipment'); // Default
         }
 
-        const curr = currencies.find(c => c.code === (chg.currency || 'USD')) || currencies[0];
+        const curr = currencies.find((c: any) => c.code === (chg.currency || 'USD')) || currencies[0];
         
         // Calculate Buy/Sell
         // If AI provides specific buy/sell, use them. Otherwise use standard margin logic.
@@ -208,7 +214,9 @@ export function ChargesManagementStep() {
       }));
 
       // 6. Update State (using smart merge)
-      const updatedLegs = legs.map(l => {
+      // Use latest legs ref again to be safe
+      const currentLegs = legsRef.current;
+      const updatedLegs = currentLegs.map(l => {
         if (l.id === legId) {
           // Merge new charges with existing ones to prevent duplicates
           const updatedCharges = [...l.charges];
@@ -270,22 +278,23 @@ export function ChargesManagementStep() {
       dispatch({ type: 'SET_LOADING', payload: false });
       setFetchingRatesFor(null);
     }
-  };
+  }, [dispatch, invokeAiAdvisor, toast, pricingService]);
 
-  const handleAutoMarginChange = (enabled: boolean) => {
+  const handleAutoMarginChange = useCallback((enabled: boolean) => {
     dispatch({ type: 'UPDATE_QUOTE_DATA', payload: { autoMargin: enabled } });
-  };
+  }, [dispatch]);
 
-  const handleMarginPercentChange = (percent: number) => {
+  const handleMarginPercentChange = useCallback((percent: number) => {
     dispatch({ type: 'UPDATE_QUOTE_DATA', payload: { marginPercent: percent } });
-  };
+  }, [dispatch]);
 
   // Leg Charge Handlers
-  const handleAddCharge = (legId: string) => {
-    const leg = legs.find(l => l.id === legId);
+  const handleAddCharge = useCallback((legId: string) => {
+    const leg = legsRef.current.find(l => l.id === legId);
     if (!leg) return;
 
     // Default values from reference data
+    const { currencies, chargeCategories, chargeBases } = referenceDataRef.current;
     const defaultCurrency = currencies.find(c => c.code === 'USD') || currencies[0];
     const defaultCategory = chargeCategories.find(c => c.code === 'FRT') || chargeCategories[0];
     const defaultBasis = chargeBases.find(b => b.code === 'shipment') || chargeBases[0];
@@ -303,10 +312,10 @@ export function ChargesManagementStep() {
 
     const updatedCharges = [...(leg.charges || []), newCharge];
     dispatch({ type: 'UPDATE_LEG', payload: { id: legId, updates: { charges: updatedCharges } } });
-  };
+  }, [dispatch]);
 
-  const handleUpdateCharge = (legId: string, chargeIdx: number, field: string, value: any) => {
-    const leg = legs.find(l => l.id === legId);
+  const handleUpdateCharge = useCallback((legId: string, chargeIdx: number, field: string, value: any) => {
+    const leg = legsRef.current.find(l => l.id === legId);
     if (!leg) return;
 
     const updatedCharges = [...(leg.charges || [])];
@@ -325,16 +334,16 @@ export function ChargesManagementStep() {
 
     dispatch({ type: 'UPDATE_LEG', payload: { id: legId, updates: { charges: updatedCharges } } });
 
-    if (autoMargin && marginPercent > 0 && field.startsWith('buy.')) {
+    if (autoMarginRef.current && marginPercentRef.current > 0 && field.startsWith('buy.')) {
       const buyRate = field === 'buy.rate' ? Number(value) : Number(existing?.buy?.rate || 0);
       const timerKey = `leg-${legId}-charge-${chargeIdx}`;
       if (debounceTimers.current.has(timerKey)) {
         clearTimeout(debounceTimers.current.get(timerKey)!);
       }
       const timer = setTimeout(() => {
-        pricingService.calculateFinancials(buyRate, Number(marginPercent), true)
+        pricingService.calculateFinancials(buyRate, Number(marginPercentRef.current), true)
           .then(result => {
-            const latestLeg = (state.legs || []).find(l => l.id === legId);
+            const latestLeg = (legsRef.current || []).find(l => l.id === legId);
             if (!latestLeg) return;
             const nextCharges = [...(latestLeg.charges || [])];
             if (!nextCharges[chargeIdx]) return;
@@ -354,53 +363,61 @@ export function ChargesManagementStep() {
       }, 300);
       debounceTimers.current.set(timerKey, timer);
     }
-  };
+  }, [dispatch, pricingService]);
 
-  const handleRemoveCharge = (legId: string, chargeIdx: number) => {
+  const handleRemoveCharge = useCallback((legId: string, chargeIdx: number) => {
     dispatch({ type: 'REMOVE_LEG_CHARGE', payload: { legId, chargeIdx } });
-  };
+  }, [dispatch]);
 
   // Combined Charge Handlers
-  const handleAddCombinedCharge = () => {
+  const handleAddCombinedCharge = useCallback(() => {
+    // Default values from reference data
+    const { currencies, chargeCategories, chargeBases } = referenceDataRef.current;
+    const defaultCurrency = currencies.find(c => c.code === 'USD') || currencies[0];
+    const defaultCategory = chargeCategories.find(c => c.code === 'FRT') || chargeCategories[0];
+    const defaultBasis = chargeBases.find(b => b.code === 'shipment') || chargeBases[0];
+
     const newCharge = {
       id: crypto.randomUUID(),
-      category: '',
-      basis: 'Per Shipment',
-      unit: 'Shipment',
-      currency: 'USD',
+      category_id: defaultCategory?.id || '',
+      basis_id: defaultBasis?.id || '',
+      unit: defaultBasis?.code || 'shipment',
+      currency_id: defaultCurrency?.id || '',
       buy: { quantity: 1, rate: 0, amount: 0, currency: 'USD' },
       sell: { quantity: 1, rate: 0, amount: 0, currency: 'USD' }
     };
     dispatch({ type: 'ADD_COMBINED_CHARGE', payload: newCharge });
-  };
+  }, [dispatch]);
 
-  const handleUpdateCombinedCharge = (chargeIdx: number, field: string, value: any) => {
+  const handleUpdateCombinedCharge = useCallback((chargeIdx: number, field: string, value: any) => {
     // We need the current charge to update it
-    const charge = combinedCharges[chargeIdx];
+    const charge = combinedChargesRef.current[chargeIdx];
     if (charge) {
        const updatedCharge = { ...charge, [field]: value };
        dispatch({ type: 'UPDATE_COMBINED_CHARGE', payload: { index: chargeIdx, charge: updatedCharge } });
     }
-  };
+  }, [dispatch]);
 
-  const handleRemoveCombinedCharge = (chargeIdx: number) => {
+  const handleRemoveCombinedCharge = useCallback((chargeIdx: number) => {
     dispatch({ type: 'REMOVE_COMBINED_CHARGE', payload: chargeIdx });
-  };
+  }, [dispatch]);
 
-  // Helper for rendering
-  const getSafeName = (name: any) => {
-    if (typeof name === 'string') return name;
-    return String(name || '');
-  };
+  const handleOpenBasisModal = useCallback((legId: string, chargeIdx: number) => {
+    dispatch({ type: 'OPEN_BASIS_MODAL', payload: { target: { type: 'leg', legId, chargeIdx } } });
+  }, [dispatch]);
 
-  const calculateTotals = (charges: any[]) => {
+  const handleOpenCombinedBasisModal = useCallback((chargeIdx: number) => {
+    dispatch({ type: 'OPEN_BASIS_MODAL', payload: { target: { type: 'combined', chargeIdx } } });
+  }, [dispatch]);
+
+  const calculateTotals = useCallback((charges: any[]) => {
     return charges.reduce((acc, charge) => ({
       buy: acc.buy + ((charge.buy?.quantity || 0) * (charge.buy?.rate || 0)),
       sell: acc.sell + ((charge.sell?.quantity || 0) * (charge.sell?.rate || 0))
     }), { buy: 0, sell: 0 });
-  };
+  }, []);
 
-  const renderTotals = (totals: { buy: number; sell: number }, margin: number, marginPercent: string) => (
+  const renderTotals = useCallback((totals: { buy: number; sell: number }, margin: number, marginPercent: string) => (
     <div className="bg-muted/30 font-semibold border-t p-2 flex items-center gap-2 text-sm mt-2">
       <div className="flex-1 text-right pr-2">Totals:</div>
       <div className="w-[120px] text-right px-2 border-r border-border/50">
@@ -416,15 +433,22 @@ export function ChargesManagementStep() {
         {margin.toFixed(2)} ({marginPercent}%)
       </div>
     </div>
-  );
+  ), []);
 
   if (!legs || legs.length === 0) {
     return (
       <Card>
+        <CardHeader>
+          <CardTitle>Charges Management</CardTitle>
+          <CardDescription>Configure charges for each leg of the journey.</CardDescription>
+        </CardHeader>
         <CardContent className="py-12">
-          <p className="text-center text-muted-foreground">
-            Please configure at least one leg before managing charges.
-          </p>
+          <div className="flex flex-col items-center justify-center p-8 text-center text-muted-foreground border-2 border-dashed rounded-lg">
+            <p className="mb-2 font-medium">No Transport Legs Configured</p>
+            <p className="text-sm">
+              Please go back to the "Transport Legs" step and add at least one leg to configure charges.
+            </p>
+          </div>
         </CardContent>
       </Card>
     );
@@ -498,10 +522,6 @@ export function ChargesManagementStep() {
           </TabsList>
 
           {legs.map((leg, legIdx) => {
-            const totals = calculateTotals(leg.charges || []);
-            const margin = totals.sell - totals.buy;
-            const marginPercentVal = totals.sell > 0 ? ((margin / totals.sell) * 100).toFixed(2) : '0.00';
-
             const serviceType = serviceTypes.find((st) =>
               st.id === leg.serviceTypeId ||
               st.id === leg.mode ||
@@ -511,62 +531,23 @@ export function ChargesManagementStep() {
 
             return (
               <TabsContent key={leg.id} value={leg.id} className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-semibold text-lg">
-                      Leg {legIdx + 1}: {getSafeName(serviceType?.name) || leg.mode.toUpperCase()}
-                    </h4>
-                    <p className="text-sm text-muted-foreground">
-                      {leg.origin || 'Origin'} → {leg.destination || 'Destination'}
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button 
-                      onClick={() => handleFetchRates(leg.id)} 
-                      size="sm" 
-                      variant="outline"
-                      disabled={fetchingRatesFor === leg.id}
-                    >
-                      {fetchingRatesFor === leg.id ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Fetching...
-                        </>
-                      ) : (
-                        <>
-                          <Globe className="mr-2 h-4 w-4" />
-                          Fetch Rates
-                        </>
-                      )}
-                    </Button>
-                    <Button onClick={() => handleAddCharge(leg.id)} size="sm">
-                      <Plus className="mr-2 h-4 w-4" />
-                      Add Charge
-                    </Button>
-                  </div>
-                </div>
-
-                {leg.charges && leg.charges.length > 0 ? (
-                  <div>
-                    <VirtualChargesList
-                      charges={leg.charges}
-                      categories={chargeCategories}
-                      bases={chargeBases}
-                      currencies={currencies}
-                      onUpdate={(idx, field, value) => handleUpdateCharge(leg.id, idx, field, value)}
-                      onRemove={(idx) => handleRemoveCharge(leg.id, idx)}
-                      onConfigureBasis={(idx) => dispatch({ type: 'OPEN_BASIS_MODAL', payload: { target: { type: 'leg', legId: leg.id, chargeIdx: idx } } })}
-                      height={400}
-                    />
-                    {renderTotals(totals, margin, marginPercentVal)}
-                  </div>
-                ) : (
-                  <div className="text-center py-16 text-muted-foreground border rounded-lg bg-muted/20">
-                    <Plus className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <p className="text-base font-medium">No charges added yet</p>
-                    <p className="text-sm mt-1">Click "Add Charge" to begin adding costs for this leg</p>
-                  </div>
-                )}
+                <LegChargesTabContent
+                  leg={leg}
+                  legIndex={legIdx}
+                  serviceType={serviceType}
+                  chargeCategories={chargeCategories}
+                  chargeBases={chargeBases}
+                  currencies={currencies}
+                  isFetching={fetchingRatesFor === leg.id}
+                  onFetchRates={handleFetchRates}
+                  onAddCharge={handleAddCharge}
+                  onUpdateCharge={handleUpdateCharge}
+                  onRemoveCharge={handleRemoveCharge}
+                  onOpenBasisModal={handleOpenBasisModal}
+                  calculateTotals={calculateTotals}
+                  renderTotals={renderTotals}
+                  getSafeName={getSafeName}
+                />
               </TabsContent>
             );
           })}
@@ -590,59 +571,35 @@ export function ChargesManagementStep() {
             </div>
 
             {combinedCharges && combinedCharges.length > 0 ? (
-              <div className="overflow-x-auto border rounded-lg shadow-sm">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/50">
-                    <tr>
-                      <th className="p-3 text-left font-semibold">Category</th>
-                      <th className="p-3 text-left font-semibold">Basis</th>
-                      <th className="p-3 text-left font-semibold">Unit</th>
-                      <th className="p-3 text-left font-semibold">Currency</th>
-                      <th className="p-3 text-right font-semibold">Buy Qty</th>
-                      <th className="p-3 text-right font-semibold">Buy Rate</th>
-                      <th className="p-3 text-right font-semibold">Buy Amt</th>
-                      <th className="p-3 text-center font-semibold">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {combinedCharges.map((charge, idx) => (
-                      <ChargeRow
-                        key={charge.id || `combined-${idx}`}
-                        charge={charge}
-                        categories={chargeCategories}
-                        bases={chargeBases}
-                        currencies={currencies}
-                        onUpdate={(field, value) => handleUpdateCombinedCharge(idx, field, value)}
-                        onRemove={() => handleRemoveCombinedCharge(idx)}
-                        onConfigureBasis={() => dispatch({ type: 'OPEN_BASIS_MODAL', payload: { target: { type: 'combined', chargeIdx: idx } } })}
-                        showBuySell={true}
-                      />
-                    ))}
-                  </tbody>
-                  <tfoot className="bg-muted/30 font-semibold border-t-2">
-                    <tr>
-                      <td colSpan={8} className="p-3">
-                        <div className="flex items-center justify-end gap-6">
-                          <div className="flex items-center gap-2">
-                             <span className="text-muted-foreground">Total Buy:</span>
-                             <span>{calculateTotals(combinedCharges).buy.toFixed(2)}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                             <span className="text-muted-foreground">Total Sell:</span>
-                             <span>{calculateTotals(combinedCharges).sell.toFixed(2)}</span>
-                          </div>
-                          <div className={`flex items-center gap-2 ${(calculateTotals(combinedCharges).sell - calculateTotals(combinedCharges).buy) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-destructive'}`}>
-                             <span className="text-muted-foreground">Margin:</span>
-                             <span>
-                               {(calculateTotals(combinedCharges).sell - calculateTotals(combinedCharges).buy).toFixed(2)} 
-                               {calculateTotals(combinedCharges).sell > 0 ? ` (${(( (calculateTotals(combinedCharges).sell - calculateTotals(combinedCharges).buy) / calculateTotals(combinedCharges).sell ) * 100).toFixed(2)}%)` : ' (0.00%)'}
-                             </span>
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
+              <div className="space-y-4">
+                <VirtualChargesList
+                  charges={combinedCharges}
+                  categories={chargeCategories}
+                  bases={chargeBases}
+                  currencies={currencies}
+                  onUpdate={handleUpdateCombinedCharge}
+                  onRemove={handleRemoveCombinedCharge}
+                  onConfigureBasis={handleOpenCombinedBasisModal}
+                  height="auto"
+                />
+                
+                <div className="bg-muted/30 font-semibold border rounded-lg p-3 flex items-center justify-end gap-6 text-sm">
+                  <div className="flex items-center gap-2">
+                     <span className="text-muted-foreground">Total Buy:</span>
+                     <span>{calculateTotals(combinedCharges).buy.toFixed(2)}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                     <span className="text-muted-foreground">Total Sell:</span>
+                     <span>{calculateTotals(combinedCharges).sell.toFixed(2)}</span>
+                  </div>
+                  <div className={`flex items-center gap-2 ${(calculateTotals(combinedCharges).sell - calculateTotals(combinedCharges).buy) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-destructive'}`}>
+                     <span className="text-muted-foreground">Margin:</span>
+                     <span>
+                       {(calculateTotals(combinedCharges).sell - calculateTotals(combinedCharges).buy).toFixed(2)} 
+                       {calculateTotals(combinedCharges).sell > 0 ? ` (${(( (calculateTotals(combinedCharges).sell - calculateTotals(combinedCharges).buy) / calculateTotals(combinedCharges).sell ) * 100).toFixed(2)}%)` : ' (0.00%)'}
+                     </span>
+                  </div>
+                </div>
               </div>
             ) : (
               <div className="text-center py-16 text-muted-foreground border rounded-lg bg-muted/20">

@@ -20,6 +20,23 @@ if (!supabaseUrl || !supabaseKey) {
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+function sanitizePayload<T>(payload: T): T {
+  const seen = new WeakSet<object>();
+  const sanitize = (obj: any): any => {
+    if (obj === null || typeof obj !== 'object') return obj;
+    if (seen.has(obj)) return undefined;
+    seen.add(obj);
+    if (Array.isArray(obj)) return obj.map(sanitize).filter(v => v !== undefined);
+    const out: any = {};
+    for (const [k, v] of Object.entries(obj)) {
+      const sv = sanitize(v);
+      if (sv !== undefined) out[k] = sv;
+    }
+    return out;
+  };
+  return sanitize(payload);
+}
+
 async function verifyQuoteHydration() {
   console.log('Verifying Quote Hydration Data Flow...');
 
@@ -96,7 +113,7 @@ async function verifyQuoteHydration() {
   };
 
   console.log('Saving quote via save_quote_atomic...');
-  const { data: saveResult, error: saveError } = await supabase.rpc('save_quote_atomic', { p_payload: payload });
+  const { data: saveResult, error: saveError } = await supabase.rpc('save_quote_atomic', { p_payload: sanitizePayload(payload) });
 
   if (saveError) {
     console.error('Error saving quote:', saveError);

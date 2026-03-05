@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, memo } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Package, LayoutList, Columns, Sparkles, AlertTriangle, HelpCircle, Plus, Info } from 'lucide-react';
@@ -27,7 +27,7 @@ interface ResultsZoneProps {
   onRenameOption?: (optionId: string, newName: string) => void;
 }
 
-export function ResultsZone({
+export const ResultsZone = memo(function ResultsZone({
   results,
   loading = false,
   smartMode = false,
@@ -242,4 +242,4 @@ export function ResultsZone({
       )}
     </div>
   );
-}
+});

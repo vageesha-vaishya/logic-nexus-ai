@@ -54,7 +54,7 @@ BEGIN
     account_id, contact_id, opportunity_id, status, valid_until, 
     pickup_date, delivery_deadline, vehicle_type, special_handling, 
     tax_percent, shipping_amount, terms_conditions, notes, 
-    billing_address, shipping_address, tenant_id, franchise_id, regulatory_data,
+    billing_address, shipping_address, tenant_id, franchise_id, regulatory_data, cargo_details,
     created_at, updated_at
   )
   VALUES (
@@ -88,6 +88,7 @@ BEGIN
     v_tenant_id,
     v_franchise_id,
     COALESCE(v_quote_data -> 'regulatory_data', '{}'::jsonb),
+    COALESCE(v_quote_data -> 'cargo_details', '{}'::jsonb),
     COALESCE((v_quote_data ->> 'created_at')::timestamptz, now()),
     now()
   )
@@ -121,6 +122,7 @@ BEGIN
     tenant_id = EXCLUDED.tenant_id,
     franchise_id = EXCLUDED.franchise_id,
     regulatory_data = EXCLUDED.regulatory_data,
+    cargo_details = EXCLUDED.cargo_details,
     updated_at = now()
   RETURNING id INTO v_quote_id;
 
@@ -454,93 +456,6 @@ BEGIN
                   v_option_total_amount := v_option_total_amount + v_amount;
                 END IF;
               END LOOP;
-            END IF;
-          END LOOP;
-        END IF;
-          END LOOP;
-        END IF;
-
-        IF (v_opt -> 'combined_charges') IS NOT NULL AND jsonb_array_length(v_opt -> 'combined_charges') > 0 THEN
-          v_charge_sort := 0;
-          FOR v_charge IN SELECT * FROM jsonb_array_elements(v_opt -> 'combined_charges')
-          LOOP
-            v_charge_sort := v_charge_sort + 1;
-
-            v_charge_side := coalesce(lower(v_charge ->> 'side'), 'sell');
-
-            IF v_charge_side IN ('buy', 'cost') THEN
-              v_charge_side_id := v_buy_side_id;
-            ELSE
-              v_charge_side_id := v_sell_side_id;
-            END IF;
-
-            v_basis_code := v_charge ->> 'basis';
-            v_basis_id := NULL;
-            IF v_basis_code IS NOT NULL AND v_basis_code <> '' THEN
-              SELECT id
-              INTO v_basis_id
-              FROM charge_bases
-              WHERE code = v_basis_code
-                AND tenant_id = v_tenant_id
-              LIMIT 1;
-
-              IF v_basis_id IS NULL THEN
-                RAISE EXCEPTION 'save_quote_atomic: unknown charge basis code % for tenant %', v_basis_code, v_tenant_id;
-              END IF;
-            END IF;
-
-            v_currency_code := v_charge ->> 'currency';
-            v_currency_id := NULL;
-            IF v_currency_code IS NOT NULL AND v_currency_code <> '' THEN
-              SELECT id
-              INTO v_currency_id
-              FROM currencies
-              WHERE code = v_currency_code
-              LIMIT 1;
-            END IF;
-
-            IF v_currency_id IS NULL THEN
-              v_currency_id := (v_quote_data ->> 'currency_id')::uuid;
-            END IF;
-
-            v_quantity := COALESCE((v_charge ->> 'quantity')::numeric, 1);
-            v_rate := COALESCE((v_charge ->> 'unit_price')::numeric, 0);
-            v_amount := v_quantity * v_rate;
-
-            INSERT INTO quote_charges (
-              quote_option_id,
-              leg_id,
-              tenant_id,
-              franchise_id,
-              category_id,
-              basis_id,
-              charge_side_id,
-              currency_id,
-              unit,
-              quantity,
-              rate,
-              amount,
-              sort_order,
-              note
-            ) VALUES (
-              v_option_id,
-              NULL,
-              v_tenant_id,
-              v_franchise_id,
-              NULLIF(v_charge ->> 'charge_code', '')::uuid,
-              v_basis_id,
-              v_charge_side_id,
-              v_currency_id,
-              v_charge ->> 'unit',
-              v_quantity,
-              v_rate,
-              v_amount,
-              v_charge_sort,
-              NULLIF(v_charge ->> 'note', '')
-            );
-
-            IF v_charge_side NOT IN ('buy', 'cost') THEN
-              v_option_total_amount := v_option_total_amount + v_amount;
             END IF;
           END LOOP;
         END IF;

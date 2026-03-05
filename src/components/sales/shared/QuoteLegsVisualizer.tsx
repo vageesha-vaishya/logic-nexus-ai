@@ -1,6 +1,7 @@
 import React from 'react';
 import { Truck, Ship, Plane, ArrowRight, Warehouse, MapPin, Train } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { normalizeModeCode } from '@/lib/mode-utils';
 
 interface Leg {
     from?: string;
@@ -28,7 +29,8 @@ export function QuoteLegsVisualizer({ legs }: QuoteLegsVisualizerProps) {
     }));
 
     const getIcon = (mode: string) => {
-        switch (mode) {
+        const normalized = normalizeModeCode(mode);
+        switch (normalized) {
             case 'ocean': return <Ship className="w-4 h-4 text-blue-600" />;
             case 'air': return <Plane className="w-4 h-4 text-sky-600" />;
             case 'road': return <Truck className="w-4 h-4 text-amber-600" />;

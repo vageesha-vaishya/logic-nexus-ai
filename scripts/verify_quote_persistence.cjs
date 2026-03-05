@@ -16,6 +16,23 @@ if (!supabaseUrl || !supabaseKey) {
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+function sanitizePayload(payload) {
+  const seen = new WeakSet();
+  const sanitize = (obj) => {
+    if (obj === null || typeof obj !== 'object') return obj;
+    if (seen.has(obj)) return undefined;
+    seen.add(obj);
+    if (Array.isArray(obj)) return obj.map(sanitize).filter(v => v !== undefined);
+    const out = {};
+    for (const [k, v] of Object.entries(obj)) {
+      const sv = sanitize(v);
+      if (sv !== undefined) out[k] = sv;
+    }
+    return out;
+  };
+  return sanitize(payload);
+}
+
 async function verifyPersistence() {
   console.log('Starting persistence verification...');
 
@@ -75,7 +92,7 @@ async function verifyPersistence() {
   console.log('Payload prepared. Calling save_quote_atomic...');
 
   // 4. Call RPC
-  const { data: quoteId, error: rpcError } = await supabase.rpc('save_quote_atomic', { p_payload: payload });
+  const { data: quoteId, error: rpcError } = await supabase.rpc('save_quote_atomic', { p_payload: sanitizePayload(payload) });
 
   if (rpcError) {
     console.error('RPC Error:', rpcError);

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, memo } from 'react';
 import { Input } from '@/components/ui/input';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
@@ -26,7 +26,7 @@ interface ChargeRowProps {
 
 import { ContainerConfigurationDialog } from './ContainerConfigurationDialog';
 
-export function ChargeRow({
+export const ChargeRow = memo(function ChargeRow({
   charge,
   categories,
   bases,
@@ -241,4 +241,4 @@ export function ChargeRow({
       )}
     </>
   );
-}
+});

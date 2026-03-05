@@ -1,5 +1,5 @@
 
-import { useRef } from 'react';
+import { memo } from 'react';
 import { VirtualChargeRow } from './VirtualChargeRow';
 import { cn } from '@/lib/utils';
 
@@ -14,7 +14,7 @@ interface VirtualChargesListProps {
   height?: number | string;
 }
 
-export function VirtualChargesList({
+export const VirtualChargesList = memo(function VirtualChargesList({
   charges,
   categories,
   bases,
@@ -52,13 +52,14 @@ export function VirtualChargesList({
           charges.map((charge, index) => (
             <VirtualChargeRow
               key={charge.id || index}
+              index={index}
               charge={charge}
               categories={categories}
               bases={bases}
               currencies={currencies}
-              onUpdate={(field, value) => onUpdate(index, field, value)}
-              onRemove={() => onRemove(index)}
-              onConfigureBasis={() => onConfigureBasis(index)}
+              onUpdate={onUpdate}
+              onRemove={onRemove}
+              onConfigureBasis={onConfigureBasis}
               className={index % 2 === 1 ? 'bg-muted/5' : ''}
             />
           ))
@@ -66,4 +67,4 @@ export function VirtualChargesList({
       </div>
     </div>
   );
-}
+});

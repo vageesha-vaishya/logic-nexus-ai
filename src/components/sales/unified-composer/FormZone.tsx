@@ -28,6 +28,7 @@ import { useQuoteStore } from '@/components/sales/composer/store/QuoteStore';
 import { logger } from '@/lib/logger';
 import { QuotationNumberService } from '@/services/quotation/QuotationNumberService';
 import { FileUpload } from '@/components/ui/file-upload';
+import { v4 as uuidv4 } from 'uuid';
 
 export type FormZoneValues = QuoteComposerValues;
 
@@ -114,6 +115,16 @@ export function FormZone({
 
   const form = useFormContext<QuoteComposerValues>();
 
+  const [cargoItem, setCargoItem] = useState<CargoItem>({
+    id: '1',
+    type: 'container',
+    quantity: 1,
+    dimensions: { l: 0, w: 0, h: 0, unit: 'cm' },
+    weight: { value: 0, unit: 'kg' },
+    stackable: false,
+    containerDetails: { typeId: '', sizeId: '' },
+  });
+
   const quoteNumber = form.watch('quoteNumber' as any);
   const [availability, setAvailability] = useState<'loading' | 'available' | 'unavailable' | null>(null);
   const standalone = form.watch('standalone' as any);
@@ -171,13 +182,16 @@ export function FormZone({
     }
   };
 
-  // Propagate changes
+  // Propagate changes - REMOVED to prevent excessive re-renders
+  // Parent component can access form values via form.watch() or form.getValues() directly if needed
+  /*
   useEffect(() => {
     const subscription = form.watch((value) => {
       onChange?.(value);
     });
     return () => subscription.unsubscribe();
   }, [form.watch, onChange]);
+  */
 
   const mode = form.watch('mode');
   const commodity = form.watch('commodity');
@@ -207,49 +221,6 @@ export function FormZone({
       hasUpdates = true;
     }
 
-    // Initialize local cargoItem state from loaded data
-    if (hasUpdates) {
-       const newCargoItem: CargoItem = {
-         ...cargoItem,
-         commodity: { 
-              description: initialValues?.commodity || cargoItem.commodity?.description || '',
-              hts_code: initialExtended?.htsCode || cargoItem.commodity?.hts_code 
-          },
-          hazmat: initialExtended?.dangerousGoods 
-            ? (cargoItem.hazmat || { unNumber: '', class: '', packingGroup: 'I' }) 
-            : undefined,
-          weight: { value: Number(initialValues?.weight) || 0, unit: 'kg' },
-         volume: Number(initialValues?.volume) || 0,
-         quantity: Number(initialExtended?.containerQty) || 1,
-       };
-
-       // Determine type and container details
-       if (initialExtended?.containerCombos && initialExtended.containerCombos.length > 0) {
-          newCargoItem.type = 'container';
-          newCargoItem.containerCombos = initialExtended.containerCombos.map(c => ({
-              typeId: c.type,
-              sizeId: c.size,
-              quantity: c.qty
-          }));
-          // Set primary details from first combo
-          if (newCargoItem.containerCombos.length > 0) {
-              newCargoItem.containerDetails = {
-                  typeId: newCargoItem.containerCombos[0].typeId,
-                  sizeId: newCargoItem.containerCombos[0].sizeId
-              };
-              newCargoItem.quantity = newCargoItem.containerCombos[0].quantity;
-          }
-       } else if (initialExtended?.containerType && initialExtended?.containerSize) {
-           newCargoItem.type = 'container';
-           newCargoItem.containerDetails = {
-               typeId: initialExtended.containerType,
-               sizeId: initialExtended.containerSize
-           };
-           newCargoItem.quantity = Number(initialExtended.containerQty) || 1;
-       }
-
-       setCargoItem(newCargoItem);
-    }
   }, [initialValues, initialExtended, form]);
 
   // Auto-expand "More options" if optional fields are populated (edit mode)
@@ -308,23 +279,57 @@ export function FormZone({
     form.clearErrors();
   }, [mode]);
 
-  // Cargo item for SharedCargoInput
-  const [cargoItem, setCargoItem] = useState<CargoItem>({
-    id: '1',
-    type: 'container',
-    quantity: 1,
-    dimensions: { l: 0, w: 0, h: 0, unit: 'cm' },
-    weight: { value: 0, unit: 'kg' },
-    stackable: false,
-    containerDetails: { typeId: '', sizeId: '' },
-  });
+  // Cargo item for SharedCargoInput (State moved to top)
+
+  // Initialize CargoItem from props
+  useEffect(() => {
+    if (initialValues || initialExtended) {
+      const isContainer = initialExtended?.containerType || initialValues?.mode === 'ocean' || initialValues?.mode === 'rail';
+      
+      setCargoItem(prev => ({
+        ...prev,
+        type: isContainer ? 'container' : 'package',
+        quantity: Number(initialExtended?.containerQty || initialValues?.containerQty || 1),
+        weight: {
+          value: Number(initialValues?.weight || 0),
+          unit: 'kg' // Defaulting to kg as unit is not always persisted
+        },
+        volume: Number(initialValues?.volume || 0),
+        commodity: initialValues?.commodity ? {
+          description: initialValues.commodity,
+          hts_code: initialExtended?.htsCode || ''
+        } : undefined,
+        hazmat: (initialExtended?.dangerousGoods || initialValues?.dangerousGoods) ? {
+          unNumber: '', // Not fully persisted
+          class: '',
+          packingGroup: 'I'
+        } : undefined,
+        containerDetails: {
+          typeId: initialExtended?.containerType || '',
+          sizeId: initialExtended?.containerSize || ''
+        },
+        containerCombos: initialExtended?.containerCombos?.map(c => ({
+          id: uuidv4(),
+          typeId: c.type,
+          sizeId: c.size,
+          quantity: c.qty
+        })) || []
+      }));
+    }
+  }, [initialValues, initialExtended]);
 
   // Sync CargoItem → form/extended
   useEffect(() => {
-    if (cargoItem.commodity?.description) {
-      form.setValue('commodity', cargoItem.commodity.description);
+    // Sync commodity description and trigger validation
+    const description = cargoItem.commodity?.description || '';
+    form.setValue('commodity', description, { shouldValidate: true, shouldDirty: true });
+    
+    // Sync HTS code if available
+    if (cargoItem.commodity?.hts_code) {
+        form.setValue('htsCode', cargoItem.commodity.hts_code, { shouldValidate: true, shouldDirty: true });
     }
-    form.setValue('dangerousGoods', !!cargoItem.hazmat);
+
+    form.setValue('dangerousGoods', !!cargoItem.hazmat, { shouldDirty: true });
 
     if (mode === 'ocean' || mode === 'rail') {
       if (cargoItem.type === 'container') {
@@ -335,15 +340,15 @@ export function FormZone({
           combos = [{ type: cargoItem.containerDetails.typeId, size: cargoItem.containerDetails.sizeId, qty: cargoItem.quantity }];
         }
         if (combos.length > 0) {
-          form.setValue('containerType', combos[0].type);
-          form.setValue('containerSize', combos[0].size);
-          form.setValue('containerQty', String(cargoItem.quantity));
+          form.setValue('containerType', combos[0].type, { shouldValidate: true });
+          form.setValue('containerSize', combos[0].size, { shouldValidate: true });
+          form.setValue('containerQty', String(cargoItem.quantity), { shouldValidate: true });
         }
       }
     } else {
-      form.setValue('weight', String(cargoItem.weight.value));
-      form.setValue('volume', String(cargoItem.volume || 0));
-      form.setValue('containerQty', String(cargoItem.quantity));
+      form.setValue('weight', String(cargoItem.weight.value), { shouldValidate: true });
+      form.setValue('volume', String(cargoItem.volume || 0), { shouldValidate: true });
+      form.setValue('containerQty', String(cargoItem.quantity), { shouldValidate: true });
     }
   }, [cargoItem, mode]);
 

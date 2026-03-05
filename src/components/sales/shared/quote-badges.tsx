@@ -12,6 +12,8 @@ import {
   Train
 } from 'lucide-react';
 
+import { normalizeModeCode } from '@/lib/mode-utils';
+
 export const getTierBadge = (tier: string) => {
     if (!tier) return null;
     switch (tier) {
@@ -27,12 +29,14 @@ export const getTierBadge = (tier: string) => {
 };
 
 export const getModeIcon = (mode: string) => {
-    if (!mode) return <Ship className="h-4 w-4" />;
-    const m = mode.toLowerCase();
-    if (m.includes('air')) return <Plane className="h-4 w-4" />;
-    if (m.includes('road') || m.includes('truck')) return <Truck className="h-4 w-4" />;
-    if (m.includes('rail') || m.includes('train')) return <Train className="h-4 w-4" />;
-    return <Ship className="h-4 w-4" />;
+    const normalized = normalizeModeCode(mode);
+    switch (normalized) {
+        case 'air': return <Plane className="h-4 w-4" />;
+        case 'road': return <Truck className="h-4 w-4" />;
+        case 'rail': return <Train className="h-4 w-4" />;
+        case 'ocean':
+        default: return <Ship className="h-4 w-4" />;
+    }
 };
 
 export const getReliabilityColor = (score: number) => {

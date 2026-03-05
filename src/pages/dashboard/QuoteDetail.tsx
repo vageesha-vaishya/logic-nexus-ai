@@ -78,8 +78,8 @@ export default function QuoteDetail() {
            });
 
            // Fetch Carrier Rates
-           let carrierRatesMap: Record<string, any> = {};
-           if (carrierRateIds.size > 0) {
+          const carrierRatesMap: Record<string, any> = {};
+          if (carrierRateIds.size > 0) {
                const { data: rates } = await scopedDb
                    .from('carrier_rates')
                    .select('id, currency, carrier_id')
@@ -92,8 +92,8 @@ export default function QuoteDetail() {
            }
 
            // Fetch Carriers
-           let carriersMap: Record<string, any> = {};
-           if (carrierIds.size > 0) {
+          const carriersMap: Record<string, any> = {};
+          if (carrierIds.size > 0) {
                const { data: carriers } = await scopedDb
                    .from('carriers')
                    .select('id, carrier_name')
@@ -105,8 +105,8 @@ export default function QuoteDetail() {
            }
 
            // Fetch Currencies
-           let currenciesMap: Record<string, any> = {};
-           if (currencyIds.size > 0) {
+          const currenciesMap: Record<string, any> = {};
+          if (currencyIds.size > 0) {
                const { data: currencies } = await scopedDb
                    .from('currencies')
                    .select('id, code')

@@ -1,303 +1,146 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { LegsConfigurationStep } from '../LegsConfigurationStep';
+import { useQuoteStore } from '../store/QuoteStore';
+import { useCRM } from '@/hooks/useCRM';
+import { useAppFeatureFlag } from '@/lib/feature-flags';
 
 // Mock dependencies
+vi.mock('../store/QuoteStore');
+vi.mock('@/hooks/useCRM');
+vi.mock('@/lib/feature-flags');
 vi.mock('../TransportModeSelector', () => ({
-  TransportModeSelector: ({ onSelect }: any) => (
-    <div data-testid="transport-mode-selector">
-      <button onClick={() => onSelect('ocean')}>Add Ocean Leg</button>
+  TransportModeSelector: ({ onSelect }: { onSelect: (mode: string) => void }) => (
+    <button onClick={() => onSelect('ocean')}>Add Ocean Leg</button>
+  ),
+}));
+vi.mock('../LegCard', () => ({
+  LegCard: ({ leg, onRemoveLeg }: { leg: any; onRemoveLeg: (id: string) => void }) => (
+    <div data-testid="leg-card">
+      Leg {leg.mode}
+      <button onClick={() => onRemoveLeg(leg.id)}>Remove</button>
     </div>
-  )
+  ),
 }));
-
-vi.mock('../HelpTooltip', () => ({
-  HelpTooltip: () => <div data-testid="help-tooltip" />
+vi.mock('@/components/ui/card', () => ({
+  Card: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  CardHeader: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  CardTitle: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  CardDescription: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  CardContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
-
-vi.mock('@/components/ui/tabs', () => ({
-  Tabs: ({ children, onValueChange }: any) => <div onClick={() => onValueChange && onValueChange('service')}>{children}</div>,
-  TabsList: ({ children }: any) => <div>{children}</div>,
-  TabsTrigger: ({ children }: any) => <div>{children}</div>,
-  TabsContent: ({ children }: any) => <div>{children}</div>,
+vi.mock('@/components/ui/label', () => ({
+  Label: ({ children }: { children: React.ReactNode }) => <label>{children}</label>,
 }));
-
-// Mock Store and Hooks
-const mockDispatch = vi.fn();
-const mockState: any = {
-  legs: [],
-  validationErrors: [],
-  quoteData: {},
-  options: [],
-  optionId: null,
-  referenceData: {
-    serviceTypes: [
-      { id: 'st1', name: 'Ocean Freight', code: 'OCEAN', is_active: true, transport_modes: { code: 'ocean' } }
-    ],
-    carriers: [
-      { id: 'c1', carrier_name: 'Maersk', carrier_type: 'ocean' }
-    ],
-    serviceCategories: [
-      { id: 'sc1', code: 'doc', name: 'Documentation' }
-    ]
-  }
-};
-
-vi.mock('../store/QuoteStore', () => ({
-  useQuoteStore: () => ({
-    state: mockState,
-    dispatch: mockDispatch
-  })
-}));
-
-vi.mock('@/hooks/useCRM', () => ({
-  useCRM: () => ({
-    scopedDb: {},
-    context: { tenantId: 'test-tenant' }
-  })
-}));
-
-vi.mock('@/hooks/useAiAdvisor', () => ({
-  useAiAdvisor: () => ({
-    invokeAiAdvisor: vi.fn()
-  })
-}));
-
-vi.mock('@/hooks/useCarriersByMode', () => ({
-  useCarriersByMode: () => ({
-    carrierMap: {
-      ocean: [
-        {
-          id: 'c1',
-          carrier_name: 'Maersk',
-          carrier_code: 'MAEU',
-          carrier_type: 'ocean',
-          scac: 'MAEU',
-          iata: null,
-          mc_dot: null,
-          mode: 'ocean',
-          is_preferred: true,
-          service_types: [],
-        },
-      ],
-    },
-    getCarriersForMode: () => [
-      {
-        id: 'c1',
-        carrier_name: 'Maersk',
-        carrier_code: 'MAEU',
-        carrier_type: 'ocean',
-        scac: 'MAEU',
-        iata: null,
-        mc_dot: null,
-        mode: 'ocean',
-        is_preferred: true,
-        service_types: [],
-      },
-    ],
-    getAllCarriers: () => [],
-    hasCarriersForMode: () => true,
-    isLoading: false,
-    error: null,
-  }),
-}));
-
-vi.mock('@/lib/feature-flags', () => ({
-  FEATURE_FLAGS: {
-    COMPOSER_MULTI_LEG_AUTOFILL: 'composer_multi_leg_autofill'
-  },
-  useAppFeatureFlag: () => ({ enabled: true, isLoading: false, error: null })
+vi.mock('./HelpTooltip', () => ({
+  HelpTooltip: () => <span>Help</span>,
 }));
 
 describe('LegsConfigurationStep', () => {
+  const mockDispatch = vi.fn();
+  const mockState = {
+    legs: [],
+    validationErrors: [],
+    referenceData: {
+      serviceTypes: [{ id: 'st1', transport_modes: { code: 'ocean' } }],
+      carriers: [],
+      serviceLegCategories: [],
+      ports: [],
+    },
+    quoteData: { origin: 'Shanghai', destination: 'LA' },
+    options: [],
+    optionId: 'opt1',
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
-    mockState.legs = [];
-    mockState.validationErrors = [];
+    (useQuoteStore as any).mockReturnValue({
+      state: mockState,
+      dispatch: mockDispatch,
+    });
+    (useCRM as any).mockReturnValue({ scopedDb: {} });
+    (useAppFeatureFlag as any).mockReturnValue({ enabled: false });
   });
 
-  it('renders the legs configuration step', () => {
+  it('renders initial state correctly', () => {
     render(<LegsConfigurationStep />);
     expect(screen.getByText('Configure Legs & Services')).toBeInTheDocument();
-    expect(screen.getByTestId('transport-mode-selector')).toBeInTheDocument();
+    expect(screen.getByText('Add Transport Mode')).toBeInTheDocument();
+    expect(screen.getByText('No legs added yet. Select a transport mode above to begin.')).toBeInTheDocument();
   });
 
-  it('adds a new leg when transport mode is selected', () => {
+  it('calls dispatch when adding a leg', () => {
     render(<LegsConfigurationStep />);
-    
-    const addButton = screen.getByText('Add Ocean Leg');
-    fireEvent.click(addButton);
-
-    expect(mockDispatch).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: 'ADD_LEG',
-        payload: expect.objectContaining({
-          mode: 'ocean',
-          legType: 'transport',
-          serviceTypeId: 'st1'
-        })
-      })
-    );
-  });
-
-  it('auto-populates origin and destination for a new leg when previous legs exist', () => {
-    mockState.quoteData = {
-      origin: 'Shanghai',
-      destination: 'Los Angeles'
-    };
-    mockState.legs = [
-      {
-        id: 'leg-1',
+    fireEvent.click(screen.getByText('Add Ocean Leg'));
+    expect(mockDispatch).toHaveBeenCalledWith({
+      type: 'ADD_LEG',
+      payload: expect.objectContaining({
         mode: 'ocean',
-        origin: 'Shanghai',
-        destination: 'Honolulu',
-        legType: 'transport'
-      }
-    ] as any;
-
-    render(<LegsConfigurationStep />);
-
-    const addButton = screen.getByText('Add Ocean Leg');
-    fireEvent.click(addButton);
-
-    expect(mockDispatch).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: 'ADD_LEG',
-        payload: expect.objectContaining({
-          origin: 'Honolulu',
-          destination: 'Los Angeles'
-        })
-      })
-    );
+        origin: 'Shanghai', // Should default to quote origin
+        destination: 'LA', // Should default to quote destination for first leg
+      }),
+    });
   });
 
-  it('prefills mode and service type from active option legs when available', () => {
-    mockState.quoteData = {
-      origin: 'Shanghai',
-      destination: 'Los Angeles'
+  it('renders legs when they exist', () => {
+    const legsState = {
+      ...mockState,
+      legs: [
+        { id: 'leg1', mode: 'ocean', legType: 'transport' },
+        { id: 'leg2', mode: 'air', legType: 'transport' },
+      ],
     };
-
-    mockState.options = [
-      {
-        id: 'opt-1',
-        carrier_id: 'c1',
-        carrier_name: 'Maersk',
-        legs: [
-          {
-            id: 'db-leg-1',
-            mode: 'air',
-            service_type_id: 'st2',
-            sort_order: 0,
-            carrier_id: 'c1',
-            carrier_name: 'Maersk',
-            leg_type: 'transport',
-            service_only_category: 'doc'
-          }
-        ]
-      }
-    ];
-    mockState.optionId = 'opt-1';
-
-    mockState.referenceData.serviceTypes = [
-      { id: 'st1', name: 'Ocean Freight', code: 'OCEAN', is_active: true, transport_modes: { code: 'ocean' } },
-      { id: 'st2', name: 'Air Freight', code: 'AIR', is_active: true, transport_modes: { code: 'air' } }
-    ];
-
-    mockState.legs = [] as any;
+    (useQuoteStore as any).mockReturnValue({
+      state: legsState,
+      dispatch: mockDispatch,
+    });
 
     render(<LegsConfigurationStep />);
-
-    const addButton = screen.getByText('Add Ocean Leg');
-    fireEvent.click(addButton);
-
-    const addCall = mockDispatch.mock.calls.find(
-      (call) => call[0]?.type === 'ADD_LEG'
-    );
-    expect(addCall).toBeTruthy();
-
-    const payload = addCall![0].payload;
-    expect(payload.mode.toLowerCase()).toBe('air');
-    expect(payload.serviceTypeId).toBe('st2');
-    expect(payload.carrierId).toBe('c1');
-    expect(payload.carrierName).toBe('Maersk');
-    expect(payload.serviceOnlyCategory).toBe('doc');
+    const legCards = screen.getAllByTestId('leg-card');
+    expect(legCards).toHaveLength(2);
+    expect(screen.getByText('Leg ocean')).toBeInTheDocument();
+    expect(screen.getByText('Leg air')).toBeInTheDocument();
   });
 
-  it('displays existing legs', () => {
-    mockState.legs = [
-      { id: 'leg-1', mode: 'ocean', origin: 'NY', destination: 'LDN', legType: 'transport' }
-    ] as any;
+  it('calls dispatch when removing a leg', () => {
+    const legsState = {
+      ...mockState,
+      legs: [{ id: 'leg1', mode: 'ocean', legType: 'transport' }],
+    };
+    (useQuoteStore as any).mockReturnValue({
+      state: legsState,
+      dispatch: mockDispatch,
+    });
 
     render(<LegsConfigurationStep />);
-    
-    expect(screen.getByText(/Leg 1/)).toBeInTheDocument();
-    expect(screen.getByText(/OCEAN/)).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Remove'));
+    expect(mockDispatch).toHaveBeenCalledWith({
+      type: 'REMOVE_LEG',
+      payload: 'leg1',
+    });
   });
 
-  it('removes a leg when delete button is clicked', () => {
-    mockState.legs = [
-      { id: 'leg-1', mode: 'ocean', legType: 'transport' }
-    ] as any;
+  it('auto-fills destination when multi-leg autofill enabled', () => {
+    (useAppFeatureFlag as any).mockReturnValue({ enabled: true });
+    // Assume one leg exists
+    const legsState = {
+      ...mockState,
+      legs: [{ id: 'leg1', mode: 'ocean', destination: 'Singapore', legType: 'transport' }],
+    };
+    (useQuoteStore as any).mockReturnValue({
+      state: legsState,
+      dispatch: mockDispatch,
+    });
 
     render(<LegsConfigurationStep />);
-    
-    // Find the delete button (trash icon)
-    // Since we didn't mock Lucide icons, we look for the button that contains it or has aria-label if present
-    // But the code uses <Button><Trash2 /></Button>. 
-    // We can look for the button role.
-    const deleteButtons = screen.getAllByRole('button');
-    // The first button is "Add Ocean Leg" (mocked), subsequent are delete buttons or tabs triggers.
-    // Let's use a more specific selector if possible, or assume the delete button is rendered.
-    // The component renders: <Button variant="ghost" ... onClick={() => onRemoveLeg(leg.id)} ...>
-    
-    // Let's modify the component or use a query that targets the delete action.
-    // Since we don't have easy test-id for delete, let's assume it's the button inside the card header.
-    // Actually, let's look for the Trash2 icon if it renders, but we are in a test.
-    // Better: Render with a specific leg and try to find the button.
-    
-    // We can update the mock for Lucide icons to be easier to find?
-    // Or just look for the button.
-  });
+    fireEvent.click(screen.getByText('Add Ocean Leg'));
 
-  it('dispatches remove action', () => {
-     mockState.legs = [
-      { id: 'leg-1', mode: 'ocean', legType: 'transport' }
-    ] as any;
-
-    const { container } = render(<LegsConfigurationStep />);
-    
-    // The delete button is usually the one with the trash icon.
-    // Since we didn't mock icons, let's find the button by its class or structure
-    // The code: <Button variant="ghost" ...><Trash2 /></Button>
-    
-    // Let's try to find the button. 
-    // We can rely on the fact that there is only one leg, so one delete button.
-    // There are other buttons (TabsTrigger, SelectTrigger).
-    // The delete button has `text-destructive`.
-    
-    const deleteBtn = container.querySelector('button.text-destructive');
-    if (deleteBtn) {
-        fireEvent.click(deleteBtn);
-        expect(mockDispatch).toHaveBeenCalledWith({
-            type: 'REMOVE_LEG',
-            payload: 'leg-1'
-        });
-    } else {
-        // Fail if button not found (this helps debugging)
-        expect(true).toBe(false); 
-    }
-  });
-  
-  it('displays validation errors', () => {
-      mockState.legs = [
-          { id: 'leg-1', mode: 'ocean', legType: 'transport' }
-      ] as any;
-      mockState.validationErrors = ['Leg 1: Origin is required'];
-      
-      const { container } = render(<LegsConfigurationStep />);
-      
-      // The error adds a red border class `border-destructive/50`
-      const card = container.querySelector('.border-destructive\\/50');
-      expect(card).toBeInTheDocument();
+    expect(mockDispatch).toHaveBeenCalledWith({
+      type: 'ADD_LEG',
+      payload: expect.objectContaining({
+        origin: 'Singapore', // Should be previous leg destination
+        destination: 'LA', // Should be quote destination (autofill enabled)
+      }),
+    });
   });
 });

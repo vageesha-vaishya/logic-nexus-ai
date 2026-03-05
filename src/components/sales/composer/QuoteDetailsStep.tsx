@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo, memo, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -8,14 +8,14 @@ import { useToast } from '@/hooks/use-toast';
 import { SharedCargoInput } from '@/components/sales/shared/SharedCargoInput';
 import { CargoItem } from '@/types/cargo';
 import { useQuoteStore } from './store/QuoteStore';
-import { dbField } from '@/lib/schemas/field-registry';
+import { getSafeName } from './utils';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useIncoterms } from '@/hooks/useIncoterms';
 
-export function QuoteDetailsStep() {
+export const QuoteDetailsStep = memo(function QuoteDetailsStep() {
   const { state, dispatch } = useQuoteStore();
   const {
     quoteData,
@@ -37,7 +37,13 @@ export function QuoteDetailsStep() {
   const [aiLoading, setAiLoading] = useState(false);
   const [complianceStatus, setComplianceStatus] = useState<{ compliant: boolean; issues: any[] } | null>(null);
 
-  const formatDateForInput = (dateVal: any): string => {
+  // Ref to hold latest quoteData for async/event handlers to avoid stale closures and dependency cycles
+  const quoteDataRef = useRef(quoteData);
+  useEffect(() => {
+    quoteDataRef.current = quoteData;
+  }, [quoteData]);
+
+  const formatDateForInput = useCallback((dateVal: any): string => {
     if (!dateVal) return '';
     try {
       const d = new Date(dateVal);
@@ -46,17 +52,17 @@ export function QuoteDetailsStep() {
     } catch (e) {
       return '';
     }
-  };
+  }, []);
 
-  const onChange = (field: string, value: any) => {
+  const onChange = useCallback((field: string, value: any) => {
     dispatch({ type: 'UPDATE_QUOTE_DATA', payload: { [field]: value } });
-  };
+  }, [dispatch]);
   
   // Derived values for AI check
   const origin = quoteData.origin || '';
   const destination = quoteData.destination || '';
 
-  const calculateDaysRemaining = (dateStr: string | undefined) => {
+  const calculateDaysRemaining = useCallback((dateStr: string | undefined) => {
     if (!dateStr) return null;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -67,7 +73,7 @@ export function QuoteDetailsStep() {
     
     const diffTime = targetDate.getTime() - today.getTime();
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  };
+  }, []);
 
   const daysRemaining = calculateDaysRemaining(quoteData.valid_until);
 
@@ -92,24 +98,8 @@ export function QuoteDetailsStep() {
   // Sync Incoterms and Shipping Term
   useEffect(() => {
     if (shippingTerms.length > 0) {
-      // If Shipping Term is set but Incoterms is empty, try to set Incoterms
-      // Note: shipping_term_id is not in QuoteFormValues schema explicitly as top level, but it is used in logic
-      // We need to check if shipping_term_id exists in schema or if it's mapped differently.
-      // Looking at schema, it doesn't seem to have shipping_term_id at root.
-      // Wait, let's check quoteSchema again.
-      // It has incoterms, but not shipping_term_id. 
-      // The previous code used shipping_term_id. Let's assume it might be added or we need to manage it.
-      // However, RHF is strict with types. Let's cast for now if needed or check where it's stored.
-      // Actually, let's comment this out if shipping_term_id is not in schema, OR add it to schema if needed.
-      // But looking at the UI, there is a select for Shipping Term.
-      // Let's check if the schema allows extra fields or if we should add it.
-      // The schema has `incoterms`, but maybe `shipping_term_id` is missing?
-      // In the previous read of `types.ts`, `shipping_term_id` was NOT in `quoteSchema` root object.
-      // BUT `QuoteDetailsStep` had a select for it.
-      // Let's look at `QuoteDetailsStep` again.
-      // It had: `onChange('shipping_term_id', val)`.
-      // If RHF schema doesn't have it, `watch` won't return it typed, but `setValue` might work if we cast.
-      // For now, I will suppress type errors for shipping_term_id as it seems to be used in UI.
+      // Sync logic for shipping_term_id and incoterms
+      // Note: shipping_term_id might not be strictly typed in QuoteFormValues but is used here
       
       const shippingTermId = quoteData.shipping_term_id;
       
@@ -133,8 +123,12 @@ export function QuoteDetailsStep() {
   }, [shippingTerms, quoteData.shipping_term_id, quoteData.incoterms]);
 
   // AI: Classify Commodity & Suggest HTSValidate Compliance
-  const handleAiAnalyze = async () => {
-    if (!quoteData.commodity || quoteData.commodity.length < 3) {
+  const handleAiAnalyze = useCallback(async () => {
+    const currentData = quoteDataRef.current;
+    const currentOrigin = currentData.origin || '';
+    const currentDestination = currentData.destination || '';
+
+    if (!currentData.commodity || currentData.commodity.length < 3) {
       toast({
         title: "Input Required",
         description: "Please enter a commodity description first.",
@@ -148,33 +142,19 @@ export function QuoteDetailsStep() {
         // Parallel calls for Classification and Compliance
         const [classRes, complianceRes] = await Promise.all([
             invokeAiAdvisor({
-                action: 'classify_commodity', payload: { commodity: quoteData.commodity }
+                action: 'classify_commodity', payload: { commodity: currentData.commodity }
             }),
             invokeAiAdvisor({
                 action: 'validate_compliance', payload: { 
-                  commodity: quoteData.commodity,
-                  origin: origin || "Global", 
-                  destination: destination || "Global"
+                  commodity: currentData.commodity,
+                  origin: currentOrigin || "Global", 
+                  destination: currentDestination || "Global"
                 }
             })
         ]);
 
         // Handle Classification
         if (classRes.data?.hts) {
-            // Note: hts_code is not in root schema, it's inside items attributes.
-            // But previous code was setting 'hts_code' at root.
-            // Let's check where it goes. Maybe into the first item?
-            // Or maybe there is a root field I missed?
-            // QuoteSchema has `items` array.
-            // But it also has `commodity` string at root.
-            // The `SharedCargoInput` updates `cargoItem` which is constructed from root fields.
-            // I will maintain the previous behavior: set root fields.
-            // If they are not in schema, they won't be saved unless `saveQuote` handles them.
-            // Wait, `saveQuote` in `useQuoteRepositoryForm` takes `QuoteFormValues`.
-            // If `hts_code` is not in schema, it might be lost.
-            // Let's stick to previous behavior but be aware of this.
-            // Actually, `SharedCargoInput` constructs `cargoItem` using `quoteData.hts_code`.
-            
             onChange('hts_code', classRes.data.hts);
             if (classRes.data.scheduleB) {
               onChange('schedule_b', classRes.data.scheduleB);
@@ -196,7 +176,6 @@ export function QuoteDetailsStep() {
               });
             }
         }
-
     } catch (err) {
         console.error("AI Analyze Error:", err);
         toast({
@@ -207,9 +186,9 @@ export function QuoteDetailsStep() {
     } finally {
         setAiLoading(false);
     }
-  };
+  }, [invokeAiAdvisor, toast, onChange]);
 
-  const handleCargoChange = (cargo: CargoItem) => {
+  const handleCargoChange = useCallback((cargo: CargoItem) => {
     onChange('commodity', cargo.commodity?.description || '');
     onChange('hts_code', cargo.commodity?.hts_code || '');
     onChange('total_weight', String(cargo.weight?.value || 0));
@@ -218,9 +197,9 @@ export function QuoteDetailsStep() {
         onChange('hazmat_details', cargo.hazmat);
     }
     onChange('cargo_details', cargo);
-  };
+  }, [onChange]);
 
-  const cargoItem: CargoItem = {
+  const cargoItem: CargoItem = useMemo(() => ({
     id: 'quote-cargo-1',
     type: 'loose',
     quantity: 1,
@@ -236,29 +215,54 @@ export function QuoteDetailsStep() {
     dimensions: { l: 0, w: 0, h: 0, unit: 'cm' },
     stackable: false,
     hazmat: quoteData.hazmat_details
-  };
-
-  const getSafeName = (obj: any, fallback: string = '') => {
-    if (obj === null || obj === undefined) return fallback;
-    if (typeof obj === 'string') return obj;
-    if (typeof obj === 'object') {
-       return obj.name || obj.code || obj.description || fallback;
-    }
-    return String(obj);
-  };
+  }), [quoteData.commodity, quoteData.hts_code, quoteData.total_weight, quoteData.total_volume, quoteData.hazmat_details]);
 
   // Helper to find account/contact name
-  const getAccountName = (id: string | undefined) => {
+  const getAccountName = useCallback((id: string | undefined) => {
       if (!id) return 'N/A';
       const acc = accounts.find((a: any) => a.id === id);
       return acc ? acc.name : 'N/A';
-  };
+  }, [accounts]);
 
-  const getContactName = (id: string | undefined) => {
+  const getContactName = useCallback((id: string | undefined) => {
       if (!id) return 'N/A';
       const con = contacts.find((c: any) => c.id === id);
       return con ? `${con.first_name} ${con.last_name}` : 'N/A';
-  };
+  }, [contacts]);
+
+  const handleOriginPortChange = useCallback((val: string) => {
+    onChange('origin_port_id', val);
+    // Auto-fill name if empty
+    const port = ports.find((p: any) => p.id === val);
+    if (port && !quoteDataRef.current.origin) {
+      onChange('origin', port.name || port.code);
+    }
+  }, [onChange, ports]);
+
+  const handleDestinationPortChange = useCallback((val: string) => {
+    onChange('destination_port_id', val);
+    // Auto-fill name if empty
+    const port = ports.find((p: any) => p.id === val);
+    if (port && !quoteDataRef.current.destination) {
+      onChange('destination', port.name || port.location_name || port.code);
+    }
+  }, [onChange, ports]);
+
+  const handleCarrierChange = useCallback((val: string) => {
+    onChange('carrier_id', val);
+  }, [onChange]);
+
+  const handleServiceTypeChange = useCallback((val: string) => {
+    onChange('service_type_id', val);
+  }, [onChange]);
+
+  const handleIncotermsChange = useCallback((val: string) => {
+    onChange('incoterms', val);
+  }, [onChange]);
+
+  const handleShippingTermChange = useCallback((val: string) => {
+    onChange('shipping_term_id', val);
+  }, [onChange]);
 
   return (
     <Card>
@@ -339,14 +343,7 @@ export function QuoteDetailsStep() {
                   <Label htmlFor="origin_port_id">Origin Port (Optional)</Label>
                   <Select 
                     value={quoteData.origin_port_id || ''} 
-                    onValueChange={(val) => {
-                      onChange('origin_port_id', val);
-                      // Auto-fill name if empty
-                      const port = ports.find((p: any) => p.id === val);
-                      if (port && !quoteData.origin) {
-                        onChange('origin', port.name || port.code);
-                      }
-                    }}
+                    onValueChange={handleOriginPortChange}
                   >
                     <SelectTrigger id="origin_port_id">
                       <SelectValue placeholder="Select Port" />
@@ -376,14 +373,7 @@ export function QuoteDetailsStep() {
                   <Label htmlFor="destination_port_id">Destination Port (Optional)</Label>
                   <Select 
                     value={quoteData.destination_port_id || ''} 
-                    onValueChange={(val) => {
-                      onChange('destination_port_id', val);
-                      // Auto-fill name if empty
-                      const port = ports.find((p: any) => p.id === val);
-                      if (port && !quoteData.destination) {
-                        onChange('destination', port.name || port.location_name || port.code);
-                      }
-                    }}
+                    onValueChange={handleDestinationPortChange}
                   >
                     <SelectTrigger id="destination_port_id">
                       <SelectValue placeholder="Select Port" />
@@ -446,7 +436,7 @@ export function QuoteDetailsStep() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
               <Label htmlFor="carrier_id">Preferred Carrier</Label>
-              <Select value={quoteData.carrier_id || ''} onValueChange={(val) => onChange('carrier_id', val)}>
+              <Select value={quoteData.carrier_id || ''} onValueChange={handleCarrierChange}>
                 <SelectTrigger id="carrier_id">
                   <SelectValue placeholder="Select Carrier" />
                 </SelectTrigger>
@@ -462,7 +452,7 @@ export function QuoteDetailsStep() {
 
             <div>
               <Label htmlFor="service_type_id">Service Type</Label>
-              <Select value={quoteData.service_type_id || ''} onValueChange={(val) => onChange('service_type_id', val)}>
+              <Select value={quoteData.service_type_id || ''} onValueChange={handleServiceTypeChange}>
                 <SelectTrigger id="service_type_id">
                   <SelectValue placeholder="Select Service" />
                 </SelectTrigger>
@@ -478,7 +468,7 @@ export function QuoteDetailsStep() {
 
             <div>
               <Label htmlFor="incoterms">Incoterms</Label>
-              <Select value={quoteData.incoterms} onValueChange={(val) => onChange('incoterms', val)}>
+              <Select value={quoteData.incoterms} onValueChange={handleIncotermsChange}>
                 <SelectTrigger id="incoterms">
                   <SelectValue placeholder="Select Incoterms" />
                 </SelectTrigger>
@@ -500,7 +490,7 @@ export function QuoteDetailsStep() {
 
             <div>
               <Label htmlFor="shipping_term_id">Shipping Term</Label>
-              <Select value={quoteData.shipping_term_id || ''} onValueChange={(val) => onChange('shipping_term_id', val)}>
+              <Select value={quoteData.shipping_term_id || ''} onValueChange={handleShippingTermChange}>
                 <SelectTrigger id="shipping_term_id">
                   <SelectValue placeholder="Select Term" />
                 </SelectTrigger>
@@ -583,4 +573,4 @@ export function QuoteDetailsStep() {
       </CardContent>
     </Card>
   );
-}
+});

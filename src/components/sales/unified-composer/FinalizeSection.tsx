@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useFormContext, useFieldArray } from 'react-hook-form';
 import { QuoteComposerValues } from './schema';
@@ -15,7 +15,6 @@ import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/component
 import { Save, FileText, Plus, ChevronDown, ChevronUp, Ship, Plane, Truck, TrainFront, Package, BarChart3, ArrowRight, Pencil, Check, X } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { RateOption, TransportLeg, Charge } from '@/types/quote-breakdown';
-import { ChargeRow } from '@/components/sales/composer/ChargeRow';
 import { ChargesAnalysisGraph } from '@/components/sales/common/ChargesAnalysisGraph';
 import { ChargeBreakdown } from '@/components/sales/common/ChargeBreakdown';
 import { useChargesManager, ManagedCharge, UseChargesManagerParams } from '@/hooks/useChargesManager';
@@ -97,12 +96,13 @@ function getModeIcon(mode?: string) {
 
 import { CarrierComparisonPanel } from '@/components/sales/composer/CarrierComparisonPanel';
 import { LegManager } from '@/components/sales/composer/LegManager';
+import { ChargeTable } from '@/components/sales/composer/ChargeTable';
 
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
-export function FinalizeSection({ 
+export const FinalizeSection = memo(function FinalizeSection({ 
   selectedOption,
   onSaveQuote,
   onGeneratePdf,
@@ -228,57 +228,7 @@ export function FinalizeSection({
     return { vizLegs: vLegs, vizGlobalCharges: vGlobal };
   }, [legs, chargesByLeg]);
 
-  // Render a charge table for a given set of charges
-  const renderChargeTable = (charges: ManagedCharge[], legId: string | null) => (
-    <div className="space-y-2">
-      {charges.length > 0 ? (
-        <div className="border rounded-lg overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-muted/50 text-muted-foreground text-xs">
-                <th className="text-left p-2 font-medium">Category</th>
-                <th className="text-left p-2 font-medium">Basis</th>
-                <th className="text-left p-2 font-medium">Unit</th>
-                <th className="text-left p-2 font-medium">Currency</th>
-                <th className="text-right p-2 font-medium">Buy Qty</th>
-                <th className="text-right p-2 font-medium">Buy Rate</th>
-                <th className="text-right p-2 font-medium">Buy Amt</th>
-                <th className="text-center p-2 font-medium w-12"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {charges.map((charge) => (
-                <ChargeRow
-                  key={charge.id}
-                  charge={charge}
-                  categories={refData.chargeCategories}
-                  bases={refData.chargeBases}
-                  currencies={refData.currencies}
-                  onUpdate={(field, value) => updateCharge(charge.id, field, value)}
-                  onRemove={() => removeCharge(charge.id)}
-                  onConfigureBasis={() => {/* BasisConfigModal integration deferred */}}
-                  showBuySell={true}
-                />
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <div className="text-center py-6 text-muted-foreground text-sm">
-          No charges yet. Click "Add Charge" to start.
-        </div>
-      )}
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        onClick={() => addCharge(legId)}
-        className="mt-1"
-      >
-        <Plus className="w-3 h-3 mr-1" /> Add Charge
-      </Button>
-    </div>
-  );
+
 
   return (
     <Card className="border-primary/20" data-testid="finalize-section">
@@ -440,7 +390,14 @@ export function FinalizeSection({
                     {/* Charge Table */}
                     <Card>
                       <CardContent className="p-0">
-                         {renderChargeTable(chargesByLeg[leg.id] || [], leg.id)}
+                         <ChargeTable
+                           charges={chargesByLeg[leg.id] || []}
+                           legId={leg.id}
+                           onUpdateCharge={updateCharge}
+                           onRemoveCharge={removeCharge}
+                           onAddCharge={addCharge}
+                           referenceData={refData}
+                         />
                       </CardContent>
                     </Card>
                  </TabsContent>
@@ -460,7 +417,14 @@ export function FinalizeSection({
                     </div>
                     <Card>
                       <CardContent className="p-0">
-                         {renderChargeTable(chargesByLeg['combined'] || [], null)}
+                         <ChargeTable
+                           charges={chargesByLeg['combined'] || []}
+                           legId={null}
+                           onUpdateCharge={updateCharge}
+                           onRemoveCharge={removeCharge}
+                           onAddCharge={addCharge}
+                           referenceData={refData}
+                         />
                       </CardContent>
                     </Card>
                  </TabsContent>
@@ -571,4 +535,4 @@ export function FinalizeSection({
       )}
     </Card>
   );
-}
+});

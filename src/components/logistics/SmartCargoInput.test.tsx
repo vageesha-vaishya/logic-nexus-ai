@@ -114,12 +114,24 @@ describe('SmartCargoInput', () => {
     vi.useRealTimers();
   });
 
-  it('should show results when typing 2 characters', async () => {
-    render(<SmartCargoInput onSelect={mockOnSelect} />);
+  it('should sync internal state when value prop changes', () => {
+    const { rerender } = render(<SmartCargoInput onSelect={mockOnSelect} value="Initial" />);
+    
+    // Initial render
+    expect(screen.getByRole('combobox')).toHaveTextContent('Initial');
 
-    // Mock successful response
+    // Update prop
+    rerender(<SmartCargoInput onSelect={mockOnSelect} value="Updated" />);
+    
+    expect(screen.getByRole('combobox')).toHaveTextContent('Updated');
+  });
+
+  it('should allow creating a custom commodity', async () => {
+    render(<SmartCargoInput onSelect={mockOnSelect} />);
+    
+    // Mock empty results
     mockUseQuery.mockReturnValue({
-      data: [{ id: '1', name: 'Apple', description: 'Fresh Apples' }],
+      data: [],
       isLoading: false,
     });
 
@@ -127,17 +139,82 @@ describe('SmartCargoInput', () => {
     fireEvent.click(trigger);
 
     const input = screen.getByPlaceholderText('Type to search...');
-    fireEvent.change(input, { target: { value: 'Ap' } });
+    fireEvent.change(input, { target: { value: 'New Item' } });
 
     // Advance timers for debounce
     act(() => {
         vi.advanceTimersByTime(300);
     });
 
-    // Should NOT show "Type at least 2 characters..."
-    expect(screen.queryByText('Type at least 2 characters...')).not.toBeInTheDocument();
+    // Look for custom option
+    const customOption = screen.getByText('Use "New Item"');
+    expect(customOption).toBeInTheDocument();
+
+    fireEvent.click(customOption);
+
+    expect(mockOnSelect).toHaveBeenCalledWith({ description: 'New Item' });
+  });
+
+  it('should handle API errors gracefully', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     
-    // Should show results
-    expect(screen.getByText('Apple')).toBeInTheDocument();
+    render(<SmartCargoInput onSelect={mockOnSelect} />);
+    
+    // Mock error response
+    mockUseQuery.mockReturnValue({
+      data: undefined,
+      error: new Error('Network Error'),
+      isError: true,
+      isLoading: false,
+    });
+
+    const trigger = screen.getByRole('combobox');
+    fireEvent.click(trigger);
+
+    const input = screen.getByPlaceholderText('Type to search...');
+    fireEvent.change(input, { target: { value: 'Error' } });
+
+    // Advance timers
+    act(() => {
+        vi.advanceTimersByTime(300);
+    });
+
+    // Should not crash, should show empty state or fallback
+    // In current implementation, it shows "No results found" (CommandEmpty) if data is undefined/empty
+    // We can check if it rendered safely
+    expect(screen.getByText('Search encountered an issue. You can still use a custom description.')).toBeInTheDocument();
+    
+    consoleSpy.mockRestore();
+  });
+
+  it('should not show error banner when only one source errors', async () => {
+    mockUseQuery
+      .mockReturnValueOnce({
+        data: undefined,
+        error: new Error('Master Error'),
+        isError: true,
+        isFetching: false,
+        isLoading: false,
+      })
+      .mockReturnValueOnce({
+        data: [],
+        isError: false,
+        isFetching: false,
+        isLoading: false,
+      });
+
+    render(<SmartCargoInput onSelect={mockOnSelect} />);
+
+    const trigger = screen.getByRole('combobox');
+    fireEvent.click(trigger);
+
+    const input = screen.getByPlaceholderText('Type to search...');
+    fireEvent.change(input, { target: { value: 'ba' } });
+
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+
+    expect(screen.queryByText('Search encountered an issue. You can still use a custom description.')).toBeNull();
   });
 });

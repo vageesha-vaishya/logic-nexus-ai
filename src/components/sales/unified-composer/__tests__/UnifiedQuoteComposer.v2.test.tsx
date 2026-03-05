@@ -123,11 +123,13 @@ const mockFrom = vi.fn();
 // This prevents infinite loops in useEffect dependencies inside the component
 vi.mock('@/hooks/useCRM', () => ({
   useCRM: () => {
-    const { useMemo } = require('react');
     return {
-      scopedDb: useMemo(() => ({ from: mockFrom }), []),
-      context: useMemo(() => ({ tenantId: 'tenant-1' }), []),
-      supabase: useMemo(() => ({ auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null }) } }), [])
+      scopedDb: React.useMemo(() => ({ from: mockFrom }), []),
+      context: React.useMemo(() => ({ tenantId: 'tenant-1' }), []),
+      supabase: React.useMemo(
+        () => ({ auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'test-user' } }, error: null }) } }),
+        []
+      )
     };
   }
 }));

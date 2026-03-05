@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useCRM } from '@/hooks/useCRM';
 import { useAiAdvisor } from '@/hooks/useAiAdvisor';
 import { useToast } from '@/hooks/use-toast';
@@ -394,7 +394,7 @@ export function useRateFetching(): RateFetchingResult {
     }
   }, [supabase, context, invokeAiAdvisor, toast]);
 
-  return {
+  return useMemo(() => ({
     results,
     loading,
     error,
@@ -403,5 +403,5 @@ export function useRateFetching(): RateFetchingResult {
     anomalies,
     fetchRates,
     clearResults,
-  };
+  }), [results, loading, error, marketAnalysis, confidenceScore, anomalies, fetchRates, clearResults]);
 }

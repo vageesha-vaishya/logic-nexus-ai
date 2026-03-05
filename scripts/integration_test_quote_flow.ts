@@ -15,6 +15,23 @@ if (!supabaseUrl || !supabaseServiceKey) {
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+function sanitizePayload<T>(payload: T): T {
+  const seen = new WeakSet<object>();
+  const sanitize = (obj: any): any => {
+    if (obj === null || typeof obj !== 'object') return obj;
+    if (seen.has(obj)) return undefined;
+    seen.add(obj);
+    if (Array.isArray(obj)) return obj.map(sanitize).filter(v => v !== undefined);
+    const out: any = {};
+    for (const [k, v] of Object.entries(obj)) {
+      const sv = sanitize(v);
+      if (sv !== undefined) out[k] = sv;
+    }
+    return out;
+  };
+  return sanitize(payload);
+}
+
 async function runRegressionTest() {
   console.log('Starting Regression Test for Quote Flow...');
 
@@ -120,7 +137,7 @@ async function runRegressionTest() {
         options: []
     };
 
-    const { data: savedId, error: saveError } = await supabase.rpc('save_quote_atomic', { p_payload: payload });
+    const { data: savedId, error: saveError } = await supabase.rpc('save_quote_atomic', { p_payload: sanitizePayload(payload) });
 
     if (saveError) throw new Error(`RPC Save Failed: ${saveError.message}`);
     console.log('Update Successful, Returned ID:', savedId);

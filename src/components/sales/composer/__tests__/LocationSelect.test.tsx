@@ -76,6 +76,10 @@ describe('LocationSelect', () => {
     mockOrder.mockReturnValue({
       limit: mockLimit,
     });
+
+    // Fix: limit() is the end of the chain in the component, so it must return a thenable (Promise)
+    // that resolves to the query result { data, error }
+    mockLimit.mockReturnValue(Promise.resolve({ data: [], error: null }));
   });
 
 

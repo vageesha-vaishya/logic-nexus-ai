@@ -21,6 +21,7 @@ import { useQuoteContext } from './QuoteContext';
 import { parseTransitTimeToHours } from '@/lib/transit-time';
 import { dbField } from '@/lib/schemas/field-registry';
 import { useAppFeatureFlag, FEATURE_FLAGS } from '@/lib/feature-flags';
+import { sanitizePayload } from '@/lib/utils/sanitizer';
 
 // ---------------------------------------------------------------------------
 // Shared helpers
@@ -1266,7 +1267,7 @@ export function useQuoteRepositoryForm(opts: {
         })) || []
       };
 
-      const { data: savedId, error } = await scopedDb.rpc('save_quote_atomic', { p_payload: payload });
+      const { data: savedId, error } = await scopedDb.rpc('save_quote_atomic', { p_payload: sanitizePayload(payload) });
 
       if (error) {
           console.error('[QuoteRepository] RPC save failed:', error);

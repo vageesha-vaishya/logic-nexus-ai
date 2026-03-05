@@ -1,4 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
+import { ScopedDataAccess } from '@/lib/db/access';
 
 export interface QuotationConfiguration {
   id: string;
@@ -11,7 +12,7 @@ export interface QuotationConfiguration {
 }
 
 export class QuotationConfigurationService {
-  constructor(private db: SupabaseClient) {}
+  constructor(private db: SupabaseClient | ScopedDataAccess) {}
 
   /**
    * Get the quotation configuration for the current tenant.

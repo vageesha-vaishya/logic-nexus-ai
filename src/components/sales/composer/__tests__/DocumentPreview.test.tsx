@@ -70,6 +70,10 @@ vi.mock('@/integrations/supabase/client', () => ({
   }
 }));
 
+vi.mock('@/components/debug/pipeline/usePipelineInterceptor', () => ({
+  usePipelineInterceptor: vi.fn()
+}));
+
 // Mock window.print
 window.print = vi.fn();
 

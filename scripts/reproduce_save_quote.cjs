@@ -37,6 +37,23 @@ if (!supabaseUrl || !supabaseServiceKey) {
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+function sanitizePayload(payload) {
+  const seen = new WeakSet();
+  const sanitize = (obj) => {
+    if (obj === null || typeof obj !== 'object') return obj;
+    if (seen.has(obj)) return undefined;
+    seen.add(obj);
+    if (Array.isArray(obj)) return obj.map(sanitize).filter(v => v !== undefined);
+    const out = {};
+    for (const [k, v] of Object.entries(obj)) {
+      const sv = sanitize(v);
+      if (sv !== undefined) out[k] = sv;
+    }
+    return out;
+  };
+  return sanitize(payload);
+}
+
 async function reproduceSaveQuote() {
   console.log('Starting reproduction of save_quote_atomic...');
 
@@ -131,7 +148,7 @@ async function reproduceSaveQuote() {
 
   // 5. Call save_quote_atomic
   const { data: savedId, error: rpcError } = await supabase.rpc('save_quote_atomic', {
-    p_payload: payload
+    p_payload: sanitizePayload(payload)
   });
 
   if (rpcError) {

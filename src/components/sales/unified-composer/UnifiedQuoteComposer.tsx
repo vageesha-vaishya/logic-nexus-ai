@@ -21,6 +21,7 @@ import { PortsService } from '@/services/PortsService';
 import { RateOption } from '@/types/quote-breakdown';
 import { invokeAnonymous, enrichPayload } from '@/lib/supabase-functions';
 import { logger } from '@/lib/logger';
+import { sanitizePayload } from '@/lib/utils/sanitizer';
 import { supabase } from '@/integrations/supabase/client';
 
 import { QuoteStoreProvider, useQuoteStore } from '@/components/sales/composer/store/QuoteStore';
@@ -159,8 +160,8 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
         // Execute parallel fetch with retry mechanism
         const [accRes, conRes, oppRes, ports] = await retryFetch(() => Promise.all([
           scopedDb.from('accounts').select('id, name').order('name'),
-          scopedDb.from('contacts').select('id, first_name, last_name').order('last_name'),
-          scopedDb.from('opportunities').select('id, name').order('name'),
+          scopedDb.from('contacts').select('id, first_name, last_name, account_id').order('last_name'),
+          scopedDb.from('opportunities').select('id, name, account_id, contact_id').order('created_at', { ascending: false }),
           portsService.getAllPorts()
         ]));
 
@@ -208,7 +209,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
   // Load configuration
   useEffect(() => {
     if (context.tenantId) {
-      new QuotationConfigurationService(scopedDb).getConfiguration(context.tenantId).then(setConfig);
+      new QuotationConfigurationService(supabase).getConfiguration(context.tenantId).then(setConfig);
     }
   }, [context.tenantId]);
 
@@ -258,10 +259,11 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
   // Network Connectivity Check
   // ---------------------------------------------------------------------------
 
-  const checkNetworkConnectivity = async (): Promise<boolean> => {
+  const checkNetworkConnectivity = useCallback(async (): Promise<boolean> => {
     try {
       // Simple check: try to access Supabase REST API health endpoint
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/rest/v1/`, {
+      // We don't care about the status code (401/404 is fine), just that we got a response
+      await fetch(`${import.meta.env.VITE_SUPABASE_URL}/rest/v1/`, {
         method: 'HEAD',
         headers: {
           'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
@@ -270,10 +272,10 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
         signal: AbortSignal.timeout(5000) // 5 second timeout
       });
       
-      return response.ok;
-    } catch (err) {
+      return true;
+    } catch (err: any) {
       // Only consider it offline if it's a genuine network error
-      if (err.name === 'AbortError' || err.message?.includes('fetch')) {
+      if (err.name === 'AbortError' || err.message?.includes('fetch') || err.message?.includes('NetworkError')) {
         logger.warn('[UnifiedComposer] Genuine network connectivity issue detected', err);
         return false;
       }
@@ -281,9 +283,9 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
       // For other errors (permissions, etc.), assume we're online
       return true;
     }
-  };
+  }, []);
 
-  const saveWithRetry = async (
+  const saveWithRetry = useCallback(async (
     operation: () => Promise<any>, 
     maxRetries = 2,
     delay = 1000
@@ -303,7 +305,6 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
           err.message?.includes('Failed to fetch') ||
           err.message?.includes('NetworkError') ||
           err.message?.includes('fetch') ||
-          err.name === 'TypeError' ||
           err.code === 'NETWORK_ERROR' ||
           err.status === 0
         );
@@ -316,7 +317,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
         await new Promise(resolve => setTimeout(resolve, delay * attempt));
       }
     }
-  };
+  }, [checkNetworkConnectivity]);
 
   // ---------------------------------------------------------------------------
   // Network Status Monitoring
@@ -357,7 +358,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
   // Handle Manual Option Creation
   // ---------------------------------------------------------------------------
 
-  const handleAddManualOption = () => {
+  const handleAddManualOption = useCallback(() => {
     const newOption: RateOption = {
       id: `manual-${Date.now()}`,
       carrier: '',
@@ -384,7 +385,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
     }));
     
     setSelectedOption(newOption);
-  };
+  }, []);
 
   // Combine results
   const combinedResults = useMemo(() => {
@@ -401,9 +402,9 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
     return fetched.filter(opt => !visibleRateIds.includes(opt.id) && !deletedOptionIds.includes(opt.id));
   }, [rateFetching.results, visibleRateIds, deletedOptionIds]);
 
-  const handleAddRateOption = (optionId: string) => {
+  const handleAddRateOption = useCallback((optionId: string) => {
     setVisibleRateIds(prev => [...prev, optionId]);
-  };
+  }, []);
 
   const getTransitDays = (val?: string | null) => {
     if (!val) return null;
@@ -434,7 +435,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
     return merged.sort((a, b) => (b.rank_score || 0) - (a.rank_score || 0));
   }, [combinedResults, config?.auto_ranking_criteria]);
 
-  const handleRemoveOption = async (optionId: string) => {
+  const handleRemoveOption = useCallback(async (optionId: string) => {
     if (displayResults.length <= 1) {
       toast({ title: 'Cannot delete', description: 'At least one option is required.', variant: 'destructive' });
       return;
@@ -454,8 +455,6 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
     const isUUID = (v: any) =>
       typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
 
-    const isManual = manualOptions.some((o) => o.id === optionId);
-
     // If it's not a UUID (temp/manual), handle locally
           if (!isUUID(optionId)) {
             setDeletedOptionIds((prev) => [...prev, optionId]);
@@ -474,7 +473,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
           }
 
     try {
-      const svc = new QuotationOptionCrudService(scopedDb);
+      const svc = new QuotationOptionCrudService(supabase);
       const { reselectedOptionId } = await svc.deleteOption(optionId, 'User removed option from composer');
       
       setManualOptions((prev) => prev.filter((o) => o.id !== optionId));
@@ -492,7 +491,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
     } catch (e: any) {
       toast({ title: 'Delete failed', description: e?.message || 'Could not delete option', variant: 'destructive' });
     }
-  };
+  }, [displayResults, rateFetching.results, selectedOption, supabase, toast]);
 
   const [attachments, setAttachments] = useState<any[]>([]);
   const [loadedAttachments, setLoadedAttachments] = useState<any[]>([]); // Track original attachments for diffing
@@ -1072,46 +1071,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
     loadExistingQuote();
   }, [loadExistingQuote, quoteId]);
 
-  // Load CRM Data
-  useEffect(() => {
-     const loadCRMData = async () => {
-      // Ensure we have a tenant context before fetching
-      const currentTenantId = context?.tenantId;
-      if (!currentTenantId && !context?.isPlatformAdmin) {
-          console.warn('[UnifiedComposer] No tenant ID available, skipping CRM data load');
-          return;
-      }
 
-      try {
-        setIsCrmLoading(true);
-        
-        // Parallel fetch for performance
-        const [accRes, conRes, oppRes] = await Promise.all([
-            scopedDb.from('accounts').select('id, name').order('name'),
-            scopedDb.from('contacts').select('id, first_name, last_name, account_id').order('first_name'),
-            scopedDb.from('opportunities').select('id, name, account_id, contact_id').order('created_at', { ascending: false })
-        ]);
-
-        if (accRes.error || conRes.error || oppRes.error) {
-            console.error('[UnifiedComposer] Failed to load CRM data', { accError: accRes.error, conError: conRes.error, oppError: oppRes.error });
-        }
-
-        setAccounts(accRes.data || []);
-        setContacts(conRes.data || []);
-        setOpportunities(oppRes.data || []);
-      } catch (e) {
-        console.error('[UnifiedComposer] Critical error loading CRM data', e);
-        toast({ title: 'Data Load Error', description: 'Failed to load customer data. Please refresh.', variant: 'destructive' });
-      } finally {
-        setIsCrmLoading(false);
-      }
-    };
-    
-    // Only load if scopedDb is ready
-    if (scopedDb) {
-        loadCRMData();
-    }
-  }, [scopedDb, context?.tenantId]);
 
   // ---------------------------------------------------------------------------
   // Handle pre-population from navigation state (QuickQuoteHistory)
@@ -1174,7 +1134,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
   // Compliance check
   // ---------------------------------------------------------------------------
 
-  const runComplianceCheck = async (params: FormZoneValues & ExtendedFormData) => {
+  const runComplianceCheck = useCallback(async (params: FormZoneValues & ExtendedFormData) => {
     try {
       const { data, error } = await invokeAiAdvisor({
         action: 'validate_compliance',
@@ -1195,7 +1155,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
     } catch {
       // Non-blocking
     }
-  };
+  }, [invokeAiAdvisor, toast]);
 
   // ---------------------------------------------------------------------------
   // Handle Composer Mode (Manual Only)
@@ -1236,7 +1196,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
   // Handle "Get Rates"
   // ---------------------------------------------------------------------------
 
-  const handleGetRates = async (formValues: FormZoneValues, extendedData: ExtendedFormData, smart: boolean) => {
+  const handleGetRates = useCallback(async (formValues: FormZoneValues, extendedData: ExtendedFormData, smart: boolean) => {
     setComplianceCheck(null);
     setLastFormData({ values: formValues, extended: extendedData });
     setIsSmartMode(smart);
@@ -1283,17 +1243,24 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
         containerResolver
       );
     }
-  };
+  }, [
+    runComplianceCheck, 
+    config, 
+    rateFetching, 
+    storeState.quoteData, 
+    containerResolver, 
+    handleComposerMode
+  ]);
 
   // ---------------------------------------------------------------------------
   // Handle option selection
   // ---------------------------------------------------------------------------
 
-  const handleSelectOption = (option: RateOption) => {
+  const handleSelectOption = useCallback((option: RateOption) => {
     setSelectedOption(option);
-  };
+  }, []);
 
-  const handleRenameOption = (optionId: string, newName: string) => {
+  const handleRenameOption = useCallback((optionId: string, newName: string) => {
     setManualOptions(prev => prev.map(opt => {
         if (opt.id === optionId) {
             return { ...opt, carrier: newName, name: newName };
@@ -1301,16 +1268,19 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
         return opt;
     }));
     
-    if (selectedOption?.id === optionId) {
-        setSelectedOption(prev => prev ? { ...prev, carrier: newName, name: newName } : null);
-    }
-  };
+    setSelectedOption(prev => {
+        if (prev?.id === optionId) {
+            return { ...prev, carrier: newName, name: newName };
+        }
+        return prev;
+    });
+  }, []);
 
   // ---------------------------------------------------------------------------
   // Handle Attachment Sync
   // ---------------------------------------------------------------------------
   
-  const handleSaveAttachments = async (quoteId: string, currentAttachments: any[]) => {
+  const handleSaveAttachments = useCallback(async (quoteId: string, currentAttachments: any[]) => {
     try {
         // 1. Identify deleted attachments
         // IDs in loadedAttachments that are NOT in currentAttachments
@@ -1383,16 +1353,16 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
         logger.error('Error syncing attachments', error);
         toast({ title: 'Attachment Error', description: 'Failed to sync attachments.', variant: 'destructive' });
     }
-  };
+  }, [loadedAttachments, scopedDb, supabase.storage, user?.id, toast]);
 
   // ---------------------------------------------------------------------------
   // Handle save quote
   // ---------------------------------------------------------------------------
 
-  const isUUID = (v: any) =>
-    typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+  const isUUID = useCallback((v: any) =>
+    typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v), []);
 
-  const handleSaveQuote = async (charges: any[], marginPercent: number, notes: string) => {
+  const handleSaveQuote = useCallback(async (charges: any[], marginPercent: number, notes: string) => {
     setSaving(true);
     logAudit('save_quote_attempt', { quoteId: quoteId || 'new' });
 
@@ -1411,7 +1381,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
       const isValid = await form.trigger();
       
       if (!isValid) {
-        console.error('Validation Errors:', JSON.stringify(form.formState.errors, null, 2));
+        logger.error('[UnifiedComposer] Validation failed', { errors: sanitizePayload(form.formState.errors) });
         toast({ title: 'Validation Error', description: 'Please check the form for errors.', variant: 'destructive' });
         setSaving(false);
         return;
@@ -1453,7 +1423,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
           return;
         }
         // Check uniqueness
-        const unique = await QuotationNumberService.isUnique(scopedDb, tenantId, finalQuoteNumber);
+        const unique = await QuotationNumberService.isUnique(supabase, tenantId, finalQuoteNumber);
         if (!unique && !currentQuoteId) {
              toast({ title: 'Duplicate Number', description: 'This quote number is already taken.', variant: 'destructive' });
              setSaving(false);
@@ -1461,8 +1431,8 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
         }
       } else if (!currentQuoteId) {
         // Auto-generate only for new quotes
-        const config = await QuotationNumberService.getConfig(scopedDb, tenantId);
-        finalQuoteNumber = await QuotationNumberService.generateNext(scopedDb, tenantId, config);
+        const config = await QuotationNumberService.getConfig(supabase, tenantId);
+        finalQuoteNumber = await QuotationNumberService.generateNext(supabase, tenantId, config);
       }
 
       // Auto-create/link opportunity (CRM-linked mode only)
@@ -1609,11 +1579,25 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
       // console.log('[UnifiedComposer] quotePayload cargo_details:', JSON.stringify(quotePayload.cargo_details, null, 2));
 
       const findBasisCodeById = (id: string) =>
-        repoData.chargeBases?.find((b: any) => b.id === id)?.code || '';
+        repoData?.chargeBases?.find((b: any) => b.id === id)?.code || '';
       const findCurrencyCodeById = (id: string) =>
-        repoData.currencies?.find((c: any) => c.id === id)?.code || 'USD';
+        repoData?.currencies?.find((c: any) => c.id === id)?.code || 'USD';
 
       const buildChargePayload = (c: any, side: 'buy' | 'sell') => {
+        if (!c) return {
+          charge_code: null,
+          basis_id: null,
+          currency_id: null,
+          basis: '',
+          currency: 'USD',
+          unit: '',
+          quantity: 1,
+          unit_price: 0,
+          amount: 0,
+          side,
+          note: null
+        };
+
         const quantity = side === 'buy' ? c.buy?.quantity : c.sell?.quantity;
         const unitPrice = side === 'buy' ? c.buy?.rate : c.sell?.rate;
         const amount = side === 'buy' ? c.buy?.amount : c.sell?.amount;
@@ -1716,9 +1700,12 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
 
       // logger.info('[UnifiedComposer] Sending save_quote_atomic payload', { payload: rpcPayload });
 
+      // Sanitize payload to remove circular references and DOM nodes
+      const safePayload = sanitizePayload(rpcPayload);
+
       const { data: savedId, error: rpcError } = await saveWithRetry(async () => {
         return scopedDb.rpc('save_quote_atomic', {
-          p_payload: rpcPayload
+          p_payload: safePayload
         });
       });
 
@@ -1747,7 +1734,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
             // Uniqueness enforcement (best-effort)
             const tenantIdStr = storeState.tenantId || context?.tenantId;
             if (tenantIdStr) {
-              const unique = await QuotationNumberService.isUnique(scopedDb, tenantIdStr, manualNo);
+              const unique = await QuotationNumberService.isUnique(supabase, tenantIdStr, manualNo);
               if (!unique) {
                 toast({ title: 'Duplicate number', description: 'This quote number already exists. Please choose another.', variant: 'destructive' });
                 return;
@@ -1805,10 +1792,9 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
         err.message?.includes('Failed to fetch') ||
         err.message?.includes('NetworkError') ||
         err.message?.includes('fetch') ||
-        err.name === 'TypeError' ||
         err.code === 'NETWORK_ERROR' ||
         err.status === 0 ||
-        (err instanceof TypeError && err.message.includes('fetch'))
+        (err instanceof TypeError && err.message?.includes('fetch'))
       );
       
       // Check for Supabase specific errors
@@ -1847,35 +1833,52 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
         description: errorMessage, 
         variant: 'destructive',
         duration: 5000,
-        action: isNetworkError ? {
-          label: 'Retry',
-          onClick: () => {
-            // Auto-retry for network errors
-            handleSaveQuote(charges, marginPercent, notes);
-          }
-        } : undefined
       });
     } finally {
       setSaving(false);
     }
-  };
+  }, [
+    quoteId,
+    storeState,
+    context,
+    versionId,
+    form,
+    canOverrideQuoteNumber,
+    supabase,
+    scopedDb,
+    user,
+    selectedOption,
+    repoData,
+    isUUID,
+    displayResults,
+    optionDrafts,
+    containerTypes,
+    containerSizes,
+    saveWithRetry,
+    dispatch,
+    handleSaveAttachments,
+    showQuotationSuccessToast,
+    toast,
+    setShowNetworkWarning,
+    logAudit
+  ]);
 
   // ---------------------------------------------------------------------------
   // Rerun rates
   // ---------------------------------------------------------------------------
 
-  const handleRerunRates = () => {
+  const handleRerunRates = useCallback(() => {
     if (lastFormData) {
       // Pass false for smart mode as rollback default
       handleGetRates(lastFormData.values, lastFormData.extended, false);
     }
-  };
+  }, [lastFormData, handleGetRates]);
 
   // ---------------------------------------------------------------------------
   // Draft save (manual)
   // ---------------------------------------------------------------------------
 
-  const handleSaveDraft = async () => {
+  const handleSaveDraft = useCallback(async () => {
     if (!lastFormData) {
       toast({ title: 'Nothing to save', description: 'Please fill out the form first.' });
       return;
@@ -1909,11 +1912,43 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
         opportunity_id: formData.values.opportunityId || null,
         owner_id: user?.id || null,
         created_by: user?.id || null,
+        cargo_details: {
+          commodity: formData.values.commodity,
+          total_weight_kg: Number(formData.values.weight) || 0,
+          total_volume_cbm: Number(formData.values.volume) || 0,
+          dangerous_goods: formData.values.dangerousGoods || formData.extended.dangerousGoods || false,
+          hts_code: formData.values.htsCode || formData.extended.htsCode || null,
+        }
       };
+
+      // Map container combos for draft
+      const combos = formData.values.containerCombos || formData.extended.containerCombos || [];
+      const cargoConfigs = combos.map((c: any) => {
+          const typeObj = containerTypes.find(t => t.id === c.type);
+          const sizeObj = containerSizes.find(s => s.id === c.size);
+          
+          return {
+              container_type: typeObj?.name || c.type,
+              container_size: sizeObj?.name || c.size,
+              container_type_id: isUUID(c.type) ? c.type : null,
+              container_size_id: isUUID(c.size) ? c.size : null,
+              quantity: c.qty,
+              temperature_control: null
+          };
+      });
+
+      const rpcPayload = {
+        quote: quotePayload,
+        items: [],
+        cargo_configurations: cargoConfigs,
+        options: [],
+      };
+
+      const safePayload = sanitizePayload(rpcPayload);
 
       const { data: savedId, error: rpcError } = await saveWithRetry(async () => {
         return scopedDb.rpc('save_quote_atomic', {
-          p_payload: { quote: quotePayload, items: [], cargo_configurations: [], options: [] },
+          p_payload: safePayload,
         });
       });
 
@@ -1942,13 +1977,13 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
     } finally {
       setSaving(false);
     }
-  };
+  }, [lastFormData, storeState, context, quoteId, user, scopedDb, toast, dispatch, setSearchParams, logAudit]);
 
   // ---------------------------------------------------------------------------
   // PDF Generation
   // ---------------------------------------------------------------------------
 
-  const handleGeneratePdf = async () => {
+  const handleGeneratePdf = useCallback(async () => {
     const currentQuoteId = storeState.quoteId || quoteId;
     const currentVersionId = storeState.versionId || versionId;
     if (!currentQuoteId) {
@@ -1983,7 +2018,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
       logAudit('generate_pdf_failure', { quoteId: currentQuoteId, error: err.message, stack: err.stack }, 'failure');
       toast({ title: 'PDF Failed', description: err.message || 'Could not generate PDF', variant: 'destructive' });
     }
-  };
+  }, [storeState.quoteId, storeState.versionId, quoteId, versionId, toast, logAudit]);
 
   const handleFormChange = useCallback((values: any) => {
     setLastFormData((prev) => ({
@@ -1991,6 +2026,23 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
       extended: (prev?.extended || (initialExtended as ExtendedFormData) || ({} as ExtendedFormData)),
     }));
   }, [initialExtended]);
+
+  // ---------------------------------------------------------------------------
+  // Reference Data Memoization & Handlers
+  // ---------------------------------------------------------------------------
+
+  const referenceData = useMemo(() => ({
+    chargeCategories: repoData.chargeCategories || [],
+    chargeBases: repoData.chargeBases || [],
+    currencies: repoData.currencies || [],
+    chargeSides: repoData.chargeSides || [],
+  }), [repoData.chargeCategories, repoData.chargeBases, repoData.currencies, repoData.chargeSides]);
+
+  const handleDraftChange = useCallback((draft: any) => {
+    if (selectedOption?.id) {
+      setOptionDrafts((prev) => ({ ...prev, [selectedOption.id]: draft }));
+    }
+  }, [selectedOption?.id]);
 
   // ---------------------------------------------------------------------------
   // Render
@@ -2156,16 +2208,9 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
                 onGeneratePdf={handleGeneratePdf}
                 saving={saving}
                 draft={optionDrafts[selectedOption.id]}
-                onDraftChange={(draft) =>
-                  setOptionDrafts((prev) => ({ ...prev, [selectedOption.id]: draft }))
-                }
+                onDraftChange={handleDraftChange}
                 onRenameOption={handleRenameOption}
-                referenceData={{
-                  chargeCategories: repoData.chargeCategories || [],
-                  chargeBases: repoData.chargeBases || [],
-                  currencies: repoData.currencies || [],
-                  chargeSides: repoData.chargeSides || [],
-                }}
+                referenceData={referenceData}
               />
             </>
           )}

@@ -1,53 +1,43 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { DocumentPreview } from './DocumentPreview';
+import { useMemo, memo } from 'react';
 
 import { QuoteStoreProvider, useQuoteStore } from './store/QuoteStore';
+import { getSafeName, calculateLegChargesTotal, calculateChargesTotal } from './utils';
+import { normalizeModeCode } from '@/lib/mode-utils';
 
 interface ReviewAndSaveStepProps {
   templateId?: string;
 }
 
-// Helper to safely render strings
-const getSafeName = (val: any): string => {
-  if (val === null || val === undefined) return '';
-  if (typeof val === 'string') return val;
-  if (typeof val === 'object') return val.name || val.code || val.description || '';
-  return String(val);
-};
-
-export function ReviewAndSaveStep({ templateId }: ReviewAndSaveStepProps) {
+export const ReviewAndSaveStep = memo(function ReviewAndSaveStep({ templateId }: ReviewAndSaveStepProps) {
   const { state } = useQuoteStore();
   const { legs, quoteData, charges: combinedCharges, referenceData } = state;
   const { currencies, shippingTerms, carriers, serviceTypes } = referenceData;
 
-  const calculateLegTotal = (leg: any, side: 'buy' | 'sell' = 'sell') => {
-    return leg.charges.reduce((acc, charge) => {
-      const qty = charge[side]?.quantity || 0;
-      const rate = charge[side]?.rate || 0;
-      return acc + (qty * rate);
-    }, 0);
-  };
+  const financials = useMemo(() => {
+    const legsTotalSell = legs.reduce((total, leg) => total + calculateLegChargesTotal(leg, 'sell'), 0);
+    const combinedTotalSell = calculateChargesTotal(combinedCharges, 'sell');
+    const grandTotalSell = legsTotalSell + combinedTotalSell;
 
-  const calculateCombinedTotal = (side: 'buy' | 'sell' = 'sell') => {
-    return combinedCharges.reduce((acc, charge) => {
-      const qty = charge[side]?.quantity || 0;
-      const rate = charge[side]?.rate || 0;
-      return acc + (qty * rate);
-    }, 0);
-  };
+    const legsTotalBuy = legs.reduce((total, leg) => total + calculateLegChargesTotal(leg, 'buy'), 0);
+    const combinedTotalBuy = calculateChargesTotal(combinedCharges, 'buy');
+    const grandTotalBuy = legsTotalBuy + combinedTotalBuy;
 
-  const calculateGrandTotal = (side: 'buy' | 'sell' = 'sell') => {
-    const legsTotal = legs.reduce((total, leg) => total + calculateLegTotal(leg, side), 0);
-    const combinedTotal = calculateCombinedTotal(side);
-    return legsTotal + combinedTotal;
-  };
+    const profit = grandTotalSell - grandTotalBuy;
+    // Use Profit Margin (Profit / Sell) for standard enterprise reporting
+    const marginPercent = grandTotalSell > 0 ? ((profit / grandTotalSell) * 100) : 0;
 
-  const grandTotalSell = calculateGrandTotal('sell');
-  const grandTotalBuy = calculateGrandTotal('buy');
-  const profit = grandTotalSell - grandTotalBuy;
-  // Use Profit Margin (Profit / Sell) for standard enterprise reporting
-  const marginPercent = grandTotalSell > 0 ? ((profit / grandTotalSell) * 100) : 0;
+    return {
+      grandTotalSell,
+      grandTotalBuy,
+      profit,
+      marginPercent
+    };
+  }, [legs, combinedCharges]);
+
+  const { grandTotalSell, grandTotalBuy, profit, marginPercent } = financials;
   
   const currency = currencies.find(c => c.id === quoteData.currencyId);
 
@@ -133,8 +123,8 @@ export function ReviewAndSaveStep({ templateId }: ReviewAndSaveStepProps) {
           <h3 className="font-semibold mb-3">Transport Legs & Services</h3>
           <div className="space-y-4">
             {legs.map((leg, idx) => {
-              const legTotalSell = calculateLegTotal(leg, 'sell');
-              const legTotalBuy = calculateLegTotal(leg, 'buy');
+              const legTotalSell = calculateLegChargesTotal(leg, 'sell');
+              const legTotalBuy = calculateLegChargesTotal(leg, 'buy');
               const legProfit = legTotalSell - legTotalBuy;
               const isServiceLeg = leg.legType === 'service';
               const legRole = leg.legType === 'pickup' ? 'Pickup Leg' : 
@@ -153,11 +143,13 @@ export function ReviewAndSaveStep({ templateId }: ReviewAndSaveStepProps) {
                              // DB requires 'transport'/'service' so we infer display role from position
                              if (leg.legType === 'service') return `Service: ${leg.serviceOnlyCategory || 'General'}`;
                              
-                             if (legs.length === 1) return `Main Leg 1 - ${leg.mode ? leg.mode.toUpperCase() : 'UNKNOWN'}`;
+                             const modeDisplay = normalizeModeCode(leg.mode || '').toUpperCase();
                              
-                             if (idx === 0) return `Pickup Leg - ${leg.mode ? leg.mode.toUpperCase() : 'UNKNOWN'}`;
-                             if (idx === legs.length - 1) return `Delivery Leg - ${leg.mode ? leg.mode.toUpperCase() : 'UNKNOWN'}`;
-                             return `Main Leg ${idx + 1} - ${leg.mode ? leg.mode.toUpperCase() : 'UNKNOWN'}`;
+                             if (legs.length === 1) return `Main Leg 1 - ${modeDisplay || 'UNKNOWN'}`;
+                             
+                             if (idx === 0) return `Pickup Leg - ${modeDisplay || 'UNKNOWN'}`;
+                             if (idx === legs.length - 1) return `Delivery Leg - ${modeDisplay || 'UNKNOWN'}`;
+                             return `Main Leg ${idx + 1} - ${modeDisplay || 'UNKNOWN'}`;
                           })()}
                         </p>
                         <p className="text-sm text-muted-foreground">
@@ -209,18 +201,18 @@ export function ReviewAndSaveStep({ templateId }: ReviewAndSaveStepProps) {
                     </div>
                     <div className="text-right">
                       <p className="text-sm text-muted-foreground">Total</p>
-                      <p className="font-bold text-lg">{currency?.symbol || ''}{calculateCombinedTotal('sell').toFixed(2)}</p>
+                      <p className="font-bold text-lg">{currency?.symbol || ''}{calculateChargesTotal(combinedCharges, 'sell').toFixed(2)}</p>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-xs bg-muted/50 p-2 rounded">
                     <div>
                       <p className="text-muted-foreground">Buy Cost</p>
-                      <p className="font-medium">{currency?.symbol || ''}{calculateCombinedTotal('buy').toFixed(2)}</p>
+                      <p className="font-medium">{currency?.symbol || ''}{calculateChargesTotal(combinedCharges, 'buy').toFixed(2)}</p>
                     </div>
                     <div>
                       <p className="text-muted-foreground">Profit</p>
                       <p className="font-medium text-primary">
-                        {currency?.symbol || ''}{(calculateCombinedTotal('sell') - calculateCombinedTotal('buy')).toFixed(2)}
+                        {currency?.symbol || ''}{(calculateChargesTotal(combinedCharges, 'sell') - calculateChargesTotal(combinedCharges, 'buy')).toFixed(2)}
                       </p>
                     </div>
                   </div>
@@ -282,4 +274,4 @@ export function ReviewAndSaveStep({ templateId }: ReviewAndSaveStepProps) {
       </CardContent>
     </Card>
   );
-}
+});

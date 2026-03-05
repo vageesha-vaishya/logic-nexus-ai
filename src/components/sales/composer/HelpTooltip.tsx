@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { HelpCircle } from 'lucide-react';
 import {
   Tooltip,
@@ -10,7 +11,7 @@ interface HelpTooltipProps {
   content: string;
 }
 
-export function HelpTooltip({ content }: HelpTooltipProps) {
+export const HelpTooltip = memo(function HelpTooltip({ content }: HelpTooltipProps) {
   return (
     <TooltipProvider>
       <Tooltip>
@@ -25,4 +26,4 @@ export function HelpTooltip({ content }: HelpTooltipProps) {
       </Tooltip>
     </TooltipProvider>
   );
-}
+});

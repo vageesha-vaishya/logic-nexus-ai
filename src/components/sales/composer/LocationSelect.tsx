@@ -28,7 +28,7 @@ interface LocationSelectProps {
   preloadedPorts?: any[];
 }
 
-export function LocationSelect({
+export const LocationSelect = React.memo(function LocationSelect({
   value,
   onChange,
   placeholder = "Select city/port...",
@@ -168,7 +168,9 @@ export function LocationSelect({
         });
       }
 
-      if (!search || search.length < 2) return [];
+      // Allow empty search to fetch default/popular locations
+      // Only skip very short searches (1 char) to avoid noise
+      if (search && search.length < 2) return [];
       
       console.log('LocationSelect searching for:', search);
       
@@ -411,4 +413,4 @@ export function LocationSelect({
       </AlertDialog>
     </>
   );
-}
+});

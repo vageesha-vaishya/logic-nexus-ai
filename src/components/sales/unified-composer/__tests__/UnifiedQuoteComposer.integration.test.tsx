@@ -154,39 +154,70 @@ vi.mock('@/components/sales/shared/AiMarketAnalysis', () => ({
 }));
 
 
-// Mock FormZone to isolate data flow and prevent deep rendering issues
-vi.mock('../FormZone', () => ({
-   FormZone: ({ initialValues, initialExtended, onChange }: any) => {
-       return (
-           <div data-testid="form-zone">
-               <input 
-                   data-testid="commodity-input" 
-                   defaultValue={initialValues?.commodity || ''}
-                   onChange={(e) => {
-                        const newValues = { ...initialValues, commodity: 'Updated Electronics' };
-                        onChange?.(newValues);
-                    }}
-               />
-               <input 
-                   data-testid="location-Origin" 
-                   defaultValue={initialValues?.origin || ''} 
-               />
-               <input 
-                   data-testid="location-Destination" 
-                   defaultValue={initialValues?.destination || ''} 
-               />
-               <input 
-                   data-testid="cargo-weight" 
-                   defaultValue={initialValues?.weight || ''} 
-               />
-               <input 
-                   data-testid="cargo-volume" 
-                   defaultValue={initialValues?.volume || ''} 
-               />
-           </div>
-       );
-   }
-}));
+vi.mock('../FormZone', async () => {
+   const { useFormContext } = await vi.importActual<typeof import('react-hook-form')>('react-hook-form');
+
+   return {
+       FormZone: ({ onChange }: any) => {
+           const { watch, setValue, getValues } = useFormContext<any>();
+
+           const commodity = watch('commodity');
+           const origin = watch('origin');
+           const destination = watch('destination');
+           const weight = watch('weight');
+           const volume = watch('volume');
+
+           const sync = () => {
+               onChange?.(getValues());
+           };
+
+           return (
+               <div data-testid="form-zone">
+                   <input
+                       data-testid="commodity-input"
+                       value={commodity || ''}
+                       onChange={(e) => {
+                           setValue('commodity', e.target.value);
+                           sync();
+                       }}
+                   />
+                   <input
+                       data-testid="location-Origin"
+                       value={origin || ''}
+                       onChange={(e) => {
+                           setValue('origin', e.target.value);
+                           sync();
+                       }}
+                   />
+                   <input
+                       data-testid="location-Destination"
+                       value={destination || ''}
+                       onChange={(e) => {
+                           setValue('destination', e.target.value);
+                           sync();
+                       }}
+                   />
+                   <input
+                       data-testid="cargo-weight"
+                       value={weight || ''}
+                       onChange={(e) => {
+                           setValue('weight', e.target.value);
+                           sync();
+                       }}
+                   />
+                   <input
+                       data-testid="cargo-volume"
+                       value={volume || ''}
+                       onChange={(e) => {
+                           setValue('volume', e.target.value);
+                           sync();
+                       }}
+                   />
+               </div>
+           );
+       }
+   };
+});
 
 
 vi.mock('../FinalizeSection', () => ({
@@ -350,13 +381,23 @@ const createMockChain = (data: any) => {
     };
     chain.select = vi.fn(() => chain);
     chain.eq = vi.fn(() => chain);
+    chain.neq = vi.fn(() => chain);
+    chain.gt = vi.fn(() => chain);
+    chain.lt = vi.fn(() => chain);
+    chain.gte = vi.fn(() => chain);
+    chain.lte = vi.fn(() => chain);
+    chain.in = vi.fn(() => chain);
+    chain.is = vi.fn(() => chain);
+    chain.like = vi.fn(() => chain);
+    chain.ilike = vi.fn(() => chain);
+    chain.contains = vi.fn(() => chain);
     chain.order = vi.fn(() => chain);
+    chain.limit = vi.fn(() => chain);
     chain.single = vi.fn(() => chain);
     chain.maybeSingle = vi.fn(() => chain);
-    chain.delete = vi.fn(() => chain);
     chain.insert = vi.fn(() => chain);
     chain.update = vi.fn(() => chain);
-    chain.in = vi.fn(() => chain);
+    chain.delete = vi.fn(() => chain);
     chain.rpc = vi.fn(() => chain);
     return chain;
 };
@@ -369,6 +410,7 @@ describe('UnifiedQuoteComposer Integration (API-to-UI)', () => {
     
     beforeEach(() => {
         vi.clearAllMocks();
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({}), { status: 200, headers: { 'Content-Type': 'application/json' } })) as any);
 
         // Default mock setup for CRM data loading
         mockScopedDb.from.mockImplementation((table: string) => {
@@ -380,7 +422,7 @@ describe('UnifiedQuoteComposer Integration (API-to-UI)', () => {
     });
 
     it('populates FormZone inputs correctly from loaded quote data', async () => {
-        const QUOTE_ID = 'test-quote-id';
+        const QUOTE_ID = '123e4567-e89b-12d3-a456-426614174000';
         
         // Mock quote data
         mockScopedDb.from.mockImplementation((table: string) => {
@@ -450,8 +492,14 @@ describe('UnifiedQuoteComposer Integration (API-to-UI)', () => {
                 return createMockChain({
                     id: QUOTE_ID,
                     quote_number: 'Q-1001',
+                    transport_mode: 'air',
+                    origin: 'New York',
+                    destination: 'London',
+                    origin_port_id: 'port-1',
+                    destination_port_id: 'port-2',
                     current_version_id: VERSION_ID,
                     tenant_id: 'test-tenant',
+                    account_id: 'acc-1',
                     cargo_details: { commodity: 'Initial', total_weight_kg: 100 }
                 });
             } else if (table === 'quotation_versions') {
@@ -502,6 +550,12 @@ describe('UnifiedQuoteComposer Integration (API-to-UI)', () => {
             expect(screen.getByTestId('commodity-input')).toHaveValue('Initial');
         });
 
+        const weightInput = screen.getByTestId('cargo-weight');
+        await fireEvent.change(weightInput, { target: { value: '100' } });
+
+        const volumeInput = screen.getByTestId('cargo-volume');
+        await fireEvent.change(volumeInput, { target: { value: '0' } });
+
         // Change commodity
         const commodityInput = screen.getByTestId('commodity-input');
         await fireEvent.change(commodityInput, { target: { value: 'Updated Electronics' } });
@@ -516,26 +570,103 @@ describe('UnifiedQuoteComposer Integration (API-to-UI)', () => {
         const saveButton = screen.getByTestId('save-quote-button');
         await user.click(saveButton);
 
-        // Verify RPC call has updated values
-        await waitFor(() => {
-             if (mockScopedDb.rpc.mock.calls.length === 0) {
-                 throw new Error('RPC not called yet');
-             }
-        });
-
-        console.log('RPC Calls:', JSON.stringify(mockScopedDb.rpc.mock.calls, null, 2));
-
+        // Verify save call
         expect(mockScopedDb.rpc).toHaveBeenCalledWith(
             'save_quote_atomic',
             expect.objectContaining({
                 p_payload: expect.objectContaining({
                     quote: expect.objectContaining({
+                        id: QUOTE_ID,
+                        status: 'draft',
+                        origin: 'New York',
+                        destination: 'London',
+                        transport_mode: 'air',
                         cargo_details: expect.objectContaining({
-                            commodity: 'Updated Electronics'
+                            commodity: 'Updated Electronics',
+                            total_weight_kg: 100,
+                            total_volume_cbm: 0
                         })
-                    })
+                    }),
+                    cargo_configurations: expect.any(Array)
                 })
             })
         );
+    });
+
+    it('does not crash when save is attempted with invalid form values', async () => {
+        const QUOTE_ID = '123e4567-e89b-12d3-a456-426614174000';
+        const VERSION_ID = '123e4567-e89b-12d3-a456-426614174001';
+        const OPTION_ID = '123e4567-e89b-12d3-a456-426614174002';
+        const user = userEvent.setup();
+
+        mockScopedDb.from.mockImplementation((table: string) => {
+            if (table === 'quotes') {
+                return createMockChain({
+                    id: QUOTE_ID,
+                    quote_number: 'Q-1001',
+                    transport_mode: 'air',
+                    origin: 'New York',
+                    destination: 'London',
+                    current_version_id: VERSION_ID,
+                    tenant_id: 'test-tenant',
+                    account_id: 'acc-1',
+                    cargo_details: { commodity: 'Initial', total_weight_kg: 100 }
+                });
+            } else if (table === 'quotation_versions') {
+                return createMockChain([{ id: VERSION_ID, version_number: 1 }]);
+            } else if (table === 'quotation_version_options') {
+                return createMockChain([{ 
+                    id: OPTION_ID, 
+                    quotation_version_id: VERSION_ID, 
+                    is_selected: true,
+                    option_name: 'Test Option',
+                    total_amount: 1000,
+                    currency: 'USD'
+                }]);
+            } else if (table === 'quotation_version_option_legs') {
+                return createMockChain([]);
+            } else if (table === 'quote_charges') {
+                return createMockChain([]);
+            } else if (table === 'quote_items') {
+                return createMockChain([]);
+            } else if (table === 'quote_documents') {
+                return createMockChain([]);
+            } else if (table === 'quote_cargo_configurations') {
+                return createMockChain([]);
+            }
+            return createMockChain([]);
+        });
+
+        mockScopedDb.rpc.mockResolvedValue({ data: QUOTE_ID, error: null });
+
+        const queryClient = new QueryClient({
+            defaultOptions: { queries: { retry: false } },
+        });
+
+        render(
+            <QueryClientProvider client={queryClient}>
+                <MemoryRouter initialEntries={[`/quotes/edit/${QUOTE_ID}`]}>
+                    <Routes>
+                        <Route path="/quotes/edit/:quoteId" element={<UnifiedQuoteComposer quoteId={QUOTE_ID} />} />
+                    </Routes>
+                </MemoryRouter>
+            </QueryClientProvider>
+        );
+
+        await waitFor(() => {
+            expect(screen.getByTestId('commodity-input')).toHaveValue('Initial');
+        });
+
+        mockToast.mockClear();
+        mockScopedDb.rpc.mockClear();
+
+        const commodityInput = screen.getByTestId('commodity-input');
+        await fireEvent.change(commodityInput, { target: { value: 'a' } });
+
+        const saveButton = screen.getByTestId('save-quote-button');
+        await user.click(saveButton);
+
+        expect(mockScopedDb.rpc).not.toHaveBeenCalled();
+        expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ title: 'Validation Error' }));
     });
 });

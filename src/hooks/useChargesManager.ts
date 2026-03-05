@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { RateOption, TransportLeg, Charge } from '@/types/quote-breakdown';
 
 export interface ManagedCharge {
@@ -167,6 +167,16 @@ export function useChargesManager({
 }: UseChargesManagerParams): UseChargesManagerReturn {
   const [autoMargin, setAutoMargin] = useState<boolean>(initialAutoMargin ?? true);
   const [marginPercent, setMarginPercent] = useState<number>(initialMarginPercent ?? defaultMarginPercent);
+  
+  // Use refs to access latest state in callbacks without re-creating them
+  const autoMarginRef = useRef(autoMargin);
+  const marginPercentRef = useRef(marginPercent);
+
+  useEffect(() => {
+    autoMarginRef.current = autoMargin;
+    marginPercentRef.current = marginPercent;
+  }, [autoMargin, marginPercent]);
+
   const [charges, setCharges] = useState<ManagedCharge[]>(() =>
     initialCharges ?? initCharges(selectedOption, referenceData, initialMarginPercent ?? defaultMarginPercent, initialAutoMargin ?? true)
   );
@@ -262,8 +272,8 @@ export function useChargesManager({
             updated[parent].amount = Number((updated[parent].quantity * updated[parent].rate).toFixed(2));
 
             // Auto-margin: if buy rate changes, recalculate sell
-            if (autoMargin && parent === 'buy' && child === 'rate') {
-              const newSellRate = Number((value * (1 + marginPercent / 100)).toFixed(2));
+            if (autoMarginRef.current && parent === 'buy' && child === 'rate') {
+              const newSellRate = Number((value * (1 + marginPercentRef.current / 100)).toFixed(2));
               updated.sell = {
                 ...updated.sell,
                 rate: newSellRate,
@@ -271,7 +281,7 @@ export function useChargesManager({
               };
             }
             // Auto-margin: if buy quantity changes, sync sell quantity
-            if (autoMargin && parent === 'buy' && child === 'quantity') {
+            if (autoMarginRef.current && parent === 'buy' && child === 'quantity') {
               updated.sell = {
                 ...updated.sell,
                 quantity: value,
@@ -295,7 +305,7 @@ export function useChargesManager({
         })
       );
     },
-    [autoMargin, marginPercent, referenceData]
+    [referenceData]
   );
 
   const removeCharge = useCallback((chargeId: string) => {

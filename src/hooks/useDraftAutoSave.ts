@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { logger } from '@/lib/logger';
+import { sanitizePayload } from '@/lib/utils/sanitizer';
 
 const AUTO_SAVE_DEBOUNCE_MS = 30_000; // 30 seconds
 
@@ -50,11 +51,13 @@ export function useDraftAutoSave(
     if (!isUUID(payload.versionId) || !isUUID(payload.tenantId)) return;
 
     // Check dirty state
-    const snapshot = JSON.stringify({
-      quoteData: payload.quoteData,
-      legs: payload.legs,
-      charges: payload.charges,
-    });
+    const snapshot = JSON.stringify(
+      sanitizePayload({
+        quoteData: payload.quoteData,
+        legs: payload.legs,
+        charges: payload.charges,
+      })
+    );
 
     if (snapshot === lastSnapshotRef.current) return; // No changes
 
@@ -164,7 +167,7 @@ export function useDraftAutoSave(
       };
 
       const { error: rpcError } = await scopedDb.rpc('save_quote_atomic', {
-        p_payload: rpcPayload,
+        p_payload: sanitizePayload(rpcPayload),
       });
 
       if (rpcError) {

@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Card } from '@/components/ui/card';
 import { useTransportModes } from '@/hooks/useTransportModes';
 import { useCarriersByMode } from '@/hooks/useCarriersByMode';
@@ -45,7 +46,7 @@ const ICON_MAP: Record<string, any> = {
   Network
 };
 
-export function TransportModeSelector({ selectedMode, onSelect }: TransportModeSelectorProps) {
+export const TransportModeSelector = memo(({ selectedMode, onSelect }: TransportModeSelectorProps) => {
   const { modes, loading: modesLoading } = useTransportModes();
   const { carrierMap, isLoading: carriersLoading } = useCarriersByMode();
 
@@ -120,7 +121,7 @@ export function TransportModeSelector({ selectedMode, onSelect }: TransportModeS
             className={`cursor-pointer transition-all hover:scale-105 ${
               isSelected ? 'ring-2 ring-primary shadow-lg' : ''
             }`}
-            onClick={() => onSelect(mode.id)}
+            onClick={() => onSelect(mode.code || mode.id)}
           >
             {content}
           </Card>
@@ -128,4 +129,4 @@ export function TransportModeSelector({ selectedMode, onSelect }: TransportModeS
       })}
     </div>
   );
-}
+});

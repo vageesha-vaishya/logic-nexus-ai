@@ -48,7 +48,7 @@ interface LocationAutocompleteProps {
   preloadedLocations?: Location[];
 }
 
-export function LocationAutocomplete({
+export const LocationAutocomplete = React.memo(function LocationAutocomplete({
   value,
   onChange,
   placeholder = "Search location...",
@@ -614,4 +614,4 @@ export function LocationAutocomplete({
       </PopoverContent>
     </Popover>
   )
-}
+});
