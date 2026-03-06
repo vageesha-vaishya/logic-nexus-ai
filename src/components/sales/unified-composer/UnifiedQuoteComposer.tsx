@@ -83,6 +83,8 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
 
   const form = useForm<QuoteComposerValues>({
     resolver: zodResolver(quoteComposerSchema),
+    mode: 'onChange',
+    reValidateMode: 'onChange',
     defaultValues: {
       mode: 'ocean',
       origin: '',
@@ -496,6 +498,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
         role="alert"
         aria-live="assertive"
         aria-label="Validation summary"
+        data-testid="validation-summary"
       >
         <AlertCircle className="h-4 w-4" />
         <AlertTitle className="ml-2 flex items-center justify-between">
@@ -505,6 +508,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
             size="sm" 
             className="h-6 w-6 p-0 hover:bg-destructive/20 text-destructive-foreground"
             onClick={() => setShowValidationSummary(false)}
+            aria-label="Close validation summary"
           >
             <X className="h-4 w-4" />
           </Button>
@@ -517,7 +521,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
                   type="button" 
                   onClick={() => scrollToField(issue.path)}
                   className="hover:underline text-left font-medium"
-                  aria-label={`Go to ${issue.label} field`}
+                  aria-label={`Go to ${issue.label} field error`}
                 >
                   {issue.label}: {issue.message}
                 </button>

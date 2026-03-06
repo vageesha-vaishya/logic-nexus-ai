@@ -2,10 +2,10 @@ import * as React from "react";
 import * as LabelPrimitive from "@radix-ui/react-label";
 import { Slot } from "@radix-ui/react-slot";
 import { Controller, ControllerProps, FieldPath, FieldValues, FormProvider, useFormContext } from "react-hook-form";
+import { AlertCircle } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
-import { AlertCircle } from "lucide-react";
 
 const Form = FormProvider;
 
@@ -65,10 +65,22 @@ const FormItem = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivEl
     const id = React.useId();
     const fieldContext = React.useContext(FormFieldContext);
     const fieldName = fieldContext?.name ? String(fieldContext.name) : undefined;
+    const { getFieldState, formState } = useFormContext();
+    const fieldError = fieldContext?.name ? getFieldState(fieldContext.name, formState).error : undefined;
 
     return (
       <FormItemContext.Provider value={{ id }}>
-        <div ref={ref} className={cn("space-y-2", className)} data-field-name={fieldName} {...props} />
+        <div
+          ref={ref}
+          className={cn(
+            "space-y-2",
+            fieldError && "rounded-md bg-destructive/5 ring-1 ring-destructive p-2",
+            className
+          )}
+          data-field-name={fieldName}
+          data-invalid={fieldError ? "true" : "false"}
+          {...props}
+        />
       </FormItemContext.Provider>
     );
   },
@@ -129,7 +141,7 @@ const FormMessage = React.forwardRef<HTMLParagraphElement, React.HTMLAttributes<
         className={cn("flex items-start gap-1.5 text-sm font-medium text-destructive", className)}
         {...props}
       >
-        <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+        <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" data-testid="field-error-icon" aria-hidden="true" />
         <span>{body}</span>
       </p>
     );
