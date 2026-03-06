@@ -381,35 +381,58 @@ export class PdfRenderer {
      
      this.cursorY -= 25;
 
-     // Simple text wrapping logic for terms
+     // Robust text wrapping logic
      const fontSize = 9;
+     const lineHeight = fontSize + 4;
      const maxWidth = this.currentPage.getSize().width - this.margins.left - this.margins.right;
      
-     // Very basic split by newline, then by word wrap
-     const lines = text.split('\n');
+     const paragraphs = text.split('\n');
      
-     for (const line of lines) {
-        if (this.cursorY < this.margins.bottom + 20) {
-            this.addNewPage();
-            this.cursorY -= 20;
-        }
-
-        this.currentPage.drawText(line, {
-            x: this.margins.left,
-            y: this.cursorY,
-            size: fontSize,
-            font: this.font,
-            maxWidth: maxWidth,
-            lineHeight: fontSize + 4,
-            color: rgb(0.2, 0.2, 0.2)
-        });
-        
-        // Estimate height usage (rough approximation)
-        const textHeight = (Math.ceil(this.font.widthOfTextAtSize(line, fontSize) / maxWidth) || 1) * (fontSize + 4);
-        this.cursorY -= (textHeight + 5);
+     for (const paragraph of paragraphs) {
+         const lines = this.breakTextIntoLines(paragraph, fontSize, maxWidth);
+         
+         for (const line of lines) {
+             if (this.cursorY < this.margins.bottom + 20) {
+                 this.addNewPage();
+                 this.cursorY -= 20;
+             }
+             
+             this.currentPage.drawText(line, {
+                 x: this.margins.left,
+                 y: this.cursorY,
+                 size: fontSize,
+                 font: this.font,
+                 color: rgb(0.2, 0.2, 0.2)
+             });
+             
+             this.cursorY -= lineHeight;
+         }
+         // Add a small gap between paragraphs if desired, or just standard leading
+         // this.cursorY -= 2; 
      }
      
      this.cursorY -= 20;
+  }
+
+  private breakTextIntoLines(text: string, fontSize: number, maxWidth: number): string[] {
+      if (!this.font) return [text];
+      
+      const words = text.split(' ');
+      const lines: string[] = [];
+      let currentLine = words[0];
+
+      for (let i = 1; i < words.length; i++) {
+          const word = words[i];
+          const width = this.font.widthOfTextAtSize(currentLine + " " + word, fontSize);
+          if (width < maxWidth) {
+              currentLine += " " + word;
+          } else {
+              lines.push(currentLine);
+              currentLine = word;
+          }
+      }
+      lines.push(currentLine);
+      return lines;
   }
 
   private async renderLogo(x: number, y: number, maxWidth: number, maxHeight: number) {
