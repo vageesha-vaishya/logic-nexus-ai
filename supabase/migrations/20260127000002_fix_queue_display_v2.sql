@@ -25,6 +25,7 @@ CREATE INDEX IF NOT EXISTS idx_queue_rules_tenant_priority ON public.queue_rules
 -- Enable RLS on rules
 ALTER TABLE public.queue_rules ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Tenant admins can manage queue rules" ON public.queue_rules;
 CREATE POLICY "Tenant admins can manage queue rules" ON public.queue_rules
     FOR ALL
     USING (

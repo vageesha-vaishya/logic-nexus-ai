@@ -4,24 +4,11 @@
 
 BEGIN;
 
-INSERT INTO platform_domains (key, code, name, description, owner, status, repository_url, swagger_endpoint)
-VALUES (
-    'logistics',
-    'logistics',
-    'Logistics & Transport',
-    'Core transportation management, quoting, and shipment tracking.',
-    'Logistics Squad',
-    'active',
-    '',
-    ''
-)
-ON CONFLICT (key) DO UPDATE SET
+INSERT INTO public.platform_domains (code, name, description)
+VALUES ('logistics', 'Logistics & Transport', 'Core transportation management, quoting, and shipment tracking.')
+ON CONFLICT (code) DO UPDATE SET
     name = EXCLUDED.name,
-    description = EXCLUDED.description,
-    owner = EXCLUDED.owner,
-    status = EXCLUDED.status,
-    repository_url = EXCLUDED.repository_url,
-    swagger_endpoint = EXCLUDED.swagger_endpoint;
+    description = EXCLUDED.description;
 
 COMMIT;
 

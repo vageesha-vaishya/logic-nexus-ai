@@ -99,15 +99,36 @@ ADD COLUMN is_open_top BOOLEAN DEFAULT false,
 ADD COLUMN is_flat_rack BOOLEAN DEFAULT false;
 
 -- Insert common container ownership variants
-INSERT INTO container_types (name, code, ownership_type, is_active, is_special, special_type) VALUES
-('Dry COC', 'DRY_COC', 'COC', true, false, NULL),
-('Dry SOC', 'DRY_SOC', 'SOC', true, false, NULL),
-('Reefer COC', 'REEFER_COC', 'COC', true, true, 'refrigerated'),
-('Reefer SOC', 'REEFER_SOC', 'SOC', true, true, 'refrigerated'),
-('Open Top', 'OPEN_TOP', 'BOTH', true, true, 'open_top'),
-('Flat Rack', 'FLAT_RACK', 'BOTH', true, true, 'flat_rack'),
-('Tank Container', 'TANK', 'BOTH', true, true, 'tank')
-ON CONFLICT (code) DO NOTHING;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'container_types'
+      AND column_name = 'category'
+  ) THEN
+    INSERT INTO container_types (name, code, ownership_type, is_active, is_special, special_type, category) VALUES
+    ('Dry COC', 'DRY_COC', 'COC', true, false, NULL, 'Standard'),
+    ('Dry SOC', 'DRY_SOC', 'SOC', true, false, NULL, 'Standard'),
+    ('Reefer COC', 'REEFER_COC', 'COC', true, true, 'refrigerated', 'Reefer'),
+    ('Reefer SOC', 'REEFER_SOC', 'SOC', true, true, 'refrigerated', 'Reefer'),
+    ('Open Top', 'OPEN_TOP', 'BOTH', true, true, 'open_top', 'Open Top'),
+    ('Flat Rack', 'FLAT_RACK', 'BOTH', true, true, 'flat_rack', 'Flat Rack'),
+    ('Tank Container', 'TANK', 'BOTH', true, true, 'tank', 'Tank')
+    ON CONFLICT (code) DO NOTHING;
+  ELSE
+    INSERT INTO container_types (name, code, ownership_type, is_active, is_special, special_type) VALUES
+    ('Dry COC', 'DRY_COC', 'COC', true, false, NULL),
+    ('Dry SOC', 'DRY_SOC', 'SOC', true, false, NULL),
+    ('Reefer COC', 'REEFER_COC', 'COC', true, true, 'refrigerated'),
+    ('Reefer SOC', 'REEFER_SOC', 'SOC', true, true, 'refrigerated'),
+    ('Open Top', 'OPEN_TOP', 'BOTH', true, true, 'open_top'),
+    ('Flat Rack', 'FLAT_RACK', 'BOTH', true, true, 'flat_rack'),
+    ('Tank Container', 'TANK', 'BOTH', true, true, 'tank')
+    ON CONFLICT (code) DO NOTHING;
+  END IF;
+END $$;
 
 -- Add RLS policies for charge_weight_breaks
 ALTER TABLE charge_weight_breaks ENABLE ROW LEVEL SECURITY;

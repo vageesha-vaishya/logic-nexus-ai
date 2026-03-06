@@ -93,6 +93,9 @@ export class PdfRenderer {
           case "footer":
             await this.renderFooter(section);
             break;
+          case "terms_block":
+            await this.renderTermsBlock(section);
+            break;
           default:
             this.logger.warn(`Unsupported section type: ${section.type}`);
         }
@@ -145,12 +148,16 @@ export class PdfRenderer {
     // Dynamic Colors & Text
     const primaryColor = this.hexToRgb(this.context.branding.primary_color || "#0087b5");
     const companyName = this.context.branding.company_name || "MIAMI GLOBAL LINES";
+    const companyAddress = this.context.branding.company_address || "140 Ethel Road West; Unit 'S&T', Piscataway, NJ 08854-USA";
+    const subHeader = this.context.branding.sub_header_text || "Phone:+1-732-640-2365,FMC Lic. # 023172NF / IAC #: NE1210010";
+    const headerText = this.context.branding.header_text || "Professional Attitude at all Altitudes";
+
     const logoText = companyName.length > 10 ? companyName.substring(0, 3).toUpperCase() : companyName;
 
-    // MGL Layout Check
-    if (this.template.name.includes("MGL")) {
-        // MGL Logo Text (Centered)
-        // Try to render logo image first
+    // Standard Layout (Logo + Centered Info)
+    // We default to this layout if branding is present or if it's the MGL template
+    if (this.template.name.includes("MGL") || this.context.branding.logo_base64) {
+        // Logo
         const logoW = 150;
         const logoH = 60;
         const logoX = (width - logoW) / 2;
@@ -164,11 +171,11 @@ export class PdfRenderer {
 
         this.drawTextCentered(companyName.toUpperCase(), height - 60, 16, true, primaryColor);
 
-        // Address
+        // Address & Contact Info
         const addrY = height - 85;
-        this.drawTextCentered("140 Ethel Road West; Unit 'S&T', Piscataway, NJ 08854-USA", addrY, 10, true);
-        this.drawTextCentered("Phone:+1-732-640-2365,FMC Lic. # 023172NF / IAC #: NE1210010", addrY - 12, 10, true);
-        this.drawTextCentered("Professional Attitude at all Altitudes", addrY - 24, 10, true, rgb(0, 0, 0));
+        this.drawTextCentered(companyAddress, addrY, 10, true);
+        this.drawTextCentered(subHeader, addrY - 12, 10, true);
+        this.drawTextCentered(headerText, addrY - 24, 10, true, rgb(0, 0, 0));
 
         this.cursorY = addrY - 50;
 
@@ -340,7 +347,8 @@ export class PdfRenderer {
   
   private async renderFooter(section: TemplateSection) {
      if (!this.currentPage || !this.font) return;
-     const text = section.content?.text || "";
+     // Use dynamic footer text if available, else fallback to section content
+     const text = this.context.branding.footer_text || section.content?.text || "";
      const { width } = this.currentPage.getSize();
      
      const textWidth = this.font.widthOfTextAtSize(text, 10);
@@ -353,6 +361,55 @@ export class PdfRenderer {
          font: this.font,
          color: rgb(0.5, 0.5, 0.5)
      });
+  }
+
+  private async renderTermsBlock(section: TemplateSection) {
+     if (!this.currentPage || !this.font) return;
+     
+     const title = "Notes and Terms";
+     // Use dynamic disclaimer text if available, else fallback to section content
+     const text = this.context.branding.disclaimer_text || section.content?.text || "Standard terms apply.";
+     
+     // Draw Title
+     this.currentPage.drawText(title, {
+         x: this.margins.left,
+         y: this.cursorY - 12,
+         size: 10,
+         font: this.boldFont!,
+         color: rgb(0, 0, 0)
+     });
+     
+     this.cursorY -= 25;
+
+     // Simple text wrapping logic for terms
+     const fontSize = 9;
+     const maxWidth = this.currentPage.getSize().width - this.margins.left - this.margins.right;
+     
+     // Very basic split by newline, then by word wrap
+     const lines = text.split('\n');
+     
+     for (const line of lines) {
+        if (this.cursorY < this.margins.bottom + 20) {
+            this.addNewPage();
+            this.cursorY -= 20;
+        }
+
+        this.currentPage.drawText(line, {
+            x: this.margins.left,
+            y: this.cursorY,
+            size: fontSize,
+            font: this.font,
+            maxWidth: maxWidth,
+            lineHeight: fontSize + 4,
+            color: rgb(0.2, 0.2, 0.2)
+        });
+        
+        // Estimate height usage (rough approximation)
+        const textHeight = (Math.ceil(this.font.widthOfTextAtSize(line, fontSize) / maxWidth) || 1) * (fontSize + 4);
+        this.cursorY -= (textHeight + 5);
+     }
+     
+     this.cursorY -= 20;
   }
 
   private async renderLogo(x: number, y: number, maxWidth: number, maxHeight: number) {

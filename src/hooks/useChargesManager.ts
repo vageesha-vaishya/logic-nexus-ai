@@ -91,12 +91,16 @@ function buildManagedCharge(
   const basisId = findRefId(refData.chargeBases, charge.basis || 'shipment');
   const currencyId = findRefId(refData.currencies, charge.currency || 'USD');
 
-  const sellRate = charge.rate || charge.amount || 0;
-  const sellQty = charge.quantity || 1;
-  const sellAmount = sellQty * sellRate;
+  const sellQty = Number(charge?.sell?.quantity ?? charge.quantity ?? 1) || 1;
+  const sellRate = Number(charge?.sell?.rate ?? charge.rate ?? charge.amount ?? 0) || 0;
+  const rawSellAmount = Number(charge?.sell?.amount ?? (sellQty * sellRate)) || 0;
+  const sellAmount = Number(rawSellAmount.toFixed(2));
 
-  const buyRate = autoMargin ? Number((sellRate / (1 + marginPercent / 100)).toFixed(2)) : sellRate;
-  const buyAmount = sellQty * buyRate;
+  const buyQty = Number(charge?.buy?.quantity ?? sellQty) || 1;
+  const computedBuyRate = autoMargin ? Number((sellRate / (1 + marginPercent / 100)).toFixed(2)) : sellRate;
+  const buyRate = Number(charge?.buy?.rate ?? computedBuyRate) || 0;
+  const rawBuyAmount = Number(charge?.buy?.amount ?? (buyQty * buyRate)) || 0;
+  const buyAmount = Number(rawBuyAmount.toFixed(2));
 
   return {
     id: charge.id || generateId(),
@@ -108,10 +112,29 @@ function buildManagedCharge(
     unit: charge.unit || '',
     currency_id: currencyId,
     currencyCode: findRefName(refData.currencies, currencyId) || charge.currency || 'USD',
-    buy: { quantity: sellQty, rate: buyRate, amount: Number(buyAmount.toFixed(2)) },
-    sell: { quantity: sellQty, rate: sellRate, amount: Number(sellAmount.toFixed(2)) },
+    buy: { quantity: buyQty, rate: buyRate, amount: Number(buyAmount) },
+    sell: { quantity: sellQty, rate: sellRate, amount: Number(sellAmount) },
     note: charge.note || '',
   };
+}
+
+function resolveLegId(charge: any): string | null {
+  return charge?.legId || charge?.leg_id || null;
+}
+
+function chargeSignature(charge: ManagedCharge): string {
+  const category = String(charge.category_id || charge.categoryName || '').toLowerCase().trim();
+  const basis = String(charge.basis_id || charge.basisName || '').toLowerCase().trim();
+  const currency = String(charge.currency_id || charge.currencyCode || '').toLowerCase().trim();
+  const note = String(charge.note || '').trim().toLowerCase();
+  const leg = charge.legId || 'combined';
+  const bq = Number(charge.buy.quantity || 0).toFixed(4);
+  const br = Number(charge.buy.rate || 0).toFixed(4);
+  const ba = Number(charge.buy.amount || 0).toFixed(4);
+  const sq = Number(charge.sell.quantity || 0).toFixed(4);
+  const sr = Number(charge.sell.rate || 0).toFixed(4);
+  const sa = Number(charge.sell.amount || 0).toFixed(4);
+  return `${leg}|${category}|${basis}|${currency}|${bq}|${br}|${ba}|${sq}|${sr}|${sa}|${note}`;
 }
 
 function initCharges(
@@ -121,13 +144,21 @@ function initCharges(
   autoMargin: boolean
 ): ManagedCharge[] {
   const charges: ManagedCharge[] = [];
+  const seen = new Set<string>();
+  const pushUnique = (rawCharge: any, legId: string | null) => {
+    const managed = buildManagedCharge(rawCharge, legId, refData, marginPercent, autoMargin);
+    const sig = chargeSignature(managed);
+    if (seen.has(sig)) return;
+    seen.add(sig);
+    charges.push(managed);
+  };
 
   // Leg-specific charges
   if (option.legs) {
     option.legs.forEach((leg) => {
       if (leg.charges) {
         leg.charges.forEach((c) => {
-          charges.push(buildManagedCharge(c, leg.id, refData, marginPercent, autoMargin));
+          pushUnique(c, leg.id);
         });
       }
     });
@@ -136,7 +167,7 @@ function initCharges(
   // Global/combined charges
   if (option.charges) {
     option.charges.forEach((c) => {
-      charges.push(buildManagedCharge(c, null, refData, marginPercent, autoMargin));
+      pushUnique(c, resolveLegId(c));
     });
   }
 
@@ -148,7 +179,7 @@ function initCharges(
       amount: option.price,
       currency: option.currency || 'USD',
     };
-    charges.push(buildManagedCharge(fallback, null, refData, marginPercent, autoMargin));
+    pushUnique(fallback, null);
   }
 
   return charges;

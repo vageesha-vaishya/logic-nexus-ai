@@ -234,6 +234,7 @@ vi.mock('lucide-react', () => ({
     AlertCircle: () => <svg />,
     History: () => <svg />,
     ExternalLink: () => <svg />,
+    X: () => <svg />,
 }));
 
 vi.mock('@/components/ui/badge', () => ({
@@ -367,7 +368,7 @@ vi.mock('./ResultsZone', () => ({
 }));
 
 vi.mock('./FinalizeSection', () => ({
-    FinalizeSection: ({ onSaveQuote }: any) => (
+    FinalizeSection: ({ onSaveQuote, onDraftChange }: any) => (
         <div data-testid="finalize-section">
             <button
                 data-testid="save-quote-btn"
@@ -390,6 +391,33 @@ vi.mock('./FinalizeSection', () => ({
                 ], 15, 'Test Notes')}
             >
                 Save Quote with Charges
+            </button>
+            <button
+                data-testid="apply-remove-leg-draft-btn"
+                onClick={() => {
+                    onDraftChange?.({
+                        legs: [{ id: 'leg-1', mode: 'ocean', origin: 'Origin', destination: 'Dest' }],
+                        charges: [],
+                        marginPercent: 15
+                    });
+                }}
+            >
+                Apply Remove Leg Draft
+            </button>
+            <button
+                data-testid="apply-add-leg-draft-btn"
+                onClick={() => {
+                    onDraftChange?.({
+                        legs: [
+                            { id: 'leg-1', mode: 'ocean', origin: 'Origin', destination: 'Dest' },
+                            { id: 'leg-new', mode: 'road', origin: 'Dest', destination: 'Final Inland' }
+                        ],
+                        charges: [],
+                        marginPercent: 18
+                    });
+                }}
+            >
+                Apply Add Leg Draft
             </button>
         </div>
     )
@@ -794,12 +822,92 @@ describe('UnifiedQuoteComposer - Save Functionality', () => {
         const saveBtn = await screen.findByTestId('save-quote-btn');
         fireEvent.click(saveBtn);
 
-        expect(await screen.findByTestId('validation-summary')).toBeInTheDocument();
+        expect(await screen.findByLabelText(/validation summary/i)).toBeInTheDocument();
         expect(screen.getByText(/Commodity: Commodity is required/i)).toBeInTheDocument();
         expect(screen.getByText(/Origin: Origin is required/i)).toBeInTheDocument();
         expect(mockScopedDb.rpc).not.toHaveBeenCalled();
 
         fireEvent.click(screen.getByText(/Commodity: Commodity is required/i));
         expect(scrollSpy).toHaveBeenCalled();
+    });
+
+    it('sends only remaining legs after a user removes one leg before save', async () => {
+        mockRateFetchingReturn.results = [
+            {
+                id: 'opt-1',
+                carrier: 'Carrier A',
+                amount: 1000,
+                transitTime: '20 days',
+                service_type: 'port_to_port',
+                charge_breakdown: [],
+                legs: [
+                    { id: 'leg-1', mode: 'ocean', origin: 'Origin', destination: 'Dest' },
+                    { id: 'leg-2', mode: 'road', origin: 'Dest', destination: 'Final' }
+                ],
+                ai_generated: false
+            }
+        ];
+
+        render(
+            <MemoryRouter>
+                <UnifiedQuoteComposer initialData={{ mode: 'ocean', origin: 'Origin', destination: 'Dest' }} />
+            </MemoryRouter>
+        );
+
+        fireEvent.click(await screen.findByTestId('select-option-btn'));
+        fireEvent.click(await screen.findByTestId('apply-remove-leg-draft-btn'));
+        fireEvent.click(await screen.findByTestId('save-quote-btn'));
+
+        await waitFor(() => expect(mockScopedDb.rpc).toHaveBeenCalled());
+
+        const rpcPayload = (mockScopedDb.rpc as any).mock.calls.at(-1)?.[1]?.p_payload;
+        const savedOption = rpcPayload?.options?.find((o: any) => o.id === undefined || o.option_name === 'Carrier A');
+        expect(savedOption?.legs).toHaveLength(1);
+        expect(savedOption?.legs?.[0]).toEqual(
+            expect.objectContaining({
+                origin_location_name: 'Origin',
+                destination_location_name: 'Dest',
+                transport_mode: 'ocean'
+            })
+        );
+    });
+
+    it('persists added draft leg updates in save payload', async () => {
+        mockRateFetchingReturn.results = [
+            {
+                id: 'opt-1',
+                carrier: 'Carrier A',
+                amount: 1000,
+                transitTime: '20 days',
+                service_type: 'port_to_port',
+                charge_breakdown: [],
+                legs: [{ id: 'leg-1', mode: 'ocean', origin: 'Origin', destination: 'Dest' }],
+                ai_generated: false
+            }
+        ];
+
+        render(
+            <MemoryRouter>
+                <UnifiedQuoteComposer initialData={{ mode: 'ocean', origin: 'Origin', destination: 'Dest' }} />
+            </MemoryRouter>
+        );
+
+        fireEvent.click(await screen.findByTestId('select-option-btn'));
+        fireEvent.click(await screen.findByTestId('apply-add-leg-draft-btn'));
+        fireEvent.click(await screen.findByTestId('save-quote-btn'));
+
+        await waitFor(() => expect(mockScopedDb.rpc).toHaveBeenCalled());
+
+        const rpcPayload = (mockScopedDb.rpc as any).mock.calls.at(-1)?.[1]?.p_payload;
+        const option = rpcPayload?.options?.[0];
+        expect(option?.margin_percent).toBe(18);
+        expect(option?.legs).toHaveLength(2);
+        expect(option?.legs?.[1]).toEqual(
+            expect.objectContaining({
+                transport_mode: 'road',
+                origin_location_name: 'Dest',
+                destination_location_name: 'Final Inland'
+            })
+        );
     });
 });

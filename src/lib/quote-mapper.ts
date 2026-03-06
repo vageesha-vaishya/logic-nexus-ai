@@ -38,6 +38,17 @@ export const mapOptionToQuote = (opt: any) => {
         normalizeTransportMode(opt.name) ||
         'ocean';
 
+    const normalizeLegType = (value: any): string => {
+        const token = String(value || '').trim().toLowerCase();
+        if (!token) return 'transport';
+        if (token.includes('pick')) return 'pickup';
+        if (token.includes('origin')) return 'origin';
+        if (token.includes('deliver')) return 'delivery';
+        if (token.includes('dest')) return 'destination';
+        if (token.includes('main') || token.includes('freight') || token.includes('transport')) return 'transport';
+        return token;
+    };
+
     const modeLabel =
         opt.transport_mode ||
         opt.name ||
@@ -164,12 +175,42 @@ export const mapOptionToQuote = (opt: any) => {
         }];
         charges = []; 
     } else {
-        legs = legs.map((leg: any, index: number) => ({
+        legs = legs.map((leg: any, index: number) => {
+            const normalizedLegMode =
+                normalizeTransportMode(leg.mode) ||
+                normalizeTransportMode(leg.transport_mode) ||
+                normalizeTransportMode(leg.type) ||
+                normalized.mode ||
+                'ocean';
+            const origin =
+                leg.origin ||
+                leg.from ||
+                leg.origin_name ||
+                leg.origin_location_name ||
+                (index === 0 ? normalized.origin : undefined) ||
+                'Origin';
+            const destination =
+                leg.destination ||
+                leg.to ||
+                leg.destination_name ||
+                leg.destination_location_name ||
+                (index === legs.length - 1 ? normalized.destination : undefined) ||
+                'Destination';
+
+            return {
             ...leg,
             id: leg.id || `leg-${index}-${Date.now()}`,
-            mode: leg.mode || normalized.mode || 'unknown',
-            origin: leg.origin || (index === 0 ? normalized.origin : undefined) || 'Origin',
-            destination: leg.destination || (index === legs.length - 1 ? normalized.destination : undefined) || 'Destination',
+            mode: normalizedLegMode,
+            leg_type: normalizeLegType(leg.leg_type || leg.type || leg.segment_type),
+            carrier: leg.carrier || leg.carrier_name || leg.provider || normalized.carrier_name || 'Unknown Carrier',
+            sequence: Number(leg.sequence ?? leg.sort_order ?? leg.order ?? index + 1),
+            origin,
+            destination,
+            origin_location_id: leg.origin_location_id || leg.originId || null,
+            destination_location_id: leg.destination_location_id || leg.destinationId || null,
+            departure_date: leg.departure_date || leg.departureDate || leg.etd || null,
+            arrival_date: leg.arrival_date || leg.arrivalDate || leg.eta || null,
+            transit_time: leg.transit_time || leg.transitTime || null,
             charges: (leg.charges || []).map((c: any) => {
                 // Hoist sell amount if available (fixes issue with Saved Quotes loaded as pairs)
                 if (c.sell?.amount !== undefined) {
@@ -186,7 +227,7 @@ export const mapOptionToQuote = (opt: any) => {
                 }
                 return c;
             })
-        }));
+        }});
 
         if (charges.length > 0) {
             const initialCount = charges.length;

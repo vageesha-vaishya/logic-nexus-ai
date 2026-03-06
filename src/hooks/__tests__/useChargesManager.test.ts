@@ -243,4 +243,50 @@ describe('useChargesManager', () => {
 
     expect(result.current.marginPercent).toBe(20);
   });
+
+  it('deduplicates repeated global and leg charges', () => {
+    const duplicateCharge = { category: 'Fee', name: 'Doc Fee', amount: 50, currency: 'USD', basis: 'shipment', quantity: 1, rate: 50 };
+    const option = makeOption({
+      legs: [
+        {
+          id: 'leg-dup',
+          mode: 'ocean',
+          leg_type: 'main',
+          origin: 'A',
+          destination: 'B',
+          sequence: 1,
+          charges: [duplicateCharge as any, duplicateCharge as any],
+        },
+      ],
+      charges: [duplicateCharge as any, duplicateCharge as any],
+    });
+
+    const { result } = renderChargesManager({ selectedOption: option });
+    expect(result.current.allCharges).toHaveLength(2);
+    expect(result.current.chargesByLeg['leg-dup']).toHaveLength(1);
+    expect(result.current.chargesByLeg['combined']).toHaveLength(1);
+  });
+
+  it('maps option charges with leg_id to corresponding leg instead of combined bucket', () => {
+    const option = makeOption({
+      legs: [
+        {
+          id: 'leg-main',
+          mode: 'ocean',
+          leg_type: 'main',
+          origin: 'A',
+          destination: 'B',
+          sequence: 1,
+          charges: [],
+        },
+      ],
+      charges: [
+        { category: 'Freight', name: 'Allocated Charge', amount: 100, currency: 'USD', leg_id: 'leg-main' } as any,
+      ],
+    });
+
+    const { result } = renderChargesManager({ selectedOption: option });
+    expect(result.current.chargesByLeg['leg-main']).toHaveLength(1);
+    expect(result.current.chargesByLeg['combined'] || []).toHaveLength(0);
+  });
 });

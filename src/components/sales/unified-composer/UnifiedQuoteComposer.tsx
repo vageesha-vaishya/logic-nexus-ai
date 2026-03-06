@@ -20,7 +20,7 @@ import { PricingService } from '@/services/pricing.service';
 import { QuoteOptionService } from '@/services/QuoteOptionService';
 import { PortsService } from '@/services/PortsService';
 import { RateOption } from '@/types/quote-breakdown';
-import { invokeAnonymous, enrichPayload } from '@/lib/supabase-functions';
+import { invokeFunction } from '@/lib/supabase-functions';
 import { logger } from '@/lib/logger';
 import { sanitizePayload } from '@/lib/utils/sanitizer';
 import { supabase } from '@/integrations/supabase/client';
@@ -294,6 +294,15 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
       .replace(/^./, (s) => s.toUpperCase());
   }, []);
 
+  const normalizeIssuePath = useCallback((path: string): string => {
+    const normalized = String(path || '').replace(/^root\./, '');
+    const aliasMap: Record<string, string> = {
+      originId: 'origin',
+      destinationId: 'destination',
+    };
+    return aliasMap[normalized] || normalized;
+  }, []);
+
   const flattenValidationErrors = useCallback((errors: any, parentPath = ''): ValidationIssue[] => {
     if (!errors || typeof errors !== 'object') return [];
     const issues: ValidationIssue[] = [];
@@ -301,9 +310,10 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
       if (!value) return;
       const path = parentPath ? `${parentPath}.${key}` : key;
       if (typeof value?.message === 'string' && value.message.trim()) {
+        const normalizedPath = normalizeIssuePath(path);
         issues.push({
-          path,
-          label: normalizeFieldLabel(path),
+          path: normalizedPath,
+          label: normalizeFieldLabel(normalizedPath),
           message: value.message.trim(),
         });
       }
@@ -312,7 +322,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
       }
     });
     return issues;
-  }, [normalizeFieldLabel]);
+  }, [normalizeFieldLabel, normalizeIssuePath]);
 
   const validationIssues = useMemo(() => {
     const unique = new Map<string, ValidationIssue>();
@@ -324,7 +334,8 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
 
   const scrollToField = useCallback((path: string) => {
     if (typeof document === 'undefined') return;
-    const pathCandidates = [path, path.replace(/^root\./, ''), path.split('.')[0]].filter(Boolean);
+    const normalized = normalizeIssuePath(path);
+    const pathCandidates = [normalized, normalized.split('.')[0]].filter(Boolean);
     const allNamed = Array.from(document.querySelectorAll<HTMLElement>('[name]'));
     const targetByName = pathCandidates
       .map((candidate) => allNamed.find((node) => node.getAttribute('name') === candidate))
@@ -332,7 +343,8 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
     const targetByAnchor = pathCandidates
       .map((candidate) => document.querySelector<HTMLElement>(`[data-field-name="${candidate}"]`))
       .find(Boolean) as HTMLElement | undefined;
-    const target = targetByName || targetByAnchor;
+    const firstInvalid = document.querySelector<HTMLElement>('[aria-invalid="true"]');
+    const target = targetByName || targetByAnchor || firstInvalid;
     if (!target) return;
     const container = target.closest('[data-field-name]') as HTMLElement | null;
     const scrollTarget = container || target;
@@ -342,7 +354,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
     } else if (typeof (scrollTarget as any).focus === 'function') {
       (scrollTarget as any).focus({ preventScroll: true });
     }
-  }, []);
+  }, [normalizeIssuePath]);
 
   const handleValidationFailed = useCallback(() => {
     setShowValidationSummary(true);
@@ -478,7 +490,13 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
     if (!showValidationSummary || validationIssues.length === 0) return null;
 
     return (
-      <Alert variant="destructive" className="mb-6 animate-in fade-in slide-in-from-top-2" role="alert">
+      <Alert
+        variant="destructive"
+        className="mb-6 animate-in fade-in slide-in-from-top-2"
+        role="alert"
+        aria-live="assertive"
+        aria-label="Validation summary"
+      >
         <AlertCircle className="h-4 w-4" />
         <AlertTitle className="ml-2 flex items-center justify-between">
           <span>Please fix the following errors before proceeding:</span>
@@ -499,6 +517,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
                   type="button" 
                   onClick={() => scrollToField(issue.path)}
                   className="hover:underline text-left font-medium"
+                  aria-label={`Go to ${issue.label} field`}
                 >
                   {issue.label}: {issue.message}
                 </button>
@@ -567,6 +586,12 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
     const m = String(val).match(/(\d+)/);
     return m ? Number(m[1]) : null;
   };
+
+  const isLegacyCargoSchemaError = useCallback((error: any): boolean => {
+    const message = String(error?.message || '');
+    if (!/column\s+"?[\w]+"?\s+does not exist/i.test(message)) return false;
+    return /column\s+"?(name|iso_code)"?\s+does not exist/i.test(message);
+  }, []);
 
   const displayResults = useMemo(() => {
     if (!combinedResults || combinedResults.length === 0) return [];
@@ -713,7 +738,24 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
         leg_id: charge?.leg_id || charge?.legId || leg.id || null,
       }));
     });
-    return [...globalCharges, ...legCharges];
+    const merged = [...globalCharges, ...legCharges];
+    const seen = new Set<string>();
+    return merged.filter((charge: any) => {
+      const legKey = charge?.legId || charge?.leg_id || 'combined';
+      const category = String(charge?.category_id || charge?.category || charge?.name || '').toLowerCase().trim();
+      const basis = String(charge?.basis_id || charge?.basis || '').toLowerCase().trim();
+      const currency = String(charge?.currency_id || charge?.currency || 'usd').toLowerCase().trim();
+      const buyQty = Number(charge?.buy?.quantity ?? charge?.quantity ?? 1).toFixed(4);
+      const buyRate = Number(charge?.buy?.rate ?? charge?.rate ?? 0).toFixed(4);
+      const buyAmount = Number(charge?.buy?.amount ?? charge?.amount ?? 0).toFixed(4);
+      const sellQty = Number(charge?.sell?.quantity ?? charge?.quantity ?? 1).toFixed(4);
+      const sellRate = Number(charge?.sell?.rate ?? charge?.rate ?? 0).toFixed(4);
+      const sellAmount = Number(charge?.sell?.amount ?? charge?.amount ?? 0).toFixed(4);
+      const signature = `${legKey}|${category}|${basis}|${currency}|${buyQty}|${buyRate}|${buyAmount}|${sellQty}|${sellRate}|${sellAmount}`;
+      if (seen.has(signature)) return false;
+      seen.add(signature);
+      return true;
+    });
   }, []);
 
   const extractContainerCombos = useCallback((values: any, extended: any) => {
@@ -1167,6 +1209,16 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
              const pairs: any[] = [];
              const pendingBuys: any[] = [];
              const pendingSells: any[] = [];
+             const pairKey = (row: any) => {
+               const category = row?.category_id || '';
+               const basis = row?.basis_id || '';
+               const leg = row?.leg_id || '';
+               const currency = row?.currency_id || '';
+               const quantity = Number(row?.quantity ?? 1).toFixed(4);
+               const unit = row?.unit || '';
+               const note = String(row?.note || '').trim().toLowerCase();
+               return `${category}|${basis}|${leg}|${currency}|${quantity}|${unit}|${note}`;
+             };
              
              charges.forEach(c => {
                  const sideCode = c.side?.code?.toLowerCase() || 'buy';
@@ -1176,11 +1228,8 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
              
              // Match sells to buys
              pendingSells.forEach(sell => {
-                 const matchIndex = pendingBuys.findIndex(buy => 
-                     buy.leg_id === sell.leg_id &&
-                     buy.category_id === sell.category_id &&
-                     buy.basis_id === sell.basis_id
-                 );
+                 const targetKey = pairKey(sell);
+                 const matchIndex = pendingBuys.findIndex((buy) => pairKey(buy) === targetKey);
                  
                  if (matchIndex >= 0) {
                      const buy = pendingBuys[matchIndex];
@@ -1259,8 +1308,23 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
                      note: buy.note
                  });
              });
-             
-             return pairs;
+
+             // Deduplicate paired rows (guards against malformed/duplicated quote_charges records)
+             const seen = new Set<string>();
+             return pairs.filter((p) => {
+               const leg = p.legId || p.leg_id || 'combined';
+               const category = p.category_id || '';
+               const basis = p.basis_id || '';
+               const currency = p.currency_id || '';
+               const buyQty = Number(p.buy?.quantity ?? 0).toFixed(4);
+               const buyRate = Number(p.buy?.rate ?? 0).toFixed(4);
+               const sellQty = Number(p.sell?.quantity ?? 0).toFixed(4);
+               const sellRate = Number(p.sell?.rate ?? 0).toFixed(4);
+               const sig = `${leg}|${category}|${basis}|${currency}|${buyQty}|${buyRate}|${sellQty}|${sellRate}`;
+               if (seen.has(sig)) return false;
+               seen.add(sig);
+               return true;
+             });
           };
 
           // Reconstruct RateOption objects
@@ -2071,7 +2135,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
         });
       });
 
-      if (rpcError && /column\s+"?name"?\s+does not exist/i.test(String(rpcError.message || ''))) {
+      if (rpcError && isLegacyCargoSchemaError(rpcError)) {
         logger.warn('[UnifiedComposer] save fallback: retrying without cargo_configurations due to legacy DB schema', {
           error: rpcError.message,
         });
@@ -2254,7 +2318,8 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
     logAudit,
     buildCargoSnapshot,
     syncQuoteCargoDetails,
-    flattenOptionCharges
+    flattenOptionCharges,
+    isLegacyCargoSchemaError
   ]);
 
   // ---------------------------------------------------------------------------
@@ -2341,7 +2406,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
         });
       });
 
-      if (rpcError && /column\s+"?name"?\s+does not exist/i.test(String(rpcError.message || ''))) {
+      if (rpcError && isLegacyCargoSchemaError(rpcError)) {
         logger.warn('[UnifiedComposer] draft-save fallback: retrying without cargo_configurations due to legacy DB schema', {
           error: rpcError.message,
         });
@@ -2384,7 +2449,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
     } finally {
       setSaving(false);
     }
-  }, [lastFormData, storeState, context, quoteId, user, scopedDb, toast, dispatch, setSearchParams, logAudit, buildCargoSnapshot, syncQuoteCargoDetails, extractContainerCombos]);
+  }, [lastFormData, storeState, context, quoteId, user, scopedDb, toast, dispatch, setSearchParams, logAudit, buildCargoSnapshot, syncQuoteCargoDetails, extractContainerCombos, isLegacyCargoSchemaError]);
 
   // ---------------------------------------------------------------------------
   // PDF Generation
@@ -2402,7 +2467,20 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
 
     try {
       const payload = { quoteId: currentQuoteId, versionId: currentVersionId, engine_v2: true, source: 'unified_composer', action: 'generate-pdf' };
-      const response = await invokeAnonymous('generate-quote-pdf', enrichPayload(payload));
+      const { data: response, error: pdfError } = await invokeFunction('generate-quote-pdf', {
+        body: payload,
+      });
+      if (pdfError) {
+        const msg = String(pdfError?.message || pdfError || '');
+        const issues = Array.isArray((pdfError as any)?.issues) ? (pdfError as any).issues : null;
+        if (/jwt|unauthorized|401/i.test(msg)) {
+          throw new Error('Unauthorized. Your session expired or is invalid. Please sign in again.');
+        }
+        if (issues && issues.length > 0) {
+          throw new Error(`${msg || 'PDF pre-render validation failed'}: ${issues.join('; ')}`);
+        }
+        throw new Error(msg || 'Failed to generate PDF');
+      }
       if (!response?.content) {
         const issues = Array.isArray(response?.issues) ? response.issues.join('; ') : null;
         throw new Error(issues || 'Received empty content from PDF service');
@@ -2418,8 +2496,15 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
       link.click();
       URL.revokeObjectURL(url);
       
+      const warnings = Array.isArray(response?.issues) ? response.issues : [];
+      if (warnings.length > 0) {
+        logger.warn('[UnifiedComposer] PDF generated with warnings', { quoteId: currentQuoteId, warningsCount: warnings.length });
+        logAudit('generate_pdf_warning', { quoteId: currentQuoteId, warningsCount: warnings.length, warnings: warnings.slice(0, 10) }, 'success');
+        toast({ title: 'PDF Generated (Warnings)', description: warnings.slice(0, 3).join('; ') });
+      } else {
       logAudit('generate_pdf_success', { quoteId: currentQuoteId }, 'success');
       toast({ title: 'PDF Generated', description: 'PDF has been downloaded.' });
+      }
     } catch (err: any) {
       logger.error('[UnifiedComposer] PDF generation failed:', err);
       logAudit('generate_pdf_failure', { quoteId: currentQuoteId, error: err.message, stack: err.stack }, 'failure');

@@ -155,7 +155,7 @@ export function ConnectionConfigForm({ onValidate, validationResult, onConfigCha
               <Input
                 id="apiKey"
                 type={showApiKey ? 'text' : 'password'}
-                placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                placeholder="sb_publishable_xxx"
                 value={config.apiKey}
                 onChange={(e) => handleChange('apiKey', e.target.value)}
                 className="pr-10"
@@ -181,7 +181,7 @@ export function ConnectionConfigForm({ onValidate, validationResult, onConfigCha
               <Input
                 id="serviceRoleKey"
                 type={showServiceKey ? 'text' : 'password'}
-                placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                placeholder="sb_publishable_xxx"
                 value={config.serviceRoleKey}
                 onChange={(e) => handleChange('serviceRoleKey', e.target.value)}
                 className="pr-10"

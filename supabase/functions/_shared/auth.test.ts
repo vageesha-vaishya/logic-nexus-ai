@@ -76,4 +76,26 @@ describe('requireAuth', () => {
     expect(result.user).toBeNull();
     expect(result.error).toBe('Missing Authorization header');
   });
+
+  it('should use SUPABASE_PUBLISHABLE_KEY when SUPABASE_ANON_KEY is missing', async () => {
+    (globalThis as any).Deno.env.get = vi.fn((key: string) => {
+      if (key === 'SUPABASE_URL') return 'https://test.supabase.co';
+      if (key === 'SUPABASE_ANON_KEY') return undefined;
+      if (key === 'SUPABASE_PUBLISHABLE_KEY') return 'test-publishable-key';
+      return undefined;
+    });
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-abc' } }, error: null });
+
+    const req = new Request('https://api.example.com', {
+      headers: { Authorization: 'Bearer valid-token' },
+    });
+
+    const result = await requireAuth(req);
+    expect(result.error).toBeNull();
+    expect(mockCreateClient).toHaveBeenCalledWith(
+      'https://test.supabase.co',
+      'test-publishable-key',
+      { global: { headers: { Authorization: 'Bearer valid-token' } } }
+    );
+  });
 });

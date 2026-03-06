@@ -3,7 +3,9 @@ import { getCorsHeaders } from "../_shared/cors.ts";
 // @ts-ignore
 import { PdfRenderer } from "./engine/renderer.ts";
 // @ts-ignore
-import { buildSafeContext, mapQuoteItemsToRawItems, ValidationBlockError } from "./engine/context.ts";
+import { buildSafeContextWithValidation, mapQuoteItemsToRawItems, ValidationBlockError } from "./engine/context.ts";
+// @ts-ignore
+import { fetchQuoteItemsWithFallbacks } from "./engine/item-loader.ts";
 // @ts-ignore
 import { DefaultTemplate } from "./engine/default_template.ts";
 // @ts-ignore
@@ -20,20 +22,23 @@ serveWithLogger(async (req, logger, adminSupabase) => {
 
     // 1. Determine Auth Context
     let supabaseClient = adminSupabase;
+    let authenticatedUserId: string | null = null;
     const authHeader = req.headers.get("Authorization");
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const isServiceRole = authHeader && serviceRoleKey && authHeader.includes(serviceRoleKey);
 
     // If not service role (e.g. Webhook/Cron), require user auth
     if (!isServiceRole) {
-        const { user, error, supabaseClient: userClient } = await requireAuth(req, logger);
+        const { user, error } = await requireAuth(req, logger);
         if (error || !user) {
             return new Response(JSON.stringify({ error: "Unauthorized" }), { 
                 status: 401, 
                 headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } 
             });
         }
-        supabaseClient = userClient;
+        authenticatedUserId = user.id;
+        // Use admin client for data loading; enforce access explicitly below.
+        supabaseClient = adminSupabase;
     }
 
     const traceLogs: string[] = [];
@@ -83,6 +88,30 @@ serveWithLogger(async (req, logger, adminSupabase) => {
          templateContent = DefaultTemplate;
     }
 
+    // Helper: retry query with fallback selector when schema differs across environments
+    const safeSelect = async (
+      table: string,
+      primarySelect: string,
+      fallbackSelect: string,
+      apply: (q: any) => any,
+      context: string,
+    ): Promise<{ data: any; error: any }> => {
+      let query = supabaseClient.from(table).select(primarySelect);
+      query = apply(query);
+      const { data, error } = await query;
+      if (!error) return { data, error: null };
+
+      const msg = String(error?.message || '');
+      if (/does not exist|relationship|column|schema cache/i.test(msg) && fallbackSelect !== primarySelect) {
+        await logger.warn(`${context}: primary select failed, using fallback`, { error: msg });
+        let fallbackQuery = supabaseClient.from(table).select(fallbackSelect);
+        fallbackQuery = apply(fallbackQuery);
+        const fallback = await fallbackQuery;
+        return { data: fallback.data, error: fallback.error };
+      }
+      return { data, error };
+    };
+
     // Fetch Charge Sides for Filtering
     const { data: sides, error: sidesError } = await supabaseClient
       .from("charge_sides")
@@ -123,25 +152,61 @@ serveWithLogger(async (req, logger, adminSupabase) => {
     if (quoteError) throw new Error(`Error fetching quote: ${quoteError.message}`);
     if (!quote) throw new Error("Quote not found");
 
-    // Fetch Quote Items separately
-    const { data: items, error: itemsError } = await supabaseClient
-      .from("quote_items")
-      .select(`
-        *,
-        container_sizes (code, name),
-        container_types (code, name),
-        master_commodities (name)
-      `)
-      .eq("quote_id", quoteId);
-    
-    if (itemsError) throw new Error(`Error fetching items: ${itemsError.message}`);
-    quote.items = items || [];
+    // Explicit tenant/franchise access checks for authenticated user context.
+    if (authenticatedUserId) {
+      const { data: userRoles, error: rolesError } = await adminSupabase
+        .from("user_roles")
+        .select("role, tenant_id, franchise_id")
+        .eq("user_id", authenticatedUserId);
+
+      if (rolesError) {
+        await logger.error(`Error resolving user roles: ${rolesError.message}`);
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401,
+          headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
+        });
+      }
+
+      const roles = Array.isArray(userRoles) ? userRoles : [];
+      const hasPlatformScope = roles.some((r: any) =>
+        ["platform_admin", "super_admin"].includes(String(r?.role || "").toLowerCase())
+      );
+
+      if (!hasPlatformScope) {
+        const quoteTenantId = (quote as any)?.tenant_id || null;
+        const quoteFranchiseId = (quote as any)?.franchise_id || null;
+        const hasTenantAccess = roles.some((r: any) => {
+          const roleTenant = r?.tenant_id || null;
+          const roleFranchise = r?.franchise_id || null;
+          if (!quoteTenantId) return true;
+          if (roleTenant !== quoteTenantId) return false;
+          if (quoteFranchiseId && roleFranchise && roleFranchise !== quoteFranchiseId) return false;
+          return true;
+        });
+
+        if (!hasTenantAccess) {
+          await logger.warn("PDF access denied by tenant/franchise scope", {
+            user_id: authenticatedUserId,
+            quote_id: quoteId,
+            quote_tenant_id: (quote as any)?.tenant_id || null,
+            quote_franchise_id: (quote as any)?.franchise_id || null,
+          });
+          return new Response(JSON.stringify({ error: "Unauthorized" }), {
+            status: 401,
+            headers: { ...getCorsHeaders(req), "Content-Type": "application/json" },
+          });
+        }
+      }
+    }
+
+    // Fetch Quote Items separately with schema/table fallbacks.
+    quote.items = await fetchQuoteItemsWithFallbacks(quoteId, safeSelect, logger);
     
     await logger.info(`Fetched ${quote.items.length} quote items. First item sizes: ${JSON.stringify(quote.items[0]?.container_sizes)}`);
 
     // Fetch Version Data (if provided or default to latest)
     let version = null;
-    let options = [];
+    let options: any[] = [];
     
     if (!versionId) {
         // Try to find the latest active version
@@ -172,15 +237,18 @@ serveWithLogger(async (req, logger, adminSupabase) => {
       version = vData;
 
       // Fetch Options separately
-      const { data: oData, error: oError } = await supabaseClient
-        .from("quotation_version_options")
-        .select(`
+      const { data: oData, error: oError } = await safeSelect(
+        "quotation_version_options",
+        `
             *,
             carriers(carrier_name),
             container_sizes(name, code),
             container_types(name, code)
-        `)
-        .eq("quotation_version_id", versionId);
+        `,
+        `*`,
+        (q) => q.eq("quotation_version_id", versionId),
+        "quotation_version_options fetch",
+      );
         
       if (oError) {
            await logger.error(`Error fetching options: ${oError.message}`);
@@ -194,29 +262,33 @@ serveWithLogger(async (req, logger, adminSupabase) => {
       // Fetch Legs and Charges for each option
       for (const opt of options) {
           // Legs
-          const { data: legs, error: legsError } = await supabaseClient
-              .from("quotation_version_option_legs")
-              .select(`
+          const { data: legs, error: legsError } = await safeSelect(
+              "quotation_version_option_legs",
+              `
                   *,
                   origin:ports_locations!origin_location_id(location_name),
                   destination:ports_locations!destination_location_id(location_name)
-              `)
-              .eq("quotation_version_option_id", opt.id);
+              `,
+              `*`,
+              (q) => q.eq("quotation_version_option_id", opt.id),
+              `legs fetch for option ${opt.id}`,
+          );
           
           if (legsError) await logger.warn(`Error fetching legs for option ${opt.id}: ${legsError.message}`);
           opt.legs = legs || [];
 
           // Charges
-          let chargesQuery = supabaseClient
-              .from("quote_charges")
-              .select("*, category:charge_categories(name)")
-              .eq("quote_option_id", opt.id);
-
-          if (sellSideId) {
-             chargesQuery = chargesQuery.eq("charge_side_id", sellSideId);
-          }
-          
-          const { data: charges, error: chargesError } = await chargesQuery;
+          const { data: charges, error: chargesError } = await safeSelect(
+              "quote_charges",
+              "*, category:charge_categories(name)",
+              "*",
+              (q) => {
+                let query = q.eq("quote_option_id", opt.id);
+                if (sellSideId) query = query.eq("charge_side_id", sellSideId);
+                return query;
+              },
+              `charges fetch for option ${opt.id}`,
+          );
           const finalCharges = charges || [];
           
           if (!chargesError && sellSideId && Array.isArray(finalCharges) && finalCharges.length === 0) {
@@ -234,29 +306,52 @@ serveWithLogger(async (req, logger, adminSupabase) => {
       }
     }
 
-    let branding: any = null;
+    let branding: any = {};
     let brandingLogoBase64: string | undefined = undefined;
 
-    try {
-      const tenantBrandingId = (quote as any).tenant_id;
-      let brandingQuery = supabaseClient.from("tenant_branding").select("*");
-      if (tenantBrandingId) {
-        brandingQuery = brandingQuery.eq("tenant_id", tenantBrandingId);
-      } else {
-        brandingQuery = brandingQuery.eq("company_name", "Miami Global Lines");
-      }
-      const { data: brandingData, error: brandingError } = await brandingQuery.single();
-      if (!brandingError && brandingData) {
-        branding = brandingData;
-        if (branding.logo_url && typeof branding.logo_url === "string" && branding.logo_url.startsWith("data:image")) {
-          brandingLogoBase64 = branding.logo_url;
+    // 1. Try fetching from quotation_configuration (New System)
+    const tenantId = (quote as any).tenant_id;
+    if (tenantId) {
+       try {
+         const { data: configData } = await supabaseClient
+            .from('quotation_configuration')
+            .select('branding_settings')
+            .eq('tenant_id', tenantId)
+            .maybeSingle();
+            
+         if (configData?.branding_settings) {
+            branding = configData.branding_settings;
+            await logger.info(`Using branding from quotation_configuration for tenant ${tenantId}`);
+         }
+       } catch (e: any) {
+          await logger.warn(`Failed to fetch quotation_configuration: ${e.message}`);
+       }
+    }
+
+    // 2. Fallback to tenant_branding (Legacy System) if new config is empty/missing key fields
+    if (!branding.company_name && !branding.logo_url) {
+        try {
+          let brandingQuery = supabaseClient.from("tenant_branding").select("*");
+          if (tenantId) {
+            brandingQuery = brandingQuery.eq("tenant_id", tenantId);
+          } else {
+            brandingQuery = brandingQuery.eq("company_name", "Miami Global Lines");
+          }
+          const { data: legacyData, error: legacyError } = await brandingQuery.maybeSingle();
+          
+          if (!legacyError && legacyData) {
+             branding = { ...branding, ...legacyData }; 
+             await logger.info(`Using legacy tenant_branding fallback for tenant ${tenantId}`);
+          } else if (legacyError) {
+             await logger.warn(`Error fetching legacy branding: ${legacyError.message}`);
+          }
+        } catch (e: any) {
+           await logger.warn(`Legacy branding fetch failed: ${e?.message || String(e)}`);
         }
-        await logger.info(`Fetched branding for: ${branding.company_name}`);
-      } else if (brandingError) {
-        await logger.warn(`Error fetching branding: ${brandingError.message}`);
-      }
-    } catch (e: any) {
-      await logger.warn(`Branding fetch failed: ${e?.message || String(e)}`);
+    }
+
+    if (branding.logo_url && typeof branding.logo_url === "string" && branding.logo_url.startsWith("data:image")) {
+        brandingLogoBase64 = branding.logo_url;
     }
 
     await log("Using V2 Rendering Engine");
@@ -264,13 +359,21 @@ serveWithLogger(async (req, logger, adminSupabase) => {
     const selectedOption =
       options.find((o: any) => Array.isArray(o.charges) && o.charges.length > 0) ||
       (options.length > 0 ? options[0] : null);
-    const brandingObj = branding || {};
-    const logoBase64 = brandingLogoBase64;
 
     const rawData = {
       branding: {
-        ...brandingObj,
-        logo_base64: logoBase64,
+        logo_url: branding.logo_url,
+        logo_base64: brandingLogoBase64,
+        primary_color: branding.primary_color,
+        secondary_color: branding.secondary_color,
+        accent_color: branding.accent_color,
+        company_name: branding.company_name || (quote.accounts?.name || 'Nexus Logistics'),
+        company_address: branding.company_address,
+        font_family: branding.font_family,
+        header_text: branding.header_text,
+        sub_header_text: branding.sub_header_text,
+        footer_text: branding.footer_text,
+        disclaimer_text: branding.disclaimer_text,
       },
       quote: {
         quote_number: quote.quote_number,
@@ -339,9 +442,15 @@ serveWithLogger(async (req, logger, adminSupabase) => {
     }
 
     if (!pdfBytes) {
-      const context = buildSafeContext(rawData, logger);
+      const { context, warnings } = buildSafeContextWithValidation(rawData, logger);
+      if (warnings.length > 0) {
+        await logWarn(`PDF pre-render warnings (${warnings.length}): ${warnings.slice(0, 5).join(" | ")}${warnings.length > 5 ? " | ..." : ""}`);
+      }
       const renderer = new PdfRenderer(templateContent || DefaultTemplate, context, logger);
       pdfBytes = await renderer.render();
+      if (warnings.length > 0) {
+        (body as any).__pdf_warnings = warnings;
+      }
     }
 
     const traceId = body?.trace_id;
@@ -424,6 +533,7 @@ serveWithLogger(async (req, logger, adminSupabase) => {
         content: base64Pdf,
         filename: `quote_${quote.quote_number || "draft"}.pdf`,
         contentType: "application/pdf",
+        issues: Array.isArray((body as any).__pdf_warnings) ? (body as any).__pdf_warnings : [],
         traceLogs: traceLogs,
       }),
       {

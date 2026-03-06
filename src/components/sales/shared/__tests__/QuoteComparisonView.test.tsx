@@ -109,4 +109,34 @@ describe('QuoteComparisonView', () => {
       expect(getByText('$1,000.00')).toBeDefined();
     });
   });
+
+  it('handles missing direct totals and still renders comparison deltas safely', async () => {
+    const optionWithoutPrice: RateOption = {
+      ...mockRateOption,
+      id: 'opt-2',
+      price: 0,
+      total_amount: 0 as any,
+      transitTime: '',
+      legs: [
+        {
+          id: 'leg-x',
+          mode: 'road',
+          leg_type: 'pickup',
+          origin: 'A',
+          destination: 'B',
+          charges: [{ category: 'Freight', amount: 300, currency: 'USD', name: 'Road Freight' }],
+        },
+      ],
+      charges: [{ category: 'Fee', amount: 50, currency: 'USD', name: 'Doc Fee' }],
+    };
+
+    const { getByText } = render(<QuoteComparisonView options={[mockRateOption, optionWithoutPrice]} onSelect={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(getByText('Cost Delta vs Cheapest')).toBeDefined();
+      expect(getByText('Transit Delta vs Fastest')).toBeDefined();
+      expect(getByText('Mode Coverage')).toBeDefined();
+      expect(getByText('USD 350')).toBeDefined();
+    });
+  });
 });

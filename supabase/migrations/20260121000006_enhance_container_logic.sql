@@ -123,23 +123,42 @@ $$ LANGUAGE plpgsql;
 
 -- 7. View for Analytics
 DROP VIEW IF EXISTS public.view_container_inventory_summary CASCADE;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'container_sizes'
+      AND column_name = 'name'
+  ) AND EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'container_sizes'
+      AND column_name = 'type_id'
+  ) THEN
+    EXECUTE $sql$
+      CREATE OR REPLACE VIEW public.view_container_inventory_summary AS
+      SELECT
+          ct.id,
+          ct.tenant_id,
+          ct.size_id,
+          ct.location_name,
+          t.name as category,
+          s.name as size,
+          s.iso_code,
+          ct.status,
+          ct.quantity as total_quantity,
+          (ct.quantity * COALESCE(s.teu_factor, 0)) as total_teu
+      FROM public.container_tracking ct
+      JOIN public.container_sizes s ON ct.size_id = s.id
+      LEFT JOIN public.container_types t ON s.type_id = t.id;
+    $sql$;
 
-CREATE OR REPLACE VIEW public.view_container_inventory_summary AS
-SELECT 
-    ct.id,
-    ct.tenant_id,
-    ct.size_id,
-    ct.location_name,
-    t.name as category,
-    s.name as size,
-    s.iso_code,
-    ct.status,
-    ct.quantity as total_quantity,
-    (ct.quantity * COALESCE(s.teu_factor, 0)) as total_teu
-FROM public.container_tracking ct
-JOIN public.container_sizes s ON ct.size_id = s.id
-LEFT JOIN public.container_types t ON s.type_id = t.id;
-
--- Grant access to view
-GRANT SELECT ON public.view_container_inventory_summary TO authenticated;
-GRANT SELECT ON public.view_container_inventory_summary TO service_role;
+    EXECUTE 'GRANT SELECT ON public.view_container_inventory_summary TO authenticated';
+    EXECUTE 'GRANT SELECT ON public.view_container_inventory_summary TO service_role';
+  ELSE
+    RAISE NOTICE 'Skipping view_container_inventory_summary: legacy container_sizes schema.';
+  END IF;
+END $$;

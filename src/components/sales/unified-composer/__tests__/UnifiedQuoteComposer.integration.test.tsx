@@ -1151,7 +1151,10 @@ describe('UnifiedQuoteComposer Integration (API-to-UI)', () => {
         });
     });
 
-    it('retries save without cargo_configurations when DB returns legacy name-column error', async () => {
+    it.each([
+        'column "name" does not exist',
+        'column "iso_code" does not exist',
+    ])('retries save without cargo_configurations when DB returns legacy schema error: %s', async (legacyColumnError) => {
         const QUOTE_ID = '123e4567-e89b-12d3-a456-426614174400';
         const VERSION_ID = '123e4567-e89b-12d3-a456-426614174401';
         const OPTION_ID = '123e4567-e89b-12d3-a456-426614174402';
@@ -1190,7 +1193,7 @@ describe('UnifiedQuoteComposer Integration (API-to-UI)', () => {
         });
 
         mockScopedDb.rpc
-            .mockResolvedValueOnce({ data: null, error: { message: 'column "name" does not exist' } })
+            .mockResolvedValueOnce({ data: null, error: { message: legacyColumnError } })
             .mockResolvedValueOnce({ data: QUOTE_ID, error: null });
 
         const queryClient = new QueryClient({

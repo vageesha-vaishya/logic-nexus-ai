@@ -15,6 +15,7 @@ interface FileUploadProps {
   error?: string;
   progress?: number;
   disabled?: boolean;
+  onClear?: () => void;
 }
 
 export function FileUpload({
@@ -27,6 +28,7 @@ export function FileUpload({
   error,
   progress,
   disabled = false,
+  onClear,
 }: FileUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
@@ -156,9 +158,12 @@ export function FileUpload({
                 className="shrink-0 hover:bg-destructive/10 hover:text-destructive"
                 onClick={(e) => {
                     e.stopPropagation();
-                    // This is a hack because onFileSelect is strict. 
-                    // Ideally parent passes a handler to clear.
-                    // I will change the interface below.
+                    if (onClear) {
+                        onClear();
+                    }
+                    if (inputRef.current) {
+                        inputRef.current.value = '';
+                    }
                 }}
               >
                 <X className="h-4 w-4" />

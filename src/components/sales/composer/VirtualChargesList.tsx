@@ -12,6 +12,7 @@ interface VirtualChargesListProps {
   onRemove: (idx: number) => void;
   onConfigureBasis: (idx: number) => void;
   height?: number | string;
+  legMode?: string;
 }
 
 export const VirtualChargesList = memo(function VirtualChargesList({
@@ -22,7 +23,8 @@ export const VirtualChargesList = memo(function VirtualChargesList({
   onUpdate,
   onRemove,
   onConfigureBasis,
-  height = 500
+  height = 500,
+  legMode
 }: VirtualChargesListProps) {
   
   return (
@@ -60,6 +62,7 @@ export const VirtualChargesList = memo(function VirtualChargesList({
               onUpdate={onUpdate}
               onRemove={onRemove}
               onConfigureBasis={onConfigureBasis}
+              legMode={legMode}
               className={index % 2 === 1 ? 'bg-muted/5' : ''}
             />
           ))

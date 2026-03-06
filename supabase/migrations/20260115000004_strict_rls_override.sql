@@ -254,9 +254,9 @@ $$;
 
 -- 7. Update set_user_scope_preference to log audit for platform admins
 CREATE OR REPLACE FUNCTION public.set_user_scope_preference(
-    p_tenant_id UUID,
-    p_franchise_id UUID,
-    p_admin_override BOOLEAN
+    p_tenant_id UUID DEFAULT NULL,
+    p_franchise_id UUID DEFAULT NULL,
+    p_admin_override BOOLEAN DEFAULT false
 )
 RETURNS VOID
 LANGUAGE plpgsql

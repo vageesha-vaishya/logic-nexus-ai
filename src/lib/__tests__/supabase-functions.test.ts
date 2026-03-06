@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { invokeFunction } from '../supabase-functions';
+import { invokeAnonymous, invokeFunction } from '../supabase-functions';
 import { supabase } from '@/integrations/supabase/client';
 
 // Mock the Supabase client
@@ -9,6 +9,7 @@ vi.mock('@/integrations/supabase/client', () => ({
       invoke: vi.fn(),
     },
     auth: {
+      getSession: vi.fn(),
       refreshSession: vi.fn(),
     },
   },
@@ -17,6 +18,10 @@ vi.mock('@/integrations/supabase/client', () => ({
 describe('invokeFunction', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    (supabase.auth.getSession as any).mockResolvedValue({
+      data: { session: null },
+      error: null,
+    });
   });
 
   it('should return data on successful first attempt', async () => {
@@ -28,11 +33,15 @@ describe('invokeFunction', () => {
     expect(result.data).toEqual(mockData);
     expect(result.error).toBeNull();
     expect(supabase.functions.invoke).toHaveBeenCalledTimes(1);
-    expect(supabase.functions.invoke).toHaveBeenCalledWith('test-func', { 
+    const invokeCall = (supabase.functions.invoke as any).mock.calls[0];
+    expect(invokeCall[0]).toBe('test-func');
+    expect(invokeCall[1]).toMatchObject({
       body: { foo: 'bar' },
       headers: {},
-      method: 'POST'
+      method: 'POST',
     });
+    expect(invokeCall[1].body.trace_id).toBeTruthy();
+    expect(invokeCall[1].body.idempotency_key).toBeTruthy();
   });
 
   it('should retry on 401 error and succeed if refresh works', async () => {
@@ -119,5 +128,50 @@ describe('invokeFunction', () => {
     expect(supabase.functions.invoke).toHaveBeenCalledTimes(1);
     expect(supabase.auth.refreshSession).not.toHaveBeenCalled();
     expect(result.error).toEqual(error500);
+  });
+
+  it('should attach issues from JSON error responses', async () => {
+    const error400: any = {
+      context: {
+        status: 400,
+        bodyUsed: false,
+        text: async () => JSON.stringify({ error: 'PDF pre-render validation failed', issues: ['Missing commodity'] }),
+      },
+      message: 'Bad Request',
+    };
+
+    (supabase.functions.invoke as any).mockResolvedValueOnce({ data: null, error: error400 });
+
+    const result = await invokeFunction('test-func');
+
+    expect(result.data).toBeNull();
+    expect(result.error).toBeTruthy();
+    expect(String((result.error as any).message)).toMatch(/PDF pre-render validation failed/);
+    expect(Array.isArray((result.error as any).issues)).toBe(true);
+    expect((result.error as any).issues).toEqual(['Missing commodity']);
+  });
+});
+
+describe('invokeAnonymous', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should attach apikey and Authorization headers when invoking anonymously', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch' as any).mockResolvedValueOnce({
+      ok: true,
+      headers: { get: () => 'application/json' },
+      json: async () => ({ ok: true }),
+    } as any);
+
+    await invokeAnonymous('public-func', { ping: true });
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const call = fetchSpy.mock.calls[0];
+    const options = call[1] as RequestInit;
+    const headers = options.headers as Record<string, string>;
+    expect(headers.apikey).toBeTruthy();
+    expect(headers.Authorization).toBeUndefined();
+    fetchSpy.mockRestore();
   });
 });

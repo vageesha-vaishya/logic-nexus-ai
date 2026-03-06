@@ -15,6 +15,49 @@ const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_S
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
+const isSchemaTableError = (message: string): boolean =>
+  /schema cache|does not exist|could not find the table|relation|permission denied for schema/i.test(message);
+
+async function fetchQuoteItemsWithFallbacks(quoteId: string) {
+  const candidates = [
+    {
+      table: "quote_items",
+      select: `
+        *,
+        container_sizes (code, name),
+        container_types (code, name)
+      `,
+    },
+    {
+      table: "quote_items_core",
+      select: "*",
+    },
+  ] as const;
+
+  let lastError = "";
+
+  for (const candidate of candidates) {
+    const { data, error } = await supabase
+      .from(candidate.table)
+      .select(candidate.select)
+      .eq("quote_id", quoteId);
+
+    if (!error) return data || [];
+
+    const message = String(error.message || "");
+    lastError = message;
+
+    if (isSchemaTableError(message)) {
+      console.warn(`Quote item source unavailable for ${candidate.table}, trying fallback: ${message}`);
+      continue;
+    }
+
+    throw new Error(`Error fetching items from ${candidate.table}: ${message}`);
+  }
+
+  throw new Error(`Error fetching items: ${lastError || "No quote item source found"}`);
+}
+
 export async function generatePdfLocal(quoteId: string, versionId?: string, templateId?: string) {
   console.log('--- Generating PDF Locally (Simulating Edge Function) ---');
 
@@ -67,18 +110,8 @@ export async function generatePdfLocal(quoteId: string, versionId?: string, temp
 
   if (quoteError) throw quoteError;
 
-  // Fetch Quote Items separately
-  const { data: items, error: itemsError } = await supabase
-    .from("quote_items")
-    .select(`
-      *,
-      container_sizes (code, name),
-      container_types (code, name)
-    `)
-    .eq("quote_id", quoteId);
-  
-  if (itemsError) throw new Error(`Error fetching items: ${itemsError.message}`);
-  quote.items = items || [];
+  // Fetch quote items with fallback for split-schema environments
+  quote.items = await fetchQuoteItemsWithFallbacks(quoteId);
 
   // Fetch Version Data (if provided)
   let version = null;

@@ -51,7 +51,12 @@ export const RawQuoteDataSchema = z.object({
     secondary_color: z.string().optional(),
     accent_color: z.string().optional(),
     company_name: z.string().optional(),
+    company_address: z.string().optional(),
     font_family: z.string().optional(),
+    header_text: z.string().optional(),
+    sub_header_text: z.string().optional(),
+    footer_text: z.string().optional(),
+    disclaimer_text: z.string().optional(),
   }).optional(),
 });
 
@@ -67,8 +72,14 @@ export class ValidationBlockError extends Error {
   }
 }
 
-function validateForPdf(raw: any): string[] {
-  const issues: string[] = [];
+type PdfValidationResult = {
+  blockers: string[];
+  warnings: string[];
+};
+
+function validateForPdf(raw: any): PdfValidationResult {
+  const blockers: string[] = [];
+  const warnings: string[] = [];
 
   const items = Array.isArray(raw.items) ? raw.items : [];
   const charges = Array.isArray(raw.charges) ? raw.charges : [];
@@ -77,39 +88,36 @@ function validateForPdf(raw: any): string[] {
     items.forEach((item: any, index: number) => {
       const commodity = item?.commodity;
       if (!commodity || commodity === "General Cargo") {
-        issues.push(`Item ${index + 1}: commodity missing or too generic`);
+        warnings.push(`Item ${index + 1}: commodity missing or too generic`);
       }
 
       const weight = Number(item?.weight ?? 0);
       const volume = Number(item?.volume ?? 0);
 
-      if (!(weight > 0)) {
-        issues.push(`Item ${index + 1}: weight must be greater than 0`);
+      if (weight < 0) {
+        blockers.push(`Item ${index + 1}: weight must be zero or greater`);
+      } else if (!(weight > 0)) {
+        warnings.push(`Item ${index + 1}: weight is missing or zero`);
       }
       if (volume < 0) {
-        issues.push(`Item ${index + 1}: volume must be zero or greater`);
+        blockers.push(`Item ${index + 1}: volume must be zero or greater`);
       }
     });
   }
 
   if (charges.length === 0) {
-    issues.push("No sell-side charges available for PDF");
+    warnings.push("No sell-side charges available for PDF");
   } else {
     const totalAmount = charges.reduce(
       (sum: number, c: any) => sum + Number(c?.amount ?? 0),
       0
     );
     if (!(totalAmount > 0)) {
-      issues.push("Total charge amount must be greater than 0");
+      warnings.push("Total charge amount is zero");
     }
   }
 
-  const companyName = raw?.branding?.company_name;
-  if (!companyName || String(companyName).trim().length === 0) {
-    issues.push("Branding company name is missing");
-  }
-
-  return issues;
+  return { blockers, warnings };
 }
 
 export function mapQuoteItemsToRawItems(items: any[] | null | undefined) {
@@ -147,7 +155,12 @@ export interface SafeContext {
     secondary_color: string;
     accent_color: string;
     company_name: string;
+    company_address: string;
     font_family: string;
+    header_text: string;
+    sub_header_text: string;
+    footer_text: string;
+    disclaimer_text: string;
   };
   quote: {
     number: string;
@@ -185,12 +198,26 @@ export interface SafeContext {
   }>;
 }
 
-export function buildSafeContext(rawData: unknown, logger: Logger, locale: string = "en-US"): SafeContext {
+function noopLogger(): Logger {
+  return {
+    info: async () => {},
+    warn: async () => {},
+    error: async () => {},
+    debug: async () => {},
+  } as any;
+}
+
+export function buildSafeContextWithValidation(
+  rawData: unknown,
+  logger?: Logger,
+  locale: string = "en-US",
+): { context: SafeContext; warnings: string[] } {
+  const safeLogger = logger || noopLogger();
   // 1. Validate Input
   const result = RawQuoteDataSchema.safeParse(rawData);
   
   if (!result.success) {
-    logger.warn("SafeContextBuilder: Input validation failed", { error: result.error });
+    safeLogger.warn("SafeContextBuilder: Input validation failed", { error: result.error });
     // In production, we might want to throw or return a partial context. 
     // For now, we'll try to proceed with best-effort mapping if possible, 
     // or just return a default structure to prevent crash.
@@ -198,9 +225,12 @@ export function buildSafeContext(rawData: unknown, logger: Logger, locale: strin
 
   const data = result.success ? result.data : (rawData as any);
 
-  const validationIssues = validateForPdf(data);
-  if (validationIssues.length > 0) {
-    throw new ValidationBlockError(validationIssues);
+  const validation = validateForPdf(data);
+  if (validation.blockers.length > 0) {
+    throw new ValidationBlockError(validation.blockers);
+  }
+  if (validation.warnings.length > 0) {
+    safeLogger.warn("SafeContextBuilder: PDF pre-render warnings", { warnings: validation.warnings });
   }
 
   // 2. Transform & Sanitize
@@ -216,7 +246,12 @@ export function buildSafeContext(rawData: unknown, logger: Logger, locale: strin
       secondary_color: data.branding?.secondary_color || "#dceef2",
       accent_color: data.branding?.accent_color || "#000000",
       company_name: data.branding?.company_name || "Nexus Logistics",
+      company_address: data.branding?.company_address || "123 Logistics Way, Transport City, TC 12345",
       font_family: data.branding?.font_family || "Helvetica",
+      header_text: data.branding?.header_text || "",
+      sub_header_text: data.branding?.sub_header_text || "",
+      footer_text: data.branding?.footer_text || "",
+      disclaimer_text: data.branding?.disclaimer_text || "Standard terms and conditions apply.",
     },
     quote: {
       number: data.quote?.quote_number || "DRAFT",
@@ -265,5 +300,9 @@ export function buildSafeContext(rawData: unknown, logger: Logger, locale: strin
     }),
   };
 
-  return safeCtx;
+  return { context: safeCtx, warnings: validation.warnings };
+}
+
+export function buildSafeContext(rawData: unknown, logger?: Logger, locale: string = "en-US"): SafeContext {
+  return buildSafeContextWithValidation(rawData, logger, locale).context;
 }

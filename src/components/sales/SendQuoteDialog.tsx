@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Mail, Loader2, Send, FileText } from 'lucide-react';
 import { toast } from 'sonner';
-import { invokeFunction, invokeAnonymous, emitEvent, enrichPayload } from '@/lib/supabase-functions';
+import { invokeFunction, emitEvent } from '@/lib/supabase-functions';
 import { EmitEventSchema } from '@/lib/schemas/events';
 
 interface SendQuoteDialogProps {
@@ -36,17 +36,18 @@ export function SendQuoteDialog({ quoteId, quoteNumber, versionId, customerEmail
     try {
       // 1. Generate PDF
       console.log('[SendQuote] Generating PDF...');
-      // Use invokeAnonymous to avoid "Invalid JWT" errors if the session token is stale/invalid
-      // The function uses Service Role internally, so it doesn't rely on the user's RLS context
-      const pdfResponse = await invokeAnonymous('generate-quote-pdf', enrichPayload({
-        quoteId, 
-        versionId,
-        engine_v2: true,
-        source: 'send-email',
-        action: 'generate-pdf'
-      }));
-
-      const pdfData = pdfResponse;
+      const { data: pdfData, error: pdfError } = await invokeFunction('generate-quote-pdf', {
+        body: {
+          quoteId,
+          versionId,
+          engine_v2: true,
+          source: 'send-email',
+          action: 'generate-pdf',
+        },
+      });
+      if (pdfError) {
+        throw new Error(`PDF generation failed: ${pdfError.message || 'unknown error'}`);
+      }
 
       if (!pdfData || !pdfData.content) {
         const issues = Array.isArray(pdfData?.issues) ? String(pdfData.issues.join('; ')) : null;

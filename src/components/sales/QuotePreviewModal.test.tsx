@@ -5,7 +5,8 @@ import * as SupabaseFunctions from '@/lib/supabase-functions';
 
 // Mock dependencies
 vi.mock('@/lib/supabase-functions', () => ({
-  invokeAnonymous: vi.fn(),
+  invokeFunction: vi.fn(),
+  emitEvent: vi.fn(),
 }));
 
 // Mock URL.createObjectURL and revokeObjectURL
@@ -37,7 +38,7 @@ describe('QuotePreviewModal', () => {
   it('opens modal and generates PDF on click', async () => {
     // Mock successful response
     const mockContent = Buffer.from('fake-pdf-content').toString('base64');
-    (SupabaseFunctions.invokeAnonymous as any).mockResolvedValue({ content: mockContent });
+    (SupabaseFunctions.invokeFunction as any).mockResolvedValue({ data: { content: mockContent }, error: null });
 
     render(<QuotePreviewModal {...defaultProps} />);
     
@@ -52,8 +53,8 @@ describe('QuotePreviewModal', () => {
 
     // Wait for PDF generation
     await waitFor(() => {
-      expect((SupabaseFunctions.invokeAnonymous as any).mock.calls[0][0]).toBe('generate-quote-pdf');
-      const payload = (SupabaseFunctions.invokeAnonymous as any).mock.calls[0][1];
+      expect((SupabaseFunctions.invokeFunction as any).mock.calls[0][0]).toBe('generate-quote-pdf');
+      const payload = (SupabaseFunctions.invokeFunction as any).mock.calls[0][1]?.body;
       expect(payload.quoteId).toBe('test-quote-id');
       expect(payload.versionId).toBe('v1');
     });
@@ -68,7 +69,7 @@ describe('QuotePreviewModal', () => {
 
   it('handles PDF generation error', async () => {
     // Mock error response
-    (SupabaseFunctions.invokeAnonymous as any).mockRejectedValue(new Error('Generation failed'));
+    (SupabaseFunctions.invokeFunction as any).mockResolvedValue({ data: null, error: { message: 'Generation failed' } });
 
     render(<QuotePreviewModal {...defaultProps} />);
     
@@ -82,9 +83,9 @@ describe('QuotePreviewModal', () => {
 
   it('allows retrying after error', async () => {
     // Mock error first
-    (SupabaseFunctions.invokeAnonymous as any)
-      .mockRejectedValueOnce(new Error('Temporary error'))
-      .mockResolvedValueOnce({ content: Buffer.from('success').toString('base64') });
+    (SupabaseFunctions.invokeFunction as any)
+      .mockResolvedValueOnce({ data: null, error: { message: 'Temporary error' } })
+      .mockResolvedValueOnce({ data: { content: Buffer.from('success').toString('base64') }, error: null });
 
     render(<QuotePreviewModal {...defaultProps} />);
     

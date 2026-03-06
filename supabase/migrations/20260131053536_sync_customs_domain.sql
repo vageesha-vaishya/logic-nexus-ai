@@ -4,24 +4,11 @@
 
 BEGIN;
 
-INSERT INTO platform_domains (key, code, name, description, owner, status, repository_url, swagger_endpoint)
-VALUES (
-    'customs',
-    'customs',
-    'Customs & Compliance',
-    'Regulatory compliance, HTS codes, and clearance.',
-    'Compliance Squad',
-    'active',
-    'https://github.com/trae/logic-nexus-ai',
-    '/api/v1/customs/openapi.json'
-)
-ON CONFLICT (key) DO UPDATE SET
+INSERT INTO public.platform_domains (code, name, description)
+VALUES ('customs', 'Customs & Compliance', 'Regulatory compliance, HTS codes, and clearance.')
+ON CONFLICT (code) DO UPDATE SET
     name = EXCLUDED.name,
-    description = EXCLUDED.description,
-    owner = EXCLUDED.owner,
-    status = EXCLUDED.status,
-    repository_url = EXCLUDED.repository_url,
-    swagger_endpoint = EXCLUDED.swagger_endpoint;
+    description = EXCLUDED.description;
 
 COMMIT;
 

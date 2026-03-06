@@ -106,6 +106,7 @@ export const LegChargesTabContent = memo(function LegChargesTabContent({
             onUpdate={handleUpdate}
             onRemove={handleRemove}
             onConfigureBasis={handleConfigureBasis}
+            legMode={leg.mode}
             height={400}
           />
           {renderTotals(totals, margin, marginPercentVal)}

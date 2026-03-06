@@ -127,10 +127,17 @@ export const ReviewAndSaveStep = memo(function ReviewAndSaveStep({ templateId }:
               const legTotalBuy = calculateLegChargesTotal(leg, 'buy');
               const legProfit = legTotalSell - legTotalBuy;
               const isServiceLeg = leg.legType === 'service';
-              const legRole = leg.legType === 'pickup' ? 'Pickup Leg' : 
-                             leg.legType === 'delivery' ? 'Delivery Leg' : 
-                             leg.legType === 'main' ? 'Main Leg' :
-                             isServiceLeg ? 'Service' : 'Leg';
+              const modeDisplay = normalizeModeCode(leg.mode || '').toUpperCase() || 'UNKNOWN';
+              const legTitle =
+                isServiceLeg
+                  ? `Service: ${leg.serviceOnlyCategory || 'General'}`
+                  : legs.length === 1
+                    ? `Main Leg 1 - ${modeDisplay}`
+                    : idx === 0
+                      ? `Pickup Leg - ${modeDisplay}`
+                      : idx === legs.length - 1
+                        ? `Delivery Leg - ${modeDisplay}`
+                        : `Main Leg ${idx + 1} - ${modeDisplay}`;
 
               return (
                 <Card key={leg.id} className="border-2 mb-4">
@@ -138,19 +145,7 @@ export const ReviewAndSaveStep = memo(function ReviewAndSaveStep({ templateId }:
                     <div className="flex items-center justify-between mb-3">
                       <div>
                         <p className="font-semibold">
-                          {(() => {
-                             // Logic synchronized with quote-mapper.ts/charge-bifurcation.ts
-                             // DB requires 'transport'/'service' so we infer display role from position
-                             if (leg.legType === 'service') return `Service: ${leg.serviceOnlyCategory || 'General'}`;
-                             
-                             const modeDisplay = normalizeModeCode(leg.mode || '').toUpperCase();
-                             
-                             if (legs.length === 1) return `Main Leg 1 - ${modeDisplay || 'UNKNOWN'}`;
-                             
-                             if (idx === 0) return `Pickup Leg - ${modeDisplay || 'UNKNOWN'}`;
-                             if (idx === legs.length - 1) return `Delivery Leg - ${modeDisplay || 'UNKNOWN'}`;
-                             return `Main Leg ${idx + 1} - ${modeDisplay || 'UNKNOWN'}`;
-                          })()}
+                          {legTitle}
                         </p>
                         <p className="text-sm text-muted-foreground">
                           {isServiceLeg 

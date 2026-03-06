@@ -4,24 +4,15 @@
 
 BEGIN;
 
-INSERT INTO platform_domains (key, code, name, description, owner, status, repository_url, swagger_endpoint)
+INSERT INTO public.platform_domains (code, name, description)
 VALUES (
     'banking',
-    'banking',
     'Banking & Finance',
-    'Loans, mortgages, and financial services',
-    '',
-    'planned',
-    '',
-    ''
+    'Loans, mortgages, and financial services'
 )
-ON CONFLICT (key) DO UPDATE SET
+ON CONFLICT (code) DO UPDATE SET
     name = EXCLUDED.name,
-    description = EXCLUDED.description,
-    owner = EXCLUDED.owner,
-    status = EXCLUDED.status,
-    repository_url = EXCLUDED.repository_url,
-    swagger_endpoint = EXCLUDED.swagger_endpoint;
+    description = EXCLUDED.description;
 
 COMMIT;
 

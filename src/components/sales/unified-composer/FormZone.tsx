@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useFormContext } from 'react-hook-form';
 import { QuoteComposerValues } from './schema';
 import { Button } from '@/components/ui/button';
@@ -13,7 +13,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuCheckboxItem } from '@/components/ui/dropdown-menu';
-import { Plane, Ship, Truck, Train, Timer, Sparkles, ChevronDown, Save, Settings2, Building2, User, FileText, Loader2, CheckCircle2, XCircle, Paperclip, File as FileIcon, X } from 'lucide-react';
+import { Plane, Ship, Truck, Train, Timer, Sparkles, ChevronDown, Save, Settings2, Building2, User, FileText, Loader2, CheckCircle2, XCircle, Paperclip, File as FileIcon, X, AlertCircle } from 'lucide-react';
 import { LocationAutocomplete } from '@/components/common/LocationAutocomplete';
 import { SharedCargoInput } from '@/components/sales/shared/SharedCargoInput';
 import { CommoditySelection } from '@/components/logistics/SmartCargoInput';
@@ -131,6 +131,28 @@ export function FormZone({
 
   const form = useFormContext<QuoteComposerValues>();
 
+  const getFieldError = useCallback((path: string) => {
+    const keys = path.split('.');
+    let current: any = form.formState.errors;
+    for (const key of keys) {
+      if (!current || typeof current !== 'object') return null;
+      current = current[key];
+    }
+    return current || null;
+  }, [form.formState.errors]);
+
+  const hasFieldError = useCallback((...paths: string[]) => {
+    return paths.some((path) => !!getFieldError(path));
+  }, [getFieldError]);
+
+  const getFieldErrorMessage = useCallback((...paths: string[]) => {
+    for (const path of paths) {
+      const message = getFieldError(path)?.message;
+      if (typeof message === 'string' && message.trim()) return message.trim();
+    }
+    return '';
+  }, [getFieldError]);
+
   const [cargoItem, setCargoItem] = useState<CargoItem>({
     id: '1',
     type: 'container',
@@ -163,7 +185,7 @@ export function FormZone({
   }, [quoteNumber, scopedDb, context?.tenantId]);
 
   const onOpportunityChange = (opportunityId: string | undefined) => {
-    form.setValue('opportunityId' as any, opportunityId || '');
+    form.setValue('opportunityId' as any, opportunityId || '', { shouldValidate: true, shouldDirty: true });
     if (!opportunityId) {
         // Optional: Clear account/contact if opportunity is cleared?
         // Usually better to keep them if user just wants to unlink opportunity but keep context.
@@ -174,26 +196,26 @@ export function FormZone({
     if (opp) {
       // 1. Set Account
       if (opp.account_id) {
-        form.setValue('accountId' as any, opp.account_id);
+        form.setValue('accountId' as any, opp.account_id, { shouldValidate: true, shouldDirty: true });
       }
       
       // 2. Set Contact
       // Prefer the contact explicitly linked to the opportunity
       if (opp.contact_id) {
-         form.setValue('contactId' as any, opp.contact_id);
+         form.setValue('contactId' as any, opp.contact_id, { shouldValidate: true, shouldDirty: true });
       } else if (opp.account_id) {
          // Fallback: Try to find a contact for this account
          const related = contacts.filter(c => c.account_id === opp.account_id);
          if (related.length === 1) {
              // Single contact found - auto-select
-             form.setValue('contactId' as any, related[0].id);
+             form.setValue('contactId' as any, related[0].id, { shouldValidate: true, shouldDirty: true });
          } else {
              // Multiple or no contacts - clear to force user selection
-             form.setValue('contactId' as any, '');
+             form.setValue('contactId' as any, '', { shouldValidate: true, shouldDirty: true });
          }
       } else {
           // No account linked - clear contact
-          form.setValue('contactId' as any, '');
+          form.setValue('contactId' as any, '', { shouldValidate: true, shouldDirty: true });
       }
     }
   };
@@ -439,7 +461,7 @@ export function FormZone({
       },
     }));
     
-    if (selection.hts_code) form.setValue('htsCode', selection.hts_code);
+    if (selection.hts_code) form.setValue('htsCode', selection.hts_code, { shouldValidate: true, shouldDirty: true });
   };
 
   const handleAiSuggest = async () => {
@@ -450,10 +472,10 @@ export function FormZone({
         invokeAiAdvisor({ action: 'classify_commodity', payload: { commodity } }),
       ]);
       if (unitRes.data?.unit) {
-        form.setValue('unit', unitRes.data.unit);
+        form.setValue('unit', unitRes.data.unit, { shouldValidate: true, shouldDirty: true });
       }
       if (classRes.data?.hts) {
-        form.setValue('htsCode', classRes.data.hts);
+        form.setValue('htsCode', classRes.data.hts, { shouldValidate: true, shouldDirty: true });
         toast({ title: 'AI Analysis Complete', description: `Classified as ${classRes.data.type} (HTS: ${classRes.data.hts})` });
       }
     } catch (err) {
@@ -475,7 +497,7 @@ export function FormZone({
     if (e.target.files && e.target.files.length > 0) {
       const newFiles = Array.from(e.target.files);
       const current = form.getValues('attachments' as any) || [];
-      form.setValue('attachments' as any, [...current, ...newFiles]);
+      form.setValue('attachments' as any, [...current, ...newFiles], { shouldDirty: true });
     }
   };
 
@@ -483,7 +505,17 @@ export function FormZone({
     const current = form.getValues('attachments' as any) || [];
     const next = [...current];
     next.splice(index, 1);
-    form.setValue('attachments' as any, next);
+    form.setValue('attachments' as any, next, { shouldDirty: true });
+  };
+
+  const InlineError = ({ message, compact = false }: { message: string; compact?: boolean }) => {
+    if (!message) return null;
+    return (
+      <span className={cn("inline-flex items-center gap-1 text-destructive", compact ? "text-[10px]" : "text-xs")} role="alert" aria-live="polite">
+        <AlertCircle className={cn("shrink-0", compact ? "h-3 w-3" : "h-3.5 w-3.5")} aria-hidden="true" />
+        <span>{message}</span>
+      </span>
+    );
   };
 
   return (
@@ -505,7 +537,7 @@ export function FormZone({
                 id="standalone-mode"
                 checked={!!standalone}
                 onCheckedChange={(checked) => {
-                  form.setValue('standalone' as any, checked);
+                  form.setValue('standalone' as any, checked, { shouldValidate: true, shouldDirty: true });
                 }}
               />
             </div>
@@ -552,9 +584,9 @@ export function FormZone({
                     const related = contacts.filter(c => c.account_id === v);
                     // Only auto-select if there is exactly one contact
                     if (related.length === 1) {
-                      form.setValue('contactId' as any, related[0].id);
+                      form.setValue('contactId' as any, related[0].id, { shouldValidate: true, shouldDirty: true });
                     } else {
-                      form.setValue('contactId' as any, '');
+                      form.setValue('contactId' as any, '', { shouldValidate: true, shouldDirty: true });
                     }
                   }} value={field.value} disabled={crmLoading}>
                     <FormControl>
@@ -1016,19 +1048,24 @@ export function FormZone({
               control={form.control}
               name={"quoteNumber" as any}
               render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="flex items-center gap-2 text-xs">
+                <FormItem className={cn(hasFieldError('quoteNumber') && "rounded-md border border-destructive/40 bg-destructive/5 p-2")}>
+                  <FormLabel className={cn("flex items-center gap-2 text-xs", hasFieldError('quoteNumber') && "text-destructive")}>
                     <FileText className="h-3.5 w-3.5" /> Quote Number (Manual Override)
                   </FormLabel>
                   <FormControl>
                     <div className="relative">
-                      <Input {...field} placeholder="Auto-generated if left blank" className="bg-background h-9 text-xs pr-8" />
+                      <Input
+                        {...field}
+                        placeholder="Auto-generated if left blank"
+                        className={cn("bg-background h-9 text-xs pr-8", hasFieldError('quoteNumber') && "border-destructive focus-visible:ring-destructive")}
+                        aria-invalid={hasFieldError('quoteNumber')}
+                      />
                       {availability === 'loading' && <Loader2 className="absolute right-2 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />}
                       {availability === 'available' && <CheckCircle2 className="absolute right-2 top-2.5 h-4 w-4 text-green-500" />}
                       {availability === 'unavailable' && <XCircle className="absolute right-2 top-2.5 h-4 w-4 text-destructive" />}
                     </div>
                   </FormControl>
-                  {availability === 'unavailable' && <p className="text-[10px] text-destructive mt-1">This number is already taken.</p>}
+                  {availability === 'unavailable' && <InlineError compact message="This number is already taken." />}
                   <FormMessage />
                 </FormItem>
               )}
@@ -1080,11 +1117,15 @@ export function FormZone({
         </Card>
 
         {/* Mode Tabs */}
-        <div className={cn("space-y-2 rounded-md p-2", form.formState.errors.mode && "bg-destructive/5 ring-1 ring-destructive")}>
-          <Label className={cn(form.formState.errors.mode && "text-destructive")}>
-            Transport Mode {form.formState.errors.mode && <span className="text-destructive text-xs ml-2">{form.formState.errors.mode.message}</span>}
+        <div
+          className={cn("space-y-2 rounded-md p-2", hasFieldError('mode') && "border border-destructive/40 bg-destructive/5 ring-1 ring-destructive/40")}
+          data-field-name="mode"
+          aria-invalid={hasFieldError('mode')}
+        >
+          <Label className={cn(hasFieldError('mode') && "text-destructive")}>
+            Transport Mode {hasFieldError('mode') && <span className="ml-2"><InlineError message={getFieldErrorMessage('mode')} /></span>}
           </Label>
-          <Tabs value={mode} onValueChange={(v) => form.setValue('mode', v as any)} className="w-full">
+          <Tabs value={mode} onValueChange={(v) => form.setValue('mode', v as any, { shouldValidate: true, shouldDirty: true })} className="w-full">
             <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="ocean"><Ship className="w-4 h-4 mr-1" />Ocean</TabsTrigger>
               <TabsTrigger value="air"><Plane className="w-4 h-4 mr-1" />Air</TabsTrigger>
@@ -1099,15 +1140,14 @@ export function FormZone({
           <div
             className={cn(
               "space-y-2 rounded-md transition-colors",
-              (form.formState.errors.origin || form.formState.errors.originId) && "bg-destructive/5 ring-1 ring-destructive p-2"
+              hasFieldError('origin', 'originId') && "border border-destructive/40 bg-destructive/5 ring-1 ring-destructive/40 p-2"
             )}
             data-field-name="origin"
-            aria-invalid={!!(form.formState.errors.origin || form.formState.errors.originId)}
+            aria-invalid={hasFieldError('origin', 'originId')}
           >
             <Label className="flex justify-between">
               Origin
-              {form.formState.errors.origin && <span className="text-destructive text-xs">{form.formState.errors.origin.message}</span>}
-              {!form.formState.errors.origin && form.formState.errors.originId && <span className="text-destructive text-xs">{form.formState.errors.originId.message}</span>}
+              <InlineError message={getFieldErrorMessage('origin', 'originId')} />
             </Label>
             <LocationAutocomplete
               data-testid="location-origin"
@@ -1122,15 +1162,14 @@ export function FormZone({
           <div
             className={cn(
               "space-y-2 rounded-md transition-colors",
-              (form.formState.errors.destination || form.formState.errors.destinationId) && "bg-destructive/5 ring-1 ring-destructive p-2"
+              hasFieldError('destination', 'destinationId') && "border border-destructive/40 bg-destructive/5 ring-1 ring-destructive/40 p-2"
             )}
             data-field-name="destination"
-            aria-invalid={!!(form.formState.errors.destination || form.formState.errors.destinationId)}
+            aria-invalid={hasFieldError('destination', 'destinationId')}
           >
             <Label className="flex justify-between">
               Destination
-              {form.formState.errors.destination && <span className="text-destructive text-xs">{form.formState.errors.destination.message}</span>}
-              {!form.formState.errors.destination && form.formState.errors.destinationId && <span className="text-destructive text-xs">{form.formState.errors.destinationId.message}</span>}
+              <InlineError message={getFieldErrorMessage('destination', 'destinationId')} />
             </Label>
             <LocationAutocomplete
               data-testid="location-destination"
@@ -1148,13 +1187,13 @@ export function FormZone({
         <div
           className={cn(
             "space-y-2 rounded-md transition-colors",
-            form.formState.errors.commodity && "bg-destructive/5 ring-1 ring-destructive p-2"
+            hasFieldError('commodity') && "border border-destructive/40 bg-destructive/5 ring-1 ring-destructive/40 p-2"
           )}
           data-field-name="commodity"
-          aria-invalid={!!form.formState.errors.commodity}
+          aria-invalid={hasFieldError('commodity')}
         >
           <Label className="flex justify-between">
-            <span>Commodity & Cargo {form.formState.errors.commodity && <span className="text-destructive text-xs ml-2">{form.formState.errors.commodity.message}</span>}</span>
+            <span>Commodity & Cargo {hasFieldError('commodity') && <span className="ml-2"><InlineError message={getFieldErrorMessage('commodity')} /></span>}</span>
             <button type="button" onClick={handleAiSuggest} className="text-xs text-primary flex items-center gap-1 hover:underline">
               <Sparkles className="w-3 h-3" /> AI Analyze
             </button>
@@ -1165,6 +1204,12 @@ export function FormZone({
             onCommodityChange={(value) => form.setValue('commodity', value, { shouldValidate: true, shouldDirty: true })}
             errors={form.formState.errors as any}
           />
+          <span className="sr-only" data-field-name="containerType" aria-hidden="true" />
+          <span className="sr-only" data-field-name="containerSize" aria-hidden="true" />
+          <span className="sr-only" data-field-name="containerQty" aria-hidden="true" />
+          {hasFieldError('containerType') && <InlineError compact message={getFieldErrorMessage('containerType')} />}
+          {hasFieldError('containerSize') && <InlineError compact message={getFieldErrorMessage('containerSize')} />}
+          {hasFieldError('containerQty') && <InlineError compact message={getFieldErrorMessage('containerQty')} />}
           
           {/* Backup commodity input for direct entry */}
           <div className="mt-2">
@@ -1195,12 +1240,16 @@ export function FormZone({
 
         {/* Road-specific fields */}
         {mode === 'road' && (
-          <div className="space-y-2 p-3 border rounded-md bg-background">
-            <Label className={cn("text-xs", form.formState.errors.vehicleType && "text-destructive")}>Vehicle Type</Label>
-            <Select value={form.watch('vehicleType')} onValueChange={(v) => form.setValue('vehicleType', v)}>
+          <div
+            className={cn("space-y-2 p-3 border rounded-md bg-background", hasFieldError('vehicleType') && "border-destructive/40 bg-destructive/5")}
+            data-field-name="vehicleType"
+            aria-invalid={hasFieldError('vehicleType')}
+          >
+            <Label className={cn("text-xs", hasFieldError('vehicleType') && "text-destructive")}>Vehicle Type</Label>
+            <Select value={form.watch('vehicleType')} onValueChange={(v) => form.setValue('vehicleType', v, { shouldValidate: true, shouldDirty: true })}>
               <SelectTrigger 
-                className={cn("h-8", form.formState.errors.vehicleType && "border-destructive focus:ring-destructive")}
-                aria-invalid={!!form.formState.errors.vehicleType}
+                className={cn("h-8", hasFieldError('vehicleType') && "border-destructive focus:ring-destructive")}
+                aria-invalid={hasFieldError('vehicleType')}
               >
                 <SelectValue />
               </SelectTrigger>
@@ -1210,7 +1259,7 @@ export function FormZone({
                 <SelectItem value="reefer">Reefer Truck</SelectItem>
               </SelectContent>
             </Select>
-            {form.formState.errors.vehicleType && <p className="text-[10px] text-destructive mt-1" role="alert">{form.formState.errors.vehicleType.message}</p>}
+            <InlineError compact message={getFieldErrorMessage('vehicleType')} />
           </div>
         )}
 
@@ -1249,7 +1298,7 @@ export function FormZone({
                     key={carrier.id}
                     checked={isSelected}
                     onCheckedChange={(checked) => {
-                      form.setValue('preferredCarriers', checked ? [...current, carrier.name] : current.filter(c => c !== carrier.name));
+                      form.setValue('preferredCarriers', checked ? [...current, carrier.name] : current.filter(c => c !== carrier.name), { shouldValidate: true, shouldDirty: true });
                     }}
                   >
                     {carrier.name}
@@ -1270,12 +1319,16 @@ export function FormZone({
           </CollapsibleTrigger>
           <CollapsibleContent className="space-y-4 pt-2">
             {/* Incoterms */}
-            <div className="space-y-2">
-              <Label className={cn("text-xs", form.formState.errors.incoterms && "text-destructive")}>Incoterms</Label>
-              <Select value={form.watch('incoterms')} onValueChange={(v) => form.setValue('incoterms', v)}>
+            <div
+              className={cn("space-y-2 rounded-md", hasFieldError('incoterms') && "border border-destructive/40 bg-destructive/5 p-2")}
+              data-field-name="incoterms"
+              aria-invalid={hasFieldError('incoterms')}
+            >
+              <Label className={cn("text-xs", hasFieldError('incoterms') && "text-destructive")}>Incoterms</Label>
+              <Select value={form.watch('incoterms')} onValueChange={(v) => form.setValue('incoterms', v, { shouldValidate: true, shouldDirty: true })}>
                 <SelectTrigger 
-                  className={cn(form.formState.errors.incoterms && "border-destructive focus:ring-destructive")}
-                  aria-invalid={!!form.formState.errors.incoterms}
+                  className={cn(hasFieldError('incoterms') && "border-destructive focus:ring-destructive")}
+                  aria-invalid={hasFieldError('incoterms')}
                 >
                   <SelectValue placeholder="Select Incoterms (Optional)" />
                 </SelectTrigger>
@@ -1291,52 +1344,64 @@ export function FormZone({
                   )}
                 </SelectContent>
               </Select>
-              {form.formState.errors.incoterms && <p className="text-[10px] text-destructive mt-1" role="alert">{form.formState.errors.incoterms.message}</p>}
+              <InlineError compact message={getFieldErrorMessage('incoterms')} />
             </div>
 
             {/* Timing */}
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label className={cn("text-xs", form.formState.errors.pickupDate && "text-destructive")}>Pickup Date</Label>
+              <div
+                className={cn("space-y-1 rounded-md", hasFieldError('pickupDate') && "border border-destructive/40 bg-destructive/5 p-2")}
+                data-field-name="pickupDate"
+                aria-invalid={hasFieldError('pickupDate')}
+              >
+                <Label className={cn("text-xs", hasFieldError('pickupDate') && "text-destructive")}>Pickup Date</Label>
                 <Input 
                   type="date" 
                   value={form.watch('pickupDate')} 
-                  onChange={(e) => form.setValue('pickupDate', e.target.value)} 
-                  className={cn("h-8 text-xs", form.formState.errors.pickupDate && "border-destructive focus-visible:ring-destructive")} 
-                  aria-invalid={!!form.formState.errors.pickupDate}
+                  onChange={(e) => form.setValue('pickupDate', e.target.value, { shouldValidate: true, shouldDirty: true })} 
+                  className={cn("h-8 text-xs", hasFieldError('pickupDate') && "border-destructive focus-visible:ring-destructive")} 
+                  aria-invalid={hasFieldError('pickupDate')}
                 />
-                {form.formState.errors.pickupDate && <p className="text-[10px] text-destructive mt-1" role="alert">{form.formState.errors.pickupDate.message}</p>}
+                <InlineError compact message={getFieldErrorMessage('pickupDate')} />
               </div>
-              <div className="space-y-1">
-                <Label className={cn("text-xs", form.formState.errors.deliveryDeadline && "text-destructive")}>Delivery Deadline</Label>
+              <div
+                className={cn("space-y-1 rounded-md", hasFieldError('deliveryDeadline') && "border border-destructive/40 bg-destructive/5 p-2")}
+                data-field-name="deliveryDeadline"
+                aria-invalid={hasFieldError('deliveryDeadline')}
+              >
+                <Label className={cn("text-xs", hasFieldError('deliveryDeadline') && "text-destructive")}>Delivery Deadline</Label>
                 <Input 
                   type="date" 
                   value={form.watch('deliveryDeadline')} 
-                  onChange={(e) => form.setValue('deliveryDeadline', e.target.value)} 
-                  className={cn("h-8 text-xs", form.formState.errors.deliveryDeadline && "border-destructive focus-visible:ring-destructive")} 
-                  aria-invalid={!!form.formState.errors.deliveryDeadline}
+                  onChange={(e) => form.setValue('deliveryDeadline', e.target.value, { shouldValidate: true, shouldDirty: true })} 
+                  className={cn("h-8 text-xs", hasFieldError('deliveryDeadline') && "border-destructive focus-visible:ring-destructive")} 
+                  aria-invalid={hasFieldError('deliveryDeadline')}
                 />
-                {form.formState.errors.deliveryDeadline && <p className="text-[10px] text-destructive mt-1" role="alert">{form.formState.errors.deliveryDeadline.message}</p>}
+                <InlineError compact message={getFieldErrorMessage('deliveryDeadline')} />
               </div>
             </div>
 
             {/* Customs & Compliance */}
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label className={cn("text-xs", form.formState.errors.htsCode && "text-destructive")}>HTS Code</Label>
+              <div
+                className={cn("space-y-1 rounded-md", hasFieldError('htsCode') && "border border-destructive/40 bg-destructive/5 p-2")}
+                data-field-name="htsCode"
+                aria-invalid={hasFieldError('htsCode')}
+              >
+                <Label className={cn("text-xs", hasFieldError('htsCode') && "text-destructive")}>HTS Code</Label>
                 <Input 
                   value={form.watch('htsCode')} 
-                  onChange={(e) => form.setValue('htsCode', e.target.value)} 
-                  className={cn("h-8 text-xs", form.formState.errors.htsCode && "border-destructive focus-visible:ring-destructive")} 
+                  onChange={(e) => form.setValue('htsCode', e.target.value, { shouldValidate: true, shouldDirty: true })} 
+                  className={cn("h-8 text-xs", hasFieldError('htsCode') && "border-destructive focus-visible:ring-destructive")} 
                   placeholder="AI Suggested" 
-                  aria-invalid={!!form.formState.errors.htsCode}
+                  aria-invalid={hasFieldError('htsCode')}
                 />
-                {form.formState.errors.htsCode && <p className="text-[10px] text-destructive mt-1" role="alert">{form.formState.errors.htsCode.message}</p>}
+                <InlineError compact message={getFieldErrorMessage('htsCode')} />
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Dangerous Goods</Label>
                 <div className="flex items-center space-x-2">
-                  <Switch checked={form.watch('dangerousGoods')} onCheckedChange={(v) => form.setValue('dangerousGoods', v)} />
+                  <Switch checked={form.watch('dangerousGoods')} onCheckedChange={(v) => form.setValue('dangerousGoods', v, { shouldValidate: true, shouldDirty: true })} />
                   <Label className="text-xs font-normal">Yes</Label>
                 </div>
               </div>

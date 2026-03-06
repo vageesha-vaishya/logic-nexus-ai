@@ -26,10 +26,10 @@ interface AuthResult {
  */
 export async function requireAuth(req: Request, logger?: Logger): Promise<AuthResult> {
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
-  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
+  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || Deno.env.get('SUPABASE_PUBLISHABLE_KEY');
 
   if (!supabaseUrl || !supabaseAnonKey) {
-      const msg = '[requireAuth] Missing SUPABASE_URL or SUPABASE_ANON_KEY';
+      const msg = '[requireAuth] Missing SUPABASE_URL or SUPABASE_ANON_KEY/SUPABASE_PUBLISHABLE_KEY';
       if (logger) logger.error(msg);
       // We cannot return a valid client, so we must return a dummy or throw.
       // Since the interface requires supabaseClient, we will throw an error if this critical config is missing,
@@ -62,7 +62,13 @@ export async function requireAuth(req: Request, logger?: Logger): Promise<AuthRe
     const msg = `[requireAuth] getUser failed: ${error?.message}`;
     // Check for specific JWT errors
     if (error?.message?.includes('jwt') || error?.message?.includes('signature')) {
-        if (logger) logger.warn(`[requireAuth] JWT Verification Failed: ${error.message}`);
+        if (logger) logger.warn(`[requireAuth] JWT Verification Failed: ${error.message}`, {
+          hasAuthorizationHeader: Boolean(authHeader),
+          tokenPrefix: token.slice(0, 12),
+          tokenLength: token.length,
+          hasSupabaseUrl: Boolean(supabaseUrl),
+          hasSupabasePublicKey: Boolean(supabaseAnonKey),
+        });
     } else {
         if (logger) logger.error(msg, { error }); else console.error(msg, error);
     }

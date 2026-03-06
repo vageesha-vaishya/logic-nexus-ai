@@ -295,6 +295,8 @@ describe('UnifiedQuoteComposer Validation', () => {
       expect(screen.getByText(/Origin: Origin is required/i)).toBeInTheDocument();
     });
 
+    fireEvent.click(screen.getByRole('button', { name: /Go to Origin field/i }));
+
     // 2. Check for Scroll
     // The component has a 100ms timeout before scrolling
     await waitFor(() => {

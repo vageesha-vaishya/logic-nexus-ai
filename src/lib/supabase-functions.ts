@@ -4,6 +4,26 @@ import { validateAvro } from '@/lib/avro/validate';
 import { schemaForEvent } from '@/lib/schemas/avro/events';
 import { ensureSchemaId } from '@/lib/avro/registry';
 
+function getSupabaseProjectUrl(): string {
+  return String(import.meta.env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
+}
+
+function getSupabasePublicKey(): string {
+  return String(import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY || '');
+}
+
+function createJwtErrorLog(error: unknown, context: Record<string, unknown>) {
+  const message = String((error as any)?.message || error || '');
+  const status = (error as any)?.status || (error as any)?.code || (error as any)?.context?.status || null;
+  return {
+    ...context,
+    status,
+    message,
+    hasPublishableKey: Boolean(getSupabasePublicKey()),
+    hasProjectUrl: Boolean(getSupabaseProjectUrl()),
+  };
+}
+
 /**
  * Invokes a Supabase Edge Function anonymously (using the ANON/Public key).
  * 
@@ -16,8 +36,14 @@ import { ensureSchemaId } from '@/lib/avro/registry';
  * @throws Error if the request fails.
  */
 export async function invokeAnonymous<T = any>(functionName: string, body: any): Promise<T> {
-    const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL || "https://gzhxgoigflftharcmdqj.supabase.co").replace(/\/$/, '');
-    const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+    const supabaseUrl = getSupabaseProjectUrl();
+    const supabasePublicKey = getSupabasePublicKey();
+    if (!supabasePublicKey) {
+      throw new Error('Missing Supabase publishable key (VITE_SUPABASE_PUBLISHABLE_KEY)');
+    }
+    if (!import.meta.env.DEV && !supabaseUrl) {
+      throw new Error('Missing Supabase URL (VITE_SUPABASE_URL)');
+    }
 
     // Use relative URL in development to leverage Vite proxy (avoids CORS)
     // Use absolute URL in production
@@ -45,7 +71,7 @@ export async function invokeAnonymous<T = any>(functionName: string, body: any):
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${supabaseAnonKey}`
+                'apikey': supabasePublicKey
             },
             body: JSON.stringify(enrichPayload(body)),
             signal: controller.signal
@@ -124,10 +150,14 @@ export async function invokeFunction<T = any>(
     }
 
     const { Authorization, authorization, ...customHeaders } = options.headers || {};
-    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd6aHhnb2lnZmxmdGhhcmNtZHFqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk1MTk2ODcsImV4cCI6MjA4NTA5NTY4N30.6xIZ3VYubUZ73pNPurzYuf-2RUpXj_9w-LpU-6d6kqU";
-    if (!anonKey) {
-        console.error('Missing VITE_SUPABASE_ANON_KEY or VITE_SUPABASE_PUBLISHABLE_KEY');
+    const publicKey = getSupabasePublicKey();
+    if (!publicKey) {
+        console.error('Missing VITE_SUPABASE_PUBLISHABLE_KEY (or VITE_SUPABASE_ANON_KEY fallback)');
         return { data: null, error: new Error('Missing Supabase configuration') };
+    }
+    const projectUrl = getSupabaseProjectUrl();
+    if (!import.meta.env.DEV && !projectUrl) {
+      return { data: null, error: new Error('Missing VITE_SUPABASE_URL') };
     }
     
     // Get current session token
@@ -166,7 +196,6 @@ export async function invokeFunction<T = any>(
           if (import.meta.env.DEV) {
               functionUrl = `/functions/v1/${functionName}`;
           } else {
-              const projectUrl = (import.meta.env.VITE_SUPABASE_URL || "").replace(/\/$/, '');
               if (!projectUrl) throw new Error("VITE_SUPABASE_URL is not defined");
               functionUrl = `${projectUrl}/functions/v1/${functionName}`;
           }
@@ -178,7 +207,7 @@ export async function invokeFunction<T = any>(
                 method: options.method || 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'apikey': anonKey,
+                    'apikey': publicKey,
                     ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
                     ...(options.headers || {})
                 },
@@ -217,6 +246,7 @@ export async function invokeFunction<T = any>(
                       /unauthorized/i.test(String(error.message || error));
 
         if (is401) {
+            console.error('[Supabase Function] JWT validation failure detected', createJwtErrorLog(error, { functionName, stage: 'initial-invoke' }));
             console.warn(`[Supabase Function] 401/Invalid JWT for ${functionName}. Refreshing session and retrying...`);
             
             const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
@@ -236,19 +266,19 @@ export async function invokeFunction<T = any>(
 
                  // If client retry still fails, try raw fetch (handles some CORS/Client issues)
                  if (error) {
+                     console.error('[Supabase Function] JWT retry failed', createJwtErrorLog(error, { functionName, stage: 'post-refresh-invoke' }));
                      console.warn(`[Supabase Function] Client retry failed. Attempting raw fetch fallback for ${functionName}...`);
                      try {
-                        const projectUrl = (import.meta.env.VITE_SUPABASE_URL || "https://gzhxgoigflftharcmdqj.supabase.co").replace(/\/$/, '');
+                        const projectUrl = getSupabaseProjectUrl();
+                        if (!projectUrl) throw new Error('VITE_SUPABASE_URL is not defined');
                         const functionUrl = `${projectUrl}/functions/v1/${functionName}`;
-                        const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd6aHhnb2lnZmxmdGhhcmNtZHFqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk1MTk2ODcsImV4cCI6MjA4NTA5NTY4N30.6xIZ3VYubUZ73pNPurzYuf-2RUpXj_9w-LpU-6d6kqU";
-
-                        console.log(`[Supabase Function] Fetching ${functionUrl} with token length ${newToken.length} and apikey prefix ${anonKey.substring(0, 10)}...`);
+                        console.log(`[Supabase Function] Fetching ${functionUrl} with token length ${newToken.length} and publishable key present ${Boolean(publicKey)}...`);
 
                         const response = await fetch(functionUrl, {
                             method: options.method || 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
-                                'apikey': anonKey,
+                                'apikey': publicKey,
                                 'Authorization': `Bearer ${newToken}`,
                                 ...(options.headers || {})
                             },
@@ -290,6 +320,7 @@ export async function invokeFunction<T = any>(
                     if (data && data.error) error.message = data.error;
                     else if (data && data.message) error.message = data.message;
                     else error.message = text;
+                    if (data && Array.isArray(data.issues)) (error as any).issues = data.issues;
                 } catch {
                     if (text) error.message = text;
                 }

@@ -174,14 +174,35 @@ CREATE TABLE IF NOT EXISTS public.vessel_operational_metrics (
 --------------------------------------------------------------------------------
 
 -- Seed Container Types
-INSERT INTO public.container_types (code, name, requires_temperature) VALUES
-('STD', 'Standard Dry', false),
-('RF', 'Refrigerated', true),
-('OT', 'Open Top', false),
-('FR', 'Flat Rack', false),
-('TK', 'Tank', false)
-ON CONFLICT (code) DO UPDATE SET 
-    requires_temperature = EXCLUDED.requires_temperature;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'container_types'
+      AND column_name = 'category'
+  ) THEN
+    INSERT INTO public.container_types (code, name, requires_temperature, category) VALUES
+    ('STD', 'Standard Dry', false, 'Standard'),
+    ('RF', 'Refrigerated', true, 'Reefer'),
+    ('OT', 'Open Top', false, 'Open Top'),
+    ('FR', 'Flat Rack', false, 'Flat Rack'),
+    ('TK', 'Tank', false, 'Tank')
+    ON CONFLICT (code) DO UPDATE SET
+      requires_temperature = EXCLUDED.requires_temperature,
+      category = EXCLUDED.category;
+  ELSE
+    INSERT INTO public.container_types (code, name, requires_temperature) VALUES
+    ('STD', 'Standard Dry', false),
+    ('RF', 'Refrigerated', true),
+    ('OT', 'Open Top', false),
+    ('FR', 'Flat Rack', false),
+    ('TK', 'Tank', false)
+    ON CONFLICT (code) DO UPDATE SET
+      requires_temperature = EXCLUDED.requires_temperature;
+  END IF;
+END $$;
 
 -- Seed Vessel Types
 INSERT INTO public.vessel_types (code, name) VALUES
@@ -239,18 +260,39 @@ CREATE POLICY "Public read vessels" ON public.vessels FOR SELECT TO authenticate
 --------------------------------------------------------------------------------
 
 DROP VIEW IF EXISTS public.view_container_inventory_summary;
-CREATE OR REPLACE VIEW public.view_container_inventory_summary AS
-SELECT 
-    ct.tenant_id,
-    c_type.name as category,
-    c_size.name as size,
-    c_size.iso_code,
-    sum(ct.quantity) as total_quantity,
-    sum(ct.teu_total) as total_teu,
-    ct.status
-FROM public.container_tracking ct
-JOIN public.container_sizes c_size ON ct.size_id = c_size.id
-JOIN public.container_types c_type ON c_size.type_id = c_type.id
-GROUP BY ct.tenant_id, c_type.name, c_size.name, c_size.iso_code, ct.status;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'container_sizes'
+      AND column_name = 'name'
+  ) AND EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'container_sizes'
+      AND column_name = 'type_id'
+  ) THEN
+    EXECUTE $sql$
+      CREATE OR REPLACE VIEW public.view_container_inventory_summary AS
+      SELECT
+          ct.tenant_id,
+          c_type.name as category,
+          c_size.name as size,
+          c_size.iso_code,
+          sum(ct.quantity) as total_quantity,
+          sum(ct.teu_total) as total_teu,
+          ct.status
+      FROM public.container_tracking ct
+      JOIN public.container_sizes c_size ON ct.size_id = c_size.id
+      JOIN public.container_types c_type ON c_size.type_id = c_type.id
+      GROUP BY ct.tenant_id, c_type.name, c_size.name, c_size.iso_code, ct.status;
+    $sql$;
+  ELSE
+    RAISE NOTICE 'Skipping view_container_inventory_summary: legacy container_sizes schema.';
+  END IF;
+END $$;
 
 COMMIT;

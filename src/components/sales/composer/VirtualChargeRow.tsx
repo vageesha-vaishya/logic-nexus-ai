@@ -3,9 +3,12 @@ import { memo, useCallback } from 'react';
 import { Input } from '@/components/ui/input';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { Trash2, Settings } from 'lucide-react';
+import { Trash2, Settings, Info } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
+import { formatContainerSize } from '@/lib/container-utils';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface VirtualChargeRowProps {
   index: number;
@@ -19,6 +22,7 @@ interface VirtualChargeRowProps {
   showBuySell?: boolean;
   style?: React.CSSProperties;
   className?: string;
+  legMode?: string;
 }
 
 export const VirtualChargeRow = memo(function VirtualChargeRow({
@@ -32,7 +36,8 @@ export const VirtualChargeRow = memo(function VirtualChargeRow({
   onConfigureBasis,
   showBuySell = true,
   style,
-  className
+  className,
+  legMode
 }: VirtualChargeRowProps) {
   const buyAmount = (charge.buy?.quantity || 1) * (charge.buy?.rate || 0);
   const sellAmount = (charge.sell?.quantity || 1) * (charge.sell?.rate || 0);
@@ -100,6 +105,56 @@ export const VirtualChargeRow = memo(function VirtualChargeRow({
               <Settings className="h-4 w-4" />
             </Button>
           )}
+          {charge.basisDetails && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-9 w-9 p-0 flex-shrink-0" title="Basis details">
+                    <Info className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-sm">
+                  <div className="text-xs space-y-1">
+                    <div className="font-medium">Basis details</div>
+                    <div className="text-muted-foreground font-mono whitespace-pre-wrap">
+                      {JSON.stringify(charge.basisDetails, null, 2)}
+                    </div>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+          {(() => {
+            const basis = bases.find(b => b.id === charge.basis_id);
+            const code = basis?.code;
+            const details = charge.basisDetails;
+            if (code === 'container' && details) {
+              const unit = String(charge.unit || '');
+              const sizePart = unit.includes('x') ? unit.split('x').slice(1).join('x') : unit;
+              const sizeName = formatContainerSize(sizePart);
+              const qty = Number(details.quantity || charge.buy?.quantity || 1);
+              return (
+                <Badge variant="outline" className="text-[10px] h-5 px-1.5 min-w-[1.5rem] border-blue-500 text-blue-600 bg-blue-50">
+                  {sizeName || 'FCL'} × {qty}
+                </Badge>
+              );
+            }
+            if (code === 'weight' && legMode === 'air') {
+              return (
+                <Badge variant="outline" className="text-[10px] h-5 px-1.5 min-w-[1.5rem] border-cyan-500 text-cyan-600 bg-cyan-50">
+                  per kg
+                </Badge>
+              );
+            }
+            if (code === 'volume' && legMode === 'ocean') {
+              return (
+                <Badge variant="outline" className="text-[10px] h-5 px-1.5 min-w-[1.5rem] border-emerald-500 text-emerald-600 bg-emerald-50">
+                  per cbm
+                </Badge>
+              );
+            }
+            return null;
+          })()}
         </div>
         
         <div className="w-[100px]">

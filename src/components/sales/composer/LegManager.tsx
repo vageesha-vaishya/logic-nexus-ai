@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { CarrierSelect } from './CarrierSelect';
 import { LocationSelect } from './LocationSelect';
 import { useQuoteStore } from './store/QuoteStore';
+import { hasRouteContinuityGap } from './routeContinuity';
 
 interface LegManagerProps {
   legs: TransportLeg[];
@@ -19,14 +20,14 @@ interface LegManagerProps {
 const LegItem = memo(({ 
   leg, 
   index, 
-  prevLegDestination, 
+  prevLeg,
   onUpdate, 
   onRemove,
   ports
 }: {
   leg: TransportLeg;
   index: number;
-  prevLegDestination?: string;
+  prevLeg?: TransportLeg;
   onUpdate: (id: string, updates: Partial<TransportLeg>) => void;
   onRemove: (id: string) => void;
   ports: any[];
@@ -105,7 +106,20 @@ const LegItem = memo(({
                 preloadedPorts={ports}
               />
             </div>
-            <ArrowRight className="w-4 h-4 text-muted-foreground mb-2 flex-shrink-0" />
+            <div className="flex flex-col items-center gap-1 mb-2">
+              <ArrowRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+              {index > 0 && (
+                hasRouteContinuityGap(prevLeg, leg) ? (
+                  <Badge variant="outline" className="text-[10px] h-4 px-1 border-amber-500 text-amber-700 bg-amber-50">
+                    Gap
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="text-[10px] h-4 px-1 border-green-500 text-green-600 bg-green-50">
+                    Continuity OK
+                  </Badge>
+                )
+              )}
+            </div>
             <div className="min-w-0">
               <Label className="text-[10px] uppercase text-muted-foreground mb-1">Destination</Label>
               <LocationSelect 
@@ -140,9 +154,9 @@ const LegItem = memo(({
         </div>
 
         {/* Validation Message */}
-        {index > 0 && prevLegDestination !== leg.origin && (
+        {index > 0 && hasRouteContinuityGap(prevLeg, leg) && (
           <div className="text-[11px] text-amber-600 bg-amber-50 px-2 py-1 rounded flex items-center gap-2">
-             ⚠️ Gap detected: Previous leg ends at "{prevLegDestination}" but this leg starts at "{leg.origin}".
+             ⚠️ Gap detected: Previous leg ends at "{prevLeg?.destination}" but this leg starts at "{leg.origin}".
           </div>
         )}
       </CardContent>
@@ -227,7 +241,7 @@ export const LegManager = memo(function LegManager({ legs, onChange }: LegManage
             <LegItem 
               leg={leg}
               index={index}
-              prevLegDestination={index > 0 ? legs[index - 1].destination : undefined}
+              prevLeg={index > 0 ? legs[index - 1] : undefined}
               onUpdate={updateLeg}
               onRemove={removeLeg}
               ports={state.referenceData?.ports}

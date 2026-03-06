@@ -23,6 +23,7 @@ ALTER TABLE public.email_account_delegations ENABLE ROW LEVEL SECURITY;
 -- 3. RLS for Delegations
 
 -- Account owners can manage delegations
+DROP POLICY IF EXISTS "Owners can manage delegations" ON public.email_account_delegations;
 CREATE POLICY "Owners can manage delegations"
 ON public.email_account_delegations
 FOR ALL
@@ -34,12 +35,14 @@ USING (
 );
 
 -- Delegates can view their delegations
+DROP POLICY IF EXISTS "Delegates can view their delegations" ON public.email_account_delegations;
 CREATE POLICY "Delegates can view their delegations"
 ON public.email_account_delegations
 FOR SELECT
 USING (delegate_user_id = auth.uid());
 
 -- Tenant/Franchise admins can view delegations in their scope
+DROP POLICY IF EXISTS "Admins can view delegations" ON public.email_account_delegations;
 CREATE POLICY "Admins can view delegations"
 ON public.email_account_delegations
 FOR SELECT
@@ -107,6 +110,7 @@ DROP POLICY IF EXISTS "Users can view own email accounts" ON public.email_accoun
 -- Let's check existing policies. If we can't check, we'll create a new policy "Users can view delegated accounts"
 -- avoiding conflict with "Users can view own email accounts".
 
+DROP POLICY IF EXISTS "Users can view delegated email accounts" ON public.email_accounts;
 CREATE POLICY "Users can view delegated email accounts"
 ON public.email_accounts FOR SELECT
 TO authenticated

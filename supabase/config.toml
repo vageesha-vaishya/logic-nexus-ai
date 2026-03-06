@@ -205,3 +205,6 @@ verify_jwt = false
 
 [functions.suggest-transport-mode]
 verify_jwt = false
+
+[functions.generate-quote-pdf]
+verify_jwt = false

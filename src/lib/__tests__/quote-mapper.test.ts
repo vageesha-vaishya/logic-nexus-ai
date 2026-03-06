@@ -196,4 +196,69 @@ describe('mapOptionToQuote', () => {
         expect(result.transport_mode).toBe('Premium Trucking');
         expect(result.raw_transport_mode).toBe('Premium Trucking');
     });
+
+    it('maps AI route legs from from/to/type and populates core route fields', () => {
+        const aiOption = {
+            id: 'ai-route-1',
+            carrier: 'AI Carrier',
+            total_amount: 3000,
+            currency: 'USD',
+            source_attribution: 'AI Smart Engine',
+            legs: [
+                {
+                    sequence: 1,
+                    type: 'pickup',
+                    from: 'Factory A',
+                    to: 'Port A',
+                    mode: 'truck',
+                    carrier: 'Local Trucker',
+                    etd: '2026-03-10',
+                },
+                {
+                    sequence: 2,
+                    type: 'main',
+                    from: 'Port A',
+                    to: 'Port B',
+                    mode: 'ocean',
+                    carrier: 'Ocean Line',
+                    eta: '2026-03-20',
+                },
+            ],
+        };
+
+        const result = mapOptionToQuote(aiOption);
+        expect(result.legs).toHaveLength(2);
+        expect(result.legs[0].origin).toBe('Factory A');
+        expect(result.legs[0].destination).toBe('Port A');
+        expect(result.legs[0].mode).toBe('road');
+        expect(result.legs[0].leg_type).toBe('pickup');
+        expect(result.legs[0].departure_date).toBe('2026-03-10');
+        expect(result.legs[1].arrival_date).toBe('2026-03-20');
+        expect(result.legs[1].carrier).toBe('Ocean Line');
+    });
+
+    it('removes duplicate global charges that mirror leg charges', () => {
+        const option = {
+            id: 'dup-charge-1',
+            total_amount: 200,
+            currency: 'USD',
+            legs: [
+                {
+                    id: 'leg-1',
+                    origin: 'A',
+                    destination: 'B',
+                    mode: 'ocean',
+                    charges: [{ name: 'Freight', amount: 100, currency: 'USD' }],
+                },
+            ],
+            charges: [
+                { name: 'Freight', amount: 100, currency: 'USD' },
+                { name: 'Documentation', amount: 100, currency: 'USD' },
+            ],
+        };
+
+        const result = mapOptionToQuote(option);
+        expect(result.charges).toHaveLength(1);
+        expect(result.charges[0].name).toBe('Documentation');
+    });
 });

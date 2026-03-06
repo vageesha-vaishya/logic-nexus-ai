@@ -91,6 +91,30 @@ export function QuoteComparisonView({
     }, [rawOptions, scopedDb, supabase]);
 
     const hasOptions = options.length > 0;
+    const getOptionTotal = (opt: RateOption) => {
+        const direct = Number(opt.price ?? opt.total_amount ?? 0) || 0;
+        if (direct > 0) return direct;
+        const legCharges = (opt.legs || []).flatMap((l: any) => l.charges || []);
+        const globalCharges = opt.charges || [];
+        return [...legCharges, ...globalCharges].reduce((sum, c: any) => {
+            const amount = Number(c?.sell?.amount ?? c?.amount ?? 0) || 0;
+            return sum + amount;
+        }, 0);
+    };
+    const parseTransitDays = (value?: string) => {
+        const token = String(value || '');
+        const match = token.match(/(\\d+)/);
+        return match ? Number(match[1]) : Number.POSITIVE_INFINITY;
+    };
+
+    const cheapestTotal = useMemo(() => {
+        if (!options.length) return 0;
+        return Math.min(...options.map(getOptionTotal));
+    }, [options]);
+    const fastestDays = useMemo(() => {
+        if (!options.length) return Number.POSITIVE_INFINITY;
+        return Math.min(...options.map((opt) => parseTransitDays(opt.transitTime)));
+    }, [options]);
     // Helper to calculate bifurcated totals for an option
     const getBifurcatedTotals = (opt: RateOption) => {
         const totals = {
@@ -224,7 +248,7 @@ export function QuoteComparisonView({
                             <TableCell key={opt.id} className="text-center">
                                 <div className="flex flex-col items-center">
                                     <span className="font-bold text-xl text-foreground">
-                                        {formatCurrency(opt.price, opt.currency || 'USD')}
+                                        {formatCurrency(getOptionTotal(opt), opt.currency || 'USD')}
                                     </span>
                                     {(opt.markupPercent !== undefined || opt.marginAmount !== undefined) && (
                                         <div className="flex flex-col items-center gap-0.5 mt-1">
@@ -243,6 +267,17 @@ export function QuoteComparisonView({
                                 </div>
                             </TableCell>
                         ))}
+                    </TableRow>
+                    <TableRow>
+                        <TableCell className="font-medium pl-6 text-muted-foreground text-sm">Cost Delta vs Cheapest</TableCell>
+                        {options.map(opt => {
+                            const delta = getOptionTotal(opt) - cheapestTotal;
+                            return (
+                                <TableCell key={opt.id} className="text-center text-sm text-muted-foreground">
+                                    {delta <= 0 ? 'Best' : `+${formatCurrency(delta, opt.currency || 'USD')}`}
+                                </TableCell>
+                            );
+                        })}
                     </TableRow>
 
                     {/* Bifurcated Costs - Simplified */}
@@ -277,10 +312,22 @@ export function QuoteComparisonView({
                         {options.map(opt => (
                             <TableCell key={opt.id} className="text-center">
                                 <div className="flex items-center justify-center gap-1 font-medium">
-                                    {opt.transitTime}
+                                    {opt.transitTime || 'N/A'}
                                 </div>
                             </TableCell>
                         ))}
+                    </TableRow>
+                    <TableRow>
+                        <TableCell className="font-medium pl-6 text-muted-foreground text-sm">Transit Delta vs Fastest</TableCell>
+                        {options.map(opt => {
+                            const days = parseTransitDays(opt.transitTime);
+                            const diff = Number.isFinite(days) && Number.isFinite(fastestDays) ? days - fastestDays : Number.POSITIVE_INFINITY;
+                            return (
+                                <TableCell key={opt.id} className="text-center text-sm text-muted-foreground">
+                                    {diff === Number.POSITIVE_INFINITY ? 'N/A' : diff <= 0 ? 'Fastest' : `+${diff} day${diff > 1 ? 's' : ''}`}
+                                </TableCell>
+                            );
+                        })}
                     </TableRow>
 
                     {/* Reliability & Eco */}
@@ -328,6 +375,17 @@ export function QuoteComparisonView({
                                 </div>
                             </TableCell>
                         ))}
+                    </TableRow>
+                    <TableRow>
+                        <TableCell className="font-semibold bg-muted/10">Mode Coverage</TableCell>
+                        {options.map(opt => {
+                            const modes = Array.from(new Set((opt.legs || []).map((leg: any) => String(leg.mode || '').toUpperCase()).filter(Boolean)));
+                            return (
+                                <TableCell key={opt.id} className="text-center">
+                                    {modes.length ? modes.join(' + ') : String(opt.mode || opt.transport_mode || 'N/A').toUpperCase()}
+                                </TableCell>
+                            );
+                        })}
                     </TableRow>
 
                     {/* AI Analysis */}

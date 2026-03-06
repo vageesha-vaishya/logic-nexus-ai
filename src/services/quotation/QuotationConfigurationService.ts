@@ -1,6 +1,20 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { ScopedDataAccess } from '@/lib/db/access';
 
+export interface BrandingSettings {
+  logo_url?: string;
+  company_name?: string;
+  company_address?: string;
+  primary_color?: string;
+  secondary_color?: string;
+  accent_color?: string;
+  font_family?: string;
+  header_text?: string;
+  sub_header_text?: string;
+  footer_text?: string;
+  disclaimer_text?: string;
+}
+
 export interface QuotationConfiguration {
   id: string;
   tenant_id: string;
@@ -9,6 +23,7 @@ export interface QuotationConfiguration {
   smart_mode_settings: Record<string, unknown>;
   multi_option_enabled: boolean;
   auto_ranking_criteria: Record<string, number>;
+  branding_settings: BrandingSettings;
 }
 
 export class QuotationConfigurationService {
@@ -82,7 +97,8 @@ export class QuotationConfigurationService {
         tenant_id: tenantId,
         default_module: 'composer',
         smart_mode_enabled: false,
-        multi_option_enabled: true
+        multi_option_enabled: true,
+        branding_settings: {}
       })
       .select()
       .single();

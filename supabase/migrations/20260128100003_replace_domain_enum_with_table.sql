@@ -13,6 +13,39 @@ CREATE TABLE IF NOT EXISTS public.platform_domains (
   updated_at timestamptz DEFAULT now()
 );
 
+-- Ensure a unique index exists for ON CONFLICT (code) across legacy schemas
+DO $$
+DECLARE
+  rec record;
+BEGIN
+  -- De-dupe any existing duplicate codes so we can create a unique index safely.
+  FOR rec IN
+    SELECT code
+    FROM public.platform_domains
+    GROUP BY code
+    HAVING count(*) > 1
+  LOOP
+    UPDATE public.platform_domains pd
+    SET code = pd.code || '-' || substring(pd.id::text, 1, 8)
+    WHERE pd.code = rec.code
+      AND pd.id <> (
+        SELECT min(id) FROM public.platform_domains WHERE code = rec.code
+      );
+  END LOOP;
+
+  -- Create a unique index if no unique constraint/index exists yet.
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_index i
+    JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
+    WHERE i.indrelid = 'public.platform_domains'::regclass
+      AND i.indisunique = true
+      AND a.attname = 'code'
+  ) THEN
+    EXECUTE 'CREATE UNIQUE INDEX IF NOT EXISTS platform_domains_code_unique ON public.platform_domains(code)';
+  END IF;
+END $$;
+
 -- 2. Populate platform_domains with initial data
 -- Use DO block to handle potential name conflicts by updating codes if necessary
 DO $$

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Eye, Loader2, Download, RefreshCw, AlertTriangle } from 'lucide-react';
-import { invokeAnonymous, emitEvent, enrichPayload } from '@/lib/supabase-functions';
+import { invokeFunction, emitEvent } from '@/lib/supabase-functions';
 import { startSpan } from '@/lib/otel-lite';
 import { toast } from 'sonner';
 import { EmitEventSchema } from '@/lib/schemas/events';
@@ -33,7 +33,12 @@ export function QuotePreviewModal({ quoteId, quoteNumber, versionId, disabled }:
 
       console.log('[QuotePreview] Generating PDF for:', { quoteId, versionId });
       const basePayload = { quoteId, versionId, engine_v2: true, source: 'preview', action: 'generate-pdf', trace_id: span.id };
-      const response = await invokeAnonymous('generate-quote-pdf', enrichPayload(basePayload));
+      const { data: response, error: pdfError } = await invokeFunction('generate-quote-pdf', {
+        body: basePayload,
+      });
+      if (pdfError) {
+        throw new Error(pdfError.message || 'Failed to generate PDF preview');
+      }
 
       if (!response || !response.content) {
         const issues = Array.isArray(response?.issues) ? String(response.issues.join('; ')) : null;

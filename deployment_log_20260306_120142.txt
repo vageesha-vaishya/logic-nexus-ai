@@ -1,0 +1,754 @@
+[0;32m[2026-03-06 12:01:42] Starting comprehensive re-deployment to project: gzhxgoigflftharcmdqj[0m
+[0m[2026-03-06 12:01:42] Log file: deployment_log_20260306_120142.txt[0m
+[1;33m[2026-03-06 12:01:42] 1. Pre-flight Checks...[0m
+[1;33m[2026-03-06 12:01:43] Warning: 'deno' command not found. Skipping local syntax check.[0m
+[0;32m[2026-03-06 12:01:43] Pre-flight checks passed (npm found).[0m
+[1;33m[2026-03-06 12:01:43] 2. Discovering Edge Functions...[0m
+[0m[2026-03-06 12:01:43] Found 92 functions to deploy.[0m
+[1;33m[2026-03-06 12:01:43] 3. Starting Verification and Deployment...[0m
+[0m[2026-03-06 12:01:43] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:01:43] Processing: admin-reset-password[0m
+[1;33m[2026-03-06 12:01:43]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:01:43]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:01:43]   > Deployment command finished.[0m
+[0m[2026-03-06 12:01:43]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/admin-reset-password[0m
+[0;32m[2026-03-06 12:01:45]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:01:45] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:01:45] Processing: ai-advisor[0m
+[1;33m[2026-03-06 12:01:45]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:01:45]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:01:45]   > Deployment command finished.[0m
+[0m[2026-03-06 12:01:45]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/ai-advisor[0m
+[0;32m[2026-03-06 12:01:46]   > Health check PASSED (HTTP 400 - Request Reached).[0m
+[0m[2026-03-06 12:01:46] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:01:46] Processing: ai-agent[0m
+[1;33m[2026-03-06 12:01:46]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:01:46]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:01:46]   > Deployment command finished.[0m
+[0m[2026-03-06 12:01:46]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/ai-agent[0m
+[0;32m[2026-03-06 12:01:46]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:01:46] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:01:46] Processing: ai-message-assistant[0m
+[1;33m[2026-03-06 12:01:46]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:01:46]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:01:46]   > Deployment command finished.[0m
+[0m[2026-03-06 12:01:46]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/ai-message-assistant[0m
+[0;32m[2026-03-06 12:01:48]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:01:48] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:01:48] Processing: alert-notifier[0m
+[1;33m[2026-03-06 12:01:48]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:01:48]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:01:48]   > Deployment command finished.[0m
+[0m[2026-03-06 12:01:48]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/alert-notifier[0m
+[0;32m[2026-03-06 12:01:51]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:01:51] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:01:51] Processing: analyze-cargo-damage[0m
+[1;33m[2026-03-06 12:01:51]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:01:51]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:01:51]   > Deployment command finished.[0m
+[0m[2026-03-06 12:01:51]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/analyze-cargo-damage[0m
+[0;32m[2026-03-06 12:01:53]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:01:53] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:01:53] Processing: analyze-email-threat[0m
+[1;33m[2026-03-06 12:01:53]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:01:53]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:01:53]   > Deployment command finished.[0m
+[0m[2026-03-06 12:01:53]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/analyze-email-threat[0m
+[0;32m[2026-03-06 12:01:55]   > Health check PASSED (HTTP 400 - Request Reached).[0m
+[0m[2026-03-06 12:01:55] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:01:55] Processing: anomaly-detection[0m
+[1;33m[2026-03-06 12:01:55]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:01:55]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:01:55]   > Deployment command finished.[0m
+[0m[2026-03-06 12:01:55]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/anomaly-detection[0m
+[0;32m[2026-03-06 12:01:58]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:01:58] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:01:58] Processing: anomaly-detector[0m
+[1;33m[2026-03-06 12:01:58]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:01:58]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:01:58]   > Deployment command finished.[0m
+[0m[2026-03-06 12:01:58]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/anomaly-detector[0m
+[0;32m[2026-03-06 12:02:00]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:02:00] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:02:00] Processing: autonomous-email[0m
+[1;33m[2026-03-06 12:02:00]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:02:00]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:02:00]   > Deployment command finished.[0m
+[0m[2026-03-06 12:02:00]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/autonomous-email[0m
+[0;32m[2026-03-06 12:02:03]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:02:03] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:02:03] Processing: calculate-lead-score[0m
+[1;33m[2026-03-06 12:02:03]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:02:03]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:02:03]   > Deployment command finished.[0m
+[0m[2026-03-06 12:02:03]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/calculate-lead-score[0m
+[0;32m[2026-03-06 12:02:05]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:02:05] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:02:05] Processing: calculate-quote-financials[0m
+[1;33m[2026-03-06 12:02:05]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:02:05]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:02:05]   > Deployment command finished.[0m
+[0m[2026-03-06 12:02:05]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/calculate-quote-financials[0m
+[0;32m[2026-03-06 12:02:07]   > Health check PASSED (HTTP 400 - Request Reached).[0m
+[0m[2026-03-06 12:02:07] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:02:07] Processing: carrier-scoring[0m
+[1;33m[2026-03-06 12:02:07]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:02:07]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:02:07]   > Deployment command finished.[0m
+[0m[2026-03-06 12:02:07]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/carrier-scoring[0m
+[0;32m[2026-03-06 12:02:10]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:02:10] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:02:10] Processing: categorize-document[0m
+[1;33m[2026-03-06 12:02:10]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:02:10]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:02:10]   > Deployment command finished.[0m
+[0m[2026-03-06 12:02:10]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/categorize-document[0m
+[0;32m[2026-03-06 12:02:12]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:02:12] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:02:12] Processing: check-expiring-documents[0m
+[1;33m[2026-03-06 12:02:12]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:02:12]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:02:12]   > Deployment command finished.[0m
+[0m[2026-03-06 12:02:12]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/check-expiring-documents[0m
+[0;32m[2026-03-06 12:02:15]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:02:15] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:02:15] Processing: classify-email[0m
+[1;33m[2026-03-06 12:02:15]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:02:15]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:02:15]   > Deployment command finished.[0m
+[0m[2026-03-06 12:02:15]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/classify-email[0m
+[0;32m[2026-03-06 12:02:15]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:02:15] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:02:15] Processing: cleanup-logs[0m
+[1;33m[2026-03-06 12:02:15]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:02:15]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:02:15]   > Deployment command finished.[0m
+[0m[2026-03-06 12:02:15]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/cleanup-logs[0m
+[0;32m[2026-03-06 12:02:19]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:02:19] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:02:19] Processing: container-demand[0m
+[1;33m[2026-03-06 12:02:19]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:02:19]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:02:19]   > Deployment command finished.[0m
+[0m[2026-03-06 12:02:19]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/container-demand[0m
+[0;32m[2026-03-06 12:02:21]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:02:21] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:02:21] Processing: create-user[0m
+[1;33m[2026-03-06 12:02:21]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:02:21]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:02:21]   > Deployment command finished.[0m
+[0m[2026-03-06 12:02:21]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/create-user[0m
+[0;32m[2026-03-06 12:02:24]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:02:24] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:02:24] Processing: delete-user[0m
+[1;33m[2026-03-06 12:02:24]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:02:24]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:02:24]   > Deployment command finished.[0m
+[0m[2026-03-06 12:02:24]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/delete-user[0m
+[0;32m[2026-03-06 12:02:27]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:02:27] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:02:27] Processing: discover-email-settings[0m
+[1;33m[2026-03-06 12:02:27]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:02:27]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:02:27]   > Deployment command finished.[0m
+[0m[2026-03-06 12:02:27]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/discover-email-settings[0m
+[0;32m[2026-03-06 12:02:29]   > Health check PASSED (HTTP 400 - Request Reached).[0m
+[0m[2026-03-06 12:02:29] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:02:29] Processing: domains-register[0m
+[1;33m[2026-03-06 12:02:29]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:02:29]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:02:29]   > Deployment command finished.[0m
+[0m[2026-03-06 12:02:29]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/domains-register[0m
+curl: (28) Operation timed out after 5001 milliseconds with 0 bytes received
+[0;31m[2026-03-06 12:02:34]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-03-06 12:02:34] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:02:34] Processing: domains-verify[0m
+[1;33m[2026-03-06 12:02:34]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:02:34]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:02:34]   > Deployment command finished.[0m
+[0m[2026-03-06 12:02:35]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/domains-verify[0m
+curl: (28) Operation timed out after 5000 milliseconds with 0 bytes received
+[0;31m[2026-03-06 12:02:40]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-03-06 12:02:40] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:02:40] Processing: email-scan[0m
+[1;33m[2026-03-06 12:02:40]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:02:40]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:02:40]   > Deployment command finished.[0m
+[0m[2026-03-06 12:02:40]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/email-scan[0m
+[0;32m[2026-03-06 12:02:40]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:02:40] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:02:40] Processing: email-stats[0m
+[1;33m[2026-03-06 12:02:40]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:02:40]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:02:40]   > Deployment command finished.[0m
+[0m[2026-03-06 12:02:40]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/email-stats[0m
+[0;32m[2026-03-06 12:02:42]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:02:42] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:02:42] Processing: emit-event[0m
+[1;33m[2026-03-06 12:02:42]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:02:42]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:02:42]   > Deployment command finished.[0m
+[0m[2026-03-06 12:02:43]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/emit-event[0m
+[0;31m[2026-03-06 12:02:45]   > Health check WARNING (HTTP 500). Check logs.[0m
+[0m[2026-03-06 12:02:45] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:02:45] Processing: ensemble-demand[0m
+[1;33m[2026-03-06 12:02:45]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:02:45]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:02:45]   > Deployment command finished.[0m
+[0m[2026-03-06 12:02:45]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/ensemble-demand[0m
+[0;32m[2026-03-06 12:02:45]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:02:45] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:02:45] Processing: escalate-message[0m
+[1;33m[2026-03-06 12:02:46]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:02:46]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:02:46]   > Deployment command finished.[0m
+[0m[2026-03-06 12:02:46]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/escalate-message[0m
+[0;32m[2026-03-06 12:02:48]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:02:48] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:02:48] Processing: exchange-oauth-token[0m
+[1;33m[2026-03-06 12:02:48]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:02:48]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:02:48]   > Deployment command finished.[0m
+[0m[2026-03-06 12:02:48]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/exchange-oauth-token[0m
+[0;32m[2026-03-06 12:02:50]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:02:50] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:02:50] Processing: execute-sql-external[0m
+[1;33m[2026-03-06 12:02:50]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:02:50]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:02:50]   > Deployment command finished.[0m
+[0m[2026-03-06 12:02:50]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/execute-sql-external[0m
+[0;32m[2026-03-06 12:02:54]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:02:54] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:02:54] Processing: export-data[0m
+[1;33m[2026-03-06 12:02:54]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:02:54]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:02:54]   > Deployment command finished.[0m
+[0m[2026-03-06 12:02:54]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/export-data[0m
+[0;32m[2026-03-06 12:02:57]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:02:57] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:02:57] Processing: extract-bol-fields[0m
+[1;33m[2026-03-06 12:02:57]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:02:57]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:02:57]   > Deployment command finished.[0m
+[0m[2026-03-06 12:02:57]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/extract-bol-fields[0m
+[0;32m[2026-03-06 12:02:59]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:02:59] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:02:59] Processing: extract-invoice-items[0m
+[1;33m[2026-03-06 12:02:59]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:02:59]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:02:59]   > Deployment command finished.[0m
+[0m[2026-03-06 12:02:59]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/extract-invoice-items[0m
+[0;32m[2026-03-06 12:03:01]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:03:01] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:03:01] Processing: fleet-utilization[0m
+[1;33m[2026-03-06 12:03:01]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:03:01]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:03:01]   > Deployment command finished.[0m
+[0m[2026-03-06 12:03:01]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/fleet-utilization[0m
+[0;32m[2026-03-06 12:03:04]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:03:04] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:03:04] Processing: forecast-demand[0m
+[1;33m[2026-03-06 12:03:04]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:03:04]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:03:04]   > Deployment command finished.[0m
+[0m[2026-03-06 12:03:04]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/forecast-demand[0m
+[0;32m[2026-03-06 12:03:06]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:03:06] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:03:06] Processing: generate-embedding[0m
+[1;33m[2026-03-06 12:03:06]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:03:06]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:03:06]   > Deployment command finished.[0m
+[0m[2026-03-06 12:03:06]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/generate-embedding[0m
+[0;32m[2026-03-06 12:03:09]   > Health check PASSED (HTTP 405 - Request Reached).[0m
+[0m[2026-03-06 12:03:09] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:03:09] Processing: generate-quote-pdf[0m
+[1;33m[2026-03-06 12:03:09]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:03:09]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:03:09]   > Deployment command finished.[0m
+[0m[2026-03-06 12:03:09]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/generate-quote-pdf[0m
+[0;32m[2026-03-06 12:03:09]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:03:09] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:03:09] Processing: get-account-label[0m
+[1;33m[2026-03-06 12:03:09]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:03:09]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:03:09]   > Deployment command finished.[0m
+[0m[2026-03-06 12:03:09]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/get-account-label[0m
+[0;32m[2026-03-06 12:03:11]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:03:11] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:03:11] Processing: get-contact-label[0m
+[1;33m[2026-03-06 12:03:11]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:03:11]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:03:11]   > Deployment command finished.[0m
+[0m[2026-03-06 12:03:11]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/get-contact-label[0m
+[0;32m[2026-03-06 12:03:14]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:03:14] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:03:14] Processing: get-opportunity-full[0m
+[1;33m[2026-03-06 12:03:14]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:03:14]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:03:14]   > Deployment command finished.[0m
+[0m[2026-03-06 12:03:14]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/get-opportunity-full[0m
+[0;32m[2026-03-06 12:03:16]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:03:16] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:03:16] Processing: get-opportunity-label[0m
+[1;33m[2026-03-06 12:03:16]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:03:16]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:03:16]   > Deployment command finished.[0m
+[0m[2026-03-06 12:03:16]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/get-opportunity-label[0m
+[0;32m[2026-03-06 12:03:19]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:03:19] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:03:19] Processing: get-service-label[0m
+[1;33m[2026-03-06 12:03:19]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:03:19]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:03:19]   > Deployment command finished.[0m
+[0m[2026-03-06 12:03:19]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/get-service-label[0m
+[0;32m[2026-03-06 12:03:22]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:03:22] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:03:22] Processing: ingest-email[0m
+[1;33m[2026-03-06 12:03:22]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:03:22]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:03:22]   > Deployment command finished.[0m
+[0m[2026-03-06 12:03:22]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/ingest-email[0m
+[0;32m[2026-03-06 12:03:26]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:03:26] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:03:26] Processing: ingest-linkedin[0m
+[1;33m[2026-03-06 12:03:26]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:03:26]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:03:26]   > Deployment command finished.[0m
+[0m[2026-03-06 12:03:26]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/ingest-linkedin[0m
+[0;31m[2026-03-06 12:03:28]   > Health check WARNING (HTTP 500). Check logs.[0m
+[0m[2026-03-06 12:03:28] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:03:28] Processing: ingest-telegram[0m
+[1;33m[2026-03-06 12:03:28]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:03:28]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:03:28]   > Deployment command finished.[0m
+[0m[2026-03-06 12:03:28]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/ingest-telegram[0m
+[0;32m[2026-03-06 12:03:30]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:03:30] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:03:30] Processing: ingest-web[0m
+[1;33m[2026-03-06 12:03:30]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:03:30]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:03:30]   > Deployment command finished.[0m
+[0m[2026-03-06 12:03:30]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/ingest-web[0m
+[0;31m[2026-03-06 12:03:33]   > Health check WARNING (HTTP 500). Check logs.[0m
+[0m[2026-03-06 12:03:33] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:03:33] Processing: ingest-whatsapp[0m
+[1;33m[2026-03-06 12:03:33]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:03:33]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:03:33]   > Deployment command finished.[0m
+[0m[2026-03-06 12:03:33]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/ingest-whatsapp[0m
+[0;32m[2026-03-06 12:03:35]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:03:35] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:03:35] Processing: ingest-x[0m
+[1;33m[2026-03-06 12:03:35]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:03:35]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:03:35]   > Deployment command finished.[0m
+[0m[2026-03-06 12:03:35]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/ingest-x[0m
+[0;31m[2026-03-06 12:03:38]   > Health check WARNING (HTTP 500). Check logs.[0m
+[0m[2026-03-06 12:03:38] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:03:38] Processing: lead-event-webhook[0m
+[1;33m[2026-03-06 12:03:38]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:03:38]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:03:38]   > Deployment command finished.[0m
+[0m[2026-03-06 12:03:38]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/lead-event-webhook[0m
+[0;32m[2026-03-06 12:03:41]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:03:41] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:03:41] Processing: lead-scoring[0m
+[1;33m[2026-03-06 12:03:41]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:03:41]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:03:41]   > Deployment command finished.[0m
+[0m[2026-03-06 12:03:41]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/lead-scoring[0m
+[0;32m[2026-03-06 12:03:43]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:03:43] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:03:43] Processing: list-edge-functions[0m
+[1;33m[2026-03-06 12:03:43]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:03:43]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:03:43]   > Deployment command finished.[0m
+[0m[2026-03-06 12:03:43]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/list-edge-functions[0m
+[0;32m[2026-03-06 12:03:45]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:03:45] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:03:45] Processing: margin-optimizer[0m
+[1;33m[2026-03-06 12:03:45]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:03:45]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:03:45]   > Deployment command finished.[0m
+[0m[2026-03-06 12:03:45]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/margin-optimizer[0m
+[0;32m[2026-03-06 12:03:48]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:03:48] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:03:48] Processing: metrics-quotation[0m
+[1;33m[2026-03-06 12:03:48]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:03:48]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:03:48]   > Deployment command finished.[0m
+[0m[2026-03-06 12:03:48]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/metrics-quotation[0m
+[0;32m[2026-03-06 12:03:50]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:03:50] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:03:50] Processing: moderate-message[0m
+[1;33m[2026-03-06 12:03:50]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:03:50]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:03:50]   > Deployment command finished.[0m
+[0m[2026-03-06 12:03:50]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/moderate-message[0m
+[0;32m[2026-03-06 12:03:53]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:03:53] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:03:53] Processing: nexus-copilot[0m
+[1;33m[2026-03-06 12:03:53]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:03:53]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:03:53]   > Deployment command finished.[0m
+[0m[2026-03-06 12:03:53]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/nexus-copilot[0m
+[0;32m[2026-03-06 12:03:55]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:03:55] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:03:55] Processing: plan-event-webhook[0m
+[1;33m[2026-03-06 12:03:55]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:03:55]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:03:55]   > Deployment command finished.[0m
+[0m[2026-03-06 12:03:55]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/plan-event-webhook[0m
+[0;32m[2026-03-06 12:03:58]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:03:58] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:03:58] Processing: portal-chatbot[0m
+[1;33m[2026-03-06 12:03:58]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:03:58]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:03:58]   > Deployment command finished.[0m
+[0m[2026-03-06 12:03:58]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/portal-chatbot[0m
+[0;32m[2026-03-06 12:04:01]   > Health check PASSED (HTTP 400 - Request Reached).[0m
+[0m[2026-03-06 12:04:01] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:04:01] Processing: predict-eta[0m
+[1;33m[2026-03-06 12:04:01]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:04:01]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:04:01]   > Deployment command finished.[0m
+[0m[2026-03-06 12:04:01]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/predict-eta[0m
+[0;32m[2026-03-06 12:04:04]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:04:04] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:04:04] Processing: process-email-retention[0m
+[1;33m[2026-03-06 12:04:04]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:04:04]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:04:04]   > Deployment command finished.[0m
+[0m[2026-03-06 12:04:04]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/process-email-retention[0m
+[0;32m[2026-03-06 12:04:06]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:04:06] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:04:06] Processing: process-franchise-import[0m
+[1;33m[2026-03-06 12:04:06]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:04:06]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:04:06]   > Deployment command finished.[0m
+[0m[2026-03-06 12:04:06]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/process-franchise-import[0m
+[0;32m[2026-03-06 12:04:08]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:04:08] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:04:08] Processing: process-lead-assignments[0m
+[1;33m[2026-03-06 12:04:08]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:04:08]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:04:08]   > Deployment command finished.[0m
+[0m[2026-03-06 12:04:08]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/process-lead-assignments[0m
+[0;32m[2026-03-06 12:04:11]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:04:11] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:04:11] Processing: process-scheduled-emails[0m
+[1;33m[2026-03-06 12:04:11]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:04:11]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:04:11]   > Deployment command finished.[0m
+[0m[2026-03-06 12:04:11]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/process-scheduled-emails[0m
+[0;32m[2026-03-06 12:04:13]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:04:13] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:04:13] Processing: process-sequences[0m
+[1;33m[2026-03-06 12:04:13]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:04:13]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:04:13]   > Deployment command finished.[0m
+[0m[2026-03-06 12:04:13]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/process-sequences[0m
+[0;32m[2026-03-06 12:04:15]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:04:15] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:04:16] Processing: push-migrations-to-target[0m
+[1;33m[2026-03-06 12:04:16]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:04:16]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:04:16]   > Deployment command finished.[0m
+[0m[2026-03-06 12:04:16]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/push-migrations-to-target[0m
+[0;32m[2026-03-06 12:04:19]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:04:19] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:04:19] Processing: quote-event-webhook[0m
+[1;33m[2026-03-06 12:04:19]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:04:19]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:04:19]   > Deployment command finished.[0m
+[0m[2026-03-06 12:04:19]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/quote-event-webhook[0m
+[0;31m[2026-03-06 12:04:21]   > Health check WARNING (HTTP 500). Check logs.[0m
+[0m[2026-03-06 12:04:21] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:04:21] Processing: rate-engine[0m
+[1;33m[2026-03-06 12:04:21]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:04:21]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:04:21]   > Deployment command finished.[0m
+[0m[2026-03-06 12:04:21]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/rate-engine[0m
+curl: (28) Operation timed out after 5002 milliseconds with 0 bytes received
+[0;31m[2026-03-06 12:04:26]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-03-06 12:04:26] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:04:26] Processing: reconcile-quote[0m
+[1;33m[2026-03-06 12:04:26]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:04:26]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:04:26]   > Deployment command finished.[0m
+[0m[2026-03-06 12:04:27]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/reconcile-quote[0m
+[0;31m[2026-03-06 12:04:29]   > Health check WARNING (HTTP 500). Check logs.[0m
+[0m[2026-03-06 12:04:29] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:04:29] Processing: remote-import[0m
+[1;33m[2026-03-06 12:04:29]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:04:29]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:04:29]   > Deployment command finished.[0m
+[0m[2026-03-06 12:04:29]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/remote-import[0m
+[0;32m[2026-03-06 12:04:31]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:04:31] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:04:31] Processing: restore-quotation-version[0m
+[1;33m[2026-03-06 12:04:31]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:04:31]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:04:31]   > Deployment command finished.[0m
+[0m[2026-03-06 12:04:31]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/restore-quotation-version[0m
+[0;32m[2026-03-06 12:04:32]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:04:32] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:04:32] Processing: revenue-forecasting[0m
+[1;33m[2026-03-06 12:04:32]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:04:32]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:04:32]   > Deployment command finished.[0m
+[0m[2026-03-06 12:04:32]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/revenue-forecasting[0m
+[0;32m[2026-03-06 12:04:34]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:04:34] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:04:34] Processing: risk-scoring[0m
+[1;33m[2026-03-06 12:04:34]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:04:34]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:04:34]   > Deployment command finished.[0m
+[0m[2026-03-06 12:04:34]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/risk-scoring[0m
+[0;32m[2026-03-06 12:04:36]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:04:36] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:04:37] Processing: route-email[0m
+[1;33m[2026-03-06 12:04:37]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:04:37]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:04:37]   > Deployment command finished.[0m
+[0m[2026-03-06 12:04:37]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/route-email[0m
+[0;32m[2026-03-06 12:04:39]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:04:39] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:04:39] Processing: route-optimization[0m
+[1;33m[2026-03-06 12:04:39]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:04:39]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:04:39]   > Deployment command finished.[0m
+[0m[2026-03-06 12:04:39]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/route-optimization[0m
+[0;32m[2026-03-06 12:04:41]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:04:41] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:04:41] Processing: salesforce-sync-opportunity[0m
+[1;33m[2026-03-06 12:04:41]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:04:41]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:04:41]   > Deployment command finished.[0m
+[0m[2026-03-06 12:04:41]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/salesforce-sync-opportunity[0m
+[0;32m[2026-03-06 12:04:44]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:04:44] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:04:44] Processing: save-quotation-version[0m
+[1;33m[2026-03-06 12:04:44]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:04:44]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:04:44]   > Deployment command finished.[0m
+[0m[2026-03-06 12:04:44]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/save-quotation-version[0m
+[0;32m[2026-03-06 12:04:44]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:04:44] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:04:44] Processing: scheduled-reconcile[0m
+[1;33m[2026-03-06 12:04:44]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:04:44]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:04:44]   > Deployment command finished.[0m
+[0m[2026-03-06 12:04:44]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/scheduled-reconcile[0m
+[0;31m[2026-03-06 12:04:47]   > Health check WARNING (HTTP 500). Check logs.[0m
+[0m[2026-03-06 12:04:47] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:04:47] Processing: search-emails[0m
+[1;33m[2026-03-06 12:04:47]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:04:47]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:04:47]   > Deployment command finished.[0m
+[0m[2026-03-06 12:04:47]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/search-emails[0m
+[0;32m[2026-03-06 12:04:49]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:04:49] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:04:49] Processing: seed-platform-admin[0m
+[1;33m[2026-03-06 12:04:49]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:04:49]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:04:49]   > Deployment command finished.[0m
+[0m[2026-03-06 12:04:49]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/seed-platform-admin[0m
+[0;31m[2026-03-06 12:04:52]   > Health check WARNING (HTTP 500). Check logs.[0m
+[0m[2026-03-06 12:04:52] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:04:52] Processing: send-email[0m
+[1;33m[2026-03-06 12:04:52]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:04:52]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:04:52]   > Deployment command finished.[0m
+[0m[2026-03-06 12:04:52]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/send-email[0m
+[0;32m[2026-03-06 12:04:55]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:04:55] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:04:55] Processing: send-web[0m
+[1;33m[2026-03-06 12:04:55]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:04:55]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:04:55]   > Deployment command finished.[0m
+[0m[2026-03-06 12:04:55]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/send-web[0m
+[0;32m[2026-03-06 12:04:57]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:04:57] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:04:57] Processing: send-whatsapp[0m
+[1;33m[2026-03-06 12:04:58]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:04:58]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:04:58]   > Deployment command finished.[0m
+[0m[2026-03-06 12:04:58]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/send-whatsapp[0m
+[0;32m[2026-03-06 12:05:00]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:05:00] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:05:00] Processing: smart-reply[0m
+[1;33m[2026-03-06 12:05:00]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:05:00]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:05:00]   > Deployment command finished.[0m
+[0m[2026-03-06 12:05:00]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/smart-reply[0m
+[0;32m[2026-03-06 12:05:03]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:05:03] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:05:04] Processing: subscription-plans[0m
+[1;33m[2026-03-06 12:05:04]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:05:04]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:05:05]   > Deployment command finished.[0m
+[0m[2026-03-06 12:05:05]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/subscription-plans[0m
+[0;32m[2026-03-06 12:05:08]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:05:08] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:05:08] Processing: suggest-transport-mode[0m
+[1;33m[2026-03-06 12:05:08]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:05:08]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:05:08]   > Deployment command finished.[0m
+[0m[2026-03-06 12:05:08]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/suggest-transport-mode[0m
+curl: (28) Operation timed out after 5001 milliseconds with 0 bytes received
+[0;31m[2026-03-06 12:05:13]   > Health check FAILED (curl error 28). Check network/DNS.[0m
+[0m[2026-03-06 12:05:13] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:05:13] Processing: sync-all-mailboxes[0m
+[1;33m[2026-03-06 12:05:13]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:05:13]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:05:13]   > Deployment command finished.[0m
+[0m[2026-03-06 12:05:13]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/sync-all-mailboxes[0m
+[0;32m[2026-03-06 12:05:15]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:05:15] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:05:15] Processing: sync-cn-hs-data[0m
+[1;33m[2026-03-06 12:05:15]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:05:15]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:05:15]   > Deployment command finished.[0m
+[0m[2026-03-06 12:05:15]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/sync-cn-hs-data[0m
+[0;32m[2026-03-06 12:05:18]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:05:18] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:05:18] Processing: sync-emails[0m
+[1;33m[2026-03-06 12:05:18]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:05:18]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:05:18]   > Deployment command finished.[0m
+[0m[2026-03-06 12:05:18]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/sync-emails[0m
+[0;32m[2026-03-06 12:05:20]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:05:20] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:05:20] Processing: sync-emails-v2[0m
+[1;33m[2026-03-06 12:05:20]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:05:20]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:05:20]   > Deployment command finished.[0m
+[0m[2026-03-06 12:05:20]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/sync-emails-v2[0m
+[0;32m[2026-03-06 12:05:21]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:05:21] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:05:21] Processing: sync-hts-data[0m
+[1;33m[2026-03-06 12:05:21]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:05:21]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:05:21]   > Deployment command finished.[0m
+[0m[2026-03-06 12:05:21]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/sync-hts-data[0m
+[0;32m[2026-03-06 12:05:23]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:05:23] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:05:23] Processing: track-email[0m
+[1;33m[2026-03-06 12:05:23]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:05:23]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:05:23]   > Deployment command finished.[0m
+[0m[2026-03-06 12:05:23]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/track-email[0m
+[0;32m[2026-03-06 12:05:26]   > Health check PASSED (HTTP 400 - Request Reached).[0m
+[0m[2026-03-06 12:05:26] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:05:26] Processing: verify-email-credentials[0m
+[1;33m[2026-03-06 12:05:26]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:05:26]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:05:26]   > Deployment command finished.[0m
+[0m[2026-03-06 12:05:26]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/verify-email-credentials[0m
+[0;32m[2026-03-06 12:05:30]   > Health check PASSED (HTTP 400 - Request Reached).[0m
+[0m[2026-03-06 12:05:30] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:05:30] Processing: win-probability[0m
+[1;33m[2026-03-06 12:05:30]   > Skipping local syntax check (deno not found).[0m
+[0m[2026-03-06 12:05:30]   > Deploying to gzhxgoigflftharcmdqj...[0m
+./deploy_edge_functions.sh: line 94: npx: command not found
+[0;32m[2026-03-06 12:05:30]   > Deployment command finished.[0m
+[0m[2026-03-06 12:05:30]   > Validating endpoint: https://gzhxgoigflftharcmdqj.supabase.co/functions/v1/win-probability[0m
+[0;32m[2026-03-06 12:05:33]   > Health check PASSED (HTTP 401).[0m
+[0m[2026-03-06 12:05:33] --------------------------------------------------[0m
+[1;33m[2026-03-06 12:05:33] Deployment Summary[0m
+[0m[2026-03-06 12:05:33] Total Functions: 92[0m
+[0;32m[2026-03-06 12:05:33] Successful Deployments: 92[0m
+[0;31m[2026-03-06 12:05:33] Failed Deployments: 0[0m
+[0;32m[2026-03-06 12:05:33] All deployments successful.[0m

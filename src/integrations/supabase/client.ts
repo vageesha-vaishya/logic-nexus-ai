@@ -2,13 +2,15 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://gzhxgoigflftharcmdqj.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd6aHhnb2lnZmxmdGhhcmNtZHFqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk1MTk2ODcsImV4cCI6MjA4NTA5NTY4N30.6xIZ3VYubUZ73pNPurzYuf-2RUpXj_9w-LpU-6d6kqU";
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 export const isSupabaseConfigured = Boolean(SUPABASE_URL && SUPABASE_PUBLISHABLE_KEY);
 
 // Log configuration status for debugging
-console.log('[Supabase] Initializing client with URL:', SUPABASE_URL);
+if (!isSupabaseConfigured) {
+  console.error('[Supabase] Missing required environment: VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY (or VITE_SUPABASE_ANON_KEY fallback)');
+}
 
 const memoryStore = new Map<string, string>();
 
@@ -60,7 +62,7 @@ const safeStorage: Storage = {
   },
 };
 
-const effectiveSupabaseUrl = SUPABASE_URL || 'http://localhost:54321';
+const effectiveSupabaseUrl = SUPABASE_URL || 'https://invalid.supabase.co';
 const effectiveSupabaseKey = SUPABASE_PUBLISHABLE_KEY || 'missing-supabase-publishable-key';
 
 // Import the supabase client like this:
