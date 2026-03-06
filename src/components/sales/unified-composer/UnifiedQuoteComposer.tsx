@@ -83,6 +83,8 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
 
   const form = useForm<QuoteComposerValues>({
     resolver: zodResolver(quoteComposerSchema),
+    mode: 'onChange',
+    reValidateMode: 'onChange',
     defaultValues: {
       mode: 'ocean',
       origin: '',
@@ -478,7 +480,12 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
     if (!showValidationSummary || validationIssues.length === 0) return null;
 
     return (
-      <Alert variant="destructive" className="mb-6 animate-in fade-in slide-in-from-top-2" role="alert">
+      <Alert
+        variant="destructive"
+        className="mb-6 animate-in fade-in slide-in-from-top-2"
+        role="alert"
+        data-testid="validation-summary"
+      >
         <AlertCircle className="h-4 w-4" />
         <AlertTitle className="ml-2 flex items-center justify-between">
           <span>Please fix the following errors before proceeding:</span>
@@ -487,6 +494,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
             size="sm" 
             className="h-6 w-6 p-0 hover:bg-destructive/20 text-destructive-foreground"
             onClick={() => setShowValidationSummary(false)}
+            aria-label="Close validation summary"
           >
             <X className="h-4 w-4" />
           </Button>
@@ -499,6 +507,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
                   type="button" 
                   onClick={() => scrollToField(issue.path)}
                   className="hover:underline text-left font-medium"
+                  aria-label={`Go to ${issue.label} field error`}
                 >
                   {issue.label}: {issue.message}
                 </button>
