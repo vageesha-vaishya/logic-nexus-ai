@@ -126,6 +126,18 @@ pipeline {
             }
         }
         
+        stage('Verify Supabase Stack') {
+            steps {
+                script {
+                    echo "Verifying Supabase core services on VPS (db, auth, rest, realtime, storage, kong)..."
+                    sh 'npm install --no-save ssh2'
+                    timeout(time: 5, unit: 'MINUTES') {
+                        sh 'node scripts/verify_supabase_stack_vps.cjs'
+                    }
+                }
+            }
+        }
+        
         stage('Trigger App Deployment') {
             steps {
                 script {
