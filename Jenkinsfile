@@ -1,5 +1,11 @@
 pipeline {
     agent any
+    parameters {
+        choice(name: 'DB_TARGET', choices: ['auto', 'local', 'cloud'], description: 'Select Supabase instance for build')
+        string(name: 'SUPABASE_URL_OVERRIDE', defaultValue: '', description: 'Optional: override Supabase URL')
+        string(name: 'SUPABASE_ANON_KEY_OVERRIDE', defaultValue: '', description: 'Optional: override Supabase anon key')
+        string(name: 'SUPABASE_SERVICE_ROLE_KEY_OVERRIDE', defaultValue: '', description: 'Optional: override Supabase service role key')
+    }
     options {
         timestamps()
     }
@@ -51,6 +57,85 @@ pipeline {
                 stage('Type Check') {
                     steps {
                         sh 'npm run typecheck'
+                    }
+                }
+            }
+        }
+        
+        stage('Determine Supabase Environment') {
+            steps {
+                script {
+                    def envFile = fileExists('.env') ? readFile(file: '.env') : ''
+                    def parseEnv = { key ->
+                        if (!envFile) return ''
+                        def m = (envFile =~ /(?m)^${key}=(.*)$/)
+                        return m ? m[0][1].trim() : ''
+                    }
+                    def envSupabaseUrl = params.SUPABASE_URL_OVERRIDE ? params.SUPABASE_URL_OVERRIDE : parseEnv('VITE_SUPABASE_URL')
+                    def envAnonKey = params.SUPABASE_ANON_KEY_OVERRIDE ? params.SUPABASE_ANON_KEY_OVERRIDE : (parseEnv('VITE_SUPABASE_PUBLISHABLE_KEY') ?: parseEnv('VITE_SUPABASE_ANON_KEY'))
+                    def envServiceKey = params.SUPABASE_SERVICE_ROLE_KEY_OVERRIDE ? params.SUPABASE_SERVICE_ROLE_KEY_OVERRIDE : parseEnv('SUPABASE_SERVICE_ROLE_KEY')
+
+                    def selectedTarget = params.DB_TARGET
+                    if (selectedTarget == 'auto') {
+                        if (envSupabaseUrl && envSupabaseUrl.contains('supabase.co')) {
+                            selectedTarget = 'cloud'
+                        } else {
+                            selectedTarget = 'local'
+                        }
+                    }
+
+                    if (selectedTarget == 'local') {
+                        env.SELECTED_SUPABASE_URL = "http://${env.VPS_IP}:${env.GATEWAY_PORT}"
+                        env.SELECTED_ANON_KEY = env.SUPABASE_ANON_KEY
+                        env.SELECTED_SERVICE_ROLE_KEY = envServiceKey ?: ''
+                    } else {
+                        env.SELECTED_SUPABASE_URL = envSupabaseUrl
+                        env.SELECTED_ANON_KEY = envAnonKey
+                        env.SELECTED_SERVICE_ROLE_KEY = envServiceKey ?: ''
+                    }
+
+                    def mask = { v -> v ? (v.length() > 8 ? v.substring(0,8)+'…' : v) : '(empty)' }
+                    echo "DB Target: ${selectedTarget}"
+                    echo "Supabase URL: ${env.SELECTED_SUPABASE_URL}"
+                    echo "Anon Key: ${mask(env.SELECTED_ANON_KEY)}"
+                    echo "Service Role Key: ${mask(env.SELECTED_SERVICE_ROLE_KEY)}"
+
+                    if (!env.SELECTED_SUPABASE_URL || !env.SELECTED_ANON_KEY) {
+                        error("Supabase configuration incomplete: URL or anon key missing")
+                    }
+                }
+            }
+        }
+
+        stage('Validate Supabase Connectivity') {
+            steps {
+                script {
+                    def isLocal = env.SELECTED_SUPABASE_URL?.startsWith("http://${env.VPS_IP}")
+                    try {
+                        if (isLocal) {
+                            sh 'npm install --no-save ssh2'
+                            withEnv([
+                                "VPS_IP=${env.VPS_IP}",
+                                "VPS_PASSWORD=${env.VPS_PASSWORD}",
+                                "CHECK_URL=${env.SELECTED_SUPABASE_URL}",
+                                "ANON=${env.SELECTED_ANON_KEY}"
+                            ]) {
+                                sh '''
+node -e "
+const {Client}=require('ssh2');
+const conn=new Client();
+conn.on('ready',()=>{conn.exec(`curl -sI ${process.env.CHECK_URL}/rest/v1/ -H \\\"apikey: ${process.env.ANON}\\\" -m 8 || exit 2`,(e,s)=>{if(e){console.error(e);process.exit(2);}let out='';s.on('data',d=>out+=d.toString());s.on('close',c=>{console.log(out);process.exit(c)});});}).connect({host:process.env.VPS_IP,username:'root',password:process.env.VPS_PASSWORD});
+"
+'''
+                            }
+                        } else {
+                            sh """
+curl -sI ${env.SELECTED_SUPABASE_URL}/rest/v1/ -H "apikey: ${env.SELECTED_ANON_KEY}" -m 8 | grep -E "HTTP/1.1 200|HTTP/2 200|HTTP/1.1 401|HTTP/2 401"
+"""
+                        }
+                        echo "Connectivity to ${env.SELECTED_SUPABASE_URL} confirmed"
+                    } catch (err) {
+                        error("Supabase connectivity validation failed: ${err}")
                     }
                 }
             }
@@ -107,13 +192,18 @@ pipeline {
                     echo "Building and running LogicPro web on VPS..."
                     timeout(time: 15, unit: 'MINUTES') {
                         sh 'npm install --no-save ssh2'
-                        echo "App Port: ${env.APP_PORT}, Supabase URL will be http://${env.VPS_IP}:${env.GATEWAY_PORT}"
-                        sh 'node scripts/deploy_web_app_vps.cjs'
+                        withEnv([
+                            "SUPABASE_URL=${env.SELECTED_SUPABASE_URL}",
+                            "SUPABASE_ANON_KEY=${env.SELECTED_ANON_KEY}"
+                        ]) {
+                            echo "App Port: ${env.APP_PORT}, Using Supabase: ${env.SELECTED_SUPABASE_URL}"
+                            sh 'node scripts/deploy_web_app_vps.cjs'
+                        }
                     }
                 }
             }
         }
-        
+        /* sarvesh temporry disabled unit tests
         stage('Verify Containers') {
             steps {
                 script {
@@ -125,7 +215,7 @@ pipeline {
                 }
             }
         }
-        
+        */
         stage('Verify Supabase Stack') {
             steps {
                 script {

@@ -17,7 +17,7 @@ if (!anonKey) {
 }
 
 const REMOTE_APP_DIR = '/home/SOSLogicPro/logicProSupabaseDev/logic-nexus-ai';
-const SUPABASE_URL = `http://${host}:${gatewayPort}`;
+const SUPABASE_URL = process.env.SUPABASE_URL || `http://${host}:${gatewayPort}`;
 
 const conn = new Client();
 console.log(`Deploying LogicPro web to ${host}:${appPort} ...`);
