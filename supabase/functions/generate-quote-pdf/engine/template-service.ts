@@ -25,7 +25,7 @@ export async function getTemplate(
   // Fetch from DB
   const { data, error } = await supabase
     .from("quote_templates")
-    .select("content")
+    .select("*")
     .eq("id", templateId)
     .single();
 
@@ -36,11 +36,26 @@ export async function getTemplate(
 
   if (data) {
     if (logger) await logger.info(`[Cache] Miss for template ${templateId}. Caching...`);
+    
+    // Merge metadata into content
+    const fullTemplate = {
+      ...data.content,
+      id: data.id,
+      name: data.template_name || data.name, // Support both new and old column names
+      tenant_id: data.tenant_id,
+      is_active: data.is_active,
+      // Enhanced fields
+      rate_options: data.rate_options,
+      transport_modes: data.transport_modes,
+      legs_config: data.legs_config,
+      carrier_selections: data.carrier_selections
+    };
+
     templateCache.set(templateId, {
-      content: data.content,
+      content: fullTemplate,
       timestamp: Date.now()
     });
-    return data.content;
+    return fullTemplate;
   }
 
   return null;

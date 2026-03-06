@@ -68,8 +68,14 @@ export function BrandingSettingsForm({ initialSettings, onSave, saving }: Brandi
       setUploadProgress(0);
       setLogoFile(file);
 
-      const fileExt = file.name.split('.').pop();
-      const fileName = `logo-${Date.now()}.${fileExt}`;
+      const fileExt = file.name.split('.').pop()?.toLowerCase();
+    
+    if (!['png', 'jpg', 'jpeg'].includes(fileExt || '')) {
+      toast.error('Invalid file type. Please upload PNG or JPG.');
+      return;
+    }
+
+    const fileName = `logo-${Date.now()}.${fileExt}`;
       const filePath = `${context.tenantId}/${fileName}`;
 
       // Upload to organization-assets bucket using raw supabase client
@@ -78,6 +84,7 @@ export function BrandingSettingsForm({ initialSettings, onSave, saving }: Brandi
         .upload(filePath, file, {
           cacheControl: '3600',
           upsert: true,
+          contentType: file.type
         });
 
       if (error) throw error;
@@ -124,9 +131,9 @@ export function BrandingSettingsForm({ initialSettings, onSave, saving }: Brandi
                 <FileUpload
                   onFileSelect={handleLogoUpload}
                   onClear={handleRemoveLogo}
-                  accept="image/png,image/jpeg,image/svg+xml"
+                  accept="image/png,image/jpeg"
                   maxSize={2 * 1024 * 1024} // 2MB
-                  label="Upload Logo (PNG, JPG, SVG)"
+                  label="Upload Logo (PNG, JPG)"
                   value={logoFile}
                   progress={uploading ? uploadProgress : undefined}
                   disabled={uploading || saving}

@@ -58,6 +58,30 @@ export const RawQuoteDataSchema = z.object({
     footer_text: z.string().optional(),
     disclaimer_text: z.string().optional(),
   }).optional(),
+  options: z.array(z.object({
+    id: z.string(),
+    grand_total: z.number(),
+    legs: z.array(z.object({
+      mode: z.string().nullable().optional(),
+      transport_mode: z.string().nullable().optional(),
+      carrier_name: z.string().nullable().optional(),
+      transit_time: z.string().nullable().optional(),
+      total_amount: z.number().nullable().optional(),
+      provider_id: z.string().nullable().optional(),
+    }).passthrough()),
+    charges: z.array(z.object({
+      amount: z.number(),
+      currency: z.string().nullable().optional(),
+      charge_name: z.string().nullable().optional(),
+      category: z.object({ name: z.string() }).optional(),
+      leg_id: z.string().nullable().optional(),
+    }).passthrough()),
+    carrier: z.string().optional(),
+    transit_time: z.string().optional(),
+    container_size: z.string().optional(),
+    container_type: z.string().optional(),
+  })).optional(),
+  mode: z.enum(['single', 'consolidated', 'individual']).optional(),
 });
 
 export type RawQuoteData = z.infer<typeof RawQuoteDataSchema>;
@@ -182,6 +206,11 @@ export interface SafeContext {
     origin: string;
     destination: string;
     carrier_name: string;
+    transport_mode?: string;
+    pol?: string;
+    pod?: string;
+    carrier?: string;
+    transit_time?: string;
   }>;
   items: Array<{
     type: string;
@@ -196,6 +225,35 @@ export interface SafeContext {
     unit_price?: number;
     qty?: number;
   }>;
+  // Multi-rate support
+  options?: Array<{
+    id: string;
+    legs: Array<{
+      seq: number;
+      mode: string;
+      origin: string;
+      destination: string;
+      carrier_name: string;
+      transport_mode?: string;
+      pol?: string;
+      pod?: string;
+      carrier?: string;
+      transit_time?: string;
+    }>;
+    charges: Array<{
+      desc: string;
+      total: number;
+      curr: string;
+      unit_price?: number;
+      qty?: number;
+  }>;
+  grand_total: number;
+  carrier?: string;
+  transit_time?: string;
+  container_size?: string;
+  container_type?: string;
+}>;
+  mode?: 'single' | 'consolidated';
 }
 
 function noopLogger(): Logger {
@@ -298,6 +356,39 @@ export function buildSafeContextWithValidation(
         quantity,
       };
     }),
+    mode: data.mode || 'single',
+    options: (data.options || []).map((opt: any) => ({
+        id: opt.id,
+        grand_total: opt.grand_total || 0,
+        carrier: opt.carrier,
+        transit_time: opt.transit_time,
+        container_size: opt.container_size,
+        container_type: opt.container_type,
+        legs: (opt.legs || []).map((l: any) => ({
+        seq: l.sequence_id || 0,
+        mode: l.mode || "Unknown",
+        origin: l.pol || "N/A",
+        destination: l.pod || "N/A",
+        carrier_name: l.carrier || "TBD",
+      })),
+      charges: (opt.charges || []).map((c: any) => {
+        const amount = Number(c.amount) || 0;
+        const quantity = c.quantity || 1;
+        const currency = c.currency || "USD";
+        const description = c.description || "Service Charge";
+        return {
+          desc: description,
+          description,
+          total: amount,
+          amount,
+          curr: currency,
+          currency,
+          unit_price: quantity ? amount / quantity : amount,
+          qty: quantity,
+          quantity,
+        };
+      }),
+    })),
   };
 
   return { context: safeCtx, warnings: validation.warnings };

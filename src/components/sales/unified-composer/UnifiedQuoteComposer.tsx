@@ -9,6 +9,15 @@ import { Separator } from '@/components/ui/separator';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Plane, Ship, Truck, Train, Timer, Sparkles, ChevronDown, Save, Settings2, Building2, User, FileText, Loader2, AlertCircle, History, ExternalLink, X } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { TemplateSelector } from "@/components/sales/quotation-versions/TemplateSelector";
 import { useCRM } from '@/hooks/useCRM';
 import { useAuth } from '@/hooks/useAuth';
 import { QuotationNumberService } from '@/services/quotation/QuotationNumberService';
@@ -114,6 +123,11 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
   const [networkStatus, setNetworkStatus] = useState<'online' | 'offline' | 'checking'>('online');
   const [showNetworkWarning, setShowNetworkWarning] = useState(false);
   const [showValidationSummary, setShowValidationSummary] = useState(false);
+
+  // PDF Generation State
+  const [showPdfModal, setShowPdfModal] = useState(false);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
   // Rate fetching hook
   const rateFetching = useRateFetching();
@@ -2459,7 +2473,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
   // PDF Generation
   // ---------------------------------------------------------------------------
 
-  const handleGeneratePdf = useCallback(async () => {
+  const handleConfirmGeneratePdf = useCallback(async () => {
     const currentQuoteId = storeState.quoteId || quoteId;
     const currentVersionId = storeState.versionId || versionId;
     if (!currentQuoteId) {
@@ -2467,10 +2481,19 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
       return;
     }
     
-    logAudit('generate_pdf_attempt', { quoteId: currentQuoteId });
+    setIsGeneratingPdf(true);
+    logAudit('generate_pdf_attempt', { quoteId: currentQuoteId, templateId: selectedTemplateId });
 
     try {
-      const payload = { quoteId: currentQuoteId, versionId: currentVersionId, engine_v2: true, source: 'unified_composer', action: 'generate-pdf' };
+      const payload = { 
+        quoteId: currentQuoteId, 
+        versionId: currentVersionId, 
+        engine_v2: true, 
+        source: 'unified_composer', 
+        action: 'generate-pdf',
+        templateId: selectedTemplateId || undefined
+      };
+      
       const { data: response, error: pdfError } = await invokeFunction('generate-quote-pdf', {
         body: payload,
       });
@@ -2506,15 +2529,24 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
         logAudit('generate_pdf_warning', { quoteId: currentQuoteId, warningsCount: warnings.length, warnings: warnings.slice(0, 10) }, 'success');
         toast({ title: 'PDF Generated (Warnings)', description: warnings.slice(0, 3).join('; ') });
       } else {
-      logAudit('generate_pdf_success', { quoteId: currentQuoteId }, 'success');
-      toast({ title: 'PDF Generated', description: 'PDF has been downloaded.' });
+        logAudit('generate_pdf_success', { quoteId: currentQuoteId }, 'success');
+        toast({ title: 'PDF Generated', description: 'PDF has been downloaded.' });
       }
+      
+      // Close modal on success
+      setShowPdfModal(false);
     } catch (err: any) {
       logger.error('[UnifiedComposer] PDF generation failed:', err);
       logAudit('generate_pdf_failure', { quoteId: currentQuoteId, error: err.message, stack: err.stack }, 'failure');
       toast({ title: 'PDF Failed', description: err.message || 'Could not generate PDF', variant: 'destructive' });
+    } finally {
+      setIsGeneratingPdf(false);
     }
-  }, [storeState.quoteId, storeState.versionId, quoteId, versionId, toast, logAudit]);
+  }, [storeState.quoteId, storeState.versionId, quoteId, versionId, toast, logAudit, selectedTemplateId]);
+
+  const handleGeneratePdf = useCallback(() => {
+    setShowPdfModal(true);
+  }, []);
 
   const handleFormChange = useCallback((values: any) => {
     setLastFormData((prev) => ({
@@ -2713,6 +2745,45 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
               />
             </>
           )}
+
+          {/* PDF Generation Modal */}
+          <Dialog open={showPdfModal} onOpenChange={setShowPdfModal}>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>Generate PDF</DialogTitle>
+                <DialogDescription>
+                  Select a template to generate the quotation PDF.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="flex flex-col gap-2">
+                  <label htmlFor="template" className="text-sm font-medium">
+                    Template
+                  </label>
+                  <TemplateSelector 
+                    value={selectedTemplateId} 
+                    onChange={setSelectedTemplateId} 
+                    disabled={isGeneratingPdf}
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowPdfModal(false)} disabled={isGeneratingPdf}>
+                  Cancel
+                </Button>
+                <Button onClick={handleConfirmGeneratePdf} disabled={isGeneratingPdf}>
+                  {isGeneratingPdf ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    'Generate PDF'
+                  )}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </FormProvider>
     </EnterpriseFormLayout>

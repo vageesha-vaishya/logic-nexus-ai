@@ -33,7 +33,29 @@ ADD COLUMN branding_settings JSONB DEFAULT '{}'::jsonb;
 ### Storage
 - **Bucket**: `organization-assets`
 - **Path**: `{tenant_id}/branding/logo-{timestamp}.{ext}`
-- **Access**: Public read, Authenticated upload (RLS restricted to tenant's folder).
+- **Access**: 
+  - **Read**: Public
+  - **Write**: Authenticated only.
+    - **Tenant Admin/User**: Restricted to their own `{tenant_id}` folder.
+    - **Platform Admin**: Full write access to all folders (global management).
+  - **RLS Implementation**: Uses `storage.foldername(name)` comparison against user's tenant ID or checks `is_platform_admin()` role.
+
+### Security & RLS Policies
+The storage bucket `organization-assets` is protected by Row Level Security (RLS) policies to ensure tenant isolation while allowing administrative oversight.
+
+- **Policy**: "Authenticated Upload Access for Organization Assets"
+- **Logic**:
+  ```sql
+  (
+      public.is_platform_admin(auth.uid()) 
+      OR 
+      (storage.foldername(name))[1] = (select public.get_user_tenant_id(auth.uid()))::text
+  )
+  ```
+- **Implications**:
+  - **Tenant Isolation**: Users cannot upload files to other tenants' folders. Attempts result in a policy violation error.
+  - **Platform Admin Bypass**: Users with `platform_admin` role can manage assets for any tenant, facilitating support and global branding updates.
+  - **Robustness**: Folder name comparison uses text casting to prevent SQL errors when folder names are not valid UUIDs.
 
 ### PDF Generation Flow
 1. **Frontend**: User configures branding in `QuotationSettingsPanel` -> `BrandingSettingsForm`.

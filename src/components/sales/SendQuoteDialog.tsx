@@ -8,6 +8,7 @@ import { Mail, Loader2, Send, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 import { invokeFunction, emitEvent } from '@/lib/supabase-functions';
 import { EmitEventSchema } from '@/lib/schemas/events';
+import { TemplateSelector } from './quotation-versions/TemplateSelector';
 
 interface SendQuoteDialogProps {
   quoteId: string;
@@ -23,6 +24,7 @@ export function SendQuoteDialog({ quoteId, quoteNumber, versionId, customerEmail
   const [subject, setSubject] = useState(`Quotation #${quoteNumber}`);
   const [message, setMessage] = useState(`Dear Customer,\n\nPlease find attached the quotation #${quoteNumber} for your review.\n\nBest regards,\nLogistics Team`);
   const [sending, setSending] = useState(false);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
 
   const handleSend = async () => {
     if (!recipient) {
@@ -43,6 +45,7 @@ export function SendQuoteDialog({ quoteId, quoteNumber, versionId, customerEmail
           engine_v2: true,
           source: 'send-email',
           action: 'generate-pdf',
+          templateId: selectedTemplateId || undefined,
         },
       });
       if (pdfError) {
@@ -104,55 +107,55 @@ export function SendQuoteDialog({ quoteId, quoteNumber, versionId, customerEmail
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="default" className="gap-2">
+        <Button variant="outline" size="sm" className="gap-2">
           <Mail className="h-4 w-4" />
-          Send Quote
+          Send Email
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Send Quote #{quoteNumber}</DialogTitle>
+          <DialogTitle>Send Quotation</DialogTitle>
           <DialogDescription>
-            Email this quotation to the customer. A PDF will be automatically attached.
+            Send this quotation to the customer via email.
           </DialogDescription>
         </DialogHeader>
-        
-        <div className="space-y-4 py-4">
-          <div className="space-y-2">
-            <Label htmlFor="recipient">Recipient Email</Label>
-            <Input 
-              id="recipient" 
-              placeholder="customer@example.com" 
+        <div className="grid gap-4 py-4">
+          <div className="grid gap-2">
+            <Label htmlFor="recipient">To</Label>
+            <Input
+              id="recipient"
+              type="email"
               value={recipient}
               onChange={(e) => setRecipient(e.target.value)}
+              placeholder="customer@example.com"
             />
           </div>
-          
-          <div className="space-y-2">
+          <div className="grid gap-2">
+            <Label htmlFor="template">PDF Template</Label>
+            <TemplateSelector
+              value={selectedTemplateId}
+              onChange={setSelectedTemplateId}
+              disabled={sending}
+            />
+          </div>
+          <div className="grid gap-2">
             <Label htmlFor="subject">Subject</Label>
-            <Input 
-              id="subject" 
+            <Input
+              id="subject"
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
             />
           </div>
-
-          <div className="space-y-2">
+          <div className="grid gap-2">
             <Label htmlFor="message">Message</Label>
-            <Textarea 
-              id="message" 
-              rows={5}
+            <Textarea
+              id="message"
               value={message}
               onChange={(e) => setMessage(e.target.value)}
+              rows={5}
             />
           </div>
-
-          <div className="flex items-center gap-2 p-3 bg-muted rounded-md text-sm text-muted-foreground">
-             <FileText className="h-4 w-4" />
-             <span>Quote-{quoteNumber}.pdf will be attached</span>
-          </div>
         </div>
-
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)} disabled={sending}>
             Cancel

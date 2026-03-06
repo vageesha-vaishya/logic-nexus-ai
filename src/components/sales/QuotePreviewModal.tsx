@@ -6,6 +6,8 @@ import { invokeFunction, emitEvent } from '@/lib/supabase-functions';
 import { startSpan } from '@/lib/otel-lite';
 import { toast } from 'sonner';
 import { EmitEventSchema } from '@/lib/schemas/events';
+import { TemplateSelector } from './quotation-versions/TemplateSelector';
+import { useCRM } from '@/hooks/useCRM';
 
 interface QuotePreviewModalProps {
   quoteId: string;
@@ -19,20 +21,48 @@ export function QuotePreviewModal({ quoteId, quoteNumber, versionId, disabled }:
   const [loading, setLoading] = useState(false);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
+  const [useEnhancedTemplate, setUseEnhancedTemplate] = useState(false);
+  const { context, supabase } = useCRM();
+
+  useEffect(() => {
+    if (context?.tenantId) {
+      const fetchFeatureFlag = async () => {
+        const { data } = await supabase
+          .from('tenant_profile')
+          .select('use_enhanced_template')
+          .eq('tenant_id', context.tenantId)
+          .maybeSingle();
+        
+        if (data) {
+          setUseEnhancedTemplate(data.use_enhanced_template || false);
+        }
+      };
+      fetchFeatureFlag();
+    }
+  }, [context?.tenantId]);
 
   const generatePdf = async () => {
     setLoading(true);
     setError(null);
     try {
-      const span = startSpan('preview.generate', { quoteId, versionId });
+      const span = startSpan('preview.generate', { quoteId, versionId, templateId: selectedTemplateId });
       // Clean up previous URL to avoid memory leaks
       if (pdfUrl) {
         URL.revokeObjectURL(pdfUrl);
         setPdfUrl(null);
       }
 
-      console.log('[QuotePreview] Generating PDF for:', { quoteId, versionId });
-      const basePayload = { quoteId, versionId, engine_v2: true, source: 'preview', action: 'generate-pdf', trace_id: span.id };
+      console.log('[QuotePreview] Generating PDF for:', { quoteId, versionId, templateId: selectedTemplateId });
+      const basePayload = { 
+        quoteId, 
+        versionId, 
+        templateId: selectedTemplateId || undefined,
+        engine_v2: true, 
+        source: 'preview', 
+        action: 'generate-pdf', 
+        trace_id: span.id 
+      };
       const { data: response, error: pdfError } = await invokeFunction('generate-quote-pdf', {
         body: basePayload,
       });
@@ -74,10 +104,10 @@ export function QuotePreviewModal({ quoteId, quoteNumber, versionId, disabled }:
   };
 
   useEffect(() => {
-    if (open && !pdfUrl) {
+    if (open) {
       generatePdf();
     }
-  }, [open]);
+  }, [open, selectedTemplateId]);
 
   // Clean up on unmount
   useEffect(() => {
@@ -100,20 +130,28 @@ export function QuotePreviewModal({ quoteId, quoteNumber, versionId, disabled }:
                 <DialogTitle>Preview Quote #{quoteNumber}</DialogTitle>
                 {versionId && <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">v{versionId}</span>}
             </div>
-            <DialogDescription className="hidden">
-                Preview of the generated PDF document for Quote #{quoteNumber}
-            </DialogDescription>
-            <div className="flex items-center gap-2">
-                <Button variant="ghost" size="icon" onClick={generatePdf} disabled={loading} title="Refresh Preview">
-                    <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                </Button>
-                {pdfUrl && (
-                    <Button variant="ghost" size="icon" asChild title="Download PDF">
-                        <a href={pdfUrl} download={`Quote-${quoteNumber}.pdf`}>
-                            <Download className="h-4 w-4" />
-                        </a>
-                    </Button>
-                )}
+            
+            <div className="flex items-center gap-4">
+                      {useEnhancedTemplate && (
+                        <TemplateSelector 
+                          value={selectedTemplateId} 
+                          onChange={setSelectedTemplateId} 
+                          disabled={loading}
+                        />
+                      )}
+                      
+                      <div className="flex items-center gap-2">
+                  <Button variant="ghost" size="icon" onClick={generatePdf} disabled={loading} title="Refresh Preview">
+                      <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                  </Button>
+                  {pdfUrl && (
+                      <Button variant="ghost" size="icon" asChild title="Download PDF">
+                          <a href={pdfUrl} download={`Quote-${quoteNumber}.pdf`}>
+                              <Download className="h-4 w-4" />
+                          </a>
+                      </Button>
+                  )}
+              </div>
             </div>
         </DialogHeader>
         

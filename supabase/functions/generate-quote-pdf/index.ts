@@ -11,6 +11,11 @@ import { DefaultTemplate } from "./engine/default_template.ts";
 // @ts-ignore
 import { getTemplate } from "./engine/template-service.ts";
 import { requireAuth } from "../_shared/auth.ts";
+import { PDFDocument } from "pdf-lib";
+// @ts-ignore
+import JSZip from "https://esm.sh/jszip@3.10.1";
+// @ts-ignore
+import Handlebars from "https://esm.sh/handlebars@4.7.7";
 
 declare const Deno: any;
 
@@ -57,7 +62,7 @@ serveWithLogger(async (req, logger, adminSupabase) => {
     };
 
     const body = await req.json();
-    const { templateId, template, engine_v2 } = body;
+    const { templateId } = body;
     let { quoteId, versionId, store_result } = body;
 
     // Handle Database Webhook Payload
@@ -79,19 +84,7 @@ serveWithLogger(async (req, logger, adminSupabase) => {
       throw new Error("Missing quoteId");
     }
 
-    await log(`Generating PDF for Quote: ${quoteId}, Version: ${versionId}, Template: ${templateId}`);
-
-    // Fetch Template (with Caching)
-    let templateContent = null;
-    if (templateId) {
-        templateContent = await getTemplate(supabaseClient, templateId, logger);
-    }
-    
-    // Default fallback template
-    if (!templateContent) {
-         await log("Using Default Template (fallback)");
-         templateContent = DefaultTemplate;
-    }
+    await log(`Generating PDF for Quote: ${quoteId}, Version: ${versionId}, Template: ${templateId || 'Auto-Detect'}`);
 
     // Helper: retry query with fallback selector when schema differs across environments
     const safeSelect = async (
@@ -215,7 +208,7 @@ serveWithLogger(async (req, logger, adminSupabase) => {
     
     if (!versionId) {
         // Try to find the latest active version
-        const { data: latestVersion, error: latestError } = await supabaseClient
+        const { data: latestVersion, error: _latestError } = await supabaseClient
             .from("quotation_versions")
             .select("*")
             .eq("quote_id", quoteId)
@@ -311,11 +304,109 @@ serveWithLogger(async (req, logger, adminSupabase) => {
       }
     }
 
+    // --- TEMPLATE SELECTION LOGIC ---
+    let templateContent = null;
+    let selectedTemplateId = templateId; // from body
+
+    // 1. If no body templateId, try quote.template_id
+    if (!selectedTemplateId && (quote as any).template_id) {
+        selectedTemplateId = (quote as any).template_id;
+        await log(`Using Template ID from Quote: ${selectedTemplateId}`);
+    }
+
+    // 2. If we have an ID, fetch it
+    if (selectedTemplateId) {
+        templateContent = await getTemplate(supabaseClient, selectedTemplateId, logger);
+    }
+
+    // 3. If still no template, check for Multi-Modal heuristic
+    if (!templateContent) {
+        // Check if any option has > 1 leg OR distinct modes
+        // We look at the legs we fetched
+        const isMultiModal = options.some((opt: any) => {
+             if (opt.legs && opt.legs.length > 1) return true;
+             // Check if distinct transport modes exist across legs
+             const modes = new Set(opt.legs.map((l: any) => l.mode || l.transport_mode));
+             if (modes.size > 1) return true;
+             return false;
+        });
+
+        if (isMultiModal) {
+            await log("Detected Multi-Modal Quote. Attempting to load 'Standard Multi-Modal' template.");
+            // Try to find the template by name
+            let query = supabaseClient
+                 .from("quote_templates")
+                 .select("content, tenant_id")
+                 .eq("name", "Standard Multi-Modal");
+             
+            if ((quote as any).tenant_id) {
+                 query = query.or(`tenant_id.eq.${(quote as any).tenant_id},tenant_id.is.null`);
+            } else {
+                 query = query.is("tenant_id", null);
+            }
+
+            const { data: templates, error: mmError } = await query;
+            
+            let mmTemplate = null;
+            if (templates && templates.length > 0) {
+                 // Sort: tenant-specific first
+                 templates.sort((a: any, b: any) => {
+                     if (a.tenant_id && !b.tenant_id) return -1;
+                     if (!a.tenant_id && b.tenant_id) return 1;
+                     return 0;
+                 });
+                 mmTemplate = templates[0];
+            }
+            
+            if (!mmError && mmTemplate && mmTemplate.content) {
+                 templateContent = mmTemplate.content;
+                 await log("Loaded 'Standard Multi-Modal' template.");
+            } else {
+                 await logWarn(`'Standard Multi-Modal' template not found or error: ${mmError?.message || 'Unknown'}`);
+            }
+        }
+    }
+
+    // 4. Fallback
+    if (!templateContent) {
+         await log("Using Default Template (fallback)");
+         templateContent = DefaultTemplate;
+    }
+
     let branding: any = {};
     let brandingLogoBase64: string | undefined = undefined;
 
-    // 1. Try fetching from quotation_configuration (New System)
+    // 1. Try fetching from tenant_profile (New Enhanced System)
     const tenantId = (quote as any).tenant_id;
+    if (tenantId) {
+        try {
+            const { data: profileData, error: profileError } = await supabaseClient
+                .from('tenant_profile')
+                .select('*')
+                .eq('tenant_id', tenantId)
+                .maybeSingle();
+
+            if (profileData) {
+                 branding = {
+                     ...branding,
+                     company_name: profileData.legal_name || profileData.company_name,
+                     company_address: profileData.registered_address || profileData.address,
+                     tax_id: profileData.tax_id,
+                     contact_email: profileData.contact_email,
+                     contact_phone: profileData.contact_phone,
+                     website: profileData.website,
+                     logo_url: profileData.logo_url
+                 };
+                 await logger.info(`Using tenant_profile for tenant ${tenantId}`);
+            } else if (profileError) {
+                 await logger.warn(`Error fetching tenant_profile: ${profileError.message}`);
+            }
+        } catch (e: any) {
+            await logger.warn(`Failed to fetch tenant_profile: ${e.message}`);
+        }
+    }
+
+    // 2. Try fetching from quotation_configuration (System V2)
     if (tenantId) {
        try {
          const { data: configData } = await supabaseClient
@@ -325,7 +416,8 @@ serveWithLogger(async (req, logger, adminSupabase) => {
             .maybeSingle();
             
          if (configData?.branding_settings) {
-            branding = configData.branding_settings;
+            // Merge, preferring config over profile for specific branding settings
+            branding = { ...branding, ...configData.branding_settings };
             await logger.info(`Using branding from quotation_configuration for tenant ${tenantId}`);
          }
        } catch (e: any) {
@@ -333,7 +425,7 @@ serveWithLogger(async (req, logger, adminSupabase) => {
        }
     }
 
-    // 2. Fallback to tenant_branding (Legacy System) if new config is empty/missing key fields
+    // 3. Fallback to tenant_branding (Legacy System) if new config is empty/missing key fields
     if (!branding.company_name && !branding.logo_url) {
         try {
           let brandingQuery = supabaseClient.from("tenant_branding").select("*");
@@ -353,6 +445,40 @@ serveWithLogger(async (req, logger, adminSupabase) => {
         } catch (e: any) {
            await logger.warn(`Legacy branding fetch failed: ${e?.message || String(e)}`);
         }
+    }
+
+    // Required Field Validation
+    const missingFields: string[] = [];
+    if (!quote.origin && !quote.origin_port_id) missingFields.push("Origin");
+    if (!quote.destination && !quote.destination_port_id) missingFields.push("Destination");
+    if (!quote.items || quote.items.length === 0) missingFields.push("Commodity/Items");
+    if (!quote.incoterms) missingFields.push("Incoterm"); // Assuming incoterms column exists
+    if (!quote.expiration_date && !quote.valid_until) missingFields.push("Validity Date");
+
+    // Check total freight on options if options exist
+    if (options.length > 0) {
+        const hasValidTotal = options.some((o: any) => {
+            const total = Array.isArray(o.charges) 
+                ? o.charges.reduce((sum: number, c: any) => sum + (Number(c.amount) || 0), 0)
+                : (quote.total_amount || 0);
+            return total > 0;
+        });
+        if (!hasValidTotal) missingFields.push("Total Freight (on at least one option)");
+    }
+
+    if (missingFields.length > 0) {
+        // Enforce strictly as requested
+        await logger.warn(`Validation failed: Missing fields: ${missingFields.join(", ")}`);
+        
+        // Return 400 Bad Request with precise field-level error map
+        return new Response(JSON.stringify({ 
+            error: "Validation Failed", 
+            issues: missingFields,
+            message: `Missing required fields: ${missingFields.join(", ")}`
+        }), {
+            status: 400,
+            headers: { ...getCorsHeaders(req), "Content-Type": "application/json" }
+        });
     }
 
     if (branding.logo_url && typeof branding.logo_url === "string") {
@@ -390,73 +516,155 @@ serveWithLogger(async (req, logger, adminSupabase) => {
 
     await log("Using V2 Rendering Engine");
 
-    const selectedOption =
-      options.find((o: any) => Array.isArray(o.charges) && o.charges.length > 0) ||
-      (options.length > 0 ? options[0] : null);
+    const mode = body.mode || 'single';
+    let pdfBytes: Uint8Array | null = null;
+    let finalWarnings: string[] = [];
 
-    const rawData = {
-      branding: {
-        logo_url: branding.logo_url,
-        logo_base64: brandingLogoBase64,
-        primary_color: branding.primary_color,
-        secondary_color: branding.secondary_color,
-        accent_color: branding.accent_color,
-        company_name: branding.company_name || (quote.accounts?.name || 'Nexus Logistics'),
-        company_address: branding.company_address,
-        font_family: branding.font_family,
-        header_text: branding.header_text,
-        sub_header_text: branding.sub_header_text,
-        footer_text: branding.footer_text,
-        disclaimer_text: branding.disclaimer_text,
-      },
-      quote: {
-        quote_number: quote.quote_number,
-        created_at: quote.created_at,
-        expiration_date: quote.expiration_date || quote.valid_until,
-        status: quote.status,
-        total_amount: quote.total_amount,
-        currency: quote.currency || "USD",
-        service_level: quote.service_level,
-        notes: quote.notes,
-        terms_conditions: quote.terms_conditions,
-      },
-      customer: {
-        company_name: quote.accounts?.name,
-        contact_name: quote.accounts?.name,
-        email: "",
-        address: [
-          quote.accounts?.billing_street,
-          quote.accounts?.billing_city,
-          quote.accounts?.billing_country,
-        ]
-          .filter(Boolean)
-          .join(", "),
-      },
-      legs:
-        selectedOption?.legs?.map((l: any) => ({
-          sequence_id: l.sequence_id || 0,
-          mode: l.mode,
-          pol: l.origin?.location_name,
-          pod: l.destination?.location_name,
-          carrier: selectedOption.carriers?.carrier_name,
-          transit_time: l.transit_time,
-        })) || [],
-      charges:
-        selectedOption?.charges?.map((c: any) => ({
-          description: c.charge_name || c.category?.name || "Charge",
-          amount: c.amount,
-          currency: c.currency || "USD",
-          type: c.charge_type,
-          basis: c.basis,
-          quantity: c.units,
-          leg_id: c.leg_id,
-        })) || [],
-      items: mapQuoteItemsToRawItems(quote.items),
+    const createRawData = (option: any) => {
+      // Calculate option specific total if possible
+      const optionTotal = Array.isArray(option?.charges) 
+        ? option.charges.reduce((sum: number, c: any) => sum + (Number(c.amount) || 0), 0)
+        : (quote.total_amount || 0);
+
+      return {
+        branding: {
+          logo_url: branding.logo_url,
+          logo_base64: brandingLogoBase64,
+          primary_color: branding.primary_color,
+          secondary_color: branding.secondary_color,
+          accent_color: branding.accent_color,
+          company_name: branding.company_name || (quote.accounts?.name || 'Nexus Logistics'),
+          company_address: branding.company_address,
+          font_family: branding.font_family,
+          header_text: branding.header_text,
+          sub_header_text: branding.sub_header_text,
+          footer_text: branding.footer_text,
+          disclaimer_text: branding.disclaimer_text,
+        },
+        quote: {
+          quote_number: quote.quote_number,
+          created_at: quote.created_at,
+          expiration_date: quote.expiration_date || quote.valid_until,
+          status: quote.status,
+          total_amount: optionTotal,
+          currency: quote.currency || "USD",
+          service_level: quote.service_level,
+          notes: quote.notes,
+          terms_conditions: quote.terms_conditions,
+          origin: quote.origin,
+          destination: quote.destination,
+          incoterms: quote.incoterms,
+        },
+        customer: {
+          company_name: quote.accounts?.name,
+          contact_name: quote.accounts?.name,
+          email: "",
+          address: [
+            quote.accounts?.billing_street,
+            quote.accounts?.billing_city,
+            quote.accounts?.billing_country,
+          ]
+            .filter(Boolean)
+            .join(", "),
+        },
+        legs:
+          option?.legs?.map((l: any) => ({
+            sequence_id: l.sequence_id || 0,
+            mode: l.mode || l.transport_mode || "Unknown",
+            pol: l.origin?.location_name || "N/A",
+            pod: l.destination?.location_name || "N/A",
+            carrier: option.carriers?.carrier_name || l.carrier_name || "TBD",
+            transit_time: l.transit_time || "",
+          })) || [],
+        charges:
+          option?.charges?.map((c: any) => ({
+            description: c.charge_name || c.category?.name || "Charge",
+            amount: c.amount,
+            currency: c.currency || "USD",
+            type: c.charge_type,
+            basis: c.basis,
+            quantity: c.units,
+            leg_id: c.leg_id,
+          })) || [],
+        items: mapQuoteItemsToRawItems(quote.items),
+        options: options.map((o: any) => ({
+          id: o.id,
+          carrier: o.carriers?.carrier_name || 'Multi-Carrier',
+          transit_time: o.transit_time_days ? `${o.transit_time_days} Days` : (o.legs?.map((l: any) => l.transit_time).filter(Boolean).join(" + ") || "N/A"),
+          container_size: o.container_sizes?.code || o.container_sizes?.name || 'N/A',
+          container_type: o.container_types?.code || o.container_types?.name || 'N/A',
+          grand_total: Array.isArray(o.charges) 
+            ? o.charges.reduce((sum: number, c: any) => sum + (Number(c.amount) || 0), 0)
+            : 0,
+          legs: o.legs?.map((l: any) => ({
+             sequence_id: l.sequence_id || 0,
+             mode: l.mode || l.transport_mode,
+             pol: l.origin?.location_name,
+             pod: l.destination?.location_name,
+             carrier: o.carriers?.carrier_name || l.carrier_name,
+             transit_time: l.transit_time,
+             transport_mode: l.transport_mode || l.mode
+          })) || [],
+          charges: o.charges || []
+        }))
+      };
     };
 
-    let pdfBytes: Uint8Array | null = null;
+    const compileTemplateWithHandlebars = (template: any, data: any): any => {
+        if (!template) return template;
+        
+        // Helper to compile a single value
+        const compileValue = (val: any): any => {
+            if (typeof val === 'string') {
+                // Check if string contains {{ }}
+                if (val.includes('{{')) {
+                    try {
+                        const compiled = Handlebars.compile(val);
+                        return compiled(data);
+                    } catch (e) {
+                        return val;
+                    }
+                }
+                return val;
+            } else if (Array.isArray(val)) {
+                return val.map(compileValue);
+            } else if (typeof val === 'object' && val !== null) {
+                const result: any = {};
+                for (const key in val) {
+                    result[key] = compileValue(val[key]);
+                }
+                return result;
+            }
+            return val;
+        };
 
-    if (!store_result && version && (version as any).storage_path) {
+        // Clone first to avoid mutation
+        const clone = JSON.parse(JSON.stringify(template));
+        return compileValue(clone);
+    };
+
+    const renderOptionToBytes = async (option: any) => {
+        const rawData = createRawData(option);
+        
+        // Apply Handlebars compilation
+        let effectiveTemplate = templateContent || DefaultTemplate;
+        try {
+             effectiveTemplate = compileTemplateWithHandlebars(effectiveTemplate, rawData);
+        } catch (e: any) {
+             await logger.warn(`Handlebars compilation failed: ${e.message}`);
+        }
+
+        const { context, warnings } = buildSafeContextWithValidation(rawData, logger);
+        if (warnings.length > 0) {
+            finalWarnings.push(...warnings);
+            await logWarn(`Warnings for option ${option.id}: ${warnings.join(", ")}`);
+        }
+        const renderer = new PdfRenderer(effectiveTemplate, context, logger);
+        return await renderer.render();
+    };
+
+    // Check for cached PDF first if single mode and not forcing re-render
+    if (mode === 'single' && !store_result && version && (version as any).storage_path) {
       try {
         const storagePath = (version as any).storage_path as string;
         const { data: file, error: downloadError } = await supabaseClient.storage
@@ -475,27 +683,132 @@ serveWithLogger(async (req, logger, adminSupabase) => {
       }
     }
 
+    let contentType = "application/pdf";
+    let fileExtension = "pdf";
+
     if (!pdfBytes) {
-      const { context, warnings } = buildSafeContextWithValidation(rawData, logger);
-      if (warnings.length > 0) {
-        await logWarn(`PDF pre-render warnings (${warnings.length}): ${warnings.slice(0, 5).join(" | ")}${warnings.length > 5 ? " | ..." : ""}`);
-      }
-      const renderer = new PdfRenderer(templateContent || DefaultTemplate, context, logger);
-      pdfBytes = await renderer.render();
-      if (warnings.length > 0) {
-        (body as any).__pdf_warnings = warnings;
-      }
+        if (mode === 'consolidated' && options.length > 0) {
+            await logger.info(`Generating Consolidated PDF for ${options.length} options`);
+            const mergedPdf = await PDFDocument.create();
+            
+            // --- NEW: Generate Summary Page ---
+            try {
+                // 1. Create Summary Context
+                // We pass an empty object for 'option' so legs/charges are empty in the main context,
+                // but we manually populate the 'options' array for the summary table.
+                const summaryRawData: any = createRawData({}); 
+                summaryRawData.options = options.map((o: any) => ({
+                    id: o.id,
+                    grand_total: Array.isArray(o.charges) 
+                        ? o.charges.reduce((sum: number, c: any) => sum + (Number(c.amount) || 0), 0)
+                        : 0,
+                    legs: o.legs,
+                    charges: o.charges
+                }));
+                
+                const { context: summaryContext } = buildSafeContextWithValidation(summaryRawData, logger);
+                
+                // 2. Create Summary Template (Clone & Modify)
+                // We want a clean summary page: Header -> Summary Table -> Terms -> Footer
+                const summaryTemplate = JSON.parse(JSON.stringify(templateContent || DefaultTemplate));
+                
+                // Remove dynamic tables (items/charges) to avoid clutter
+                summaryTemplate.sections = summaryTemplate.sections.filter((s: any) => 
+                    s.type !== 'dynamic_table' && s.type !== 'static_block'
+                );
+                
+                // Inject multi_rate_summary after Header
+                const headerIdx = summaryTemplate.sections.findIndex((s: any) => s.type === 'header');
+                const insertIdx = headerIdx >= 0 ? headerIdx + 1 : 0;
+                
+                summaryTemplate.sections.splice(insertIdx, 0, {
+                    type: "multi_rate_summary",
+                    height: 150,
+                    page_break_before: false,
+                    content: { text: "Quotation Options Summary" }
+                });
+
+                // Render Summary
+                const summaryRenderer = new PdfRenderer(summaryTemplate, summaryContext, logger);
+                const summaryBytes = await summaryRenderer.render();
+                const summaryDoc = await PDFDocument.load(summaryBytes);
+                const summaryPages = await mergedPdf.copyPages(summaryDoc, summaryDoc.getPageIndices());
+                summaryPages.forEach((page: any) => mergedPdf.addPage(page));
+                
+                await logger.info("Added Summary Page to Consolidated PDF");
+            } catch (e: any) {
+                await logger.warn(`Failed to generate summary page: ${e.message}`);
+            }
+            // ----------------------------------
+
+            for (const opt of options) {
+                try {
+                    const optBytes = await renderOptionToBytes(opt);
+                    const optDoc = await PDFDocument.load(optBytes);
+                    const copiedPages = await mergedPdf.copyPages(optDoc, optDoc.getPageIndices());
+                    copiedPages.forEach((page: any) => mergedPdf.addPage(page));
+                } catch (e: any) {
+                    await logger.error(`Failed to render option ${opt.id}: ${e.message}`);
+                    // Continue with other options? Or fail?
+                    // Let's continue but log error
+                }
+            }
+            pdfBytes = await mergedPdf.save();
+        } else if (mode === 'individual' && options.length > 0) {
+            await logger.info(`Generating Individual PDFs for ${options.length} options (ZIP output)`);
+            contentType = "application/zip";
+            fileExtension = "zip";
+            // @ts-ignore
+            const zip = new JSZip();
+            
+            for (let i = 0; i < options.length; i++) {
+                const opt = options[i];
+                try {
+                    const optBytes = await renderOptionToBytes(opt);
+                    const fileName = `Quote-${quote.quote_number || 'draft'}-RateOption-${i + 1}.pdf`;
+                    zip.file(fileName, optBytes);
+                } catch (e: any) {
+                    const errMsg = `Failed to render option ${opt.id}: ${e.message}`;
+                    await logger.error(errMsg);
+                    finalWarnings.push(errMsg);
+                }
+            }
+            
+            // Generate ZIP
+            pdfBytes = await zip.generateAsync({ type: "uint8array" });
+        } else {
+            // Single Mode
+            const selectedOption =
+                options.find((o: any) => Array.isArray(o.charges) && o.charges.length > 0) ||
+                (options.length > 0 ? options[0] : null);
+            
+            if (selectedOption) {
+                pdfBytes = await renderOptionToBytes(selectedOption);
+            } else {
+                // No options found? Render with empty option to show header/items at least
+                await logger.warn("No options found for quote. Rendering generic PDF.");
+                pdfBytes = await renderOptionToBytes({});
+            }
+        }
+        
+        if (finalWarnings.length > 0) {
+            (body as any).__pdf_warnings = [...new Set(finalWarnings)];
+        }
+    }
+
+    if (!pdfBytes) {
+        throw new Error("Failed to generate PDF content");
     }
 
     const traceId = body?.trace_id;
     const idem = body?.idempotency_key;
 
     if (store_result) {
-      const fileName = `${quoteId}/${versionId || "latest"}_${Date.now()}.pdf`;
+      const fileName = `${quoteId}/${versionId || "latest"}_${Date.now()}.${fileExtension}`;
       const { data: uploadData, error: uploadError } = await supabaseClient.storage
         .from("quotations")
         .upload(fileName, pdfBytes, {
-          contentType: "application/pdf",
+          contentType: contentType,
           upsert: true,
         });
 
@@ -565,8 +878,8 @@ serveWithLogger(async (req, logger, adminSupabase) => {
     return new Response(
       JSON.stringify({
         content: base64Pdf,
-        filename: `quote_${quote.quote_number || "draft"}.pdf`,
-        contentType: "application/pdf",
+        filename: `quote_${quote.quote_number || "draft"}.${fileExtension}`,
+        contentType: contentType,
         issues: Array.isArray((body as any).__pdf_warnings) ? (body as any).__pdf_warnings : [],
         traceLogs: traceLogs,
       }),
