@@ -38,9 +38,10 @@ interface SmartCargoInputProps {
   placeholder?: string;
   value?: string;
   onInputChange?: (value: string) => void;
+  error?: boolean;
 }
 
-export function SmartCargoInput({ onSelect, className, placeholder = "Search commodities or HTS codes...", value, onInputChange }: SmartCargoInputProps) {
+export function SmartCargoInput({ onSelect, className, placeholder = "Search commodities or HTS codes...", value, onInputChange, error }: SmartCargoInputProps) {
   const { scopedDb } = useCRM();
   const [open, setOpen] = useState(false);
   const [browserOpen, setBrowserOpen] = useState(false);
@@ -207,7 +208,12 @@ export function SmartCargoInput({ onSelect, className, placeholder = "Search com
             variant="outline"
             role="combobox"
             aria-expanded={open}
-            className={cn("flex-1 justify-between text-left font-normal", !searchTerm && "text-muted-foreground")}
+            aria-invalid={!!error}
+            className={cn(
+              "flex-1 justify-between text-left font-normal", 
+              !searchTerm && "text-muted-foreground",
+              error && "border-destructive focus-visible:ring-destructive"
+            )}
             onFocus={() => setOpen(true)}
             onKeyDown={(e) => {
               const isPrintable = e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey;

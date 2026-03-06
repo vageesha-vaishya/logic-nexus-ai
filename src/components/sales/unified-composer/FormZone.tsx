@@ -99,6 +99,7 @@ interface FormZoneProps {
   onChange?: (values: any) => void;
   onOpenSmartSettings?: () => void;
   onEnterComposerMode?: () => void;
+  onValidationFailed?: () => void;
 }
 
 export function FormZone({ 
@@ -114,6 +115,7 @@ export function FormZone({
   onChange,
   onOpenSmartSettings,
   onEnterComposerMode,
+  onValidationFailed,
 }: FormZoneProps) {
   const [smartMode, setSmartMode] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -488,6 +490,7 @@ export function FormZone({
     <div className="bg-muted/30 border rounded-lg p-6">
       <form onSubmit={form.handleSubmit(onSubmit, (errors) => {
           logger.error('Form Errors:', errors);
+          onValidationFailed?.();
           const firstError = Object.values(errors)[0];
           const message = (firstError as any)?.message || 'Please fix the highlighted fields.';
           toast({ title: 'Validation Error', description: String(message), variant: 'destructive' });
@@ -514,12 +517,15 @@ export function FormZone({
               name={"opportunityId" as any}
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="flex items-center gap-2 text-xs">
+                  <FormLabel className={cn("flex items-center gap-2 text-xs", form.formState.errors.opportunityId && "text-destructive")}>
                     <FileText className="h-3.5 w-3.5" /> Opportunity
                   </FormLabel>
                   <Select onValueChange={(val) => onOpportunityChange(val)} value={field.value} disabled={crmLoading}>
                     <FormControl>
-                      <SelectTrigger className="bg-background h-9 text-xs">
+                      <SelectTrigger 
+                        className={cn("bg-background h-9 text-xs", form.formState.errors.opportunityId && "border-destructive focus:ring-destructive")}
+                        aria-invalid={!!form.formState.errors.opportunityId}
+                      >
                         <SelectValue placeholder={crmLoading ? "Loading opportunities..." : "Select Opportunity"} />
                       </SelectTrigger>
                     </FormControl>
@@ -538,7 +544,7 @@ export function FormZone({
               name={"accountId" as any}
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="flex items-center gap-2 text-xs">
+                  <FormLabel className={cn("flex items-center gap-2 text-xs", form.formState.errors.accountId && "text-destructive")}>
                     <Building2 className="h-3.5 w-3.5" /> Account
                   </FormLabel>
                   <Select onValueChange={(v) => {
@@ -552,7 +558,10 @@ export function FormZone({
                     }
                   }} value={field.value} disabled={crmLoading}>
                     <FormControl>
-                      <SelectTrigger className="bg-background h-9 text-xs">
+                      <SelectTrigger 
+                        className={cn("bg-background h-9 text-xs", form.formState.errors.accountId && "border-destructive focus:ring-destructive")}
+                        aria-invalid={!!form.formState.errors.accountId}
+                      >
                         <SelectValue placeholder={crmLoading ? "Loading accounts..." : "Select Customer"} />
                       </SelectTrigger>
                     </FormControl>
@@ -575,12 +584,15 @@ export function FormZone({
               name={"contactId" as any}
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="flex items-center gap-2 text-xs">
+                  <FormLabel className={cn("flex items-center gap-2 text-xs", form.formState.errors.contactId && "text-destructive")}>
                     <User className="h-3.5 w-3.5" /> Contact
                   </FormLabel>
                   <Select onValueChange={field.onChange} value={field.value} disabled={!accountId || crmLoading}>
                     <FormControl>
-                      <SelectTrigger className="bg-background h-9 text-xs">
+                      <SelectTrigger 
+                        className={cn("bg-background h-9 text-xs", form.formState.errors.contactId && "border-destructive focus:ring-destructive")}
+                        aria-invalid={!!form.formState.errors.contactId}
+                      >
                         <SelectValue placeholder={crmLoading ? "Loading contacts..." : "Select Contact"} />
                       </SelectTrigger>
                     </FormControl>
@@ -603,11 +615,16 @@ export function FormZone({
                   name={"quoteTitle" as any}
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="flex items-center gap-2 text-xs">
+                      <FormLabel className={cn("flex items-center gap-2 text-xs", form.formState.errors.quoteTitle && "text-destructive")}>
                         <FileText className="h-3.5 w-3.5" /> Quote Reference
                       </FormLabel>
                       <FormControl>
-                        <Input {...field} placeholder="e.g. Q3 Shipment" className="bg-background h-9 text-xs" />
+                        <Input 
+                          {...field} 
+                          placeholder="e.g. Q3 Shipment" 
+                          className={cn("bg-background h-9 text-xs", form.formState.errors.quoteTitle && "border-destructive focus-visible:ring-destructive")}
+                          aria-invalid={!!form.formState.errors.quoteTitle}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -623,9 +640,14 @@ export function FormZone({
                     name={"guestCompany" as any}
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-xs">Company Name *</FormLabel>
+                        <FormLabel className={cn("text-xs", form.formState.errors.guestCompany && "text-destructive")}>Company Name *</FormLabel>
                         <FormControl>
-                          <Input {...field} placeholder="Acme Corp" className="bg-background h-9 text-xs" />
+                          <Input 
+                            {...field} 
+                            placeholder="Acme Corp" 
+                            className={cn("bg-background h-9 text-xs", form.formState.errors.guestCompany && "border-destructive focus-visible:ring-destructive")}
+                            aria-invalid={!!form.formState.errors.guestCompany}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -636,9 +658,14 @@ export function FormZone({
                     name={"taxId" as any}
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-xs">Tax ID / VAT</FormLabel>
+                        <FormLabel className={cn("text-xs", form.formState.errors.taxId && "text-destructive")}>Tax ID / VAT</FormLabel>
                         <FormControl>
-                          <Input {...field} placeholder="Tax Identification Number" className="bg-background h-9 text-xs" />
+                          <Input 
+                            {...field} 
+                            placeholder="Tax Identification Number" 
+                            className={cn("bg-background h-9 text-xs", form.formState.errors.taxId && "border-destructive focus-visible:ring-destructive")}
+                            aria-invalid={!!form.formState.errors.taxId}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -655,9 +682,14 @@ export function FormZone({
                     name={"guestName" as any}
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-xs">Full Name *</FormLabel>
+                        <FormLabel className={cn("text-xs", form.formState.errors.guestName && "text-destructive")}>Full Name *</FormLabel>
                         <FormControl>
-                          <Input {...field} placeholder="John Doe" className="bg-background h-9 text-xs" />
+                          <Input 
+                            {...field} 
+                            placeholder="John Doe" 
+                            className={cn("bg-background h-9 text-xs", form.formState.errors.guestName && "border-destructive focus-visible:ring-destructive")}
+                            aria-invalid={!!form.formState.errors.guestName}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -668,9 +700,14 @@ export function FormZone({
                     name={"guestEmail" as any}
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-xs">Email Address *</FormLabel>
+                        <FormLabel className={cn("text-xs", form.formState.errors.guestEmail && "text-destructive")}>Email Address *</FormLabel>
                         <FormControl>
-                          <Input {...field} placeholder="john@example.com" className="bg-background h-9 text-xs" />
+                          <Input 
+                            {...field} 
+                            placeholder="john@example.com" 
+                            className={cn("bg-background h-9 text-xs", form.formState.errors.guestEmail && "border-destructive focus-visible:ring-destructive")}
+                            aria-invalid={!!form.formState.errors.guestEmail}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -681,9 +718,14 @@ export function FormZone({
                     name={"guestPhone" as any}
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-xs">Phone Number</FormLabel>
+                        <FormLabel className={cn("text-xs", form.formState.errors.guestPhone && "text-destructive")}>Phone Number</FormLabel>
                         <FormControl>
-                          <Input {...field} placeholder="+1 234 567 8900" className="bg-background h-9 text-xs" />
+                          <Input 
+                            {...field} 
+                            placeholder="+1 234 567 8900" 
+                            className={cn("bg-background h-9 text-xs", form.formState.errors.guestPhone && "border-destructive focus-visible:ring-destructive")}
+                            aria-invalid={!!form.formState.errors.guestPhone}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -694,9 +736,14 @@ export function FormZone({
                     name={"guestJobTitle" as any}
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-xs">Job Title</FormLabel>
+                        <FormLabel className={cn("text-xs", form.formState.errors.guestJobTitle && "text-destructive")}>Job Title</FormLabel>
                         <FormControl>
-                          <Input {...field} placeholder="Manager" className="bg-background h-9 text-xs" />
+                          <Input 
+                            {...field} 
+                            placeholder="Manager" 
+                            className={cn("bg-background h-9 text-xs", form.formState.errors.guestJobTitle && "border-destructive focus-visible:ring-destructive")}
+                            aria-invalid={!!form.formState.errors.guestJobTitle}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -707,9 +754,14 @@ export function FormZone({
                     name={"guestDepartment" as any}
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-xs">Department</FormLabel>
+                        <FormLabel className={cn("text-xs", form.formState.errors.guestDepartment && "text-destructive")}>Department</FormLabel>
                         <FormControl>
-                          <Input {...field} placeholder="Logistics" className="bg-background h-9 text-xs" />
+                          <Input 
+                            {...field} 
+                            placeholder="Logistics" 
+                            className={cn("bg-background h-9 text-xs", form.formState.errors.guestDepartment && "border-destructive focus-visible:ring-destructive")}
+                            aria-invalid={!!form.formState.errors.guestDepartment}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -725,9 +777,14 @@ export function FormZone({
                     name={"billingAddress.street" as any}
                     render={({ field }) => (
                       <FormItem className="col-span-2">
-                        <FormLabel className="text-xs">Street Address *</FormLabel>
+                        <FormLabel className={cn("text-xs", form.formState.errors.billingAddress?.street && "text-destructive")}>Street Address *</FormLabel>
                         <FormControl>
-                          <Input {...field} placeholder="123 Main St" className="bg-background h-9 text-xs" />
+                          <Input 
+                            {...field} 
+                            placeholder="123 Main St" 
+                            className={cn("bg-background h-9 text-xs", form.formState.errors.billingAddress?.street && "border-destructive focus-visible:ring-destructive")}
+                            aria-invalid={!!form.formState.errors.billingAddress?.street}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -738,9 +795,14 @@ export function FormZone({
                     name={"billingAddress.city" as any}
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-xs">City *</FormLabel>
+                        <FormLabel className={cn("text-xs", form.formState.errors.billingAddress?.city && "text-destructive")}>City *</FormLabel>
                         <FormControl>
-                          <Input {...field} placeholder="New York" className="bg-background h-9 text-xs" />
+                          <Input 
+                            {...field} 
+                            placeholder="New York" 
+                            className={cn("bg-background h-9 text-xs", form.formState.errors.billingAddress?.city && "border-destructive focus-visible:ring-destructive")}
+                            aria-invalid={!!form.formState.errors.billingAddress?.city}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -751,9 +813,14 @@ export function FormZone({
                     name={"billingAddress.state" as any}
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-xs">State / Province</FormLabel>
+                        <FormLabel className={cn("text-xs", form.formState.errors.billingAddress?.state && "text-destructive")}>State / Province</FormLabel>
                         <FormControl>
-                          <Input {...field} placeholder="NY" className="bg-background h-9 text-xs" />
+                          <Input 
+                            {...field} 
+                            placeholder="NY" 
+                            className={cn("bg-background h-9 text-xs", form.formState.errors.billingAddress?.state && "border-destructive focus-visible:ring-destructive")}
+                            aria-invalid={!!form.formState.errors.billingAddress?.state}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -764,9 +831,14 @@ export function FormZone({
                     name={"billingAddress.postalCode" as any}
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-xs">Postal Code</FormLabel>
+                        <FormLabel className={cn("text-xs", form.formState.errors.billingAddress?.postalCode && "text-destructive")}>Postal Code</FormLabel>
                         <FormControl>
-                          <Input {...field} placeholder="10001" className="bg-background h-9 text-xs" />
+                          <Input 
+                            {...field} 
+                            placeholder="10001" 
+                            className={cn("bg-background h-9 text-xs", form.formState.errors.billingAddress?.postalCode && "border-destructive focus-visible:ring-destructive")}
+                            aria-invalid={!!form.formState.errors.billingAddress?.postalCode}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -777,9 +849,14 @@ export function FormZone({
                     name={"billingAddress.country" as any}
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-xs">Country *</FormLabel>
+                        <FormLabel className={cn("text-xs", form.formState.errors.billingAddress?.country && "text-destructive")}>Country *</FormLabel>
                         <FormControl>
-                          <Input {...field} placeholder="USA" className="bg-background h-9 text-xs" />
+                          <Input 
+                            {...field} 
+                            placeholder="USA" 
+                            className={cn("bg-background h-9 text-xs", form.formState.errors.billingAddress?.country && "border-destructive focus-visible:ring-destructive")}
+                            aria-invalid={!!form.formState.errors.billingAddress?.country}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -801,9 +878,14 @@ export function FormZone({
                           name={"shippingAddress.street" as any}
                           render={({ field }) => (
                             <FormItem className="col-span-2">
-                              <FormLabel className="text-xs">Street Address</FormLabel>
+                              <FormLabel className={cn("text-xs", form.formState.errors.shippingAddress?.street && "text-destructive")}>Street Address</FormLabel>
                               <FormControl>
-                                <Input {...field} placeholder="123 Main St" className="bg-background h-9 text-xs" />
+                                <Input 
+                                  {...field} 
+                                  placeholder="123 Main St" 
+                                  className={cn("bg-background h-9 text-xs", form.formState.errors.shippingAddress?.street && "border-destructive focus-visible:ring-destructive")}
+                                  aria-invalid={!!form.formState.errors.shippingAddress?.street}
+                                />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -814,9 +896,14 @@ export function FormZone({
                           name={"shippingAddress.city" as any}
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel className="text-xs">City</FormLabel>
+                              <FormLabel className={cn("text-xs", form.formState.errors.shippingAddress?.city && "text-destructive")}>City</FormLabel>
                               <FormControl>
-                                <Input {...field} placeholder="New York" className="bg-background h-9 text-xs" />
+                                <Input 
+                                  {...field} 
+                                  placeholder="New York" 
+                                  className={cn("bg-background h-9 text-xs", form.formState.errors.shippingAddress?.city && "border-destructive focus-visible:ring-destructive")}
+                                  aria-invalid={!!form.formState.errors.shippingAddress?.city}
+                                />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -827,9 +914,14 @@ export function FormZone({
                           name={"shippingAddress.state" as any}
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel className="text-xs">State / Province</FormLabel>
+                              <FormLabel className={cn("text-xs", form.formState.errors.shippingAddress?.state && "text-destructive")}>State / Province</FormLabel>
                               <FormControl>
-                                <Input {...field} placeholder="NY" className="bg-background h-9 text-xs" />
+                                <Input 
+                                  {...field} 
+                                  placeholder="NY" 
+                                  className={cn("bg-background h-9 text-xs", form.formState.errors.shippingAddress?.state && "border-destructive focus-visible:ring-destructive")}
+                                  aria-invalid={!!form.formState.errors.shippingAddress?.state}
+                                />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -840,9 +932,14 @@ export function FormZone({
                           name={"shippingAddress.postalCode" as any}
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel className="text-xs">Postal Code</FormLabel>
+                              <FormLabel className={cn("text-xs", form.formState.errors.shippingAddress?.postalCode && "text-destructive")}>Postal Code</FormLabel>
                               <FormControl>
-                                <Input {...field} placeholder="10001" className="bg-background h-9 text-xs" />
+                                <Input 
+                                  {...field} 
+                                  placeholder="10001" 
+                                  className={cn("bg-background h-9 text-xs", form.formState.errors.shippingAddress?.postalCode && "border-destructive focus-visible:ring-destructive")}
+                                  aria-invalid={!!form.formState.errors.shippingAddress?.postalCode}
+                                />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -853,9 +950,14 @@ export function FormZone({
                           name={"shippingAddress.country" as any}
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel className="text-xs">Country</FormLabel>
+                              <FormLabel className={cn("text-xs", form.formState.errors.shippingAddress?.country && "text-destructive")}>Country</FormLabel>
                               <FormControl>
-                                <Input {...field} placeholder="USA" className="bg-background h-9 text-xs" />
+                                <Input 
+                                  {...field} 
+                                  placeholder="USA" 
+                                  className={cn("bg-background h-9 text-xs", form.formState.errors.shippingAddress?.country && "border-destructive focus-visible:ring-destructive")}
+                                  aria-invalid={!!form.formState.errors.shippingAddress?.country}
+                                />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -978,8 +1080,10 @@ export function FormZone({
         </Card>
 
         {/* Mode Tabs */}
-        <div className="space-y-2">
-          <Label>Transport Mode</Label>
+        <div className={cn("space-y-2 rounded-md p-2", form.formState.errors.mode && "bg-destructive/5 ring-1 ring-destructive")}>
+          <Label className={cn(form.formState.errors.mode && "text-destructive")}>
+            Transport Mode {form.formState.errors.mode && <span className="text-destructive text-xs ml-2">{form.formState.errors.mode.message}</span>}
+          </Label>
           <Tabs value={mode} onValueChange={(v) => form.setValue('mode', v as any)} className="w-full">
             <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="ocean"><Ship className="w-4 h-4 mr-1" />Ocean</TabsTrigger>
@@ -1011,6 +1115,7 @@ export function FormZone({
               value={origin}
               onChange={(value, location) => handleLocationChange('origin', value, location)}
               preloadedLocations={ports}
+              error={!!(form.formState.errors.origin || form.formState.errors.originId)}
             />
             <input type="hidden" {...form.register('origin')} />
           </div>
@@ -1033,6 +1138,7 @@ export function FormZone({
               value={destination}
               onChange={(value, location) => handleLocationChange('destination', value, location)}
               preloadedLocations={ports}
+              error={!!(form.formState.errors.destination || form.formState.errors.destinationId)}
             />
             <input type="hidden" {...form.register('destination')} />
           </div>
@@ -1090,15 +1196,21 @@ export function FormZone({
         {/* Road-specific fields */}
         {mode === 'road' && (
           <div className="space-y-2 p-3 border rounded-md bg-background">
-            <Label className="text-xs">Vehicle Type</Label>
+            <Label className={cn("text-xs", form.formState.errors.vehicleType && "text-destructive")}>Vehicle Type</Label>
             <Select value={form.watch('vehicleType')} onValueChange={(v) => form.setValue('vehicleType', v)}>
-              <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+              <SelectTrigger 
+                className={cn("h-8", form.formState.errors.vehicleType && "border-destructive focus:ring-destructive")}
+                aria-invalid={!!form.formState.errors.vehicleType}
+              >
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="van">Dry Van</SelectItem>
                 <SelectItem value="flatbed">Flatbed</SelectItem>
                 <SelectItem value="reefer">Reefer Truck</SelectItem>
               </SelectContent>
             </Select>
+            {form.formState.errors.vehicleType && <p className="text-[10px] text-destructive mt-1" role="alert">{form.formState.errors.vehicleType.message}</p>}
           </div>
         )}
 
@@ -1159,9 +1271,14 @@ export function FormZone({
           <CollapsibleContent className="space-y-4 pt-2">
             {/* Incoterms */}
             <div className="space-y-2">
-              <Label className="text-xs">Incoterms</Label>
+              <Label className={cn("text-xs", form.formState.errors.incoterms && "text-destructive")}>Incoterms</Label>
               <Select value={form.watch('incoterms')} onValueChange={(v) => form.setValue('incoterms', v)}>
-                <SelectTrigger><SelectValue placeholder="Select Incoterms (Optional)" /></SelectTrigger>
+                <SelectTrigger 
+                  className={cn(form.formState.errors.incoterms && "border-destructive focus:ring-destructive")}
+                  aria-invalid={!!form.formState.errors.incoterms}
+                >
+                  <SelectValue placeholder="Select Incoterms (Optional)" />
+                </SelectTrigger>
                 <SelectContent>
                   {incLoading ? (
                     <SelectItem value="__loading" disabled>Loading...</SelectItem>
@@ -1174,25 +1291,47 @@ export function FormZone({
                   )}
                 </SelectContent>
               </Select>
+              {form.formState.errors.incoterms && <p className="text-[10px] text-destructive mt-1" role="alert">{form.formState.errors.incoterms.message}</p>}
             </div>
 
             {/* Timing */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label className="text-xs">Pickup Date</Label>
-                <Input type="date" value={form.watch('pickupDate')} onChange={(e) => form.setValue('pickupDate', e.target.value)} className="h-8 text-xs" />
+                <Label className={cn("text-xs", form.formState.errors.pickupDate && "text-destructive")}>Pickup Date</Label>
+                <Input 
+                  type="date" 
+                  value={form.watch('pickupDate')} 
+                  onChange={(e) => form.setValue('pickupDate', e.target.value)} 
+                  className={cn("h-8 text-xs", form.formState.errors.pickupDate && "border-destructive focus-visible:ring-destructive")} 
+                  aria-invalid={!!form.formState.errors.pickupDate}
+                />
+                {form.formState.errors.pickupDate && <p className="text-[10px] text-destructive mt-1" role="alert">{form.formState.errors.pickupDate.message}</p>}
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">Delivery Deadline</Label>
-                <Input type="date" value={form.watch('deliveryDeadline')} onChange={(e) => form.setValue('deliveryDeadline', e.target.value)} className="h-8 text-xs" />
+                <Label className={cn("text-xs", form.formState.errors.deliveryDeadline && "text-destructive")}>Delivery Deadline</Label>
+                <Input 
+                  type="date" 
+                  value={form.watch('deliveryDeadline')} 
+                  onChange={(e) => form.setValue('deliveryDeadline', e.target.value)} 
+                  className={cn("h-8 text-xs", form.formState.errors.deliveryDeadline && "border-destructive focus-visible:ring-destructive")} 
+                  aria-invalid={!!form.formState.errors.deliveryDeadline}
+                />
+                {form.formState.errors.deliveryDeadline && <p className="text-[10px] text-destructive mt-1" role="alert">{form.formState.errors.deliveryDeadline.message}</p>}
               </div>
             </div>
 
             {/* Customs & Compliance */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label className="text-xs">HTS Code</Label>
-                <Input value={form.watch('htsCode')} onChange={(e) => form.setValue('htsCode', e.target.value)} className="h-8 text-xs" placeholder="AI Suggested" />
+                <Label className={cn("text-xs", form.formState.errors.htsCode && "text-destructive")}>HTS Code</Label>
+                <Input 
+                  value={form.watch('htsCode')} 
+                  onChange={(e) => form.setValue('htsCode', e.target.value)} 
+                  className={cn("h-8 text-xs", form.formState.errors.htsCode && "border-destructive focus-visible:ring-destructive")} 
+                  placeholder="AI Suggested" 
+                  aria-invalid={!!form.formState.errors.htsCode}
+                />
+                {form.formState.errors.htsCode && <p className="text-[10px] text-destructive mt-1" role="alert">{form.formState.errors.htsCode.message}</p>}
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Dangerous Goods</Label>

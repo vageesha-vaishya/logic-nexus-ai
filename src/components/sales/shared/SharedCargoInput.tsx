@@ -15,13 +15,13 @@ import { useContainerRefs } from '@/hooks/useContainerRefs';
 import { HazmatWizard } from './HazmatWizard';
 import { v4 as uuidv4 } from 'uuid';
 
-interface SharedCargoInputProps {
+export interface SharedCargoInputProps {
   value: CargoItem;
   onChange: (value: CargoItem) => void;
   onCommodityChange?: (value: string) => void;
   onRemove?: () => void;
   className?: string;
-  errors?: Record<string, string>;
+  errors?: any;
   disableMultiContainer?: boolean;
 }
 
@@ -307,13 +307,16 @@ export function SharedCargoInput({ value, onChange, onCommodityChange, onRemove,
                           return (
                         <div key={combo.id || idx} className="grid grid-cols-12 gap-2 items-end">
                             <div className="col-span-5 space-y-1">
-                                <Label className="text-[10px] text-muted-foreground">Type</Label>
+                                <Label className={cn("text-[10px]", errors?.containerCombos?.[idx]?.typeId || errors?.containerType ? "text-destructive" : "text-muted-foreground")}>Type</Label>
                                 <Select 
                                     value={resolvedTypeId} 
                                     onValueChange={(v) => updateCombo(idx, 'typeId', v)}
                                 >
-                                    <SelectTrigger aria-label={`Container type ${idx + 1}`} className="h-8 text-xs bg-white">
-                                      <SelectValue placeholder="Please select container type" />
+                                    <SelectTrigger 
+                                        aria-label={`Container type ${idx + 1}`} 
+                                        className={cn("h-8 text-xs bg-white", (errors?.containerCombos?.[idx]?.typeId || errors?.containerType) && "border-destructive focus:ring-destructive")}
+                                    >
+                                      <SelectValue placeholder="Select type" />
                                     </SelectTrigger>
                                     <SelectContent role="listbox" aria-label={`Container type options ${idx + 1}`}>
                                         {containerTypes.map(t => (
@@ -321,16 +324,24 @@ export function SharedCargoInput({ value, onChange, onCommodityChange, onRemove,
                                         ))}
                                     </SelectContent>
                                 </Select>
+                                {(errors?.containerCombos?.[idx]?.typeId || errors?.containerType) && (
+                                  <p className="text-[10px] text-destructive mt-0.5 truncate">
+                                    {errors?.containerCombos?.[idx]?.typeId?.message || errors?.containerType?.message || "Required"}
+                                  </p>
+                                )}
                             </div>
                             <div className="col-span-4 space-y-1">
-                                <Label className="text-[10px] text-muted-foreground">Size</Label>
+                                <Label className={cn("text-[10px]", errors?.containerCombos?.[idx]?.sizeId || errors?.containerSize ? "text-destructive" : "text-muted-foreground")}>Size</Label>
                                 <Select 
                                     value={resolvedSizeId} 
                                     onValueChange={(v) => updateCombo(idx, 'sizeId', v)}
                                     disabled={!resolvedTypeId}
                                 >
-                                    <SelectTrigger aria-label={`Container size ${idx + 1}`} className="h-8 text-xs bg-white">
-                                      <SelectValue placeholder="Please select container size" />
+                                    <SelectTrigger 
+                                        aria-label={`Container size ${idx + 1}`} 
+                                        className={cn("h-8 text-xs bg-white", (errors?.containerCombos?.[idx]?.sizeId || errors?.containerSize) && "border-destructive focus:ring-destructive")}
+                                    >
+                                      <SelectValue placeholder="Select size" />
                                     </SelectTrigger>
                                     <SelectContent role="listbox" aria-label={`Container size options ${idx + 1}`}>
                                         {sizeOptions.map((s: any) => (
@@ -338,16 +349,26 @@ export function SharedCargoInput({ value, onChange, onCommodityChange, onRemove,
                                             ))}
                                     </SelectContent>
                                 </Select>
+                                {(errors?.containerCombos?.[idx]?.sizeId || errors?.containerSize) && (
+                                  <p className="text-[10px] text-destructive mt-0.5 truncate">
+                                    {errors?.containerCombos?.[idx]?.sizeId?.message || errors?.containerSize?.message || "Required"}
+                                  </p>
+                                )}
                             </div>
                             <div className="col-span-2 space-y-1">
-                                <Label className="text-[10px] text-muted-foreground">Qty</Label>
+                                <Label className={cn("text-[10px]", errors?.containerCombos?.[idx]?.quantity || errors?.containerQty ? "text-destructive" : "text-muted-foreground")}>Qty</Label>
                                 <Input 
                                     type="number"
                                     min={1}
-                                    className="h-8 text-xs bg-white px-2"
+                                    className={cn("h-8 text-xs bg-white px-2", (errors?.containerCombos?.[idx]?.quantity || errors?.containerQty) && "border-destructive focus-visible:ring-destructive")}
                                     value={combo.quantity}
                                     onChange={(e) => updateCombo(idx, 'quantity', parseInt(e.target.value) || 1)}
                                 />
+                                {(errors?.containerCombos?.[idx]?.quantity || errors?.containerQty) && (
+                                  <p className="text-[10px] text-destructive mt-0.5 truncate">
+                                    {errors?.containerCombos?.[idx]?.quantity?.message || errors?.containerQty?.message || "Invalid"}
+                                  </p>
+                                )}
                             </div>
                             <div className="col-span-1 pb-1">
                                 {!disableMultiContainer && (
@@ -378,29 +399,31 @@ export function SharedCargoInput({ value, onChange, onCommodityChange, onRemove,
         <div className="space-y-4">
           {/* Commodity - Full Width to prevent overlap */}
           <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">Commodity</Label>
+            <Label className={cn("text-xs", errors?.commodity ? "text-destructive" : "text-muted-foreground")}>Commodity</Label>
             <SmartCargoInput
               onSelect={handleCommoditySelect}
               onInputChange={handleCommodityInputChange}
               placeholder="Search commodity or HTS code..."
-              className={errors?.commodity ? "border-red-500" : ""}
+              error={!!errors?.commodity}
               value={value.commodity?.description}
             />
+            {errors?.commodity && <p className="text-[10px] text-destructive mt-0.5">{errors.commodity.message || "Required"}</p>}
           </div>
 
           {/* Secondary Fields Row */}
           <div className="grid grid-cols-3 gap-4">
             {/* Quantity */}
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Quantity {value.type === 'container' && '(Total)'}</Label>
+              <Label className={cn("text-xs", errors?.quantity ? "text-destructive" : "text-muted-foreground")}>Quantity {value.type === 'container' && '(Total)'}</Label>
               <Input
                 type="number"
                 min={1}
                 value={value.quantity}
                 disabled={value.type === 'container'}
-                className={value.type === 'container' ? "bg-muted text-muted-foreground" : ""}
+                className={cn(value.type === 'container' ? "bg-muted text-muted-foreground" : "", errors?.quantity && "border-destructive focus-visible:ring-destructive")}
                 onChange={(e) => updateField('quantity', parseInt(e.target.value) || 1)}
               />
+              {errors?.quantity && <p className="text-[10px] text-destructive mt-0.5">{errors.quantity.message || "Invalid quantity"}</p>}
             </div>
 
             {/* Stackable */}
@@ -410,8 +433,10 @@ export function SharedCargoInput({ value, onChange, onCommodityChange, onRemove,
                       id={`stackable-${value.id}`} 
                       checked={value.stackable}
                       onCheckedChange={(c) => updateField('stackable', c)}
+                      className={errors?.stackable ? "border-destructive" : ""}
+                      aria-invalid={!!errors?.stackable}
                   />
-                  <Label htmlFor={`stackable-${value.id}`} className="cursor-pointer flex items-center gap-1 text-xs whitespace-nowrap">
+                  <Label htmlFor={`stackable-${value.id}`} className={cn("cursor-pointer flex items-center gap-1 text-xs whitespace-nowrap", errors?.stackable ? "text-destructive" : "")}>
                       <Layers className="w-3 h-3" /> Stackable
                   </Label>
               </div>
@@ -424,9 +449,10 @@ export function SharedCargoInput({ value, onChange, onCommodityChange, onRemove,
                       id={`hazmat-${value.id}`} 
                       checked={showHazmat}
                       onCheckedChange={toggleHazmat}
-                      className="data-[state=checked]:bg-amber-500"
+                      className={cn("data-[state=checked]:bg-amber-500", errors?.dangerousGoods ? "border-destructive" : "")}
+                      aria-invalid={!!errors?.dangerousGoods}
                   />
-                  <Label htmlFor={`hazmat-${value.id}`} className="cursor-pointer flex items-center gap-1 text-amber-700 font-medium text-xs whitespace-nowrap">
+                  <Label htmlFor={`hazmat-${value.id}`} className={cn("cursor-pointer flex items-center gap-1 font-medium text-xs whitespace-nowrap", errors?.dangerousGoods ? "text-destructive" : "text-amber-700")}>
                       <AlertTriangle className="w-3 h-3" /> Hazmat
                   </Label>
               </div>
@@ -445,29 +471,32 @@ export function SharedCargoInput({ value, onChange, onCommodityChange, onRemove,
             {/* Dimensions */}
             <div className={cn("space-y-2", value.type === 'container' && "opacity-50 pointer-events-none")}>
                 <div className="flex items-center gap-2">
-                    <Ruler className="w-4 h-4 text-muted-foreground" />
-                    <Label className="text-xs font-semibold">Dimensions (LxWxH)</Label>
+                    <Ruler className={cn("w-4 h-4", (errors?.dimensions?.l || errors?.dimensions?.w || errors?.dimensions?.h) ? "text-destructive" : "text-muted-foreground")} />
+                    <Label className={cn("text-xs font-semibold", (errors?.dimensions?.l || errors?.dimensions?.w || errors?.dimensions?.h) ? "text-destructive" : "")}>Dimensions (LxWxH)</Label>
                 </div>
                 <div className="flex items-center gap-2">
                     <Input 
                         placeholder="L" 
                         value={value.dimensions.l || ''} 
                         onChange={(e) => updateDimension('l', e.target.value)}
-                        className="h-8 text-sm px-2"
+                        className={cn("h-8 text-sm px-2", errors?.dimensions?.l && "border-destructive focus-visible:ring-destructive")}
+                        aria-invalid={!!errors?.dimensions?.l}
                     />
                     <span className="text-muted-foreground">x</span>
                     <Input 
                         placeholder="W" 
                         value={value.dimensions.w || ''} 
                         onChange={(e) => updateDimension('w', e.target.value)}
-                        className="h-8 text-sm px-2"
+                        className={cn("h-8 text-sm px-2", errors?.dimensions?.w && "border-destructive focus-visible:ring-destructive")}
+                        aria-invalid={!!errors?.dimensions?.w}
                     />
                     <span className="text-muted-foreground">x</span>
                     <Input 
                         placeholder="H" 
                         value={value.dimensions.h || ''} 
                         onChange={(e) => updateDimension('h', e.target.value)}
-                        className="h-8 text-sm px-2"
+                        className={cn("h-8 text-sm px-2", errors?.dimensions?.h && "border-destructive focus-visible:ring-destructive")}
+                        aria-invalid={!!errors?.dimensions?.h}
                     />
                     <Select 
                         value={value.dimensions.unit} 
@@ -482,35 +511,41 @@ export function SharedCargoInput({ value, onChange, onCommodityChange, onRemove,
                         </SelectContent>
                     </Select>
                 </div>
+                {(errors?.dimensions?.l || errors?.dimensions?.w || errors?.dimensions?.h) && (
+                    <p className="text-[10px] text-destructive mt-0.5">Dimensions required</p>
+                )}
             </div>
 
              {/* Volume */}
              <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                    <Cuboid className="w-4 h-4 text-muted-foreground" />
-                    <Label className="text-xs font-semibold">Volume (m³)</Label>
+                    <Cuboid className={cn("w-4 h-4", errors?.volume ? "text-destructive" : "text-muted-foreground")} />
+                    <Label className={cn("text-xs font-semibold", errors?.volume ? "text-destructive" : "")}>Volume (m³)</Label>
                 </div>
                 <Input 
                     type="number"
                     placeholder="Total Volume" 
                     value={value.volume || ''} 
                     onChange={(e) => updateField('volume', parseFloat(e.target.value))}
-                    className="h-8 text-sm"
+                    className={cn("h-8 text-sm", errors?.volume && "border-destructive focus-visible:ring-destructive")}
+                    aria-invalid={!!errors?.volume}
                 />
+                {errors?.volume && <p className="text-[10px] text-destructive mt-0.5">{errors.volume.message || "Required"}</p>}
             </div>
 
             {/* Weight */}
             <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                    <Scale className="w-4 h-4 text-muted-foreground" />
-                    <Label className="text-xs font-semibold">Weight (Per Unit)</Label>
+                    <Scale className={cn("w-4 h-4", errors?.weight ? "text-destructive" : "text-muted-foreground")} />
+                    <Label className={cn("text-xs font-semibold", errors?.weight ? "text-destructive" : "")}>Weight (Per Unit)</Label>
                 </div>
                 <div className="flex items-center gap-2">
                      <Input 
                         placeholder="Weight" 
                         value={value.weight.value || ''} 
                         onChange={(e) => updateWeight(e.target.value)}
-                        className="h-8 text-sm"
+                        className={cn("h-8 text-sm", errors?.weight && "border-destructive focus-visible:ring-destructive")}
+                        aria-invalid={!!errors?.weight}
                     />
                     <Select 
                         value={value.weight.unit} 
@@ -525,6 +560,7 @@ export function SharedCargoInput({ value, onChange, onCommodityChange, onRemove,
                         </SelectContent>
                     </Select>
                 </div>
+                {errors?.weight && <p className="text-[10px] text-destructive mt-0.5">{errors.weight.message || "Required"}</p>}
             </div>
         </div>
 
@@ -537,30 +573,37 @@ export function SharedCargoInput({ value, onChange, onCommodityChange, onRemove,
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     <div className="space-y-1">
-                        <Label className="text-[10px] uppercase text-amber-700">UN Number</Label>
+                        <Label className={cn("text-[10px] uppercase", errors?.hazmat?.unNumber ? "text-destructive" : "text-amber-700")}>UN Number</Label>
                         <Input 
                             placeholder="e.g. 1263" 
-                            className="bg-white border-amber-200 h-8 text-sm"
+                            className={cn("bg-white border-amber-200 h-8 text-sm", errors?.hazmat?.unNumber && "border-destructive focus-visible:ring-destructive")}
                             value={value.hazmat.unNumber}
                             onChange={(e) => onChange({...value, hazmat: {...value.hazmat!, unNumber: e.target.value}})}
+                            aria-invalid={!!errors?.hazmat?.unNumber}
                         />
+                        {errors?.hazmat?.unNumber && <p className="text-[10px] text-destructive mt-0.5">{errors.hazmat.unNumber.message || "Required"}</p>}
                     </div>
                     <div className="space-y-1">
-                        <Label className="text-[10px] uppercase text-amber-700">Class</Label>
+                        <Label className={cn("text-[10px] uppercase", errors?.hazmat?.class ? "text-destructive" : "text-amber-700")}>Class</Label>
                         <Input 
                             placeholder="e.g. 3" 
-                            className="bg-white border-amber-200 h-8 text-sm"
+                            className={cn("bg-white border-amber-200 h-8 text-sm", errors?.hazmat?.class && "border-destructive focus-visible:ring-destructive")}
                             value={value.hazmat.class}
                             onChange={(e) => onChange({...value, hazmat: {...value.hazmat!, class: e.target.value}})}
+                            aria-invalid={!!errors?.hazmat?.class}
                         />
+                        {errors?.hazmat?.class && <p className="text-[10px] text-destructive mt-0.5">{errors.hazmat.class.message || "Required"}</p>}
                     </div>
                     <div className="space-y-1">
-                        <Label className="text-[10px] uppercase text-amber-700">Packing Group</Label>
+                        <Label className={cn("text-[10px] uppercase", errors?.hazmat?.packingGroup ? "text-destructive" : "text-amber-700")}>Packing Group</Label>
                         <Select 
                             value={value.hazmat.packingGroup}
                             onValueChange={(v: any) => onChange({...value, hazmat: {...value.hazmat!, packingGroup: v}})}
                         >
-                            <SelectTrigger className="bg-white border-amber-200 h-8 text-sm">
+                            <SelectTrigger 
+                                className={cn("bg-white border-amber-200 h-8 text-sm", errors?.hazmat?.packingGroup && "border-destructive focus:ring-destructive")}
+                                aria-invalid={!!errors?.hazmat?.packingGroup}
+                            >
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -569,14 +612,15 @@ export function SharedCargoInput({ value, onChange, onCommodityChange, onRemove,
                                 <SelectItem value="III">III (Low)</SelectItem>
                             </SelectContent>
                         </Select>
+                        {errors?.hazmat?.packingGroup && <p className="text-[10px] text-destructive mt-0.5">{errors.hazmat.packingGroup.message || "Required"}</p>}
                     </div>
                      <div className="space-y-1">
-                        <Label className="text-[10px] uppercase text-amber-700">Flash Point</Label>
+                        <Label className={cn("text-[10px] uppercase", errors?.hazmat?.flashPoint ? "text-destructive" : "text-amber-700")}>Flash Point</Label>
                         <div className="flex gap-1">
                              <Input 
                                 type="number"
                                 placeholder="Temp" 
-                                className="bg-white border-amber-200 h-8 text-sm"
+                                className={cn("bg-white border-amber-200 h-8 text-sm", errors?.hazmat?.flashPoint && "border-destructive focus-visible:ring-destructive")}
                                 value={value.hazmat.flashPoint?.value || ''}
                                 onChange={(e) => onChange({
                                     ...value, 
@@ -585,6 +629,7 @@ export function SharedCargoInput({ value, onChange, onCommodityChange, onRemove,
                                         flashPoint: { value: parseFloat(e.target.value) || 0, unit: value.hazmat?.flashPoint?.unit || 'C' }
                                     }
                                 })}
+                                aria-invalid={!!errors?.hazmat?.flashPoint}
                             />
                             <Select 
                                 value={value.hazmat.flashPoint?.unit || 'C'}
@@ -596,7 +641,7 @@ export function SharedCargoInput({ value, onChange, onCommodityChange, onRemove,
                                     }
                                 })}
                             >
-                                <SelectTrigger className="bg-white border-amber-200 h-8 text-sm w-14 px-1">
+                                <SelectTrigger className={cn("bg-white border-amber-200 h-8 text-sm w-14 px-1", errors?.hazmat?.flashPoint && "border-destructive focus:ring-destructive")}>
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -605,6 +650,7 @@ export function SharedCargoInput({ value, onChange, onCommodityChange, onRemove,
                                 </SelectContent>
                             </Select>
                         </div>
+                        {errors?.hazmat?.flashPoint && <p className="text-[10px] text-destructive mt-0.5">{errors.hazmat.flashPoint.message || "Required"}</p>}
                     </div>
                 </div>
             </div>

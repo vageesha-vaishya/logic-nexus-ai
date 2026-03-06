@@ -46,6 +46,7 @@ interface LocationAutocompleteProps {
   className?: string;
   disabled?: boolean;
   preloadedLocations?: Location[];
+  error?: boolean | string;
 }
 
 export const LocationAutocomplete = React.memo(function LocationAutocomplete({
@@ -54,7 +55,8 @@ export const LocationAutocomplete = React.memo(function LocationAutocomplete({
   placeholder = "Search location...",
   className,
   disabled = false,
-  preloadedLocations
+  preloadedLocations,
+  error
 }: LocationAutocompleteProps) {
   const [open, setOpen] = React.useState(false)
   const [inputValue, setInputValue] = React.useState("")
@@ -468,7 +470,12 @@ export const LocationAutocomplete = React.memo(function LocationAutocomplete({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className={cn("w-full justify-between text-left font-normal", !value && !selectedLocation && "text-muted-foreground", className)}
+          className={cn(
+            "w-full justify-between text-left font-normal",
+            !value && !selectedLocation && "text-muted-foreground",
+            error && "border-destructive focus-visible:ring-destructive",
+            className
+          )}
           disabled={disabled}
           onFocus={() => setOpen(true)}
           onKeyDown={(e) => {

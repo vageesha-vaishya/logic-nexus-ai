@@ -49,23 +49,25 @@ export const quoteComposerSchema = z.object({
   notesText: z.string().optional(), // Deprecated but kept for backward compatibility
 
   // Phase 1: FormZone fields
-  mode: z.enum(['air', 'ocean', 'road', 'rail']),
-  origin: z.string().min(2, 'Origin is required'),
+  mode: z.enum(['air', 'ocean', 'road', 'rail'], {
+    required_error: "Please select a transport mode",
+  }),
+  origin: z.string().min(2, 'Please select a valid origin port'),
   originId: z.string().min(1, 'Please select a valid origin from the list'),
-  destination: z.string().min(2, 'Destination is required'),
+  destination: z.string().min(2, 'Please select a valid destination port'),
   destinationId: z.string().min(1, 'Please select a valid destination from the list'),
-  commodity: z.string().min(1, 'Commodity is required').optional(),
+  commodity: z.string().min(1, 'Please specify the commodity details').optional(),
   preferredCarriers: z.array(z.string()).optional(),
   weight: z.string().optional().refine((val) => {
     if (!val) return true;
     const n = Number(val);
     return !isNaN(n) && n >= 0;
-  }, { message: 'Weight must be a non-negative number' }),
+  }, { message: 'Please enter a valid positive weight' }),
   volume: z.string().optional().refine((val) => {
     if (!val) return true;
     const n = Number(val);
     return !isNaN(n) && n >= 0;
-  }, { message: 'Volume must be a non-negative number' }),
+  }, { message: 'Please enter a valid positive volume' }),
   unit: z.enum(['kg', 'lb', 'cbm']).optional(),
   
   // Extended fields (formerly in extendedData state)
@@ -114,49 +116,49 @@ export const quoteComposerSchema = z.object({
   // TEMPORARILY DISABLED: Custom commodity validation for debugging
   const commodityValue = data.commodity;
   if (!commodityValue || commodityValue.trim().length < 2) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Commodity is required', path: ['commodity'] });
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Please specify the commodity details', path: ['commodity'] });
   }
   
   if (data.mode === 'air') {
     if (!data.weight || isNaN(Number(data.weight)) || Number(data.weight) <= 0) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Valid weight is required for Air', path: ['weight'] });
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Air freight requires a valid weight', path: ['weight'] });
     }
   }
   if (data.mode === 'ocean' || data.mode === 'rail') {
     const qtyNum = Number(data.containerQty || '');
-    if (!data.containerType) ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Container type is required', path: ['containerType'] });
-    if (!data.containerSize) ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Container size is required', path: ['containerSize'] });
-    if (isNaN(qtyNum) || qtyNum <= 0) ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Container quantity must be > 0', path: ['containerQty'] });
+    if (!data.containerType) ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Please select a container type', path: ['containerType'] });
+    if (!data.containerSize) ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Please select a container size', path: ['containerSize'] });
+    if (isNaN(qtyNum) || qtyNum <= 0) ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Container quantity must be at least 1', path: ['containerQty'] });
   }
   if (data.origin.trim().toLowerCase() === data.destination.trim().toLowerCase()) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Origin and Destination cannot be the same', path: ['destination'] });
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Origin and Destination ports cannot be the same', path: ['destination'] });
   }
   if (data.standalone) {
     if (!data.guestCompany || data.guestCompany.trim().length < 2) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Company is required in standalone mode', path: ['guestCompany'] });
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Guest company name is required', path: ['guestCompany'] });
     }
     if (!data.guestName || data.guestName.trim().length < 2) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Contact name is required in standalone mode', path: ['guestName'] });
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Contact name is required', path: ['guestName'] });
     }
     if (!data.guestEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.guestEmail)) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Valid email is required', path: ['guestEmail'] });
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Please enter a valid email address', path: ['guestEmail'] });
     }
     // Phone validation (E.164-ish)
     if (data.guestPhone && !/^\+?[1-9]\d{1,14}$/.test(data.guestPhone.replace(/[\s-()]/g, ''))) {
-       ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Invalid phone format', path: ['guestPhone'] });
+       ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Please enter a valid phone number', path: ['guestPhone'] });
     }
     // Tax ID
     if (data.taxId && !/^[A-Z0-9-]{5,20}$/i.test(data.taxId)) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Invalid Tax ID format', path: ['taxId'] });
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Please enter a valid Tax ID', path: ['taxId'] });
     }
     
     // Billing Address Mandatory
-    if (!data.billingAddress?.street) ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Street is required', path: ['billingAddress', 'street'] });
-    if (!data.billingAddress?.city) ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'City is required', path: ['billingAddress', 'city'] });
-    if (!data.billingAddress?.country) ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Country is required', path: ['billingAddress', 'country'] });
+    if (!data.billingAddress?.street) ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Billing street address is required', path: ['billingAddress', 'street'] });
+    if (!data.billingAddress?.city) ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Billing city is required', path: ['billingAddress', 'city'] });
+    if (!data.billingAddress?.country) ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Billing country is required', path: ['billingAddress', 'country'] });
   } else {
     if (!data.opportunityId && !data.accountId) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Select an Opportunity or Account', path: ['opportunityId'] });
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Please link this quote to an Opportunity or Account', path: ['opportunityId'] });
     }
   }
 });

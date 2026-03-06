@@ -7,7 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import { Plane, Ship, Truck, Train, Timer, Sparkles, ChevronDown, Save, Settings2, Building2, User, FileText, Loader2, AlertCircle, History, ExternalLink } from 'lucide-react';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import { Plane, Ship, Truck, Train, Timer, Sparkles, ChevronDown, Save, Settings2, Building2, User, FileText, Loader2, AlertCircle, History, ExternalLink, X } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { useAuth } from '@/hooks/useAuth';
 import { QuotationNumberService } from '@/services/quotation/QuotationNumberService';
@@ -343,6 +344,17 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
     }
   }, []);
 
+  const handleValidationFailed = useCallback(() => {
+    setShowValidationSummary(true);
+    // Wait for render then scroll to first error
+    setTimeout(() => {
+      // Re-calculate issues or use current state
+      if (validationIssues.length > 0) {
+        scrollToField(validationIssues[0].path);
+      }
+    }, 100);
+  }, [validationIssues, scrollToField]);
+
   useEffect(() => {
     if (validationIssues.length === 0 && showValidationSummary) {
       setShowValidationSummary(false);
@@ -457,6 +469,46 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
       window.removeEventListener('offline', handleOffline);
     };
   }, [checkNetworkConnectivity]);
+
+  // ---------------------------------------------------------------------------
+  // Validation Summary Panel
+  // ---------------------------------------------------------------------------
+
+  const renderValidationSummary = () => {
+    if (!showValidationSummary || validationIssues.length === 0) return null;
+
+    return (
+      <Alert variant="destructive" className="mb-6 animate-in fade-in slide-in-from-top-2" role="alert">
+        <AlertCircle className="h-4 w-4" />
+        <AlertTitle className="ml-2 flex items-center justify-between">
+          <span>Please fix the following errors before proceeding:</span>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="h-6 w-6 p-0 hover:bg-destructive/20 text-destructive-foreground"
+            onClick={() => setShowValidationSummary(false)}
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </AlertTitle>
+        <AlertDescription className="mt-2 ml-2">
+          <ul className="list-disc pl-5 space-y-1 text-sm">
+            {validationIssues.map((issue) => (
+              <li key={issue.path} className="text-destructive-foreground/90">
+                <button 
+                  type="button" 
+                  onClick={() => scrollToField(issue.path)}
+                  className="hover:underline text-left font-medium"
+                >
+                  {issue.label}: {issue.message}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </AlertDescription>
+      </Alert>
+    );
+  };
 
   // ---------------------------------------------------------------------------
   // Handle Manual Option Creation
@@ -2518,37 +2570,13 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
             </div>
           )}
 
-          {showValidationSummary && validationIssues.length > 0 && (
-            <div
-              className="rounded-md border border-destructive/40 bg-destructive/10 p-4"
-              role="alert"
-              aria-live="assertive"
-              data-testid="validation-summary"
-            >
-              <div className="flex items-center gap-2 font-medium text-destructive">
-                <AlertCircle className="h-4 w-4" />
-                <span>Please fix the highlighted fields before saving.</span>
-              </div>
-              <ul className="mt-3 space-y-2 text-sm">
-                {validationIssues.map((issue) => (
-                  <li key={issue.path}>
-                    <button
-                      type="button"
-                      className="text-left underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive rounded-sm"
-                      onClick={() => scrollToField(issue.path)}
-                    >
-                      <span className="font-medium">{issue.label}:</span> {issue.message}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+          {renderValidationSummary()}
 
           {/* Form Zone */}
           <FormZone
               onGetRates={handleGetRates}
               onSaveDraft={handleSaveDraft}
+              onValidationFailed={handleValidationFailed}
               loading={rateFetching.loading}
               crmLoading={isCrmLoading}
               initialValues={initialFormValues}
