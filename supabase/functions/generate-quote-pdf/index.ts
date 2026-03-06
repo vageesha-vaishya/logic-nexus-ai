@@ -350,8 +350,37 @@ serveWithLogger(async (req, logger, adminSupabase) => {
         }
     }
 
-    if (branding.logo_url && typeof branding.logo_url === "string" && branding.logo_url.startsWith("data:image")) {
-        brandingLogoBase64 = branding.logo_url;
+    if (branding.logo_url && typeof branding.logo_url === "string") {
+        if (branding.logo_url.startsWith("data:image")) {
+            brandingLogoBase64 = branding.logo_url;
+        } else if (branding.logo_url.startsWith("http")) {
+            try {
+                const response = await fetch(branding.logo_url);
+                if (response.ok) {
+                    const arrayBuffer = await response.arrayBuffer();
+                    let binary = '';
+                    const bytes = new Uint8Array(arrayBuffer);
+                    const len = bytes.byteLength;
+                    const CHUNK_SIZE = 0x8000; // 32KB chunks to avoid stack overflow
+                    for (let i = 0; i < len; i += CHUNK_SIZE) {
+                        binary += String.fromCharCode.apply(
+                            null,
+                            // @ts-ignore
+                            bytes.subarray(i, Math.min(i + CHUNK_SIZE, len))
+                        );
+                    }
+                    const base64 = btoa(binary);
+                    // Detect mime type or assume png/jpg based on extension or header
+                    const contentType = response.headers.get("content-type") || "image/png";
+                    brandingLogoBase64 = `data:${contentType};base64,${base64}`;
+                    await logger.info(`Successfully fetched and converted logo from URL: ${branding.logo_url}`);
+                } else {
+                    await logger.warn(`Failed to fetch logo from URL: ${branding.logo_url} - Status: ${response.status}`);
+                }
+            } catch (e: any) {
+                await logger.warn(`Error fetching logo from URL: ${e.message}`);
+            }
+        }
     }
 
     await log("Using V2 Rendering Engine");

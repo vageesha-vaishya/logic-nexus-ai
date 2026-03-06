@@ -101,21 +101,6 @@ export function FileUpload({
     }
   };
 
-  const removeFile = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (inputRef.current) inputRef.current.value = '';
-    // We can't pass null to onFileSelect if strict, but assuming the parent handles it via external state reset
-    // Actually, onFileSelect expects a File. 
-    // This component is controlled by `value`. 
-    // To clear, we usually need an `onClear` or pass null.
-    // For now, I'll rely on the parent checking `value`. 
-    // Wait, onFileSelect signature is `(file: File) => void`. 
-    // I should probably allow passing null or add onClear.
-    // For simplicity, I'll assume parent handles removal if they pass `value`.
-    // I'll add onClear prop or modify onFileSelect.
-    // Let's modify onFileSelect to accept null.
-  };
-
   return (
     <div className={cn('w-full', className)}>
       <div
