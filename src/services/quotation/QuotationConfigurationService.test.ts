@@ -40,7 +40,7 @@ describe('QuotationConfigurationService', () => {
       error: null 
     });
 
-    // @ts-ignore
+    // @ts-ignore Mock dynamic table routing for tests
     mockSupabase.from.mockImplementation((table: string) => {
       if (table === 'quotation_configuration') {
         return {
@@ -76,7 +76,7 @@ describe('QuotationConfigurationService', () => {
       error: null 
     });
 
-    // @ts-ignore
+    // @ts-ignore Mock dynamic table routing for tests
     mockSupabase.from.mockImplementation((table: string) => {
         if (table === 'quotation_configuration') {
             return {
