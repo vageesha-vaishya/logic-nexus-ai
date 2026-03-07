@@ -830,7 +830,9 @@ export class PdfRenderer {
 
   private resolvePath(obj: any, path: string): any {
     if (!obj || !path) return undefined;
-    const parts = path.split(/[.[\]]/).filter(Boolean);
+    // Handle array access like legs[0].pol or customer.company_name
+    // Split by dot or bracket
+    const parts = path.replace(/\]/g, '').split(/[.\[]/);
     
     return parts.reduce((prev, curr) => {
         return prev && prev[curr] !== undefined ? prev[curr] : undefined;
