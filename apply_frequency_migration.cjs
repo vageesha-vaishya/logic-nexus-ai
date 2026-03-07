@@ -4,21 +4,31 @@ const path = require('path');
 require('dotenv').config();
 
 async function applyMigration() {
-    const connectionString = process.env.DATABASE_URL || "postgresql://postgres:postgres@localhost:54322/postgres"; // Fallback to local
+    // Check for DATABASE_URL environment variable
+    const connectionString = process.env.DATABASE_URL;
+    if (!connectionString) {
+        console.error("Error: DATABASE_URL environment variable is not set.");
+        process.exit(1);
+    }
     
-    console.log("Connecting to database with string: " + connectionString);
+    console.log("Connecting to database...");
     const client = new Client({
         connectionString: connectionString,
-        ssl: { rejectUnauthorized: false } // Needed for remote connections usually
+        ssl: { rejectUnauthorized: false }
     });
 
     try {
         await client.connect();
         console.log("Connected.");
 
-        const migrationPath = path.join(__dirname, 'supabase/migrations/20260307120000_add_mgl_main_template.sql');
+        const migrationPath = path.join(__dirname, 'supabase/migrations/20260307140000_add_frequency_to_options.sql');
         console.log(`Reading migration file: ${migrationPath}`);
         
+        if (!fs.existsSync(migrationPath)) {
+            console.error(`Migration file not found at: ${migrationPath}`);
+            process.exit(1);
+        }
+
         const sql = fs.readFileSync(migrationPath, 'utf8');
         
         console.log("Applying migration...");

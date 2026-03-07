@@ -63,4 +63,37 @@ describe("fetchQuoteItemsWithFallbacks", () => {
     expect(safeSelect).toHaveBeenCalledTimes(2);
     expect(logger.warn).toHaveBeenCalled();
   });
+
+  it("performs manual commodity join for quote_items_core", async () => {
+    const safeSelect = vi
+      .fn()
+      // 1. quote_items fail
+      .mockResolvedValueOnce({
+        data: null,
+        error: { message: "Could not find the table 'public.quote_items' in the schema cache" },
+      })
+      // 2. quote_items_core success with commodity_id but no commodity object
+      .mockResolvedValueOnce({
+        data: [{ id: "item-core-1", commodity_id: "comm-1", product_name: "General Cargo" }],
+        error: null,
+      })
+      // 3. master_commodities manual fetch
+      .mockResolvedValueOnce({
+        data: [{ id: "comm-1", name: "Electronics" }],
+        error: null,
+      });
+
+    const logger = { warn: vi.fn(), info: vi.fn() };
+
+    const result = await fetchQuoteItemsWithFallbacks("q-1", safeSelect, logger);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+        id: "item-core-1",
+        commodity_id: "comm-1",
+        master_commodities: { name: "Electronics" },
+        commodity: "Electronics"
+    });
+    expect(safeSelect).toHaveBeenCalledTimes(3);
+  });
 });

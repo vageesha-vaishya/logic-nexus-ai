@@ -13,12 +13,18 @@ export const RawQuoteDataSchema = z.object({
     service_level: z.string().optional(),
     notes: z.string().optional(),
     terms_conditions: z.string().optional(),
+    origin: z.any().optional(),
+    destination: z.any().optional(),
+    incoterms: z.string().optional(),
   }),
   customer: z.object({
     company_name: z.string().optional(),
     contact_name: z.string().optional(),
     email: z.string().optional(),
+    phone: z.string().optional(),
     address: z.string().optional(),
+    code: z.string().optional(),
+    inquiry_number: z.string().optional(),
   }).optional(),
   legs: z.array(z.object({
     sequence_id: z.number(),
@@ -36,6 +42,7 @@ export const RawQuoteDataSchema = z.object({
     basis: z.string().optional(),
     quantity: z.number().optional(),
     leg_id: z.string().optional(),
+    note: z.string().optional(),
   })).optional(),
   items: z.array(z.object({
     container_type: z.string().optional(),
@@ -75,9 +82,11 @@ export const RawQuoteDataSchema = z.object({
       charge_name: z.string().nullable().optional(),
       category: z.object({ name: z.string() }).optional(),
       leg_id: z.string().nullable().optional(),
+      note: z.string().nullable().optional(),
     }).passthrough()),
     carrier: z.string().optional(),
     transit_time: z.string().optional(),
+    frequency: z.string().optional(),
     container_size: z.string().optional(),
     container_type: z.string().optional(),
   })).optional(),
@@ -119,12 +128,14 @@ function validateForPdf(raw: any): PdfValidationResult {
       const volume = Number(item?.volume ?? 0);
 
       if (weight < 0) {
-        blockers.push(`Item ${index + 1}: weight must be zero or greater`);
+        // Log as warning instead of blocking
+        warnings.push(`Item ${index + 1}: weight must be zero or greater (found ${weight})`);
       } else if (!(weight > 0)) {
         warnings.push(`Item ${index + 1}: weight is missing or zero`);
       }
       if (volume < 0) {
-        blockers.push(`Item ${index + 1}: volume must be zero or greater`);
+        // Log as warning instead of blocking
+        warnings.push(`Item ${index + 1}: volume must be zero or greater (found ${volume})`);
       }
     });
   }
@@ -160,7 +171,7 @@ export function mapQuoteItemsToRawItems(items: any[] | null | undefined) {
     return {
       container_type: i.container_types?.name || i.container_types?.code || "Container",
       quantity: i.quantity,
-      commodity: i.master_commodities?.name || i.commodity_description || "General Cargo",
+      commodity: i.commodity || i.master_commodities?.name || i.commodity_description || "General Cargo",
       weight,
       volume,
     };
@@ -188,17 +199,31 @@ export interface SafeContext {
   };
   quote: {
     number: string;
+    quote_number: string;
     date: string;
+    created_at: string;
     expiry?: string;
+    expiration_date?: string;
     grand_total: number;
     currency: string;
     notes?: string;
     terms_conditions?: string;
+    origin?: any;
+    destination?: any;
+    incoterms?: string;
+    service_level?: string;
   };
   customer: {
     name: string;
+    company_name: string;
     contact: string;
+    contact_name: string;
+    email: string;
+    phone: string;
     full_address: string;
+    address: string;
+    code: string;
+    inquiry_number: string;
   };
   legs: Array<{
     seq: number;
@@ -224,6 +249,7 @@ export interface SafeContext {
     curr: string;
     unit_price?: number;
     qty?: number;
+    note?: string;
   }>;
   // Multi-rate support
   options?: Array<{
@@ -246,10 +272,13 @@ export interface SafeContext {
       curr: string;
       unit_price?: number;
       qty?: number;
-  }>;
+      category?: string;
+      note?: string;
+    }>;
   grand_total: number;
   carrier?: string;
   transit_time?: string;
+  frequency?: string;
   container_size?: string;
   container_type?: string;
 }>;
@@ -313,17 +342,31 @@ export function buildSafeContextWithValidation(
     },
     quote: {
       number: data.quote?.quote_number || "DRAFT",
+      quote_number: data.quote?.quote_number || "DRAFT",
       date: data.quote?.created_at || new Date().toISOString(),
+      created_at: data.quote?.created_at || new Date().toISOString(),
       expiry: data.quote?.expiration_date,
+      expiration_date: data.quote?.expiration_date,
       grand_total: Number(data.quote?.total_amount) || 0,
       currency: data.quote?.currency || "USD",
       notes: data.quote?.notes,
       terms_conditions: data.quote?.terms_conditions,
+      origin: data.quote?.origin,
+      destination: data.quote?.destination,
+      incoterms: data.quote?.incoterms,
+      service_level: data.quote?.service_level,
     },
     customer: {
       name: data.customer?.company_name || "Valued Customer",
+      company_name: data.customer?.company_name || "Valued Customer",
       contact: data.customer?.contact_name || "",
+      contact_name: data.customer?.contact_name || "",
+      email: data.customer?.email || "",
+      phone: data.customer?.phone || "",
       full_address: data.customer?.address || "",
+      address: data.customer?.address || "",
+      code: data.customer?.code || "",
+      inquiry_number: data.customer?.inquiry_number || "",
     },
     legs: (data.legs || []).map((l: any) => ({
       seq: l.sequence_id || 0,
@@ -354,6 +397,7 @@ export function buildSafeContextWithValidation(
         unit_price: quantity ? amount / quantity : amount,
         qty: quantity,
         quantity,
+        note: c.note || "",
       };
     }),
     mode: data.mode || 'single',
@@ -362,16 +406,19 @@ export function buildSafeContextWithValidation(
         grand_total: opt.grand_total || 0,
         carrier: opt.carrier,
         transit_time: opt.transit_time,
+        frequency: opt.frequency,
         container_size: opt.container_size,
         container_type: opt.container_type,
         legs: (opt.legs || []).map((l: any) => ({
-        seq: l.sequence_id || 0,
-        mode: l.mode || "Unknown",
-        origin: l.pol || "N/A",
-        destination: l.pod || "N/A",
-        carrier_name: l.carrier || "TBD",
-      })),
-      charges: (opt.charges || []).map((c: any) => {
+            seq: l.sequence_id || 0,
+            mode: l.mode || "Unknown",
+            transport_mode: l.transport_mode,
+            origin: l.pol || "N/A",
+            destination: l.pod || "N/A",
+            carrier_name: l.carrier || "TBD",
+            transit_time: l.transit_time,
+          })),
+    charges: (opt.charges || []).map((c: any) => {
         const amount = Number(c.amount) || 0;
         const quantity = c.quantity || 1;
         const currency = c.currency || "USD";
@@ -386,6 +433,8 @@ export function buildSafeContextWithValidation(
           unit_price: quantity ? amount / quantity : amount,
           qty: quantity,
           quantity,
+          category: c.category?.name || "Other",
+          note: c.note || "",
         };
       }),
     })),

@@ -21,7 +21,6 @@ import { toast } from 'sonner';
 
 interface Template {
   id: string;
-  template_name: string;
   name: string;
   is_active: boolean;
 }
@@ -32,7 +31,7 @@ interface TemplateSelectorProps {
   disabled?: boolean;
 }
 
-export function TemplateSelector({ value, onChange, disabled }: TemplateSelectorProps) {
+export function TemplateSelector({ value, onChange, disabled, tenantId }: TemplateSelectorProps & { tenantId?: string | null }) {
   const [open, setOpen] = useState(false);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(false);
@@ -40,16 +39,24 @@ export function TemplateSelector({ value, onChange, disabled }: TemplateSelector
 
   useEffect(() => {
     const fetchTemplates = async () => {
-      if (!context.tenantId) return;
+      const effectiveTenantId = tenantId !== undefined ? tenantId : context.tenantId;
 
       setLoading(true);
       try {
-        const { data, error } = await supabase
+        let query = supabase
           .from('quote_templates')
-          .select('id, template_name, name, is_active')
+          .select('id, name, is_active')
           .eq('is_active', true)
-          .eq('tenant_id', context.tenantId)
-          .order('template_name', { ascending: true });
+          .order('name', { ascending: true });
+
+        if (effectiveTenantId) {
+          query = query.eq('tenant_id', effectiveTenantId);
+        } else {
+          // Explicitly fetch global templates if tenantId is null
+          query = query.is('tenant_id', null);
+        }
+
+        const { data, error } = await query;
 
         if (error) throw error;
 
@@ -59,7 +66,7 @@ export function TemplateSelector({ value, onChange, disabled }: TemplateSelector
         // Default to "MGL-Main-Template" if no value is selected
         if (!value && fetchedTemplates.length > 0) {
           const defaultTemplate = fetchedTemplates.find(
-            (t) => t.template_name === 'MGL-Main-Template'
+            (t) => t.name === 'MGL-Main-Template'
           );
           if (defaultTemplate) {
             onChange(defaultTemplate.id);
@@ -74,7 +81,7 @@ export function TemplateSelector({ value, onChange, disabled }: TemplateSelector
     };
 
     fetchTemplates();
-  }, [context.tenantId]); // Run when tenantId changes
+  }, [context.tenantId, tenantId]); // Run when tenantId changes
 
   const selectedTemplate = templates.find((t) => t.id === value);
 
@@ -94,7 +101,7 @@ export function TemplateSelector({ value, onChange, disabled }: TemplateSelector
               Loading...
             </span>
           ) : value ? (
-            selectedTemplate?.template_name || selectedTemplate?.name || 'Select template...'
+            selectedTemplate?.name || 'Select template...'
           ) : (
             'Select template...'
           )}
@@ -109,7 +116,7 @@ export function TemplateSelector({ value, onChange, disabled }: TemplateSelector
             {templates.map((template) => (
               <CommandItem
                 key={template.id}
-                value={template.template_name || template.name}
+                value={template.name}
                 onSelect={() => {
                   onChange(template.id);
                   setOpen(false);
@@ -121,7 +128,7 @@ export function TemplateSelector({ value, onChange, disabled }: TemplateSelector
                     value === template.id ? 'opacity-100' : 'opacity-0'
                   )}
                 />
-                {template.template_name || template.name}
+                {template.name}
               </CommandItem>
             ))}
           </CommandGroup>

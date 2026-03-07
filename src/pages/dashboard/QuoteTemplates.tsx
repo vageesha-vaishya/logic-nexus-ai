@@ -31,7 +31,7 @@ export default function QuoteTemplates() {
       }
 
       // Create a new quote from the template
-      // We explicitly exclude id, system fields, and PDF layout fields (header, layout, sections)
+      // We explicitly exclude id, system fields, and PDF layout fields (header, layout, sections, config)
       // to prevent "column does not exist" errors
       const { 
         id, 
@@ -44,6 +44,7 @@ export default function QuoteTemplates() {
         footer, 
         styles,
         terms,
+        config,
         ...content 
       } = template.content as any;
 

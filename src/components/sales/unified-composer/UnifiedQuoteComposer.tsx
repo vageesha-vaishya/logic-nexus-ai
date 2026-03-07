@@ -112,6 +112,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
 
   // Local state
   const [selectedOption, setSelectedOption] = useState<RateOption | null>(null);
+  const [quoteTenantId, setQuoteTenantId] = useState<string | null>(null);
   const [visibleRateIds, setVisibleRateIds] = useState<string[]>([]);
   const [isSmartMode, setIsSmartMode] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -894,6 +895,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
       });
       
       const raw = quoteRow as any;
+      setQuoteTenantId(raw.tenant_id);
 
       const cargoDetails = parseJsonObject(raw.cargo_details);
 
@@ -2764,6 +2766,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
                     value={selectedTemplateId} 
                     onChange={setSelectedTemplateId} 
                     disabled={isGeneratingPdf}
+                    tenantId={quoteTenantId || context.tenantId}
                   />
                 </div>
               </div>

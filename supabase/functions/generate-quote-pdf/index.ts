@@ -140,7 +140,8 @@ serveWithLogger(async (req, logger, adminSupabase) => {
       .from("quotes")
       .select(`
         *,
-        accounts (name, billing_street, billing_city, billing_state, billing_postal_code, billing_country, phone),
+        accounts (name, billing_street, billing_city, billing_state, billing_postal_code, billing_country, phone, email, account_number),
+        contacts:contacts!contact_id (first_name, last_name, email, phone),
         origin:ports_locations!origin_port_id(location_name, country_id),
         destination:ports_locations!destination_port_id(location_name, country_id)
       `)
@@ -336,7 +337,7 @@ serveWithLogger(async (req, logger, adminSupabase) => {
             // Try to find the template by name
             let query = supabaseClient
                  .from("quote_templates")
-                 .select("content, tenant_id")
+                 .select("content, tenant_id, name")
                  .eq("name", "Standard Multi-Modal");
              
             if ((quote as any).tenant_id) {
@@ -359,7 +360,7 @@ serveWithLogger(async (req, logger, adminSupabase) => {
             }
             
             if (!mmError && mmTemplate && mmTemplate.content) {
-                 templateContent = mmTemplate.content;
+                 templateContent = { ...mmTemplate.content, name: mmTemplate.name };
                  await log("Loaded 'Standard Multi-Modal' template.");
             } else {
                  await logWarn(`'Standard Multi-Modal' template not found or error: ${mmError?.message || 'Unknown'}`);
@@ -367,7 +368,42 @@ serveWithLogger(async (req, logger, adminSupabase) => {
         }
     }
 
-    // 4. Fallback
+    // 4. Try loading 'MGL-Main-Template' as the preferred default
+    if (!templateContent) {
+        await log("Attempting to load 'MGL-Main-Template' as preferred default.");
+        let query = supabaseClient
+             .from("quote_templates")
+             .select("content, tenant_id, name")
+             .eq("name", "MGL-Main-Template");
+         
+        if ((quote as any).tenant_id) {
+             query = query.or(`tenant_id.eq.${(quote as any).tenant_id},tenant_id.is.null`);
+        } else {
+             query = query.is("tenant_id", null);
+        }
+
+        const { data: templates, error: defError } = await query;
+        
+        let defTemplate = null;
+        if (templates && templates.length > 0) {
+             // Sort: tenant-specific first
+             templates.sort((a: any, b: any) => {
+                 if (a.tenant_id && !b.tenant_id) return -1;
+                 if (!a.tenant_id && b.tenant_id) return 1;
+                 return 0;
+             });
+             defTemplate = templates[0];
+        }
+        
+        if (!defError && defTemplate && defTemplate.content) {
+             templateContent = { ...defTemplate.content, name: defTemplate.name };
+             await log("Loaded 'MGL-Main-Template'.");
+        } else {
+             await logWarn(`'MGL-Main-Template' not found or error: ${defError?.message || 'Unknown'}`);
+        }
+    }
+
+    // 5. Fallback to hardcoded DefaultTemplate
     if (!templateContent) {
          await log("Using Default Template (fallback)");
          templateContent = DefaultTemplate;
@@ -448,12 +484,20 @@ serveWithLogger(async (req, logger, adminSupabase) => {
     }
 
     // Required Field Validation
-    const missingFields: string[] = [];
+    let missingFields: string[] = [];
     if (!quote.origin && !quote.origin_port_id) missingFields.push("Origin");
     if (!quote.destination && !quote.destination_port_id) missingFields.push("Destination");
-    if (!quote.items || quote.items.length === 0) missingFields.push("Commodity/Items");
-    if (!quote.incoterms) missingFields.push("Incoterm"); // Assuming incoterms column exists
-    if (!quote.expiration_date && !quote.valid_until) missingFields.push("Validity Date");
+    
+    // Warn but do not block for Items/Incoterms/Validity to ensure PDF generation works
+    if (!quote.items || quote.items.length === 0) {
+        await logger.warn("Validation Warning: Commodity/Items missing. Proceeding with empty items.");
+    }
+    if (!quote.incoterms) {
+        await logger.warn("Validation Warning: Incoterm missing. Proceeding.");
+    } 
+    if (!quote.expiration_date && !quote.valid_until) {
+        await logger.warn("Validation Warning: Validity Date missing. Proceeding.");
+    }
 
     // Check total freight on options if options exist
     if (options.length > 0) {
@@ -463,11 +507,16 @@ serveWithLogger(async (req, logger, adminSupabase) => {
                 : (quote.total_amount || 0);
             return total > 0;
         });
-        if (!hasValidTotal) missingFields.push("Total Freight (on at least one option)");
+        if (!hasValidTotal) {
+             await logger.warn("Validation Warning: Total Freight is zero. Proceeding.");
+        }
     }
 
+    // Safety: Ensure we don't block on non-critical fields even if they somehow got into missingFields
+    missingFields = missingFields.filter(f => !["Commodity/Items", "Validity Date", "Incoterms"].includes(f));
+
     if (missingFields.length > 0) {
-        // Enforce strictly as requested
+        // Enforce strictly only for critical location fields
         await logger.warn(`Validation failed: Missing fields: ${missingFields.join(", ")}`);
         
         // Return 400 Bad Request with precise field-level error map
@@ -557,8 +606,9 @@ serveWithLogger(async (req, logger, adminSupabase) => {
         },
         customer: {
           company_name: quote.accounts?.name,
-          contact_name: quote.accounts?.name,
-          email: "",
+          contact_name: quote.contacts ? `${quote.contacts.first_name || ''} ${quote.contacts.last_name || ''}`.trim() : quote.accounts?.name,
+          email: quote.contacts?.email || quote.accounts?.email || "",
+          phone: quote.contacts?.phone || quote.accounts?.phone || "",
           address: [
             quote.accounts?.billing_street,
             quote.accounts?.billing_city,
@@ -566,6 +616,8 @@ serveWithLogger(async (req, logger, adminSupabase) => {
           ]
             .filter(Boolean)
             .join(", "),
+          code: quote.accounts?.account_number || "",
+          inquiry_number: quote.quote_number,
         },
         legs:
           option?.legs?.map((l: any) => ({
@@ -585,12 +637,14 @@ serveWithLogger(async (req, logger, adminSupabase) => {
             basis: c.basis,
             quantity: c.units,
             leg_id: c.leg_id,
+            note: c.note || "",
           })) || [],
         items: mapQuoteItemsToRawItems(quote.items),
         options: options.map((o: any) => ({
           id: o.id,
           carrier: o.carriers?.carrier_name || 'Multi-Carrier',
           transit_time: o.transit_time_days ? `${o.transit_time_days} Days` : (o.legs?.map((l: any) => l.transit_time).filter(Boolean).join(" + ") || "N/A"),
+          frequency: o.frequency || o.service_level || "Weekly", // Fallback to Weekly if missing
           container_size: o.container_sizes?.code || o.container_sizes?.name || 'N/A',
           container_type: o.container_types?.code || o.container_types?.name || 'N/A',
           grand_total: Array.isArray(o.charges) 

@@ -57,7 +57,57 @@ export async function fetchQuoteItemsWithFallbacks(
       if (candidate.table !== "quote_items") {
         await logger.warn(`Primary quote items view unavailable; using fallback table ${candidate.table}`);
       }
-      return Array.isArray(data) ? data : [];
+      
+      const items = Array.isArray(data) ? data : [];
+      
+      // If we got items from a fallback source (like quote_items_core), they might lack joined data
+      if (candidate.table === "quote_items_core" && items.length > 0) {
+        // Fetch master_commodities to manually join
+        // @ts-ignore
+        const commodityIds = [...new Set(items.map(i => i.commodity_id).filter(Boolean))];
+        
+        if (commodityIds.length > 0) {
+          try {
+            const { data: comms, error: cError } = await safeSelect(
+               "master_commodities",
+               "id, name",
+               "id, name",
+               // @ts-ignore
+               (q) => q.in("id", commodityIds),
+               "master_commodities manual join"
+            );
+            
+            // @ts-ignore
+            if (!cError && comms) {
+               // @ts-ignore
+               const commMap = new Map(comms.map((c: any) => [c.id, c.name]));
+               items.forEach((item: any) => {
+                  // @ts-ignore
+                  if (item.commodity_id && commMap.has(item.commodity_id)) {
+                      // @ts-ignore
+                      item.master_commodities = { name: commMap.get(item.commodity_id) };
+                      // Also set 'commodity' field directly if needed by consumer
+                      // @ts-ignore
+                      item.commodity = commMap.get(item.commodity_id);
+                  }
+               });
+            }
+          } catch (e: any) {
+             await logger.warn(`Failed to manually join commodities: ${e.message}`);
+          }
+        }
+        
+        // Ensure every item has at least a commodity name from product_name if missing
+        items.forEach((item: any) => {
+           if (!item.commodity && !item.master_commodities?.name) {
+               item.commodity = item.product_name || "General Cargo";
+               // Log warning if fallback used
+               // await logger.warn(`Item ${item.id} missing commodity, using product_name: ${item.commodity}`);
+           }
+        });
+      }
+      
+      return items;
     }
 
     const message = String(error.message || "");

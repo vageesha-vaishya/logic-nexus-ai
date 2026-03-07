@@ -1,45 +1,33 @@
 
-import { Client } from 'pg';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as dotenv from 'dotenv';
-import { fileURLToPath } from 'url';
+import { Client } from "https://deno.land/x/postgres/mod.ts";
+import { config } from "https://deno.land/x/dotenv/mod.ts";
 
-dotenv.config();
+// Load .env
+const env = config();
+const dbUrl = env.DATABASE_URL || Deno.env.get("DATABASE_URL");
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const connectionString = process.env.DATABASE_URL;
-
-if (!connectionString) {
-  console.error('DATABASE_URL is not set in .env');
-  process.exit(1);
+if (!dbUrl) {
+  console.error("DATABASE_URL not found");
+  Deno.exit(1);
 }
 
-const client = new Client({
-    connectionString: connectionString,
-    ssl: { rejectUnauthorized: false }
-});
+const client = new Client(dbUrl);
 
-async function applyMigration() {
+async function run() {
+  await client.connect();
+  console.log("Connected to DB");
+
+  // Read the SQL file
+  const sql = await Deno.readTextFile("./supabase/migrations/20260307120000_add_mgl_main_template.sql");
+
   try {
-    await client.connect();
-    
-    const migrationPath = path.join(__dirname, 'supabase/migrations/20260228140000_fix_save_quote_atomic_charge_basis.sql');
-    console.log('Reading migration file:', migrationPath);
-    
-    const migrationSql = fs.readFileSync(migrationPath, 'utf8');
-
-    console.log('Applying migration...');
-    await client.query(migrationSql);
-    console.log('Migration applied successfully.');
-
-  } catch (error) {
-    console.error('Error applying migration:', error);
+    await client.queryArray(sql);
+    console.log("Migration applied successfully");
+  } catch (e) {
+    console.error("Migration failed:", e);
   } finally {
     await client.end();
   }
 }
 
-applyMigration();
+run();

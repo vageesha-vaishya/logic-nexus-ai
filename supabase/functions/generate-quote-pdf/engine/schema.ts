@@ -52,7 +52,7 @@ export const DynamicTableConfigSchema = z.object({
 
 // Section Schema
 export const SectionSchema = z.object({
-  type: z.enum(["header", "footer", "static_block", "key_value_grid", "dynamic_table", "terms_block", "multi_rate_summary", "multi_modal_details", "matrix_rate_table"]),
+  type: z.enum(["header", "footer", "static_block", "key_value_grid", "dynamic_table", "terms_block", "multi_rate_summary", "multi_modal_details", "matrix_rate_table", "detailed_matrix_rate_table"]),
   height: z.number().optional(),
   page_break_before: z.boolean().default(false),
   visible_if: z.string().optional(), // Logic expression
