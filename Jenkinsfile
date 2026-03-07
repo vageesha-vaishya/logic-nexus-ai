@@ -218,7 +218,7 @@ curl -sI ${env.SELECTED_SUPABASE_URL}/rest/v1/ -H "apikey: ${env.SELECTED_ANON_K
                 }
             }
         }
-        */
+        
         stage('Verify Supabase Stack') {
             steps {
                 script {
@@ -230,7 +230,7 @@ curl -sI ${env.SELECTED_SUPABASE_URL}/rest/v1/ -H "apikey: ${env.SELECTED_ANON_K
                 }
             }
         }
-        
+        */
         stage('Trigger App Deployment') {
             steps {
                 script {
