@@ -518,7 +518,7 @@ serveWithLogger(async (req, logger, adminSupabase) => {
 
     const mode = body.mode || 'single';
     let pdfBytes: Uint8Array | null = null;
-    let finalWarnings: string[] = [];
+    const finalWarnings: string[] = [];
 
     const createRawData = (option: any) => {
       // Calculate option specific total if possible
