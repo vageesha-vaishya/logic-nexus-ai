@@ -22,7 +22,16 @@ export class PdfRenderer {
     this.context = context;
     this.logger = logger;
     this.i18n = new I18nEngine(template, logger);
-    this.margins = template.config.margins;
+    const configRaw = (template as any)?.config;
+    const config = configRaw && typeof configRaw === "object" ? configRaw : {};
+    const marginsRaw = config?.margins;
+    const margins = marginsRaw && typeof marginsRaw === "object" ? marginsRaw : {};
+    this.margins = {
+      top: Number(margins.top) || 40,
+      bottom: Number(margins.bottom) || 40,
+      left: Number(margins.left) || 40,
+      right: Number(margins.right) || 40,
+    };
   }
 
   async init() {
@@ -821,9 +830,7 @@ export class PdfRenderer {
 
   private resolvePath(obj: any, path: string): any {
     if (!obj || !path) return undefined;
-    // Handle array access like legs[0].pol or customer.company_name
-    // Split by dot or bracket
-    const parts = path.replace(/\]/g, '').split(/[.\[]/);
+    const parts = path.split(/[.[\]]/).filter(Boolean);
     
     return parts.reduce((prev, curr) => {
         return prev && prev[curr] !== undefined ? prev[curr] : undefined;
@@ -1165,10 +1172,15 @@ export class PdfRenderer {
   private async renderDetailedMatrixRateTable(section: TemplateSection) {
     if (!this.currentPage || !this.font || !this.boldFont) return;
 
+    console.log("renderDetailedMatrixRateTable: Starting render...");
+
     let optionsToRender = this.context.options || [];
     if (optionsToRender.length === 0 && section.config?.options) {
          optionsToRender = section.config.options;
     }
+    
+    console.log(`renderDetailedMatrixRateTable: Found ${optionsToRender.length} options to render.`);
+    
     if (optionsToRender.length === 0) return;
 
     const title = section.content?.text || "Freight Rates Breakdown";
@@ -1186,6 +1198,8 @@ export class PdfRenderer {
 
     // Use helper to group options
     const groups = groupOptionsForMatrix(optionsToRender);
+    
+    console.log(`renderDetailedMatrixRateTable: Grouped into ${groups.length} groups.`);
 
     const cyanColor = this.hexToRgb("#66c2cd"); // Cyan from screenshot approx
 
@@ -1312,7 +1326,7 @@ export class PdfRenderer {
 
             sortedContainers.forEach(ct => {
                 const val = amounts.get(ct);
-                const text = val ? val.toFixed(2) : ""; 
+                const text = (val !== undefined && val !== null) ? val.toFixed(2) : ""; 
                 this.currentPage!.drawText(text, { x: x + 2, y: this.cursorY - 14, size: 9, font: this.font!, color: rgb(0,0,0) });
                 x += colWidth;
             });

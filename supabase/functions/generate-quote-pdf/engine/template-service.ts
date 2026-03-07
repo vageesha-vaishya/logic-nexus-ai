@@ -37,9 +37,21 @@ export async function getTemplate(
   if (data) {
     if (logger) await logger.info(`[Cache] Miss for template ${templateId}. Caching...`);
     
+    let content = data.content as any;
+    if (typeof content === "string") {
+      try {
+        content = JSON.parse(content);
+      } catch {
+        content = {};
+      }
+    }
+    if (!content || typeof content !== "object") {
+      content = {};
+    }
+
     // Merge metadata into content
     const fullTemplate = {
-      ...data.content,
+      ...content,
       id: data.id,
       name: data.template_name || data.name, // Support both new and old column names
       tenant_id: data.tenant_id,

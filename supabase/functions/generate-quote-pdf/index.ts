@@ -10,6 +10,8 @@ import { fetchQuoteItemsWithFallbacks } from "./engine/item-loader.ts";
 import { DefaultTemplate } from "./engine/default_template.ts";
 // @ts-ignore
 import { getTemplate } from "./engine/template-service.ts";
+// @ts-ignore
+import { fetchMglOptions } from "./engine/mgl-loader.ts";
 import { requireAuth } from "../_shared/auth.ts";
 import { PDFDocument } from "pdf-lib";
 // @ts-ignore
@@ -32,9 +34,33 @@ serveWithLogger(async (req, logger, adminSupabase) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const bypassKey = Deno.env.get("TEST_BYPASS_KEY");
     const requestBypassKey = req.headers.get("x-bypass-key");
+
+    const decodeBase64Url = (input: string) => {
+        const normalized = input.replace(/-/g, "+").replace(/_/g, "/");
+        const padded = normalized + "===".slice((normalized.length + 3) % 4);
+        return atob(padded);
+    };
+
+    const getJwtRole = (headerValue: string | null) => {
+        if (!headerValue) return null;
+        const token = headerValue.startsWith("Bearer ") ? headerValue.slice(7) : headerValue;
+        const parts = token.split(".");
+        if (parts.length < 2) return null;
+        try {
+            const payload = JSON.parse(decodeBase64Url(parts[1]));
+            return payload?.role || payload?.app_metadata?.role || null;
+        } catch {
+            return null;
+        }
+    };
+
+    const tokenRole = getJwtRole(authHeader);
+    const hasServiceRoleClaim = tokenRole && ["service_role", "supabase_admin"].includes(String(tokenRole));
     
-    const isServiceRole = (authHeader && serviceRoleKey && authHeader.includes(serviceRoleKey)) || 
-                          (bypassKey && requestBypassKey && bypassKey === requestBypassKey);
+    const isServiceRole =
+        (authHeader && serviceRoleKey && authHeader.includes(serviceRoleKey)) ||
+        hasServiceRoleClaim ||
+        (bypassKey && requestBypassKey && bypassKey === requestBypassKey);
 
     // If not service role (e.g. Webhook/Cron), require user auth
     if (!isServiceRole) {
@@ -257,9 +283,30 @@ serveWithLogger(async (req, logger, adminSupabase) => {
       options = oData || [];
       await logger.info(`Fetched ${options.length} options for version ${versionId}`);
 
+      // --- BACKWARD COMPATIBILITY: MGL Rate Options Support ---
+      // If standard options are empty, try fetching from new MGL tables
+      if (options.length === 0) {
+        await logger.info("No standard options found. Checking for MGL Rate Options...");
+        const mglOptions = await fetchMglOptions(supabaseClient, versionId, safeSelect, logger);
+        if (mglOptions && mglOptions.length > 0) {
+             options.push(...mglOptions);
+        }
+      }
+
+      await logger.info(`Final option count after MGL check: ${options.length}`);
+      
+      // No need to fetch Legs/Charges again for MGL options as we built them above.
+      // But we have a loop below "Fetch Legs and Charges for each option".
+      // We should skip that loop for MGL options or make it safe.
+      // The loop iterates `options`. Standard options have `opt.id` from DB. MGL options have synthetic IDs.
+      // Standard fetch uses `quotation_version_option_legs` table which won't match synthetic IDs.
+      // So we must modify the loop below to skip if legs/charges are already populated.
 
       // Fetch Legs and Charges for each option
       for (const opt of options) {
+          // Skip if legs are already populated (e.g. MGL options)
+          if (opt.legs && opt.legs.length > 0) continue;
+
           // Legs
           const { data: legs, error: legsError } = await safeSelect(
               "quotation_version_option_legs",
@@ -563,6 +610,19 @@ serveWithLogger(async (req, logger, adminSupabase) => {
         }
     }
 
+    // Hard fallback to prevent pre-render validation failures when branding
+    // records are incomplete across environments.
+    branding.company_name = String(
+      branding.company_name ||
+      quote.accounts?.name ||
+      (quote as any)?.tenant_name ||
+      "Miami Global Lines",
+    ).trim() || "Miami Global Lines";
+    branding.company_address = String(branding.company_address || "").trim();
+    branding.primary_color = branding.primary_color || "#0087b5";
+    branding.secondary_color = branding.secondary_color || "#dceef2";
+    branding.accent_color = branding.accent_color || "#000000";
+
     await log("Using V2 Rendering Engine");
 
     const mode = body.mode || 'single';
@@ -659,7 +719,12 @@ serveWithLogger(async (req, logger, adminSupabase) => {
              transit_time: l.transit_time,
              transport_mode: l.transport_mode || l.mode
           })) || [],
-          charges: o.charges || []
+          charges: o.charges?.map((c: any) => ({
+            description: c.description || c.charge_name || c.name || c.category?.name || "Charge",
+            amount: Number(c.amount) || 0,
+            currency: c.currency || "USD",
+            note: c.note || ""
+          })) || []
         }))
       };
     };
@@ -697,6 +762,25 @@ serveWithLogger(async (req, logger, adminSupabase) => {
         return compileValue(clone);
     };
 
+    const ensureTemplateConfig = (template: any) => {
+        const safeTemplate = template && typeof template === "object" ? template : {};
+        const baseConfig = (DefaultTemplate as any)?.config || {};
+        const templateConfigRaw = (safeTemplate as any)?.config;
+        const templateConfig = templateConfigRaw && typeof templateConfigRaw === "object" ? templateConfigRaw : {};
+        return {
+            ...safeTemplate,
+            config: {
+                ...baseConfig,
+                ...templateConfig,
+                margins: {
+                    ...(baseConfig?.margins || {}),
+                    ...(templateConfig?.margins || {}),
+                },
+                default_locale: templateConfig?.default_locale || baseConfig?.default_locale || "en-US",
+            },
+        };
+    };
+
     const renderOptionToBytes = async (option: any) => {
         const rawData = createRawData(option);
         
@@ -707,6 +791,7 @@ serveWithLogger(async (req, logger, adminSupabase) => {
         } catch (e: any) {
              await logger.warn(`Handlebars compilation failed: ${e.message}`);
         }
+        effectiveTemplate = ensureTemplateConfig(effectiveTemplate);
 
         const { context, warnings } = buildSafeContextWithValidation(rawData, logger);
         if (warnings.length > 0) {
@@ -764,7 +849,9 @@ serveWithLogger(async (req, logger, adminSupabase) => {
                 
                 // 2. Create Summary Template (Clone & Modify)
                 // We want a clean summary page: Header -> Summary Table -> Terms -> Footer
-                const summaryTemplate = JSON.parse(JSON.stringify(templateContent || DefaultTemplate));
+                const summaryTemplate = ensureTemplateConfig(
+                    JSON.parse(JSON.stringify(templateContent || DefaultTemplate))
+                );
                 
                 // Remove dynamic tables (items/charges) to avoid clutter
                 summaryTemplate.sections = summaryTemplate.sections.filter((s: any) => 

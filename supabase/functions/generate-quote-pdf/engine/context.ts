@@ -89,7 +89,7 @@ export const RawQuoteDataSchema = z.object({
     frequency: z.string().optional(),
     container_size: z.string().optional(),
     container_type: z.string().optional(),
-  })).optional(),
+  }).passthrough()).optional(),
   mode: z.enum(['single', 'consolidated', 'individual']).optional(),
 });
 
@@ -321,6 +321,12 @@ export function buildSafeContextWithValidation(
   }
 
   // 2. Transform & Sanitize
+  const resolvedBrandingCompanyName = String(
+    data.branding?.company_name ||
+    data.customer?.company_name ||
+    "Miami Global Lines",
+  ).trim() || "Miami Global Lines";
+
   const safeCtx: SafeContext = {
     meta: {
       generated_at: new Date().toISOString(),
@@ -332,7 +338,7 @@ export function buildSafeContextWithValidation(
       primary_color: data.branding?.primary_color || "#0087b5",
       secondary_color: data.branding?.secondary_color || "#dceef2",
       accent_color: data.branding?.accent_color || "#000000",
-      company_name: data.branding?.company_name || "Nexus Logistics",
+      company_name: resolvedBrandingCompanyName,
       company_address: data.branding?.company_address || "123 Logistics Way, Transport City, TC 12345",
       font_family: data.branding?.font_family || "Helvetica",
       header_text: data.branding?.header_text || "",

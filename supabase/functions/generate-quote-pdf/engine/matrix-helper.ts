@@ -50,7 +50,7 @@ export function groupOptionsForMatrix(options: any[]): MatrixGroup[] {
             const ct = o.container_size || o.container_type || "Standard";
             const charges = o.charges || [];
             charges.forEach((c: any) => {
-                const desc = c.description || c.name || "Charge";
+                const desc = c.description || c.charge_name || c.name || "Charge";
                 if (!chargeMap.has(desc)) chargeMap.set(desc, new Map());
                 const current = chargeMap.get(desc)!.get(ct) || 0;
                 chargeMap.get(desc)!.set(ct, current + (Number(c.amount) || 0));

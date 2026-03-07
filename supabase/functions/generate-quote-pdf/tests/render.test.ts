@@ -101,7 +101,6 @@ describe('PdfRenderer', () => {
   });
 
   it('should render key_value_grid with dynamic fields', async () => {
-    // Create a template with key_value_grid accessing customer.code
     const templateWithGrid = {
       ...DefaultTemplate,
       sections: [
@@ -114,10 +113,33 @@ describe('PdfRenderer', () => {
           ]
         }
       ]
-    };
-    // @ts-ignore
+    } as any;
     const renderer = new PdfRenderer(templateWithGrid, mockContext, mockLogger);
     const pdfBytes = await renderer.render();
     expect(pdfBytes).toBeDefined();
+  });
+
+  it('should render when template config is missing', async () => {
+    const templateWithoutConfig = {
+      name: "Template Missing Config",
+      sections: [
+        {
+          type: "header",
+          height: 80,
+          content: { text: "Header", alignment: "left" }
+        },
+        {
+          type: "key_value_grid",
+          height: 80,
+          grid_fields: [
+            { key: "quote.quote_number", label: "Quote Ref" }
+          ]
+        }
+      ]
+    } as any;
+    const renderer = new PdfRenderer(templateWithoutConfig, mockContext, mockLogger);
+    const pdfBytes = await renderer.render();
+    expect(pdfBytes).toBeDefined();
+    expect(pdfBytes.length).toBeGreaterThan(0);
   });
 });

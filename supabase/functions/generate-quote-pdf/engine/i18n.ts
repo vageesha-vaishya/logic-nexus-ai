@@ -9,8 +9,15 @@ export class I18nEngine {
 
   constructor(template?: QuoteTemplate, logger?: Logger) {
     if (template) {
-      this.labels = template.i18n?.labels || {};
-      this.defaultLocale = template.config.default_locale || "en-US";
+      const templateAny = template as any;
+      const labels = templateAny?.i18n?.labels;
+      this.labels = labels && typeof labels === "object" ? labels : {};
+      const configRaw = templateAny?.config;
+      const config = configRaw && typeof configRaw === "object" ? configRaw : {};
+      const defaultLocale = config?.default_locale;
+      this.defaultLocale = typeof defaultLocale === "string" && defaultLocale.trim()
+        ? defaultLocale
+        : "en-US";
     }
     this.logger = logger || null;
   }

@@ -40,6 +40,35 @@ const PRESET_TEMPLATES = [
     }
   },
   {
+    id: 'mgl-main-template',
+    name: 'MGL Main Template',
+    description: 'Carrier-first rates matrix for multi-rate options with equipment-wise totals and remarks.',
+    content: {
+      name: 'MGL-Main-Template',
+      config: {
+        page_size: 'A4',
+        font_family: 'Helvetica',
+        rate_matrix_columns: [
+          { key: 'standard_20', label: "Standard - 20'" },
+          { key: 'open_top_40', label: "Open Top - 40'" },
+          { key: 'flat_rack_40', label: "Flat Rack - 40'" },
+          { key: 'flat_rack_collapsible_20', label: "Flat Rack collapsible - 20'" },
+          { key: 'platform_20', label: "Platform - 20'" },
+          { key: 'high_cube_45', label: 'High Cube - 45' },
+          { key: 'remarks', label: 'Remarks' }
+        ]
+      },
+      sections: [
+        { type: 'header', content: { text: 'MGL Main Quotation Matrix' }, height: 120 },
+        { type: 'customer_matrix_header', title: 'Customer Details' },
+        { type: 'shipment_matrix_details', title: 'Shipment and Routing' },
+        { type: 'rates_matrix', title: 'Carrier Rate Matrix' },
+        { type: 'terms', title: 'Terms and Conditions' },
+        { type: 'footer', content: { text: 'All Inclusive rates from SD/Port basis' } }
+      ]
+    }
+  },
+  {
     id: 'mgl-matrix',
     name: 'MGL Matrix Style',
     description: 'Complex layout with rates matrix, specifically designed for Miami Global Lines.',
