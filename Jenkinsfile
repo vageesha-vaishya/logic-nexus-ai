@@ -38,6 +38,9 @@ pipeline {
         stage('Checkout') {
             steps {
                 checkout scm
+                echo "Workspace: ${env.WORKSPACE}"
+                sh 'pwd'
+                sh 'ls -la'
             }
         }
         
