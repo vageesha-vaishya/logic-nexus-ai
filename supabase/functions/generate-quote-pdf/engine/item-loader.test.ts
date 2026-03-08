@@ -40,7 +40,7 @@ describe("fetchQuoteItemsWithFallbacks", () => {
 
     const result = await fetchQuoteItemsWithFallbacks("q-1", safeSelect, logger);
 
-    expect(result).toEqual([{ id: "item-core-1" }]);
+    expect(result).toEqual([{ id: "item-core-1", commodity: "General Cargo" }]);
     expect(safeSelect).toHaveBeenCalledTimes(2);
   });
 
@@ -95,5 +95,46 @@ describe("fetchQuoteItemsWithFallbacks", () => {
         commodity: "Electronics"
     });
     expect(safeSelect).toHaveBeenCalledTimes(3);
+  });
+
+  it("performs manual container joins for quote_items_core", async () => {
+    const safeSelect = vi
+      .fn()
+      .mockResolvedValueOnce({
+        data: null,
+        error: { message: "Could not find the table 'public.quote_items' in the schema cache" },
+      })
+      .mockResolvedValueOnce({
+        data: [{
+          id: "item-core-2",
+          product_name: "Cargo",
+          container_type_id: "type-1",
+          container_size_id: "size-1",
+        }],
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: [{ id: "type-1", name: "General Purpose", code: "GP" }],
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: [{ id: "size-1", name: "40 High Cube", code: "40HC" }],
+        error: null,
+      });
+
+    const logger = { warn: vi.fn(), info: vi.fn() };
+    const result = await fetchQuoteItemsWithFallbacks("q-1", safeSelect, logger);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      id: "item-core-2",
+      container_type_id: "type-1",
+      container_size_id: "size-1",
+      container_type: "GP",
+      container_size: "40HC",
+      container_types: { name: "General Purpose", code: "GP" },
+      container_sizes: { name: "40 High Cube", code: "40HC" },
+    });
+    expect(safeSelect).toHaveBeenCalledTimes(4);
   });
 });

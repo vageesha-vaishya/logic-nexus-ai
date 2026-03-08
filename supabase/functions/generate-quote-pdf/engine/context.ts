@@ -124,6 +124,10 @@ function validateForPdf(raw: any): PdfValidationResult {
       if (!commodity || commodity === "General Cargo") {
         warnings.push(`Item ${index + 1}: commodity missing or too generic`);
       }
+      const containerType = String(item?.container_type || "").trim();
+      if (!containerType || /^container$/i.test(containerType)) {
+        warnings.push(`Item ${index + 1}: container type is missing`);
+      }
 
       const weight = Number(item?.weight ?? 0);
       const volume = Number(item?.volume ?? 0);
@@ -159,6 +163,29 @@ function validateForPdf(raw: any): PdfValidationResult {
 export function mapQuoteItemsToRawItems(items: any[] | null | undefined) {
   if (!items) return [];
   return items.map((i: any) => {
+    const containerSize =
+      i.container_sizes?.code ||
+      i.container_sizes?.name ||
+      i.container_size?.code ||
+      i.container_size?.name ||
+      i.container_size_code ||
+      i.container_size_name ||
+      i.container_size ||
+      "";
+    const containerType =
+      i.container_types?.code ||
+      i.container_types?.name ||
+      i.container_type?.code ||
+      i.container_type?.name ||
+      i.container_type_code ||
+      i.container_type_name ||
+      i.container_type ||
+      "";
+    const normalizedContainer = [containerSize, containerType]
+      .map((value: unknown) => String(value || "").trim())
+      .filter(Boolean)
+      .join(" ")
+      .trim();
     const weight = Number(
       typeof i.weight_kg !== "undefined" && i.weight_kg !== null
         ? i.weight_kg
@@ -170,7 +197,7 @@ export function mapQuoteItemsToRawItems(items: any[] | null | undefined) {
         : i.total_volume
     ) || 0;
     return {
-      container_type: i.container_types?.name || i.container_types?.code || "Container",
+      container_type: normalizedContainer || "Container",
       quantity: i.quantity,
       commodity: i.commodity || i.master_commodities?.name || i.commodity_description || "General Cargo",
       weight,
@@ -387,13 +414,31 @@ export function buildSafeContextWithValidation(
       code: data.customer?.code || "",
       inquiry_number: data.customer?.inquiry_number || "",
     },
-    legs: (data.legs || []).map((l: any) => ({
-      seq: l.sequence_id || 0,
-      mode: l.mode || "Unknown",
-      origin: l.pol || "N/A",
-      destination: l.pod || "N/A",
-      carrier_name: l.carrier || "TBD",
-    })),
+    legs: (data.legs || []).map((l: any) => {
+      const origin =
+        l.pol ||
+        l.origin?.location_name ||
+        l.origin_location?.location_name ||
+        l.origin ||
+        "N/A";
+      const destination =
+        l.pod ||
+        l.destination?.location_name ||
+        l.destination_location?.location_name ||
+        l.destination ||
+        "N/A";
+      return {
+        seq: l.sequence_id || l.sort_order || 0,
+        mode: l.mode || l.transport_mode || "Unknown",
+        transport_mode: l.transport_mode,
+        origin,
+        destination,
+        pol: origin,
+        pod: destination,
+        carrier_name: l.carrier_name || l.carrier || "TBD",
+        transit_time: l.transit_time || l.transit_time_hours,
+      };
+    }),
     items: (data.items || []).map((i: any) => ({
       type: i.container_type || "Standard",
       qty: i.quantity || 1,
@@ -429,21 +474,38 @@ export function buildSafeContextWithValidation(
     options: (data.options || []).map((opt: any) => ({
         id: opt.id,
         grand_total: opt.grand_total || opt.total_amount || 0,
-        carrier: opt.carrier || opt.carriers?.carrier_name,
+        carrier: opt.carrier || opt.carrier_name || opt.carriers?.carrier_name,
         transit_time: opt.transit_time,
         frequency: opt.frequency,
         container_size: opt.container_size || opt.container_sizes?.name || opt.container_sizes?.code,
         container_type: opt.container_type || opt.container_types?.name || opt.container_types?.code,
         remarks: opt.remarks,
-        legs: (opt.legs || []).map((l: any) => ({
-            seq: l.sequence_id || 0,
-            mode: l.mode || "Unknown",
-            transport_mode: l.transport_mode,
-            origin: l.pol || "N/A",
-            destination: l.pod || "N/A",
-            carrier_name: l.carrier || "TBD",
-            transit_time: l.transit_time,
-          })),
+        legs: (opt.legs || []).map((l: any) => {
+            const origin =
+              l.pol ||
+              l.origin?.location_name ||
+              l.origin_location?.location_name ||
+              l.origin ||
+              "N/A";
+            const destination =
+              l.pod ||
+              l.destination?.location_name ||
+              l.destination_location?.location_name ||
+              l.destination ||
+              "N/A";
+            return {
+              seq: l.sequence_id || l.sort_order || 0,
+              mode: l.mode || l.transport_mode || "Unknown",
+              transport_mode: l.transport_mode,
+              origin,
+              destination,
+              pol: origin,
+              pod: destination,
+              carrier_name: l.carrier_name || l.carrier || opt.carrier_name || "TBD",
+              carrier: l.carrier || l.carrier_name || opt.carrier || opt.carrier_name,
+              transit_time: l.transit_time || l.transit_time_hours,
+            };
+          }),
     charges: (opt.charges || []).map((c: any) => {
         const amount = Number(c.amount) || 0;
         const quantity = c.quantity || 1;

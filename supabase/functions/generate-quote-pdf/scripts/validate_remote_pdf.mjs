@@ -1,6 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
 import fs from 'node:fs/promises';
-import path from 'node:path';
 import 'dotenv/config'; // Make sure dotenv is installed or run with --env-file
 
 const supabaseUrl = process.env.SUPABASE_URL;
@@ -14,6 +13,54 @@ if (!supabaseUrl || !supabaseKey) {
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 const QUOTE_NUMBER = 'QUO-260303-00002';
+
+function isPdfBuffer(buffer) {
+  return buffer.subarray(0, 5).toString('utf8') === '%PDF-';
+}
+
+function decodeBase64Pdf(value) {
+  if (typeof value !== 'string' || value.length === 0) return null;
+  const normalized = value.trim();
+  const decoded = normalized.startsWith('%PDF-')
+    ? Buffer.from(normalized, 'binary')
+    : Buffer.from(normalized, 'base64');
+  return isPdfBuffer(decoded) ? decoded : null;
+}
+
+function extractPdfFromJsonPayload(payload) {
+  if (!payload || typeof payload !== 'object') return null;
+  const candidates = [payload.content, payload.pdf, payload.data];
+  for (const candidate of candidates) {
+    const decoded = decodeBase64Pdf(candidate);
+    if (decoded) return decoded;
+  }
+  return null;
+}
+
+async function decodePdfResponse(response) {
+  const contentType = String(response.headers.get('content-type') || '').toLowerCase();
+  const bodyBuffer = Buffer.from(await response.arrayBuffer());
+
+  if (isPdfBuffer(bodyBuffer)) {
+    return { pdfBuffer: bodyBuffer, source: 'binary' };
+  }
+
+  const shouldAttemptJson =
+    contentType.includes('application/json') ||
+    bodyBuffer.subarray(0, 1).toString('utf8') === '{' ||
+    bodyBuffer.subarray(0, 1).toString('utf8') === '[';
+
+  if (shouldAttemptJson) {
+    const payload = JSON.parse(bodyBuffer.toString('utf8'));
+    const decoded = extractPdfFromJsonPayload(payload);
+    if (decoded) {
+      return { pdfBuffer: decoded, source: 'json-base64' };
+    }
+    throw new Error(`JSON response missing PDF content fields (content/pdf/data). Keys: ${Object.keys(payload).join(', ')}`);
+  }
+
+  throw new Error(`Unknown non-PDF response format. content-type=${contentType || 'n/a'}, prefix=${bodyBuffer.subarray(0, 40).toString('utf8')}`);
+}
 
 async function main() {
   console.log(`Validating PDF generation for ${QUOTE_NUMBER}...`);
@@ -127,17 +174,16 @@ async function main() {
             continue;
         }
 
-        const buffer = await response.arrayBuffer();
-        const size = buffer.byteLength;
+        const { pdfBuffer, source } = await decodePdfResponse(response);
+        const size = pdfBuffer.byteLength;
         console.log(`Generated PDF size: ${size} bytes`);
 
         if (size < 1000) {
             console.error('ERROR: Generated PDF is too small (likely blank or error).');
         } else {
-            console.log('SUCCESS: PDF generated and appears valid.');
-            // Save to disk
+            console.log(`SUCCESS: PDF generated and appears valid (${source}).`);
             const filename = `validate_${QUOTE_NUMBER}_${template.name.replace(/\s+/g, '_')}.pdf`;
-            await fs.writeFile(filename, Buffer.from(buffer));
+            await fs.writeFile(filename, pdfBuffer);
             console.log(`Saved to ${filename}`);
         }
     } catch (err) {

@@ -109,7 +109,7 @@ async function fetchQuoteData(quoteNumber: string) {
 
   // 5. Fetch Items (Try core if main fails)
   let items = [];
-  let { data: itemsData, error: itemsError } = await supabase
+  const { data: itemsData, error: itemsError } = await supabase
     .from('quote_items')
     .select('*')
     .eq('quote_id', quote.id);

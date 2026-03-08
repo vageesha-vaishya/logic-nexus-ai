@@ -194,16 +194,9 @@ export class PdfRenderer {
     if (type === "shipment_matrix_details" || type === "shipment_details") {
         return {
             ...rawSection,
-            type: "key_value_grid",
-            content: { ...(rawSection.content || {}), text: "Shipment Details", alignment: "left" },
-            grid_fields: [
-                { key: "quote.origin.location_name", label: "Origin" },
-                { key: "quote.destination.location_name", label: "Destination" },
-                { key: "items[0].commodity", label: "Commodity" },
-                { key: "items[0].details", label: "Details" },
-                { key: "quote.incoterms", label: "Incoterm" }
-            ],
-            config: { ...(rawSection.config || {}), columns: 2 }
+            type: "multi_modal_details",
+            content: { ...(rawSection.content || {}), text: "Transport Details", alignment: "left" },
+            config: { ...(rawSection.config || {}), showLegs: true }
         } as TemplateSection;
     }
 
@@ -342,10 +335,10 @@ export class PdfRenderer {
          // Data Extraction
          const optionName = `Option ${index + 1}`;
          // Try to find main carrier from legs
-               const mainLeg = opt.legs.find((l: any) => 
-                   (l.mode === 'ocean' || l.mode === 'air') || 
-                   (l.transport_mode === 'ocean' || l.transport_mode === 'air')
-               ) || opt.legs[0];
+              const mainLeg = opt.legs.find((l: any) => {
+                  const normalizedMode = this.normalizeTransportMode(l.mode || l.transport_mode);
+                  return normalizedMode === "ocean" || normalizedMode === "air";
+              }) || opt.legs[0];
                
                const carrier = mainLeg?.carrier_name || "Multi-Carrier";
          const transit = opt.legs.map((l: any) => l.transit_time).filter(Boolean).join(" + ") || "N/A";
@@ -601,7 +594,7 @@ export class PdfRenderer {
             this.drawRect(x, this.cursorY - rowHeight, tableWidth, rowHeight); 
 
             const rowData = [
-                (leg.mode || leg.transport_mode || "N/A").toUpperCase(),
+                this.formatTransportMode(leg.mode || leg.transport_mode),
                 leg.pol || leg.origin || "",
                 leg.pod || leg.destination || "",
                 leg.carrier_name || leg.carrier || "",
@@ -933,7 +926,7 @@ export class PdfRenderer {
     if (!obj || !path) return undefined;
     // Handle array access like legs[0].pol or customer.company_name
     // Split by dot or bracket
-    const parts = path.replace(/\]/g, '').split(/[.\[]/);
+    const parts = path.replace(/\]/g, '').split(/\.|\[/);
     
     return parts.reduce((prev, curr) => {
         return prev && prev[curr] !== undefined ? prev[curr] : undefined;
@@ -1360,7 +1353,12 @@ export class PdfRenderer {
         });
 
         // Mode of Transportation (from first leg or derived)
-        const mainMode = legs.find((l: any) => l.mode === 'Ocean' || l.mode === 'Air')?.mode || legs[0]?.mode || "Multi-Modal";
+        const mainMode = this.formatTransportMode(
+            legs.find((l: any) => {
+                const normalizedMode = this.normalizeTransportMode(l.mode || l.transport_mode);
+                return normalizedMode === "ocean" || normalizedMode === "air";
+            })?.mode || legs[0]?.mode || legs[0]?.transport_mode || "multimodal"
+        );
         this.currentPage!.drawText(`Mode: ${mainMode}`, {
             x: this.margins.left + (tableWidth * 0.4),
             y: textY,
@@ -1433,7 +1431,8 @@ export class PdfRenderer {
             const legCarrierCode = leg.carrier_code || this.getCarrierCode(legCarrier, [leg]) || "";
             const legCarrierDisplay = legCarrierCode ? `${legCarrier} (${legCarrierCode})` : legCarrier;
 
-            const legTitle = `${legCarrierDisplay} | ${leg.mode?.toUpperCase() || 'LEG'} : ${leg.pol || 'Origin'} -> ${leg.pod || 'Destination'}`;
+            const legMode = this.formatTransportMode(leg.mode || leg.transport_mode || "leg");
+            const legTitle = `${legCarrierDisplay} | ${legMode} : ${leg.pol || 'Origin'} -> ${leg.pod || 'Destination'}`;
             this.drawRect(this.margins.left, this.cursorY - 18, tableWidth, 18, rgb(0.95, 0.95, 0.95), true);
             this.currentPage!.drawText(legTitle, {
                 x: this.margins.left + 5,
@@ -1659,6 +1658,28 @@ export class PdfRenderer {
       if (match) return match[1];
       
       return undefined;
+  }
+
+  private normalizeTransportMode(value: any): string {
+      const normalized = String(value || "").trim().toLowerCase();
+      if (!normalized) return "";
+      if (normalized === "sea") return "ocean";
+      if (normalized === "truck") return "road";
+      return normalized;
+  }
+
+  private formatTransportMode(value: any): string {
+      const normalized = this.normalizeTransportMode(value);
+      if (!normalized) return "N/A";
+      const labels: Record<string, string> = {
+          ocean: "Ocean",
+          air: "Air",
+          road: "Road",
+          rail: "Rail",
+          multimodal: "Multimodal",
+          leg: "Leg"
+      };
+      return labels[normalized] || `${normalized.charAt(0).toUpperCase()}${normalized.slice(1)}`;
   }
 
   private aggregateChargesForLeg(opts: any[], legId: string | null, containers: string[]): Map<string, any> {

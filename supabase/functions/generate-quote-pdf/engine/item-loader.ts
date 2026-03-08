@@ -60,11 +60,10 @@ export async function fetchQuoteItemsWithFallbacks(
       
       const items = Array.isArray(data) ? data : [];
       
-      // If we got items from a fallback source (like quote_items_core), they might lack joined data
       if (candidate.table === "quote_items_core" && items.length > 0) {
-        // Fetch master_commodities to manually join
-        // @ts-ignore
         const commodityIds = [...new Set(items.map(i => i.commodity_id).filter(Boolean))];
+        const containerTypeIds = [...new Set(items.map(i => i.container_type_id).filter(Boolean))];
+        const containerSizeIds = [...new Set(items.map(i => i.container_size_id).filter(Boolean))];
         
         if (commodityIds.length > 0) {
           try {
@@ -72,22 +71,15 @@ export async function fetchQuoteItemsWithFallbacks(
                "master_commodities",
                "id, name",
                "id, name",
-               // @ts-ignore
                (q) => q.in("id", commodityIds),
                "master_commodities manual join"
             );
             
-            // @ts-ignore
             if (!cError && comms) {
-               // @ts-ignore
                const commMap = new Map(comms.map((c: any) => [c.id, c.name]));
                items.forEach((item: any) => {
-                  // @ts-ignore
                   if (item.commodity_id && commMap.has(item.commodity_id)) {
-                      // @ts-ignore
                       item.master_commodities = { name: commMap.get(item.commodity_id) };
-                      // Also set 'commodity' field directly if needed by consumer
-                      // @ts-ignore
                       item.commodity = commMap.get(item.commodity_id);
                   }
                });
@@ -96,15 +88,83 @@ export async function fetchQuoteItemsWithFallbacks(
              await logger.warn(`Failed to manually join commodities: ${e.message}`);
           }
         }
-        
-        // Ensure every item has at least a commodity name from product_name if missing
+
+        if (containerTypeIds.length > 0) {
+          try {
+            const { data: types, error: typeError } = await safeSelect(
+              "container_types",
+              "id, name, code",
+              "id, name, code",
+              (q) => q.in("id", containerTypeIds),
+              "container_types manual join",
+            );
+
+            if (!typeError && types) {
+              const typeMap = new Map(types.map((t: any) => [t.id, t]));
+              items.forEach((item: any) => {
+                if (item.container_type_id && typeMap.has(item.container_type_id)) {
+                  const match = typeMap.get(item.container_type_id);
+                  item.container_types = {
+                    name: match?.name,
+                    code: match?.code,
+                  };
+                  item.container_type = item.container_type || match?.code || match?.name;
+                }
+              });
+            }
+          } catch (e: any) {
+            await logger.warn(`Failed to manually join container types: ${e.message}`);
+          }
+        }
+
+        if (containerSizeIds.length > 0) {
+          try {
+            const { data: sizes, error: sizeError } = await safeSelect(
+              "container_sizes",
+              "id, name, code",
+              "id, name, code",
+              (q) => q.in("id", containerSizeIds),
+              "container_sizes manual join",
+            );
+
+            if (!sizeError && sizes) {
+              const sizeMap = new Map(sizes.map((s: any) => [s.id, s]));
+              items.forEach((item: any) => {
+                if (item.container_size_id && sizeMap.has(item.container_size_id)) {
+                  const match = sizeMap.get(item.container_size_id);
+                  item.container_sizes = {
+                    name: match?.name,
+                    code: match?.code,
+                  };
+                  item.container_size = item.container_size || match?.code || match?.name;
+                }
+              });
+            }
+          } catch (e: any) {
+            await logger.warn(`Failed to manually join container sizes: ${e.message}`);
+          }
+        }
+
         items.forEach((item: any) => {
            if (!item.commodity && !item.master_commodities?.name) {
                item.commodity = item.product_name || "General Cargo";
-               // Log warning if fallback used
-               // await logger.warn(`Item ${item.id} missing commodity, using product_name: ${item.commodity}`);
            }
         });
+
+        const unresolvedContainerTypes = items.filter(
+          (item: any) => item.container_type_id && !item.container_types?.code && !item.container_types?.name,
+        ).length;
+        const unresolvedContainerSizes = items.filter(
+          (item: any) => item.container_size_id && !item.container_sizes?.code && !item.container_sizes?.name,
+        ).length;
+
+        if (unresolvedContainerTypes > 0 || unresolvedContainerSizes > 0) {
+          await logger.warn("Container mapping unresolved for fallback quote items", {
+            quote_id: quoteId,
+            unresolved_container_types: unresolvedContainerTypes,
+            unresolved_container_sizes: unresolvedContainerSizes,
+          });
+        }
       }
       
       return items;
