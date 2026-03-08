@@ -70,7 +70,7 @@ pipeline {
                     def envFile = fileExists('.env') ? readFile(file: '.env') : ''
                     def sanitizeValue = { raw ->
                         if (!raw) return ''
-                        def cleaned = String(raw).trim()
+                        def cleaned = raw.toString().trim()
                         cleaned = cleaned.replaceAll(/^['"`]+|['"`]+$/, '')
                         return cleaned.trim()
                     }
