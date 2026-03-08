@@ -74,15 +74,20 @@ pipeline {
                         cleaned = cleaned.replaceAll(/^['"`]+|['"`]+$/, '')
                         return cleaned.trim()
                     }
+                    echo "sanitizeValue value: ${sanitizeValue}"
                     def parseEnv = { key ->
                         if (!envFile) return ''
                         def m = (envFile =~ /(?m)^${key}=(.*)$/)
                         if (!m) return ''
                         return sanitizeValue(m[0][1])
                     }
+                    echo "parseEnv value: ${parseEnv}"
                     def envSupabaseUrl = sanitizeValue(params.SUPABASE_URL_OVERRIDE ? params.SUPABASE_URL_OVERRIDE : parseEnv('VITE_SUPABASE_URL'))
                     def envAnonKey = sanitizeValue(params.SUPABASE_ANON_KEY_OVERRIDE ? params.SUPABASE_ANON_KEY_OVERRIDE : (parseEnv('VITE_SUPABASE_PUBLISHABLE_KEY') ?: parseEnv('VITE_SUPABASE_ANON_KEY')))
                     def envServiceKey = sanitizeValue(params.SUPABASE_SERVICE_ROLE_KEY_OVERRIDE ? params.SUPABASE_SERVICE_ROLE_KEY_OVERRIDE : parseEnv('SUPABASE_SERVICE_ROLE_KEY'))
+                    echo "envSupabaseUrl: ${envSupabaseUrl}"
+                    echo "envAnonKey: ${envAnonKey}"
+                    echo "envServiceKey: ${envServiceKey}"
 
                     def selectedTarget = params.DB_TARGET
                     if (selectedTarget == 'auto') {
