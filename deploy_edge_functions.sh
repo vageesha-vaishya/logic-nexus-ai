@@ -32,8 +32,13 @@ if ! command -v npm &> /dev/null; then
     log "Error: npm could not be found." "$RED"
     exit 1
 fi
-if ! npm exec --yes -- supabase --version &> /dev/null; then
-    log "Error: Supabase CLI is not available via npm exec." "$RED"
+SUPABASE_CLI="./node_modules/.bin/supabase"
+if [ ! -x "$SUPABASE_CLI" ]; then
+    log "Error: Supabase CLI binary not found at $SUPABASE_CLI. Ensure 'npm install --no-save supabase' ran before this script." "$RED"
+    exit 1
+fi
+if ! "$SUPABASE_CLI" --version &> /dev/null; then
+    log "Error: Supabase CLI is not executable from $SUPABASE_CLI." "$RED"
     exit 1
 fi
 log "Pre-flight checks passed (npm found)." "$GREEN"
@@ -64,7 +69,7 @@ DEPLOY_SUCCESS=0
 DEPLOY_FAIL=0
 
 run_supabase() {
-    npm exec --yes -- supabase "$@"
+    "$SUPABASE_CLI" "$@"
 }
 
 for func_name in "${FUNCTIONS[@]}"; do

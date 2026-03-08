@@ -221,17 +221,34 @@ curl -sI ${env.SELECTED_SUPABASE_URL}/rest/v1/ -H "apikey: ${env.SELECTED_ANON_K
                     ]) {
                         sh '''
 set -e
+SUPABASE_CLI="./node_modules/.bin/supabase"
+if [ ! -x "$SUPABASE_CLI" ]; then
+  echo "Supabase CLI binary not found at $SUPABASE_CLI"
+  exit 1
+fi
+if [ -z "$TARGET_PROJECT_REF" ]; then
+  echo "Missing project ref for edge secret sync"
+  exit 1
+fi
+if [ -z "$TARGET_SUPABASE_URL" ]; then
+  echo "Missing Supabase URL for edge secret sync"
+  exit 1
+fi
 if [ -z "$TARGET_SUPABASE_SERVICE_ROLE_KEY" ]; then
   echo "Missing service role key for edge secret sync"
   exit 1
 fi
+if ! echo "$TARGET_SUPABASE_URL" | grep -Eq '^https://[^.]+\\.supabase\\.co/?$'; then
+  echo "Invalid Supabase URL format: $TARGET_SUPABASE_URL"
+  exit 1
+fi
+trap 'rm -f .supabase-secrets.env' EXIT
 cat > .supabase-secrets.env <<EOF
 SUPABASE_URL=$TARGET_SUPABASE_URL
 SUPABASE_ANON_KEY=$TARGET_SUPABASE_ANON_KEY
 SUPABASE_SERVICE_ROLE_KEY=$TARGET_SUPABASE_SERVICE_ROLE_KEY
 EOF
-npm exec --yes -- supabase secrets set --project-ref "$TARGET_PROJECT_REF" --env-file .supabase-secrets.env
-rm -f .supabase-secrets.env
+"$SUPABASE_CLI" secrets set --project-ref "$TARGET_PROJECT_REF" --env-file .supabase-secrets.env
 '''
                     }
                 }
@@ -251,7 +268,16 @@ rm -f .supabase-secrets.env
                     ]) {
                         sh '''
 set -e
-SECRETS="$(npm exec --yes -- supabase secrets list --project-ref "$PROJECT_REF" || true)"
+SUPABASE_CLI="./node_modules/.bin/supabase"
+if [ ! -x "$SUPABASE_CLI" ]; then
+  echo "Supabase CLI binary not found at $SUPABASE_CLI"
+  exit 1
+fi
+if [ -z "$PROJECT_REF" ]; then
+  echo "Missing project ref while verifying edge secrets"
+  exit 1
+fi
+SECRETS="$("$SUPABASE_CLI" secrets list --project-ref "$PROJECT_REF" || true)"
 echo "$SECRETS"
 for REQUIRED in SUPABASE_URL SUPABASE_ANON_KEY SUPABASE_SERVICE_ROLE_KEY; do
   echo "$SECRETS" | grep -q "$REQUIRED" || { echo "Missing required Edge Function secret: $REQUIRED"; exit 1; }

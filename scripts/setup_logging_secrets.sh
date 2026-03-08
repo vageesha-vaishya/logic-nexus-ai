@@ -3,11 +3,30 @@
 # Script to setup logging secrets for Supabase Edge Functions
 # Usage: ./scripts/setup_logging_secrets.sh
 
+SUPABASE_CLI="./node_modules/.bin/supabase"
+
+if [ ! -x "$SUPABASE_CLI" ]; then
+  echo "❌ Supabase CLI binary not found at $SUPABASE_CLI"
+  echo "   Run: npm install --no-save supabase"
+  exit 1
+fi
+
+PROJECT_REF="${PROJECT_REF:-}"
+if [ -z "$PROJECT_REF" ]; then
+  read -p "Enter Supabase project ref: " PROJECT_REF
+fi
+
+if [ -z "$PROJECT_REF" ]; then
+  echo "❌ Project ref is required."
+  exit 1
+fi
+
 echo "----------------------------------------------------------------"
 echo "🔐 Supabase Logging System Secrets Setup"
 echo "----------------------------------------------------------------"
 echo "This script will help you set up the required secrets for the"
 echo "Alerting & Intelligence phase of the Logging System."
+echo "Target project ref: $PROJECT_REF"
 echo ""
 
 # Function to prompt and set secret
@@ -23,7 +42,7 @@ set_secret() {
   
   if [ -n "$value" ]; then
     echo "   Setting $key..."
-    npx supabase secrets set "$key=$value"
+    "$SUPABASE_CLI" secrets set --project-ref "$PROJECT_REF" "$key=$value"
     echo "   ✅ $key set."
   else
     echo "   ⚠️  Skipped $key."
@@ -33,9 +52,9 @@ set_secret() {
 
 # Check if user is logged in
 echo "Checking Supabase login status..."
-if ! npx supabase projects list > /dev/null 2>&1; then
+if ! "$SUPABASE_CLI" projects list > /dev/null 2>&1; then
   echo "❌ You are not logged in to Supabase CLI or cannot list projects."
-  echo "   Please run 'npx supabase login' first."
+  echo "   Please run './node_modules/.bin/supabase login' first."
   exit 1
 fi
 
