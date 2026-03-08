@@ -158,18 +158,21 @@ curl -sI ${env.SELECTED_SUPABASE_URL}/rest/v1/ -H "apikey: ${env.SELECTED_ANON_K
         stage('Deploy Edge Functions') {
             steps {
                 script {
-                    // Only deploy if tests pass
-                    echo "Deploying Supabase Edge Functions to VPS (Self-Hosted)..."
-                    
-                    // Use Node.js script for deployment to avoid system dependency issues (expect/sudo)
-                    // Install ssh2 library in the current workspace (no-save to avoid modifying package.json)
-                    sh 'npm install --no-save ssh2'
-                    
-                    // Run the Node.js deployment script
-                    // VPS_IP and VPS_PASSWORD are already environment variables
-                    catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                        withEnv(["VPS_USER=${env.VPS_USER}"]) {
-                            sh 'node scripts/deploy_vps.cjs'
+                    def isCloud = env.SELECTED_SUPABASE_URL && env.SELECTED_SUPABASE_URL.contains('supabase.co')
+                    if (isCloud) {
+                        echo "Deploying Supabase Edge Functions to Cloud project: ${env.PROJECT_REF}"
+                        sh 'npm install --no-save supabase'
+                        sh 'chmod +x ./deploy_edge_functions.sh'
+                        withEnv(["SUPABASE_ACCESS_TOKEN=${env.SUPABASE_ACCESS_TOKEN}"]) {
+                            sh './deploy_edge_functions.sh'
+                        }
+                    } else {
+                        echo "Deploying Supabase Edge Functions to VPS (Self-Hosted)..."
+                        sh 'npm install --no-save ssh2'
+                        catchError(buildResult: "SUCCESS", stageResult: "FAILURE") {
+                            withEnv(["VPS_USER=${env.VPS_USER}"]) {
+                                sh "node scripts/deploy_vps.cjs"
+                            }
                         }
                     }
                 }
