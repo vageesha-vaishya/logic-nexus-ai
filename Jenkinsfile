@@ -71,7 +71,9 @@ pipeline {
                     def parseEnv = { key ->
                         if (!envFile) return ''
                         def m = (envFile =~ /(?m)^${key}=(.*)$/)
-                        return m ? m[0][1].trim() : ''
+                        if (!m) return ''
+                        def raw = m[0][1].trim()
+                        return raw.replaceAll(/^['"`]|['"`]$/, '')
                     }
                     def envSupabaseUrl = params.SUPABASE_URL_OVERRIDE ? params.SUPABASE_URL_OVERRIDE : parseEnv('VITE_SUPABASE_URL')
                     def envAnonKey = params.SUPABASE_ANON_KEY_OVERRIDE ? params.SUPABASE_ANON_KEY_OVERRIDE : (parseEnv('VITE_SUPABASE_PUBLISHABLE_KEY') ?: parseEnv('VITE_SUPABASE_ANON_KEY'))
@@ -218,11 +220,10 @@ if [ -z "$TARGET_SUPABASE_SERVICE_ROLE_KEY" ]; then
   echo "Missing service role key for edge secret sync"
   exit 1
 fi
-npm exec --yes supabase secrets set \
+npm exec --yes -- supabase secrets set --project-ref "$TARGET_PROJECT_REF" \
   SUPABASE_URL="$TARGET_SUPABASE_URL" \
   SUPABASE_ANON_KEY="$TARGET_SUPABASE_ANON_KEY" \
-  SUPABASE_SERVICE_ROLE_KEY="$TARGET_SUPABASE_SERVICE_ROLE_KEY" \
-  --project-ref "$TARGET_PROJECT_REF"
+  SUPABASE_SERVICE_ROLE_KEY="$TARGET_SUPABASE_SERVICE_ROLE_KEY"
 '''
                     }
                 }
@@ -242,7 +243,7 @@ npm exec --yes supabase secrets set \
                     ]) {
                         sh '''
 set -e
-SECRETS="$(npm exec --yes supabase secrets list --project-ref "$PROJECT_REF" || true)"
+SECRETS="$(npm exec --yes -- supabase secrets list --project-ref "$PROJECT_REF" || true)"
 echo "$SECRETS"
 for REQUIRED in SUPABASE_URL SUPABASE_ANON_KEY SUPABASE_SERVICE_ROLE_KEY; do
   echo "$SECRETS" | grep -q "$REQUIRED" || { echo "Missing required Edge Function secret: $REQUIRED"; exit 1; }

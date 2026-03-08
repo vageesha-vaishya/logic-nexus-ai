@@ -32,7 +32,7 @@ if ! command -v npm &> /dev/null; then
     log "Error: npm could not be found." "$RED"
     exit 1
 fi
-if ! npm exec --yes supabase --version &> /dev/null; then
+if ! npm exec --yes -- supabase --version &> /dev/null; then
     log "Error: Supabase CLI is not available via npm exec." "$RED"
     exit 1
 fi
@@ -64,7 +64,7 @@ DEPLOY_SUCCESS=0
 DEPLOY_FAIL=0
 
 run_supabase() {
-    npm exec --yes supabase "$@"
+    npm exec --yes -- supabase "$@"
 }
 
 for func_name in "${FUNCTIONS[@]}"; do
