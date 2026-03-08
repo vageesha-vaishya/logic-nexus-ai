@@ -220,9 +220,7 @@ curl -sI ${env.SELECTED_SUPABASE_URL}/rest/v1/ -H "apikey: ${env.SELECTED_ANON_K
                     withEnv([
                         "SUPABASE_ACCESS_TOKEN=${env.SUPABASE_ACCESS_TOKEN}",
                         "TARGET_PROJECT_REF=${env.SELECTED_PROJECT_REF}",
-                        "TARGET_SUPABASE_URL=${env.SELECTED_SUPABASE_URL}",
-                        "TARGET_SUPABASE_ANON_KEY=${env.SELECTED_ANON_KEY}",
-                        "TARGET_SUPABASE_SERVICE_ROLE_KEY=${env.SELECTED_SERVICE_ROLE_KEY}"
+                        "EDGE_TEST_BYPASS_KEY=${env.TEST_BYPASS_KEY ?: ''}"
                     ]) {
                         sh '''
 set -e
@@ -235,25 +233,18 @@ if [ -z "$TARGET_PROJECT_REF" ]; then
   echo "Missing project ref for edge secret sync"
   exit 1
 fi
-if [ -z "$TARGET_SUPABASE_URL" ]; then
-  echo "Missing Supabase URL for edge secret sync"
-  exit 1
+trap 'rm -f .supabase-edge.env' EXIT
+> .supabase-edge.env
+# Only set non-reserved keys. Example: TEST_BYPASS_KEY used by functions for controlled bypass in tests.
+if [ -n "$EDGE_TEST_BYPASS_KEY" ]; then
+  echo "TEST_BYPASS_KEY=$EDGE_TEST_BYPASS_KEY" >> .supabase-edge.env
 fi
-if [ -z "$TARGET_SUPABASE_SERVICE_ROLE_KEY" ]; then
-  echo "Missing service role key for edge secret sync"
-  exit 1
+LINES=$(wc -l < .supabase-edge.env | tr -d ' ')
+if [ "$LINES" = "0" ]; then
+  echo "No non-reserved Edge Function secrets to set. Skipping."
+  exit 0
 fi
-if ! echo "$TARGET_SUPABASE_URL" | grep -Eq '^https://[^.]+\\.supabase\\.co/?$'; then
-  echo "Invalid Supabase URL format: $TARGET_SUPABASE_URL"
-  exit 1
-fi
-trap 'rm -f .supabase-secrets.env' EXIT
-cat > .supabase-secrets.env <<EOF
-SUPABASE_URL=$TARGET_SUPABASE_URL
-SUPABASE_ANON_KEY=$TARGET_SUPABASE_ANON_KEY
-SUPABASE_SERVICE_ROLE_KEY=$TARGET_SUPABASE_SERVICE_ROLE_KEY
-EOF
-"$SUPABASE_CLI" secrets set --project-ref "$TARGET_PROJECT_REF" --env-file .supabase-secrets.env
+"$SUPABASE_CLI" secrets set --project-ref "$TARGET_PROJECT_REF" --env-file .supabase-edge.env
 '''
                     }
                 }
@@ -284,8 +275,9 @@ if [ -z "$PROJECT_REF" ]; then
 fi
 SECRETS="$("$SUPABASE_CLI" secrets list --project-ref "$PROJECT_REF" || true)"
 echo "$SECRETS"
-for REQUIRED in SUPABASE_URL SUPABASE_ANON_KEY SUPABASE_SERVICE_ROLE_KEY; do
-  echo "$SECRETS" | grep -q "$REQUIRED" || { echo "Missing required Edge Function secret: $REQUIRED"; exit 1; }
+# Verify presence of non-reserved keys only
+for REQUIRED in TEST_BYPASS_KEY; do
+  echo "$SECRETS" | grep -q "$REQUIRED" || { echo "Missing expected Edge Function secret: $REQUIRED"; exit 1; }
 done
 '''
                     }
