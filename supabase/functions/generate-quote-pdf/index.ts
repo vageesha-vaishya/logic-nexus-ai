@@ -66,10 +66,24 @@ serveWithLogger(async (req, logger, adminSupabase) => {
     if (!isServiceRole) {
         const { user, error } = await requireAuth(req, logger);
         if (error || !user) {
-            await logger.error("Authentication failed", { error });
-            return new Response(JSON.stringify({ error: "Unauthorized" }), { 
+            const correlationId = logger.getCorrelationId();
+            const authError = String(error || "Unauthorized");
+            if (/missing configuration|SUPABASE_URL|SUPABASE_ANON_KEY|SUPABASE_PUBLISHABLE_KEY/i.test(authError)) {
+              await logger.critical("PDF auth configuration invalid", {
+                error: authError,
+                hasAuthorizationHeader: Boolean(authHeader),
+                correlation_id: correlationId,
+              });
+            } else {
+              await logger.warn("PDF auth rejected", {
+                error: authError,
+                hasAuthorizationHeader: Boolean(authHeader),
+                correlation_id: correlationId,
+              });
+            }
+            return new Response(JSON.stringify({ error: "Unauthorized", ...(correlationId ? { correlation_id: correlationId } : {}) }), { 
                 status: 401, 
-                headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } 
+                headers: { ...getCorsHeaders(req), "Content-Type": "application/json", ...(correlationId ? { "x-correlation-id": correlationId } : {}) } 
             });
         }
         authenticatedUserId = user.id;

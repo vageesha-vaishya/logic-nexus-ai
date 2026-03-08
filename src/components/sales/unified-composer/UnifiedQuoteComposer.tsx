@@ -2501,14 +2501,16 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
       });
       if (pdfError) {
         const msg = String(pdfError?.message || pdfError || '');
+        const correlationId = String((pdfError as any)?.correlation_id || '');
         const issues = Array.isArray((pdfError as any)?.issues) ? (pdfError as any).issues : null;
         if (/jwt|unauthorized|401/i.test(msg)) {
-          throw new Error('Unauthorized. Your session expired or is invalid. Please sign in again.');
+          const suffix = correlationId ? ` (Ref: ${correlationId})` : '';
+          throw new Error(`Unauthorized. Your session expired or is invalid, or PDF service auth is misconfigured.${suffix}`);
         }
         if (issues && issues.length > 0) {
           throw new Error(`${msg || 'PDF pre-render validation failed'}: ${issues.join('; ')}`);
         }
-        throw new Error(msg || 'Failed to generate PDF');
+        throw new Error(`${msg || 'Failed to generate PDF'}${correlationId ? ` (Ref: ${correlationId})` : ''}`);
       }
       if (!response?.content) {
         const issues = Array.isArray(response?.issues) ? response.issues.join('; ') : null;

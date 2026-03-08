@@ -321,6 +321,7 @@ export async function invokeFunction<T = any>(
                     else if (data && data.message) error.message = data.message;
                     else error.message = text;
                     if (data && Array.isArray(data.issues)) (error as any).issues = data.issues;
+                    if (data && data.correlation_id) (error as any).correlation_id = data.correlation_id;
                 } catch {
                     if (text) error.message = text;
                 }

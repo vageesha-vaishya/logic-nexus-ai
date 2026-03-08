@@ -67,7 +67,8 @@ export function QuotePreviewModal({ quoteId, quoteNumber, versionId, disabled }:
         body: basePayload,
       });
       if (pdfError) {
-        throw new Error(pdfError.message || 'Failed to generate PDF preview');
+        const correlationId = (pdfError as any)?.correlation_id ? ` (Ref: ${(pdfError as any).correlation_id})` : '';
+        throw new Error(`${pdfError.message || 'Failed to generate PDF preview'}${correlationId}`);
       }
 
       if (!response || !response.content) {

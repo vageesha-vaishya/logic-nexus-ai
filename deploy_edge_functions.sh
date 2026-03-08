@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Configuration
-PROJECT_REF="gzhxgoigflftharcmdqj"
+PROJECT_REF="${PROJECT_REF:-gzhxgoigflftharcmdqj}"
 FUNCTIONS_DIR="supabase/functions"
 LOG_FILE="deployment_log_$(date +%Y%m%d_%H%M%S).txt"
 
@@ -32,6 +32,10 @@ if ! command -v npm &> /dev/null; then
     log "Error: npm could not be found." "$RED"
     exit 1
 fi
+if ! npm exec --yes supabase --version &> /dev/null; then
+    log "Error: Supabase CLI is not available via npm exec." "$RED"
+    exit 1
+fi
 log "Pre-flight checks passed (npm found)." "$GREEN"
 
 # 2. Function Discovery
@@ -58,6 +62,10 @@ log "3. Starting Verification and Deployment..." "$YELLOW"
 
 DEPLOY_SUCCESS=0
 DEPLOY_FAIL=0
+
+run_supabase() {
+    npm exec --yes supabase "$@"
+}
 
 for func_name in "${FUNCTIONS[@]}"; do
     log "--------------------------------------------------"
@@ -91,35 +99,24 @@ for func_name in "${FUNCTIONS[@]}"; do
     # If the function requires secrets, ensure they are set via 'supabase secrets set' beforehand, 
     # but we assume env is configured or we'll deploy anyway.
     
-    if npx supabase functions deploy "$func_name" --project-ref "$PROJECT_REF" --no-verify-jwt 2>&1 | tee -a "$LOG_FILE"; then
+    if run_supabase functions deploy "$func_name" --project-ref "$PROJECT_REF" 2>&1 | tee -a "$LOG_FILE"; then
         log "  > Deployment command finished." "$GREEN"
+        ((DEPLOY_SUCCESS++))
         
-        # Check if the output contains "Error" (since npx might return 0 even on some failures)
-        if grep -q "Error" <<< "$(tail -n 5 "$LOG_FILE")"; then
-             log "  > Deployment likely FAILED (check logs)." "$RED"
-             ((DEPLOY_FAIL++))
+        FUNC_URL="https://$PROJECT_REF.supabase.co/functions/v1/$func_name"
+        log "  > Validating endpoint: $FUNC_URL"
+        
+        HTTP_CODE=$(curl -sS -m 5 -o /dev/null -w "%{http_code}" "$FUNC_URL" 2>> "$LOG_FILE")
+        CURL_EXIT=$?
+        
+        if [ $CURL_EXIT -ne 0 ]; then
+            log "  > Health check FAILED (curl error $CURL_EXIT). Check network/DNS." "$RED"
+        elif [[ "$HTTP_CODE" == "401" ]] || [[ "$HTTP_CODE" == "200" ]]; then
+             log "  > Health check PASSED (HTTP $HTTP_CODE)." "$GREEN"
+        elif [[ "$HTTP_CODE" == "400" ]] || [[ "$HTTP_CODE" == "405" ]]; then
+             log "  > Health check PASSED (HTTP $HTTP_CODE - Request Reached)." "$GREEN"
         else
-             ((DEPLOY_SUCCESS++))
-             
-             # Step 4: Post-deployment Validation (Health Check)
-             FUNC_URL="https://$PROJECT_REF.supabase.co/functions/v1/$func_name"
-             log "  > Validating endpoint: $FUNC_URL"
-             
-             # Use a 5-second timeout (-m 5)
-             HTTP_CODE=$(curl -sS -m 5 -o /dev/null -w "%{http_code}" "$FUNC_URL" 2>> "$LOG_FILE")
-             CURL_EXIT=$?
-             
-             if [ $CURL_EXIT -ne 0 ]; then
-                 log "  > Health check FAILED (curl error $CURL_EXIT). Check network/DNS." "$RED"
-                 # Don't mark deployment as failed just because health check failed (could be network), 
-                 # but log it clearly.
-             elif [[ "$HTTP_CODE" == "401" ]] || [[ "$HTTP_CODE" == "200" ]]; then
-                  log "  > Health check PASSED (HTTP $HTTP_CODE)." "$GREEN"
-             elif [[ "$HTTP_CODE" == "400" ]] || [[ "$HTTP_CODE" == "405" ]]; then
-                  log "  > Health check PASSED (HTTP $HTTP_CODE - Request Reached)." "$GREEN"
-             else
-                  log "  > Health check WARNING (HTTP $HTTP_CODE). Check logs." "$RED"
-             fi
+             log "  > Health check WARNING (HTTP $HTTP_CODE). Check logs." "$RED"
         fi
 
     else
