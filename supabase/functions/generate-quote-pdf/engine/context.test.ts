@@ -55,7 +55,118 @@ describe("mapQuoteItemsToRawItems", () => {
 
     const result = mapQuoteItemsToRawItems(items);
 
-    expect(result[0].container_type).toBe("40HC GP");
+    expect(result[0].container_type).toBe("Dry Standard");
+    expect(result[0].container_size).toBe("40FT");
+  });
+
+  it("deduplicates container labels when size and type are identical", () => {
+    const items = [
+      {
+        quantity: 1,
+        weight_kg: 5,
+        volume_cbm: 1,
+        container_sizes: { code: "40HC" },
+        container_types: { code: "40HC" },
+      },
+    ];
+
+    const result = mapQuoteItemsToRawItems(items);
+    expect(result[0].container_type).toBe("40HC");
+  });
+
+  it("keeps container size when type is unavailable", () => {
+    const items = [
+      {
+        quantity: 1,
+        weight_kg: 8,
+        volume_cbm: 1,
+        container_sizes: { code: "20FT", name: "20ft" },
+      },
+    ];
+
+    const result = mapQuoteItemsToRawItems(items);
+
+    expect(result[0].container_type).toBe("Container");
+    expect(result[0].container_size).toBe("20FT");
+  });
+
+  it("maps standard, refrigerated, and open-top container configurations", () => {
+    const items = [
+      {
+        quantity: 1,
+        weight_kg: 10,
+        volume_cbm: 2,
+        container_sizes: { code: "20FT" },
+        container_types: { code: "GP" },
+      },
+      {
+        quantity: 1,
+        weight_kg: 10,
+        volume_cbm: 2,
+        container_sizes: { code: "40FT" },
+        container_types: { code: "RF" },
+      },
+      {
+        quantity: 1,
+        weight_kg: 10,
+        volume_cbm: 2,
+        container_sizes: { code: "40FT HC" },
+        container_types: { code: "OT" },
+      },
+    ];
+
+    const result = mapQuoteItemsToRawItems(items);
+    expect(result.map((item) => item.container_type)).toEqual(["Dry Standard", "Reefer", "Open Top"]);
+  });
+
+  it("derives container labels from commodity text when ids are unavailable", () => {
+    const items = [
+      { quantity: 1, product_name: "20GP Containerized Machinery", total_weight: 1000, total_volume: 10 },
+      { quantity: 1, commodity_description: "40ft refrigerated cargo", total_weight: 1200, total_volume: 12 },
+      { quantity: 1, description: "Open-top 40ft heavy equipment", total_weight: 900, total_volume: 8 },
+    ];
+
+    const result = mapQuoteItemsToRawItems(items);
+    expect(result.map((item) => item.container_type)).toEqual(["Dry Standard", "Reefer", "Open Top"]);
+  });
+
+  it("maps cargo container combos with typeId and sizeId", () => {
+    const items = [
+      { sizeId: "20", typeId: "dry", quantity: 1, commodity: "Cargo" },
+      { sizeId: "40ft", typeId: "open_top", quantity: -1, commodity: "Cargo" },
+    ];
+
+    const result = mapQuoteItemsToRawItems(items);
+    expect(result).toHaveLength(2);
+    expect(result[0]).toMatchObject({
+      container_type: "Dry Standard",
+      container_size: "20FT",
+      quantity: 1,
+    });
+    expect(result[1]).toMatchObject({
+      container_type: "Open Top",
+      container_size: "40FT",
+      quantity: -1,
+    });
+  });
+
+  it("preserves positive negative and zero quantities across container types", () => {
+    const items = [
+      { sizeId: "20ft", typeId: "gp", quantity: 1, commodity: "Cargo" },
+      { sizeId: "40ft", typeId: "rf", quantity: 0, commodity: "Cargo" },
+      { sizeId: "40", typeId: "ot", quantity: -1, commodity: "Cargo" },
+      { sizeId: "45", typeId: "flat_rack", quantity: "", commodity: "Cargo" },
+    ];
+
+    const result = mapQuoteItemsToRawItems(items);
+    expect(result.map((item) => item.container_type)).toEqual([
+      "Dry Standard",
+      "Reefer",
+      "Open Top",
+      "Flat Rack",
+    ]);
+    expect(result.map((item) => item.container_size)).toEqual(["20FT", "40FT", "40FT", "45FT"]);
+    expect(result.map((item) => item.quantity)).toEqual([1, 0, -1, 0]);
   });
 });
 
@@ -89,5 +200,63 @@ describe("buildSafeContextWithValidation", () => {
 
     const result = buildSafeContextWithValidation(payload);
     expect(result.warnings.some((w) => w.includes("container type is missing"))).toBe(true);
+  });
+
+  it("maps quantity aliases for renderer compatibility", () => {
+    const payload = {
+      quote: {
+        quote_number: "Q-2",
+        created_at: new Date().toISOString(),
+        status: "draft",
+        total_amount: 100,
+        currency: "USD",
+      },
+      items: [
+        {
+          qty: 4,
+          commodity: "Food",
+          weight: 200,
+          volume: 10,
+          container_size: "40FT",
+          container_type: "RF",
+        },
+      ],
+      charges: [{ description: "Freight", amount: 100, currency: "USD" }],
+    };
+
+    const result = buildSafeContextWithValidation(payload);
+    expect(result.context.items[0].qty).toBe(4);
+    expect(result.context.items[0].quantity).toBe(4);
+    expect(result.context.items[0].container_type).toBe("RF");
+    expect(result.context.items[0].container_size).toBe("40FT");
+  });
+
+  it("keeps zero and negative quantities for item and charge totals", () => {
+    const payload = {
+      quote: {
+        quote_number: "Q-3",
+        created_at: new Date().toISOString(),
+        status: "draft",
+        total_amount: 100,
+        currency: "USD",
+      },
+      items: [
+        {
+          quantity: 0,
+          commodity: "Food",
+          weight: 200,
+          volume: 10,
+          container_size: "20FT",
+          container_type: "GP",
+        },
+      ],
+      charges: [{ description: "Freight", amount: 100, currency: "USD", quantity: -1 }],
+    };
+
+    const result = buildSafeContextWithValidation(payload);
+    expect(result.context.items[0].quantity).toBe(0);
+    expect(result.context.items[0].qty).toBe(0);
+    expect(result.context.charges[0].qty).toBe(-1);
+    expect(result.context.charges[0].unit_price).toBe(-100);
   });
 });

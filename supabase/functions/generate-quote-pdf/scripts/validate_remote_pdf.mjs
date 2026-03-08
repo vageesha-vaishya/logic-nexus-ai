@@ -37,6 +37,64 @@ function extractPdfFromJsonPayload(payload) {
   return null;
 }
 
+function formatContainerLabel(size, type) {
+  const sizeText = String(size || '').trim();
+  const typeText = String(type || '').trim();
+  const values = [sizeText, typeText].filter(Boolean).filter((value, index, arr) => arr.indexOf(value) === index);
+  return values.join(' ').trim() || 'Container';
+}
+
+function deriveContainerFromText(...values) {
+  const haystack = values
+    .map((value) => String(value || '').trim())
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+  if (!haystack) {
+    return { size: '', type: '' };
+  }
+  const compact = haystack.replace(/[^a-z0-9]/g, '');
+  const compactMatch = compact.match(/(20|40|45)(gp|hc|hq|rf|reefer|ot|opentop|fr|flatrack|std|standard)/i);
+  if (compactMatch) {
+    return { size: `${compactMatch[1]}FT`, type: compactMatch[2].toUpperCase().replace('REEFER', 'RF').replace('OPENTOP', 'OT').replace('FLATRACK', 'FR').replace('STD', 'GP').replace('STANDARD', 'GP') };
+  }
+  const sizeMatch = haystack.match(/\b(20|40|45)\s*(ft|')?\b/i);
+  const size = sizeMatch ? `${sizeMatch[1]}FT` : '';
+  if (/\b(hc|hq|high\s*cube)\b/i.test(haystack)) return { size, type: 'HC' };
+  if (/\b(rf|reefer|refrigerated)\b/i.test(haystack)) return { size, type: 'RF' };
+  if (/\b(ot|open[\s-]*top)\b/i.test(haystack)) return { size, type: 'OT' };
+  if (/\b(fr|flat[\s-]*rack)\b/i.test(haystack)) return { size, type: 'FR' };
+  if (/\b(gp|general\s*purpose|standard|std)\b/i.test(haystack)) return { size, type: 'GP' };
+  return { size, type: '' };
+}
+
+async function fetchContainerMaps(sizeIds, typeIds) {
+  const sizeMap = new Map();
+  const typeMap = new Map();
+
+  if (sizeIds.length > 0) {
+    const { data: sizes, error: sizesError } = await supabase
+      .from('container_sizes')
+      .select('id, code, name')
+      .in('id', sizeIds);
+    if (!sizesError && sizes) {
+      sizes.forEach((s) => sizeMap.set(s.id, s));
+    }
+  }
+
+  if (typeIds.length > 0) {
+    const { data: types, error: typesError } = await supabase
+      .from('container_types')
+      .select('id, code, name')
+      .in('id', typeIds);
+    if (!typesError && types) {
+      types.forEach((t) => typeMap.set(t.id, t));
+    }
+  }
+
+  return { sizeMap, typeMap };
+}
+
 async function decodePdfResponse(response) {
   const contentType = String(response.headers.get('content-type') || '').toLowerCase();
   const bodyBuffer = Buffer.from(await response.arrayBuffer());
@@ -79,6 +137,33 @@ async function main() {
 
   console.log(`Quote found: ${quote.quote_number} (${quote.id})`);
 
+  const { data: quoteItems, error: quoteItemsError } = await supabase
+    .from('quote_items_core')
+    .select('*')
+    .eq('quote_id', quote.id);
+
+  if (quoteItemsError) {
+    console.warn('Could not fetch quote items for diagnostics:', quoteItemsError.message);
+  } else {
+    const quoteItemSizeIds = [...new Set((quoteItems || []).map((item) => item.container_size_id).filter(Boolean))];
+    const quoteItemTypeIds = [...new Set((quoteItems || []).map((item) => item.container_type_id).filter(Boolean))];
+    const { sizeMap, typeMap } = await fetchContainerMaps(quoteItemSizeIds, quoteItemTypeIds);
+    const normalizedItemContainers = (quoteItems || []).map((item) => {
+      const resolvedSize = item.container_size_id ? sizeMap.get(item.container_size_id) : null;
+      const resolvedType = item.container_type_id ? typeMap.get(item.container_type_id) : null;
+      const inferred = deriveContainerFromText(item.product_name, item.commodity, item.commodity_description, item.description);
+      const size = resolvedSize?.code || resolvedSize?.name || item.container_size_id || inferred.size;
+      const type = resolvedType?.code || resolvedType?.name || item.container_type_id || inferred.type;
+      return {
+        id: item.id,
+        quantity: item.quantity || 0,
+        commodity: item.commodity || item.product_name || item.commodity_description || 'General Cargo',
+        container: formatContainerLabel(size, type),
+      };
+    });
+    console.log('Quote Item Containers:', normalizedItemContainers);
+  }
+
   // 1.1 Fetch latest version and its options
   const { data: versions, error: versionsError } = await supabase
     .from('quotation_versions')
@@ -112,9 +197,18 @@ async function main() {
           // console.log('--- OPTIONS DUMP ---');
           console.log('Options Count:', options.length);
           if (options.length > 0) {
-              // console.log(JSON.stringify(options, null, 2));
               const amounts = options.map(o => o.total_amount);
               console.log('Option Amounts:', amounts);
+              const optionSizeIds = [...new Set(options.map((o) => o.container_size_id).filter(Boolean))];
+              const optionTypeIds = [...new Set(options.map((o) => o.container_type_id).filter(Boolean))];
+              const { sizeMap, typeMap } = await fetchContainerMaps(optionSizeIds, optionTypeIds);
+              const optionContainers = options.map((o) =>
+                formatContainerLabel(
+                  (o.container_size_id ? sizeMap.get(o.container_size_id)?.code || sizeMap.get(o.container_size_id)?.name : null) || o.container_size || o.container_size_id,
+                  (o.container_type_id ? typeMap.get(o.container_type_id)?.code || typeMap.get(o.container_type_id)?.name : null) || o.container_type_id,
+                )
+              );
+              console.log('Option Containers:', optionContainers);
           } else {
               console.log('No standard options found.');
           }

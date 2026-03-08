@@ -38,6 +38,7 @@ export const DefaultTemplate: QuoteTemplate = {
     {
         type: "key_value_grid",
         height: 60,
+        page_break_before: false,
         config: { columns: 2 },
         grid_fields: [
           { key: "quote.quote_number", label: "Quote Ref" },
@@ -49,6 +50,7 @@ export const DefaultTemplate: QuoteTemplate = {
     {
         type: "key_value_grid",
         height: 80,
+        page_break_before: false,
         config: { columns: 2 },
         grid_fields: [
           { key: "customer.company_name", label: "Customer" },
@@ -77,11 +79,13 @@ export const DefaultTemplate: QuoteTemplate = {
       table_config: {
         source: "items",
         columns: [
-          { field: "container_type", label: "Equipment", width: "25%", align: "left" },
-          { field: "quantity", label: "Qty", width: "15%", align: "center" },
-          { field: "commodity", label: "Commodity", width: "30%", align: "left" },
-          { field: "weight", label: "Weight (kg)", width: "15%", align: "right" },
-          { field: "volume", label: "Volume (cbm)", width: "15%", align: "right" }
+          { field: "sequence_number", label: "Seq", width: "10%", align: "center" },
+          { field: "container_type", label: "Type", width: "20%", align: "left" },
+          { field: "container_size", label: "Size", width: "15%", align: "center" },
+          { field: "quantity", label: "Qty", width: "10%", align: "center" },
+          { field: "commodity", label: "Commodity", width: "25%", align: "left" },
+          { field: "weight", label: "Weight (kg)", width: "10%", align: "right" },
+          { field: "volume", label: "Volume (cbm)", width: "10%", align: "right" }
         ],
         show_subtotals: false
       }
@@ -99,6 +103,7 @@ export const DefaultTemplate: QuoteTemplate = {
     {
         type: "detailed_matrix_rate_table",
         height: 200,
+        page_break_before: false,
         config: {
             show_images: true,
             columns: [

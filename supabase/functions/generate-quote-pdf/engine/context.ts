@@ -45,11 +45,18 @@ export const RawQuoteDataSchema = z.object({
     note: z.string().optional(),
   })).optional(),
   items: z.array(z.object({
+    sequence_number: z.number().optional(),
     container_type: z.string().optional(),
+    container_size: z.string().optional(),
     quantity: z.number().optional(),
+    qty: z.number().optional(),
     commodity: z.string().optional(),
     weight: z.number().optional(),
     volume: z.number().optional(),
+    dimensions: z.string().optional(),
+    declared_value: z.number().optional(),
+    is_hazmat: z.boolean().optional(),
+    is_stackable: z.boolean().optional(),
   })).optional(),
   branding: z.object({
     logo_url: z.string().optional(),
@@ -160,45 +167,122 @@ function validateForPdf(raw: any): PdfValidationResult {
   return { blockers, warnings };
 }
 
+function deriveContainerFromText(...values: Array<unknown>): { size: string; type: string } {
+  const haystack = values
+    .map((value) => String(value || "").trim())
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  if (!haystack) {
+    return { size: "", type: "" };
+  }
+
+  const compact = haystack.replace(/[^a-z0-9]/g, "");
+  const compactMatch = compact.match(/(20|40|45)(gp|hc|hq|rf|reefer|ot|opentop|fr|flatrack|std|standard)/i);
+  let inferredSize = "";
+  let inferredType = "";
+
+  if (compactMatch) {
+    inferredSize = `${compactMatch[1]}FT`;
+    inferredType = compactMatch[2].toUpperCase();
+  } else {
+    const sizeMatch = haystack.match(/\b(20|40|45)\s*(ft|')?\b/i);
+    if (sizeMatch) {
+      inferredSize = `${sizeMatch[1]}FT`;
+    }
+    if (/\b(hc|hq|high\s*cube)\b/i.test(haystack)) inferredType = "HC";
+    else if (/\b(rf|reefer|refrigerated)\b/i.test(haystack)) inferredType = "RF";
+    else if (/\b(ot|open[\s-]*top)\b/i.test(haystack)) inferredType = "OT";
+    else if (/\b(fr|flat[\s-]*rack)\b/i.test(haystack)) inferredType = "FR";
+    else if (/\b(gp|general\s*purpose|standard|std)\b/i.test(haystack)) inferredType = "GP";
+  }
+
+  if (inferredType === "REEFER") inferredType = "Reefer";
+  if (inferredType === "OPENTOP") inferredType = "Open Top";
+  if (inferredType === "FLATRACK") inferredType = "Flat Rack";
+  if (inferredType === "STD" || inferredType === "STANDARD" || inferredType === "GP") inferredType = "Dry Standard";
+  if (inferredType === "HC") inferredType = "High Cube";
+
+  return {
+    size: inferredSize,
+    type: inferredType,
+  };
+}
+
 export function mapQuoteItemsToRawItems(items: any[] | null | undefined) {
   if (!items) return [];
-  return items.map((i: any) => {
+  return items.map((i: any, index: number) => {
+    const toFiniteNumber = (value: unknown, fallback = 0): number => {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : fallback;
+    };
+
+    const extractCodeOrName = (obj: any): string => {
+      if (!obj) return "";
+      if (Array.isArray(obj)) {
+        return obj.length > 0 ? extractCodeOrName(obj[0]) : "";
+      }
+      return obj.code || obj.name || "";
+    };
+
     const containerSize =
-      i.container_sizes?.code ||
-      i.container_sizes?.name ||
-      i.container_size?.code ||
-      i.container_size?.name ||
+      extractCodeOrName(i.container_sizes) ||
+      extractCodeOrName(i.container_size) ||
+      i.sizeId ||
+      i.size_id ||
       i.container_size_code ||
       i.container_size_name ||
-      i.container_size ||
+      (typeof i.container_size === 'string' ? i.container_size : "") ||
       "";
+
     const containerType =
-      i.container_types?.code ||
-      i.container_types?.name ||
-      i.container_type?.code ||
-      i.container_type?.name ||
+      extractCodeOrName(i.container_types) ||
+      extractCodeOrName(i.container_type) ||
+      i.typeId ||
+      i.type_id ||
       i.container_type_code ||
       i.container_type_name ||
-      i.container_type ||
+      (typeof i.container_type === 'string' ? i.container_type : "") ||
       "";
-    const normalizedContainer = [containerSize, containerType]
-      .map((value: unknown) => String(value || "").trim())
-      .filter(Boolean)
-      .join(" ")
-      .trim();
-    const weight = Number(
-      typeof i.weight_kg !== "undefined" && i.weight_kg !== null
-        ? i.weight_kg
-        : i.total_weight
-    ) || 0;
-    const volume = Number(
-      typeof i.volume_cbm !== "undefined" && i.volume_cbm !== null
-        ? i.volume_cbm
-        : i.total_volume
-    ) || 0;
+
+    const inferred = deriveContainerFromText(
+      i.product_name,
+      i.commodity,
+      i.commodity_description,
+      i.description,
+      i.item_description,
+      typeof i.typeId === 'string' ? i.typeId : "",
+      typeof i.sizeId === 'string' ? i.sizeId : "",
+      typeof i.container_type === 'string' ? i.container_type : "",
+      typeof i.container_size === 'string' ? i.container_size : ""
+    );
+
+    let normalizedSize = String(containerSize || inferred.size || "").trim();
+    let normalizedType = String(containerType || inferred.type || "").trim();
+
+    const typeUpper = normalizedType.toUpperCase().replace(/[\s_-]/g, "");
+    if (typeUpper === "GP" || typeUpper === "STANDARD" || typeUpper === "STD" || typeUpper === "DRY" || typeUpper === "DRYSTANDARD") normalizedType = "Dry Standard";
+    if (typeUpper === "OT" || typeUpper === "OPENTOP") normalizedType = "Open Top";
+    if (typeUpper === "RF" || typeUpper === "REEFER") normalizedType = "Reefer";
+    if (typeUpper === "FR" || typeUpper === "FLATRACK") normalizedType = "Flat Rack";
+    if (typeUpper === "HC" || typeUpper === "HIGHCUBE") normalizedType = "High Cube";
+
+    const sizeUpper = normalizedSize.toUpperCase().replace(/[\s_-]/g, "");
+    if (sizeUpper === "20" || sizeUpper === "20FT") normalizedSize = "20FT";
+    if (sizeUpper === "40" || sizeUpper === "40FT") normalizedSize = "40FT";
+    if (sizeUpper === "45" || sizeUpper === "45FT") normalizedSize = "45FT";
+    if (sizeUpper === "40HC" || sizeUpper === "40HQ") normalizedSize = "40FT";
+
+    const weight = toFiniteNumber(i.gross_weight ?? i.weight_kg ?? i.weight ?? i.total_weight ?? 0, 0);
+    const volume = toFiniteNumber(i.volume_cbm ?? i.cbm ?? i.volume ?? i.total_volume ?? 0, 0);
+    const rawQty = i.quantity ?? i.qty ?? 1;
+    const quantity = toFiniteNumber(rawQty, 0);
+
     return {
-      container_type: normalizedContainer || "Container",
-      quantity: i.quantity,
+      sequence_number: index + 1,
+      container_type: normalizedType || "Container",
+      container_size: normalizedSize || "-",
+      quantity: quantity,
       commodity: i.commodity || i.master_commodities?.name || i.commodity_description || "General Cargo",
       weight,
       volume,
@@ -271,7 +355,11 @@ export interface SafeContext {
   }>;
   items: Array<{
     type: string;
+    sequence_number: number;
+    container_type?: string;
+    container_size?: string;
     qty: number;
+    quantity?: number;
     commodity: string;
     details: string;
     weight?: number;
@@ -439,9 +527,13 @@ export function buildSafeContextWithValidation(
         transit_time: l.transit_time || l.transit_time_hours,
       };
     }),
-    items: (data.items || []).map((i: any) => ({
-      type: i.container_type || "Standard",
-      qty: i.quantity || 1,
+    items: (data.items || []).map((i: any, index: number) => ({
+      type: i.container_type || i.type || [i.container_size, i.container_type].filter(Boolean).join(" ").trim() || "Standard",
+      sequence_number: i.sequence_number || index + 1,
+      container_type: i.container_type || i.type || [i.container_size, i.container_type].filter(Boolean).join(" ").trim() || "Standard",
+      container_size: i.container_size,
+      qty: Number.isFinite(Number(i.quantity ?? i.qty ?? 1)) ? Number(i.quantity ?? i.qty ?? 1) : 0,
+      quantity: Number.isFinite(Number(i.quantity ?? i.qty ?? 1)) ? Number(i.quantity ?? i.qty ?? 1) : 0,
       commodity: i.commodity || "General Cargo",
       details: `${i.weight || 0} kg / ${i.volume || 0} cbm`,
       weight: i.weight || 0,
@@ -453,7 +545,7 @@ export function buildSafeContextWithValidation(
     })),
     charges: (data.charges || []).map((c: any) => {
       const amount = Number(c.amount) || 0;
-      const quantity = c.quantity || 1;
+      const quantity = Number.isFinite(Number(c.quantity ?? 1)) ? Number(c.quantity ?? 1) : 0;
       const currency = c.currency || "USD";
       const description = c.description || "Service Charge";
 
@@ -508,7 +600,7 @@ export function buildSafeContextWithValidation(
           }),
     charges: (opt.charges || []).map((c: any) => {
         const amount = Number(c.amount) || 0;
-        const quantity = c.quantity || 1;
+        const quantity = Number.isFinite(Number(c.quantity ?? 1)) ? Number(c.quantity ?? 1) : 0;
         const currency = c.currency || "USD";
         const description = c.description || "Service Charge";
         return {

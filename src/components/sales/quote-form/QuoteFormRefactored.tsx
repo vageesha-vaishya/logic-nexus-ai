@@ -2,7 +2,7 @@ import { useState, useEffect, Suspense, lazy } from 'react';
 import { useForm, FormProvider } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/components/ui/button';
-import { QuoteDataProvider } from './QuoteContext';
+import { QuoteDataProvider, useQuoteContext } from './QuoteContext';
 import { QuoteHeader } from './QuoteHeader';
 import { QuoteLogistics } from './QuoteLogistics';
 // Lazy load non-critical components
@@ -11,7 +11,7 @@ const QuoteFinancials = lazy(() => import('./QuoteFinancials').then(module => ({
 
 import { quoteSchema, QuoteFormValues } from './types';
 import { QuoteErrorBoundary } from './QuoteErrorBoundary';
-import { UnifiedQuoteComposer } from '@/components/sales/unified-composer/UnifiedQuoteComposer';
+import { MultiModalQuoteComposer } from '@/components/sales/MultiModalQuoteComposer';
 import { Loader2, Save, X, LayoutDashboard } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQuoteRepositoryForm } from './useQuoteRepository';
@@ -28,11 +28,10 @@ interface QuoteFormProps {
   initialData?: Partial<QuoteFormValues>;
   autoSave?: boolean;
   initialViewMode?: 'form' | 'composer';
-  showPreviewInFormHeader?: boolean;
 }
 
-function QuoteFormContent({ quoteId, quoteNumber, versionId, onSuccess, initialData, autoSave, initialViewMode = 'form', showPreviewInFormHeader = true }: QuoteFormProps) {
-
+function QuoteFormContent({ quoteId, quoteNumber, versionId, onSuccess, initialData, autoSave, initialViewMode = 'form' }: QuoteFormProps) {
+  const { resolvedTenantId } = useQuoteContext();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasAutoSaved, setHasAutoSaved] = useState(false);
   const [showCatalogDialog, setShowCatalogDialog] = useState(false);
@@ -97,24 +96,13 @@ function QuoteFormContent({ quoteId, quoteNumber, versionId, onSuccess, initialD
 
   // Auto-save logic for Quick Quote conversion
   useEffect(() => {
-    if (
-      autoSave && 
-      !hasAutoSaved && 
-      !quoteId && 
-      initialData && 
-      !isSubmitting
-    ) {
-      const hasPortsResolved = !!initialData.origin_port_id && !!initialData.destination_port_id;
-      const legs = Array.isArray(initialData.options) ? (initialData.options[0]?.legs || []) : [];
-      const hasLegsResolved = legs.length > 0 && legs.every((l: any) => !!l.origin_location_id && !!l.destination_location_id);
-      
-      if (hasPortsResolved || hasLegsResolved) {
-        const timer = setTimeout(() => {
-          form.handleSubmit(onSubmit)();
-          setHasAutoSaved(true);
-        }, 500);
-        return () => clearTimeout(timer);
-      }
+    if (autoSave && !hasAutoSaved && !quoteId && initialData && !isSubmitting) {
+      console.log('[QuoteForm] Triggering auto-save from Quick Quote data...');
+      const timer = setTimeout(() => {
+        form.handleSubmit(onSubmit)();
+        setHasAutoSaved(true);
+      }, 500); // Small delay to ensure form state is settled
+      return () => clearTimeout(timer);
     }
   }, [autoSave, hasAutoSaved, quoteId, initialData, form]);
 
@@ -169,11 +157,6 @@ function QuoteFormContent({ quoteId, quoteNumber, versionId, onSuccess, initialD
 
     try {
       const savedId = await saveQuote({ quoteId, data });
-      
-      // Reset form with the submitted data to clear dirty state
-      // This ensures that subsequent hydrations (e.g. after switching back from Composer)
-      // are not blocked by the dirty check.
-      form.reset(data);
       
       const duration = performance.now() - startTime;
       formDebug.logResponse(
@@ -230,12 +213,12 @@ function QuoteFormContent({ quoteId, quoteNumber, versionId, onSuccess, initialD
                         {quoteId ? 'Edit Quote' : 'New Quote'}
                     </h2>
                     <p className="text-sm text-muted-foreground hidden md:block">
-                        {quoteId ? `Quote #: ${quoteNumber || quoteId}` : 'Create a new logistics quotation'}
+                        {quoteId ? `Ref: ${quoteId.slice(0, 8)}...` : 'Create a new logistics quotation'}
                     </p>
                 </div>
             </div>
-                <div className="flex gap-3">
-                 {quoteId && showPreviewInFormHeader && (
+            <div className="flex gap-3">
+                 {quoteId && (
                     <>
                         <QuotePreviewModal 
                             quoteId={quoteId} 
@@ -253,9 +236,26 @@ function QuoteFormContent({ quoteId, quoteNumber, versionId, onSuccess, initialD
                             disabled={isSubmitting || isHydrating}
                         >
                             <LayoutDashboard className="h-4 w-4" />
-                            {isSubmitting ? 'Saving...' : (viewMode === 'form' ? 'Save & Compose' : 'Back to Form')}
+                            {isSubmitting ? 'Saving...' : (viewMode === 'form' ? 'Save & Switch to Composer' : 'Back to Form')}
                         </Button>
                     </>
+                 )}
+                 {quoteId && viewMode === 'form' && (
+                     <Button 
+                        type="button" 
+                        variant="secondary"
+                        onClick={form.handleSubmit(async (data) => {
+                            const success = await onSubmit(data);
+                            if (success) {
+                                setViewMode('composer');
+                            }
+                        }, onInvalid)}
+                        disabled={isSubmitting || isHydrating}
+                        className="gap-2"
+                     >
+                        <Save className="h-4 w-4" />
+                        Save & Compose
+                     </Button>
                  )}
                  <Button type="button" variant="outline" onClick={() => window.history.back()} className="gap-2">
                     <X className="h-4 w-4" />
@@ -279,9 +279,10 @@ function QuoteFormContent({ quoteId, quoteNumber, versionId, onSuccess, initialD
           </div>
         ) : viewMode === 'composer' && quoteId ? (
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <UnifiedQuoteComposer
+                <MultiModalQuoteComposer 
                     quoteId={quoteId}
                     versionId={versionId}
+                    tenantId={resolvedTenantId || undefined}
                 />
             </div>
         ) : (
@@ -291,7 +292,7 @@ function QuoteFormContent({ quoteId, quoteNumber, versionId, onSuccess, initialD
                     <span className="flex h-6 w-6 items-center justify-center rounded-full border border-primary/30 bg-primary/5 text-xs">1</span>
                     <h3>General Information</h3>
                 </div>
-                <QuoteHeader quoteNumber={quoteNumber || quoteId} />
+                <QuoteHeader />
             </section>
             
             <section className="space-y-4">

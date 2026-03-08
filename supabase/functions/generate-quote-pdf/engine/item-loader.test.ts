@@ -137,4 +137,45 @@ describe("fetchQuoteItemsWithFallbacks", () => {
     });
     expect(safeSelect).toHaveBeenCalledTimes(4);
   });
+
+  it("logs unresolved container mapping when manual joins miss ids", async () => {
+    const safeSelect = vi
+      .fn()
+      .mockResolvedValueOnce({
+        data: null,
+        error: { message: "Could not find the table 'public.quote_items' in the schema cache" },
+      })
+      .mockResolvedValueOnce({
+        data: [
+          {
+            id: "item-core-3",
+            product_name: "Cargo",
+            container_type_id: "type-missing",
+            container_size_id: "size-missing",
+          },
+        ],
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: [],
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: [],
+        error: null,
+      });
+
+    const logger = { warn: vi.fn(), info: vi.fn() };
+    const result = await fetchQuoteItemsWithFallbacks("q-1", safeSelect, logger);
+
+    expect(result).toHaveLength(1);
+    expect(logger.warn).toHaveBeenCalledWith(
+      "Container mapping unresolved for fallback quote items",
+      expect.objectContaining({
+        quote_id: "q-1",
+        unresolved_container_types: 1,
+        unresolved_container_sizes: 1,
+      }),
+    );
+  });
 });

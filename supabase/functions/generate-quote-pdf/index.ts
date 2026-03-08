@@ -90,6 +90,7 @@ serveWithLogger(async (req, logger, adminSupabase) => {
     const body = await req.json();
     const { templateId } = body;
     let { quoteId, versionId, store_result } = body;
+    const forceRerender = Boolean(body?.force_rerender || body?.skip_cache);
 
     // Handle Database Webhook Payload
     if (body.type === 'INSERT' || body.type === 'UPDATE') {
@@ -134,6 +135,65 @@ serveWithLogger(async (req, logger, adminSupabase) => {
         return { data: fallback.data, error: fallback.error };
       }
       return { data, error };
+    };
+
+    const enrichOptionContainers = async (targetOptions: any[]) => {
+      if (!Array.isArray(targetOptions) || targetOptions.length === 0) return;
+
+      const unresolvedTypeIds = [
+        ...new Set(
+          targetOptions
+            .filter((option) => option?.container_type_id && !option?.container_types?.code && !option?.container_types?.name)
+            .map((option) => option.container_type_id),
+        ),
+      ];
+      const unresolvedSizeIds = [
+        ...new Set(
+          targetOptions
+            .filter((option) => option?.container_size_id && !option?.container_sizes?.code && !option?.container_sizes?.name)
+            .map((option) => option.container_size_id),
+        ),
+      ];
+
+      if (unresolvedTypeIds.length > 0) {
+        const { data: typeRows, error: typeError } = await safeSelect(
+          "container_types",
+          "id, code, name",
+          "id, code, name",
+          (q) => q.in("id", unresolvedTypeIds),
+          "manual option container types join",
+        );
+        if (!typeError && Array.isArray(typeRows)) {
+          const typeMap = new Map(typeRows.map((row: any) => [row.id, row]));
+          targetOptions.forEach((option: any) => {
+            if (option?.container_type_id && typeMap.has(option.container_type_id)) {
+              const match = typeMap.get(option.container_type_id);
+              option.container_types = { code: match?.code, name: match?.name };
+              option.container_type = option.container_type || match?.code || match?.name;
+            }
+          });
+        }
+      }
+
+      if (unresolvedSizeIds.length > 0) {
+        const { data: sizeRows, error: sizeError } = await safeSelect(
+          "container_sizes",
+          "id, code, name",
+          "id, code, name",
+          (q) => q.in("id", unresolvedSizeIds),
+          "manual option container sizes join",
+        );
+        if (!sizeError && Array.isArray(sizeRows)) {
+          const sizeMap = new Map(sizeRows.map((row: any) => [row.id, row]));
+          targetOptions.forEach((option: any) => {
+            if (option?.container_size_id && sizeMap.has(option.container_size_id)) {
+              const match = sizeMap.get(option.container_size_id);
+              option.container_sizes = { code: match?.code, name: match?.name };
+              option.container_size = option.container_size || match?.code || match?.name;
+            }
+          });
+        }
+      }
     };
 
     // Fetch Charge Sides for Filtering
@@ -281,6 +341,7 @@ serveWithLogger(async (req, logger, adminSupabase) => {
       }
       
       options = oData || [];
+      await enrichOptionContainers(options);
       await logger.info(`Fetched ${options.length} options for version ${versionId}`);
 
       // --- BACKWARD COMPATIBILITY: MGL Rate Options Support ---
@@ -630,6 +691,64 @@ serveWithLogger(async (req, logger, adminSupabase) => {
     const finalWarnings: string[] = [];
 
     const createRawData = (option: any) => {
+      const quoteItems = Array.isArray(quote.items) ? quote.items : [];
+      const cargoDetails = (quote as any)?.cargo_details || {};
+      const containerCombos = Array.isArray(cargoDetails?.container_combos) ? cargoDetails.container_combos : [];
+      const cargoCommodity =
+        cargoDetails?.commodity ||
+        cargoDetails?.commodity_details?.description ||
+        "General Cargo";
+      const syntheticItemsFromCargo = containerCombos.map((combo: any) => ({
+        sizeId: combo?.sizeId || combo?.size_id,
+        typeId: combo?.typeId || combo?.type_id,
+        quantity: combo?.quantity,
+        commodity: cargoCommodity,
+        total_weight: Number(cargoDetails?.total_weight_kg || 0),
+        total_volume: Number(cargoDetails?.total_volume_cbm || 0),
+        dimensions: cargoDetails?.dimensions || "N/A",
+        is_hazmat: !!cargoDetails?.dangerous_goods,
+        is_stackable: !!cargoDetails?.stackable,
+      }));
+      const mappedQuoteItems = mapQuoteItemsToRawItems(quoteItems);
+      const mappedCargoComboItems = mapQuoteItemsToRawItems(syntheticItemsFromCargo);
+      const comboDrivenItems = mappedCargoComboItems.length > 0
+        ? [
+            ...mappedCargoComboItems,
+            ...mappedQuoteItems.filter((item: any) => {
+              const duplicate = mappedCargoComboItems.some((comboItem: any) =>
+                String(comboItem?.container_type || "").trim().toLowerCase() === String(item?.container_type || "").trim().toLowerCase() &&
+                String(comboItem?.container_size || "").trim().toLowerCase() === String(item?.container_size || "").trim().toLowerCase() &&
+                Number(comboItem?.quantity ?? comboItem?.qty ?? 0) === Number(item?.quantity ?? item?.qty ?? 0),
+              );
+              return !duplicate;
+            }),
+          ]
+        : mappedQuoteItems;
+      const mappedItems = comboDrivenItems;
+      const fallbackItem = mappedItems.find((item: any) => item?.container_size || item?.container_type);
+
+      const resolveOptionContainerSize = (opt: any) =>
+        opt?.container_sizes?.code ||
+        opt?.container_sizes?.name ||
+        opt?.container_size?.code ||
+        opt?.container_size?.name ||
+        opt?.container_size_code ||
+        opt?.container_size_name ||
+        opt?.container_size ||
+        fallbackItem?.container_size ||
+        "N/A";
+
+      const resolveOptionContainerType = (opt: any) =>
+        opt?.container_types?.code ||
+        opt?.container_types?.name ||
+        opt?.container_type?.code ||
+        opt?.container_type?.name ||
+        opt?.container_type_code ||
+        opt?.container_type_name ||
+        opt?.container_type ||
+        fallbackItem?.container_type ||
+        "N/A";
+
       // Calculate option specific total if possible
       const optionTotal = Array.isArray(option?.charges) 
         ? option.charges.reduce((sum: number, c: any) => sum + (Number(c.amount) || 0), 0)
@@ -699,14 +818,14 @@ serveWithLogger(async (req, logger, adminSupabase) => {
             leg_id: c.leg_id,
             note: c.note || "",
           })) || [],
-        items: mapQuoteItemsToRawItems(quote.items),
+        items: mappedItems,
         options: options.map((o: any) => ({
           id: o.id,
           carrier: o.carriers?.carrier_name || 'Multi-Carrier',
           transit_time: o.transit_time_days ? `${o.transit_time_days} Days` : (o.legs?.map((l: any) => l.transit_time).filter(Boolean).join(" + ") || "N/A"),
           frequency: o.frequency || o.service_level || "Weekly", // Fallback to Weekly if missing
-          container_size: o.container_sizes?.code || o.container_sizes?.name || 'N/A',
-          container_type: o.container_types?.code || o.container_types?.name || 'N/A',
+          container_size: resolveOptionContainerSize(o),
+          container_type: resolveOptionContainerType(o),
           grand_total: Array.isArray(o.charges) 
             ? o.charges.reduce((sum: number, c: any) => sum + (Number(c.amount) || 0), 0)
             : 0,
@@ -767,6 +886,41 @@ serveWithLogger(async (req, logger, adminSupabase) => {
         const baseConfig = (DefaultTemplate as any)?.config || {};
         const templateConfigRaw = (safeTemplate as any)?.config;
         const templateConfig = templateConfigRaw && typeof templateConfigRaw === "object" ? templateConfigRaw : {};
+        const sourceSections = Array.isArray((safeTemplate as any)?.sections) ? (safeTemplate as any).sections : [];
+        const normalizedSections = sourceSections.flatMap((section: any) => {
+            const gridFields = Array.isArray(section?.grid_fields) ? section.grid_fields : [];
+            const hasFirstItemRefs = gridFields.some((field: any) => typeof field?.key === "string" && /^items\[0\]\./.test(field.key));
+            const hasCargoLabels = gridFields.some((field: any) =>
+              /equipment\s*type|quantity|cargo\s*description|weight|volume/i.test(String(field?.label || "")),
+            );
+            if (section?.type !== "key_value_grid" || !hasFirstItemRefs || !hasCargoLabels) {
+              return [section];
+            }
+
+            const keptGridFields = gridFields.filter((field: any) => !(typeof field?.key === "string" && /^items\[0\]\./.test(field.key)));
+            const normalizedGridSection = {
+              ...section,
+              grid_fields: keptGridFields,
+            };
+            const cargoItemsTableSection = {
+              type: "dynamic_table",
+              page_break_before: false,
+              table_config: {
+                source: "items",
+                columns: [
+                  { field: "sequence_number", label: "Seq", width: "10%", align: "center" },
+                  { field: "container_type", label: "Type", width: "20%", align: "left" },
+                  { field: "container_size", label: "Size", width: "15%", align: "center" },
+                  { field: "quantity", label: "Qty", width: "10%", align: "center" },
+                  { field: "commodity", label: "Commodity", width: "25%", align: "left" },
+                  { field: "weight", label: "Weight (kg)", width: "10%", align: "right" },
+                  { field: "volume", label: "Volume (cbm)", width: "10%", align: "right" },
+                ],
+                show_subtotals: false,
+              },
+            };
+            return keptGridFields.length > 0 ? [normalizedGridSection, cargoItemsTableSection] : [cargoItemsTableSection];
+        });
         return {
             ...safeTemplate,
             config: {
@@ -778,6 +932,7 @@ serveWithLogger(async (req, logger, adminSupabase) => {
                 },
                 default_locale: templateConfig?.default_locale || baseConfig?.default_locale || "en-US",
             },
+            sections: normalizedSections,
         };
     };
 
@@ -802,8 +957,13 @@ serveWithLogger(async (req, logger, adminSupabase) => {
         return await renderer.render();
     };
 
+    const hasCargoContainerCombos =
+      Array.isArray((quote as any)?.cargo_details?.container_combos) &&
+      (quote as any).cargo_details.container_combos.length > 0;
+    const skipCacheForCargoCombos = hasCargoContainerCombos;
+
     // Check for cached PDF first if single mode and not forcing re-render
-    if (mode === 'single' && !store_result && version && (version as any).storage_path) {
+    if (mode === 'single' && !store_result && !forceRerender && !skipCacheForCargoCombos && version && (version as any).storage_path) {
       try {
         const storagePath = (version as any).storage_path as string;
         const { data: file, error: downloadError } = await supabaseClient.storage
@@ -820,6 +980,8 @@ serveWithLogger(async (req, logger, adminSupabase) => {
       } catch (e: any) {
         await logger.warn(`Cached PDF retrieval failed: ${e?.message || String(e)}`);
       }
+    } else if (skipCacheForCargoCombos) {
+      await logger.info("Skipping cached PDF because cargo_details.container_combos must be freshly mapped into items");
     }
 
     let contentType = "application/pdf";

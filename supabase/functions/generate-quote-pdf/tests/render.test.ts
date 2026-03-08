@@ -38,7 +38,7 @@ describe('PdfRenderer', () => {
       inquiry_number: "INQ-999"
     },
     items: [
-      { type: "20' GP", qty: 1, commodity: "Electronics", details: "1000 kg / 10 cbm" }
+      { sequence_number: 1, type: "20' GP", qty: 1, commodity: "Electronics", details: "1000 kg / 10 cbm" }
     ],
     legs: [],
     charges: [],
@@ -230,5 +230,40 @@ describe('PdfRenderer', () => {
     const pdfBytes = await renderer.render();
     expect(pdfBytes).toBeDefined();
     expect(pdfBytes.length).toBeGreaterThan(0);
+  });
+
+  it('builds container labels with size and type variants', () => {
+    const renderer = new PdfRenderer(DefaultTemplate, mockContext, mockLogger) as any;
+    expect(renderer.resolveItemContainerLabel({ container_size: "20FT", container_type: "GP" })).toBe("20FT GP");
+    expect(renderer.resolveItemContainerLabel({ container_size: "40FT", type: "RF" })).toBe("40FT RF");
+    expect(renderer.resolveItemContainerLabel({ container_size: "40FT HC", container_type: "OT" })).toBe("40FT HC OT");
+    expect(renderer.resolveItemContainerLabel({ container_type: "20FT" })).toBe("20FT");
+  });
+
+  it('supports quantity and qty fields in cargo aggregation', () => {
+    const renderer = new PdfRenderer(DefaultTemplate, mockContext, mockLogger) as any;
+    expect(renderer.resolveItemQuantity({ quantity: 3 })).toBe(3);
+    expect(renderer.resolveItemQuantity({ qty: 2 })).toBe(2);
+    expect(renderer.resolveItemQuantity({})).toBe(0);
+  });
+
+  it('keeps positive negative and zero quantities in container rows', () => {
+    const renderer = new PdfRenderer(DefaultTemplate, mockContext, mockLogger) as any;
+    const rows = renderer.buildContainerBreakdownRows([
+      { container_type: "Dry Standard", container_size: "20FT", quantity: 1, commodity: "Machinery" },
+      { container_type: "Open Top", container_size: "40FT", quantity: -1, commodity: "Machinery" },
+      { container_type: "Reefer", container_size: "20FT", quantity: 0, commodity: "Food" },
+    ]);
+    expect(rows).toHaveLength(3);
+    expect(rows[0]).toMatchObject({ container_type: "Dry Standard", container_size: "20FT", quantity: 1 });
+    expect(rows[1]).toMatchObject({ container_type: "Open Top", container_size: "40FT", quantity: -1 });
+    expect(rows[2]).toMatchObject({ container_type: "Reefer", container_size: "20FT", quantity: 0 });
+  });
+
+  it('detects legacy cargo key-value grid fields', () => {
+    const renderer = new PdfRenderer(DefaultTemplate, mockContext, mockLogger) as any;
+    expect(renderer.isLegacyCargoGridField({ key: "items[0].type", label: "Equipment Type" })).toBe(true);
+    expect(renderer.isLegacyCargoGridField({ key: "items[0].qty", label: "Quantity" })).toBe(true);
+    expect(renderer.isLegacyCargoGridField({ key: "customer.email", label: "Email" })).toBe(false);
   });
 });

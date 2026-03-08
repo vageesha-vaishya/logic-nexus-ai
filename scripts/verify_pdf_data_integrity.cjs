@@ -60,6 +60,8 @@ async function fetchQuoteItemsWithFallbacks(quoteId) {
             
             // Manual Commodity Join Logic
             const commodityIds = [...new Set(coreItems.map(i => i.commodity_id).filter(Boolean))];
+            const containerTypeIds = [...new Set(coreItems.map(i => i.container_type_id).filter(Boolean))];
+            const containerSizeIds = [...new Set(coreItems.map(i => i.container_size_id).filter(Boolean))];
             
             if (commodityIds.length > 0) {
                 const { data: comms, error: cError } = await client
@@ -73,6 +75,42 @@ async function fetchQuoteItemsWithFallbacks(quoteId) {
                         if (item.commodity_id && commMap.has(item.commodity_id)) {
                             item.master_commodities = { name: commMap.get(item.commodity_id) };
                             item.commodity = commMap.get(item.commodity_id);
+                        }
+                    });
+                }
+            }
+
+            if (containerTypeIds.length > 0) {
+                const { data: types, error: tError } = await client
+                    .from('container_types')
+                    .select('id, name, code')
+                    .in('id', containerTypeIds);
+
+                if (!tError && types) {
+                    const typeMap = new Map(types.map(t => [t.id, t]));
+                    coreItems.forEach(item => {
+                        if (item.container_type_id && typeMap.has(item.container_type_id)) {
+                            const match = typeMap.get(item.container_type_id);
+                            item.container_types = { name: match.name, code: match.code };
+                            item.container_type = item.container_type || match.code || match.name;
+                        }
+                    });
+                }
+            }
+
+            if (containerSizeIds.length > 0) {
+                const { data: sizes, error: sError } = await client
+                    .from('container_sizes')
+                    .select('id, name, code')
+                    .in('id', containerSizeIds);
+
+                if (!sError && sizes) {
+                    const sizeMap = new Map(sizes.map(s => [s.id, s]));
+                    coreItems.forEach(item => {
+                        if (item.container_size_id && sizeMap.has(item.container_size_id)) {
+                            const match = sizeMap.get(item.container_size_id);
+                            item.container_sizes = { name: match.name, code: match.code };
+                            item.container_size = item.container_size || match.code || match.name;
                         }
                     });
                 }
@@ -95,6 +133,54 @@ async function fetchQuoteItemsWithFallbacks(quoteId) {
 function mapQuoteItemsToRawItems(items) {
     if (!items) return [];
     return items.map((i) => {
+      const deriveContainerFromText = (...values) => {
+        const haystack = values
+          .map((value) => String(value || "").trim())
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        if (!haystack) return { size: "", type: "" };
+        const compact = haystack.replace(/[^a-z0-9]/g, "");
+        const compactMatch = compact.match(/(20|40|45)(gp|hc|hq|rf|reefer|ot|opentop|fr|flatrack|std|standard)/i);
+        if (compactMatch) {
+          return {
+            size: `${compactMatch[1]}FT`,
+            type: compactMatch[2].toUpperCase().replace("REEFER", "RF").replace("OPENTOP", "OT").replace("FLATRACK", "FR").replace("STD", "GP").replace("STANDARD", "GP"),
+          };
+        }
+        const sizeMatch = haystack.match(/\b(20|40|45)\s*(ft|')?\b/i);
+        const size = sizeMatch ? `${sizeMatch[1]}FT` : "";
+        if (/\b(hc|hq|high\s*cube)\b/i.test(haystack)) return { size, type: "HC" };
+        if (/\b(rf|reefer|refrigerated)\b/i.test(haystack)) return { size, type: "RF" };
+        if (/\b(ot|open[\s-]*top)\b/i.test(haystack)) return { size, type: "OT" };
+        if (/\b(fr|flat[\s-]*rack)\b/i.test(haystack)) return { size, type: "FR" };
+        if (/\b(gp|general\s*purpose|standard|std)\b/i.test(haystack)) return { size, type: "GP" };
+        return { size, type: "" };
+      };
+      const containerSize =
+        i.container_sizes?.code ||
+        i.container_sizes?.name ||
+        i.container_size?.code ||
+        i.container_size?.name ||
+        i.container_size_code ||
+        i.container_size_name ||
+        i.container_size ||
+        "";
+      const containerType =
+        i.container_types?.code ||
+        i.container_types?.name ||
+        i.container_type?.code ||
+        i.container_type?.name ||
+        i.container_type_code ||
+        i.container_type_name ||
+        i.container_type ||
+        "";
+      const inferred = deriveContainerFromText(i.product_name, i.commodity, i.commodity_description, i.description);
+      const normalizedContainer = [String(containerSize || inferred.size || "").trim(), String(containerType || inferred.type || "").trim()]
+        .filter(Boolean)
+        .filter((value, index, arr) => arr.indexOf(value) === index)
+        .join(" ")
+        .trim();
       const weight = Number(
         typeof i.weight_kg !== "undefined" && i.weight_kg !== null
           ? i.weight_kg
@@ -106,7 +192,8 @@ function mapQuoteItemsToRawItems(items) {
           : i.total_volume
       ) || 0;
       return {
-        container_type: i.container_types?.name || i.container_types?.code || "Container",
+        container_type: normalizedContainer || "Container",
+        container_size: String(containerSize || "").trim() || undefined,
         quantity: i.quantity,
         commodity: i.commodity || i.master_commodities?.name || i.commodity_description || "General Cargo",
         weight,

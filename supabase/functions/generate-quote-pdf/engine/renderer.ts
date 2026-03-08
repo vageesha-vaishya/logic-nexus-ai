@@ -196,7 +196,7 @@ export class PdfRenderer {
             ...rawSection,
             type: "multi_modal_details",
             content: { ...(rawSection.content || {}), text: "Transport Details", alignment: "left" },
-            config: { ...(rawSection.config || {}), showLegs: true }
+            config: { ...(rawSection.config || {}), showLegs: true, showContainerBreakdown: true }
         } as TemplateSection;
     }
 
@@ -505,6 +505,10 @@ export class PdfRenderer {
          color: rgb(0, 0, 0)
     });
     this.cursorY -= 30;
+
+    if (section.config?.showContainerBreakdown) {
+        await this.renderContainerBreakdownTable();
+    }
 
     let optionsToRender = this.context.options && this.context.options.length > 0 
         ? this.context.options 
@@ -855,6 +859,19 @@ export class PdfRenderer {
         return;
     }
 
+    const cargoFields = section.grid_fields.filter((field) => this.isLegacyCargoGridField(field));
+    if (cargoFields.length > 0) {
+        const nonCargoFields = section.grid_fields.filter((field) => !this.isLegacyCargoGridField(field));
+        if (nonCargoFields.length > 0) {
+            await this.renderKeyValueGrid({
+                ...section,
+                grid_fields: nonCargoFields,
+            } as TemplateSection);
+        }
+        await this.renderContainerBreakdownTable();
+        return;
+    }
+
     const { width } = this.currentPage.getSize();
     const tableWidth = width - this.margins.left - this.margins.right;
     
@@ -921,6 +938,64 @@ export class PdfRenderer {
     
     this.cursorY -= 10;
   }
+
+  private isLegacyCargoGridField(field: any): boolean {
+    const key = String(field?.key || "").toLowerCase();
+    const label = String(field?.label || "").toLowerCase();
+    if (!key.startsWith("items[0].")) return false;
+    return /equipment\s*type|quantity|cargo\s*description|weight|volume|commodity|type|qty/.test(label) ||
+      /items\[0\]\.(type|qty|quantity|details|commodity|weight|volume)/.test(key);
+  }
+
+  private buildContainerBreakdownRows(items: any[]): any[] {
+    return items.map((item: any, index: number) => ({
+      sequence_number: item?.sequence_number ?? index + 1,
+      container_type: String(item?.container_type || item?.type || "Container"),
+      container_size: String(item?.container_size || item?.size || "-"),
+      quantity: this.resolveItemQuantity(item),
+      commodity: String(item?.commodity || item?.details || "General Cargo"),
+      weight: Number(item?.weight ?? item?.total_weight ?? 0),
+      volume: Number(item?.volume ?? item?.total_volume ?? 0),
+    }));
+  }
+
+  private async renderContainerBreakdownTable() {
+    if (!this.currentPage || !this.font || !this.boldFont) return;
+    const sourceItems = Array.isArray(this.context.items) ? this.context.items : [];
+    if (sourceItems.length === 0) return;
+    const rows = this.buildContainerBreakdownRows(sourceItems);
+    const totalQty = rows.reduce((sum, row) => sum + (Number(row.quantity) || 0), 0);
+    const tableSourceKey = "__container_breakdown_rows__";
+    (this.context as any)[tableSourceKey] = rows;
+    await this.renderDynamicTable({
+      type: "dynamic_table",
+      table_config: {
+        source: tableSourceKey,
+        columns: [
+          { field: "sequence_number", label: "Seq", width: "8%", align: "center" },
+          { field: "container_type", label: "Type", width: "22%", align: "left" },
+          { field: "container_size", label: "Size", width: "15%", align: "center" },
+          { field: "quantity", label: "Qty", width: "10%", align: "center" },
+          { field: "commodity", label: "Commodity", width: "25%", align: "left" },
+          { field: "weight", label: "Weight (kg)", width: "10%", align: "right" },
+          { field: "volume", label: "Volume (cbm)", width: "10%", align: "right" },
+        ],
+      },
+    } as any);
+    delete (this.context as any)[tableSourceKey];
+    const totalText = `Total Qty: ${totalQty}`;
+    const textWidth = this.boldFont.widthOfTextAtSize(totalText, 9);
+    const x = this.currentPage.getSize().width - this.margins.right - textWidth;
+    this.currentPage.drawText(totalText, {
+      x,
+      y: this.cursorY - 12,
+      size: 9,
+      font: this.boldFont,
+      color: rgb(0, 0, 0),
+    });
+    this.cursorY -= 24;
+  }
+
 
   private resolvePath(obj: any, path: string): any {
     if (!obj || !path) return undefined;
@@ -1587,63 +1662,90 @@ export class PdfRenderer {
   private async renderCargoDetails() {
       if (!this.currentPage || !this.font || !this.boldFont) return;
       
+      const font = this.font;
+      const boldFont = this.boldFont;
+      
       const quote = this.context.quote;
       const items = this.context.items || [];
+      const toFiniteNumber = (value: unknown, fallback = 0): number => {
+          const parsed = Number(value);
+          return Number.isFinite(parsed) ? parsed : fallback;
+      };
       
-      if (this.cursorY < this.margins.bottom + 60) { this.addNewPage(); this.cursorY -= 20; }
+      // Group by Type + Size for display
+      const groups = new Map<string, { type: string, size: string, qty: number }>();
+      items.forEach((item: any) => {
+          const type = item.container_type || "Container";
+          const size = item.container_size || "-";
+          const key = `${type}|${size}`;
+          if (!groups.has(key)) {
+              groups.set(key, { type, size, qty: 0 });
+          }
+          const entry = groups.get(key)!;
+          entry.qty += toFiniteNumber(item.quantity ?? item.qty ?? 0, 0);
+      });
+      const distinctConfigs = Array.from(groups.values());
 
-      const boxHeight = 70; // Increased height for extra details
-      const width = this.currentPage.getSize().width - this.margins.left - this.margins.right;
+      // Calculate dynamic height
+      // Header (15) + Commodity (15) + Weight/Vol (15) + Configs (N * 15) + Padding (10)
+      const contentHeight = 45 + (distinctConfigs.length * 15) + 10;
+      const boxHeight = Math.max(80, contentHeight);
+      
+      if (this.cursorY < this.margins.bottom + boxHeight + 20) { this.addNewPage(); this.cursorY -= 20; }
+
+      const width = this.currentPage!.getSize().width - this.margins.left - this.margins.right;
       
       this.drawRect(this.margins.left, this.cursorY - boxHeight, width, boxHeight, rgb(0.98, 0.98, 0.98), true);
       this.drawRect(this.margins.left, this.cursorY - boxHeight, width, boxHeight, rgb(0.8, 0.8, 0.8));
 
-      // Row 1: Commodity, Quantity, Weight, Volume
       let textY = this.cursorY - 15;
-      const commodity = items.map((i:any) => i.commodity).filter((v:any, i:any, a:any) => a.indexOf(v) === i).join(", ") || "General Cargo";
-      const details = items[0]?.details || "Loose";
-      
-      this.currentPage.drawText(`Commodity: ${commodity}`, { x: this.margins.left + 5, y: textY, size: 9, font: this.boldFont, color: rgb(0,0,0) });
-      this.currentPage.drawText(`Details: ${details}`, { x: this.margins.left + 200, y: textY, size: 9, font: this.font, color: rgb(0,0,0) });
-      
-      textY -= 15;
-      // Aggregates
-      const totalQty = items.reduce((s:number, i:any) => s + (Number(i.quantity)||0), 0);
-      const totalWt = items.reduce((s:number, i:any) => s + (Number(i.weight)||0), 0);
-      const totalVol = items.reduce((s:number, i:any) => s + (Number(i.volume)||0), 0);
-      
-      // Container Breakdown
-      const containerCounts = items.reduce((acc: any, item: any) => {
-        const type = item.container_type || item.type || "Pkg";
-        acc[type] = (acc[type] || 0) + (Number(item.quantity) || 0);
-        return acc;
-      }, {});
-      const containerStr = Object.entries(containerCounts).map(([k, v]) => `${v}x ${k}`).join(", ");
 
-      this.currentPage.drawText(`Total Qty: ${totalQty} (${containerStr})`, { x: this.margins.left + 5, y: textY, size: 9, font: this.font, color: rgb(0,0,0) });
-      this.currentPage.drawText(`Weight: ${totalWt} kg`, { x: this.margins.left + 250, y: textY, size: 9, font: this.font, color: rgb(0,0,0) });
-      this.currentPage.drawText(`Volume: ${totalVol} cbm`, { x: this.margins.left + 350, y: textY, size: 9, font: this.font, color: rgb(0,0,0) });
+      // Row 1: Commodity
+      const commodity = items.map((i:any) => i.commodity).filter((v:any, i:any, a:any) => a.indexOf(v) === i).join(", ") || "General Cargo";
+      this.currentPage!.drawText(`Commodity: ${commodity}`, { x: this.margins.left + 5, y: textY, size: 9, font: boldFont, color: rgb(0,0,0) });
       
-      textY -= 15;
-      // Dimensions & Value
-      // Use details as proxy or "N/A" if missing
+      // Details/Dimensions on right
       const dimensions = items[0]?.dimensions || "N/A";
-      // Try to find value in quote or items
+      this.currentPage!.drawText(`Dims: ${dimensions}`, { x: this.margins.left + 350, y: textY, size: 9, font: font, color: rgb(0,0,0) });
+
+      textY -= 15;
+
+      // Row 2: Weight | Volume | Value
+      const totalWt = items.reduce((s:number, i:any) => s + toFiniteNumber(i.weight, 0), 0);
+      const totalVol = items.reduce((s:number, i:any) => s + toFiniteNumber(i.volume, 0), 0);
       const shipmentValue = (quote as any)?.declared_value || (items[0] as any)?.declared_value || "N/A";
 
-      this.currentPage.drawText(`Dimensions: ${dimensions}`, { x: this.margins.left + 5, y: textY, size: 9, font: this.font, color: rgb(0,0,0) });
-      this.currentPage.drawText(`Shipment Cost Value: ${shipmentValue}`, { x: this.margins.left + 200, y: textY, size: 9, font: this.font, color: rgb(0,0,0) });
+      this.currentPage!.drawText(`Total Weight: ${totalWt} kg`, { x: this.margins.left + 5, y: textY, size: 9, font: font, color: rgb(0,0,0) });
+      this.currentPage!.drawText(`Total Volume: ${totalVol} cbm`, { x: this.margins.left + 150, y: textY, size: 9, font: font, color: rgb(0,0,0) });
+      this.currentPage!.drawText(`Value: ${shipmentValue}`, { x: this.margins.left + 300, y: textY, size: 9, font: font, color: rgb(0,0,0) });
 
-      // Hazmat / Stackable
+      // Hazmat Flags
       const isHaz = items.some((i:any) => i.is_hazmat);
       const isStack = items.some((i:any) => i.is_stackable);
       const flags = [];
       if (isHaz) flags.push("HAZMAT");
       if (isStack) flags.push("Stackable");
-      
       if (flags.length > 0) {
-           this.currentPage.drawText(flags.join(", "), { x: this.margins.left + 450, y: textY, size: 9, font: this.boldFont, color: rgb(1,0,0) });
+           this.currentPage!.drawText(flags.join(", "), { x: this.margins.left + 450, y: textY, size: 9, font: boldFont, color: rgb(1,0,0) });
       }
+
+      textY -= 20; // Extra gap for container list
+
+      // Row 3+: Container Configurations
+      distinctConfigs.forEach(config => {
+           // "Type : Dry Standard   Size : 20FT   Qty : 1"
+           let x = this.margins.left + 5;
+           
+           this.currentPage!.drawText(`Type : ${config.type}`, { x, y: textY, size: 9, font: boldFont, color: rgb(0,0,0) });
+           x += 180;
+           
+           this.currentPage!.drawText(`Size : ${config.size}`, { x, y: textY, size: 9, font: boldFont, color: rgb(0,0,0) });
+           x += 100;
+           
+           this.currentPage!.drawText(`Qty : ${config.qty}`, { x, y: textY, size: 9, font: boldFont, color: rgb(0,0,0) });
+           
+           textY -= 15;
+      });
 
       this.cursorY -= (boxHeight + 15);
   }
@@ -1740,6 +1842,21 @@ export class PdfRenderer {
     if (field === "carrier") return row.carrier ?? row.carrier_name;
     if (field === "carrier_name") return row.carrier_name ?? row.carrier;
     return row[field];
+  }
+
+  private resolveItemQuantity(item: any): number {
+    return Number(item?.quantity ?? item?.qty ?? 0) || 0;
+  }
+
+  private resolveItemContainerLabel(item: any): string {
+    const size = String(item?.container_size || "").trim();
+    const type = String(item?.container_type || item?.type || "").trim();
+    const label = [size, type]
+      .filter(Boolean)
+      .filter((value, index, values) => values.indexOf(value) === index)
+      .join(" ")
+      .trim();
+    return label || "Pkg";
   }
 
   private hexToRgb(hex: string) {
