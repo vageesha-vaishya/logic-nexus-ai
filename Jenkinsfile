@@ -68,16 +68,21 @@ pipeline {
             steps {
                 script {
                     def envFile = fileExists('.env') ? readFile(file: '.env') : ''
+                    def sanitizeValue = { raw ->
+                        if (!raw) return ''
+                        def cleaned = String(raw).trim()
+                        cleaned = cleaned.replaceAll(/^['"`]+|['"`]+$/, '')
+                        return cleaned.trim()
+                    }
                     def parseEnv = { key ->
                         if (!envFile) return ''
                         def m = (envFile =~ /(?m)^${key}=(.*)$/)
                         if (!m) return ''
-                        def raw = m[0][1].trim()
-                        return raw.replaceAll(/^['"`]|['"`]$/, '')
+                        return sanitizeValue(m[0][1])
                     }
-                    def envSupabaseUrl = params.SUPABASE_URL_OVERRIDE ? params.SUPABASE_URL_OVERRIDE : parseEnv('VITE_SUPABASE_URL')
-                    def envAnonKey = params.SUPABASE_ANON_KEY_OVERRIDE ? params.SUPABASE_ANON_KEY_OVERRIDE : (parseEnv('VITE_SUPABASE_PUBLISHABLE_KEY') ?: parseEnv('VITE_SUPABASE_ANON_KEY'))
-                    def envServiceKey = params.SUPABASE_SERVICE_ROLE_KEY_OVERRIDE ? params.SUPABASE_SERVICE_ROLE_KEY_OVERRIDE : parseEnv('SUPABASE_SERVICE_ROLE_KEY')
+                    def envSupabaseUrl = sanitizeValue(params.SUPABASE_URL_OVERRIDE ? params.SUPABASE_URL_OVERRIDE : parseEnv('VITE_SUPABASE_URL'))
+                    def envAnonKey = sanitizeValue(params.SUPABASE_ANON_KEY_OVERRIDE ? params.SUPABASE_ANON_KEY_OVERRIDE : (parseEnv('VITE_SUPABASE_PUBLISHABLE_KEY') ?: parseEnv('VITE_SUPABASE_ANON_KEY')))
+                    def envServiceKey = sanitizeValue(params.SUPABASE_SERVICE_ROLE_KEY_OVERRIDE ? params.SUPABASE_SERVICE_ROLE_KEY_OVERRIDE : parseEnv('SUPABASE_SERVICE_ROLE_KEY'))
 
                     def selectedTarget = params.DB_TARGET
                     if (selectedTarget == 'auto') {
@@ -97,7 +102,7 @@ pipeline {
                         env.SELECTED_SUPABASE_URL = envSupabaseUrl
                         env.SELECTED_ANON_KEY = envAnonKey
                         env.SELECTED_SERVICE_ROLE_KEY = envServiceKey ?: ''
-                        def projectRefOverride = params.PROJECT_REF_OVERRIDE?.trim()
+                        def projectRefOverride = sanitizeValue(params.PROJECT_REF_OVERRIDE)
                         if (projectRefOverride) {
                             env.SELECTED_PROJECT_REF = projectRefOverride
                         } else {
@@ -220,10 +225,13 @@ if [ -z "$TARGET_SUPABASE_SERVICE_ROLE_KEY" ]; then
   echo "Missing service role key for edge secret sync"
   exit 1
 fi
-npm exec --yes -- supabase secrets set --project-ref "$TARGET_PROJECT_REF" \
-  SUPABASE_URL="$TARGET_SUPABASE_URL" \
-  SUPABASE_ANON_KEY="$TARGET_SUPABASE_ANON_KEY" \
-  SUPABASE_SERVICE_ROLE_KEY="$TARGET_SUPABASE_SERVICE_ROLE_KEY"
+cat > .supabase-secrets.env <<EOF
+SUPABASE_URL=$TARGET_SUPABASE_URL
+SUPABASE_ANON_KEY=$TARGET_SUPABASE_ANON_KEY
+SUPABASE_SERVICE_ROLE_KEY=$TARGET_SUPABASE_SERVICE_ROLE_KEY
+EOF
+npm exec --yes -- supabase secrets set --project-ref "$TARGET_PROJECT_REF" --env-file .supabase-secrets.env
+rm -f .supabase-secrets.env
 '''
                     }
                 }
