@@ -15,8 +15,6 @@ CREATE TABLE IF NOT EXISTS public.aes_hts_codes_history (
     unit_of_measure character varying(50),
     duty_rate character varying(50),
     special_provisions text,
-    uom1 character varying,
-    uom2 character varying,
     operation_type text NOT NULL, -- 'INSERT', 'UPDATE', 'DELETE'
     changed_at timestamp with time zone DEFAULT now(),
     changed_by uuid -- Optional link to auth.users if available via context
@@ -32,11 +30,11 @@ BEGIN
     IF (TG_OP = 'DELETE') THEN
         INSERT INTO public.aes_hts_codes_history (
             original_id, hts_code, schedule_b, category, description, 
-            unit_of_measure, duty_rate, special_provisions, uom1, uom2, 
+            unit_of_measure, duty_rate, special_provisions, 
             operation_type, changed_at
         ) VALUES (
             OLD.id, OLD.hts_code, OLD.schedule_b, OLD.category, OLD.description,
-            OLD.unit_of_measure, OLD.duty_rate, OLD.special_provisions, OLD.uom1, OLD.uom2,
+            OLD.unit_of_measure, OLD.duty_rate, OLD.special_provisions,
             'DELETE', now()
         );
         
@@ -51,11 +49,11 @@ BEGIN
     ELSIF (TG_OP = 'UPDATE') THEN
         INSERT INTO public.aes_hts_codes_history (
             original_id, hts_code, schedule_b, category, description, 
-            unit_of_measure, duty_rate, special_provisions, uom1, uom2, 
+            unit_of_measure, duty_rate, special_provisions, 
             operation_type, changed_at
         ) VALUES (
             NEW.id, NEW.hts_code, NEW.schedule_b, NEW.category, NEW.description,
-            NEW.unit_of_measure, NEW.duty_rate, NEW.special_provisions, NEW.uom1, NEW.uom2,
+            NEW.unit_of_measure, NEW.duty_rate, NEW.special_provisions,
             'UPDATE', now()
         );
         
@@ -71,11 +69,11 @@ BEGIN
     ELSIF (TG_OP = 'INSERT') THEN
         INSERT INTO public.aes_hts_codes_history (
             original_id, hts_code, schedule_b, category, description, 
-            unit_of_measure, duty_rate, special_provisions, uom1, uom2, 
+            unit_of_measure, duty_rate, special_provisions, 
             operation_type, changed_at
         ) VALUES (
             NEW.id, NEW.hts_code, NEW.schedule_b, NEW.category, NEW.description,
-            NEW.unit_of_measure, NEW.duty_rate, NEW.special_provisions, NEW.uom1, NEW.uom2,
+            NEW.unit_of_measure, NEW.duty_rate, NEW.special_provisions,
             'INSERT', now()
         );
         

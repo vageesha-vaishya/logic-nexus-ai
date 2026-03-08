@@ -87,8 +87,13 @@ CREATE TRIGGER trg_audit_services
   EXECUTE FUNCTION audit_pricing_change();
 
 -- Trigger for Service Pricing Tiers
-DROP TRIGGER IF EXISTS trg_audit_service_pricing_tiers ON public.service_pricing_tiers;
-CREATE TRIGGER trg_audit_service_pricing_tiers
-  AFTER INSERT OR UPDATE OR DELETE ON public.service_pricing_tiers
-  FOR EACH ROW
-  EXECUTE FUNCTION audit_pricing_change();
+DO $$
+BEGIN
+    IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'service_pricing_tiers') THEN
+        DROP TRIGGER IF EXISTS trg_audit_service_pricing_tiers ON public.service_pricing_tiers;
+        CREATE TRIGGER trg_audit_service_pricing_tiers
+          AFTER INSERT OR UPDATE OR DELETE ON public.service_pricing_tiers
+          FOR EACH ROW
+          EXECUTE FUNCTION audit_pricing_change();
+    END IF;
+END $$;

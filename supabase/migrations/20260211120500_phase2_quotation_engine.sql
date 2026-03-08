@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS public.quote_templates (
 );
 
 -- Ensure columns exist (if table already existed with different schema)
+ALTER TABLE public.quote_templates ALTER COLUMN tenant_id DROP NOT NULL;
 ALTER TABLE public.quote_templates ADD COLUMN IF NOT EXISTS is_default BOOLEAN DEFAULT false;
 ALTER TABLE public.quote_templates ADD COLUMN IF NOT EXISTS version TEXT DEFAULT '1.0.0';
 

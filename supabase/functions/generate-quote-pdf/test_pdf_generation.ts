@@ -1,6 +1,7 @@
 
+import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { PdfRenderer } from "./engine/renderer.ts";
-import { buildSafeContextWithValidation, RawQuoteDataSchema } from "./engine/context.ts";
+import { buildSafeContextWithValidation } from "./engine/context.ts";
 import { Logger } from "../_shared/logger.ts";
 
 // Mock Logger
@@ -22,88 +23,174 @@ const mockTemplate = {
   },
   layout: [
     {
+      id: "header",
+      type: "header",
+      content: { text: "MGL QUOTE TEST" },
+      height: 50
+    },
+    {
       id: "matrix_section",
       type: "detailed_matrix_rate_table",
       config: {
         title: "Rate Options Matrix",
         group_by: ["carrier", "transit_time", "frequency"],
         show_total: true,
-        columns: [
-          { field: "container_type", label: "Container" },
-          { field: "charge_description", label: "Description" },
-          { field: "amount", label: "Amount" },
-          { field: "total", label: "Total" }
-        ]
+        show_breakdown: true
+      },
+      content: {
+        text: "Freight Rates Breakdown"
       }
     }
   ]
 };
 
-// Mock Raw Data
+// Mock Raw Data mimicking the migration seed data
 const mockRawData = {
   quote: {
-    quote_number: "Q-12345",
+    quote_number: "QUO-MGL-MATRIX-TEST",
     created_at: new Date().toISOString(),
     status: "draft",
     currency: "USD",
     service_level: "Standard",
     origin: { location_name: "Shanghai" },
-    destination: { location_name: "Los Angeles" }
+    destination: { location_name: "Los Angeles" },
+    customer_id: "cust-123"
   },
   customer: {
-    company_name: "Test Customer",
-    contact_name: "John Doe"
+    company_name: "MGL Matrix Test Customer",
+    contact_name: "Test User"
   },
   options: [
+    // MSC - 20SD
     {
       id: "opt-1",
-      carrier: "Maersk",
-      transit_time: "18 Days",
+      carrier: "MSC",
+      transit_time: "25 Days",
       frequency: "Weekly",
-      container_size: "40",
-      container_type: "HC",
-      grand_total: 5500,
+      container_size: "20SD",
+      grand_total: 1650,
       charges: [
-        { description: "Ocean Freight", amount: 4000, currency: "USD" },
-        { description: "THC Origin", amount: 200, currency: "USD" },
-        { description: "THC Dest", amount: 300, currency: "USD" },
-        { description: "Doc Fee", amount: 100, currency: "USD" }
+        { description: "Freight", amount: 1500, currency: "USD" },
+        { description: "THC/O", amount: 150, currency: "USD", note: "THC/O" }
       ],
-      legs: []
+      legs: [{ carrier: "MSC", mode: "Ocean", pol: "Shanghai", pod: "Los Angeles" }]
     },
+    // MSC - 40SD
     {
       id: "opt-2",
-      carrier: "Maersk",
-      transit_time: "18 Days",
+      carrier: "MSC",
+      transit_time: "25 Days",
       frequency: "Weekly",
-      container_size: "20",
-      container_type: "GP",
-      grand_total: 3500,
+      container_size: "40SD",
+      grand_total: 2950,
       charges: [
-        { description: "Ocean Freight", amount: 2500, currency: "USD" },
-        { description: "THC Origin", amount: 150, currency: "USD" },
-        { description: "THC Dest", amount: 250, currency: "USD" },
-        { description: "Doc Fee", amount: 100, currency: "USD" }
+        { description: "Freight", amount: 2800, currency: "USD" },
+        { description: "THC/O", amount: 150, currency: "USD", note: "THC/O" }
       ],
-      legs: []
+      legs: [{ carrier: "MSC", mode: "Ocean", pol: "Shanghai", pod: "Los Angeles" }]
     },
+    // MSC - 40HQ
     {
       id: "opt-3",
       carrier: "MSC",
-      transit_time: "22 Days",
-      frequency: "Bi-Weekly",
-      container_size: "40",
-      container_type: "HC",
-      grand_total: 5200,
+      transit_time: "25 Days",
+      frequency: "Weekly",
+      container_size: "40HQ",
+      grand_total: 3050,
       charges: [
-        { description: "Ocean Freight", amount: 3800, currency: "USD" },
-        { description: "THC Origin", amount: 200, currency: "USD" },
-        { description: "THC Dest", amount: 300, currency: "USD" }
+        { description: "Freight", amount: 2900, currency: "USD" },
+        { description: "THC/O", amount: 150, currency: "USD", note: "THC/O" }
       ],
-      legs: []
+      legs: [{ carrier: "MSC", mode: "Ocean", pol: "Shanghai", pod: "Los Angeles" }]
+    },
+    
+    // Maersk - 20SD (Includes Remarks)
+    {
+      id: "opt-4",
+      carrier: "Maersk",
+      transit_time: "22 Days",
+      frequency: "Weekly",
+      container_size: "20SD",
+      grand_total: 1700,
+      remarks: "Rates subject to space availability.",
+      charges: [
+        { description: "Freight", amount: 1550, currency: "USD", note: "Includes BAF" },
+        { description: "Doc Fee", amount: 50, currency: "USD", note: "Doc Fee" },
+        { description: "THC/O", amount: 100, currency: "USD", note: "THC/O" }
+      ],
+      legs: [{ carrier: "Maersk", mode: "Ocean", pol: "Shanghai", pod: "Los Angeles" }]
+    },
+    // Maersk - 40SD
+    {
+      id: "opt-5",
+      carrier: "Maersk",
+      transit_time: "22 Days",
+      frequency: "Weekly",
+      container_size: "40SD",
+      grand_total: 3100,
+      remarks: "Rates subject to space availability.",
+      charges: [
+        { description: "Freight", amount: 2950, currency: "USD", note: "Includes BAF" },
+        { description: "Doc Fee", amount: 50, currency: "USD", note: "Doc Fee" },
+        { description: "THC/O", amount: 100, currency: "USD", note: "THC/O" }
+      ],
+      legs: [{ carrier: "Maersk", mode: "Ocean", pol: "Shanghai", pod: "Los Angeles" }]
+    },
+
+    // CMA CGM - 40HQ Only
+    {
+      id: "opt-6",
+      carrier: "CMA CGM",
+      transit_time: "28 Days",
+      frequency: "Bi-Weekly",
+      container_size: "40HQ",
+      grand_total: 3200,
+      charges: [
+        { description: "Freight", amount: 3000, currency: "USD", note: "Subject to GRI" },
+        { description: "THC/O", amount: 200, currency: "USD", note: "THC/O" }
+      ],
+      legs: [{ carrier: "CMA CGM", mode: "Ocean", pol: "Shanghai", pod: "Los Angeles" }]
+    },
+
+    // Hapag-Lloyd - All 3
+    {
+      id: "opt-7",
+      carrier: "Hapag-Lloyd",
+      transit_time: "24 Days",
+      frequency: "Weekly",
+      container_size: "20SD",
+      grand_total: 1600,
+      charges: [
+        { description: "Freight", amount: 1600, currency: "USD" }
+      ],
+      legs: [{ carrier: "Hapag-Lloyd", mode: "Ocean", pol: "Shanghai", pod: "Los Angeles" }]
+    },
+    {
+      id: "opt-8",
+      carrier: "Hapag-Lloyd",
+      transit_time: "24 Days",
+      frequency: "Weekly",
+      container_size: "40SD",
+      grand_total: 2900,
+      charges: [
+        { description: "Freight", amount: 2900, currency: "USD" }
+      ],
+      legs: [{ carrier: "Hapag-Lloyd", mode: "Ocean", pol: "Shanghai", pod: "Los Angeles" }]
+    },
+    {
+      id: "opt-9",
+      carrier: "Hapag-Lloyd",
+      transit_time: "24 Days",
+      frequency: "Weekly",
+      container_size: "40HQ",
+      grand_total: 3000,
+      charges: [
+        { description: "Freight", amount: 3000, currency: "USD" }
+      ],
+      legs: [{ carrier: "Hapag-Lloyd", mode: "Ocean", pol: "Shanghai", pod: "Los Angeles" }]
     }
   ],
-  mode: "single"
+  mode: "ocean"
 };
 
 async function runTest() {
@@ -118,24 +205,22 @@ async function runTest() {
     
     // 2. Render PDF
     const renderer = new PdfRenderer(mockTemplate, context, logger);
-    // Note: render() returns Uint8Array (PDF bytes)
-    // We want to inspect the internal HTML generation if possible, 
-    // but PdfRenderer encapsulates it.
-    // However, if render() succeeds without error, it means the structure was processed.
-    
     const pdfBytes = await renderer.render();
+    
     console.log(`PDF Generated Successfully! Size: ${pdfBytes.length} bytes`);
     
-    // Since we can't easily see the HTML, we rely on the fact that no error occurred
-    // and that the logic in renderer.ts (which we reviewed) uses the matrix data.
-    
-    // To be more sure, we can check if the context has the grouped matrix data.
-    // The context passed to renderer contains the raw data + mapped helpers.
-    // But matrix grouping happens INSIDE renderer.render() -> _renderMatrixRateTable
-    
+    // 3. Write to file
+    try {
+        await Deno.writeFile("test_output.pdf", pdfBytes);
+        console.log("Saved to test_output.pdf");
+    } catch (err) {
+        console.error("Failed to write file:", err);
+    }
+
     console.log("Test Passed.");
   } catch (e) {
     console.error("Test Failed:", e);
+    if (e.stack) console.error(e.stack);
   }
 }
 

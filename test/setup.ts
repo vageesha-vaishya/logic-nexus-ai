@@ -24,21 +24,27 @@ const localStorageMock = (function() {
   };
 })();
 
-Object.defineProperty(window, 'localStorage', {
-  value: localStorageMock
-});
+if (typeof window !== 'undefined') {
+  Object.defineProperty(window, 'localStorage', {
+    value: localStorageMock
+  });
 
-// Mock ResizeObserver
-class ResizeObserver {
-  observe() {}
-  unobserve() {}
-  disconnect() {}
+  // Mock ResizeObserver
+  class ResizeObserver {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
+  window.ResizeObserver = ResizeObserver;
 }
-window.ResizeObserver = ResizeObserver;
 
 // Mock scrollIntoView for Radix UI / cmdk
-Element.prototype.scrollIntoView = vi.fn();
-HTMLElement.prototype.scrollIntoView = vi.fn();
+if (typeof Element !== 'undefined') {
+  Element.prototype.scrollIntoView = vi.fn();
+}
+if (typeof HTMLElement !== 'undefined') {
+  HTMLElement.prototype.scrollIntoView = vi.fn();
+}
 
 // ---------------------------------------------------------------------------
 // Global mocks for hooks and services used pervasively across components.
@@ -154,19 +160,21 @@ vi.mock('react-i18next', () => ({
 }));
 
 // Mock matchMedia
-Object.defineProperty(window, 'matchMedia', {
-  writable: true,
-  value: vi.fn().mockImplementation(query => ({
-    matches: false,
-    media: query,
-    onchange: null,
-    addListener: vi.fn(), // deprecated
-    removeListener: vi.fn(), // deprecated
-    addEventListener: vi.fn(),
-    removeEventListener: vi.fn(),
-    dispatchEvent: vi.fn(),
-  })),
-});
+if (typeof window !== 'undefined') {
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: vi.fn().mockImplementation(query => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(), // deprecated
+      removeListener: vi.fn(), // deprecated
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  });
+}
 
 afterEach(() => {
   cleanup();

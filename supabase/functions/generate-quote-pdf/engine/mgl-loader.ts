@@ -112,14 +112,14 @@ export async function fetchMglOptions(
           rate_option_id: mglOpt.id,
           carrier: mglOpt.carrier_name,
           carrier_name: mglOpt.carrier_name,
-          transit_time: mglOpt.transit_time_days ? `${mglOpt.transit_time_days} Days` : null,
-          frequency: mglOpt.frequency_per_week ? `${mglOpt.frequency_per_week} / week` : null,
+          transit_time: mglOpt.transit_time_days ? String(mglOpt.transit_time_days) : null,
+          frequency: mglOpt.frequency_per_week ? String(mglOpt.frequency_per_week) : null,
           container_type: eqKey,
           container_size: eqKey,
           grand_total: optionTotal,
           legs: optionLegs,
           charges: optionCharges,
-          remarks: mglOpt.remarks,
+          remarks: mglOpt.notes || mglOpt.remarks,
           is_mgl: true,
         };
 

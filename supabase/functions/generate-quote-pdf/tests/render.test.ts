@@ -3,6 +3,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { PdfRenderer } from '../engine/renderer';
 import { DefaultTemplate } from '../engine/default_template';
 import { SafeContext } from '../engine/context';
+import { I18nEngine } from '../engine/i18n';
 import { Logger } from '../../_shared/logger';
 import './setup'; // Ensure Deno mock is loaded
 
@@ -138,6 +139,94 @@ describe('PdfRenderer', () => {
       ]
     } as any;
     const renderer = new PdfRenderer(templateWithoutConfig, mockContext, mockLogger);
+    const pdfBytes = await renderer.render();
+    expect(pdfBytes).toBeDefined();
+    expect(pdfBytes.length).toBeGreaterThan(0);
+  });
+
+  it('falls back to en-US when default_locale is missing', () => {
+    const templateWithoutLocale = {
+      name: "Template Missing Locale",
+      i18n: {
+        labels: {
+          greeting: {
+            "en-US": "Hello",
+            "es-ES": "Hola"
+          }
+        }
+      }
+    } as any;
+    const i18n = new I18nEngine(templateWithoutLocale, mockLogger);
+    expect(i18n.t("greeting")).toBe("Hello");
+  });
+
+  it('renders MGL Standard Granular without config', async () => {
+    const template = {
+      name: "MGL Standard Granular",
+      sections: [
+        {
+          type: "header",
+          height: 80,
+          content: { text: "MGL Standard Granular", alignment: "left" }
+        },
+        {
+          type: "key_value_grid",
+          height: 80,
+          grid_fields: [
+            { key: "quote.quote_number", label: "Quote Ref" }
+          ]
+        }
+      ]
+    } as any;
+    const renderer = new PdfRenderer(template, mockContext, mockLogger);
+    const pdfBytes = await renderer.render();
+    expect(pdfBytes).toBeDefined();
+    expect(pdfBytes.length).toBeGreaterThan(0);
+  });
+
+  it('renders MGL FCL Quote without config', async () => {
+    const template = {
+      name: "MGL FCL Quote",
+      sections: [
+        {
+          type: "header",
+          height: 80,
+          content: { text: "MGL FCL Quote", alignment: "left" }
+        },
+        {
+          type: "key_value_grid",
+          height: 80,
+          grid_fields: [
+            { key: "quote.quote_number", label: "Quote Ref" }
+          ]
+        }
+      ]
+    } as any;
+    const renderer = new PdfRenderer(template, mockContext, mockLogger);
+    const pdfBytes = await renderer.render();
+    expect(pdfBytes).toBeDefined();
+    expect(pdfBytes.length).toBeGreaterThan(0);
+  });
+
+  it('renders MGL Granular Quote without config', async () => {
+    const template = {
+      name: "MGL Granular Quote",
+      sections: [
+        {
+          type: "header",
+          height: 80,
+          content: { text: "MGL Granular Quote", alignment: "left" }
+        },
+        {
+          type: "key_value_grid",
+          height: 80,
+          grid_fields: [
+            { key: "quote.quote_number", label: "Quote Ref" }
+          ]
+        }
+      ]
+    } as any;
+    const renderer = new PdfRenderer(template, mockContext, mockLogger);
     const pdfBytes = await renderer.render();
     expect(pdfBytes).toBeDefined();
     expect(pdfBytes.length).toBeGreaterThan(0);

@@ -8,11 +8,17 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const envLocalPath = path.resolve(__dirname, '../.env.local');
+const envLocalBakPath = path.resolve(__dirname, '../.env.local.bak');
 const envPath = path.resolve(__dirname, '../.env');
 
 if (fs.existsSync(envLocalPath)) {
+  console.log('Using .env.local');
   dotenv.config({ path: envLocalPath });
+} else if (fs.existsSync(envLocalBakPath)) {
+  console.log('Using .env.local.bak');
+  dotenv.config({ path: envLocalBakPath });
 } else {
+  console.log('Using .env');
   dotenv.config({ path: envPath });
 }
 
@@ -70,17 +76,70 @@ async function run() {
 
   console.log('Function returned data type:', typeof pdfBlob);
 
-  const outputPath = path.join(__dirname, `v2_pdf_${quote.quote_number}.pdf`);
-
   let buffer;
   if (pdfBlob instanceof Blob) {
     const arrayBuffer = await pdfBlob.arrayBuffer();
     buffer = Buffer.from(arrayBuffer);
   } else if (pdfBlob instanceof ArrayBuffer) {
     buffer = Buffer.from(pdfBlob);
+  } else if (pdfBlob && typeof pdfBlob === 'object') {
+     // Handle JSON response with base64 data - check property directly
+
+     // Try to find the data property (it might be 'data' or 'content')
+     let data = (pdfBlob as any)['data'];
+     if (!data && (pdfBlob as any)['content']) {
+          data = (pdfBlob as any)['content'];
+     }
+
+     if (typeof data === 'string') {
+          if ((pdfBlob as any).traceLogs) {
+              console.log('Trace Logs:');
+              ((pdfBlob as any).traceLogs).forEach((log: string) => console.log(`  ${log}`));
+          }
+          
+          if (data.startsWith('%PDF')) {
+              buffer = Buffer.from(data, 'binary');
+          } else {
+              buffer = Buffer.from(data, 'base64');
+          }
+     } else {
+        // Fallback: Check if it's an array-like object (buffer-like)
+        if (Array.isArray(pdfBlob) || Buffer.isBuffer(pdfBlob) || (pdfBlob as any).type === 'Buffer') {
+             console.log('Treating object as buffer-like');
+             buffer = Buffer.from(pdfBlob as any);
+        } else {
+            console.log('Object received but .data is not a string.');
+            console.log('Keys:', Object.keys(pdfBlob));
+            // Try to see if it's just the JSON response without data
+            // In that case, we might have FAILED to get the PDF but got a JSON log instead
+            // But wait, the logs show the PDF content PRINTED to stdout!
+            // This means the function MIGHT be returning a stream that is being logged?
+            // Or maybe the 'pdfBlob' IS the JSON object, but the PDF binary was returned separately?
+            // No, supabase.functions.invoke returns { data, error }
+            
+            // If the PDF binary is in the object but not in 'data', where is it?
+            // It might be that the content type was application/pdf, but the client parsed it as JSON?
+            // Or the client returned the raw body?
+            
+            console.log('Full content:', JSON.stringify(pdfBlob, null, 2));
+            
+            // If we have a filename and contentType but no data, maybe we can't recover here.
+            // But let's try to see if we can interpret the object values as bytes if it looks like an array?
+            const values = Object.values(pdfBlob);
+            if (values.length > 0 && typeof values[0] === 'number') {
+                 console.log('Object values look like bytes, trying to convert...');
+                 buffer = Buffer.from(values as number[]);
+            } else {
+                 throw new Error('Received object response but could not find PDF data. See logs.');
+            }
+        }
+     }
   } else {
+    console.log('Returned data is not Blob, ArrayBuffer, or {data: string}. Content:', JSON.stringify(pdfBlob, null, 2));
     buffer = Buffer.from(pdfBlob as any);
   }
+
+  const outputPath = path.join(__dirname, `v2_pdf_${quote.quote_number}.pdf`);
 
   fs.writeFileSync(outputPath, buffer);
   console.log(`PDF saved to ${outputPath}`);

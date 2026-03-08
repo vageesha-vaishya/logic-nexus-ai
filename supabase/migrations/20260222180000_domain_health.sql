@@ -30,4 +30,4 @@ CREATE POLICY "Tenant admins can manage domain verifications" ON public.complian
 DROP TRIGGER IF EXISTS update_domain_verifications_modtime ON public.compliance_domain_verifications;
 CREATE TRIGGER update_domain_verifications_modtime
     BEFORE UPDATE ON public.compliance_domain_verifications
-    FOR EACH ROW EXECUTE FUNCTION update_modified_column();
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

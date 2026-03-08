@@ -29,9 +29,10 @@ ON public.container_sizes (iso_code)
 WHERE iso_code IS NOT NULL;
 
 -- 3. Update Foreign Key to ON DELETE CASCADE (as requested)
--- First drop existing constraint if possible (name might vary, so we try standard names)
--- We'll use a DO block to find and drop the constraint safely
+-- Explicitly drop the constraint if it exists by name to avoid conflicts
+ALTER TABLE public.container_sizes DROP CONSTRAINT IF EXISTS container_sizes_type_id_fkey;
 
+-- Also try to drop any other constraint on this column to avoid duplicates (best effort)
 DO $$
 DECLARE
     fk_name text;
@@ -40,7 +41,8 @@ BEGIN
     FROM pg_constraint
     WHERE conrelid = 'public.container_sizes'::regclass
     AND confrelid = 'public.container_types'::regclass
-    AND contype = 'f';
+    AND contype = 'f'
+    AND conname != 'container_sizes_type_id_fkey'; -- Don't try to drop what we just dropped (if it was the same)
 
     IF fk_name IS NOT NULL THEN
         EXECUTE 'ALTER TABLE public.container_sizes DROP CONSTRAINT ' || fk_name;

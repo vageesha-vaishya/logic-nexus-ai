@@ -1,5 +1,9 @@
 BEGIN;
 
+-- Ensure franchise_id columns exist
+ALTER TABLE public.invoices ADD COLUMN IF NOT EXISTS franchise_id UUID REFERENCES public.franchises(id);
+ALTER TABLE public.payments ADD COLUMN IF NOT EXISTS franchise_id UUID REFERENCES public.franchises(id);
+
 -- 1. Invoices
 -- Drop the broad policy that allowed cross-franchise access
 DROP POLICY IF EXISTS "Users view invoices" ON public.invoices;

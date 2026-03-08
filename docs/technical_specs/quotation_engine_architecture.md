@@ -120,6 +120,11 @@ The following critical gaps identified in the `quotation_engine_audit_review.md`
     -   **Section Isolation**: The renderer now wraps each section in a `try-catch` block.
     -   **Graceful Degradation**: If a section fails to render, an error placeholder is drawn instead of crashing the entire PDF generation process.
 
+## 6.1 Regression Prevention (2026-03-07)
+-   **Locale Defaults**: Template locale resolution now guards against missing or invalid `config.default_locale`.
+-   **Config Fallbacks**: Missing template `config` and `margins` are safely defaulted for rendering.
+-   **Template Parsing**: Template payloads are normalized before rendering to avoid undefined shapes.
+
 ## 7. Phase 4: Enterprise Designer Suite (Planned)
 
 ### 7.1 Visual Template Designer

@@ -49,71 +49,71 @@ DECLARE
 BEGIN
     FOR t IN SELECT id FROM public.tenants LOOP
         -- Ocean Carriers
-        INSERT INTO public.carriers (tenant_id, carrier_name, carrier_type, mode, scac, is_active)
-        SELECT t.id, 'Maersk', 'ocean', 'ocean', 'MAEU', true
+        INSERT INTO public.carriers (tenant_id, name, carrier_name, carrier_type, mode, scac, is_active)
+        SELECT t.id, 'Maersk', 'Maersk', 'ocean', 'ocean', 'MAEU', true
         WHERE NOT EXISTS (SELECT 1 FROM public.carriers WHERE tenant_id = t.id AND carrier_name = 'Maersk');
 
-        INSERT INTO public.carriers (tenant_id, carrier_name, carrier_type, mode, scac, is_active)
-        SELECT t.id, 'MSC', 'ocean', 'ocean', 'MSCU', true
+        INSERT INTO public.carriers (tenant_id, name, carrier_name, carrier_type, mode, scac, is_active)
+        SELECT t.id, 'MSC', 'MSC', 'ocean', 'ocean', 'MSCU', true
         WHERE NOT EXISTS (SELECT 1 FROM public.carriers WHERE tenant_id = t.id AND carrier_name = 'MSC');
 
-        INSERT INTO public.carriers (tenant_id, carrier_name, carrier_type, mode, scac, is_active)
-        SELECT t.id, 'CMA CGM', 'ocean', 'ocean', 'CMACGM', true
+        INSERT INTO public.carriers (tenant_id, name, carrier_name, carrier_type, mode, scac, is_active)
+        SELECT t.id, 'CMA CGM', 'CMA CGM', 'ocean', 'ocean', 'CMACGM', true
         WHERE NOT EXISTS (SELECT 1 FROM public.carriers WHERE tenant_id = t.id AND carrier_name = 'CMA CGM');
 
-        INSERT INTO public.carriers (tenant_id, carrier_name, carrier_type, mode, scac, is_active)
-        SELECT t.id, 'Hapag-Lloyd', 'ocean', 'ocean', 'HLCU', true
+        INSERT INTO public.carriers (tenant_id, name, carrier_name, carrier_type, mode, scac, is_active)
+        SELECT t.id, 'Hapag-Lloyd', 'Hapag-Lloyd', 'ocean', 'ocean', 'HLCU', true
         WHERE NOT EXISTS (SELECT 1 FROM public.carriers WHERE tenant_id = t.id AND carrier_name = 'Hapag-Lloyd');
 
-        INSERT INTO public.carriers (tenant_id, carrier_name, carrier_type, mode, scac, is_active)
-        SELECT t.id, 'COSCO', 'ocean', 'ocean', 'COSU', true
+        INSERT INTO public.carriers (tenant_id, name, carrier_name, carrier_type, mode, scac, is_active)
+        SELECT t.id, 'COSCO', 'COSCO', 'ocean', 'ocean', 'COSU', true
         WHERE NOT EXISTS (SELECT 1 FROM public.carriers WHERE tenant_id = t.id AND carrier_name = 'COSCO');
 
         -- Air Carriers
-        INSERT INTO public.carriers (tenant_id, carrier_name, carrier_type, mode, iata, is_active)
-        SELECT t.id, 'Lufthansa Cargo', 'air_cargo', 'air', 'LH', true
+        INSERT INTO public.carriers (tenant_id, name, carrier_name, carrier_type, mode, iata, is_active)
+        SELECT t.id, 'Lufthansa Cargo', 'Lufthansa Cargo', 'air_cargo', 'air', 'LH', true
         WHERE NOT EXISTS (SELECT 1 FROM public.carriers WHERE tenant_id = t.id AND carrier_name = 'Lufthansa Cargo');
 
-        INSERT INTO public.carriers (tenant_id, carrier_name, carrier_type, mode, iata, is_active)
-        SELECT t.id, 'Emirates SkyCargo', 'air_cargo', 'air', 'EK', true
+        INSERT INTO public.carriers (tenant_id, name, carrier_name, carrier_type, mode, iata, is_active)
+        SELECT t.id, 'Emirates SkyCargo', 'Emirates SkyCargo', 'air_cargo', 'air', 'EK', true
         WHERE NOT EXISTS (SELECT 1 FROM public.carriers WHERE tenant_id = t.id AND carrier_name = 'Emirates SkyCargo');
 
-        INSERT INTO public.carriers (tenant_id, carrier_name, carrier_type, mode, iata, is_active)
-        SELECT t.id, 'FedEx Express', 'air_cargo', 'air', 'FX', true
+        INSERT INTO public.carriers (tenant_id, name, carrier_name, carrier_type, mode, iata, is_active)
+        SELECT t.id, 'FedEx Express', 'FedEx Express', 'air_cargo', 'air', 'FX', true
         WHERE NOT EXISTS (SELECT 1 FROM public.carriers WHERE tenant_id = t.id AND carrier_name = 'FedEx Express');
 
-        INSERT INTO public.carriers (tenant_id, carrier_name, carrier_type, mode, iata, is_active)
-        SELECT t.id, 'DHL Aviation', 'air_cargo', 'air', 'D0', true
+        INSERT INTO public.carriers (tenant_id, name, carrier_name, carrier_type, mode, iata, is_active)
+        SELECT t.id, 'DHL Aviation', 'DHL Aviation', 'air_cargo', 'air', 'D0', true
         WHERE NOT EXISTS (SELECT 1 FROM public.carriers WHERE tenant_id = t.id AND carrier_name = 'DHL Aviation');
 
-        INSERT INTO public.carriers (tenant_id, carrier_name, carrier_type, mode, iata, is_active)
-        SELECT t.id, 'Cathay Pacific Cargo', 'air_cargo', 'air', 'CX', true
+        INSERT INTO public.carriers (tenant_id, name, carrier_name, carrier_type, mode, iata, is_active)
+        SELECT t.id, 'Cathay Pacific Cargo', 'Cathay Pacific Cargo', 'air_cargo', 'air', 'CX', true
         WHERE NOT EXISTS (SELECT 1 FROM public.carriers WHERE tenant_id = t.id AND carrier_name = 'Cathay Pacific Cargo');
 
         -- Trucking
-        INSERT INTO public.carriers (tenant_id, carrier_name, carrier_type, mode, scac, is_active)
-        SELECT t.id, 'J.B. Hunt', 'trucking', 'inland_trucking', 'JBHT', true
+        INSERT INTO public.carriers (tenant_id, name, carrier_name, carrier_type, mode, scac, is_active)
+        SELECT t.id, 'J.B. Hunt', 'J.B. Hunt', 'trucking', 'inland_trucking', 'JBHT', true
         WHERE NOT EXISTS (SELECT 1 FROM public.carriers WHERE tenant_id = t.id AND carrier_name = 'J.B. Hunt');
 
-        INSERT INTO public.carriers (tenant_id, carrier_name, carrier_type, mode, scac, is_active)
-        SELECT t.id, 'XPO Logistics', 'trucking', 'inland_trucking', 'XPO', true
+        INSERT INTO public.carriers (tenant_id, name, carrier_name, carrier_type, mode, scac, is_active)
+        SELECT t.id, 'XPO Logistics', 'XPO Logistics', 'trucking', 'inland_trucking', 'XPO', true
         WHERE NOT EXISTS (SELECT 1 FROM public.carriers WHERE tenant_id = t.id AND carrier_name = 'XPO Logistics');
 
-        INSERT INTO public.carriers (tenant_id, carrier_name, carrier_type, mode, scac, is_active)
-        SELECT t.id, 'Schneider', 'trucking', 'inland_trucking', 'SNDR', true
+        INSERT INTO public.carriers (tenant_id, name, carrier_name, carrier_type, mode, scac, is_active)
+        SELECT t.id, 'Schneider', 'Schneider', 'trucking', 'inland_trucking', 'SNDR', true
         WHERE NOT EXISTS (SELECT 1 FROM public.carriers WHERE tenant_id = t.id AND carrier_name = 'Schneider');
 
         -- Rail
-        INSERT INTO public.carriers (tenant_id, carrier_name, carrier_type, mode, is_active)
-        SELECT t.id, 'Union Pacific', 'rail', 'rail', true
+        INSERT INTO public.carriers (tenant_id, name, carrier_name, carrier_type, mode, is_active)
+        SELECT t.id, 'Union Pacific', 'Union Pacific', 'rail', 'rail', true
         WHERE NOT EXISTS (SELECT 1 FROM public.carriers WHERE tenant_id = t.id AND carrier_name = 'Union Pacific');
 
-        INSERT INTO public.carriers (tenant_id, carrier_name, carrier_type, mode, is_active)
-        SELECT t.id, 'CSX', 'rail', 'rail', true
+        INSERT INTO public.carriers (tenant_id, name, carrier_name, carrier_type, mode, is_active)
+        SELECT t.id, 'CSX', 'CSX', 'rail', 'rail', true
         WHERE NOT EXISTS (SELECT 1 FROM public.carriers WHERE tenant_id = t.id AND carrier_name = 'CSX');
 
-        INSERT INTO public.carriers (tenant_id, carrier_name, carrier_type, mode, is_active)
-        SELECT t.id, 'BNSF', 'rail', 'rail', true
+        INSERT INTO public.carriers (tenant_id, name, carrier_name, carrier_type, mode, is_active)
+        SELECT t.id, 'BNSF', 'BNSF', 'rail', 'rail', true
         WHERE NOT EXISTS (SELECT 1 FROM public.carriers WHERE tenant_id = t.id AND carrier_name = 'BNSF');
 
     END LOOP;

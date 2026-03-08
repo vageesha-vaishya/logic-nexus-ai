@@ -4,6 +4,9 @@
 
 BEGIN;
 
+-- Ensure container_sizes has a name column (missing from some migration paths)
+ALTER TABLE public.container_sizes ADD COLUMN IF NOT EXISTS name TEXT;
+
 -- Add foreign key columns
 ALTER TABLE public.quote_cargo_configurations
 ADD COLUMN IF NOT EXISTS container_type_id UUID REFERENCES public.container_types(id),

@@ -89,6 +89,7 @@ export const RawQuoteDataSchema = z.object({
     frequency: z.string().optional(),
     container_size: z.string().optional(),
     container_type: z.string().optional(),
+    remarks: z.string().optional(),
   }).passthrough()).optional(),
   mode: z.enum(['single', 'consolidated', 'individual']).optional(),
 });
@@ -281,6 +282,7 @@ export interface SafeContext {
   frequency?: string;
   container_size?: string;
   container_type?: string;
+  remarks?: string;
 }>;
   mode?: 'single' | 'consolidated';
 }
@@ -409,12 +411,13 @@ export function buildSafeContextWithValidation(
     mode: data.mode || 'single',
     options: (data.options || []).map((opt: any) => ({
         id: opt.id,
-        grand_total: opt.grand_total || 0,
-        carrier: opt.carrier,
+        grand_total: opt.grand_total || opt.total_amount || 0,
+        carrier: opt.carrier || opt.carriers?.carrier_name,
         transit_time: opt.transit_time,
         frequency: opt.frequency,
-        container_size: opt.container_size,
-        container_type: opt.container_type,
+        container_size: opt.container_size || opt.container_sizes?.name || opt.container_sizes?.code,
+        container_type: opt.container_type || opt.container_types?.name || opt.container_types?.code,
+        remarks: opt.remarks,
         legs: (opt.legs || []).map((l: any) => ({
             seq: l.sequence_id || 0,
             mode: l.mode || "Unknown",

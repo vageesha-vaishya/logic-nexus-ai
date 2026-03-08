@@ -14,7 +14,7 @@ SELECT
   c.carrier_type,
   c.scac,
   c.iata,
-  c.mode,
+  c.mode::public.transport_mode,
   true as is_active
 FROM public.tenants t
 CROSS JOIN (

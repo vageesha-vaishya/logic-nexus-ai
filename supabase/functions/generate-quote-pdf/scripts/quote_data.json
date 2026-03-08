@@ -1,0 +1,178 @@
+{
+  "quote": {
+    "id": "ab8dcb16-1597-4d1e-88ab-b558fd6abead",
+    "tenant_id": "86962cdf-8179-4bb5-a89b-3bf57371314a",
+    "franchise_id": null,
+    "quote_number": "QUO-260303-00002",
+    "title": "Quote - ABDERDEEN to Charleston Rail Terminal",
+    "description": null,
+    "opportunity_id": "2380efbd-9262-4909-a316-afc3934cd206",
+    "account_id": "d2d4eb4c-57ff-4a8b-a54f-c3e8cbe32ab6",
+    "contact_id": "ab58687c-adca-43e6-91a2-16bcdc924cc9",
+    "owner_id": "52811a3b-5baf-4c5f-854b-7ced632e3a74",
+    "status": "draft",
+    "valid_until": null,
+    "subtotal": 0,
+    "discount_amount": 0,
+    "discount_percent": 0,
+    "tax_amount": 0,
+    "tax_percent": 0,
+    "shipping_amount": 0,
+    "total_amount": 0,
+    "currency": "USD",
+    "terms_conditions": null,
+    "notes": null,
+    "billing_address": null,
+    "shipping_address": {},
+    "created_by": "52811a3b-5baf-4c5f-854b-7ced632e3a74",
+    "created_at": "2026-03-03T12:12:52.088569+00:00",
+    "updated_at": "2026-03-07T03:45:41.929355+00:00",
+    "accepted_at": null,
+    "rejected_at": null,
+    "incoterms": "FOB",
+    "origin_location": {},
+    "destination_location": {},
+    "cargo_details": {
+      "hts_code": null,
+      "quantity": 3,
+      "commodity": "PARTS OF BABY CARRIAGES - 8715.00.00.40",
+      "stackable": false,
+      "cargo_type": "container",
+      "dimensions": {
+        "h": 900,
+        "l": 900,
+        "w": 900,
+        "unit": "cm"
+      },
+      "weight_unit": "kg",
+      "hazmat_details": null,
+      "dangerous_goods": false,
+      "total_weight_kg": 50000,
+      "container_combos": [
+        {
+          "sizeId": "40hc",
+          "typeId": "dry",
+          "quantity": 1
+        },
+        {
+          "sizeId": "40ft",
+          "typeId": "reefer",
+          "quantity": 1
+        },
+        {
+          "sizeId": "40ft",
+          "typeId": "flat_rack",
+          "quantity": 1
+        }
+      ],
+      "total_volume_cbm": 2187,
+      "commodity_details": {
+        "hts_code": "",
+        "description": "PARTS OF BABY CARRIAGES - 8715.00.00.40"
+      }
+    },
+    "special_handling": null,
+    "regulatory_data": {},
+    "compliance_status": "pending",
+    "carrier_id": null,
+    "service_id": null,
+    "is_primary": false,
+    "consignee_id": null,
+    "origin_port_id": "57280f34-9000-425c-8e8e-dcd466934fdf",
+    "destination_port_id": "e6701c90-3b28-4f87-b234-0c6dbefaad2d",
+    "cost_price": null,
+    "sell_price": null,
+    "margin_amount": null,
+    "margin_percentage": null,
+    "additional_costs": [],
+    "incoterm_id": null,
+    "payment_terms": null,
+    "service_type_id": null,
+    "current_version_id": "35707353-bc83-4a6e-a3ba-4e2fbf9e7b62",
+    "priority": "medium",
+    "ready_date": null,
+    "service_level": null,
+    "is_hazmat": false,
+    "origin_code": null,
+    "destination_code": null,
+    "transport_mode": null,
+    "unit_details": {},
+    "compliance_checks": {},
+    "pickup_date": null,
+    "delivery_deadline": null,
+    "vehicle_type": "van",
+    "template_id": null,
+    "currency_id": "f4739a55-66ab-47da-a66f-450188f01e69",
+    "origin": null,
+    "origin_port_data": null,
+    "destination": null,
+    "destination_port_data": null
+  },
+  "options": [],
+  "items": [],
+  "legs": [],
+  "charges": [],
+  "template": {
+    "id": "2b2f7878-4f66-4c7d-9192-74d24bb5e97b",
+    "tenant_id": "86962cdf-8179-4bb5-a89b-3bf57371314a",
+    "name": "MGL Standard Granular",
+    "description": "Standard granular quote template for MGL",
+    "category": "",
+    "content": {
+      "config": {
+        "margins": {
+          "top": 40,
+          "left": 40,
+          "right": 40,
+          "bottom": 40
+        },
+        "page_size": "A4",
+        "default_locale": "en-US"
+      },
+      "footer": {
+        "text": "Thank you for your business."
+      },
+      "header": {
+        "title": "QUOTATION",
+        "show_logo": true,
+        "company_info": true
+      },
+      "layout": "mgl_granular",
+      "sections": [
+        {
+          "type": "customer_matrix_header",
+          "title": "Customer Information"
+        },
+        {
+          "type": "shipment_matrix_details",
+          "title": "Details (with Equipment/QTY)"
+        },
+        {
+          "type": "terms",
+          "title": "Terms & Conditions"
+        },
+        {
+          "type": "rates_matrix",
+          "title": "Freight Charges Matrix"
+        },
+        {
+          "type": "static_block",
+          "title": "New Section",
+          "content": {}
+        }
+      ]
+    },
+    "is_active": true,
+    "version": "1.0.0",
+    "created_by": null,
+    "updated_by": null,
+    "created_at": "2026-02-11T15:20:26.793741+00:00",
+    "updated_at": "2026-03-07T10:14:16.151545+00:00",
+    "is_default": true,
+    "template_name": null,
+    "rate_options": [],
+    "transport_modes": [],
+    "legs_config": [],
+    "carrier_selections": []
+  }
+}

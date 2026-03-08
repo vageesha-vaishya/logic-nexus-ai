@@ -61,8 +61,15 @@ CREATE INDEX IF NOT EXISTS idx_quote_approvals_status ON public.quote_approvals(
 -- 3. Advanced Pricing & Rate Management Integration
 -----------------------------------------------------------------------------
 -- Link Quote Charges to Vendor Contracts (if applicable)
-ALTER TABLE public.quote_charges 
-ADD COLUMN IF NOT EXISTS vendor_id UUID REFERENCES public.vendors(id),
+DO $$
+BEGIN
+    IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'vendors') THEN
+        ALTER TABLE public.quote_charges 
+        ADD COLUMN IF NOT EXISTS vendor_id UUID REFERENCES public.vendors(id);
+    END IF;
+END $$;
+
+ALTER TABLE public.quote_charges
 ADD COLUMN IF NOT EXISTS contract_reference TEXT,
 ADD COLUMN IF NOT EXISTS is_system_calculated BOOLEAN DEFAULT false;
 

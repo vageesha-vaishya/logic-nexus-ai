@@ -141,6 +141,7 @@ BEGIN
                 service_name, 
                 service_type, 
                 service_type_id,
+                shipment_type,
                 description, 
                 is_template, 
                 base_price, 
@@ -156,6 +157,7 @@ BEGIN
                 'Global Ocean FCL 20ft Standard', 
                 'ocean', 
                 v_ocean_type_id,
+                'ocean_freight',
                 'Template for Ocean FCL 20ft shipments with standard billing rules', 
                 true, 
                 0, -- Base price is 0 for template

@@ -10,6 +10,9 @@ CREATE TABLE IF NOT EXISTS user_preferences (
   UNIQUE(user_id, role)
 );
 
+-- Ensure role column exists if table already existed without it
+ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'standard';
+
 -- Create index on user_id for faster lookups
 CREATE INDEX idx_user_preferences_user_id ON user_preferences(user_id);
 CREATE INDEX idx_user_preferences_role ON user_preferences(role);
