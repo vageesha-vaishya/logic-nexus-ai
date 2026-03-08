@@ -15,7 +15,7 @@ pipeline {
         // Credentials binding for Supabase
         SUPABASE_ACCESS_TOKEN = credentials('supabase-access-token')
         SUPABASE_ANON_KEY = credentials('supabase-anon-key')
-        SUPABASE_SERVICE_ROLE_KEY = credentials('supabase-service-role-key')
+        SUPABASE_SERVICE_ROLE_KEY = ''
         
         // VPS Credentials for Deployment
         VPS_PASSWORD = credentials('vps-root-password')
@@ -75,7 +75,7 @@ pipeline {
                     }
                     def envSupabaseUrl = params.SUPABASE_URL_OVERRIDE ? params.SUPABASE_URL_OVERRIDE : parseEnv('VITE_SUPABASE_URL')
                     def envAnonKey = params.SUPABASE_ANON_KEY_OVERRIDE ? params.SUPABASE_ANON_KEY_OVERRIDE : (parseEnv('VITE_SUPABASE_PUBLISHABLE_KEY') ?: parseEnv('VITE_SUPABASE_ANON_KEY'))
-                    def envServiceKey = params.SUPABASE_SERVICE_ROLE_KEY_OVERRIDE ? params.SUPABASE_SERVICE_ROLE_KEY_OVERRIDE : (parseEnv('SUPABASE_SERVICE_ROLE_KEY') ?: env.SUPABASE_SERVICE_ROLE_KEY)
+                    def envServiceKey = params.SUPABASE_SERVICE_ROLE_KEY_OVERRIDE ? params.SUPABASE_SERVICE_ROLE_KEY_OVERRIDE : parseEnv('SUPABASE_SERVICE_ROLE_KEY')
 
                     def selectedTarget = params.DB_TARGET
                     if (selectedTarget == 'auto') {
