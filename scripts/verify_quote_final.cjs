@@ -54,6 +54,15 @@ async function run() {
     optionsRes.rows.forEach((opt, i) => {
       console.log(`Option ${i+1}: Carrier=${opt.carrier_id}, Total=${opt.total_amount}`);
     });
+
+    // 4. Check Items (Legacy/Core)
+    const itemsResCheck = await client.query(`
+      SELECT * FROM quote_items_legacy WHERE quote_id = $1
+    `, [quote.id]);
+    console.log(`Found ${itemsResCheck.rows.length} items in quote_items_legacy`);
+    itemsResCheck.rows.forEach((item, i) => {
+        console.log(`Item ${i+1}: Product=${item.product_name}, Qty=${item.quantity}, Weight=${item.weight_kg}, Vol=${item.volume_cbm}`);
+    });
     
     // 8. Check Quotes Schema
     const quotesSchemaRes = await client.query(`

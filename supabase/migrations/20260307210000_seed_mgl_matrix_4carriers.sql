@@ -25,6 +25,20 @@ DECLARE
   v_port_dest uuid;
   
   -- Container IDs
+  v_cont_20sd uuid;
+  v_cont_40sd uuid;
+  v_cont_40hq uuid;
+
+  v_carr_msc uuid;
+  v_carr_maersk uuid;
+  v_carr_cma uuid;
+  v_carr_hl uuid;
+  
+  -- Option IDs
+  v_opt_id uuid;
+  
+BEGIN
+  -- 0. Get Container IDs
   SELECT s.id INTO v_cont_20sd
   FROM container_sizes s
   JOIN container_types t ON s.container_type_id = t.id
@@ -42,15 +56,7 @@ DECLARE
   JOIN container_types t ON s.container_type_id = t.id
   WHERE t.code = '40HC' OR t.name ILIKE '%40%High Cube%'
   LIMIT 1;
-  v_carr_msc uuid;
-  v_carr_maersk uuid;
-  v_carr_cma uuid;
-  v_carr_hl uuid;
-  
-  -- Option IDs
-  v_opt_id uuid;
-  
-BEGIN
+
   -- 1. Get/Create Context (Tenant, User)
   SELECT id INTO v_tenant_id FROM public.tenants LIMIT 1;
   

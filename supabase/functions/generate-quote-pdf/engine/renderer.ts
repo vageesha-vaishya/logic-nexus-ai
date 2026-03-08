@@ -1331,13 +1331,17 @@ export class PdfRenderer {
 
         // Header Data
         const carrier = group.carrier;
+        // Try to find carrier code
+        const firstOpt = opts[0];
+        const legs = firstOpt.legs || [];
+        
+        // Get Carrier Code from first leg with same carrier name, or fallback
+        const carrierCode = this.getCarrierCode(group.carrier, legs) || ""; 
+        const carrierDisplay = carrierCode ? `${carrier} (${carrierCode})` : carrier;
+
         const transit = group.transit;
         const frequency = group.frequency;
         
-        // Use the first option to get routing/mode details
-        const firstOpt = opts[0];
-        const legs = firstOpt.legs || [];
-
         // Draw Header Bar (Cyan)
         const headerHeight = 25;
         const pageWidth = this.currentPage!.getSize().width;
@@ -1347,7 +1351,7 @@ export class PdfRenderer {
 
         // Header Text
         const textY = this.cursorY - 18;
-        this.currentPage!.drawText(`Carrier: ${carrier}`, {
+        this.currentPage!.drawText(`Carrier: ${carrierDisplay}`, {
             x: this.margins.left + 5,
             y: textY,
             size: 10,
@@ -1376,16 +1380,19 @@ export class PdfRenderer {
         this.cursorY -= headerHeight;
 
         // --- Column Definitions ---
-        // Desc | Basis | Unit | Curr | [Cont 1] | [Cont 2] ... | Notes
+        // Desc | Basis | Unit | Curr | Qty | Rate | [Cont 1] | [Cont 2] ... | Notes
         const staticCols = [
-            { label: "Charge Category", width: 100 },
-            { label: "Basis", width: 40 },
+            { label: "Charge Category", width: 90 },
+            { label: "Basis", width: 35 },
             { label: "Unit", width: 30 },
-            { label: "Curr", width: 30 }
+            { label: "Curr", width: 30 },
+            { label: "Qty", width: 25 },
+            { label: "Rate", width: 40 }
         ];
         
-        const notesColWidth = 60;
-        const availableForContainers = tableWidth - (100 + 40 + 30 + 30 + notesColWidth);
+        const notesColWidth = 50;
+        const usedWidth = staticCols.reduce((s, c) => s + c.width, 0) + notesColWidth;
+        const availableForContainers = tableWidth - usedWidth;
         const containerColWidth = sortedContainers.length > 0 ? availableForContainers / sortedContainers.length : 0;
 
         // Render Table Header
@@ -1400,9 +1407,13 @@ export class PdfRenderer {
 
         // Container Headers
         sortedContainers.forEach(h => {
-            const tw = this.boldFont!.widthOfTextAtSize(h, 8);
+            // Truncate container name if too long
+            const maxLen = 15;
+            const displayH = h.length > maxLen ? h.substring(0, maxLen) + "..." : h;
+            
+            const tw = this.boldFont!.widthOfTextAtSize(displayH, 8);
             const tx = x + (containerColWidth - tw) / 2;
-            this.currentPage!.drawText(h, { x: tx, y: this.cursorY - 14, size: 8, font: this.boldFont!, color: rgb(0,0,0) });
+            this.currentPage!.drawText(displayH, { x: tx, y: this.cursorY - 14, size: 8, font: this.boldFont!, color: rgb(0,0,0) });
             x += containerColWidth;
         });
 
@@ -1417,7 +1428,12 @@ export class PdfRenderer {
             // Leg Header
             if (this.cursorY < this.margins.bottom + 40) { this.addNewPage(); this.cursorY -= 20; }
             
-            const legTitle = `${leg.mode?.toUpperCase() || 'LEG'} : ${leg.pol || 'Origin'} -> ${leg.pod || 'Destination'}`;
+            // Extract leg-specific carrier info
+            const legCarrier = leg.carrier_name || carrier;
+            const legCarrierCode = leg.carrier_code || this.getCarrierCode(legCarrier, [leg]) || "";
+            const legCarrierDisplay = legCarrierCode ? `${legCarrier} (${legCarrierCode})` : legCarrier;
+
+            const legTitle = `${legCarrierDisplay} | ${leg.mode?.toUpperCase() || 'LEG'} : ${leg.pol || 'Origin'} -> ${leg.pod || 'Destination'}`;
             this.drawRect(this.margins.left, this.cursorY - 18, tableWidth, 18, rgb(0.95, 0.95, 0.95), true);
             this.currentPage!.drawText(legTitle, {
                 x: this.margins.left + 5,
@@ -1429,7 +1445,6 @@ export class PdfRenderer {
             this.cursorY -= 18;
 
             // Collect charges for this leg across all container options
-            // Map: ChargeName -> { basis, unit, curr, notes, amounts: { [container]: amount } }
             const legCharges = this.aggregateChargesForLeg(opts, leg.id, sortedContainers);
 
             for (const [desc, details] of legCharges) {
@@ -1438,17 +1453,33 @@ export class PdfRenderer {
                 x = this.margins.left;
                 
                 // Static Cols
-                this.currentPage!.drawText(desc, { x: x + 2, y: this.cursorY - 14, size: 8, font: this.font!, color: rgb(0,0,0) });
+                // Description
+                let descText = desc;
+                if (descText.length > 20) descText = descText.substring(0, 18) + "...";
+                this.currentPage!.drawText(descText, { x: x + 2, y: this.cursorY - 14, size: 8, font: this.font!, color: rgb(0,0,0) });
                 x += staticCols[0].width;
                 
+                // Basis
                 this.currentPage!.drawText(details.basis, { x: x + 2, y: this.cursorY - 14, size: 8, font: this.font!, color: rgb(0,0,0) });
                 x += staticCols[1].width;
 
+                // Unit
                 this.currentPage!.drawText(details.unit, { x: x + 2, y: this.cursorY - 14, size: 8, font: this.font!, color: rgb(0,0,0) });
                 x += staticCols[2].width;
 
+                // Curr
                 this.currentPage!.drawText(details.curr, { x: x + 2, y: this.cursorY - 14, size: 8, font: this.font!, color: rgb(0,0,0) });
                 x += staticCols[3].width;
+                
+                // Qty
+                const qtyVal = details.qty !== undefined ? String(details.qty) : "1";
+                this.currentPage!.drawText(qtyVal, { x: x + 2, y: this.cursorY - 14, size: 8, font: this.font!, color: rgb(0,0,0) });
+                x += staticCols[4].width;
+
+                // Rate
+                const rateVal = details.rate !== undefined ? details.rate.toFixed(2) : "-";
+                this.currentPage!.drawText(rateVal, { x: x + 2, y: this.cursorY - 14, size: 8, font: this.font!, color: rgb(0,0,0) });
+                x += staticCols[5].width;
 
                 // Container Amounts
                 sortedContainers.forEach(ct => {
@@ -1459,7 +1490,9 @@ export class PdfRenderer {
                 });
 
                 // Notes
-                this.currentPage!.drawText(details.notes, { x: x + 2, y: this.cursorY - 14, size: 7, font: this.font!, color: rgb(0,0,0) });
+                let noteText = details.notes;
+                if (noteText.length > 15) noteText = noteText.substring(0, 12) + "...";
+                this.currentPage!.drawText(noteText, { x: x + 2, y: this.cursorY - 14, size: 7, font: this.font!, color: rgb(0,0,0) });
 
                 this.drawLine(this.margins.left, this.cursorY - rowHeight, this.margins.left + tableWidth, this.cursorY - rowHeight, rgb(0.8, 0.8, 0.8));
                 this.cursorY -= rowHeight;
@@ -1485,7 +1518,10 @@ export class PdfRenderer {
                 if (this.cursorY < this.margins.bottom + 20) { this.addNewPage(); this.cursorY -= 20; }
                 x = this.margins.left;
                 
-                this.currentPage!.drawText(desc, { x: x + 2, y: this.cursorY - 14, size: 8, font: this.font!, color: rgb(0,0,0) });
+                // Static Cols
+                let descText = desc;
+                if (descText.length > 20) descText = descText.substring(0, 18) + "...";
+                this.currentPage!.drawText(descText, { x: x + 2, y: this.cursorY - 14, size: 8, font: this.font!, color: rgb(0,0,0) });
                 x += staticCols[0].width;
                 this.currentPage!.drawText(details.basis, { x: x + 2, y: this.cursorY - 14, size: 8, font: this.font!, color: rgb(0,0,0) });
                 x += staticCols[1].width;
@@ -1493,6 +1529,14 @@ export class PdfRenderer {
                 x += staticCols[2].width;
                 this.currentPage!.drawText(details.curr, { x: x + 2, y: this.cursorY - 14, size: 8, font: this.font!, color: rgb(0,0,0) });
                 x += staticCols[3].width;
+                
+                const qtyVal = details.qty !== undefined ? String(details.qty) : "1";
+                this.currentPage!.drawText(qtyVal, { x: x + 2, y: this.cursorY - 14, size: 8, font: this.font!, color: rgb(0,0,0) });
+                x += staticCols[4].width;
+
+                const rateVal = details.rate !== undefined ? details.rate.toFixed(2) : "-";
+                this.currentPage!.drawText(rateVal, { x: x + 2, y: this.cursorY - 14, size: 8, font: this.font!, color: rgb(0,0,0) });
+                x += staticCols[5].width;
 
                 sortedContainers.forEach(ct => {
                     const amt = details.amounts[ct];
@@ -1500,7 +1544,10 @@ export class PdfRenderer {
                     this.currentPage!.drawText(txt, { x: x + 2, y: this.cursorY - 14, size: 8, font: this.font!, color: rgb(0,0,0) });
                     x += containerColWidth;
                 });
-                this.currentPage!.drawText(details.notes, { x: x + 2, y: this.cursorY - 14, size: 7, font: this.font!, color: rgb(0,0,0) });
+                
+                let noteText = details.notes;
+                if (noteText.length > 15) noteText = noteText.substring(0, 12) + "...";
+                this.currentPage!.drawText(noteText, { x: x + 2, y: this.cursorY - 14, size: 7, font: this.font!, color: rgb(0,0,0) });
                 this.drawLine(this.margins.left, this.cursorY - rowHeight, this.margins.left + tableWidth, this.cursorY - rowHeight, rgb(0.8, 0.8, 0.8));
                 this.cursorY -= rowHeight;
             }
@@ -1513,17 +1560,25 @@ export class PdfRenderer {
         x = this.margins.left;
         this.currentPage!.drawText("Grand Total", { x: x + 2, y: this.cursorY - 14, size: 9, font: this.boldFont!, color: rgb(0,0,0) });
         // Skip static cols
-        x += (staticCols[0].width + staticCols[1].width + staticCols[2].width + staticCols[3].width);
+        x += usedWidth - notesColWidth; // Totals align with containers
 
         sortedContainers.forEach(ct => {
-            const opt = opts.find((o: any) => (o.container_size || o.container_type || "Standard") === ct);
+            const opt = opts.find((o: any) => (o.container_size || o.container_type || o._derived_container_type || "Standard") === ct);
             const total = opt ? opt.grand_total : 0;
-            this.currentPage!.drawText(total.toFixed(2), { x: x + 2, y: this.cursorY - 14, size: 9, font: this.boldFont!, color: rgb(0,0,0) });
+            const txt = total !== undefined ? total.toFixed(2) : "0.00";
+            this.currentPage!.drawText(txt, { x: x + 2, y: this.cursorY - 14, size: 9, font: this.boldFont!, color: rgb(0,0,0) });
             x += containerColWidth;
         });
 
         this.cursorY -= rowHeight;
         this.cursorY -= 20; // Spacing
+
+        // Remarks centered below table
+        const remarks = (this.context.quote as any).remarks || (this.context.quote as any).notes;
+        if (remarks) {
+             this.drawTextCentered(remarks, this.cursorY, 9, false, rgb(0.3, 0.3, 0.3));
+             this.cursorY -= 15;
+        }
     }
 
     // Terms
@@ -1538,7 +1593,7 @@ export class PdfRenderer {
       
       if (this.cursorY < this.margins.bottom + 60) { this.addNewPage(); this.cursorY -= 20; }
 
-      const boxHeight = 50;
+      const boxHeight = 70; // Increased height for extra details
       const width = this.currentPage.getSize().width - this.margins.left - this.margins.right;
       
       this.drawRect(this.margins.left, this.cursorY - boxHeight, width, boxHeight, rgb(0.98, 0.98, 0.98), true);
@@ -1546,7 +1601,7 @@ export class PdfRenderer {
 
       // Row 1: Commodity, Quantity, Weight, Volume
       let textY = this.cursorY - 15;
-      const commodity = items[0]?.commodity || "General Cargo";
+      const commodity = items.map((i:any) => i.commodity).filter((v:any, i:any, a:any) => a.indexOf(v) === i).join(", ") || "General Cargo";
       const details = items[0]?.details || "Loose";
       
       this.currentPage.drawText(`Commodity: ${commodity}`, { x: this.margins.left + 5, y: textY, size: 9, font: this.boldFont, color: rgb(0,0,0) });
@@ -1558,10 +1613,28 @@ export class PdfRenderer {
       const totalWt = items.reduce((s:number, i:any) => s + (Number(i.weight)||0), 0);
       const totalVol = items.reduce((s:number, i:any) => s + (Number(i.volume)||0), 0);
       
-      this.currentPage.drawText(`Total Qty: ${totalQty}`, { x: this.margins.left + 5, y: textY, size: 9, font: this.font, color: rgb(0,0,0) });
-      this.currentPage.drawText(`Weight: ${totalWt} kg`, { x: this.margins.left + 150, y: textY, size: 9, font: this.font, color: rgb(0,0,0) });
-      this.currentPage.drawText(`Volume: ${totalVol} cbm`, { x: this.margins.left + 300, y: textY, size: 9, font: this.font, color: rgb(0,0,0) });
+      // Container Breakdown
+      const containerCounts = items.reduce((acc: any, item: any) => {
+        const type = item.container_type || item.type || "Pkg";
+        acc[type] = (acc[type] || 0) + (Number(item.quantity) || 0);
+        return acc;
+      }, {});
+      const containerStr = Object.entries(containerCounts).map(([k, v]) => `${v}x ${k}`).join(", ");
+
+      this.currentPage.drawText(`Total Qty: ${totalQty} (${containerStr})`, { x: this.margins.left + 5, y: textY, size: 9, font: this.font, color: rgb(0,0,0) });
+      this.currentPage.drawText(`Weight: ${totalWt} kg`, { x: this.margins.left + 250, y: textY, size: 9, font: this.font, color: rgb(0,0,0) });
+      this.currentPage.drawText(`Volume: ${totalVol} cbm`, { x: this.margins.left + 350, y: textY, size: 9, font: this.font, color: rgb(0,0,0) });
       
+      textY -= 15;
+      // Dimensions & Value
+      // Use details as proxy or "N/A" if missing
+      const dimensions = items[0]?.dimensions || "N/A";
+      // Try to find value in quote or items
+      const shipmentValue = (quote as any)?.declared_value || (items[0] as any)?.declared_value || "N/A";
+
+      this.currentPage.drawText(`Dimensions: ${dimensions}`, { x: this.margins.left + 5, y: textY, size: 9, font: this.font, color: rgb(0,0,0) });
+      this.currentPage.drawText(`Shipment Cost Value: ${shipmentValue}`, { x: this.margins.left + 200, y: textY, size: 9, font: this.font, color: rgb(0,0,0) });
+
       // Hazmat / Stackable
       const isHaz = items.some((i:any) => i.is_hazmat);
       const isStack = items.some((i:any) => i.is_stackable);
@@ -1574,6 +1647,18 @@ export class PdfRenderer {
       }
 
       this.cursorY -= (boxHeight + 15);
+  }
+
+  private getCarrierCode(carrierName: string, legs: any[]): string | undefined {
+      // 1. Check if leg has carrier_code
+      const leg = legs.find((l: any) => l.carrier_name === carrierName && l.carrier_code);
+      if (leg) return leg.carrier_code;
+      
+      // 2. Try to extract from name if it looks like "Maersk (MAEU)"
+      const match = /\(([^)]+)\)/.exec(carrierName);
+      if (match) return match[1];
+      
+      return undefined;
   }
 
   private aggregateChargesForLeg(opts: any[], legId: string | null, containers: string[]): Map<string, any> {
@@ -1599,16 +1684,21 @@ export class PdfRenderer {
                       unit: c.unit || "Unit",
                       curr: c.currency || "USD",
                       notes: c.note || "",
+                      qty: Number(c.quantity || c.qty || 1),
+                      rate: Number(c.unit_price || c.rate || 0),
                       amounts: {}
                   });
               }
               
               const entry = map.get(desc);
+              // Aggregating amounts for matrix
               entry.amounts[ct] = (entry.amounts[ct] || 0) + (Number(c.amount) || 0);
               
               // Update metadata if missing
               if (!entry.basis && c.basis) entry.basis = c.basis;
               if (!entry.notes && c.note) entry.notes = c.note;
+              // If rate is zero in entry but present here, update it
+              if (entry.rate === 0 && (c.unit_price || c.rate)) entry.rate = Number(c.unit_price || c.rate);
           });
       });
       

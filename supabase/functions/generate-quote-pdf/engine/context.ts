@@ -175,6 +175,10 @@ export function mapQuoteItemsToRawItems(items: any[] | null | undefined) {
       commodity: i.commodity || i.master_commodities?.name || i.commodity_description || "General Cargo",
       weight,
       volume,
+      dimensions: i.dimensions || "N/A",
+      declared_value: i.declared_value,
+      is_hazmat: i.is_hazmat,
+      is_stackable: i.is_stackable,
     };
   });
 }
@@ -243,6 +247,12 @@ export interface SafeContext {
     qty: number;
     commodity: string;
     details: string;
+    weight?: number;
+    volume?: number;
+    dimensions?: string;
+    declared_value?: number;
+    is_hazmat?: boolean;
+    is_stackable?: boolean;
   }>;
   charges: Array<{
     desc: string;
@@ -274,6 +284,7 @@ export interface SafeContext {
       unit_price?: number;
       qty?: number;
       category?: string;
+      leg_id?: string;
       note?: string;
     }>;
   grand_total: number;
@@ -387,7 +398,13 @@ export function buildSafeContextWithValidation(
       type: i.container_type || "Standard",
       qty: i.quantity || 1,
       commodity: i.commodity || "General Cargo",
-      details: `${i.weight || 0} kg / ${i.volume || 0} cbm`
+      details: `${i.weight || 0} kg / ${i.volume || 0} cbm`,
+      weight: i.weight || 0,
+      volume: i.volume || 0,
+      dimensions: i.dimensions || "N/A",
+      declared_value: i.declared_value || 0,
+      is_hazmat: !!i.is_hazmat,
+      is_stackable: !!i.is_stackable,
     })),
     charges: (data.charges || []).map((c: any) => {
       const amount = Number(c.amount) || 0;
@@ -444,6 +461,7 @@ export function buildSafeContextWithValidation(
           quantity,
           category: c.category?.name || "Other",
           note: c.note || "",
+          leg_id: c.leg_id,
         };
       }),
     })),
