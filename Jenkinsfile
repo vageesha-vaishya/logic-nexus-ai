@@ -2,9 +2,9 @@ pipeline {
     agent any
     parameters {
         choice(name: 'DB_TARGET', choices: ['auto', 'local', 'cloud'], description: 'Select Supabase instance for build')
-        string(name: 'SUPABASE_URL_OVERRIDE', defaultValue: '', description: 'Optional: override Supabase URL')
-        string(name: 'SUPABASE_ANON_KEY_OVERRIDE', defaultValue: '', description: 'Optional: override Supabase anon key')
-        string(name: 'SUPABASE_SERVICE_ROLE_KEY_OVERRIDE', defaultValue: '', description: 'Optional: override Supabase service role key')
+        string(name: 'SUPABASE_URL_OVERRIDE', defaultValue: 'https://gzhxgoigflftharcmdqj.supabase.co', description: 'Optional: override Supabase URL')
+        string(name: 'SUPABASE_ANON_KEY_OVERRIDE', defaultValue: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd6aHhnb2lnZmxmdGhhcmNtZHFqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk1MTk2ODcsImV4cCI6MjA4NTA5NTY4N30.6xIZ3VYubUZ73pNPurzYuf-2RUpXj_9w-LpU-6d6kqU', description: 'Optional: override Supabase anon key')
+        string(name: 'SUPABASE_SERVICE_ROLE_KEY_OVERRIDE', defaultValue: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd6aHhnb2lnZmxmdGhhcmNtZHFqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2OTUxOTY4NywiZXhwIjoyMDg1MDk1Njg3fQ.MImJoQhZUG2lSQ9PpN0z1QwDI1nvA2AsYPOeVfDGMos', description: 'Optional: override Supabase service role key')
         string(name: 'PROJECT_REF_OVERRIDE', defaultValue: '', description: 'Optional: override Supabase project ref for cloud deployments')
     }
     options {
