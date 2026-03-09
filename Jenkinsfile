@@ -183,6 +183,7 @@ curl -sI ${env.SELECTED_SUPABASE_URL}/rest/v1/ -H "apikey: ${env.SELECTED_ANON_K
             }
         }
         */
+        /* sarvesh temporry disabled unit tests
         stage('Deploy Edge Functions') {
             steps {
                 script {
@@ -209,7 +210,7 @@ curl -sI ${env.SELECTED_SUPABASE_URL}/rest/v1/ -H "apikey: ${env.SELECTED_ANON_K
                 }
             }
         }
-
+        */
         stage('Sync Edge Function Secrets') {
             when {
                 expression { return env.SELECTED_SUPABASE_URL && env.SELECTED_SUPABASE_URL.contains('supabase.co') }

@@ -292,7 +292,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
     }, 15000);
 
-    // Auth state listener MUST be synchronous; do not await or call Supabase inside callback.
+    if (typeof window !== 'undefined') {
+      const startAutoRefresh = (supabase.auth as any).startAutoRefresh;
+      if (typeof startAutoRefresh === 'function') {
+        startAutoRefresh.call(supabase.auth);
+      }
+    }
+
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, currentSession) => {
@@ -303,8 +309,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Initial session bootstrap
     supabase.auth
       .getSession()
-      .then(({ data: { session: currentSession } }) => {
+      .then(async ({ data: { session: currentSession } }) => {
         if (cancelled) return;
+        if (currentSession) {
+          const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+          if (!refreshError && refreshData.session) {
+            currentSession = refreshData.session;
+          }
+        }
         applySession(currentSession, 'getSession');
       })
       .catch((err) => {
@@ -314,6 +326,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       cancelled = true;
+      if (typeof window !== 'undefined') {
+        const stopAutoRefresh = (supabase.auth as any).stopAutoRefresh;
+        if (typeof stopAutoRefresh === 'function') {
+          stopAutoRefresh.call(supabase.auth);
+        }
+      }
       subscription.unsubscribe();
       clearTimeout(safetyTimeout);
     };
