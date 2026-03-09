@@ -87,29 +87,35 @@ const mockScopedDb = {
 };
 
 vi.mock('@/hooks/useCRM', () => ({
-  useCRM: () => ({
-    supabase: {
-      auth: {
-        getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'user-1' } } }),
-        getSession: vi.fn().mockResolvedValue({ data: { session: { access_token: 'token' } } }),
-      },
-      functions: {
-        invoke: vi.fn(),
-      }
-    },
-    context: { tenantId: 'tenant-1' },
-    scopedDb: mockScopedDb,
-  })
+  useCRM: () => mockCRMState
 }));
 
 vi.mock('@/hooks/useDebug', () => ({
-  useDebug: () => ({
-    info: vi.fn(),
-    log: vi.fn(),
-    error: vi.fn(),
-    warn: vi.fn(),
-  })
+  useDebug: () => debugMock,
 }));
+
+const debugMock = {
+  info: vi.fn(),
+  log: vi.fn(),
+  error: vi.fn(),
+  warn: vi.fn(),
+};
+
+const mockSupabase = {
+  auth: {
+    getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'user-1' } } }),
+    getSession: vi.fn().mockResolvedValue({ data: { session: { access_token: 'token' } } }),
+  },
+  functions: {
+    invoke: vi.fn(),
+  }
+};
+
+const mockCRMState = {
+  supabase: mockSupabase,
+  context: { tenantId: 'tenant-1' },
+  scopedDb: mockScopedDb,
+};
 
 // Helper to create chainable mock
 const createMockChain = (data: any) => {
@@ -134,8 +140,7 @@ describe('QuoteDetail Reproduction', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.useParams.mockReturnValue({ id: 'quote-123' });
-    // Default to NO versionId in URL (simulating refresh/clean navigation)
-    mocks.useSearchParams.mockReturnValue([new URLSearchParams({})]);
+    mocks.useSearchParams.mockReturnValue([new URLSearchParams({}), vi.fn()]);
   });
 
   it('loads latest version options when URL versionId is missing', async () => {

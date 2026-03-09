@@ -1,7 +1,6 @@
 import { useMemo, useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCRM } from '@/hooks/useCRM';
-import { useDebug } from '@/hooks/useDebug';
 import { Quote } from './quotes-data';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { FirstScreenTemplate } from '@/components/system/FirstScreenTemplate';
@@ -20,7 +19,7 @@ import { toast } from 'sonner';
 import { logger } from '@/lib/logger';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { useUrlFilters, SortState } from '@/hooks/useUrlFilters';
+import { useUrlFilters } from '@/hooks/useUrlFilters';
 import Papa from 'papaparse';
 import { AdvancedSearchFilter, FilterCriterion } from '@/components/sales/AdvancedSearchFilter';
 
@@ -30,6 +29,11 @@ interface QuoteWithRelations extends Quote {
   opportunities?: { id: string; name: string };
   carriers?: { id: string; carrier_name: string };
 }
+
+type SortState = {
+  field: string;
+  direction: 'asc' | 'desc';
+};
 
 // Helper to handle multi-column sorting
 const calculateNewSorts = (currentSorts: SortState[], field: string, multi: boolean): SortState[] => {
@@ -47,10 +51,26 @@ const calculateNewSorts = (currentSorts: SortState[], field: string, multi: bool
   return nextDirection ? [...others, { field, direction: nextDirection }] : others;
 };
 
+const RETRY_DELAYS_MS = [0, 500, 1200];
+
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const isRetryableError = (error: unknown): boolean => {
+  const message = error instanceof Error ? error.message.toLowerCase() : String(error || '').toLowerCase();
+  return (
+    message.includes('fetch') ||
+    message.includes('network') ||
+    message.includes('timeout') ||
+    message.includes('temporar') ||
+    message.includes('connection') ||
+    message.includes('socket') ||
+    message.includes('failed to load')
+  );
+};
+
 export default function Quotes() {
   const navigate = useNavigate();
   const { scopedDb, supabase } = useCRM();
-  const debug = useDebug('Sales', 'QuotesList');
   const [quotes, setQuotes] = useState<QuoteWithRelations[]>([]);
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
@@ -78,10 +98,10 @@ export default function Quotes() {
   }, [filters.sorts]);
 
   const fetchQuotes = useCallback(async () => {
-    // Only show loading on initial fetch or filter change, not background refresh
     if (quotes.length === 0) setLoading(true);
     setError(null);
-    try {
+
+    const fetchQuotesAttempt = async (attempt: number) => {
       const from = (Number(filters.page) - 1) * Number(filters.pageSize);
       const to = from + Number(filters.pageSize) - 1;
       const sortableQuoteFields = new Set(['quote_number', 'sell_price', 'status', 'created_at', 'updated_at', 'title']);
@@ -152,7 +172,10 @@ export default function Quotes() {
 
       const primaryResult = await query;
       if (primaryResult.error) {
-        logger.warn('Primary quotes query with relations failed; using fallback query', primaryResult.error);
+        logger.warn('Primary quotes query with relations failed; using fallback query', {
+          attempt,
+          error: primaryResult.error,
+        });
 
         let fallbackQuery = scopedDb
           .from('quotes')
@@ -291,37 +314,65 @@ export default function Quotes() {
 
       setQuotes(quotesData);
       setTotalCount(count || 0);
-    } catch (error: any) {
-      console.error('Failed to fetch quotes:', error);
-      // Last-resort compatibility mode: load quotes without relational joins.
+    };
+
+    let lastError: unknown = null;
+
+    for (let i = 0; i < RETRY_DELAYS_MS.length; i += 1) {
+      const attempt = i + 1;
       try {
-        const from = (Number(filters.page) - 1) * Number(filters.pageSize);
-        const to = from + Number(filters.pageSize) - 1;
-
-        let minimalQuery = scopedDb
-          .from('quotes')
-          .select('id, quote_number, title, status, created_at, updated_at, sell_price, account_id, contact_id, opportunity_id, carrier_id', { count: 'exact' });
-
-        if (filters.status !== 'any') {
-          minimalQuery = minimalQuery.eq('status', filters.status);
+        await fetchQuotesAttempt(attempt);
+        setLoading(false);
+        return;
+      } catch (error: any) {
+        logger.error('Quotes fetch attempt failed', {
+          attempt,
+          maxAttempts: RETRY_DELAYS_MS.length,
+          error: error?.message || String(error),
+        });
+        lastError = error;
+        const shouldRetry = i < RETRY_DELAYS_MS.length - 1 && isRetryableError(error);
+        if (shouldRetry) {
+          await delay(RETRY_DELAYS_MS[i + 1]);
+          continue;
         }
-        if (filters.q) {
-          minimalQuery = minimalQuery.or(`quote_number.ilike.%${filters.q}%,title.ilike.%${filters.q}%`);
-        }
-
-        minimalQuery = minimalQuery.order('created_at', { ascending: false }).range(from, to);
-        const minimalRes = await minimalQuery;
-        if (minimalRes.error) throw minimalRes.error;
-
-        setQuotes((minimalRes.data || []) as QuoteWithRelations[]);
-        setTotalCount(minimalRes.count || 0);
-        setError(null);
-        toast.error('Loaded quotes in compatibility mode');
-        logger.warn('Quotes loaded in compatibility mode after fetch failure', error);
-      } catch (minimalError: any) {
-        setError(minimalError || error);
-        toast.error('Failed to load quotes');
       }
+    }
+
+    try {
+      const from = (Number(filters.page) - 1) * Number(filters.pageSize);
+      const to = from + Number(filters.pageSize) - 1;
+
+      let minimalQuery = scopedDb
+        .from('quotes')
+        .select('id, quote_number, title, status, created_at, updated_at, sell_price, account_id, contact_id, opportunity_id, carrier_id', { count: 'exact' });
+
+      if (filters.status !== 'any') {
+        minimalQuery = minimalQuery.eq('status', filters.status);
+      }
+      if (filters.q) {
+        minimalQuery = minimalQuery.or(`quote_number.ilike.%${filters.q}%,title.ilike.%${filters.q}%`);
+      }
+
+      minimalQuery = minimalQuery.order('created_at', { ascending: false }).range(from, to);
+      const minimalRes = await minimalQuery;
+      if (minimalRes.error) throw minimalRes.error;
+
+      setQuotes((minimalRes.data || []) as QuoteWithRelations[]);
+      setTotalCount(minimalRes.count || 0);
+      setError(null);
+      toast.error('Loaded quotes in compatibility mode');
+      logger.warn('Quotes loaded in compatibility mode after retries failed', {
+        error: lastError instanceof Error ? lastError.message : String(lastError || ''),
+      });
+    } catch (minimalError: any) {
+      const finalError = minimalError instanceof Error ? minimalError : new Error(minimalError?.message || 'Failed to load quotes');
+      setError(finalError);
+      logger.error('Quotes fetch failed in compatibility mode', {
+        error: finalError.message,
+        rootError: lastError instanceof Error ? lastError.message : String(lastError || ''),
+      });
+      toast.error('Failed to load quotes');
     } finally {
       setLoading(false);
     }

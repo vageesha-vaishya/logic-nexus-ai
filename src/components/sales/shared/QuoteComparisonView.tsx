@@ -91,15 +91,26 @@ export function QuoteComparisonView({
     }, [rawOptions, scopedDb, supabase]);
 
     const hasOptions = options.length > 0;
-    const getOptionTotal = (opt: RateOption) => {
-        const direct = Number(opt.price ?? opt.total_amount ?? 0) || 0;
-        if (direct > 0) return direct;
+    const isSystemBalancingCharge = (charge: any) => {
+        const note = typeof charge?.note === 'string' ? charge.note.trim().toLowerCase() : '';
+        return note === 'unitemized surcharges' || note === 'bundle discount adjustment';
+    };
+
+    const getComposerCharges = (opt: RateOption) => {
         const legCharges = (opt.legs || []).flatMap((l: any) => l.charges || []);
         const globalCharges = opt.charges || [];
-        return [...legCharges, ...globalCharges].reduce((sum, c: any) => {
+        return [...legCharges, ...globalCharges].filter((charge: any) => !isSystemBalancingCharge(charge));
+    };
+
+    const getOptionTotal = (opt: RateOption) => {
+        const composerCharges = getComposerCharges(opt);
+        const chargeTotal = composerCharges.reduce((sum, c: any) => {
             const amount = Number(c?.sell?.amount ?? c?.amount ?? 0) || 0;
             return sum + amount;
         }, 0);
+        if (chargeTotal > 0) return chargeTotal;
+        const direct = Number(opt.total_amount ?? opt.price ?? 0) || 0;
+        return direct > 0 ? direct : 0;
     };
     const parseTransitDays = (value?: string) => {
         const token = String(value || '');
@@ -131,7 +142,9 @@ export function QuoteComparisonView({
         if (opt.legs) {
             opt.legs.forEach(leg => {
                 if (leg.charges) {
-                    leg.charges.forEach(c => {
+                    leg.charges
+                    .filter(c => !isSystemBalancingCharge(c))
+                    .forEach(c => {
                         allCharges.push({ ...c, leg_id: leg.id, mode: leg.mode });
                     });
                 }
@@ -140,7 +153,9 @@ export function QuoteComparisonView({
         
         // Collect global charges
         if (opt.charges) {
-            opt.charges.forEach(c => {
+            opt.charges
+            .filter(c => !isSystemBalancingCharge(c))
+            .forEach(c => {
                 allCharges.push({ ...c });
             });
         } else if (opt.price_breakdown) {
@@ -382,7 +397,7 @@ export function QuoteComparisonView({
                             const modes = Array.from(new Set((opt.legs || []).map((leg: any) => String(leg.mode || '').toUpperCase()).filter(Boolean)));
                             return (
                                 <TableCell key={opt.id} className="text-center">
-                                    {modes.length ? modes.join(' + ') : String(opt.mode || opt.transport_mode || 'N/A').toUpperCase()}
+                                    {modes.length ? modes.join(' + ') : String((opt as any).mode || opt.transport_mode || 'N/A').toUpperCase()}
                                 </TableCell>
                             );
                         })}

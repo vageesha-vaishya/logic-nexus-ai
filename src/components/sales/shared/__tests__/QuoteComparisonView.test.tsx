@@ -139,4 +139,33 @@ describe('QuoteComparisonView', () => {
       expect(getByText('USD 350')).toBeDefined();
     });
   });
+
+  it('uses composer charges instead of direct total when both are present', async () => {
+    const mismatchedOption: RateOption = {
+      ...mockRateOption,
+      id: 'opt-mismatch',
+      price: 6646.3,
+      total_amount: 6646.3,
+      legs: [
+        {
+          id: 'leg-1',
+          mode: 'ocean',
+          leg_type: 'transport',
+          origin: 'Shanghai',
+          destination: 'Los Angeles',
+          charges: [{ category: 'Freight', amount: 2000, currency: 'USD', name: 'Ocean Freight' }],
+        },
+      ],
+      charges: [
+        { category: 'Fee', amount: 1555, currency: 'USD', name: 'Doc Fee' },
+        { category: 'Adjustment', amount: 3091.3, currency: 'USD', name: 'Ancillary Fees', note: 'Unitemized surcharges' },
+      ],
+    };
+
+    const { getByText } = render(<QuoteComparisonView options={[mismatchedOption]} onSelect={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(getByText('USD 3555')).toBeDefined();
+    });
+  });
 });

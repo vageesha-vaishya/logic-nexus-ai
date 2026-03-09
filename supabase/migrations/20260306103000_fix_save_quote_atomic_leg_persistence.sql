@@ -35,6 +35,7 @@ DECLARE
   v_amount numeric;
   v_charge_sort integer;
   v_option_total_amount numeric;
+  v_recompute_total boolean;
   v_payload_leg_ids uuid[];
   v_charge_side_id uuid;
   v_charge_side text;
@@ -273,12 +274,16 @@ BEGIN
       END IF;
 
       v_option_total_amount := COALESCE((v_opt ->> 'total_amount')::numeric, 0);
+      v_recompute_total := v_option_total_amount <= 0;
+      IF v_recompute_total THEN
+        v_option_total_amount := 0;
+      END IF;
 
       IF v_option_id IS NOT NULL THEN
         -- Upsert (Insert or Update) using ON CONFLICT
         INSERT INTO quotation_version_options (
           id, quotation_version_id, tenant_id, franchise_id,
-          option_name, is_selected, total_amount, currency,
+          option_name, carrier_name, carrier_rate_id, is_selected, total_amount, currency,
           total_transit_days, created_by,
           source, source_attribution, is_recommended, recommendation_reason,
           rank_score, rank_details, margin_percentage,
@@ -286,6 +291,8 @@ BEGIN
         ) VALUES (
           v_option_id, v_version_id, v_tenant_id, v_franchise_id,
           COALESCE(v_opt ->> 'option_name', 'Option'),
+          NULLIF(v_opt ->> 'carrier_name', ''),
+          NULLIF(v_opt ->> 'carrier_rate_id', '')::uuid,
           COALESCE((v_opt ->> 'is_selected')::boolean, false),
           v_option_total_amount,
           COALESCE(v_opt ->> 'currency', 'USD'),
@@ -301,6 +308,9 @@ BEGIN
           now(), now()
         )
         ON CONFLICT (id) DO UPDATE SET
+          option_name = EXCLUDED.option_name,
+          carrier_name = COALESCE(EXCLUDED.carrier_name, quotation_version_options.carrier_name),
+          carrier_rate_id = COALESCE(EXCLUDED.carrier_rate_id, quotation_version_options.carrier_rate_id),
           is_selected = EXCLUDED.is_selected,
           total_amount = EXCLUDED.total_amount,
           currency = EXCLUDED.currency,
@@ -312,7 +322,7 @@ BEGIN
         v_option_id := gen_random_uuid();
         INSERT INTO quotation_version_options (
           id, quotation_version_id, tenant_id, franchise_id,
-          option_name, is_selected, total_amount, currency,
+          option_name, carrier_name, carrier_rate_id, is_selected, total_amount, currency,
           total_transit_days, created_by,
           source, source_attribution, is_recommended, recommendation_reason,
           rank_score, rank_details, margin_percentage,
@@ -320,6 +330,8 @@ BEGIN
         ) VALUES (
           v_option_id, v_version_id, v_tenant_id, v_franchise_id,
           COALESCE(v_opt ->> 'option_name', 'Option'),
+          NULLIF(v_opt ->> 'carrier_name', ''),
+          NULLIF(v_opt ->> 'carrier_rate_id', '')::uuid,
           COALESCE((v_opt ->> 'is_selected')::boolean, false),
           v_option_total_amount,
           COALESCE(v_opt ->> 'currency', 'USD'),
@@ -506,6 +518,10 @@ BEGIN
                  v_charge_side_id,
                  now(), now()
                );
+
+               IF v_recompute_total AND lower(v_charge_side) = 'sell' THEN
+                 v_option_total_amount := COALESCE(v_option_total_amount, 0) + COALESCE(v_amount, 0);
+               END IF;
              END LOOP;
           END IF;
         END LOOP;
@@ -570,8 +586,16 @@ BEGIN
              v_charge_side_id,
              now(), now()
            );
+
+           IF v_recompute_total AND lower(v_charge_side) = 'sell' THEN
+             v_option_total_amount := COALESCE(v_option_total_amount, 0) + COALESCE(v_amount, 0);
+           END IF;
          END LOOP;
       END IF;
+
+      UPDATE quotation_version_options
+      SET total_amount = COALESCE(v_option_total_amount, 0)
+      WHERE id = v_option_id;
 
     END LOOP;
   END IF;

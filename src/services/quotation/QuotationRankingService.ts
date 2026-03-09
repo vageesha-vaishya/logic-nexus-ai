@@ -1,5 +1,3 @@
-import { QuotationConfiguration } from './QuotationConfigurationService';
-
 export interface RankingCriteria {
   cost: number;
   transit_time: number;
@@ -11,12 +9,49 @@ export interface RankableOption {
   id: string;
   total_amount: number;
   transit_time_days: number | null;
-  reliability_score?: number; // 0-1 or 0-100
+  reliability_score?: number;
   rank_score?: number;
   rank_details?: Record<string, number>;
   is_recommended?: boolean;
   recommendation_reason?: string;
 }
+
+const DEFAULT_CRITERIA: RankingCriteria = { cost: 0.4, transit_time: 0.3, reliability: 0.3 };
+const FALLBACK_TRANSIT_DAYS = 999;
+const FALLBACK_RELIABILITY = 0.5;
+
+const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
+
+const normalizeReliability = (value?: number) => {
+  if (typeof value !== 'number' || Number.isNaN(value)) return FALLBACK_RELIABILITY;
+  if (value > 1) return clamp01(value / 100);
+  return clamp01(value);
+};
+
+const normalizeCost = (value?: number) => {
+  if (typeof value !== 'number' || Number.isNaN(value) || !Number.isFinite(value) || value < 0) return 0;
+  return value;
+};
+
+const normalizeTransitDays = (value?: number | null) => {
+  if (typeof value !== 'number' || Number.isNaN(value) || !Number.isFinite(value) || value <= 0) return FALLBACK_TRANSIT_DAYS;
+  return value;
+};
+
+const normalizeCriteria = (criteria: RankingCriteria): RankingCriteria => {
+  const safeCost = Math.max(0, Number(criteria.cost || 0));
+  const safeTime = Math.max(0, Number(criteria.transit_time || 0));
+  const safeReliability = Math.max(0, Number(criteria.reliability || 0));
+  const total = safeCost + safeTime + safeReliability;
+  if (total <= 0) {
+    return DEFAULT_CRITERIA;
+  }
+  return {
+    cost: safeCost / total,
+    transit_time: safeTime / total,
+    reliability: safeReliability / total,
+  };
+};
 
 export class QuotationRankingService {
   /**
@@ -25,7 +60,7 @@ export class QuotationRankingService {
    */
   static rankOptions<T extends RankableOption>(
     options: T[],
-    criteria: RankingCriteria = { cost: 0.4, transit_time: 0.3, reliability: 0.3 }
+    criteria: RankingCriteria = DEFAULT_CRITERIA
   ): T[] {
     if (!options || options.length === 0) return [];
     if (options.length === 1) {
@@ -37,10 +72,17 @@ export class QuotationRankingService {
       }];
     }
 
-    // 1. Extract values for normalization
-    const costs = options.map(o => o.total_amount);
-    const times = options.map(o => o.transit_time_days || 999); // Penalty for missing time
-    const reliabilities = options.map(o => o.reliability_score || 0.5); // Default to neutral
+    const normalizedCriteria = normalizeCriteria(criteria);
+    const normalizedOptions = options.map((option) => ({
+      ...option,
+      total_amount: normalizeCost(option.total_amount),
+      transit_time_days: normalizeTransitDays(option.transit_time_days),
+      reliability_score: normalizeReliability(option.reliability_score),
+    }));
+
+    const costs = normalizedOptions.map(o => o.total_amount);
+    const times = normalizedOptions.map(o => normalizeTransitDays(o.transit_time_days));
+    const reliabilities = normalizedOptions.map(o => normalizeReliability(o.reliability_score));
 
     const minCost = Math.min(...costs);
     const maxCost = Math.max(...costs);
@@ -51,30 +93,20 @@ export class QuotationRankingService {
     const minRel = Math.min(...reliabilities);
     const maxRel = Math.max(...reliabilities);
 
-    // 2. Calculate scores
-    const rankedOptions = options.map(opt => {
-      const cost = opt.total_amount;
-      const time = opt.transit_time_days || 999;
-      const rel = opt.reliability_score || 0.5;
+    const rankedOptions = normalizedOptions.map(opt => {
+      const cost = normalizeCost(opt.total_amount);
+      const time = normalizeTransitDays(opt.transit_time_days);
+      const rel = normalizeReliability(opt.reliability_score);
 
-      // Normalize (0 to 1)
-      // Cost: Lower is better
       const costScore = maxCost === minCost ? 1 : 1 - ((cost - minCost) / (maxCost - minCost));
-      
-      // Time: Lower is better
       const timeScore = maxTime === minTime ? 1 : 1 - ((time - minTime) / (maxTime - minTime));
-      
-      // Reliability: Higher is better
       const relScore = maxRel === minRel ? 1 : (rel - minRel) / (maxRel - minRel);
 
-      // Weighted Sum
       const rawScore = (
-        (costScore * (criteria.cost || 0)) +
-        (timeScore * (criteria.transit_time || 0)) +
-        (relScore * (criteria.reliability || 0))
+        (costScore * normalizedCriteria.cost) +
+        (timeScore * normalizedCriteria.transit_time) +
+        (relScore * normalizedCriteria.reliability)
       );
-      
-      // Scale to 0-100
       const finalScore = Math.round(rawScore * 100);
 
       return {
@@ -88,14 +120,10 @@ export class QuotationRankingService {
       };
     });
 
-    // 3. Sort by score descending
     rankedOptions.sort((a, b) => (b.rank_score || 0) - (a.rank_score || 0));
 
-    // 4. Mark recommended
     if (rankedOptions.length > 0) {
       rankedOptions[0].is_recommended = true;
-      
-      // Generate reason
       const best = rankedOptions[0];
       const reasons: string[] = [];
       if (best.rank_details?.cost_score && best.rank_details.cost_score >= 90) reasons.push('Best Price');

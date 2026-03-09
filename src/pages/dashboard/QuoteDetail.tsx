@@ -17,12 +17,97 @@ import { Button } from "@/components/ui/button";
 import { DetailScreenTemplate } from '@/components/system/DetailScreenTemplate';
 import { QuotationConfigurationService } from '@/services/quotation/QuotationConfigurationService';
 import { QuotationRankingService } from '@/services/quotation/QuotationRankingService';
+import { logger } from '@/lib/logger';
+
+const RETRY_DELAYS_MS = [0, 500, 1200];
+const DEFAULT_RANKING_CRITERIA = { cost: 0.4, transit_time: 0.3, reliability: 0.3 };
+
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const isRetryableError = (error: unknown): boolean => {
+  const message = error instanceof Error ? error.message.toLowerCase() : String(error || '').toLowerCase();
+  return (
+    message.includes('fetch') ||
+    message.includes('network') ||
+    message.includes('timeout') ||
+    message.includes('temporar') ||
+    message.includes('connection') ||
+    message.includes('socket') ||
+    message.includes('failed to load')
+  );
+};
+
+const normalizeCurrencyCode = (value?: string) => {
+  if (!value) return 'USD';
+  const normalized = String(value).toUpperCase().trim();
+  return /^[A-Z]{3}$/.test(normalized) ? normalized : 'USD';
+};
+
+const normalizeTransitDays = (value: unknown) => {
+  if (typeof value === 'number' && Number.isFinite(value) && value > 0) return value;
+  if (typeof value === 'string') {
+    const matched = value.match(/(\d+)/);
+    if (matched) {
+      const parsed = Number(matched[1]);
+      if (Number.isFinite(parsed) && parsed > 0) return parsed;
+    }
+  }
+  return null;
+};
+
+const normalizeReliability = (value: unknown) => {
+  if (typeof value !== 'number' || Number.isNaN(value)) return 0.5;
+  if (value > 1) return Math.max(0, Math.min(1, value / 100));
+  return Math.max(0, Math.min(1, value));
+};
+
+const normalizeAmount = (value: unknown) => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) return 0;
+  return parsed;
+};
+
+const normalizeRate = (value: unknown) => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) return null;
+  return parsed;
+};
+
+const isSystemBalancingCharge = (note: unknown) => {
+  if (typeof note !== 'string') return false;
+  const normalized = note.trim().toLowerCase();
+  return normalized === 'unitemized surcharges' || normalized === 'bundle discount adjustment';
+};
+
+const getOptionDisplayName = (optionRow: any, fallbackIndex: number) => {
+  const optionName = typeof optionRow?.option_name === 'string' ? optionRow.option_name.trim() : '';
+  if (optionName) return optionName;
+  const serviceType = typeof optionRow?.service_type === 'string' ? optionRow.service_type.trim() : '';
+  if (serviceType) return `${serviceType} Option`;
+  return `Option ${fallbackIndex + 1}`;
+};
+
+const getMissingComparisonFields = (option: any) => {
+  const missingFields: string[] = [];
+  if (!option.option_name) missingFields.push('option_name');
+  if (!Number.isFinite(Number(option.total_amount)) || Number(option.total_amount) < 0) missingFields.push('option_amount');
+  if (!Array.isArray(option.charges) || option.charges.length === 0) {
+    missingFields.push('charges');
+  } else {
+    const hasAmount = option.charges.some((charge: any) => Number.isFinite(Number(charge.amount)));
+    const hasRate = option.charges.some((charge: any) => Number.isFinite(Number(charge.rate)));
+    if (!hasAmount) missingFields.push('charge_amount');
+    if (!hasRate) missingFields.push('interest_rates');
+  }
+  return missingFields;
+};
 
 export default function QuoteDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const urlVersionId = searchParams.get('versionId');
+  const urlOptionId = searchParams.get('optionId');
   const { supabase, context, scopedDb } = useCRM();
   const debug = useDebug('Sales', 'QuoteDetail');
   const [loading, setLoading] = useState(true);
@@ -34,7 +119,14 @@ export default function QuoteDetail() {
   const [showSaveVersion, setShowSaveVersion] = useState(false);
   const [config, setConfig] = useState<any>(null);
   const [comparisonOptions, setComparisonOptions] = useState<any[]>([]);
+  const [selectedComparisonOptionId, setSelectedComparisonOptionId] = useState<string | null>(urlOptionId || null);
+  const [selectionSaving, setSelectionSaving] = useState(false);
   const versionAbortRef = useRef<AbortController | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
+
+  useEffect(() => {
+    setSelectedComparisonOptionId(urlOptionId || null);
+  }, [urlOptionId]);
 
   // Load configuration
   useEffect(() => {
@@ -50,117 +142,284 @@ export default function QuoteDetail() {
         setComparisonOptions([]);
         
         const fetchOptions = async () => {
-          // Fetch options (without joins to be robust)
-           const { data: optionRows, error } = await scopedDb
-             .from('quotation_version_options')
-             .select('*')
-             .eq('quotation_version_id', versionId);
- 
-           if (error) {
-             console.error('Error fetching options:', error);
-             return;
-           }
- 
-           if (!optionRows || optionRows.length === 0) {
-             setComparisonOptions([]);
-             return;
-           }
+          const startedAt = Date.now();
+          const { data: optionRows, error } = await scopedDb
+            .from('quotation_version_options')
+            .select('*')
+            .eq('quotation_version_id', versionId);
 
-           // Collect IDs for hydration
-           const carrierIds = new Set<string>();
-           const carrierRateIds = new Set<string>();
-           const currencyIds = new Set<string>();
+          if (error) {
+            logger.error('Error fetching comparison options', { versionId, error: error.message });
+            return;
+          }
 
-           optionRows.forEach((opt: any) => {
-               if (opt.carrier_id) carrierIds.add(opt.carrier_id);
-               if (opt.carrier_rate_id) carrierRateIds.add(opt.carrier_rate_id);
-               if (opt.currency_id) currencyIds.add(opt.currency_id);
-           });
+          if (!optionRows || optionRows.length === 0) {
+            setComparisonOptions([]);
+            return;
+          }
 
-           // Fetch Carrier Rates
+          const carrierIds = new Set<string>();
+          const carrierRateIds = new Set<string>();
+          const currencyIds = new Set<string>();
+          const optionIds = new Set<string>();
+          const chargeCategoryIds = new Set<string>();
+
+          optionRows.forEach((opt: any) => {
+            if (opt?.id) optionIds.add(opt.id);
+            if (opt?.carrier_id) carrierIds.add(opt.carrier_id);
+            if (opt?.carrier_rate_id) carrierRateIds.add(opt.carrier_rate_id);
+            if (opt?.currency_id) currencyIds.add(opt.currency_id);
+          });
+
           const carrierRatesMap: Record<string, any> = {};
           if (carrierRateIds.size > 0) {
-               const { data: rates } = await scopedDb
-                   .from('carrier_rates')
-                   .select('id, currency, carrier_id')
-                   .in('id', Array.from(carrierRateIds));
-                
-               rates?.forEach((r: any) => {
-                   carrierRatesMap[r.id] = r;
-                   if (r.carrier_id) carrierIds.add(r.carrier_id);
-               });
-           }
+            const { data: rates } = await scopedDb
+              .from('carrier_rates')
+              .select('id, currency, carrier_id')
+              .in('id', Array.from(carrierRateIds));
 
-           // Fetch Carriers
+            rates?.forEach((rate: any) => {
+              carrierRatesMap[rate.id] = rate;
+              if (rate?.carrier_id) carrierIds.add(rate.carrier_id);
+            });
+          }
+
           const carriersMap: Record<string, any> = {};
           if (carrierIds.size > 0) {
-               const { data: carriers } = await scopedDb
-                   .from('carriers')
-                   .select('id, carrier_name')
-                   .in('id', Array.from(carrierIds));
-                
-               carriers?.forEach((c: any) => {
-                   carriersMap[c.id] = c;
-               });
-           }
+            const { data: carriers } = await scopedDb
+              .from('carriers')
+              .select('id, carrier_name')
+              .in('id', Array.from(carrierIds));
 
-           // Fetch Currencies
+            carriers?.forEach((carrier: any) => {
+              carriersMap[carrier.id] = carrier;
+            });
+          }
+
+          const chargesByOptionId: Record<string, any[]> = {};
+          const optionLegsByOptionId: Record<string, any[]> = {};
+          if (optionIds.size > 0) {
+            const { data: chargeRows, error: chargeError } = await scopedDb
+              .from('quote_charges')
+              .select('id, quote_option_id, category_id, amount, rate, currency_id, note, sort_order')
+              .in('quote_option_id', Array.from(optionIds));
+
+            if (chargeError) {
+              logger.error('Error fetching option charges', { versionId, error: chargeError.message });
+            }
+
+            chargeRows?.forEach((charge: any) => {
+              if (charge?.currency_id) currencyIds.add(charge.currency_id);
+              if (charge?.category_id) chargeCategoryIds.add(charge.category_id);
+              const optionId = String(charge?.quote_option_id || '');
+              if (!optionId) return;
+              if (!chargesByOptionId[optionId]) chargesByOptionId[optionId] = [];
+              chargesByOptionId[optionId].push(charge);
+            });
+
+            const { data: legRows, error: legError } = await scopedDb
+              .from('quotation_version_option_legs')
+              .select('id, quotation_version_option_id, provider_id, carrier_name, transit_time_hours, sort_order')
+              .in('quotation_version_option_id', Array.from(optionIds));
+
+            if (legError) {
+              logger.error('Error fetching option legs', { versionId, error: legError.message });
+            }
+
+            legRows?.forEach((leg: any) => {
+              if (leg?.provider_id) carrierIds.add(leg.provider_id);
+              const optionId = String(leg?.quotation_version_option_id || '');
+              if (!optionId) return;
+              if (!optionLegsByOptionId[optionId]) optionLegsByOptionId[optionId] = [];
+              optionLegsByOptionId[optionId].push(leg);
+            });
+
+            const missingCarrierIds = Array.from(carrierIds).filter((carrierId) => !carriersMap[carrierId]);
+            if (missingCarrierIds.length > 0) {
+              const { data: moreCarriers } = await scopedDb
+                .from('carriers')
+                .select('id, carrier_name')
+                .in('id', missingCarrierIds);
+              moreCarriers?.forEach((carrier: any) => {
+                carriersMap[carrier.id] = carrier;
+              });
+            }
+          }
+
           const currenciesMap: Record<string, any> = {};
           if (currencyIds.size > 0) {
-               const { data: currencies } = await scopedDb
-                   .from('currencies')
-                   .select('id, code')
-                   .in('id', Array.from(currencyIds));
-                
-               currencies?.forEach((c: any) => {
-                   currenciesMap[c.id] = c;
-               });
-           }
- 
-           // Map to RankableOption
-           const rankableOptions = optionRows.map((opt: any) => {
-             // Resolve carrier rate
-             const carrierRate = opt.carrier_rate_id ? carrierRatesMap[opt.carrier_rate_id] : null;
+            const { data: currencies } = await scopedDb
+              .from('currencies')
+              .select('id, code')
+              .in('id', Array.from(currencyIds));
 
-             // Resolve carrier name
-             let carrierName = carriersMap[opt.carrier_id]?.carrier_name;
-             if (!carrierName && carrierRate?.carrier_id) {
-                 carrierName = carriersMap[carrierRate.carrier_id]?.carrier_name;
-             }
-             if (!carrierName) carrierName = 'Unknown Carrier';
-             
-             // Resolve transit time
-             let transitTime = opt.transit_days;
-             if (!transitTime && opt.transit_time) {
-                // Parse transit_time string if needed, e.g. "25 days"
-                const match = String(opt.transit_time).match(/(\d+)/);
-                if (match) transitTime = parseInt(match[1], 10);
-             }
+            currencies?.forEach((currencyRow: any) => {
+              currenciesMap[currencyRow.id] = currencyRow;
+            });
+          }
 
-             // Resolve currency
-             const currencyCode = currenciesMap[opt.currency_id]?.code;
-             const currency = currencyCode || opt.currency || carrierRate?.currency || 'USD';
- 
-             return {
-               ...opt,
-               carrier_name: carrierName, // Enhance with resolved name
-               total_amount: Number(opt.total_amount || opt.sell_subtotal || 0),
-               currency,
-               transit_time_days: transitTime,
-               reliability_score: opt.reliability_score || 0.5, // Default to neutral if not stored
-             };
-           });
+          const chargeCategoriesMap: Record<string, string> = {};
+          if (chargeCategoryIds.size > 0) {
+            const { data: categories } = await scopedDb
+              .from('charge_categories')
+              .select('id, name')
+              .in('id', Array.from(chargeCategoryIds));
 
-          // Rank options
-          const criteria = config?.auto_ranking_criteria || { cost: 0.4, transit_time: 0.3, reliability: 0.3 };
+            categories?.forEach((category: any) => {
+              chargeCategoriesMap[category.id] = category.name;
+            });
+          }
+
+          const rankableOptions = optionRows
+            .filter((opt: any) => typeof opt?.id === 'string' && opt.id.length > 0)
+            .map((opt: any, index: number) => {
+              const optionLegs = (optionLegsByOptionId[opt.id] || [])
+                .sort((a: any, b: any) => Number(a?.sort_order || 0) - Number(b?.sort_order || 0));
+              const carrierRate = opt.carrier_rate_id ? carrierRatesMap[opt.carrier_rate_id] : null;
+              const optionCarrierName = typeof opt?.carrier_name === 'string' ? opt.carrier_name.trim() : '';
+              let carrierName = optionCarrierName || carriersMap[opt.provider_id]?.carrier_name;
+              if (!carrierName && carrierRate?.carrier_id) {
+                carrierName = carriersMap[carrierRate.carrier_id]?.carrier_name;
+              }
+              if (!carrierName) {
+                const legCarrierName = optionLegs
+                  .map((leg: any) => {
+                    const explicitName = typeof leg?.carrier_name === 'string' ? leg.carrier_name.trim() : '';
+                    if (explicitName) return explicitName;
+                    if (leg?.provider_id) return carriersMap[leg.provider_id]?.carrier_name || '';
+                    return '';
+                  })
+                  .find((value: string) => value.length > 0);
+                if (legCarrierName) carrierName = legCarrierName;
+              }
+              if (!carrierName) carrierName = 'Unknown Carrier';
+              const transitTimeFromLegs = optionLegs
+                .map((leg: any) => {
+                  const transitHours = Number(leg?.transit_time_hours);
+                  if (!Number.isFinite(transitHours) || transitHours <= 0) return null;
+                  return Math.max(1, Math.round(transitHours / 24));
+                })
+                .filter((value: number | null): value is number => typeof value === 'number')
+                .reduce((sum: number, value: number) => sum + value, 0);
+              const transitTime = normalizeTransitDays(opt.total_transit_days)
+                ?? normalizeTransitDays(opt.transit_days)
+                ?? normalizeTransitDays(opt.transit_time)
+                ?? (transitTimeFromLegs > 0 ? transitTimeFromLegs : null);
+              const currencyCode = currenciesMap[opt.currency_id]?.code;
+              const currency = normalizeCurrencyCode(currencyCode || opt.currency || carrierRate?.currency);
+              const storedTotalAmount = normalizeAmount(opt.total_amount ?? opt.sell_subtotal);
+              const rawCharges = chargesByOptionId[opt.id] || [];
+              const charges = rawCharges
+                .map((charge: any) => {
+                  const chargeCurrencyCode = charge?.currency_id ? currenciesMap[charge.currency_id]?.code : null;
+                  return {
+                    id: String(charge.id),
+                    name: chargeCategoriesMap[charge.category_id] || 'Charge',
+                    amount: normalizeAmount(charge.amount),
+                    rate: normalizeRate(charge.rate),
+                    currency: normalizeCurrencyCode(chargeCurrencyCode || currency),
+                    note: typeof charge?.note === 'string' ? charge.note : null,
+                    sort_order: Number.isFinite(Number(charge?.sort_order)) ? Number(charge.sort_order) : 0,
+                  };
+                })
+                .sort((a, b) => a.sort_order - b.sort_order);
+              const composerCharges = charges.filter((charge: any) => !isSystemBalancingCharge(charge.note));
+              const optionName = getOptionDisplayName(opt, index);
+              const rateValues = composerCharges.map((charge: any) => charge.rate).filter((rate: any) => typeof rate === 'number');
+              const averageRate = rateValues.length > 0
+                ? Number((rateValues.reduce((sum: number, rate: number) => sum + rate, 0) / rateValues.length).toFixed(2))
+                : null;
+              const chargesTotal = Number(
+                composerCharges.reduce((sum: number, charge: any) => sum + normalizeAmount(charge.amount), 0).toFixed(2)
+              );
+              const totalAmount = chargesTotal > 0
+                ? chargesTotal
+                : (storedTotalAmount > 0 ? storedTotalAmount : 0);
+              const reliabilitySource = typeof opt?.reliability_score === 'number'
+                ? opt.reliability_score
+                : opt?.rank_details?.reliability_score;
+              const reliabilityScore = normalizeReliability(reliabilitySource);
+              const optionData = {
+                ...opt,
+                option_name: optionName,
+                carrier_name: carrierName,
+                total_amount: totalAmount,
+                currency,
+                transit_time_days: transitTime,
+                reliability_score: reliabilityScore,
+                charges: composerCharges,
+                charges_total: chargesTotal,
+                average_rate: averageRate,
+              };
+              const missing_fields = getMissingComparisonFields(optionData);
+              if (storedTotalAmount <= 0 && chargesTotal > 0) {
+                logger.warn('Comparison option total amount recovered from charge sum', {
+                  versionId,
+                  optionId: opt.id,
+                  storedTotalAmount,
+                  chargesTotal,
+                });
+              }
+              if (charges.length !== composerCharges.length) {
+                logger.warn('Excluded system balancing charges from comparison totals', {
+                  versionId,
+                  optionId: opt.id,
+                  excludedCharges: charges.length - composerCharges.length,
+                });
+              }
+              if (carrierName === 'Unknown Carrier') {
+                logger.warn('Comparison option missing carrier mapping', {
+                  versionId,
+                  optionId: opt.id,
+                  carrier_rate_id: opt?.carrier_rate_id || null,
+                  optionCarrierName: optionCarrierName || null,
+                });
+              }
+              if (missing_fields.length > 0) {
+                logger.warn('Comparison option data incomplete', {
+                  versionId,
+                  optionId: opt.id,
+                  missingFields: missing_fields,
+                });
+              }
+
+              return {
+                ...optionData,
+                missing_fields,
+                data_completeness: {
+                  is_complete: missing_fields.length === 0,
+                  missing_fields,
+                },
+              };
+            });
+
+          const criteria = config?.auto_ranking_criteria || DEFAULT_RANKING_CRITERIA;
           const ranked = QuotationRankingService.rankOptions(rankableOptions, criteria);
           
           setComparisonOptions(ranked);
+          const selected = ranked.find((opt: any) => opt.id === urlOptionId)
+            || ranked.find((opt: any) => opt.is_selected)
+            || ranked[0];
+          const selectedId = selected?.id ?? null;
+          setSelectedComparisonOptionId(selectedId);
+          if (selectedId && urlOptionId !== selectedId) {
+            setSearchParams((prev) => {
+              const next = new URLSearchParams(prev);
+              next.set('optionId', selectedId);
+              return next;
+            }, { replace: true });
+          }
+          logger.info('Loaded comparison options', {
+            versionId,
+            optionsCount: ranked.length,
+            incompleteOptionsCount: ranked.filter((opt: any) => !opt?.data_completeness?.is_complete).length,
+            durationMs: Date.now() - startedAt,
+          });
         };
 
         fetchOptions();
     }
-  }, [versionId, config]);
+  }, [versionId, config, scopedDb, setSearchParams, urlOptionId]);
 
   useEffect(() => {
     // Reset state when ID changes to prevent data mismatch during transition
@@ -172,46 +431,65 @@ export default function QuoteDetail() {
     setLoading(true);
 
     const checkQuote = async () => {
-      try {
-        setError(null);
-        if (!id) throw new Error('Missing quote identifier');
-        debug.info('Resolving quote', { id });
-        
-        // Validate UUID format to prevent "invalid input syntax" DB errors
-        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
-        
-        let query = scopedDb
-          .from('quotes')
-          .select('id, tenant_id, quote_number');
-
-        if (isUuid) {
-           // If it looks like a UUID, check both ID and Quote Number (safe)
-           query = query.or(`id.eq.${id},quote_number.eq.${id}`);
-        } else {
-           // If NOT a UUID, only check Quote Number (avoids UUID syntax error)
-           query = query.eq('quote_number', id);
-        }
-
-        const { data, error } = await query
-          .limit(1)
-          .maybeSingle();
-
-        if (error) throw error;
-        if (!data) throw new Error('Quote not found');
-
-        debug.log('Quote resolved', data);
-        setResolvedId((data as any)?.id ?? null);
-        setTenantId((data as any)?.tenant_id ?? null);
-        setQuoteNumber((data as any)?.quote_number ?? null);
-        // Don't set loading to false here, wait for version
-      } catch (err: any) {
-        debug.error('Failed to load quote', { error: err.message });
-        setError(err.message || 'Failed to load quote');
+      setError(null);
+      if (!id) {
+        setError('Missing quote identifier');
         setLoading(false);
+        return;
       }
+      debug.info('Resolving quote', { id });
+
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+      let lastError: unknown = null;
+
+      for (let i = 0; i < RETRY_DELAYS_MS.length; i += 1) {
+        const attempt = i + 1;
+        try {
+          let query = scopedDb
+            .from('quotes')
+            .select('id, tenant_id, quote_number');
+
+          if (isUuid) {
+            query = query.or(`id.eq.${id},quote_number.eq.${id}`);
+          } else {
+            query = query.eq('quote_number', id);
+          }
+
+          const { data, error } = await query
+            .limit(1)
+            .maybeSingle();
+
+          if (error) throw error;
+          if (!data) throw new Error('Quote not found');
+
+          logger.info('Quote resolved', { id, resolvedId: (data as any)?.id, attempt });
+          setResolvedId((data as any)?.id ?? null);
+          setTenantId((data as any)?.tenant_id ?? null);
+          setQuoteNumber((data as any)?.quote_number ?? null);
+          return;
+        } catch (err: any) {
+          lastError = err;
+          logger.error('Quote resolution attempt failed', {
+            id,
+            attempt,
+            maxAttempts: RETRY_DELAYS_MS.length,
+            error: err?.message || String(err),
+          });
+          const shouldRetry = i < RETRY_DELAYS_MS.length - 1 && isRetryableError(err);
+          if (shouldRetry) {
+            await wait(RETRY_DELAYS_MS[i + 1]);
+            continue;
+          }
+        }
+      }
+
+      const message = lastError instanceof Error ? lastError.message : 'Failed to load quote';
+      debug.error('Failed to load quote', { error: message });
+      setError(message);
+      setLoading(false);
     };
     checkQuote();
-  }, [id]);
+  }, [id, reloadToken, scopedDb, debug]);
 
   useEffect(() => {
     const loadLatestVersion = async () => {
@@ -358,7 +636,11 @@ export default function QuoteDetail() {
       } catch (error: any) {
         const msg = error?.message ? String(error.message).toLowerCase() : '';
         if (error?.name === 'AbortError' || msg.includes('aborted')) return;
-        console.error('[QuoteDetail] Unexpected error in loadLatestVersion:', error);
+        logger.error('Quote version load failed', {
+          resolvedId,
+          urlVersionId,
+          error: error?.message || String(error),
+        });
         setError(error.message || 'Failed to load quotation version');
         setLoading(false);
       }
@@ -368,7 +650,7 @@ export default function QuoteDetail() {
     return () => {
       if (versionAbortRef.current) versionAbortRef.current.abort();
     };
-  }, [resolvedId, urlVersionId]);
+  }, [resolvedId, urlVersionId, tenantId, context.tenantId, scopedDb, supabase, debug]);
 
   const handleSaveVersion = async (type: 'minor' | 'major', reason: string) => {
     if (!resolvedId) return;
@@ -422,6 +704,84 @@ export default function QuoteDetail() {
     }
   };
 
+  const handleRetry = () => {
+    setError(null);
+    setLoading(true);
+    setReloadToken((v) => v + 1);
+  };
+
+  const persistSelectedOption = async (nextOptionId: string) => {
+    if (!versionId) return;
+    const clearResult = await scopedDb
+      .from('quotation_version_options')
+      .update({ is_selected: false })
+      .eq('quotation_version_id', versionId)
+      .neq('id', nextOptionId);
+    if (clearResult.error) {
+      throw new Error(clearResult.error.message);
+    }
+
+    const selectResult = await scopedDb
+      .from('quotation_version_options')
+      .update({ is_selected: true })
+      .eq('id', nextOptionId)
+      .eq('quotation_version_id', versionId);
+    if (selectResult.error) {
+      throw new Error(selectResult.error.message);
+    }
+  };
+
+  const handleSelectComparisonOption = async (nextOptionId: string) => {
+    if (selectionSaving) return;
+    const nextOption = comparisonOptions.find((option) => option.id === nextOptionId);
+    if (!nextOption) {
+      toast.error('Selected option is unavailable');
+      return;
+    }
+    if (!nextOption?.data_completeness?.is_complete) {
+      toast.error('Selected option has incomplete comparison data');
+    }
+    if (selectedComparisonOptionId === nextOptionId) {
+      return;
+    }
+
+    const previousSelected = selectedComparisonOptionId;
+    const previousOptions = comparisonOptions;
+    setSelectionSaving(true);
+    setSelectedComparisonOptionId(nextOptionId);
+    setComparisonOptions((prev) => prev.map((opt) => ({ ...opt, is_selected: opt.id === nextOptionId })));
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set('optionId', nextOptionId);
+      return next;
+    }, { replace: true });
+
+    try {
+      await persistSelectedOption(nextOptionId);
+      toast.success('Option selected');
+    } catch (selectionError: any) {
+      logger.error('Failed persisting selected option', {
+        versionId,
+        optionId: nextOptionId,
+        error: selectionError?.message || String(selectionError),
+      });
+      setSelectedComparisonOptionId(previousSelected || null);
+      setComparisonOptions(previousOptions);
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        if (previousSelected) {
+          next.set('optionId', previousSelected);
+        } else {
+          next.delete('optionId');
+        }
+        return next;
+      }, { replace: true });
+      toast.error('Failed to update selected option');
+    } finally {
+      setSelectionSaving(false);
+    }
+  };
+
   if (loading) {
     return (
       <DashboardLayout>
@@ -448,7 +808,7 @@ export default function QuoteDetail() {
                     {error}
                 </p>
                 <div className="flex space-x-4">
-                    <Button onClick={() => window.location.reload()}>
+                    <Button onClick={handleRetry}>
                         Retry
                     </Button>
                     <Button variant="outline" onClick={() => navigate('/dashboard/quotes')}>
@@ -505,10 +865,8 @@ export default function QuoteDetail() {
           {config?.multi_option_enabled && comparisonOptions.length > 0 && (
             <QuotationComparisonDashboard 
               options={comparisonOptions}
-              onSelect={(optId) => {
-                // Handle option selection logic (e.g. mark as selected)
-                toast.success('Option selected');
-              }}
+              selectedOptionId={selectedComparisonOptionId}
+              onSelect={handleSelectComparisonOption}
             />
           )}
           
