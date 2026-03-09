@@ -35,31 +35,8 @@ serveWithLogger(async (req, logger, adminSupabase) => {
     const bypassKey = Deno.env.get("TEST_BYPASS_KEY");
     const requestBypassKey = req.headers.get("x-bypass-key");
 
-    const decodeBase64Url = (input: string) => {
-        const normalized = input.replace(/-/g, "+").replace(/_/g, "/");
-        const padded = normalized + "===".slice((normalized.length + 3) % 4);
-        return atob(padded);
-    };
-
-    const getJwtRole = (headerValue: string | null) => {
-        if (!headerValue) return null;
-        const token = headerValue.startsWith("Bearer ") ? headerValue.slice(7) : headerValue;
-        const parts = token.split(".");
-        if (parts.length < 2) return null;
-        try {
-            const payload = JSON.parse(decodeBase64Url(parts[1]));
-            return payload?.role || payload?.app_metadata?.role || null;
-        } catch {
-            return null;
-        }
-    };
-
-    const tokenRole = getJwtRole(authHeader);
-    const hasServiceRoleClaim = tokenRole && ["service_role", "supabase_admin"].includes(String(tokenRole));
-    
     const isServiceRole =
         isServiceRoleAuthorizationHeader(authHeader, serviceRoleKey) ||
-        hasServiceRoleClaim ||
         (bypassKey && requestBypassKey && bypassKey === requestBypassKey);
 
     // If not service role (e.g. Webhook/Cron), require user auth

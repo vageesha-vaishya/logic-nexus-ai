@@ -6,7 +6,7 @@ import { GmailService } from "./services/gmail.ts";
 import { saveSyncLog } from "./utils/db.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { serveWithLogger } from "../_shared/logger.ts";
-import { requireAuth } from "../_shared/auth.ts";
+import { isServiceRoleAuthorizationHeader, requireAuth } from "../_shared/auth.ts";
 
 declare const Deno: any;
 
@@ -20,7 +20,7 @@ serveWithLogger(async (req, logger, adminSupabase) => {
     // Determine if request is from Service Role (Cron/Admin) or User
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
     const authHeader = req.headers.get("Authorization");
-    const isServiceRole = authHeader?.includes(serviceRoleKey);
+    const isServiceRole = isServiceRoleAuthorizationHeader(authHeader, serviceRoleKey);
 
     let userSupabase = adminSupabase; // Default to admin if service role
     let user = null;

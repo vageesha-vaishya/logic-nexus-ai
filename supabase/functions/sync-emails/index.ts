@@ -2,7 +2,7 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { serveWithLogger } from '../_shared/logger.ts';
 import { getCorsHeaders } from '../_shared/cors.ts';
-import { requireAuth } from '../_shared/auth.ts';
+import { isServiceRoleAuthorizationHeader, requireAuth } from '../_shared/auth.ts';
 
 type GmailHeader = { name: string; value: string };
 type GmailMessagePart = {
@@ -34,7 +34,7 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
     let supabase: SupabaseClient;
 
-    if (authHeader && serviceKey && authHeader.includes(serviceKey)) {
+    if (isServiceRoleAuthorizationHeader(authHeader, serviceKey)) {
       supabase = supabaseAdmin;
       logger.info("Using Service Role for sync");
     } else {

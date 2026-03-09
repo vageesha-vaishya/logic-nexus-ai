@@ -1,6 +1,6 @@
 
 import { getCorsHeaders } from "../_shared/cors.ts";
-import { requireAuth } from "../_shared/auth.ts";
+import { isServiceRoleAuthorizationHeader, requireAuth } from "../_shared/auth.ts";
 import { serveWithLogger } from "../_shared/logger.ts";
 
 serveWithLogger(async (req, logger, supabase) => {
@@ -10,7 +10,7 @@ serveWithLogger(async (req, logger, supabase) => {
   // Auth: verify service role key or authenticated user (admin manually triggering)
   const authHeader = req.headers.get('Authorization');
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-  if (!authHeader || !authHeader.includes(serviceKey)) {
+  if (!isServiceRoleAuthorizationHeader(authHeader, serviceKey)) {
     const { user, error: authError } = await requireAuth(req);
     if (authError || !user) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...headers, 'Content-Type': 'application/json' } });
