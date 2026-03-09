@@ -12,7 +12,7 @@ import { DefaultTemplate } from "./engine/default_template.ts";
 import { getTemplate } from "./engine/template-service.ts";
 // @ts-ignore
 import { fetchMglOptions } from "./engine/mgl-loader.ts";
-import { requireAuth } from "../_shared/auth.ts";
+import { isServiceRoleAuthorizationHeader, requireAuth } from "../_shared/auth.ts";
 import { PDFDocument } from "pdf-lib";
 // @ts-ignore
 import JSZip from "https://esm.sh/jszip@3.10.1";
@@ -58,7 +58,7 @@ serveWithLogger(async (req, logger, adminSupabase) => {
     const hasServiceRoleClaim = tokenRole && ["service_role", "supabase_admin"].includes(String(tokenRole));
     
     const isServiceRole =
-        (authHeader && serviceRoleKey && authHeader.includes(serviceRoleKey)) ||
+        isServiceRoleAuthorizationHeader(authHeader, serviceRoleKey) ||
         hasServiceRoleClaim ||
         (bypassKey && requestBypassKey && bypassKey === requestBypassKey);
 

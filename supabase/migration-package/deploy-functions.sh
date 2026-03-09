@@ -54,7 +54,7 @@ else
     echo -e "${BLUE}Functions to deploy:${NC} ${FUNCTIONS[*]}"
     for func in "${FUNCTIONS[@]}"; do
         echo -e "${BLUE}Deploying $func...${NC}"
-        supabase functions deploy "$func" --project-ref "$NEW_PROJECT_ID"
+        supabase functions deploy "$func" --project-ref "$NEW_PROJECT_ID" --no-verify-jwt
         echo -e "${GREEN}✓ $func deployed${NC}"
     done
     cd supabase/migration-package
