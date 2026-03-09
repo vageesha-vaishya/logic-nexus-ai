@@ -292,20 +292,37 @@ done
                     withEnv([
                         "PDF_BASE_URL=${env.SELECTED_SUPABASE_URL}",
                         "PDF_ANON_KEY=${env.SELECTED_ANON_KEY}",
-                        "PDF_SERVICE_ROLE_KEY=${env.SELECTED_SERVICE_ROLE_KEY}"
+                        "PDF_SERVICE_ROLE_KEY=${env.SELECTED_SERVICE_ROLE_KEY}",
+                        "PDF_BYPASS_KEY=${env.TEST_BYPASS_KEY ?: ''}"
                     ]) {
                         sh '''
 set -e
-if [ -z "$PDF_SERVICE_ROLE_KEY" ]; then
-  echo "Missing PDF service role key for smoke test"
+if [ -z "$PDF_BASE_URL" ] || [ -z "$PDF_ANON_KEY" ]; then
+  echo "Missing PDF base URL or anon key for smoke test"
   exit 1
 fi
-HTTP_CODE=$(curl -sS -o /tmp/pdf_auth_smoke.json -w "%{http_code}" \
-  "$PDF_BASE_URL/functions/v1/generate-quote-pdf" \
-  -H "Content-Type: application/json" \
-  -H "apikey: $PDF_ANON_KEY" \
-  -H "Authorization: Bearer $PDF_SERVICE_ROLE_KEY" \
-  -d '{"engine_v2":true,"source":"jenkins-auth-smoke","action":"auth-smoke"}')
+if [ -z "$PDF_BYPASS_KEY" ] && [ -z "$PDF_SERVICE_ROLE_KEY" ]; then
+  echo "Missing both PDF_BYPASS_KEY and PDF_SERVICE_ROLE_KEY for smoke test"
+  exit 1
+fi
+
+set +x
+if [ -n "$PDF_BYPASS_KEY" ]; then
+  HTTP_CODE=$(curl -sS -o /tmp/pdf_auth_smoke.json -w "%{http_code}" \
+    "$PDF_BASE_URL/functions/v1/generate-quote-pdf" \
+    -H "Content-Type: application/json" \
+    -H "apikey: $PDF_ANON_KEY" \
+    -H "x-bypass-key: $PDF_BYPASS_KEY" \
+    -d '{"engine_v2":true,"source":"jenkins-auth-smoke","action":"auth-smoke"}')
+else
+  HTTP_CODE=$(curl -sS -o /tmp/pdf_auth_smoke.json -w "%{http_code}" \
+    "$PDF_BASE_URL/functions/v1/generate-quote-pdf" \
+    -H "Content-Type: application/json" \
+    -H "apikey: $PDF_ANON_KEY" \
+    -H "Authorization: Bearer $PDF_SERVICE_ROLE_KEY" \
+    -d '{"engine_v2":true,"source":"jenkins-auth-smoke","action":"auth-smoke"}')
+fi
+set -x
 echo "PDF auth smoke status: $HTTP_CODE"
 cat /tmp/pdf_auth_smoke.json || true
 if [ "$HTTP_CODE" = "401" ] || [ "$HTTP_CODE" = "403" ]; then
