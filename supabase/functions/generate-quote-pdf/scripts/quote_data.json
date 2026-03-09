@@ -137,7 +137,7 @@
         "show_logo": true,
         "company_info": true
       },
-      "layout": "mgl_granular",
+      "layout": "granular",
       "sections": [
         {
           "type": "customer_matrix_header",

@@ -1,8 +1,7 @@
 
 import { render, screen, waitFor, act } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import QuoteDetail from './QuoteDetail';
 import { useCRM } from '@/hooks/useCRM';
 
 // Mock hooks
@@ -40,8 +39,48 @@ vi.mock('@/components/sales/quotation-versions/QuotationComparisonDashboard', ()
     </div>
   ),
 }));
+vi.mock('@/components/sales/quotation-versions/SaveVersionDialog', () => ({
+  SaveVersionDialog: () => <div data-testid="save-version-dialog" />,
+}));
+vi.mock('@/components/sales/QuotationVersionHistory', () => ({
+  QuotationVersionHistory: () => <div data-testid="quotation-version-history" />,
+}));
+vi.mock('@/components/sales/portal/ShareQuoteDialog', () => ({
+  ShareQuoteDialog: () => <div data-testid="share-quote-dialog" />,
+}));
+vi.mock('@/components/sales/SendQuoteDialog', () => ({
+  SendQuoteDialog: () => <div data-testid="send-quote-dialog" />,
+}));
+vi.mock('@/components/sales/QuotePreviewModal', () => ({
+  QuotePreviewModal: () => <div data-testid="quote-preview-modal" />,
+}));
+vi.mock('@/components/system/DetailScreenTemplate', () => ({
+  DetailScreenTemplate: ({ children }: any) => <div data-testid="detail-screen-template">{children}</div>,
+}));
+vi.mock('@/services/quotation/QuotationConfigurationService', () => ({
+  QuotationConfigurationService: class {
+    async getConfiguration() {
+      return {
+        auto_ranking_criteria: { cost: 0.4, transit_time: 0.3, reliability: 0.3 },
+        multi_option_enabled: true
+      };
+    }
+  }
+}));
+vi.mock('@/services/quotation/QuotationRankingService', () => ({
+  QuotationRankingService: {
+    rankOptions: (options: any[]) => options
+  }
+}));
 
 describe('QuoteDetail - Empty State & Data Loading', () => {
+  let QuoteDetail: any;
+
+  beforeAll(async () => {
+    const mod = await import('./QuoteDetail');
+    QuoteDetail = mod.default;
+  });
+
   const mockScopedDb = {
     from: vi.fn(),
   };

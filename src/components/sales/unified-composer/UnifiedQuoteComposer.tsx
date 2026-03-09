@@ -898,6 +898,14 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
       setQuoteTenantId(raw.tenant_id);
 
       const cargoDetails = parseJsonObject(raw.cargo_details);
+      const standaloneProfile = parseJsonObject(raw.billing_address);
+      const isStandaloneQuote = !!standaloneProfile && !raw.account_id && !raw.opportunity_id;
+      const billingAddressData = (standaloneProfile?.billing_address && typeof standaloneProfile.billing_address === 'object')
+        ? standaloneProfile.billing_address
+        : undefined;
+      const shippingAddressData = (standaloneProfile?.shipping_address && typeof standaloneProfile.shipping_address === 'object')
+        ? standaloneProfile.shipping_address
+        : undefined;
 
       // Parallel fetch for detailed configurations (Cargo, Items, Documents, Versions)
       // We use allSettled to allow partial failures
@@ -1054,7 +1062,23 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
         accountId: raw.account_id || '',
         opportunityId: raw.opportunity_id || '',
         contactId: raw.contact_id || '',
+        standalone: isStandaloneQuote,
+        guestCompany: standaloneProfile?.company || '',
+        guestName: standaloneProfile?.name || '',
+        guestEmail: standaloneProfile?.email || '',
+        guestPhone: standaloneProfile?.phone || '',
+        guestJobTitle: standaloneProfile?.job_title || '',
+        guestDepartment: standaloneProfile?.department || '',
+        billingAddress: billingAddressData,
+        shippingAddress: shippingAddressData,
+        taxId: standaloneProfile?.tax_id || '',
+        customerPo: standaloneProfile?.customer_po || '',
+        vendorRef: standaloneProfile?.vendor_ref || '',
+        projectCode: standaloneProfile?.project_code || '',
         quoteTitle: raw.title || '',
+        termsConditions: raw.terms_conditions || '',
+        internalNotes: raw.notes || '',
+        specialInstructions: cargoDetails?.special_handling || '',
         mode: (raw.transport_mode || 'ocean') as any,
         origin: raw.origin_port_data?.location_name || raw.origin || '',
         destination: raw.destination_port_data?.location_name || raw.destination || '',
@@ -1072,7 +1096,23 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
             accountId: raw.account_id || '',
             opportunityId: raw.opportunity_id || '',
             contactId: raw.contact_id || '',
+            standalone: isStandaloneQuote,
+            guestCompany: standaloneProfile?.company || '',
+            guestName: standaloneProfile?.name || '',
+            guestEmail: standaloneProfile?.email || '',
+            guestPhone: standaloneProfile?.phone || '',
+            guestJobTitle: standaloneProfile?.job_title || '',
+            guestDepartment: standaloneProfile?.department || '',
+            billingAddress: billingAddressData,
+            shippingAddress: shippingAddressData,
+            taxId: standaloneProfile?.tax_id || '',
+            customerPo: standaloneProfile?.customer_po || '',
+            vendorRef: standaloneProfile?.vendor_ref || '',
+            projectCode: standaloneProfile?.project_code || '',
             quoteTitle: raw.title || '',
+            termsConditions: raw.terms_conditions || '',
+            internalNotes: raw.notes || '',
+            specialInstructions: cargoDetails?.special_handling || '',
             mode: (raw.transport_mode || 'ocean') as any,
             origin: raw.origin_port_data?.location_name || raw.origin || '',
             destination: raw.destination_port_data?.location_name || raw.destination || '',
@@ -1089,7 +1129,13 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
         pickupDate: raw.pickup_date ? new Date(raw.pickup_date).toISOString().split('T')[0] : '',
         deliveryDeadline: raw.delivery_deadline ? new Date(raw.delivery_deadline).toISOString().split('T')[0] : '',
         htsCode: cargoDetails?.hts_code || '',
+        aes_hts_id: cargoDetails?.commodity_details?.aes_hts_id || '',
+        scheduleB: cargoDetails?.commodity_details?.schedule_b || '',
+        dims: cargoDetails?.dimensions
+          ? `${cargoDetails.dimensions.l || 0}x${cargoDetails.dimensions.w || 0}x${cargoDetails.dimensions.h || 0} ${cargoDetails.dimensions.unit || 'cm'}`
+          : '',
         dangerousGoods: !!(raw.dangerous_goods || cargoDetails?.dangerous_goods || cargoHazmat),
+        specialHandling: cargoDetails?.special_handling || '',
         vehicleType: raw.vehicle_type || 'van',
         containerCombos: containerCombos,
         attachments: docs,
@@ -2244,6 +2290,16 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
         timestamp: new Date().toISOString()
       }, 'success');
 
+      if (savedId && displayQuoteNumber) {
+        dispatch({
+          type: 'UPDATE_QUOTE_DATA',
+          payload: {
+            id: savedId,
+            quote_number: displayQuoteNumber,
+          },
+        });
+      }
+
       if (displayQuoteNumber) {
         showQuotationSuccessToast(displayQuoteNumber);
       } else {
@@ -2463,8 +2519,32 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
            }
       }
 
-      logAudit('save_draft_success', { quoteId: savedId }, 'success');
-      toast({ title: 'Draft saved', description: 'Your quote draft has been saved.' });
+      let draftQuoteNumber: string | null = null;
+      if (savedId) {
+        try {
+          const { data: q } = await scopedDb.from('quotes').select('quote_number').eq('id', savedId).single();
+          if (q?.quote_number) {
+            draftQuoteNumber = q.quote_number;
+            dispatch({
+              type: 'UPDATE_QUOTE_DATA',
+              payload: {
+                id: savedId,
+                quote_number: q.quote_number,
+              },
+            });
+          }
+        } catch (e) {
+          console.warn('Failed to fetch quote number for draft toast', e);
+        }
+      }
+
+      logAudit('save_draft_success', { quoteId: savedId, quoteNumber: draftQuoteNumber }, 'success');
+      toast({
+        title: 'Draft saved',
+        description: draftQuoteNumber
+          ? `Draft saved as ${draftQuoteNumber}.`
+          : 'Your quote draft has been saved.',
+      });
     } catch (err: any) {
       logger.error('[UnifiedComposer] Draft save failed:', err);
       logAudit('save_draft_failure', { quoteId: quoteId || 'new', error: err.message, stack: err.stack }, 'failure');

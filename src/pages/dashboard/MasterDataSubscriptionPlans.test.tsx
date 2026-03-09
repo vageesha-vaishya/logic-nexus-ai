@@ -68,8 +68,8 @@ describe('MasterDataSubscriptionPlans', () => {
     const mockOrder = vi.fn().mockResolvedValue({ data: mockPlans, error: null });
     const mockSelect = vi.fn(() => ({ order: mockOrder }));
 
-    const from = vi.fn((table: string, readScope?: boolean) => {
-      if (table === 'subscription_plans' && readScope) {
+    const from = vi.fn((table: string) => {
+      if (table === 'subscription_plans') {
         return {
           select: mockSelect,
         };
@@ -113,19 +113,14 @@ describe('MasterDataSubscriptionPlans', () => {
     const mockInsertPlan = vi.fn(() => ({ select: mockSelectInsert }));
     const mockAuditInsert = vi.fn().mockResolvedValue({ error: null });
 
-    const from = vi.fn((table: string, readScope?: boolean) => {
-      if (table === 'subscription_plans' && readScope) {
-        return {
-          select: mockSelectRead,
-        };
-      }
+    const from = vi.fn((table: string) => {
       if (table === 'subscription_plans') {
         return {
+          select: mockSelectRead,
           insert: mockInsertPlan,
           update: vi.fn().mockResolvedValue({ error: null }),
           delete: vi.fn().mockResolvedValue({ error: null }),
           eq: vi.fn(),
-          select: vi.fn(),
         };
       }
       if (table === 'audit_logs') {
@@ -215,19 +210,14 @@ describe('MasterDataSubscriptionPlans', () => {
     const mockInsertPlan = vi.fn(() => ({ select: mockSelectInsert }));
     const mockAuditInsert = vi.fn().mockResolvedValue({ error: null });
 
-    const from = vi.fn((table: string, readScope?: boolean) => {
-      if (table === 'subscription_plans' && readScope) {
-        return {
-          select: mockSelectRead,
-        };
-      }
+    const from = vi.fn((table: string) => {
       if (table === 'subscription_plans') {
         return {
+          select: mockSelectRead,
           insert: mockInsertPlan,
           update: vi.fn().mockResolvedValue({ error: null }),
           delete: vi.fn().mockResolvedValue({ error: null }),
           eq: vi.fn(),
-          select: vi.fn(),
         };
       }
       if (table === 'audit_logs') {

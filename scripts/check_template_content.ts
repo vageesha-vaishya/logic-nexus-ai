@@ -18,11 +18,11 @@ if (!supabaseUrl || !supabaseKey) {
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function checkTemplate() {
-    console.log("Checking for 'mgl_granular' template...");
+    console.log("Checking for 'granular' template...");
     const { data: templates, error } = await supabase
         .from('quote_templates')
         .select('*')
-        .eq('layout_type', 'mgl_granular');
+        .eq('layout_type', 'granular');
 
     if (error) {
         console.error("Error fetching template:", error);
@@ -30,7 +30,7 @@ async function checkTemplate() {
     }
 
     if (!templates || templates.length === 0) {
-        console.log("No template found with layout_type = 'mgl_granular'.");
+        console.log("No template found with layout_type = 'granular'.");
     } else {
         console.log(`Found ${templates.length} templates.`);
         templates.forEach(t => {

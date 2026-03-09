@@ -11,11 +11,11 @@ export async function fetchMglOptions(
 
   // Check for MGL Rate Options
   const { data: mglOptions, error: mglError } = await safeSelect(
-    "mgl_rate_options",
+    "rate_options",
     "*",
     "*",
     (q: any) => q.eq("quote_version_id", versionId),
-    "mgl_rate_options fetch"
+    "rate_options fetch"
   );
 
   if (!mglError && mglOptions && mglOptions.length > 0) {
@@ -24,7 +24,7 @@ export async function fetchMglOptions(
     for (const mglOpt of mglOptions) {
       // Fetch Legs
       const { data: mglLegs } = await safeSelect(
-        "mgl_rate_option_legs",
+        "rate_option_legs",
         "*",
         "*",
         (q: any) => q.eq("rate_option_id", mglOpt.id).order("sequence_no", { ascending: true }),
@@ -33,7 +33,7 @@ export async function fetchMglOptions(
 
       // Fetch Charge Rows
       const { data: mglRows } = await safeSelect(
-        "mgl_rate_charge_rows",
+        "rate_charge_rows",
         "*",
         "*",
         (q: any) => q.eq("rate_option_id", mglOpt.id).order("sort_order", { ascending: true }),
@@ -45,7 +45,7 @@ export async function fetchMglOptions(
       let mglCells: any[] = [];
       if (rowIds.length > 0) {
         const { data: cellsData } = await safeSelect(
-          "mgl_rate_charge_cells",
+          "rate_charge_cells",
           "*",
           "*",
           (q: any) => q.in("charge_row_id", rowIds),

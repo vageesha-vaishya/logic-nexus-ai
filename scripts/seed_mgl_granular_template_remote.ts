@@ -24,7 +24,7 @@ async function seedTemplate() {
     console.log('Seeding MGL Granular Quote template...');
 
     const config = {
-        layout: 'mgl_granular',
+        layout: 'granular',
         header: {
             show_logo: true,
             show_address: true,

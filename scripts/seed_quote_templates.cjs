@@ -16,7 +16,7 @@ const templates = [
         name: 'MGL FCL Quote',
         description: 'Miami Global Lines FCL Quotation with Rate Matrix',
         content: {
-            layout: "mgl_matrix",
+            layout: "matrix",
             header: { 
                 show_logo: true, 
                 company_info: true, 

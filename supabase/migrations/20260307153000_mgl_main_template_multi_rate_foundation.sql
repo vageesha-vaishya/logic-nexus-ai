@@ -1,11 +1,11 @@
--- MGL Main Template foundation for multi-rate options, multi-mode legs, and charge matrices.
+-- Main Template foundation for multi-rate options, multi-mode legs, and charge matrices.
 
-CREATE TABLE IF NOT EXISTS public.mgl_templates (
+CREATE TABLE IF NOT EXISTS public.quotation_templates (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id uuid NOT NULL,
   quote_id uuid REFERENCES public.quotes(id) ON DELETE CASCADE,
   quote_version_id uuid REFERENCES public.quotation_versions(id) ON DELETE CASCADE,
-  template_name text NOT NULL DEFAULT 'MGL-Main-Template',
+  template_name text NOT NULL DEFAULT 'Main-Template',
   config jsonb NOT NULL DEFAULT '{}'::jsonb,
   is_active boolean NOT NULL DEFAULT true,
   created_by uuid,
@@ -14,12 +14,12 @@ CREATE TABLE IF NOT EXISTS public.mgl_templates (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE TABLE IF NOT EXISTS public.mgl_rate_options (
+CREATE TABLE IF NOT EXISTS public.rate_options (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id uuid NOT NULL,
   quote_id uuid NOT NULL REFERENCES public.quotes(id) ON DELETE CASCADE,
   quote_version_id uuid REFERENCES public.quotation_versions(id) ON DELETE CASCADE,
-  template_id uuid REFERENCES public.mgl_templates(id) ON DELETE SET NULL,
+  template_id uuid REFERENCES public.quotation_templates(id) ON DELETE SET NULL,
   option_name text,
   carrier_name text NOT NULL,
   transit_time_days integer,
@@ -36,9 +36,9 @@ CREATE TABLE IF NOT EXISTS public.mgl_rate_options (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE TABLE IF NOT EXISTS public.mgl_rate_option_legs (
+CREATE TABLE IF NOT EXISTS public.rate_option_legs (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  rate_option_id uuid NOT NULL REFERENCES public.mgl_rate_options(id) ON DELETE CASCADE,
+  rate_option_id uuid NOT NULL REFERENCES public.rate_options(id) ON DELETE CASCADE,
   tenant_id uuid NOT NULL,
   sequence_no integer NOT NULL,
   transport_mode text NOT NULL,
@@ -53,13 +53,13 @@ CREATE TABLE IF NOT EXISTS public.mgl_rate_option_legs (
   metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT mgl_rate_option_legs_transport_mode_check CHECK (transport_mode IN ('air', 'ocean', 'road', 'rail')),
-  CONSTRAINT mgl_rate_option_legs_unique_seq UNIQUE (rate_option_id, sequence_no)
+  CONSTRAINT rate_option_legs_transport_mode_check CHECK (transport_mode IN ('air', 'ocean', 'road', 'rail')),
+  CONSTRAINT rate_option_legs_unique_seq UNIQUE (rate_option_id, sequence_no)
 );
 
-CREATE TABLE IF NOT EXISTS public.mgl_rate_charge_rows (
+CREATE TABLE IF NOT EXISTS public.rate_charge_rows (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  rate_option_id uuid NOT NULL REFERENCES public.mgl_rate_options(id) ON DELETE CASCADE,
+  rate_option_id uuid NOT NULL REFERENCES public.rate_options(id) ON DELETE CASCADE,
   tenant_id uuid NOT NULL,
   row_code text,
   row_name text NOT NULL,
@@ -72,35 +72,35 @@ CREATE TABLE IF NOT EXISTS public.mgl_rate_charge_rows (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE TABLE IF NOT EXISTS public.mgl_rate_charge_cells (
+CREATE TABLE IF NOT EXISTS public.rate_charge_cells (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  charge_row_id uuid NOT NULL REFERENCES public.mgl_rate_charge_rows(id) ON DELETE CASCADE,
+  charge_row_id uuid NOT NULL REFERENCES public.rate_charge_rows(id) ON DELETE CASCADE,
   tenant_id uuid NOT NULL,
   equipment_key text NOT NULL,
   amount numeric(14,2) NOT NULL DEFAULT 0,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT mgl_rate_charge_cells_unique_equipment UNIQUE (charge_row_id, equipment_key)
+  CONSTRAINT rate_charge_cells_unique_equipment UNIQUE (charge_row_id, equipment_key)
 );
 
-CREATE TABLE IF NOT EXISTS public.mgl_rate_option_history (
+CREATE TABLE IF NOT EXISTS public.rate_option_history (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  rate_option_id uuid NOT NULL REFERENCES public.mgl_rate_options(id) ON DELETE CASCADE,
+  rate_option_id uuid NOT NULL REFERENCES public.rate_options(id) ON DELETE CASCADE,
   tenant_id uuid NOT NULL,
   revision_no integer NOT NULL,
   event_type text NOT NULL,
   snapshot jsonb NOT NULL,
   changed_by uuid,
   changed_at timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT mgl_rate_option_history_unique_revision UNIQUE (rate_option_id, revision_no)
+  CONSTRAINT rate_option_history_unique_revision UNIQUE (rate_option_id, revision_no)
 );
 
-CREATE TABLE IF NOT EXISTS public.mgl_quotation_audit_logs (
+CREATE TABLE IF NOT EXISTS public.quotation_audit_logs (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id uuid NOT NULL,
   quote_id uuid REFERENCES public.quotes(id) ON DELETE CASCADE,
   quote_version_id uuid REFERENCES public.quotation_versions(id) ON DELETE CASCADE,
-  rate_option_id uuid REFERENCES public.mgl_rate_options(id) ON DELETE SET NULL,
+  rate_option_id uuid REFERENCES public.rate_options(id) ON DELETE SET NULL,
   action text NOT NULL,
   actor_id uuid,
   actor_email text,
@@ -109,51 +109,74 @@ CREATE TABLE IF NOT EXISTS public.mgl_quotation_audit_logs (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_mgl_templates_tenant_quote ON public.mgl_templates (tenant_id, quote_id);
-CREATE INDEX IF NOT EXISTS idx_mgl_rate_options_quote_version ON public.mgl_rate_options (quote_id, quote_version_id);
-CREATE INDEX IF NOT EXISTS idx_mgl_rate_option_legs_option ON public.mgl_rate_option_legs (rate_option_id, sequence_no);
-CREATE INDEX IF NOT EXISTS idx_mgl_rate_charge_rows_option ON public.mgl_rate_charge_rows (rate_option_id, sort_order);
-CREATE INDEX IF NOT EXISTS idx_mgl_rate_charge_cells_row ON public.mgl_rate_charge_cells (charge_row_id, equipment_key);
-CREATE INDEX IF NOT EXISTS idx_mgl_rate_option_history_option ON public.mgl_rate_option_history (rate_option_id, revision_no DESC);
-CREATE INDEX IF NOT EXISTS idx_mgl_audit_quote_version ON public.mgl_quotation_audit_logs (quote_id, quote_version_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_quotation_templates_tenant_quote ON public.quotation_templates (tenant_id, quote_id);
+CREATE INDEX IF NOT EXISTS idx_rate_options_quote_version ON public.rate_options (quote_id, quote_version_id);
+CREATE INDEX IF NOT EXISTS idx_rate_option_legs_option ON public.rate_option_legs (rate_option_id, sequence_no);
+CREATE INDEX IF NOT EXISTS idx_rate_charge_rows_option ON public.rate_charge_rows (rate_option_id, sort_order);
+CREATE INDEX IF NOT EXISTS idx_rate_charge_cells_row ON public.rate_charge_cells (charge_row_id, equipment_key);
+CREATE INDEX IF NOT EXISTS idx_rate_option_history_option ON public.rate_option_history (rate_option_id, revision_no DESC);
+CREATE INDEX IF NOT EXISTS idx_quotation_audit_quote_version ON public.quotation_audit_logs (quote_id, quote_version_id, created_at DESC);
 
-CREATE OR REPLACE VIEW public.mgl_rate_matrix_view AS
-SELECT
-  o.id AS rate_option_id,
-  o.quote_id,
-  o.quote_version_id,
-  o.tenant_id,
-  o.carrier_name,
-  o.option_name,
-  o.transit_time_days,
-  o.frequency_per_week,
-  o.mode,
-  o.remarks,
-  o.total_by_equipment,
-  o.grand_total,
-  l.id AS leg_id,
-  l.sequence_no,
-  l.transport_mode,
-  l.origin_code,
-  l.destination_code,
-  l.origin_name,
-  l.destination_name,
-  l.transit_days,
-  l.frequency_per_week AS leg_frequency_per_week,
-  r.id AS charge_row_id,
-  r.row_code,
-  r.row_name,
-  r.currency,
-  r.include_in_total,
-  r.sort_order,
-  c.equipment_key,
-  c.amount
-FROM public.mgl_rate_options o
-LEFT JOIN public.mgl_rate_option_legs l ON l.rate_option_id = o.id
-LEFT JOIN public.mgl_rate_charge_rows r ON r.rate_option_id = o.id
-LEFT JOIN public.mgl_rate_charge_cells c ON c.charge_row_id = r.id;
+CREATE OR REPLACE VIEW public.rate_matrix_view AS
+ SELECT
+   o.id AS rate_option_id,
+   o.tenant_id,
+   o.quote_id,
+   o.quote_version_id,
+   o.template_id,
+   o.option_name,
+   o.carrier_name,
+   o.transit_time_days,
+   o.frequency_per_week,
+   o.mode,
+   o.equipment_columns,
+   o.remarks,
+   o.status,
+   o.total_by_equipment,
+   o.grand_total,
+   o.created_by,
+   o.updated_by,
+   o.created_at,
+   o.updated_at,
+   jsonb_agg(
+     jsonb_build_object(
+       'id', l.id,
+       'sequence_no', l.sequence_no,
+       'transport_mode', l.transport_mode,
+       'leg_type', l.leg_type,
+       'origin_code', l.origin_code,
+       'destination_code', l.destination_code,
+       'origin_name', l.origin_name,
+       'destination_name', l.destination_name,
+       'carrier_name', l.carrier_name,
+       'transit_days', l.transit_days,
+       'frequency_per_week', l.frequency_per_week,
+       'metadata', l.metadata
+     ) ORDER BY l.sequence_no
+   ) FILTER (WHERE l.id IS NOT NULL) AS legs,
+   jsonb_agg(
+     jsonb_build_object(
+       'id', r.id,
+       'row_code', r.row_code,
+       'row_name', r.row_name,
+       'currency', r.currency,
+       'basis', r.basis,
+       'include_in_total', r.include_in_total,
+       'remarks', r.remarks,
+       'sort_order', r.sort_order,
+       'values_by_equipment', (
+         SELECT jsonb_object_agg(c.equipment_key, c.amount)
+         FROM public.rate_charge_cells c
+         WHERE c.charge_row_id = r.id
+       )
+     ) ORDER BY r.sort_order
+   ) FILTER (WHERE r.id IS NOT NULL) AS charge_rows
+ FROM public.rate_options o
+ LEFT JOIN public.rate_option_legs l ON l.rate_option_id = o.id
+ LEFT JOIN public.rate_charge_rows r ON r.rate_option_id = o.id
+ GROUP BY o.id;
 
-CREATE OR REPLACE VIEW public.quotation_version_options_mgl_compat AS
+CREATE OR REPLACE VIEW public.quotation_version_options_compat AS
 SELECT
   o.id,
   o.quote_version_id AS quotation_version_id,
@@ -166,15 +189,15 @@ SELECT
   o.created_at,
   o.updated_at,
   o.tenant_id
-FROM public.mgl_rate_options o;
+FROM public.rate_options o;
 
-ALTER TABLE public.mgl_templates ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.mgl_rate_options ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.mgl_rate_option_legs ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.mgl_rate_charge_rows ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.mgl_rate_charge_cells ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.mgl_rate_option_history ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.mgl_quotation_audit_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.templates ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.rate_options ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.rate_option_legs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.rate_charge_rows ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.rate_charge_cells ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.rate_option_history ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.quotation_audit_logs ENABLE ROW LEVEL SECURITY;
 
 DO $$
 DECLARE
@@ -182,13 +205,13 @@ DECLARE
 BEGIN
   FOR tbl IN
     SELECT unnest(ARRAY[
-      'mgl_templates',
-      'mgl_rate_options',
-      'mgl_rate_option_legs',
-      'mgl_rate_charge_rows',
-      'mgl_rate_charge_cells',
-      'mgl_rate_option_history',
-      'mgl_quotation_audit_logs'
+      'templates',
+      'rate_options',
+       'rate_option_legs',
+       'rate_charge_rows',
+       'rate_charge_cells',
+       'rate_option_history',
+       'quotation_audit_logs'
     ])
   LOOP
     EXECUTE format('DROP POLICY IF EXISTS "tenant_select_policy" ON public.%I', tbl);
@@ -205,12 +228,12 @@ BEGIN
   END LOOP;
 END $$;
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.mgl_templates TO authenticated, service_role;
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.mgl_rate_options TO authenticated, service_role;
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.mgl_rate_option_legs TO authenticated, service_role;
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.mgl_rate_charge_rows TO authenticated, service_role;
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.mgl_rate_charge_cells TO authenticated, service_role;
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.mgl_rate_option_history TO authenticated, service_role;
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.mgl_quotation_audit_logs TO authenticated, service_role;
-GRANT SELECT ON public.mgl_rate_matrix_view TO authenticated, service_role;
-GRANT SELECT ON public.quotation_version_options_mgl_compat TO authenticated, service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.templates TO authenticated, service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.rate_options TO authenticated, service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.rate_option_legs TO authenticated, service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.rate_charge_rows TO authenticated, service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.rate_charge_cells TO authenticated, service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.rate_option_history TO authenticated, service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.quotation_audit_logs TO authenticated, service_role;
+GRANT SELECT ON public.rate_matrix_view TO authenticated, service_role;
+GRANT SELECT ON public.quotation_version_options_compat TO authenticated, service_role;

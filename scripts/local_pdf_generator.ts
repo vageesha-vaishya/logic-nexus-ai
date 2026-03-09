@@ -189,8 +189,8 @@ export async function generatePdfLocal(quoteId: string, versionId?: string, temp
   };
 
   // MGL Layout Logic
-  const isMGL = templateContent.layout === "mgl_matrix";
-  const isMGLGranular = templateContent.layout === "mgl_granular";
+  const isMGL = templateContent.layout === "matrix";
+  const isMGLGranular = templateContent.layout === "granular";
 
   if (isMGL || isMGLGranular) {
       // MGL Header

@@ -7,12 +7,17 @@ The MGL Main Template implementation is built around modular blocks:
 - `MGL Rate Option Engine`
   - Validates leg continuity and mode transitions.
   - Computes per-equipment totals and grand totals for each carrier option.
+  - Generates four standalone rate options for scenario-based quoting.
 - `Charge Matrix Model`
   - Row-oriented charge definitions (`Ocean Freight`, `Trucking`, surcharges, fees).
   - Column-oriented equipment profiles (`Standard-20`, `Open Top-40`, `Flat Rack-40`, `Platform-20`, `High Cube-45`).
 - `Transport Leg Model`
   - Supports multi-leg, multi-modal journeys (`air`, `ocean`, `road`, `rail`).
   - Ordered sequence with route continuity checks.
+  - Validates NYC origin and Dehra Dun Airport destination scope.
+- `Scenario Constraints`
+  - Container profile validation for `20'`, `40'`, `40'HC`, `45'`.
+  - Commodity handling compatibility validation across container types.
 - `Compatibility Layer`
   - Maps MGL options to legacy `RateOption`/`quote-breakdown` structures.
   - Supports backward consumption by existing quotation views and services.
@@ -27,22 +32,22 @@ Code modules:
 
 ## 2) Database Schema
 
-Migration: `supabase/migrations/20260307153000_mgl_main_template_multi_rate_foundation.sql`
+Migration: `supabase/migrations/20260307153000_main_template_multi_rate_foundation.sql`
 
 New tables:
 
-- `mgl_templates`
-- `mgl_rate_options`
-- `mgl_rate_option_legs`
-- `mgl_rate_charge_rows`
-- `mgl_rate_charge_cells`
-- `mgl_rate_option_history`
-- `mgl_quotation_audit_logs`
+- `templates`
+- `rate_options`
+- `rate_option_legs`
+- `rate_charge_rows`
+- `rate_charge_cells`
+- `rate_option_history`
+- `quotation_audit_logs`
 
 Views:
 
-- `mgl_rate_matrix_view` (flattened read model)
-- `quotation_version_options_mgl_compat` (legacy integration)
+- `rate_matrix_view` (flattened read model)
+- `quotation_version_options_compat` (legacy integration)
 
 Features:
 
@@ -110,19 +115,50 @@ Supports:
 - Legs must be sequential and route-continuous.
 - Negative charges are rejected.
 - Totals are computed per equipment column and aggregated for analytics/reporting.
+- Standalone mode requires exactly four rate options with ordinals `1..4`.
+- Route scope validation enforces New York City origin and Dehra Dun Airport destination.
+- Commodity and container compatibility rules reject invalid pairings.
 
-## 6) Backward Compatibility
+## 6) Capability Gap Analysis for NYC → Dehra Dun Scenario
+
+Original MGL limitations before enhancement:
+
+- No first-class commodity field to enforce handling policies.
+- No container type and size validation for advanced equipment combinations.
+- No explicit route scope guard for NYC-to-Dehra-Dun specific workflows.
+- No deterministic generator for four required standalone rate options.
+
+Enhancements implemented:
+
+- Added `containerType`, `containerSize`, and `commodityType` to `MglRateOption`.
+- Added `MglScenarioConfig` for standalone scenario-driven generation.
+- Added engine-level rules:
+  - `CONTAINER_UNSUPPORTED`
+  - `CONTAINER_COMMODITY_INCOMPATIBLE`
+  - `ROUTE_OUT_OF_SCOPE`
+  - `INVALID_OPTION_SET`
+  - `MISSING_REQUIRED_FIELD`
+- Added `generateStandaloneMglRateOptions` and `validateStandaloneOptionSet`.
+- Added service wrappers in `MglMainTemplateService` for standalone option generation/validation.
+- Expanded builder UI to capture container, commodity, and route fields and to save all four standalone options.
+
+## 7) Backward Compatibility
 
 - `compatibility.ts` provides mappings between MGL and legacy rate models.
-- View `quotation_version_options_mgl_compat` enables downstream systems to consume MGL data without immediate refactor.
+- View `quotation_version_options_compat` enables downstream systems to consume MGL data without immediate refactor.
+- New fields are additive and optional, preserving existing API payload compatibility.
 
-## 7) Test Coverage
+## 8) Test Coverage
 
 - Unit: `tests/unit/mgl/mgl-engine.test.ts`
 - Integration: `tests/integration/mgl/multimodal-scenario.test.ts`
 - Regression: `tests/unit/mgl/mgl-compatibility.regression.test.ts`
+- Additional validations covered:
+  - Four-option standalone generation.
+  - Commodity/container compatibility.
+  - NYC-to-Dehra-Dun route scope checks.
 
-## 8) Migration Guidelines
+## 9) Migration Guidelines
 
 1. Run DB migration.
 2. Deploy `mgl-quotation-api` edge function.

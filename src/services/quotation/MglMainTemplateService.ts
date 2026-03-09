@@ -1,6 +1,11 @@
 import { invokeFunction } from '@/lib/supabase-functions';
-import type { MglRateOption } from './mgl';
-import { calculateMglRateOption, validateMglRateOption } from './mgl';
+import type { MglRateOption, MglScenarioConfig } from './mgl';
+import {
+  calculateMglRateOption,
+  generateStandaloneMglRateOptions,
+  validateMglRateOption,
+  validateStandaloneOptionSet,
+} from './mgl';
 
 export interface MglTemplateRecord {
   id: string;
@@ -116,5 +121,13 @@ export class MglMainTemplateService {
 
   static calculate(option: MglRateOption) {
     return calculateMglRateOption(option);
+  }
+
+  static generateStandaloneOptions(config: MglScenarioConfig) {
+    return generateStandaloneMglRateOptions(config);
+  }
+
+  static validateStandaloneOptions(options: MglRateOption[]) {
+    return validateStandaloneOptionSet(options);
   }
 }

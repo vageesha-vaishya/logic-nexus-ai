@@ -32,9 +32,9 @@ The quotation PDF was failing to generate with the correct MGL-specific layout a
 - **Action:** Modified `supabase/functions/generate-quote-pdf/index.ts` to update the default template structure:
   - Renamed "Shipment Details" to **"Details (with Equipment/QTY)"**.
   - Renamed "Freight Charges" to **"Freight Charges Matrix"**.
-- **Verification:** Verified via `e2e_mgl_granular_system_data.ts` forcing the default template.
+- **Verification:** Verified via `e2e_granular_system_data.ts` forcing the default template.
 
-### B. E2E Integration Test Suite (`scripts/e2e_mgl_granular_system_data.ts`)
+### B. E2E Integration Test Suite (`scripts/e2e_granular_system_data.ts`)
 - **Action:** Created a comprehensive E2E script that:
   - **Mocks System Data:** Uses the user-provided carrier data (Evergreen, MSC, COSCO).
   - **Creates Multi-Modal Legs:** Inserts Rail (Chicago->Seattle), Ocean (Seattle->NY), and Trucking (NY->Delivery) legs.
@@ -49,11 +49,11 @@ The quotation PDF was failing to generate with the correct MGL-specific layout a
 
 ### How to Run the Test
 ```bash
-npx tsx scripts/e2e_mgl_granular_system_data.ts
+npx tsx scripts/e2e_granular_system_data.ts
 ```
 
 ### Success Criteria Verified
-- [x] **PDF Generation:** `mgl_system_data_output.pdf` is created.
+- [x] **PDF Generation:** `system_data_output.pdf` is created.
 - [x] **Email Delivery:** Email sent to `bahuguna.vimal@gmail.com`.
 - [x] **Section Headers:** PDF contains "Details (with Equipment/QTY)" and "Freight Charges Matrix".
 - [x] **Granular Charges:** Rail, Ocean, and Trucking charges are displayed.

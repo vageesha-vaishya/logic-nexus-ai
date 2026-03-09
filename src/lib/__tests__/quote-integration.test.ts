@@ -127,7 +127,7 @@ describe('Quote Synchronization Integration Tests', () => {
         expect(adjustment).toBeDefined();
         expect(adjustment.name).toBe('Ancillary Fees');
         expect(adjustment.amount).toBe(150);
-        expect(adjustment.note).toBe('Unitemized surcharges from Smart Quote');
+        expect(adjustment.note).toBe('Unitemized surcharges');
     });
 
     test('Output structure is compatible with QuoteNew insertion logic', () => {

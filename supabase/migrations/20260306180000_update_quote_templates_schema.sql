@@ -1,6 +1,6 @@
 -- Migration: Update Quote Templates Schema and Add Upsert RPC
 -- Date: 2026-03-06
--- Description: Adds missing columns to quote_templates and creates upsert_mgl_main_template RPC.
+-- Description: Adds missing columns to quote_templates and creates upsert_main_template RPC.
 
 BEGIN;
 
@@ -22,10 +22,10 @@ ADD COLUMN IF NOT EXISTS website TEXT,
 ADD COLUMN IF NOT EXISTS contact_email TEXT,
 ADD COLUMN IF NOT EXISTS contact_phone TEXT;
 
--- 2. Create upsert_mgl_main_template RPC
-DROP FUNCTION IF EXISTS public.upsert_mgl_main_template(UUID, JSONB, JSONB, JSONB, JSONB, JSONB, UUID);
+-- 2. Create upsert_main_template RPC
+DROP FUNCTION IF EXISTS public.upsert_main_template(UUID, JSONB, JSONB, JSONB, JSONB, JSONB, UUID);
 
-CREATE OR REPLACE FUNCTION public.upsert_mgl_main_template(
+CREATE OR REPLACE FUNCTION public.upsert_main_template(
     p_tenant_id UUID,
     p_content JSONB,
     p_rate_options JSONB,

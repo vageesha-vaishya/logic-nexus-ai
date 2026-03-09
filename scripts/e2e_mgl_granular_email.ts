@@ -335,7 +335,7 @@ async function runE2E() {
     // 7. Generate PDF Locally for Verification
     console.log('Generating PDF Locally...');
     await generatePdfLocal(validQuote.id, version.id, template.id);
-    console.log('PDF generated locally: mgl_granular_test.pdf');
+    console.log('PDF generated locally: granular_test.pdf');
 
     // 8. Send Email (using Edge Function)
     console.log('Sending Email...');

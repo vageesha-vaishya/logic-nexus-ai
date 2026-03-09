@@ -80,7 +80,7 @@ BEGIN
           'Main Quotation Template with Matrix Rates',
           'General',
           '{
-                "layout": "mgl_matrix",
+                "layout": "matrix",
                 "header": { "show_logo": true, "company_info": true, "title": "QUOTATION" },
                 "sections": [
                     { "type": "header", "height": 120, "content": { "text": "MGL Global Logistics" } },
@@ -122,7 +122,7 @@ BEGIN
       ) RETURNING id INTO v_template_id;
   ELSE
       UPDATE quote_templates SET content = '{
-            "layout": "mgl_matrix",
+            "layout": "matrix",
             "header": { "show_logo": true, "company_info": true, "title": "QUOTATION" },
             "sections": [
                 { "type": "header", "height": 120, "content": { "text": "MGL Global Logistics" } },

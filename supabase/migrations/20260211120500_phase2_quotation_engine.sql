@@ -62,7 +62,7 @@ SELECT
     'MGL Standard Granular', 
     'Standard granular quote template for MGL',
     '{
-        "layout": "mgl_granular",
+        "layout": "granular",
         "header": { "show_logo": true, "company_info": true, "title": "QUOTATION" },
         "sections": [
             { "type": "customer_matrix_header", "title": "Customer Information" },

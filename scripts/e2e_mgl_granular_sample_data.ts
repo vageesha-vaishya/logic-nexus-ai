@@ -288,8 +288,8 @@ async function run() {
 
     // Save locally
     const pdfBuffer = Buffer.from(pdfData.content, 'base64');
-    fs.writeFileSync('mgl_sample_data_output.pdf', pdfBuffer);
-    console.log('PDF saved to mgl_sample_data_output.pdf');
+    fs.writeFileSync('sample_data_output.pdf', pdfBuffer);
+    console.log('PDF saved to sample_data_output.pdf');
 
     // Send Email
     console.log('Sending Email...');

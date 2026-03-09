@@ -4152,7 +4152,7 @@ Please delete the remarks below appearing by default under terms and conditions 
 <p style="margin: 0in; font-family: Aptos, sans-serif; font-size: 12pt;"><span style="font-family: Calibri, sans-serif; color: rgb(23, 78, 134);">&nbsp;</span></p>
 </div>
 <p style="text-align: center; margin: 0in 0in 12pt; font-family: Aptos, sans-serif; font-size: 12pt;">
-<img style="width: 2.0833in; height: 0.5208in; margin-top: 0px; margin-bottom: 0px;" height="49" width="199" id="x__x0000_i1026" alt="logo" src="https://lo-expert.miamigloballines.com/MGL/Images/Icons/mgl_icon_full.png"></p>
+<img style="width: 2.0833in; height: 0.5208in; margin-top: 0px; margin-bottom: 0px;" height="49" width="199" id="x__x0000_i1026" alt="logo" src="https://lo-expert.miamigloballines.com/MGL/Images/Icons/icon_full.png"></p>
 <p style="text-align: center; margin: 1em 0in 12pt;"><b>140 Ethel Road West; Unit ''S&amp;T'', Piscataway, NJ 08854âUSA<br>
 Phone:+1-732-640-2365,FMC Lic. # 023172NF / IAC #: NE1210010<br>
 Professional Attitude at all Altitudes</b></p>

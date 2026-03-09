@@ -68,7 +68,7 @@ const mockOptions = [
 ];
 
 const templateContent = {
-    layout: "mgl_granular",
+    layout: "granular",
     header: { show_logo: true },
     sections: [
         { type: "customer_matrix_header" },

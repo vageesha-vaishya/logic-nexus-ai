@@ -58,6 +58,8 @@ export function MglMainTemplateBuilder({
     quoteVersionId,
     optionName: initialOption?.optionName || 'MGL Matrix Option',
     carrierName: initialOption?.carrierName || 'ZIM',
+    rateType: initialOption?.rateType || 'spot',
+    rateValidUntil: initialOption?.rateValidUntil || '2099-01-01T00:00:00.000Z',
     transitTimeDays: initialOption?.transitTimeDays || 1,
     frequencyPerWeek: initialOption?.frequencyPerWeek || 1,
     mode: initialOption?.mode || 'multimodal',
@@ -65,6 +67,13 @@ export function MglMainTemplateBuilder({
     legs: initialOption?.legs || [createDefaultLeg()],
     chargeRows:
       initialOption?.chargeRows || [createDefaultRow('Ocean Freight'), createDefaultRow('Trucking')],
+    containerType: initialOption?.containerType || 'standard',
+    containerSize: initialOption?.containerSize || "20'",
+    commodityType: initialOption?.commodityType || 'general',
+    originCode: initialOption?.originCode || 'USNYC',
+    destinationCode: initialOption?.destinationCode || 'INDED',
+    standaloneMode: initialOption?.standaloneMode ?? true,
+    optionOrdinal: initialOption?.optionOrdinal || 1,
     remarks: initialOption?.remarks || 'All Inclusive rates from SD/Port basis',
   });
 
@@ -103,6 +112,51 @@ export function MglMainTemplateBuilder({
     }
   };
 
+  const saveStandaloneSet = async () => {
+    setSaving(true);
+    try {
+      const options = MglMainTemplateService.generateStandaloneOptions({
+        quoteId,
+        quoteVersionId,
+        carrierName: option.carrierName,
+        containerType: option.containerType || 'standard',
+        containerSize: option.containerSize || "20'",
+        commodityType: option.commodityType || 'general',
+        originCode: option.originCode || 'USNYC',
+        destinationCode: option.destinationCode || 'INDED',
+        transitPoints: option.transitPoints,
+        legConnections: option.legConnections,
+        legs: option.legs,
+        baseChargeRows: option.chargeRows,
+        hsCode: option.hsCode,
+        imdgClass: option.imdgClass,
+        temperatureControlMinC: option.temperatureControlMinC,
+        temperatureControlMaxC: option.temperatureControlMaxC,
+        oversizedLengthCm: option.oversizedLengthCm,
+        oversizedWidthCm: option.oversizedWidthCm,
+        oversizedHeightCm: option.oversizedHeightCm,
+        rateValidUntil: option.rateValidUntil,
+        equipmentColumns: option.equipmentColumns,
+      });
+      const setValidation = MglMainTemplateService.validateStandaloneOptions(options);
+      if (!setValidation.valid) {
+        throw new Error(setValidation.errors.map((issue) => issue.message).join('; '));
+      }
+      const saved = await Promise.all(
+        options.map((generatedOption) => MglMainTemplateService.upsertRateOption(tenantId, generatedOption)),
+      );
+      const firstSaved = saved.find((item) => item?.id);
+      if (firstSaved?.id) {
+        onSaved?.(firstSaved.id);
+      }
+      toast.success('Standalone 4-option set saved');
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to save standalone set');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <Card>
       <CardHeader className="space-y-4">
@@ -136,10 +190,65 @@ export function MglMainTemplateBuilder({
             />
           </div>
           <div>
+            <Label>Rate Type</Label>
+            <Input
+              value={option.rateType || 'spot'}
+              onChange={(e) => setOption((prev) => ({ ...prev, rateType: (e.target.value || 'spot') as any }))}
+            />
+          </div>
+          <div>
+            <Label>Rate Valid Until</Label>
+            <Input
+              value={option.rateValidUntil || ''}
+              onChange={(e) => setOption((prev) => ({ ...prev, rateValidUntil: e.target.value }))}
+            />
+          </div>
+          <div>
             <Label>Remarks</Label>
             <Input
               value={option.remarks || ''}
               onChange={(e) => setOption((prev) => ({ ...prev, remarks: e.target.value }))}
+            />
+          </div>
+          <div>
+            <Label>Container Type</Label>
+            <Input
+              value={option.containerType || 'standard'}
+              onChange={(e) =>
+                setOption((prev) => ({ ...prev, containerType: (e.target.value || 'standard') as any }))
+              }
+            />
+          </div>
+          <div>
+            <Label>Container Size</Label>
+            <Input
+              value={option.containerSize || "20'"}
+              onChange={(e) =>
+                setOption((prev) => ({ ...prev, containerSize: (e.target.value || "20'") as any }))
+              }
+            />
+          </div>
+          <div>
+            <Label>Commodity Type</Label>
+            <Input
+              value={option.commodityType || 'general'}
+              onChange={(e) =>
+                setOption((prev) => ({ ...prev, commodityType: (e.target.value || 'general') as any }))
+              }
+            />
+          </div>
+          <div>
+            <Label>Origin</Label>
+            <Input
+              value={option.originCode || ''}
+              onChange={(e) => setOption((prev) => ({ ...prev, originCode: e.target.value }))}
+            />
+          </div>
+          <div>
+            <Label>Destination</Label>
+            <Input
+              value={option.destinationCode || ''}
+              onChange={(e) => setOption((prev) => ({ ...prev, destinationCode: e.target.value }))}
             />
           </div>
         </div>
@@ -244,6 +353,9 @@ export function MglMainTemplateBuilder({
           </Button>
           <Button type="button" onClick={save} disabled={saving}>
             <Save className="w-4 h-4 mr-1" /> {saving ? 'Saving...' : 'Save Rate Option'}
+          </Button>
+          <Button type="button" variant="secondary" onClick={saveStandaloneSet} disabled={saving}>
+            <Save className="w-4 h-4 mr-1" /> {saving ? 'Saving...' : 'Save 4 Standalone Options'}
           </Button>
         </div>
       </CardContent>

@@ -223,7 +223,7 @@ async function main() {
     console.log('PDF Generated successfully (Base64 length):', pdfData.content.length);
 
     // Write to file for visual inspection
-    const filename = `mgl_quote_${quote.quote_number}.pdf`;
+    const filename = `quote_${quote.quote_number}.pdf`;
     fs.writeFileSync(filename, Buffer.from(pdfData.content, 'base64'));
     console.log(`Saved to ${filename}`);
 

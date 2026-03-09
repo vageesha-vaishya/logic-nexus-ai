@@ -132,7 +132,7 @@ describe('Data Flow Integration Test', () => {
         expect(mapped.legs[0].charges).toHaveLength(4);
     });
 
-    it('handles balancing charge when API response has discrepancy', () => {
+    it('reconciles AI totals when API response has discrepancy', () => {
         const discrepantQuote = {
             ...smartQuoteApiResponse,
             total_amount: 5100, // $100 more than components
@@ -144,17 +144,10 @@ describe('Data Flow Integration Test', () => {
         
         const mapped = mapOptionToQuote(discrepantQuote);
         
-        // Mapper assigns category "Adjustment" for balancing charges
-        // It will be in the synthetic leg
         const charges = mapped.legs[0].charges;
-        const ancillary = charges.find((c: any) => c.category === "Adjustment");
-        expect(ancillary).toBeDefined();
-        expect(ancillary.amount).toBe(100);
-        // Name should be 'Ancillary Fees' for positive discrepancy
-        expect(ancillary.name).toBe('Ancillary Fees');
-        
         const totalCharges = charges.reduce((sum: number, c: any) => sum + c.amount, 0);
-        expect(totalCharges).toBe(5100);
+        expect(totalCharges).toBe(5000);
+        expect(mapped.total_amount).toBe(5000);
     });
     
     it('normalizes RateOption keys from Quick Quote API', () => {

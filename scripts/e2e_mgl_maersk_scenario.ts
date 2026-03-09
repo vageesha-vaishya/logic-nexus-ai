@@ -150,7 +150,7 @@ async function run() {
          }
        ]
     };
-    const { data: templates } = await supabase.from('quote_templates').select('id').eq('layout_type', 'mgl_granular').maybeSingle();
+    const { data: templates } = await supabase.from('quote_templates').select('id').eq('layout_type', 'granular').maybeSingle();
     const templateId = templates?.id || 'cf58b647-10ab-495e-8907-cb4756e01b45'; // Fallback to ID from previous script
     console.log(`Using Template ID: ${templateId}`);
 
@@ -354,8 +354,8 @@ async function run() {
 
     // Save locally
     const pdfBuffer = Buffer.from(pdfData.content, 'base64');
-    fs.writeFileSync('mgl_user_sample_output.pdf', pdfBuffer);
-    console.log('PDF saved to mgl_user_sample_output.pdf');
+    fs.writeFileSync('user_sample_output.pdf', pdfBuffer);
+    console.log('PDF saved to user_sample_output.pdf');
 
     // Send Email
     console.log('Sending Email to bahuguna.vimal@gmail.com...');

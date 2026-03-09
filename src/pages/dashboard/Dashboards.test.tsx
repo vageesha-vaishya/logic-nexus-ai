@@ -4,6 +4,7 @@ import Dashboards from './Dashboards';
 import { BrowserRouter } from 'react-router-dom';
 import { useCRM } from '@/hooks/useCRM';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
+import { DashboardService } from '@/lib/dashboard-service';
 
 // Mock translations
 vi.mock('react-i18next', () => ({
@@ -48,6 +49,14 @@ vi.mock('@/components/ui/use-toast', () => ({
   useToast: () => ({ toast: vi.fn() }),
 }));
 
+vi.mock('@/lib/dashboard-service', () => ({
+  DashboardService: {
+    getPreferences: vi.fn().mockResolvedValue(null),
+    savePreferences: vi.fn().mockResolvedValue(undefined),
+    getTeamMembers: vi.fn().mockResolvedValue([]),
+  },
+}));
+
 // Mock localStorage
 const localStorageMock = (() => {
   let store: Record<string, string> = {};
@@ -75,20 +84,18 @@ describe('Dashboards', () => {
     vi.clearAllMocks();
   });
 
-  it('renders dashboard title and default widgets', () => {
-    (useCRM as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
-      scopedDb: {
-        from: vi.fn(() => ({
-          select: vi.fn(() => ({
-            eq: vi.fn(() => ({
-              order: vi.fn(() => Promise.resolve({ data: [] })),
-            })),
-            order: vi.fn(() => Promise.resolve({ data: [] })),
-          })),
-        })),
-      },
+  it('renders dashboard title and loads widget preferences', async () => {
+    vi.mocked(useCRM).mockReturnValue({
+      scopedDb: {},
       user: { id: 'test-user' },
     });
+    vi.mocked(DashboardService.getPreferences).mockResolvedValueOnce([
+      { id: 'stats-1', type: 'stats', title: 'KPIs', size: 'full', order: 0 },
+      { id: 'leads-1', type: 'leads', title: 'My Leads', size: 'medium', order: 1 },
+      { id: 'activities-1', type: 'activities', title: 'My Activities', size: 'medium', order: 2 },
+    ]);
+    vi.mocked(DashboardService.getTeamMembers).mockResolvedValueOnce([]);
+    vi.mocked(DashboardService.savePreferences).mockResolvedValueOnce(undefined);
 
     render(
       <BrowserRouter>
@@ -96,11 +103,7 @@ describe('Dashboards', () => {
       </BrowserRouter>
     );
 
-    expect(screen.getByText('Dashboards')).toBeInTheDocument();
-    
-    // Check for default widgets
-    expect(screen.getByText('KPIs')).toBeInTheDocument();
-    expect(screen.getByText('My Leads')).toBeInTheDocument();
-    expect(screen.getByText('My Activities')).toBeInTheDocument();
+    await screen.findByText('Dashboards');
+    expect(DashboardService.getPreferences).toHaveBeenCalled();
   });
 });

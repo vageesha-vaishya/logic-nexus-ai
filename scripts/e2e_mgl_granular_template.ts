@@ -154,7 +154,7 @@ async function run() {
     };
 
     // 3. Create Quote
-    const { data: templates } = await supabase.from('quote_templates').select('id').eq('layout_type', 'mgl_granular').maybeSingle();
+    const { data: templates } = await supabase.from('quote_templates').select('id').eq('layout_type', 'granular').maybeSingle();
     const templateId = templates?.id || 'cf58b647-10ab-495e-8907-cb4756e01b45';
 
     console.log('Creating Quote...');
@@ -329,8 +329,8 @@ async function run() {
     if (pdfError) throw pdfError;
     
     const pdfBuffer = Buffer.from(pdfData.content, 'base64');
-    fs.writeFileSync('mgl_template_output.pdf', pdfBuffer);
-    console.log('PDF saved to mgl_template_output.pdf');
+    fs.writeFileSync('template_output.pdf', pdfBuffer);
+    console.log('PDF saved to template_output.pdf');
 
     // Send Email
     console.log('Sending Email to bahuguna.vimal@gmail.com...');

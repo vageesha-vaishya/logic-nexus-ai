@@ -1,10 +1,23 @@
 import React from 'react';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderHook, waitFor } from '@testing-library/react';
 import { useIncoterms } from '../useIncoterms';
 
+vi.mock('@/integrations/supabase/client', () => ({
+  supabase: { from: vi.fn() },
+}));
+
 describe('useIncoterms', () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    const { supabase } = await import('@/integrations/supabase/client');
+    (supabase.from as any).mockReturnValue({
+      select: vi.fn().mockReturnThis(),
+      order: vi.fn().mockResolvedValue({ data: [], error: null }),
+    });
+  });
+
   const createClient = () =>
     new QueryClient({
       defaultOptions: { queries: { retry: false } },
@@ -27,25 +40,20 @@ describe('useIncoterms', () => {
       { id: '2', incoterm_code: 'CIF', incoterm_name: 'Cost, Insurance and Freight', description: null },
     ];
 
-    const fromMock = vi.fn(() => ({
+    const { supabase } = await import('@/integrations/supabase/client');
+    (supabase.from as any).mockReturnValue({
       select: vi.fn().mockReturnThis(),
       order: vi.fn().mockResolvedValue({ data: mockData, error: null }),
-    }));
-
-    vi.doMock('@/integrations/supabase/client', () => ({
-      supabase: { from: fromMock },
-    }));
-
-    const { useIncoterms: freshUseIncoterms } = await import('../useIncoterms');
+    });
 
     const client = createClient();
     const wrapper = ({ children }: { children: React.ReactNode }) => (
       <QueryClientProvider client={client}>{children}</QueryClientProvider>
     );
 
-    const { result } = renderHook(() => freshUseIncoterms(), { wrapper });
+    const { result } = renderHook(() => useIncoterms(), { wrapper });
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.incoterms.map(i => i.incoterm_code)).toEqual(['FOB', 'CIF']);
-    expect(fromMock).toHaveBeenCalledWith('incoterms');
+    expect(supabase.from).toHaveBeenCalledWith('incoterms');
   });
 });

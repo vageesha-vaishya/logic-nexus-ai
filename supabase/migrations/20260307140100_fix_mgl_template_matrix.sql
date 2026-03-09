@@ -20,7 +20,7 @@ BEGIN
     IF EXISTS (SELECT 1 FROM quote_templates WHERE name = 'MGL-Main-Template' AND tenant_id = v_tenant_id) THEN
         UPDATE quote_templates
         SET content = '{
-            "layout": "mgl_matrix",
+            "layout": "matrix",
             "header": {
                 "show_logo": true,
                 "company_info": true,
@@ -103,7 +103,7 @@ BEGIN
             'MGL-Main-Template',
             'Main Quotation Template with Matrix Rates',
             '{
-                "layout": "mgl_matrix",
+                "layout": "matrix",
                 "header": { "show_logo": true, "company_info": true, "title": "QUOTATION" },
                 "sections": [
                     { "type": "header", "height": 120, "content": { "text": "MGL Global Logistics" } },

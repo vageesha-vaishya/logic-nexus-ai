@@ -115,7 +115,7 @@ async function debugQuoteData() {
   // 4. Check MGL specific tables
   console.log('\nChecking MGL Tables:');
   const { count: mglOptionsCount } = await supabase
-    .from('mgl_rate_options')
+    .from('rate_options')
     .select('*', { count: 'exact', head: true })
     .eq('quote_version_id', quote.current_version_id);
   console.log(`MGL Options for version ${quote.current_version_id}: ${mglOptionsCount}`);

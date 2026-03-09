@@ -16,7 +16,7 @@ async function applyMigration() {
         await client.connect();
         console.log("Connected.");
 
-        const migrationPath = path.join(__dirname, 'supabase/migrations/20260307120000_add_mgl_main_template.sql');
+        const migrationPath = path.join(__dirname, 'supabase/migrations/20260307120000_add_main_template.sql');
         console.log(`Reading migration file: ${migrationPath}`);
         
         const sql = fs.readFileSync(migrationPath, 'utf8');

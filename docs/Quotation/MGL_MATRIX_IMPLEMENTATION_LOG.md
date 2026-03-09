@@ -7,7 +7,7 @@
 
 ## 1. Analysis & Field Extraction
 
-The following data was extracted from the provided screenshot and mapped to the `mgl_rate_options` schema.
+The following data was extracted from the provided screenshot and mapped to the `rate_options` schema.
 
 ### Carrier Group 1: Zim
 *   **Carrier Name:** `Zim`
@@ -49,9 +49,9 @@ The following data was extracted from the provided screenshot and mapped to the 
 
 ### Database Schema Target
 Data is mapped to the MGL-specific multi-rate tables defined in `20260307153000_mgl_main_template_multi_rate_foundation.sql`:
-*   `mgl_rate_options`: Stores carrier, transit, frequency, and equipment columns definition.
-*   `mgl_rate_charge_rows`: Stores charge descriptions (Ocean Freight, Trucking, EPS) and sorting.
-*   `mgl_rate_charge_cells`: Stores the specific amount for each charge row and equipment column.
+*   `rate_options`: Stores carrier, transit, frequency, and equipment columns definition.
+*   `rate_charge_rows`: Stores charge descriptions (Ocean Freight, Trucking, EPS) and sorting.
+*   `rate_charge_cells`: Stores the specific amount for each charge row and equipment column.
 
 ### Migration Script
 A SQL seed script `supabase/migrations/20260307200000_seed_mgl_quote_data.sql` was created to:

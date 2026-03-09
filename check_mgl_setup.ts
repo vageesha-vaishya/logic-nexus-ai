@@ -11,7 +11,7 @@ async function checkSetup() {
   const { data: tenant, error: tenantError } = await supabase
     .from('tenants')
     .select('id, name')
-    .ilike('name', '%Miami Global Lines%')
+    .ilike('name', '%Main Template%')
     .single();
 
   if (tenantError) {
@@ -32,11 +32,11 @@ async function checkSetup() {
   }
   console.log('Templates found:', templates);
 
-  const mglTemplate = templates.find(t => t.name === 'MGL-Main-Template');
-  if (mglTemplate) {
-    console.log('\nMGL-Main-Template is present and active:', mglTemplate.is_active);
+  const mainTemplate = templates.find(t => t.name === 'Main-Template');
+  if (mainTemplate) {
+    console.log('\nMain-Template is present and active:', mainTemplate.is_active);
   } else {
-    console.error('\nMGL-Main-Template is MISSING for this tenant!');
+    console.error('\nMain-Template is MISSING for this tenant!');
   }
 }
 

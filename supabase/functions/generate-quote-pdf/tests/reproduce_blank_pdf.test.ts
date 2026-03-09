@@ -85,7 +85,7 @@ describe("Reproduce Blank PDF Issue", () => {
     footer: {
       text: "Thank you for your business."
     },
-    layout: "mgl_granular", 
+    layout: "granular", 
     sections: [
       {
         type: "customer_matrix_header",

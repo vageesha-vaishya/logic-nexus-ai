@@ -122,13 +122,14 @@ describe('Charge Bifurcation Logic', () => {
             expect(result[1].assignedLegType).toBe('transport');
         });
 
-        it('should fallback to main leg if no match found', () => {
+        it('should leave unmatched charges unassigned', () => {
              const charges: Charge[] = [
                 { category: 'General', name: 'Mystery Fee', amount: 100, currency: 'USD' }
             ];
             const result = bifurcateCharges(charges, mockLegsMulti);
-            // Fallback logic in bifurcateCharges defaults to Main Leg
-            expect(result[0].assignedLegId).toBe('leg_main');
+            expect(result[0].assignedLegId).toBeUndefined();
+            expect(result[0].assignedLegType).toBe('Global');
+            expect(result[0].assignedMode).toBe('N/A');
         });
     });
 });

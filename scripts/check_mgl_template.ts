@@ -32,7 +32,7 @@ async function run() {
     const { data: templates } = await supabase
         .from('quote_templates')
         .select('*')
-        .eq('layout_type', 'mgl_granular');
+        .eq('layout_type', 'granular');
     
     if (templates && templates.length > 0) {
         console.log('Found templates:', templates.length);
@@ -41,7 +41,7 @@ async function run() {
             console.log('Content:', JSON.stringify(t.content, null, 2));
         });
     } else {
-        console.log('No mgl_granular templates found.');
+        console.log('No granular templates found.');
     }
 }
 

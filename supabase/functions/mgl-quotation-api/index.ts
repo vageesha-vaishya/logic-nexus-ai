@@ -1,48 +1,8 @@
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { requireAuth } from '../_shared/auth.ts';
 import { serveWithLogger } from '../_shared/logger.ts';
-
-type TransportMode = 'air' | 'ocean' | 'road' | 'rail';
-
-type RateLeg = {
-  id?: string;
-  sequenceNo: number;
-  mode: TransportMode;
-  originCode: string;
-  destinationCode: string;
-  originName?: string;
-  destinationName?: string;
-  carrierName?: string;
-  transitDays?: number;
-  frequencyPerWeek?: number;
-};
-
-type ChargeRow = {
-  id?: string;
-  rowCode?: string;
-  rowName: string;
-  currency?: string;
-  includeInTotal?: boolean;
-  remarks?: string;
-  sortOrder?: number;
-  valuesByEquipment: Record<string, number>;
-};
-
-type RateOptionPayload = {
-  id?: string;
-  quoteId: string;
-  quoteVersionId?: string;
-  templateId?: string;
-  optionName?: string;
-  carrierName: string;
-  transitTimeDays?: number;
-  frequencyPerWeek?: number;
-  mode?: 'single' | 'multimodal';
-  equipmentColumns: Array<{ key: string; label: string }>;
-  legs: RateLeg[];
-  chargeRows: ChargeRow[];
-  remarks?: string;
-};
+import { validatePayload } from './validation.ts';
+import type { RateOptionPayload } from './validation.ts';
 
 const CORS_HEADERS = {
   'Content-Type': 'application/json',
@@ -74,39 +34,49 @@ function calculateTotals(payload: RateOptionPayload) {
   return { totalsByEquipment, grandTotal };
 }
 
-function validatePayload(payload: RateOptionPayload): string[] {
+async function validateStandaloneUniqueness(
+  adminSupabase: any,
+  tenantId: string,
+  payload: RateOptionPayload,
+) {
+  if (!payload.standaloneMode || !payload.quoteId || !payload.optionOrdinal) return [];
+
   const errors: string[] = [];
+  const query = adminSupabase
+    .from('rate_options')
+    .select('id, option_name, option_ordinal, rate_type')
+    .eq('tenant_id', tenantId)
+    .eq('quote_id', payload.quoteId);
 
-  if (!payload.quoteId) errors.push('quoteId is required');
-  if (!payload.carrierName) errors.push('carrierName is required');
-  if (!Array.isArray(payload.equipmentColumns) || payload.equipmentColumns.length === 0) {
-    errors.push('equipmentColumns must contain at least one column');
+  if (payload.quoteVersionId) query.eq('quote_version_id', payload.quoteVersionId);
+  if (payload.id) query.neq('id', payload.id);
+
+  const { data, error } = await query;
+  if (error) return [`Unable to validate standalone option uniqueness: ${error.message}`];
+
+  const desiredName = payload.optionName || `Option ${payload.optionOrdinal}`;
+  const duplicate = (data || []).some((row: any) => String(row.option_name || '') === desiredName);
+  const duplicateOrdinal = (data || []).some(
+    (row: any) =>
+      Number(row.option_ordinal || 0) === Number(payload.optionOrdinal || 0) &&
+      Number(payload.optionOrdinal || 0) > 0,
+  );
+  const duplicateRateType = payload.rateType
+    ? (data || []).some((row: any) => String(row.rate_type || '') === String(payload.rateType))
+    : false;
+  const existingCount = Array.isArray(data) ? data.length : 0;
+  if (duplicate) {
+    errors.push(`Standalone option ${payload.optionOrdinal} already exists for this quote context`);
   }
-  if (!Array.isArray(payload.legs) || payload.legs.length === 0) {
-    errors.push('At least one transport leg is required');
+  if (duplicateOrdinal) {
+    errors.push(`Standalone option ordinal ${payload.optionOrdinal} already exists for this quote context`);
   }
-
-  const sortedLegs = [...(payload.legs || [])].sort((a, b) => a.sequenceNo - b.sequenceNo);
-  sortedLegs.forEach((leg, index) => {
-    if (leg.sequenceNo !== index + 1) {
-      errors.push(`Invalid leg sequence for leg ${leg.id || `#${index + 1}`}`);
-    }
-    if (index > 0) {
-      const prev = sortedLegs[index - 1];
-      if (String(prev.destinationCode || '').toUpperCase() !== String(leg.originCode || '').toUpperCase()) {
-        errors.push(`Route break between sequence ${prev.sequenceNo} and ${leg.sequenceNo}`);
-      }
-    }
-  });
-
-  for (const row of payload.chargeRows || []) {
-    for (const value of Object.values(row.valuesByEquipment || {})) {
-      if (Number(value) < 0) {
-        errors.push(`Negative amount is not allowed in row ${row.rowName}`);
-      }
-    }
+  if (duplicateRateType) {
+    errors.push(`Standalone rate type ${payload.rateType} already exists for this quote context`);
   }
-
+  if (existingCount >= 4) {
+    errors.push('Standalone mode supports a maximum of 4 options per quote context');
+  }
   return errors;
 }
 
@@ -128,7 +98,7 @@ serveWithLogger(async (req, logger, adminSupabase) => {
   if (!tenantId) return json(req, 400, { error: 'tenantId is required' });
 
   const logAudit = async (meta: Record<string, unknown>) => {
-    await adminSupabase.from('mgl_quotation_audit_logs').insert({
+    await adminSupabase.from('quotation_audit_logs').insert({
       tenant_id: tenantId,
       quote_id: body?.quoteId || null,
       quote_version_id: body?.quoteVersionId || null,
@@ -143,7 +113,7 @@ serveWithLogger(async (req, logger, adminSupabase) => {
 
   const persistHistory = async (rateOptionId: string, eventType: string, snapshot: Record<string, unknown>) => {
     const { data: latest } = await adminSupabase
-      .from('mgl_rate_option_history')
+      .from('rate_option_history')
       .select('revision_no')
       .eq('rate_option_id', rateOptionId)
       .order('revision_no', { ascending: false })
@@ -152,7 +122,7 @@ serveWithLogger(async (req, logger, adminSupabase) => {
 
     const revision = Number(latest?.revision_no || 0) + 1;
 
-    await adminSupabase.from('mgl_rate_option_history').insert({
+    await adminSupabase.from('rate_option_history').insert({
       tenant_id: tenantId,
       rate_option_id: rateOptionId,
       revision_no: revision,
@@ -167,7 +137,7 @@ serveWithLogger(async (req, logger, adminSupabase) => {
     const id = payload.id || crypto.randomUUID();
 
     const { data, error } = await adminSupabase
-      .from('mgl_templates')
+      .from('templates')
       .upsert({
         id,
         tenant_id: tenantId,
@@ -190,7 +160,7 @@ serveWithLogger(async (req, logger, adminSupabase) => {
 
   if (action === 'list_templates') {
     const query = adminSupabase
-      .from('mgl_templates')
+      .from('templates')
       .select('*')
       .eq('tenant_id', tenantId)
       .order('updated_at', { ascending: false });
@@ -207,7 +177,7 @@ serveWithLogger(async (req, logger, adminSupabase) => {
     if (!rateOptionId) return json(req, 400, { error: 'rateOptionId is required' });
 
     const { error } = await adminSupabase
-      .from('mgl_rate_options')
+      .from('rate_options')
       .delete()
       .eq('id', rateOptionId)
       .eq('tenant_id', tenantId);
@@ -223,7 +193,7 @@ serveWithLogger(async (req, logger, adminSupabase) => {
     if (!rateOptionId) return json(req, 400, { error: 'rateOptionId is required' });
 
     const { data: option, error: optionError } = await adminSupabase
-      .from('mgl_rate_options')
+      .from('rate_options')
       .select('*')
       .eq('id', rateOptionId)
       .eq('tenant_id', tenantId)
@@ -233,17 +203,17 @@ serveWithLogger(async (req, logger, adminSupabase) => {
 
     const [{ data: legs }, { data: rows }, { data: cells }] = await Promise.all([
       adminSupabase
-        .from('mgl_rate_option_legs')
+        .from('rate_option_legs')
         .select('*')
         .eq('rate_option_id', rateOptionId)
         .order('sequence_no', { ascending: true }),
       adminSupabase
-        .from('mgl_rate_charge_rows')
+        .from('rate_charge_rows')
         .select('*')
         .eq('rate_option_id', rateOptionId)
         .order('sort_order', { ascending: true }),
       adminSupabase
-        .from('mgl_rate_charge_cells')
+        .from('rate_charge_cells')
         .select('*')
         .eq('tenant_id', tenantId),
     ]);
@@ -275,6 +245,25 @@ serveWithLogger(async (req, logger, adminSupabase) => {
     return json(req, 200, {
       data: {
         ...option,
+        rateType: option.rate_type || undefined,
+        rateValidUntil: option.rate_valid_until || undefined,
+        containerType: option.container_type || undefined,
+        containerSize: option.container_size || undefined,
+        commodityType: option.commodity_type || undefined,
+        hsCode: option.hs_code || undefined,
+        imdgClass: option.imdg_class || undefined,
+        temperatureControlMinC: option.temperature_control_min_c ?? undefined,
+        temperatureControlMaxC: option.temperature_control_max_c ?? undefined,
+        oversizedLengthCm: option.oversized_length_cm ?? undefined,
+        oversizedWidthCm: option.oversized_width_cm ?? undefined,
+        oversizedHeightCm: option.oversized_height_cm ?? undefined,
+        originCode: option.origin_code || undefined,
+        destinationCode: option.destination_code || undefined,
+        standaloneMode: option.standalone_mode ?? undefined,
+        optionOrdinal: option.option_ordinal ?? undefined,
+        multimodalRuleConfig: option.multimodal_rule_config || {},
+        transitPoints: option.transit_points || [],
+        legConnections: option.leg_connections || [],
         legs: legs || [],
         chargeRows: responseRows,
       },
@@ -289,12 +278,16 @@ serveWithLogger(async (req, logger, adminSupabase) => {
     if (validationErrors.length > 0) {
       return json(req, 400, { error: 'Validation failed', issues: validationErrors });
     }
+    const standaloneErrors = await validateStandaloneUniqueness(adminSupabase, tenantId, payload);
+    if (standaloneErrors.length > 0) {
+      return json(req, 400, { error: 'Validation failed', issues: standaloneErrors });
+    }
 
     const { totalsByEquipment, grandTotal } = calculateTotals(payload);
     const rateOptionId = payload.id || crypto.randomUUID();
 
     const { data: optionRecord, error: optionError } = await adminSupabase
-      .from('mgl_rate_options')
+      .from('rate_options')
       .upsert({
         id: rateOptionId,
         tenant_id: tenantId,
@@ -303,10 +296,29 @@ serveWithLogger(async (req, logger, adminSupabase) => {
         template_id: payload.templateId || null,
         option_name: payload.optionName || null,
         carrier_name: payload.carrierName,
+        rate_type: payload.rateType || null,
+        rate_valid_until: payload.rateValidUntil || null,
         transit_time_days: payload.transitTimeDays || null,
         frequency_per_week: payload.frequencyPerWeek || null,
         mode: payload.mode || 'multimodal',
         equipment_columns: payload.equipmentColumns || [],
+        transit_points: payload.transitPoints || [],
+        leg_connections: payload.legConnections || [],
+        container_type: payload.containerType || null,
+        container_size: payload.containerSize || null,
+        commodity_type: payload.commodityType || null,
+        hs_code: payload.hsCode || null,
+        imdg_class: payload.imdgClass || null,
+        temperature_control_min_c: payload.temperatureControlMinC ?? null,
+        temperature_control_max_c: payload.temperatureControlMaxC ?? null,
+        oversized_length_cm: payload.oversizedLengthCm ?? null,
+        oversized_width_cm: payload.oversizedWidthCm ?? null,
+        oversized_height_cm: payload.oversizedHeightCm ?? null,
+        origin_code: payload.originCode || null,
+        destination_code: payload.destinationCode || null,
+        standalone_mode: payload.standaloneMode === true,
+        option_ordinal: payload.optionOrdinal || null,
+        multimodal_rule_config: payload.multimodalRuleConfig || {},
         remarks: payload.remarks || null,
         total_by_equipment: totalsByEquipment,
         grand_total: grandTotal,
@@ -318,7 +330,7 @@ serveWithLogger(async (req, logger, adminSupabase) => {
 
     if (optionError) return json(req, 400, { error: optionError.message });
 
-    await adminSupabase.from('mgl_rate_option_legs').delete().eq('rate_option_id', rateOptionId);
+    await adminSupabase.from('rate_option_legs').delete().eq('rate_option_id', rateOptionId);
     if ((payload.legs || []).length > 0) {
       const legsPayload = payload.legs.map((leg) => ({
         id: leg.id || crypto.randomUUID(),
@@ -334,15 +346,15 @@ serveWithLogger(async (req, logger, adminSupabase) => {
         transit_days: leg.transitDays || null,
         frequency_per_week: leg.frequencyPerWeek || null,
       }));
-      const { error: legsError } = await adminSupabase.from('mgl_rate_option_legs').insert(legsPayload);
+      const { error: legsError } = await adminSupabase.from('rate_option_legs').insert(legsPayload);
       if (legsError) return json(req, 400, { error: legsError.message });
     }
 
-    await adminSupabase.from('mgl_rate_charge_rows').delete().eq('rate_option_id', rateOptionId);
+    await adminSupabase.from('rate_charge_rows').delete().eq('rate_option_id', rateOptionId);
 
     for (const row of payload.chargeRows || []) {
       const rowId = row.id || crypto.randomUUID();
-      const { error: rowError } = await adminSupabase.from('mgl_rate_charge_rows').insert({
+      const { error: rowError } = await adminSupabase.from('rate_charge_rows').insert({
         id: rowId,
         rate_option_id: rateOptionId,
         tenant_id: tenantId,
@@ -364,7 +376,7 @@ serveWithLogger(async (req, logger, adminSupabase) => {
       }));
 
       if (cellRecords.length > 0) {
-        const { error: cellsError } = await adminSupabase.from('mgl_rate_charge_cells').insert(cellRecords);
+        const { error: cellsError } = await adminSupabase.from('rate_charge_cells').insert(cellRecords);
         if (cellsError) return json(req, 400, { error: cellsError.message });
       }
     }
@@ -395,7 +407,7 @@ serveWithLogger(async (req, logger, adminSupabase) => {
     if (!rateOptionId) return json(req, 400, { error: 'rateOptionId is required' });
 
     const { data, error } = await adminSupabase
-      .from('mgl_rate_option_history')
+      .from('rate_option_history')
       .select('*')
       .eq('tenant_id', tenantId)
       .eq('rate_option_id', rateOptionId)

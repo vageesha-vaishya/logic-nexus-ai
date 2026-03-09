@@ -17,7 +17,7 @@ describe('fetchMglOptions', () => {
     const result = await fetchMglOptions(mockSupabaseClient, 'ver-123', mockSafeSelect, mockLogger);
     expect(result).toEqual([]);
     expect(mockSafeSelect).toHaveBeenCalledWith(
-      "mgl_rate_options",
+      "rate_options",
       expect.any(String),
       expect.any(String),
       expect.any(Function),
@@ -56,10 +56,10 @@ describe('fetchMglOptions', () => {
 
     // Mock safeSelect to return appropriate data based on table name
     const mockSafeSelect = vi.fn().mockImplementation((table) => {
-      if (table === 'mgl_rate_options') return Promise.resolve({ data: mockMglOptions, error: null });
-      if (table === 'mgl_rate_option_legs') return Promise.resolve({ data: mockLegs, error: null });
-      if (table === 'mgl_rate_charge_rows') return Promise.resolve({ data: mockRows, error: null });
-      if (table === 'mgl_rate_charge_cells') return Promise.resolve({ data: mockCells, error: null });
+      if (table === 'rate_options') return Promise.resolve({ data: mockMglOptions, error: null });
+      if (table === 'rate_option_legs') return Promise.resolve({ data: mockLegs, error: null });
+      if (table === 'rate_charge_rows') return Promise.resolve({ data: mockRows, error: null });
+      if (table === 'rate_charge_cells') return Promise.resolve({ data: mockCells, error: null });
       return Promise.resolve({ data: [], error: null });
     });
 

@@ -1,10 +1,24 @@
 import React from 'react';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderHook, waitFor } from '@testing-library/react';
 import { useServiceTypes } from '../useServiceTypes';
 
+vi.mock('@/integrations/supabase/client', () => ({
+  supabase: { from: vi.fn() },
+}));
+
 describe('useServiceTypes', () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    const { supabase } = await import('@/integrations/supabase/client');
+    (supabase.from as any).mockReturnValue({
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      order: vi.fn().mockResolvedValue({ data: [], error: null }),
+    });
+  });
+
   const createClient = () =>
     new QueryClient({
       defaultOptions: { queries: { retry: false } },
@@ -27,26 +41,21 @@ describe('useServiceTypes', () => {
       { id: '2', code: 'air_standard', name: 'Air Standard', mode_id: null },
     ];
 
-    const fromMock = vi.fn(() => ({
+    const { supabase } = await import('@/integrations/supabase/client');
+    (supabase.from as any).mockReturnValue({
       select: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
       order: vi.fn().mockResolvedValue({ data: mockData, error: null }),
-    }));
-
-    vi.doMock('@/integrations/supabase/client', () => ({
-      supabase: { from: fromMock },
-    }));
-
-    const { useServiceTypes: freshUseServiceTypes } = await import('../useServiceTypes');
+    });
 
     const client = createClient();
     const wrapper = ({ children }: { children: React.ReactNode }) => (
       <QueryClientProvider client={client}>{children}</QueryClientProvider>
     );
 
-    const { result } = renderHook(() => freshUseServiceTypes(), { wrapper });
+    const { result } = renderHook(() => useServiceTypes(), { wrapper });
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.serviceTypes.map(s => s.code)).toEqual(['ocean_fcl', 'air_standard']);
-    expect(fromMock).toHaveBeenCalledWith('service_types');
+    expect(supabase.from).toHaveBeenCalledWith('service_types');
   });
 });

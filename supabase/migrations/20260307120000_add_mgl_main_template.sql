@@ -25,7 +25,7 @@ BEGIN
         'Main template for MGL with Matrix Rate Table',
         'General',
         '{
-            "layout": "mgl_matrix",
+            "layout": "matrix",
             "header": {
                 "show_logo": true,
                 "company_info": true,

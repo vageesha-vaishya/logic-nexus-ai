@@ -391,7 +391,7 @@ export function TemplateBuilder() {
 
       if (asMglMain) {
         // Use the RPC for MGL Main Template
-        const { error } = await supabase.rpc('upsert_mgl_main_template', {
+        const { error } = await supabase.rpc('upsert_main_template', {
           p_tenant_id: context.tenantId,
           p_content: templateData.content,
           p_rate_options: templateData.rate_options,

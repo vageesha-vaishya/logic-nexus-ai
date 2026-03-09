@@ -8036,8 +8036,8 @@ psql:<stdin>:28: ERROR:  relation "user_preferences" does not exist
 psql:<stdin>:31: ERROR:  relation "user_preferences" does not exist
 Successfully applied 20260225090000_create_user_preferences.sql
 INSERT 0 1
-Applying migration: 20260225100000_seed_mgl_granular_template.sql (version: 20260225100000)
-Successfully applied 20260225100000_seed_mgl_granular_template.sql
+Applying migration: 20260225100000_seed_granular_template.sql (version: 20260225100000)
+Successfully applied 20260225100000_seed_granular_template.sql
 psql:<stdin>:49: ERROR:  column "category" of relation "quote_templates" does not exist
 LINE 42: ...ic.quote_templates (tenant_id, name, description, category, ...
                                                               ^

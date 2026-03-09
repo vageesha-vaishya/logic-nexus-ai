@@ -18,6 +18,7 @@ function QuoteNewInner() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [createdQuoteId, setCreatedQuoteId] = useState<string | null>(null);
+  const [createdQuoteNumber, setCreatedQuoteNumber] = useState<string | null>(null);
   const [versionId, setVersionId] = useState<string | null>(null);
   const [, setTenantId] = useState<string | null>(null);
   const [initializing, setInitializing] = useState(true);
@@ -48,11 +49,25 @@ function QuoteNewInner() {
         if (urlId) {
             setCreatedQuoteId(urlId);
             setInitializing(false);
+            void fetchQuoteNumber(urlId);
         } else {
             createQuoteShell();
         }
     }
-  }, [authLoading]);
+  }, [authLoading, scopedDb, searchParams]);
+
+  const fetchQuoteNumber = async (quoteId: string) => {
+    try {
+      const { data } = await scopedDb
+        .from('quotes')
+        .select('quote_number')
+        .eq('id', quoteId)
+        .maybeSingle();
+      setCreatedQuoteNumber((data as any)?.quote_number || null);
+    } catch (error) {
+      logger.warn('[QuoteNew] Failed to fetch quote number', error);
+    }
+  };
 
   const createQuoteShell = async () => {
     try {
@@ -100,7 +115,7 @@ function QuoteNewInner() {
           contact_id: state?.contactId || null,
           opportunity_id: state?.opportunityId || null,
         })
-        .select('id')
+        .select('id, quote_number')
         .single();
 
       if (quoteError || !quote) {
@@ -110,7 +125,9 @@ function QuoteNewInner() {
       }
 
       const quoteId = (quote as any).id;
+      const quoteNumber = (quote as any).quote_number || null;
       setCreatedQuoteId(quoteId);
+      setCreatedQuoteNumber(quoteNumber);
       
       // Update URL so refresh works
       setSearchParams(prev => {
@@ -166,11 +183,11 @@ function QuoteNewInner() {
                 <BreadcrumbLink href="/dashboard/quotes">Quotes</BreadcrumbLink>
               </BreadcrumbItem>
               <BreadcrumbItem>
-                <BreadcrumbLink>New Quote</BreadcrumbLink>
+                <BreadcrumbLink>{createdQuoteNumber || 'New Quote'}</BreadcrumbLink>
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>
-          <h1 className="text-3xl font-bold">Create Quote</h1>
+          <h1 className="text-3xl font-bold">{createdQuoteNumber ? `Create Quote ${createdQuoteNumber}` : 'Create Quote'}</h1>
         </div>
 
         {initializing ? (

@@ -8,7 +8,7 @@ WITH payload AS (
     'MGL FCL Quote with granular rate breakdown (Ocean, Trucking, etc.) per leg/mode.'::text AS description,
     'FCL'::text AS category,
     '{
-      "layout": "mgl_granular",
+      "layout": "granular",
       "header": {
         "show_logo": true,
         "show_address": true,
@@ -54,7 +54,7 @@ WITH payload AS (
     'MGL FCL Quote with granular rate breakdown (Ocean, Trucking, etc.) per leg/mode.'::text AS description,
     'FCL'::text AS category,
     '{
-      "layout": "mgl_granular",
+      "layout": "granular",
       "header": {
         "show_logo": true,
         "show_address": true,

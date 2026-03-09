@@ -18,7 +18,7 @@ async function run() {
   console.log("Connected to DB");
 
   // Read the SQL file
-  const sql = await Deno.readTextFile("./supabase/migrations/20260307120000_add_mgl_main_template.sql");
+  const sql = await Deno.readTextFile("./supabase/migrations/20260307120000_add_main_template.sql");
 
   try {
     await client.queryArray(sql);

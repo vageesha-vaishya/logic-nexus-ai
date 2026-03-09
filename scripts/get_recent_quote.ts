@@ -40,6 +40,7 @@ async function getRecentQuote() {
 
     const quote = result.rows[0];
     console.log('Recent Quote:', quote);
+    console.log(`SUMMARY: quote.id=${quote.id} quote_number=${quote.quote_number || 'N/A'}`);
 
     if (quote.current_version_id) {
         const vQuery = `

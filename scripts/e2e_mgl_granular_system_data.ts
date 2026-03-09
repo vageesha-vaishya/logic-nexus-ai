@@ -199,8 +199,8 @@ async function run() {
 
     // 3. Create Quote
     // Force default if not found or ensure granular
-    const { data: templates } = await supabase.from('quote_templates').select('id').eq('layout_type', 'mgl_granular').maybeSingle();
-    // Pass undefined if not found to trigger default in Edge Function (which is now updated to mgl_granular)
+    const { data: templates } = await supabase.from('quote_templates').select('id').eq('layout_type', 'granular').maybeSingle();
+    // Pass undefined if not found to trigger default in Edge Function (which is now updated to granular)
     const templateId = templates?.id; 
 
     console.log('Creating Quote...');
@@ -452,8 +452,8 @@ async function run() {
     
     const pdfBuffer = Buffer.from(pdfData.content, 'base64');
     console.log(`\nPDF Content Length: ${pdfBuffer.length} bytes`);
-    fs.writeFileSync('mgl_system_data_output.pdf', pdfBuffer);
-    console.log('PDF saved to mgl_system_data_output.pdf');
+    fs.writeFileSync('system_data_output.pdf', pdfBuffer);
+    console.log('PDF saved to system_data_output.pdf');
 
     // Send Email
     console.log('Sending Email to bahuguna.vimal@gmail.com...');
