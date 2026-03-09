@@ -136,7 +136,7 @@ export function createServiceClient(logger: Logger): SupabaseClient {
   return createClient(supabaseUrl, serviceKey);
 }
 
-function extractBearerToken(authHeader: string): string | null {
+export function extractBearerToken(authHeader: string): string | null {
   const [scheme, token] = authHeader.trim().split(/\s+/, 2);
   if (!scheme || !token || !/^bearer$/i.test(scheme)) {
     return null;
