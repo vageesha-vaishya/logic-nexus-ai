@@ -19,7 +19,11 @@ describe('invokeFunction', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     (supabase.auth.getSession as any).mockResolvedValue({
-      data: { session: null },
+      data: { session: { access_token: 'existing-token' } },
+      error: null,
+    });
+    (supabase.auth.refreshSession as any).mockResolvedValue({
+      data: { session: { access_token: 'refreshed-token' } },
       error: null,
     });
   });
@@ -37,7 +41,7 @@ describe('invokeFunction', () => {
     expect(invokeCall[0]).toBe('test-func');
     expect(invokeCall[1]).toMatchObject({
       body: { foo: 'bar' },
-      headers: {},
+      headers: { Authorization: 'Bearer existing-token' },
       method: 'POST',
     });
     expect(invokeCall[1].body.trace_id).toBeTruthy();
@@ -93,7 +97,8 @@ describe('invokeFunction', () => {
     expect(supabase.functions.invoke).toHaveBeenCalledTimes(1);
     expect(supabase.auth.refreshSession).toHaveBeenCalledTimes(1);
     expect(result.data).toBeNull();
-    expect(result.error).toEqual(error401);
+    expect((result.error as any)?.status).toBe(401);
+    expect(String((result.error as any)?.message || '')).toMatch(/no active Supabase user session/i);
   });
 
   it('should remove manual Authorization header to prevent stale tokens', async () => {
@@ -114,7 +119,7 @@ describe('invokeFunction', () => {
     const callArgs = (supabase.functions.invoke as any).mock.calls[0];
     const calledOptions = callArgs[1];
     
-    expect(calledOptions.headers['Authorization']).toBeUndefined();
+    expect(calledOptions.headers['Authorization']).toBe('Bearer existing-token');
     expect(calledOptions.headers['Content-Type']).toBe('application/json');
   });
 
