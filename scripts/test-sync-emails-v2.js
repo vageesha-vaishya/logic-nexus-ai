@@ -1,10 +1,12 @@
 
 import { createClient } from '@supabase/supabase-js';
+import dotenv from 'dotenv';
 
-// Load env vars
-const projectUrl = "https://iutyqzjlpenfddqdwcsk.supabase.co";
-const anonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml1dHlxempscGVuZmRkcWR3Y3NrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg2NjQ4MjMsImV4cCI6MjA4NDI0MDgyM30.90USeHOMTy-Nz7AFZIwZ3s75AO5ch9uFgSHTDbmbWQw";
-const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+dotenv.config();
+
+const projectUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "";
+const anonKey = process.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY || "";
+const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY || "";
 
 if (!projectUrl || !anonKey) {
   console.error('❌ Missing VITE_SUPABASE_URL or VITE_SUPABASE_PUBLISHABLE_KEY in .env');

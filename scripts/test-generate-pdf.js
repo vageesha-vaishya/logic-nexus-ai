@@ -25,8 +25,7 @@ function loadEnvFromConfig() {
 const envFromConfig = loadEnvFromConfig();
 const projectUrl = process.env.VITE_SUPABASE_URL || envFromConfig.VITE_SUPABASE_URL || 'http://127.0.0.1:54321';
 const anonKey = process.env.VITE_SUPABASE_PUBLISHABLE_KEY || envFromConfig.VITE_SUPABASE_PUBLISHABLE_KEY;
-// Hardcoded service role key from previous step for local dev
-const serviceRoleKey = process.env.SERVICE_ROLE_KEY || 'eyJhbGciOiJFUzI1NiIsImtpZCI6ImI4MTI2OWYxLTIxZDgtNGYyZS1iNzE5LWMyMjQwYTg0MGQ5MCIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MjA4ODI2MDM3M30.LwFikm83DgFGgIQHZ9Hg5yT2WfWR7Af9Lz7T42TAy53Oky_xNSTw_4Wo6iHPX1Oy5CJALFyOIyTNZSnaO3B7HQ';
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SERVICE_ROLE_KEY || envFromConfig.SERVICE_ROLE_KEY || '';
 
 const supabase = createClient(projectUrl, serviceRoleKey);
 
