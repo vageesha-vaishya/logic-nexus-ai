@@ -163,6 +163,10 @@ export async function invokeFunction<T = any>(
     // Get current session token
     const { data: sessionData } = await supabase.auth.getSession();
     let token = sessionData?.session?.access_token;
+    if (!token) {
+      const { data: refreshData } = await supabase.auth.refreshSession();
+      token = refreshData?.session?.access_token;
+    }
     
     const getHeaders = (t?: string) => {
         // Do not explicitly add apikey here as Supabase SDK adds it automatically.
@@ -304,6 +308,11 @@ export async function invokeFunction<T = any>(
 
             } else {
                  console.error(`[Supabase Function] Session refresh failed:`, refreshError);
+                 error = {
+                  ...(typeof error === 'object' ? error : { message: String(error || 'Unauthorized') }),
+                  message: 'Unauthorized: no active Supabase user session found. Please sign in again.',
+                  status: 401,
+                 };
             }
         }
     }
