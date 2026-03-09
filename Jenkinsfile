@@ -116,6 +116,10 @@ pipeline {
                         }
                     }
 
+                    if (selectedTarget == 'cloud' && !sanitizeValue(env.TEST_BYPASS_KEY)) {
+                        env.TEST_BYPASS_KEY = "jenkins-${env.JOB_BASE_NAME ?: 'job'}-${env.BUILD_NUMBER}-${java.util.UUID.randomUUID().toString().replace('-', '')}"
+                    }
+
                     def mask = { v -> v ? (v.length() > 8 ? v.substring(0,8)+'…' : v) : '(empty)' }
                     echo "DB Target: ${selectedTarget}"
                     echo "Supabase URL: ${env.SELECTED_SUPABASE_URL}"
@@ -182,7 +186,7 @@ curl -sI ${env.SELECTED_SUPABASE_URL}/rest/v1/ -H "apikey: ${env.SELECTED_ANON_K
                 }
             }
         }
-        */
+        
       
         stage('Deploy Edge Functions') {
             steps {
@@ -210,7 +214,7 @@ curl -sI ${env.SELECTED_SUPABASE_URL}/rest/v1/ -H "apikey: ${env.SELECTED_ANON_K
                 }
             }
         }
-        
+        */
         stage('Sync Edge Function Secrets') {
             when {
                 expression { return env.SELECTED_SUPABASE_URL && env.SELECTED_SUPABASE_URL.contains('supabase.co') }
