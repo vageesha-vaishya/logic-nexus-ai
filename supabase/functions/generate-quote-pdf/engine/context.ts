@@ -426,6 +426,12 @@ function noopLogger(): Logger {
   } as any;
 }
 
+function resolveNormalizedAmount(charge: any): number {
+  const normalized = Number(charge?.converted_amount);
+  if (Number.isFinite(normalized)) return normalized;
+  return Number(charge?.amount) || Number(charge?.total) || 0;
+}
+
 export function buildSafeContextWithValidation(
   rawData: unknown,
   logger?: Logger,
@@ -509,20 +515,30 @@ export function buildSafeContextWithValidation(
     legs: (data.legs || []).map((l: any) => {
       const origin =
         l.pol ||
+        l.origin_name ||
+        l.origin_code ||
         l.origin?.location_name ||
+        l.origin?.name ||
         l.origin_location?.location_name ||
+        l.origin_location?.name ||
         l.origin ||
         "N/A";
       const destination =
         l.pod ||
+        l.destination_name ||
+        l.destination_code ||
         l.destination?.location_name ||
+        l.destination?.name ||
         l.destination_location?.location_name ||
+        l.destination_location?.name ||
         l.destination ||
         "N/A";
       return {
+        id: l.id || l.leg_id || null,
         seq: l.sequence_id || l.sort_order || 0,
+        sequence_id: l.sequence_id || l.sort_order || 0,
         mode: l.mode || l.transport_mode || "Unknown",
-        transport_mode: l.transport_mode,
+        transport_mode: l.transport_mode || l.mode,
         origin,
         destination,
         pol: origin,
@@ -548,9 +564,9 @@ export function buildSafeContextWithValidation(
       is_stackable: !!i.is_stackable,
     })),
     charges: (data.charges || []).map((c: any) => {
-      const amount = Number(c.amount) || 0;
+      const amount = resolveNormalizedAmount(c);
       const quantity = Number.isFinite(Number(c.quantity ?? 1)) ? Number(c.quantity ?? 1) : 0;
-      const currency = c.currency || "USD";
+      const currency = c.target_currency || c.currency || "USD";
       const description = c.description || "Service Charge";
 
       return {
@@ -564,6 +580,9 @@ export function buildSafeContextWithValidation(
         qty: quantity,
         quantity,
         note: c.note || "",
+        source_currency: c.source_currency || c.currency || currency,
+        target_currency: c.target_currency || currency,
+        fx_rate: Number(c.fx_rate) || 1,
       };
     }),
     mode: data.mode || 'single',
@@ -583,20 +602,30 @@ export function buildSafeContextWithValidation(
         legs: (opt.legs || []).map((l: any) => {
             const origin =
               l.pol ||
+              l.origin_name ||
+              l.origin_code ||
               l.origin?.location_name ||
+              l.origin?.name ||
               l.origin_location?.location_name ||
+              l.origin_location?.name ||
               l.origin ||
               "N/A";
             const destination =
               l.pod ||
+              l.destination_name ||
+              l.destination_code ||
               l.destination?.location_name ||
+              l.destination?.name ||
               l.destination_location?.location_name ||
+              l.destination_location?.name ||
               l.destination ||
               "N/A";
             return {
+              id: l.id || l.leg_id || null,
               seq: l.sequence_id || l.sort_order || 0,
+              sequence_id: l.sequence_id || l.sort_order || 0,
               mode: l.mode || l.transport_mode || "Unknown",
-              transport_mode: l.transport_mode,
+              transport_mode: l.transport_mode || l.mode,
               origin,
               destination,
               pol: origin,
@@ -607,9 +636,9 @@ export function buildSafeContextWithValidation(
             };
           }),
     charges: (opt.charges || []).map((c: any) => {
-        const amount = Number(c.amount) || 0;
+        const amount = resolveNormalizedAmount(c);
         const quantity = Number.isFinite(Number(c.quantity ?? 1)) ? Number(c.quantity ?? 1) : 0;
-        const currency = c.currency || "USD";
+        const currency = c.target_currency || c.currency || "USD";
         const description = c.description || "Service Charge";
         return {
           desc: description,
@@ -624,6 +653,9 @@ export function buildSafeContextWithValidation(
           category: c.category?.name || "Other",
           note: c.note || "",
           leg_id: c.leg_id,
+          source_currency: c.source_currency || c.currency || currency,
+          target_currency: c.target_currency || currency,
+          fx_rate: Number(c.fx_rate) || 1,
         };
       }),
     })),

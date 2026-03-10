@@ -41,7 +41,7 @@ export function WinLossMetrics() {
         const winRate = totalClosed > 0 ? Math.round((winCount / totalClosed) * 100) : 0;
         
         // Calculate average deal size from won deals
-        const totalRevenue = wonDeals?.reduce((sum, deal) => sum + (deal.amount || 0), 0) || 0;
+        const totalRevenue = (wonDeals || []).reduce((sum, deal: any) => sum + (Number(deal?.amount) || 0), 0);
         const avgDealSize = winCount > 0 ? totalRevenue / winCount : 0;
 
         setMetrics({

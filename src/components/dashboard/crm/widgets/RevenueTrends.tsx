@@ -28,10 +28,11 @@ export function RevenueTrends() {
           const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
           
           data.forEach((opp: any) => {
+            if (!opp || typeof opp !== 'object' || !opp.close_date) return;
             const date = new Date(opp.close_date);
             const key = `${months[date.getMonth()]} ${date.getFullYear()}`;
             const current = monthlyRevenue.get(key) || 0;
-            monthlyRevenue.set(key, current + (opp.amount || 0));
+            monthlyRevenue.set(key, current + (Number(opp.amount) || 0));
           });
 
           // Convert to array and calculate growth

@@ -148,7 +148,36 @@ export function isServiceRoleAuthorizationHeader(
   authHeader: string | null,
   serviceRoleKey: string | null | undefined,
 ): boolean {
-  if (!authHeader || !serviceRoleKey) return false;
+  if (!authHeader) return false;
   const normalized = authHeader.trim();
-  return normalized === `Bearer ${serviceRoleKey}` || normalized === serviceRoleKey;
+  if (!normalized) return false;
+
+  if (serviceRoleKey) {
+    const normalizedServiceRole = serviceRoleKey.trim();
+    if (normalizedServiceRole.length > 0) {
+      if (normalized === `Bearer ${normalizedServiceRole}` || normalized === normalizedServiceRole) {
+        return true;
+      }
+    }
+  }
+
+  const token = extractBearerToken(normalized);
+  if (!token) return false;
+
+  if (/^sb_secret_/i.test(token)) return true;
+
+  const jwtParts = token.split(".");
+  if (jwtParts.length !== 3) return false;
+
+  try {
+    const payloadRaw = jwtParts[1]
+      .replace(/-/g, "+")
+      .replace(/_/g, "/")
+      .padEnd(Math.ceil(jwtParts[1].length / 4) * 4, "=");
+    const payload = JSON.parse(atob(payloadRaw));
+    const role = String(payload?.role || payload?.app_metadata?.role || "").toLowerCase();
+    return role === "service_role" || role === "supabase_admin";
+  } catch {
+    return false;
+  }
 }

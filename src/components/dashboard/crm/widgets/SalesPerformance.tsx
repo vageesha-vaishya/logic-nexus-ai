@@ -28,7 +28,8 @@ export function SalesPerformance() {
           const reps = new Map<string, { name: string; won: number; total: number; revenue: number }>();
           
           data.forEach((opp: any) => {
-            const ownerId = opp.owner_id;
+            if (!opp || typeof opp !== 'object') return;
+            const ownerId = String(opp.owner_id || 'unassigned');
             const name = opp.profiles 
               ? `${opp.profiles.first_name} ${opp.profiles.last_name}` 
               : 'Unassigned';
@@ -42,7 +43,7 @@ export function SalesPerformance() {
             
             if (opp.stage === 'closed_won') {
               current.won++;
-              current.revenue += (opp.amount || 0);
+              current.revenue += Number(opp.amount) || 0;
             }
           });
 

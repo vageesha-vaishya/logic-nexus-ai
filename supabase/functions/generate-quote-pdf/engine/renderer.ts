@@ -1640,16 +1640,16 @@ export class PdfRenderer {
             this.cursorY -= 18;
 
             // Collect charges for this leg across all container options
-            const legCharges = this.aggregateChargesForLeg(opts, leg.id, sortedContainers);
+            const legCharges = this.aggregateChargesForLeg(opts, leg, sortedContainers);
 
-            for (const [desc, details] of legCharges) {
+            for (const [_chargeKey, details] of legCharges) {
                 if (this.cursorY < this.margins.bottom + 20) { this.addNewPage(); this.cursorY -= 20; }
                 
                 x = this.margins.left;
                 
                 // Static Cols
                 // Description
-                let descText = desc;
+                let descText = String(details.description || "Charge");
                 if (descText.length > 20) descText = descText.substring(0, 18) + "...";
                 this.currentPage!.drawText(descText, { x: x + 2, y: this.cursorY - 14, size: 8, font: this.font!, color: rgb(0,0,0) });
                 x += staticCols[0].width;
@@ -1695,7 +1695,7 @@ export class PdfRenderer {
         }
 
         // --- Global Charges ---
-        const globalCharges = this.aggregateChargesForLeg(opts, null, sortedContainers); // null leg_id
+        const globalCharges = this.aggregateChargesForLeg(opts, null, sortedContainers); // null leg scope
         if (globalCharges.size > 0) {
             if (this.cursorY < this.margins.bottom + 40) { this.addNewPage(); this.cursorY -= 20; }
             
@@ -1709,12 +1709,12 @@ export class PdfRenderer {
             });
             this.cursorY -= 18;
 
-            for (const [desc, details] of globalCharges) {
+            for (const [_chargeKey, details] of globalCharges) {
                 if (this.cursorY < this.margins.bottom + 20) { this.addNewPage(); this.cursorY -= 20; }
                 x = this.margins.left;
                 
                 // Static Cols
-                let descText = desc;
+                let descText = String(details.description || "Charge");
                 if (descText.length > 20) descText = descText.substring(0, 18) + "...";
                 this.currentPage!.drawText(descText, { x: x + 2, y: this.cursorY - 14, size: 8, font: this.font!, color: rgb(0,0,0) });
                 x += staticCols[0].width;
@@ -1875,28 +1875,45 @@ export class PdfRenderer {
       return labels[normalized] || `${normalized.charAt(0).toUpperCase()}${normalized.slice(1)}`;
   }
 
-  private aggregateChargesForLeg(opts: any[], legId: string | null, containers: string[]): Map<string, any> {
+  private aggregateChargesForLeg(opts: any[], legRef: any | null, containers: string[]): Map<string, any> {
       const map = new Map<string, any>();
+      const seen = new Set<string>();
+      const targetLegId = legRef?.id ? String(legRef.id) : null;
       
       opts.forEach(opt => {
           const ct = opt.container_size || opt.container_type || opt._derived_container_type || "Standard";
           const charges = opt.charges || [];
+          const optionScope = String(opt.rate_option_id || opt.option_group_key || opt.id || "");
           
           charges.forEach((c: any) => {
-              // Filter by leg
-              if (legId) {
-                  if (c.leg_id !== legId) return;
+              const chargeLegId = c.leg_id ? String(c.leg_id) : null;
+              if (targetLegId) {
+                  if (chargeLegId !== targetLegId) return;
               } else {
-                  if (c.leg_id) return; // Global only
+                  if (chargeLegId) return;
               }
 
-              const desc = c.description || c.charge_name || c.name || "Charge";
+              const description = String(c.description || c.charge_name || c.name || "Charge");
+              const category = String(c.category?.name || c.category || "Other");
+              const basis = String(c.basis || c.basis_code || "Per Ctr");
+              const unit = String(c.unit || c.units || "Unit");
+              const currency = String(c.currency || c.curr || "USD");
+              const chargeLegScope = String(chargeLegId || "global");
+              const compositeKey = [description, category, basis, unit, currency, chargeLegScope].join("|");
+              const sourceKey = String(
+                c.id ||
+                `${description}|${basis}|${unit}|${currency}|${chargeLegScope}|${Number(c.amount) || 0}|${Number(c.unit_price || c.rate) || 0}`,
+              );
+              const dedupeKey = `${optionScope}|${ct}|${sourceKey}`;
+              if (seen.has(dedupeKey)) return;
+              seen.add(dedupeKey);
               
-              if (!map.has(desc)) {
-                  map.set(desc, {
-                      basis: c.basis || "Per Ctr",
-                      unit: c.unit || "Unit",
-                      curr: c.currency || "USD",
+              if (!map.has(compositeKey)) {
+                  map.set(compositeKey, {
+                      description,
+                      basis,
+                      unit,
+                      curr: currency,
                       notes: c.note || "",
                       qty: Number(c.quantity || c.qty || 1),
                       rate: Number(c.unit_price || c.rate || 0),
@@ -1904,7 +1921,7 @@ export class PdfRenderer {
                   });
               }
               
-              const entry = map.get(desc);
+              const entry = map.get(compositeKey);
               // Aggregating amounts for matrix
               entry.amounts[ct] = (entry.amounts[ct] || 0) + (Number(c.amount) || 0);
               
@@ -1917,9 +1934,6 @@ export class PdfRenderer {
       });
       
       return map;
-  }
-
-  private noop() {
   }
 
   // Helpers

@@ -13,7 +13,6 @@ import { getTemplate } from "./engine/template-service.ts";
 // @ts-ignore
 import { fetchMglOptions } from "./engine/mgl-loader.ts";
 import { isServiceRoleAuthorizationHeader, requireAuth } from "../_shared/auth.ts";
-import { PDFDocument } from "pdf-lib";
 // @ts-ignore
 import JSZip from "https://esm.sh/jszip@3.10.1";
 // @ts-ignore
@@ -31,9 +30,9 @@ serveWithLogger(async (req, logger, adminSupabase) => {
     let supabaseClient = adminSupabase;
     let authenticatedUserId: string | null = null;
     const authHeader = req.headers.get("Authorization");
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    const bypassKey = Deno.env.get("TEST_BYPASS_KEY");
-    const requestBypassKey = req.headers.get("x-bypass-key");
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SUPABASE_SERVICE_KEY");
+    const bypassKey = Deno.env.get("TEST_BYPASS_KEY") || Deno.env.get("E2E_BYPASS_KEY");
+    const requestBypassKey = req.headers.get("x-bypass-key") || req.headers.get("x-e2e-key");
 
     const isServiceRole =
         isServiceRoleAuthorizationHeader(authHeader, serviceRoleKey) ||
@@ -217,6 +216,7 @@ serveWithLogger(async (req, logger, adminSupabase) => {
       .from("quotes")
       .select(`
         *,
+        currency_meta:currencies!currency_id(code),
         accounts (name, billing_street, billing_city, billing_state, billing_postal_code, billing_country, phone, email, account_number),
         contacts:contacts!contact_id (first_name, last_name, email, phone),
         origin:ports_locations!origin_port_id(location_name, country_id),
@@ -359,7 +359,7 @@ serveWithLogger(async (req, logger, adminSupabase) => {
           // Charges
           const { data: charges, error: chargesError } = await safeSelect(
               "quote_charges",
-              "*, category:charge_categories(name)",
+              "*, category:charge_categories(name), currency_meta:currencies!currency_id(code)",
               "*",
               (q) => {
                 let query = q.eq("quote_option_id", opt.id);
@@ -385,10 +385,15 @@ serveWithLogger(async (req, logger, adminSupabase) => {
       }
 
       const getCarrierLabel = (opt: any): string => {
+        const optionLegs = Array.isArray(opt?.legs) ? opt.legs : [];
+        const legCarrier = optionLegs
+          .map((leg: any) => String(leg?.carrier_name || leg?.carrier || "").trim())
+          .find((name: string) => name.length > 0);
         return String(
           opt?.carrier ||
           opt?.carrier_name ||
           opt?.carriers?.carrier_name ||
+          legCarrier ||
           opt?.provider_name ||
           "",
         ).trim();
@@ -405,14 +410,32 @@ serveWithLogger(async (req, logger, adminSupabase) => {
         (opt: any) => Array.isArray(opt?.charges) && opt.charges.length > 0,
       );
       const optionsWithChargesCount = optionsWithCharges.length;
+      const hasLegScopedCharges = optionsWithCharges.some((opt: any) => {
+        const optionLegIds = new Set(
+          (Array.isArray(opt?.legs) ? opt.legs : [])
+            .map((leg: any) => leg?.id || leg?.leg_id)
+            .filter(Boolean)
+            .map((id: any) => String(id)),
+        );
+        return (Array.isArray(opt?.charges) ? opt.charges : []).some((charge: any) => {
+          if (!charge?.leg_id) return false;
+          return optionLegIds.has(String(charge.leg_id));
+        });
+      });
       const standardCarrierDiversity = countDistinctCarriers(
         optionsWithChargesCount > 0 ? optionsWithCharges : options,
       );
 
       const shouldProbeMglOptions =
         options.length === 0 ||
-        optionsWithChargesCount <= 1 ||
-        (optionsWithChargesCount > 1 && standardCarrierDiversity <= 1);
+        optionsWithChargesCount === 0 ||
+        (
+          !hasLegScopedCharges &&
+          (
+            optionsWithChargesCount === 1 ||
+            (optionsWithChargesCount > 1 && standardCarrierDiversity <= 1)
+          )
+        );
       if (shouldProbeMglOptions) {
         await logger.info("Checking for MGL Rate Options...");
         const mglOptions = await fetchMglOptions(supabaseClient, versionId, safeSelect, logger);
@@ -431,8 +454,9 @@ serveWithLogger(async (req, logger, adminSupabase) => {
           const shouldUseMglOptions =
             options.length === 0 ||
             optionsWithChargesCount === 0 ||
-            (optionsWithChargesCount === 1 && mglOptionCount > 1) ||
+            (!hasLegScopedCharges && optionsWithChargesCount === 1 && mglOptionCount > 1) ||
             (
+              !hasLegScopedCharges &&
               optionsWithChargesCount > 1 &&
               standardCarrierDiversity <= 1 &&
               mglOptionsWithChargesCount >= 2 &&
@@ -443,11 +467,11 @@ serveWithLogger(async (req, logger, adminSupabase) => {
             options = mglOptionsWithChargesCount > 0 ? mglOptionsWithCharges : mglOptions;
             await enrichOptionContainers(options);
             await logger.info(
-              `Using ${options.length} MGL options for rendering (standard options=${standardOptionCount}, optionsWithCharges=${optionsWithChargesCount}, standardCarrierDiversity=${standardCarrierDiversity}, mglOptions=${mglOptionCount}, mglOptionsWithCharges=${mglOptionsWithChargesCount}, mglCarrierDiversity=${mglCarrierDiversity})`,
+              `Using ${options.length} MGL options for rendering (standard options=${standardOptionCount}, optionsWithCharges=${optionsWithChargesCount}, hasLegScopedCharges=${hasLegScopedCharges}, standardCarrierDiversity=${standardCarrierDiversity}, mglOptions=${mglOptionCount}, mglOptionsWithCharges=${mglOptionsWithChargesCount}, mglCarrierDiversity=${mglCarrierDiversity})`,
             );
           } else {
             await logger.info(
-              `Keeping standard options for rendering (standard options=${standardOptionCount}, optionsWithCharges=${optionsWithChargesCount}, standardCarrierDiversity=${standardCarrierDiversity}, mgl options=${mglOptionCount}, mglOptionsWithCharges=${mglOptionsWithChargesCount}, mglCarrierDiversity=${mglCarrierDiversity})`,
+              `Keeping standard options for rendering (standard options=${standardOptionCount}, optionsWithCharges=${optionsWithChargesCount}, hasLegScopedCharges=${hasLegScopedCharges}, standardCarrierDiversity=${standardCarrierDiversity}, mgl options=${mglOptionCount}, mglOptionsWithCharges=${mglOptionsWithChargesCount}, mglCarrierDiversity=${mglCarrierDiversity})`,
             );
           }
         } else {
@@ -734,8 +758,156 @@ serveWithLogger(async (req, logger, adminSupabase) => {
     }
     let pdfBytes: Uint8Array | null = null;
     const finalWarnings: string[] = [];
+    const quoteCurrencyCode = String(
+      (quote as any)?.currency ||
+      (quote as any)?.currency_meta?.code ||
+      (quote as any)?.currencies?.code ||
+      "USD",
+    ).trim().toUpperCase() || "USD";
+    const normalizedWarningSet = new Set<string>();
 
-    const createRawData = (option: any) => {
+    const normalizeCurrencyCode = (value: any): string => {
+      const code = String(value || "").trim().toUpperCase();
+      return code || quoteCurrencyCode;
+    };
+
+    const resolveChargeCurrencyCode = (charge: any): string => normalizeCurrencyCode(
+      charge?.currency ||
+      charge?.curr ||
+      charge?.currency_code ||
+      charge?.currency_meta?.code ||
+      charge?.currencies?.code,
+    );
+
+    const sourceCurrencies = new Set<string>([quoteCurrencyCode]);
+    options.forEach((opt: any) => {
+      (opt?.charges || []).forEach((charge: any) => {
+        sourceCurrencies.add(resolveChargeCurrencyCode(charge));
+      });
+    });
+
+    const fxRateByCurrency = new Map<string, number>([[quoteCurrencyCode, 1]]);
+
+    const loadFxRates = async () => {
+      const tenantId = (quote as any)?.tenant_id;
+      if (!tenantId || sourceCurrencies.size <= 1) return;
+
+      const codes = Array.from(sourceCurrencies).filter(Boolean);
+      const { data: currenciesData, error: currenciesError } = await supabaseClient
+        .from("currencies")
+        .select("id, code")
+        .in("code", codes);
+
+      if (currenciesError) {
+        await logger.warn(`Unable to resolve currencies for FX normalization: ${currenciesError.message}`);
+        return;
+      }
+
+      const codeToId = new Map<string, string>();
+      for (const row of currenciesData || []) {
+        const code = normalizeCurrencyCode((row as any)?.code);
+        if (!codeToId.has(code) && (row as any)?.id) {
+          codeToId.set(code, String((row as any).id));
+        }
+      }
+
+      const quoteCurrencyId = codeToId.get(quoteCurrencyCode);
+      if (!quoteCurrencyId) return;
+
+      const fromCurrencyIds = Array.from(codeToId.entries())
+        .filter(([code]) => code !== quoteCurrencyCode)
+        .map(([, id]) => id);
+
+      if (fromCurrencyIds.length === 0) return;
+
+      const effectiveDate = (quote as any)?.created_at || new Date().toISOString();
+
+      const { data: directRates, error: directRateError } = await supabaseClient
+        .from("fx_rates")
+        .select("from_currency_id, to_currency_id, rate, effective_date")
+        .eq("tenant_id", tenantId)
+        .eq("to_currency_id", quoteCurrencyId)
+        .in("from_currency_id", fromCurrencyIds)
+        .lte("effective_date", effectiveDate)
+        .order("effective_date", { ascending: false });
+
+      if (directRateError) {
+        await logger.warn(`Unable to resolve direct FX rates: ${directRateError.message}`);
+      }
+
+      const rateByFromId = new Map<string, number>();
+      for (const row of directRates || []) {
+        const fromId = String((row as any)?.from_currency_id || "");
+        if (!fromId || rateByFromId.has(fromId)) continue;
+        const rate = Number((row as any)?.rate || 0);
+        if (rate > 0) rateByFromId.set(fromId, rate);
+      }
+
+      const missingFromIds = fromCurrencyIds.filter((id) => !rateByFromId.has(id));
+      if (missingFromIds.length > 0) {
+        const { data: reverseRates, error: reverseRateError } = await supabaseClient
+          .from("fx_rates")
+          .select("from_currency_id, to_currency_id, rate, effective_date")
+          .eq("tenant_id", tenantId)
+          .eq("from_currency_id", quoteCurrencyId)
+          .in("to_currency_id", missingFromIds)
+          .lte("effective_date", effectiveDate)
+          .order("effective_date", { ascending: false });
+
+        if (reverseRateError) {
+          await logger.warn(`Unable to resolve reverse FX rates: ${reverseRateError.message}`);
+        } else {
+          const reverseByToId = new Map<string, number>();
+          for (const row of reverseRates || []) {
+            const toId = String((row as any)?.to_currency_id || "");
+            if (!toId || reverseByToId.has(toId)) continue;
+            const reverseRate = Number((row as any)?.rate || 0);
+            if (reverseRate > 0) reverseByToId.set(toId, reverseRate);
+          }
+          for (const fromId of missingFromIds) {
+            const reverseRate = reverseByToId.get(fromId);
+            if (reverseRate && reverseRate > 0) {
+              rateByFromId.set(fromId, 1 / reverseRate);
+            }
+          }
+        }
+      }
+
+      for (const [code, id] of codeToId.entries()) {
+        if (code === quoteCurrencyCode) {
+          fxRateByCurrency.set(code, 1);
+          continue;
+        }
+        const rate = rateByFromId.get(id);
+        if (rate && Number.isFinite(rate) && rate > 0) {
+          fxRateByCurrency.set(code, rate);
+        }
+      }
+    };
+
+    await loadFxRates();
+
+    const resolveFxRate = (sourceCurrency: string): number => {
+      const normalizedSource = normalizeCurrencyCode(sourceCurrency);
+      if (normalizedSource === quoteCurrencyCode) return 1;
+      const rate = fxRateByCurrency.get(normalizedSource);
+      if (rate && Number.isFinite(rate) && rate > 0) return rate;
+
+      const warning = `Missing FX rate for ${normalizedSource} -> ${quoteCurrencyCode}; using 1.0`;
+      if (!normalizedWarningSet.has(warning)) {
+        normalizedWarningSet.add(warning);
+        finalWarnings.push(warning);
+      }
+      return 1;
+    };
+
+    const createRawData = (option: any, config: { optionsOverride?: any[]; singleOptionScope?: boolean } = {}) => {
+      const singleOptionScope = Boolean(config?.singleOptionScope);
+      const optionSource = Array.isArray(config?.optionsOverride)
+        ? config.optionsOverride
+        : singleOptionScope
+          ? (option ? [option] : [])
+          : options;
       const quoteItems = Array.isArray(quote.items) ? quote.items : [];
       const cargoDetails = (quote as any)?.cargo_details || {};
       const containerCombos = Array.isArray(cargoDetails?.container_combos) ? cargoDetails.container_combos : [];
@@ -840,9 +1012,96 @@ serveWithLogger(async (req, logger, adminSupabase) => {
         fallbackItem?.container_type ||
         "N/A";
 
+      const normalizeAmount = (charge: any) => Number(charge?.amount ?? charge?.total ?? 0) || 0;
+      const normalizeQuantity = (charge: any) => {
+        const value = Number(charge?.quantity ?? charge?.qty ?? charge?.units ?? 1);
+        return Number.isFinite(value) ? value : 1;
+      };
+      const normalizeDescription = (charge: any) =>
+        String(charge?.description || charge?.charge_name || charge?.name || charge?.category?.name || "Charge");
+
+      const normalizeCharge = (charge: any, fallbackCategory?: string) => {
+        const sourceCurrency = resolveChargeCurrencyCode(charge);
+        const amount = normalizeAmount(charge);
+        const fxRate = resolveFxRate(sourceCurrency);
+        const convertedAmount = amount * fxRate;
+        return {
+          ...charge,
+          description: normalizeDescription(charge),
+          category: charge?.category?.name || charge?.category || fallbackCategory || "Other",
+          quantity: normalizeQuantity(charge),
+          amount,
+          converted_amount: convertedAmount,
+          source_currency: sourceCurrency,
+          target_currency: quoteCurrencyCode,
+          fx_rate: fxRate,
+        };
+      };
+
+      const materializeQuoteLevelCharges = (baseCharges: any[]) => {
+        const normalizedBaseCharges = baseCharges
+          .filter((charge: any) => charge && typeof charge === "object")
+          .map((charge: any) => normalizeCharge(charge));
+        const existingNames = new Set(
+          normalizedBaseCharges
+            .map((charge: any) => String(charge?.description || "").trim().toLowerCase())
+            .filter(Boolean),
+        );
+
+        const subtotal = normalizedBaseCharges.reduce(
+          (sum: number, charge: any) => sum + (Number(charge?.converted_amount) || 0),
+          0,
+        );
+        const quoteTaxPercent = Number((quote as any)?.tax_percent || 0);
+        const quoteShippingAmount = Number((quote as any)?.shipping_amount || 0);
+
+        const hasTaxCharge = Array.from(existingNames).some((name) => name.includes("tax") || name.includes("vat") || name.includes("duty"));
+        if (quoteTaxPercent > 0 && !hasTaxCharge) {
+          const taxAmount = subtotal * (quoteTaxPercent / 100);
+          normalizedBaseCharges.push(
+            normalizeCharge(
+              {
+                description: "Tax",
+                amount: taxAmount,
+                quantity: 1,
+                unit_price: taxAmount,
+                currency: quoteCurrencyCode,
+                basis: "Per Shipment",
+                note: `Tax ${quoteTaxPercent}%`,
+              },
+              "Tax",
+            ),
+          );
+        }
+
+        const hasShippingCharge = Array.from(existingNames).some((name) => name.includes("shipping") || name.includes("freight"));
+        if (quoteShippingAmount > 0 && !hasShippingCharge) {
+          normalizedBaseCharges.push(
+            normalizeCharge(
+              {
+                description: "Shipping",
+                amount: quoteShippingAmount,
+                quantity: 1,
+                unit_price: quoteShippingAmount,
+                currency: quoteCurrencyCode,
+                basis: "Per Shipment",
+              },
+              "Logistics",
+            ),
+          );
+        }
+
+        return normalizedBaseCharges;
+      };
+
+      const optionLevelCharges = materializeQuoteLevelCharges(Array.isArray(option?.charges) ? option.charges : []);
+      const optionLegs = Array.isArray(option?.legs)
+        ? option.legs.filter((leg: any) => leg && typeof leg === "object")
+        : [];
+
       // Calculate option specific total if possible
-      const optionTotal = Array.isArray(option?.charges) 
-        ? option.charges.reduce((sum: number, c: any) => sum + (Number(c.amount) || 0), 0)
+      const optionTotal = optionLevelCharges.length > 0
+        ? optionLevelCharges.reduce((sum: number, c: any) => sum + (Number(c.converted_amount) || 0), 0)
         : (quote.total_amount || 0);
 
       return {
@@ -866,7 +1125,7 @@ serveWithLogger(async (req, logger, adminSupabase) => {
           expiration_date: quote.expiration_date || quote.valid_until,
           status: quote.status,
           total_amount: optionTotal,
-          currency: quote.currency || "USD",
+          currency: quoteCurrencyCode,
           service_level: quote.service_level,
           notes: quote.notes,
           terms_conditions: quote.terms_conditions,
@@ -890,27 +1149,44 @@ serveWithLogger(async (req, logger, adminSupabase) => {
           inquiry_number: quote.quote_number,
         },
         legs:
-          option?.legs?.map((l: any) => ({
-            sequence_id: l.sequence_id || 0,
+          optionLegs.map((l: any) => ({
+            id: l.id || null,
+            sequence_id: l.sequence_id || l.sequence_no || l.sort_order || 0,
             mode: l.mode || l.transport_mode || "Unknown",
             pol: resolveLegLocation(l, "origin"),
             pod: resolveLegLocation(l, "destination"),
+            origin_name: l.origin_name || l.origin_code || null,
+            origin_code: l.origin_code || l.origin_name || null,
+            destination_name: l.destination_name || l.destination_code || null,
+            destination_code: l.destination_code || l.destination_name || null,
             carrier: option.carriers?.carrier_name || l.carrier_name || "TBD",
             transit_time: resolveLegTransit(l),
-          })) || [],
+            transport_mode: l.transport_mode || l.mode || null,
+          })),
         charges:
-          option?.charges?.map((c: any) => ({
-            description: c.charge_name || c.category?.name || "Charge",
-            amount: c.amount,
-            currency: c.currency || "USD",
+          optionLevelCharges.map((c: any) => ({
+            description: c.description || "Charge",
+            amount: Number(c.converted_amount) || 0,
+            converted_amount: Number(c.converted_amount) || 0,
+            currency: quoteCurrencyCode,
+            source_currency: c.source_currency || quoteCurrencyCode,
+            target_currency: quoteCurrencyCode,
+            fx_rate: Number(c.fx_rate) || 1,
             type: c.charge_type,
             basis: c.basis,
-            quantity: c.units,
+            quantity: Number(c.quantity) || 1,
             leg_id: c.leg_id,
             note: c.note || "",
           })) || [],
         items: mappedItems,
-        options: options.map((o: any) => ({
+        options: optionSource
+          .filter((o: any) => o && typeof o === "object")
+          .map((o: any) => {
+          const normalizedOptionCharges = materializeQuoteLevelCharges(Array.isArray(o.charges) ? o.charges : []);
+          const normalizedOptionLegs = Array.isArray(o?.legs)
+            ? o.legs.filter((leg: any) => leg && typeof leg === "object")
+            : [];
+          return ({
           id: o.id,
           rate_option_id: o.rate_option_id || o.option_id || o.id,
           option_group_key: o.option_group_key || o.rate_option_id || o.option_id || o.id,
@@ -921,29 +1197,40 @@ serveWithLogger(async (req, logger, adminSupabase) => {
           frequency: o.frequency || (Number(o.frequency_per_week) > 0 ? `${Number(o.frequency_per_week)} / week` : "") || o.service_level || "",
           container_size: resolveOptionContainerSize(o),
           container_type: resolveOptionContainerType(o),
-          grand_total: Array.isArray(o.charges) 
-            ? o.charges.reduce((sum: number, c: any) => sum + (Number(c.amount) || 0), 0)
-            : 0,
-          legs: o.legs?.map((l: any) => ({
-             sequence_id: l.sequence_id || 0,
+          grand_total: normalizedOptionCharges.reduce(
+            (sum: number, c: any) => sum + (Number(c.converted_amount) || 0),
+            0,
+          ),
+          legs: normalizedOptionLegs.map((l: any) => ({
+             id: l.id || null,
+             sequence_id: l.sequence_id || l.sequence_no || l.sort_order || 0,
              mode: l.mode || l.transport_mode,
              pol: resolveLegLocation(l, "origin"),
              pod: resolveLegLocation(l, "destination"),
+             origin_name: l.origin_name || l.origin_code || null,
+             origin_code: l.origin_code || l.origin_name || null,
+             destination_name: l.destination_name || l.destination_code || null,
+             destination_code: l.destination_code || l.destination_name || null,
              carrier: o.carrier || o.carrier_name || o.carriers?.carrier_name || l.carrier_name || l.carrier || "",
              transit_time: resolveLegTransit(l),
              transport_mode: l.transport_mode || l.mode
-          })) || [],
-          charges: o.charges?.map((c: any) => ({
-            description: c.description || c.charge_name || c.name || c.category?.name || "Charge",
-            amount: Number(c.amount) || 0,
-            currency: c.currency || "USD",
+          })),
+          charges: normalizedOptionCharges.map((c: any) => ({
+            description: c.description || "Charge",
+            amount: Number(c.converted_amount) || 0,
+            converted_amount: Number(c.converted_amount) || 0,
+            currency: quoteCurrencyCode,
+            source_currency: c.source_currency || quoteCurrencyCode,
+            target_currency: quoteCurrencyCode,
+            fx_rate: Number(c.fx_rate) || 1,
             note: c.note || "",
             leg_id: c.leg_id || null,
             basis: c.basis,
             quantity: Number.isFinite(Number(c.quantity ?? c.units ?? 1)) ? Number(c.quantity ?? c.units ?? 1) : 1,
-            unit_price: Number(c.unit_price ?? c.rate ?? 0) || 0
+            unit_price: Number(c.unit_price ?? c.rate ?? c.converted_amount ?? 0) || 0
           })) || []
-        }))
+        });
+        })
       };
     };
 
@@ -1035,8 +1322,8 @@ serveWithLogger(async (req, logger, adminSupabase) => {
         };
     };
 
-    const renderOptionToBytes = async (option: any) => {
-        const rawData = createRawData(option);
+    const renderOptionToBytes = async (option: any, config: { optionsOverride?: any[]; singleOptionScope?: boolean } = {}) => {
+        const rawData = createRawData(option, config);
         
         // Apply Handlebars compilation
         let effectiveTemplate = templateContent || DefaultTemplate;
@@ -1093,83 +1380,41 @@ serveWithLogger(async (req, logger, adminSupabase) => {
 
     if (!pdfBytes) {
         if (mode === 'consolidated' && options.length > 0) {
-            await logger.info(`Generating Consolidated PDF for ${options.length} options`);
-            const mergedPdf = await PDFDocument.create();
-            
-            // --- NEW: Generate Summary Page ---
+            await logger.info(`Generating consolidated single-document PDF for ${options.length} options`);
+            const consolidatedRawData = createRawData(options[0] || {}, {
+              optionsOverride: options,
+            });
+
+            let consolidatedTemplate = templateContent || DefaultTemplate;
             try {
-                // 1. Create Summary Context
-                // We pass an empty object for 'option' so legs/charges are empty in the main context,
-                // but we manually populate the 'options' array for the summary table.
-                const summaryRawData: any = createRawData({}); 
-                summaryRawData.options = options.map((o: any) => ({
-                    id: o.id,
-                    option_name: o.option_name || o.rate_option_name || o.name || null,
-                    rate_option_name: o.rate_option_name || o.option_name || o.name || null,
-                    option_group_key: o.option_group_key || o.rate_option_id || o.option_id || o.id,
-                    rate_option_id: o.rate_option_id || o.option_id || o.id,
-                    carrier: o.carriers?.carrier_name || o.carrier || "Multi-Carrier",
-                    transit_time: o.transit_time_days ? `${o.transit_time_days} Days` : (o.transit_time || "N/A"),
-                    frequency: o.frequency || o.service_level || "N/A",
-                    container_size: o.container_sizes?.code || o.container_sizes?.name || o.container_size || "N/A",
-                    container_type: o.container_types?.code || o.container_types?.name || o.container_type || "N/A",
-                    grand_total: Array.isArray(o.charges) 
-                        ? o.charges.reduce((sum: number, c: any) => sum + (Number(c.amount) || 0), 0)
-                        : 0,
-                    legs: o.legs,
-                    charges: o.charges
-                }));
-                
-                const { context: summaryContext } = buildSafeContextWithValidation(summaryRawData, logger);
-                
-                // 2. Create Summary Template (Clone & Modify)
-                // We want a clean summary page: Header -> Summary Table -> Terms -> Footer
-                const summaryTemplate = ensureTemplateConfig(
-                    JSON.parse(JSON.stringify(templateContent || DefaultTemplate))
-                );
-                
-                // Remove dynamic tables (items/charges) to avoid clutter
-                summaryTemplate.sections = summaryTemplate.sections.filter((s: any) => 
-                    s.type !== 'dynamic_table' && s.type !== 'static_block'
-                );
-                
-                // Inject multi_rate_summary after Header
-                const headerIdx = summaryTemplate.sections.findIndex((s: any) => s.type === 'header');
-                const insertIdx = headerIdx >= 0 ? headerIdx + 1 : 0;
-                
-                summaryTemplate.sections.splice(insertIdx, 0, {
-                    type: "multi_rate_summary",
-                    height: 150,
-                    page_break_before: false,
-                    content: { text: "Quotation Options Summary" }
-                });
-
-                // Render Summary
-                const summaryRenderer = new PdfRenderer(summaryTemplate, summaryContext, logger);
-                const summaryBytes = await summaryRenderer.render();
-                const summaryDoc = await PDFDocument.load(summaryBytes);
-                const summaryPages = await mergedPdf.copyPages(summaryDoc, summaryDoc.getPageIndices());
-                summaryPages.forEach((page: any) => mergedPdf.addPage(page));
-                
-                await logger.info("Added Summary Page to Consolidated PDF");
+              consolidatedTemplate = compileTemplateWithHandlebars(consolidatedTemplate, consolidatedRawData);
             } catch (e: any) {
-                await logger.warn(`Failed to generate summary page: ${e.message}`);
+              await logger.warn(`Handlebars compilation failed for consolidated template: ${e.message}`);
             }
-            // ----------------------------------
+            consolidatedTemplate = ensureTemplateConfig(consolidatedTemplate);
 
-            for (const opt of options) {
-                try {
-                    const optBytes = await renderOptionToBytes(opt);
-                    const optDoc = await PDFDocument.load(optBytes);
-                    const copiedPages = await mergedPdf.copyPages(optDoc, optDoc.getPageIndices());
-                    copiedPages.forEach((page: any) => mergedPdf.addPage(page));
-                } catch (e: any) {
-                    await logger.error(`Failed to render option ${opt.id}: ${e.message}`);
-                    // Continue with other options? Or fail?
-                    // Let's continue but log error
-                }
+            const existingSections = Array.isArray(consolidatedTemplate.sections) ? consolidatedTemplate.sections : [];
+            const hasSummarySection = existingSections.some((s: any) => s?.type === "multi_rate_summary");
+            if (!hasSummarySection) {
+              const summarySection = {
+                type: "multi_rate_summary",
+                height: 150,
+                page_break_before: false,
+                content: { text: "Quotation Options Summary" },
+              };
+              const headerIdx = existingSections.findIndex((s: any) => s?.type === "header");
+              const insertIdx = headerIdx >= 0 ? headerIdx + 1 : 0;
+              existingSections.splice(insertIdx, 0, summarySection);
+              consolidatedTemplate.sections = existingSections;
             }
-            pdfBytes = await mergedPdf.save();
+
+            const { context: consolidatedContext, warnings } = buildSafeContextWithValidation(consolidatedRawData, logger);
+            if (warnings.length > 0) {
+              finalWarnings.push(...warnings);
+              await logWarn(`Warnings for consolidated render: ${warnings.join(", ")}`);
+            }
+            const consolidatedRenderer = new PdfRenderer(consolidatedTemplate, consolidatedContext, logger);
+            pdfBytes = await consolidatedRenderer.render();
         } else if (mode === 'individual' && options.length > 0) {
             await logger.info(`Generating Individual PDFs for ${options.length} options (ZIP output)`);
             contentType = "application/zip";
@@ -1180,7 +1425,7 @@ serveWithLogger(async (req, logger, adminSupabase) => {
             for (let i = 0; i < options.length; i++) {
                 const opt = options[i];
                 try {
-                    const optBytes = await renderOptionToBytes(opt);
+                    const optBytes = await renderOptionToBytes(opt, { singleOptionScope: true });
                     const fileName = `Quote-${quote.quote_number || 'draft'}-RateOption-${i + 1}.pdf`;
                     zip.file(fileName, optBytes);
                 } catch (e: any) {
@@ -1199,11 +1444,11 @@ serveWithLogger(async (req, logger, adminSupabase) => {
                 (options.length > 0 ? options[0] : null);
             
             if (selectedOption) {
-                pdfBytes = await renderOptionToBytes(selectedOption);
+                pdfBytes = await renderOptionToBytes(selectedOption, { singleOptionScope: true });
             } else {
                 // No options found? Render with empty option to show header/items at least
                 await logger.warn("No options found for quote. Rendering generic PDF.");
-                pdfBytes = await renderOptionToBytes({});
+                pdfBytes = await renderOptionToBytes({}, { singleOptionScope: true });
             }
         }
         

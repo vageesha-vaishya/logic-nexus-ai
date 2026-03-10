@@ -11,6 +11,16 @@ export interface MatrixGroup {
   routing: any[];
 }
 
+function buildCompositeChargeKey(charge: any): string {
+    const desc = String(charge?.description || charge?.charge_name || charge?.name || charge?.desc || "Charge").trim();
+    const category = String(charge?.category?.name || charge?.category || "Other").trim();
+    const basis = String(charge?.basis || charge?.basis_code || "Per Ctr").trim();
+    const unit = String(charge?.unit || charge?.units || "Unit").trim();
+    const currency = String(charge?.currency || charge?.curr || "USD").trim();
+    const legScope = String(charge?.leg_id || "global").trim();
+    return [desc, category, basis, unit, currency, legScope].join("|");
+}
+
 export function groupOptionsForMatrix(options: any[]): MatrixGroup[] {
     const groups = new Map<string, any[]>();
     const hasOptionScopedGrouping = options.some((opt: any) =>
@@ -116,15 +126,15 @@ export function groupOptionsForMatrix(options: any[]): MatrixGroup[] {
             const ct = o._derived_container_type || "Standard";
             const charges = o.charges || [];
             charges.forEach((c: any) => {
-                const desc = c.description || c.charge_name || c.name || c.desc || "Charge";
-                if (!chargeMap.has(desc)) chargeMap.set(desc, new Map());
-                const current = chargeMap.get(desc)!.get(ct) || 0;
+                const chargeKey = buildCompositeChargeKey(c);
+                if (!chargeMap.has(chargeKey)) chargeMap.set(chargeKey, new Map());
+                const current = chargeMap.get(chargeKey)!.get(ct) || 0;
                 
                 const amount = Number(c.amount) || Number(c.total) || 0;
-                chargeMap.get(desc)!.set(ct, current + amount);
+                chargeMap.get(chargeKey)!.set(ct, current + amount);
                 
                 if (c.note) {
-                     chargeNoteMap.set(desc, c.note);
+                     chargeNoteMap.set(chargeKey, c.note);
                 }
             });
         });

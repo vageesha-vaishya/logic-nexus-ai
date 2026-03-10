@@ -25,13 +25,14 @@ export function TeamPipeline() {
           const stages = new Map<string, { count: number; value: number }>();
           
           data.forEach((opp: any) => {
+            if (!opp || typeof opp !== 'object') return;
             const stage = opp.stage || 'Unknown';
             if (!stages.has(stage)) {
               stages.set(stage, { count: 0, value: 0 });
             }
             const current = stages.get(stage)!;
             current.count++;
-            current.value += (opp.amount || 0);
+            current.value += Number(opp.amount) || 0;
           });
 
           // Define standard stages order

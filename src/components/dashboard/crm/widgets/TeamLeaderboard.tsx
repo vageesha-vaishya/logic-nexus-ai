@@ -49,8 +49,9 @@ export function TeamLeaderboard() {
               .select('amount')
               .eq('assigned_to', profile.id);
 
-            const dealCount = opportunities?.filter(o => o.amount).length || 0;
-            const revenue = opportunities?.reduce((sum: number, o: any) => sum + (o.amount || 0), 0) || 0;
+            const safeOpportunities = (opportunities || []).filter((o: any) => o && typeof o === 'object');
+            const dealCount = safeOpportunities.filter((o: any) => Number(o.amount) > 0).length;
+            const revenue = safeOpportunities.reduce((sum: number, o: any) => sum + (Number(o.amount) || 0), 0);
 
             teamData.push({
               id: profile.id,

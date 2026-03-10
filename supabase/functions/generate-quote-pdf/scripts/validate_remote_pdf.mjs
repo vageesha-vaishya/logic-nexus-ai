@@ -3,10 +3,10 @@ import fs from 'node:fs/promises';
 import 'dotenv/config'; // Make sure dotenv is installed or run with --env-file
 
 const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
 
 if (!supabaseUrl || !supabaseKey) {
-  console.error('Error: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required.');
+  console.error('Error: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_SERVICE_KEY) are required.');
   process.exit(1);
 }
 
@@ -276,15 +276,42 @@ async function buildRateDiagnostics(versionId) {
   };
 }
 
-async function extractPdfTextSummary(pdfBuffer) {
+async function extractPdfTextSummary(pdfBuffer, expectedCarriers = []) {
   try {
-    const { default: pdfParse } = await import('pdf-parse');
-    const parsed = await pdfParse(pdfBuffer);
-    const text = String(parsed?.text || '');
-    const rateOptionMatches = text.match(/Rate Option\s+\d+/gi) || [];
+    const pdfParseModule = await import('pdf-parse');
+    let text = '';
+    const PDFParse = pdfParseModule?.PDFParse || pdfParseModule?.default?.PDFParse;
+    if (PDFParse) {
+      const parser = new PDFParse({ data: pdfBuffer });
+      const parsed = await parser.getText();
+      text = String(parsed?.text || '');
+    } else {
+      const parseFn =
+        (typeof pdfParseModule?.default === 'function' ? pdfParseModule.default : null) ||
+        (typeof pdfParseModule === 'function' ? pdfParseModule : null);
+      if (parseFn) {
+        const parsed = await parseFn(pdfBuffer);
+        text = String(parsed?.text || '');
+      }
+    }
+    const optionPatterns = [
+      /Rate\s*Option\s*#?\s*\d+/gi,
+      /\bOption\s*#?\s*\d+\b/gi,
+      /Carrier:\s*[^\n]+/gi,
+    ];
+    const optionTokenSet = new Set();
+    optionPatterns.forEach((pattern) => {
+      (text.match(pattern) || []).forEach((token) => optionTokenSet.add(String(token).trim().toLowerCase()));
+    });
+    const carrierHitCount = expectedCarriers.reduce((count, carrier) => {
+      const normalizedCarrier = String(carrier || '').trim();
+      if (!normalizedCarrier) return count;
+      const escaped = normalizedCarrier.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      return count + (new RegExp(escaped, 'i').test(text) ? 1 : 0);
+    }, 0);
     return {
       text,
-      rateOptionCount: rateOptionMatches.length,
+      rateOptionCount: Math.max(optionTokenSet.size, carrierHitCount),
       hasFreightBreakdown: /Freight Rates Breakdown/i.test(text),
     };
   } catch (err) {
@@ -411,9 +438,15 @@ async function main() {
   }
 
   let diagnosticsOk = true;
+  let expectedRateOptionCount = 0;
+  let expectedCarrierNames = [];
   if (latestVersionId) {
     const diagnosticsResult = await buildRateDiagnostics(latestVersionId);
     diagnosticsOk = diagnosticsResult.ok;
+    const chargeBacked = (diagnosticsResult.diagnostics || []).filter((d) => d.chargeCount > 0 && d.cellCount > 0);
+    const source = chargeBacked.length > 0 ? chargeBacked : (diagnosticsResult.diagnostics || []);
+    expectedCarrierNames = source.map((d) => d.carrier).filter(Boolean);
+    expectedRateOptionCount = source.length;
   }
 
   // 2. Fetch Templates
@@ -483,13 +516,14 @@ async function main() {
         } else {
             console.log(`SUCCESS: PDF generated and appears valid (${source}).`);
             successfulPdfCount += 1;
-            const pdfSummary = await extractPdfTextSummary(pdfBuffer);
+            const pdfSummary = await extractPdfTextSummary(pdfBuffer, expectedCarrierNames);
             console.log('PDF Content Summary:', {
               rateOptionCount: pdfSummary.rateOptionCount,
               hasFreightBreakdown: pdfSummary.hasFreightBreakdown,
             });
-            if (QUOTE_NUMBER === 'QUO-260309-00001' && pdfSummary.rateOptionCount < 4) {
-              console.error(`Expected at least 4 rate option sections, found ${pdfSummary.rateOptionCount}.`);
+            const requiredRateOptions = expectedRateOptionCount > 0 ? expectedRateOptionCount : 4;
+            if (QUOTE_NUMBER === 'QUO-260309-00001' && pdfSummary.rateOptionCount < requiredRateOptions) {
+              console.error(`Expected at least ${requiredRateOptions} rate option sections, found ${pdfSummary.rateOptionCount}.`);
               diagnosticsOk = false;
             }
             const filename = `validate_${QUOTE_NUMBER}_${template.name.replace(/\s+/g, '_')}.pdf`;

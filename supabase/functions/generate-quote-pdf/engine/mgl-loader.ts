@@ -36,6 +36,78 @@ async function safeSelectWithTableFallback(
   return { data: legacyData, tableUsed: legacyTable, error: null };
 }
 
+function normalizeMode(value: any): string {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (!normalized) return "";
+  if (normalized === "sea") return "ocean";
+  if (normalized === "truck") return "road";
+  return normalized;
+}
+
+function inferChargeCategory(row: any): string {
+  const code = String(row?.row_code || "").trim().toLowerCase();
+  const name = String(row?.row_name || "").trim().toLowerCase();
+  const token = `${code} ${name}`;
+  if (token.includes("fuel")) return "Fuel";
+  if (token.includes("security")) return "Security";
+  if (token.includes("custom")) return "Customs";
+  if (token.includes("handling")) return "Handling";
+  if (token.includes("delivery") || token.includes("oncarriage")) return "On-Carriage";
+  if (token.includes("air")) return "Air Freight";
+  if (token.includes("ocean") || token.includes("sea")) return "Ocean Freight";
+  return "Freight";
+}
+
+function inferLegForRow(row: any, legs: any[]): any | null {
+  if (!Array.isArray(legs) || legs.length === 0) return null;
+  const rowLegId = row?.leg_id || row?.rate_option_leg_id || row?.option_leg_id || row?.leg_ref_id;
+  if (rowLegId) {
+    const direct = legs.find((leg: any) => leg?.id === rowLegId);
+    if (direct) return direct;
+  }
+
+  const sequenceRaw = row?.sequence_no ?? row?.leg_sequence ?? row?.leg_sequence_no ?? row?.segment_no;
+  const sequenceNo = Number(sequenceRaw);
+  if (Number.isFinite(sequenceNo)) {
+    const bySequence = legs.find((leg: any) => Number(leg?.sequence_no) === sequenceNo);
+    if (bySequence) return bySequence;
+  }
+
+  const rowMode = normalizeMode(row?.transport_mode || row?.mode || row?.segment_mode);
+  if (rowMode) {
+    const byMode = legs.find((leg: any) => normalizeMode(leg?.transport_mode || leg?.mode) === rowMode);
+    if (byMode) return byMode;
+  }
+
+  const code = String(row?.row_code || "").trim().toLowerCase();
+  const name = String(row?.row_name || "").trim().toLowerCase();
+  const token = `${code} ${name}`;
+
+  if (token.includes("oncarriage") || token.includes("delivery") || token.includes("last mile")) {
+    return legs[legs.length - 1];
+  }
+
+  if (token.includes("precarriage") || token.includes("pickup") || token.includes("origin")) {
+    return legs[0];
+  }
+
+  if (token.includes("ocean") || token.includes("sea") || token.includes("vessel")) {
+    const oceanLeg = legs.find((leg: any) => normalizeMode(leg?.transport_mode || leg?.mode) === "ocean");
+    if (oceanLeg) return oceanLeg;
+  }
+
+  if (token.includes("air") || token.includes("flight") || token.includes("uplift")) {
+    const airLeg = legs.find((leg: any) => normalizeMode(leg?.transport_mode || leg?.mode) === "air");
+    if (airLeg) return airLeg;
+  }
+
+  if (legs.length === 1) {
+    return legs[0];
+  }
+
+  return null;
+}
+
 export async function fetchMglOptions(
   supabaseClient: any,
   versionId: string,
@@ -129,6 +201,14 @@ export async function fetchMglOptions(
           for (const row of mglRows) {
             const cell = mglCells.find((c: any) => c.charge_row_id === row.id && c.equipment_key === eqKey);
             if (cell) {
+              const mappedLeg = inferLegForRow(row, mglLegs || []);
+              const mappedMode = normalizeMode(
+                row?.transport_mode ||
+                row?.mode ||
+                row?.segment_mode ||
+                mappedLeg?.transport_mode ||
+                mappedLeg?.mode,
+              );
               optionCharges.push({
                 id: cell.id,
                 charge_name: row.row_name,
@@ -137,8 +217,14 @@ export async function fetchMglOptions(
                 total: Number(cell.amount || 0),
                 currency: row.currency,
                 rate_option_id: mglOpt.id,
-                category: { name: "Freight" }, // Default category
+                category: { name: inferChargeCategory(row) },
                 include_in_total: row.include_in_total,
+                basis: row.basis || "Per Ctr",
+                note: row.remarks || "",
+                quantity: 1,
+                unit_price: Number(cell.amount || 0),
+                leg_id: mappedLeg?.id || null,
+                transport_mode: mappedMode || null,
               });
               if (row.include_in_total) {
                 optionTotal += Number(cell.amount || 0);

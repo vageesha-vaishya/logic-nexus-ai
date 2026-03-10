@@ -340,9 +340,15 @@ async function run() {
 
     // Generate PDF
     console.log('Generating PDF...');
+    const bypassKey = process.env.TEST_BYPASS_KEY || process.env.E2E_BYPASS_KEY || 'trae-bypass-verification-2026';
+    const serviceHeaders = {
+        Authorization: `Bearer ${SUPABASE_KEY}`,
+        apikey: SUPABASE_KEY
+    };
+
     const { data: pdfData, error: pdfError } = await supabase.functions.invoke('generate-quote-pdf', {
         body: { quoteId: quote.id, templateId: templateId },
-        headers: { 'X-E2E-Key': 'trae-bypass-verification-2026' }
+        headers: { ...serviceHeaders, 'X-E2E-Key': bypassKey, 'x-bypass-key': bypassKey }
     });
 
     if (pdfError) {
@@ -381,7 +387,7 @@ async function run() {
 
     const { data: emailData, error: emailError } = await supabase.functions.invoke('send-email', {
         body: emailPayload,
-        headers: { 'X-E2E-Key': 'trae-bypass-verification-2026' }
+        headers: { ...serviceHeaders, 'X-E2E-Key': bypassKey, 'x-bypass-key': bypassKey }
     });
 
     if (emailError) {
