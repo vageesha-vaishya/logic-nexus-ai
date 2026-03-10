@@ -957,7 +957,7 @@ export function EmailInbox() {
                           processEmail(email.id);
                         }}
                       >
-                        Process
+                        Classify
                       </Button>
                       <Button
                         variant="ghost"
