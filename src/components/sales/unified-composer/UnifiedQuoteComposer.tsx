@@ -738,8 +738,16 @@ function UnifiedQuoteComposerContent({
     return String(commodity).trim();
   }, []);
 
+  const resolveLatestCargoItem = useCallback((values: any, extended: any) => {
+    const fromValues = values?.cargoItem;
+    if (fromValues && typeof fromValues === 'object') return fromValues;
+    const fromExtended = extended?.cargoItem;
+    if (fromExtended && typeof fromExtended === 'object') return fromExtended;
+    return null;
+  }, []);
+
   const buildCargoSnapshot = useCallback((values: any, extended: any) => {
-    const cargoItem = (extended?.cargoItem || values?.cargoItem || null) as any;
+    const cargoItem = resolveLatestCargoItem(values, extended) as any;
     const commodityFromCargoItem = normalizeCommodityText(cargoItem?.commodity);
     const rawCommodity = (normalizeCommodityText(values?.commodity) || commodityFromCargoItem || '').trim();
     const hazmat = cargoItem?.hazmat;
@@ -761,7 +769,7 @@ function UnifiedQuoteComposerContent({
       hazmat_details: hazmat || null,
       container_combos: cargoItem?.containerCombos || null,
     };
-  }, [normalizeCommodityText]);
+  }, [normalizeCommodityText, resolveLatestCargoItem]);
 
   const flattenOptionCharges = useCallback((option: RateOption | null | undefined): any[] => {
     if (!option) return [];
@@ -801,9 +809,9 @@ function UnifiedQuoteComposerContent({
     const ext = Array.isArray(extended?.containerCombos) ? extended.containerCombos : [];
     if (ext.length > 0) return ext;
 
-    const cargoCombos = Array.isArray(extended?.cargoItem?.containerCombos)
-      ? extended.cargoItem.containerCombos
-      : (Array.isArray(values?.cargoItem?.containerCombos) ? values.cargoItem.containerCombos : []);
+    const cargoCombos = Array.isArray(values?.cargoItem?.containerCombos)
+      ? values.cargoItem.containerCombos
+      : (Array.isArray(extended?.cargoItem?.containerCombos) ? extended.cargoItem.containerCombos : []);
 
     if (cargoCombos.length > 0) {
       return cargoCombos.map((c: any) => ({
@@ -1044,26 +1052,46 @@ function UnifiedQuoteComposerContent({
 
       // Pre-populate form values for edit mode
       
-      // Calculate totals from quote_items if available AND they have weight/volume data
-      // otherwise fallback to quote header/cargo details.
-      // Note: quote_items_core fallback does not have weight/volume, so we must check for presence.
-      const totalWeight = items.length > 0 && items.some((i: any) => Number(i.weight_kg) > 0)
+      const draftMode = String(raw.status || '').toLowerCase() === 'draft';
+      const snapshotCommodity = normalizeCommodityText(cargoDetails?.commodity) || normalizeCommodityText(cargoDetails?.commodity_details);
+      const hasSnapshotWeight = cargoDetails?.total_weight_kg !== null && cargoDetails?.total_weight_kg !== undefined;
+      const hasSnapshotVolume = cargoDetails?.total_volume_cbm !== null && cargoDetails?.total_volume_cbm !== undefined;
+      const hasSnapshotCombos = Array.isArray(cargoDetails?.container_combos) && cargoDetails.container_combos.length > 0;
+      const hasSnapshotCargo = !!snapshotCommodity || hasSnapshotWeight || hasSnapshotVolume || hasSnapshotCombos || !!cargoDetails?.quantity;
+
+      // For draft reloads, prefer latest header snapshot (quote.cargo_details) when present,
+      // because quote_items may still contain stale finalized-line values.
+      const itemDerivedWeight = items.length > 0 && items.some((i: any) => Number(i.weight_kg) > 0)
         ? items.reduce((sum: number, item: any) => sum + (Number(item.weight_kg) || 0), 0)
-        : (cargoDetails?.total_weight_kg || raw.total_weight || '');
-        
-      const totalVolume = items.length > 0 && items.some((i: any) => Number(i.volume_cbm) > 0)
+        : '';
+      const itemDerivedVolume = items.length > 0 && items.some((i: any) => Number(i.volume_cbm) > 0)
         ? items.reduce((sum: number, item: any) => sum + (Number(item.volume_cbm) || 0), 0)
-        : (cargoDetails?.total_volume_cbm || raw.total_volume || '');
-        
+        : '';
+
+      const totalWeight = (draftMode && hasSnapshotCargo)
+        ? (cargoDetails?.total_weight_kg ?? raw.total_weight ?? itemDerivedWeight ?? '')
+        : (itemDerivedWeight || cargoDetails?.total_weight_kg || raw.total_weight || '');
+
+      const totalVolume = (draftMode && hasSnapshotCargo)
+        ? (cargoDetails?.total_volume_cbm ?? raw.total_volume ?? itemDerivedVolume ?? '')
+        : (itemDerivedVolume || cargoDetails?.total_volume_cbm || raw.total_volume || '');
+
       const itemCommodity = items.find((i: any) => i?.product_name || i?.description);
-      const primaryCommodity = (
-        itemCommodity?.product_name ||
-        itemCommodity?.description ||
-        normalizeCommodityText(cargoDetails?.commodity) ||
-        normalizeCommodityText(cargoDetails?.commodity_details) ||
-        raw.commodity ||
-        ''
-      );
+      const primaryCommodity = (draftMode && hasSnapshotCargo)
+        ? (
+          snapshotCommodity ||
+          itemCommodity?.product_name ||
+          itemCommodity?.description ||
+          raw.commodity ||
+          ''
+        )
+        : (
+          itemCommodity?.product_name ||
+          itemCommodity?.description ||
+          snapshotCommodity ||
+          raw.commodity ||
+          ''
+        );
       const cargoHazmat = cargoDetails?.hazmat_details && typeof cargoDetails.hazmat_details === 'object'
         ? cargoDetails.hazmat_details
         : ((cargoDetails?.dangerous_goods || raw.dangerous_goods) ? {
@@ -2505,21 +2533,50 @@ function UnifiedQuoteComposerContent({
       return;
     }
     const values = form.getValues() as FormZoneValues;
-    const fallbackExtended = values as unknown as ExtendedFormData;
-    const extended = lastFormData?.extended || fallbackExtended;
+    const priorExtended = (lastFormData?.extended || initialExtended || {}) as Partial<ExtendedFormData>;
+    const fallbackExtended: ExtendedFormData = {
+      containerType: values.containerType || '',
+      containerSize: values.containerSize || '',
+      containerQty: values.containerQty || '1',
+      containerCombos: (values.containerCombos || priorExtended.containerCombos || [])
+        .map((combo) => ({
+          type: combo?.type || '',
+          size: combo?.size || '',
+          qty: Number(combo?.qty) || 1,
+        }))
+        .filter((combo) => Boolean(combo.type && combo.size)),
+      htsCode: values.htsCode || '',
+      aes_hts_id: priorExtended.aes_hts_id || '',
+      scheduleB: priorExtended.scheduleB || '',
+      dims: priorExtended.dims || '',
+      dangerousGoods: !!values.dangerousGoods,
+      pickupDate: values.pickupDate || '',
+      deliveryDeadline: values.deliveryDeadline || '',
+      incoterms: values.incoterms || '',
+      specialHandling: priorExtended.specialHandling || '',
+      vehicleType: values.vehicleType || priorExtended.vehicleType || 'van',
+      attachments: values.attachments || [],
+      cargoItem: (values as FormZoneValues & { cargoItem?: ExtendedFormData['cargoItem'] }).cargoItem
+        ?? (lastFormData?.values as FormZoneValues & { cargoItem?: ExtendedFormData['cargoItem'] } | undefined)?.cargoItem
+        ?? lastFormData?.extended?.cargoItem
+        ?? initialExtended?.cargoItem
+        ?? null,
+      originDetails: priorExtended.originDetails || null,
+      destinationDetails: priorExtended.destinationDetails || null,
+    };
+    const extended = {
+      ...(initialExtended || {}),
+      ...(lastFormData?.extended || {}),
+      ...fallbackExtended,
+    } as ExtendedFormData;
     await handleGetRates(values, extended, isSmartMode);
-  }, [form, handleGetRates, handleValidationFailed, isSmartMode, lastFormData?.extended]);
+  }, [form, handleGetRates, handleValidationFailed, isSmartMode, lastFormData?.extended, initialExtended]);
 
   // ---------------------------------------------------------------------------
   // Draft save (manual)
   // ---------------------------------------------------------------------------
 
   const handleSaveDraft = useCallback(async () => {
-    if (!lastFormData) {
-      toast({ title: 'Nothing to save', description: 'Please fill out the form first.' });
-      return;
-    }
-
     const tenantId = storeState.tenantId || context?.tenantId;
     if (!tenantId) {
       toast({ title: 'Error', description: 'Tenant context not found', variant: 'destructive' });
@@ -2530,7 +2587,45 @@ function UnifiedQuoteComposerContent({
 
     try {
       setSaving(true);
-      const formData = lastFormData;
+      const currentValues = form.getValues() as FormZoneValues;
+      const mergedValues = {
+        ...(lastFormData?.values || {}),
+        ...currentValues,
+      } as FormZoneValues;
+      const priorExtended = (lastFormData?.extended || initialExtended || {}) as Partial<ExtendedFormData>;
+      const mergedExtended = {
+        ...(initialExtended || {}),
+        ...(lastFormData?.extended || {}),
+        containerType: currentValues.containerType || '',
+        containerSize: currentValues.containerSize || '',
+        containerQty: currentValues.containerQty || '1',
+        containerCombos: (currentValues.containerCombos || priorExtended.containerCombos || [])
+          .map((combo) => ({
+            type: combo?.type || '',
+            size: combo?.size || '',
+            qty: Number(combo?.qty) || 1,
+          }))
+          .filter((combo) => Boolean(combo.type && combo.size)),
+        htsCode: currentValues.htsCode || '',
+        aes_hts_id: priorExtended.aes_hts_id || '',
+        scheduleB: priorExtended.scheduleB || '',
+        dims: priorExtended.dims || '',
+        dangerousGoods: !!currentValues.dangerousGoods,
+        pickupDate: currentValues.pickupDate || '',
+        deliveryDeadline: currentValues.deliveryDeadline || '',
+        incoterms: currentValues.incoterms || '',
+        specialHandling: priorExtended.specialHandling || '',
+        vehicleType: currentValues.vehicleType || priorExtended.vehicleType || 'van',
+        attachments: currentValues.attachments || [],
+        cargoItem: (currentValues as FormZoneValues & { cargoItem?: ExtendedFormData['cargoItem'] }).cargoItem
+          ?? (lastFormData?.values as FormZoneValues & { cargoItem?: ExtendedFormData['cargoItem'] } | undefined)?.cargoItem
+          ?? lastFormData?.extended?.cargoItem
+          ?? initialExtended?.cargoItem
+          ?? null,
+        originDetails: priorExtended.originDetails || null,
+        destinationDetails: priorExtended.destinationDetails || null,
+      } as ExtendedFormData;
+      const formData = { values: mergedValues, extended: mergedExtended };
       const cargoSnapshot = buildCargoSnapshot(formData.values, formData.extended);
       const quotePayload: any = {
         id: isUUID(storeState.quoteId) ? storeState.quoteId : (isUUID(quoteId) ? quoteId : undefined),
@@ -2736,7 +2831,13 @@ function UnifiedQuoteComposerContent({
   const handleFormChange = useCallback((values: any) => {
     setLastFormData((prev) => ({
       values: values as FormZoneValues,
-      extended: (prev?.extended || (initialExtended as ExtendedFormData) || ({} as ExtendedFormData)),
+      extended: {
+        ...(prev?.extended || (initialExtended as ExtendedFormData) || ({} as ExtendedFormData)),
+        cargoItem: (values as FormZoneValues & { cargoItem?: ExtendedFormData['cargoItem'] }).cargoItem
+          ?? prev?.extended?.cargoItem
+          ?? (initialExtended as ExtendedFormData | undefined)?.cargoItem
+          ?? null,
+      },
     }));
   }, [initialExtended]);
 

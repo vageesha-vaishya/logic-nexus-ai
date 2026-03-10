@@ -681,6 +681,94 @@ describe('UnifiedQuoteComposer Integration (API-to-UI)', () => {
         }, { timeout: 3000 });
     });
 
+    it('prefers draft cargo_details over stale quote_items during reload', async () => {
+        const QUOTE_ID = '123e4567-e89b-12d3-a456-426614174120';
+        const VERSION_ID = 'v1';
+
+        mockScopedDb.from.mockImplementation((table: string) => {
+            if (table === 'quotes') {
+                return createMockChain({
+                    id: QUOTE_ID,
+                    quote_number: 'QUO-260309-00001',
+                    status: 'draft',
+                    tenant_id: 'test-tenant',
+                    origin: 'Miami',
+                    destination: 'Santos',
+                    current_version_id: VERSION_ID,
+                    cargo_details: {
+                        commodity: 'Updated Draft Commodity',
+                        total_weight_kg: 640,
+                        total_volume_cbm: 28.4,
+                        hts_code: '8507.60',
+                        quantity: 4,
+                        cargo_type: 'unit',
+                    }
+                });
+            } else if (table === 'quotation_versions') {
+                return createMockChain([{ id: VERSION_ID, version_number: 1 }]);
+            } else if (table === 'quote_items') {
+                return createMockChain([
+                    { product_name: 'Stale Item Commodity', weight_kg: 100, volume_cbm: 10 }
+                ]);
+            } else if (table === 'quote_documents' || table === 'quote_cargo_configurations' || table === 'quotation_version_options' || table === 'quotation_version_option_legs' || table === 'quote_charges') {
+                return createMockChain([]);
+            }
+            return createMockChain([]);
+        });
+
+        mockSupabase.from.mockImplementation((table: string) => {
+            if (table === 'quotes') {
+                return createMockChain({
+                    id: QUOTE_ID,
+                    quote_number: 'QUO-260309-00001',
+                    status: 'draft',
+                    tenant_id: 'test-tenant',
+                    origin: 'Miami',
+                    destination: 'Santos',
+                    current_version_id: VERSION_ID,
+                    cargo_details: {
+                        commodity: 'Updated Draft Commodity',
+                        total_weight_kg: 640,
+                        total_volume_cbm: 28.4,
+                        hts_code: '8507.60',
+                        quantity: 4,
+                        cargo_type: 'unit',
+                    }
+                });
+            } else if (table === 'quotation_versions') {
+                return createMockChain([{ id: VERSION_ID, version_number: 1 }]);
+            } else if (table === 'quote_items') {
+                return createMockChain([
+                    { product_name: 'Stale Item Commodity', weight_kg: 100, volume_cbm: 10 }
+                ]);
+            } else if (table === 'quote_documents' || table === 'quote_cargo_configurations') {
+                return createMockChain([]);
+            }
+            return createMockChain([]);
+        });
+
+        const queryClient = new QueryClient({
+            defaultOptions: { queries: { retry: false } },
+        });
+
+        render(
+            <QueryClientProvider client={queryClient}>
+                <MemoryRouter initialEntries={[`/quotes/edit/${QUOTE_ID}`]}>
+                    <Routes>
+                        <Route path="/quotes/edit/:quoteId" element={<UnifiedQuoteComposer quoteId={QUOTE_ID} />} />
+                    </Routes>
+                </MemoryRouter>
+            </QueryClientProvider>
+        );
+
+        await waitFor(() => {
+            expect(screen.getByTestId('commodity-input')).toHaveValue('Updated Draft Commodity');
+        }, { timeout: 3000 });
+
+        expect(screen.getByTestId('cargo-weight')).toHaveValue('640');
+        expect(screen.getByTestId('cargo-volume')).toHaveValue('28.4');
+    });
+
     it('updates composer state and persists changes when FormZone inputs change', async () => {
         const QUOTE_ID = '123e4567-e89b-12d3-a456-426614174000';
         const VERSION_ID = '123e4567-e89b-12d3-a456-426614174001';
@@ -1070,6 +1158,98 @@ describe('UnifiedQuoteComposer Integration (API-to-UI)', () => {
                         ]),
                     }),
                 })
+            );
+        });
+    });
+
+    it('uses latest form cargoItem values for draft save payload', async () => {
+        const QUOTE_ID = '123e4567-e89b-12d3-a456-426614174350';
+        const VERSION_ID = '123e4567-e89b-12d3-a456-426614174351';
+        const OPTION_ID = '123e4567-e89b-12d3-a456-426614174352';
+        const user = userEvent.setup();
+
+        mockScopedDb.from.mockImplementation((table: string) => {
+            if (table === 'quotes') {
+                return createMockChain({
+                    id: QUOTE_ID,
+                    quote_number: 'QUO-260309-00001',
+                    transport_mode: 'ocean',
+                    origin: 'Miami',
+                    destination: 'Santos',
+                    origin_port_id: 'port-origin-1',
+                    destination_port_id: 'port-dest-1',
+                    current_version_id: VERSION_ID,
+                    tenant_id: 'test-tenant',
+                    account_id: 'acc-1',
+                    cargo_details: {
+                        commodity: 'Initial Commodity',
+                        total_weight_kg: 100,
+                        total_volume_cbm: 10,
+                        commodity_details: { description: 'Initial Commodity', hts_code: '1111.11' },
+                    },
+                });
+            } else if (table === 'quotation_versions') {
+                return createMockChain([{ id: VERSION_ID, version_number: 1 }]);
+            } else if (table === 'quotation_version_options') {
+                return createMockChain([{
+                    id: OPTION_ID,
+                    quotation_version_id: VERSION_ID,
+                    is_selected: true,
+                    option_name: 'Test Option',
+                    total_amount: 2000,
+                    currency: 'USD',
+                }]);
+            } else if (table === 'quotation_version_option_legs' || table === 'quote_charges' || table === 'quote_items' || table === 'quote_documents' || table === 'quote_cargo_configurations') {
+                return createMockChain([]);
+            }
+            return createMockChain([]);
+        });
+
+        mockScopedDb.rpc.mockResolvedValue({ data: QUOTE_ID, error: null });
+
+        const queryClient = new QueryClient({
+            defaultOptions: { queries: { retry: false } },
+        });
+
+        render(
+            <QueryClientProvider client={queryClient}>
+                <MemoryRouter initialEntries={[`/quotes/edit/${QUOTE_ID}`]}>
+                    <Routes>
+                        <Route path="/quotes/edit/:quoteId" element={<UnifiedQuoteComposer quoteId={QUOTE_ID} />} />
+                    </Routes>
+                </MemoryRouter>
+            </QueryClientProvider>
+        );
+
+        await waitFor(() => {
+            expect(screen.getByTestId('commodity-input')).toHaveValue('Initial Commodity');
+        });
+
+        await user.click(screen.getByTestId('set-cargo-edited'));
+        await user.click(screen.getByRole('tab', { name: /Results & Finalize/i }));
+        await user.click(screen.getByRole('button', { name: /^Draft$/i }));
+
+        await waitFor(() => {
+            const saveCalls = mockScopedDb.rpc.mock.calls.filter((c: any[]) => c[0] === 'save_quote_atomic');
+            expect(saveCalls.length).toBeGreaterThan(0);
+            const lastPayload = saveCalls[saveCalls.length - 1][1]?.p_payload;
+            expect(lastPayload?.quote?.cargo_details).toEqual(
+                expect.objectContaining({
+                    commodity: 'Consumer Electronics',
+                    total_weight_kg: 600,
+                    total_volume_cbm: 24.2,
+                    dangerous_goods: false,
+                    hts_code: '8517.12',
+                    stackable: false,
+                    dimensions: expect.objectContaining({ l: 130, w: 90, h: 150, unit: 'cm' }),
+                    commodity_details: expect.objectContaining({ description: 'Consumer Electronics', hts_code: '8517.12' }),
+                })
+            );
+            expect(lastPayload?.quote?.cargo_details?.hazmat_details).toBeNull();
+            expect(lastPayload?.cargo_configurations).toEqual(
+                expect.arrayContaining([
+                    expect.objectContaining({ quantity: 3 }),
+                ])
             );
         });
     });

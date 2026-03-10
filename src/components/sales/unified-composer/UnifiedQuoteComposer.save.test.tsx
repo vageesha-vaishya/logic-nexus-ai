@@ -321,7 +321,7 @@ vi.mock('@/components/notifications/QuotationSuccessToast', () => ({
 }));
 
 vi.mock('./FormZone', () => ({
-    FormZone: ({ onGetRates }: any) => (
+    FormZone: ({ onGetRates, onSaveDraft }: any) => (
         <div data-testid="form-zone">
             <div data-field-name="origin">
                 <input name="origin" data-testid="origin-field" />
@@ -338,6 +338,9 @@ vi.mock('./FormZone', () => ({
                 )}
             >
                 Search
+            </button>
+            <button data-testid="draft-btn" onClick={() => onSaveDraft?.()}>
+                Draft
             </button>
         </div>
     )
@@ -768,6 +771,161 @@ describe('UnifiedQuoteComposer - Save Functionality', () => {
             container_size_id: '00000000-0000-0000-0000-000000000002',
           })
         );
+    });
+
+    it('uses latest form cargoItem for draft save when initial cargoItem is stale', async () => {
+        const staleCargoItem = {
+            id: 'main',
+            type: 'container',
+            quantity: 1,
+            commodity: { description: 'Old Commodity', hts_code: '1111.11' },
+            weight: { value: 90, unit: 'kg' },
+            volume: 9,
+            stackable: true,
+            dimensions: { l: 100, w: 100, h: 100, unit: 'cm' },
+            hazmat: { class: '3', unNumber: '1203', packingGroup: 'II' },
+            containerCombos: [{ typeId: 'ct-1', sizeId: 'cs-1', quantity: 1 }],
+        };
+        const latestCargoItem = {
+            id: 'main',
+            type: 'container',
+            quantity: 4,
+            commodity: { description: 'Updated Commodity', hts_code: '8507.60' },
+            weight: { value: 640, unit: 'kg' },
+            volume: 28.4,
+            stackable: false,
+            dimensions: { l: 140, w: 95, h: 160, unit: 'cm' },
+            hazmat: null,
+            containerCombos: [{ typeId: 'ct-1', sizeId: 'cs-1', quantity: 4 }],
+        };
+
+        mockFormReturn.getValues.mockReturnValue({
+            ...mockFormReturn.getValues(),
+            mode: 'ocean',
+            quoteNumber: 'QUO-260309-00001',
+            origin: 'Miami',
+            destination: 'Santos',
+            commodity: 'Updated Commodity',
+            htsCode: '8507.60',
+            weight: '640',
+            volume: '28.4',
+            dangerousGoods: false,
+            cargoItem: latestCargoItem,
+            containerType: 'ct-1',
+            containerSize: 'cs-1',
+            containerQty: '4',
+        });
+
+        render(
+            <MemoryRouter>
+                <UnifiedQuoteComposer
+                    initialData={{
+                        mode: 'ocean',
+                        quoteNumber: 'QUO-260309-00001',
+                        origin: 'Miami',
+                        destination: 'Santos',
+                        cargoItem: staleCargoItem as any,
+                    }}
+                />
+            </MemoryRouter>
+        );
+
+        const draftBtn = await screen.findByTestId('draft-btn');
+        fireEvent.click(draftBtn);
+
+        await waitFor(() => {
+            const saveCall = (mockScopedDb.rpc as any).mock.calls.find((call: any[]) => call[0] === 'save_quote_atomic');
+            expect(saveCall).toBeTruthy();
+            const payload = saveCall[1]?.p_payload;
+            expect(payload?.quote?.cargo_details).toEqual(
+                expect.objectContaining({
+                    commodity: 'Updated Commodity',
+                    hts_code: '8507.60',
+                    total_weight_kg: 640,
+                    total_volume_cbm: 28.4,
+                    cargo_type: 'container',
+                    quantity: 4,
+                    stackable: false,
+                    dangerous_goods: false,
+                    commodity_details: expect.objectContaining({ description: 'Updated Commodity', hts_code: '8507.60' }),
+                })
+            );
+            expect(payload?.quote?.cargo_details?.hazmat_details).toBeNull();
+            expect(payload?.cargo_configurations).toEqual(
+                expect.arrayContaining([
+                    expect.objectContaining({ quantity: 4 }),
+                ])
+            );
+        });
+    });
+
+    it('persists unit cargo draft details without container configurations', async () => {
+        const latestCargoItem = {
+            id: 'main',
+            type: 'unit',
+            quantity: 12,
+            commodity: { description: 'Palletized Machinery', hts_code: '8428.90' },
+            weight: { value: 1800, unit: 'kg' },
+            volume: 9.6,
+            stackable: true,
+            dimensions: { l: 120, w: 100, h: 80, unit: 'cm' },
+            hazmat: null,
+            containerCombos: [],
+        };
+
+        mockFormReturn.getValues.mockReturnValue({
+            ...mockFormReturn.getValues(),
+            mode: 'air',
+            quoteNumber: 'QUO-260309-00001',
+            origin: 'Miami',
+            destination: 'Sao Paulo',
+            commodity: 'Palletized Machinery',
+            htsCode: '8428.90',
+            weight: '1800',
+            volume: '9.6',
+            dangerousGoods: false,
+            cargoItem: latestCargoItem,
+            containerType: '',
+            containerSize: '',
+            containerQty: '12',
+            containerCombos: [],
+        });
+
+        render(
+            <MemoryRouter>
+                <UnifiedQuoteComposer
+                    initialData={{
+                        mode: 'air',
+                        quoteNumber: 'QUO-260309-00001',
+                        origin: 'Miami',
+                        destination: 'Sao Paulo',
+                    }}
+                />
+            </MemoryRouter>
+        );
+
+        const draftBtn = await screen.findByTestId('draft-btn');
+        fireEvent.click(draftBtn);
+
+        await waitFor(() => {
+            const saveCall = (mockScopedDb.rpc as any).mock.calls.find((call: any[]) => call[0] === 'save_quote_atomic');
+            expect(saveCall).toBeTruthy();
+            const payload = saveCall[1]?.p_payload;
+            expect(payload?.quote?.cargo_details).toEqual(
+                expect.objectContaining({
+                    commodity: 'Palletized Machinery',
+                    hts_code: '8428.90',
+                    total_weight_kg: 1800,
+                    total_volume_cbm: 9.6,
+                    cargo_type: 'unit',
+                    quantity: 12,
+                    stackable: true,
+                    dangerous_goods: false,
+                    commodity_details: expect.objectContaining({ description: 'Palletized Machinery', hts_code: '8428.90' }),
+                })
+            );
+            expect(payload?.cargo_configurations || []).toHaveLength(0);
+        });
     });
 
     it('shows validation summary and blocks save when form has errors', async () => {

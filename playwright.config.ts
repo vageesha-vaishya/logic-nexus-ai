@@ -1,5 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const firefoxNoSandbox = process.env.PW_FIREFOX_NO_SANDBOX === '1';
+
 export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: true,
@@ -18,7 +20,24 @@ export default defineConfig({
     },
     {
       name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
+      use: {
+        ...devices['Desktop Firefox'],
+        ...(firefoxNoSandbox
+          ? {
+              launchOptions: {
+                env: {
+                  MOZ_DISABLE_CONTENT_SANDBOX: '1',
+                  MOZ_DISABLE_GMP_SANDBOX: '1',
+                  MOZ_DISABLE_RDD_SANDBOX: '1',
+                  MOZ_DISABLE_SOCKET_PROCESS_SANDBOX: '1',
+                },
+                firefoxUserPrefs: {
+                  'security.sandbox.content.level': 0,
+                },
+              },
+            }
+          : {}),
+      },
     },
     {
       name: 'webkit',

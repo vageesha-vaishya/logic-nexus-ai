@@ -3,10 +3,64 @@ import { test, expect } from '@playwright/test';
 test.describe('End-to-End Business Flow', () => {
     test.setTimeout(120000); // 2 minutes timeout for the whole suite including hooks
 
+    const setStableUiState = async (page: any) => {
+        await page.addInitScript(() => {
+            localStorage.setItem('has_seen_onboarding_tour', 'true');
+        });
+    };
+
+    const pickTenantIfVisible = async (page: any) => {
+        const tenantField = page.locator('div.space-y-2').filter({ hasText: 'Tenant *' }).first();
+        if (await tenantField.isVisible()) {
+            const tenantCombobox = tenantField.getByRole('combobox').first();
+            await tenantCombobox.click();
+            await page.getByRole('option').first().click();
+        }
+    };
+
+    const fillQuoteBasics = async (page: any, title: string) => {
+        const quoteTitleInput = page.getByTestId('quote-title-input');
+        if (await quoteTitleInput.isVisible()) {
+            await quoteTitleInput.fill(title);
+        } else {
+            await page.getByLabel(/Quote Reference|Quote Title/i).first().fill(title);
+        }
+
+        const originTrigger = page.getByTestId('origin-select-trigger');
+        if (await originTrigger.isVisible()) {
+            await originTrigger.click();
+        } else {
+            await page.locator('[data-field-name="origin"]').getByRole('combobox').first().click();
+        }
+        await page.getByRole('option').filter({ hasText: 'Shanghai' }).first().click();
+
+        const destinationTrigger = page.getByTestId('destination-select-trigger');
+        if (await destinationTrigger.isVisible()) {
+            await destinationTrigger.click();
+        } else {
+            await page.locator('[data-field-name="destination"]').getByRole('combobox').first().click();
+        }
+        await page.getByRole('option').filter({ hasText: 'New York' }).first().click();
+    };
+
+    const saveQuoteFromCurrentUi = async (page: any) => {
+        const saveQuoteButton = page.getByTestId('save-quote-btn');
+        if (await saveQuoteButton.isVisible()) {
+            await saveQuoteButton.click();
+        } else {
+            await page.getByRole('button', { name: /^Draft$/ }).first().click();
+        }
+        await expect(
+            page.getByText(/Quote saved successfully|Draft saved/i).first()
+        ).toBeVisible({ timeout: 10000 });
+    };
+
     // Shared state
     let oppId: string;
     
     test.beforeEach(async ({ page }) => {
+        await setStableUiState(page);
+
         // Mock AI Advisor
         await page.route('**/functions/v1/ai-advisor', async route => {
             const json = {
@@ -172,6 +226,32 @@ test.describe('End-to-End Business Flow', () => {
             }
         });
 
+        await page.route('**/rest/v1/quotation_versions*', async route => {
+            const method = route.request().method();
+            const url = route.request().url();
+            if (method === 'GET') {
+                const quoteMatch = url.match(/quote_id=eq\.([0-9a-fA-F-]{36})/);
+                const quoteId = quoteMatch?.[1] ?? quote1Id;
+                await route.fulfill({
+                    json: [{
+                        id: `ver-${quoteId}`,
+                        quote_id: quoteId,
+                        version_number: 1,
+                        tenant_id: 't_1'
+                    }]
+                });
+            } else {
+                await route.fulfill({
+                    json: [{
+                        id: 'ver-upsert',
+                        quote_id: quote1Id,
+                        version_number: 1,
+                        tenant_id: 't_1'
+                    }]
+                });
+            }
+        });
+
         // Login
         await page.goto('/auth');
         // Use data-testid for more robust selection
@@ -179,6 +259,7 @@ test.describe('End-to-End Business Flow', () => {
         await page.getByTestId('password-input').fill('Vimal@1234');
         await page.getByTestId('login-btn').click();
         await expect(page).toHaveURL('/dashboard');
+        await page.evaluate(() => localStorage.setItem('has_seen_onboarding_tour', 'true'));
     });
 
     test('should complete full flow: Opportunity -> Smart Quote (Multi-Mode) -> Multi-Quote -> Booking', async ({ page }) => {
@@ -194,13 +275,7 @@ test.describe('End-to-End Business Flow', () => {
         await page.getByLabel('Opportunity Name').fill(oppName);
         
         // Select Tenant if visible (for Platform Admins)
-        const tenantLabel = page.getByText('Tenant *');
-        if (await tenantLabel.isVisible()) {
-            console.log('Platform Admin detected, selecting Tenant...');
-            // Find the FormItem that contains the label "Tenant *" and click the combobox
-            await page.locator('div.space-y-2').filter({ hasText: 'Tenant *' }).getByRole('combobox').click();
-            await page.getByRole('option').first().click();
-        }
+        await pickTenantIfVisible(page);
 
         // Check for error toasts
         const errorToast = page.locator('.group.toast.destructive');
@@ -229,7 +304,7 @@ test.describe('End-to-End Business Flow', () => {
         await expect(page).toHaveURL(/.*\/quotes\/new.*/);
         
         // Fill Quote Form
-        await page.getByTestId('quote-title-input').fill('Smart Quote for E2E Test');
+        await fillQuoteBasics(page, 'Smart Quote for E2E Test');
 
         // Select Service Type if available
         const serviceTypeTrigger = page.getByTestId('service-type-select-trigger');
@@ -240,18 +315,8 @@ test.describe('End-to-End Business Flow', () => {
             await option.click();
         }
 
-        // Fill Origin/Destination using TestIDs
-        await page.getByTestId('origin-select-trigger').click();
-        await page.getByRole('option').filter({ hasText: 'Shanghai' }).first().click();
-        
-        await page.getByTestId('destination-select-trigger').click();
-        await page.getByRole('option').filter({ hasText: 'New York' }).first().click(); 
-        
         // Save Quote
-        await page.getByTestId('save-quote-btn').click();
-        
-        // Verify Quote Creation Success (Note: It stays on the same page but switches view)
-        await expect(page.getByText('Quote saved successfully')).toBeVisible({ timeout: 10000 });
+        await saveQuoteFromCurrentUi(page);
         console.log('Quote Saved successfully.');
 
         // Navigate to Quote List to find the created quote
@@ -275,7 +340,7 @@ test.describe('End-to-End Business Flow', () => {
         await page.getByTestId('new-quote-btn').click();
 
         // Fill Quote Form
-        await page.getByTestId('quote-title-input').fill('Manual Quote for E2E Test');
+        await fillQuoteBasics(page, 'Manual Quote for E2E Test');
 
         // Select Service Type if available
         const serviceTypeTrigger2 = page.getByTestId('service-type-select-trigger');
@@ -286,16 +351,7 @@ test.describe('End-to-End Business Flow', () => {
             await option.click();
         }
 
-        await page.getByTestId('origin-select-trigger').click();
-        await page.getByRole('option').filter({ hasText: 'Shanghai' }).first().click();
-        
-        await page.getByTestId('destination-select-trigger').click();
-        await page.getByRole('option').filter({ hasText: 'New York' }).first().click(); 
-        
-        await page.getByTestId('save-quote-btn').click();
-        
-        // Verify Quote 2 Creation
-        await expect(page.getByText('Quote saved successfully')).toBeVisible({ timeout: 10000 });
+        await saveQuoteFromCurrentUi(page);
         console.log('Quote 2 Saved successfully.');
 
         // Navigate back to Quotes List
@@ -330,16 +386,9 @@ test.describe('End-to-End Business Flow', () => {
         await page.goto('/dashboard/quotes/new');
         
         // Fill Quote Form
-        await page.getByTestId('quote-title-input').fill('Draft Quote Test');
+        await fillQuoteBasics(page, 'Draft Quote Test');
         
-        await page.getByTestId('origin-select-trigger').click();
-        await page.getByRole('option').filter({ hasText: 'Shanghai' }).first().click();
-        
-        await page.getByTestId('destination-select-trigger').click();
-        await page.getByRole('option').filter({ hasText: 'New York' }).first().click(); 
-        
-        await page.getByTestId('save-quote-btn').click();
-        await expect(page.getByText('Quote saved successfully')).toBeVisible();
+        await saveQuoteFromCurrentUi(page);
 
         // Go to Detail Page
         // Mock returns ID 1111 which is Draft by default

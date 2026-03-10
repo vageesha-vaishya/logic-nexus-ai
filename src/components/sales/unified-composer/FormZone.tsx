@@ -188,14 +188,14 @@ export function FormZone({
     setAvailability('loading');
     const timer = setTimeout(async () => {
       try {
-        const isUnique = await QuotationNumberService.isUnique(scopedDb, context.tenantId || '', quoteNumber);
+        const isUnique = await QuotationNumberService.isUnique(supabase, context.tenantId || '', quoteNumber);
         setAvailability(isUnique ? 'available' : 'unavailable');
       } catch (err) {
         setAvailability('unavailable');
       }
     }, 500);
     return () => clearTimeout(timer);
-  }, [quoteNumber, scopedDb, context?.tenantId]);
+  }, [quoteNumber, supabase, context?.tenantId]);
 
   const onOpportunityChange = (opportunityId: string | undefined) => {
     form.setValue('opportunityId' as any, opportunityId || '', { shouldValidate: true, shouldDirty: true });
@@ -233,16 +233,13 @@ export function FormZone({
     }
   };
 
-  // Propagate changes - REMOVED to prevent excessive re-renders
-  // Parent component can access form values via form.watch() or form.getValues() directly if needed
-  /*
   useEffect(() => {
+    if (!onChange) return;
     const subscription = form.watch((value) => {
       onChange?.(value);
     });
     return () => subscription.unsubscribe();
-  }, [form.watch, onChange]);
-  */
+  }, [form, onChange]);
 
   const mode = form.watch('mode');
   const commodity = form.watch('commodity');
