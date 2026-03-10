@@ -1,13 +1,13 @@
-import { useState, useEffect, useMemo, useReducer, useCallback } from 'react';
+import { useState, useEffect, useMemo, useReducer, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useForm, FormProvider } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { quoteComposerSchema, QuoteComposerValues } from './schema';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plane, Ship, Truck, Train, Timer, Sparkles, ChevronDown, Save, Settings2, Building2, User, FileText, Loader2, AlertCircle, History, ExternalLink, X } from 'lucide-react';
 import {
   Dialog,
@@ -62,6 +62,10 @@ type ValidationIssue = {
   message: string;
 };
 
+type ComposerSection = 'form' | 'results' | 'finalize';
+
+const HYDRATION_CACHE_WINDOW_MS = 1000 * 60 * 5;
+
 // ---------------------------------------------------------------------------
 // Wrapped export (provides QuoteStoreProvider)
 // ---------------------------------------------------------------------------
@@ -79,7 +83,11 @@ export function UnifiedQuoteComposer(props: UnifiedQuoteComposerProps) {
 // Inner content component
 // ---------------------------------------------------------------------------
 
-function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: UnifiedQuoteComposerProps) {
+function UnifiedQuoteComposerContent({
+  quoteId,
+  versionId,
+  initialData,
+}: UnifiedQuoteComposerProps) {
   logger.debug('[UnifiedComposer] Render Content', { quoteId, versionId });
   const { scopedDb, context, supabase } = useCRM();
   const { user } = useAuth();
@@ -124,6 +132,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
   const [networkStatus, setNetworkStatus] = useState<'online' | 'offline' | 'checking'>('online');
   const [showNetworkWarning, setShowNetworkWarning] = useState(false);
   const [showValidationSummary, setShowValidationSummary] = useState(false);
+  const [activeComposerSection, setActiveComposerSection] = useState<ComposerSection>('form');
 
   // PDF Generation State
   const [showPdfModal, setShowPdfModal] = useState(false);
@@ -132,6 +141,12 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
 
   // Rate fetching hook
   const rateFetching = useRateFetching();
+
+  useEffect(() => {
+    if (activeComposerSection === 'finalize') {
+      setActiveComposerSection('results');
+    }
+  }, [activeComposerSection]);
   
   // Clear deleted options when new search starts
   useEffect(() => {
@@ -230,6 +245,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
   const [initialFormValues, setInitialFormValues] = useState<Partial<FormZoneValues> | undefined>(undefined);
   const [initialExtended, setInitialExtended] = useState<Partial<ExtendedFormData> | undefined>(undefined);
   const [config, setConfig] = useState<any>(null);
+  const hydratedOptionsCacheRef = useRef<Record<string, { data: RateOption[]; cachedAt: number }>>({});
 
   // Load configuration
   useEffect(() => {
@@ -817,6 +833,32 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
     }
   }, [scopedDb]);
 
+  const applyReconstructedOptions = useCallback((reconstructedOptions: RateOption[]) => {
+    setManualOptions(reconstructedOptions);
+    const paramOptionId = searchParams.get('optionId');
+    const selected = reconstructedOptions.find(o => o.id === paramOptionId)
+      || reconstructedOptions.find(o => (o as any).is_selected)
+      || reconstructedOptions[0];
+
+    if (selected) {
+      setSelectedOption(selected);
+      dispatch({ type: 'INITIALIZE', payload: { optionId: selected.id } });
+    }
+
+    setOptionDrafts((prev) => {
+      const next = { ...prev };
+      reconstructedOptions.forEach((opt) => {
+        next[opt.id] = {
+          ...(next[opt.id] || {}),
+          legs: Array.isArray(opt.legs) ? opt.legs : [],
+          charges: flattenOptionCharges(opt),
+          marginPercent: (opt as any).marginPercent || form.getValues('marginPercent') || 15,
+        };
+      });
+      return next;
+    });
+  }, [dispatch, flattenOptionCharges, form, searchParams]);
+
   // ---------------------------------------------------------------------------
   // Edit mode: load existing quote data
   // ---------------------------------------------------------------------------
@@ -1173,6 +1215,18 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
       
       if (targetVersionId && isValidUUID(targetVersionId)) {
         logger.info('[UnifiedComposer] Loading version', { targetVersionId });
+        const cacheKey = `${quoteId}:${targetVersionId}`;
+        const cachedEntry = hydratedOptionsCacheRef.current[cacheKey];
+        const cacheAgeMs = cachedEntry ? (Date.now() - cachedEntry.cachedAt) : Number.POSITIVE_INFINITY;
+        const hasFreshCache = cacheAgeMs < HYDRATION_CACHE_WINDOW_MS;
+        if (cachedEntry && hasFreshCache) {
+          applyReconstructedOptions(cachedEntry.data);
+          logAudit('reload_success', { quoteId, versionId: targetVersionId, source: 'cache' });
+          return;
+        }
+        if (cachedEntry && !hasFreshCache) {
+          delete hydratedOptionsCacheRef.current[cacheKey];
+        }
         // Fetch options with enriched data
         // We fetch carrier_rates and carriers separately to avoid join failures if FK is missing/broken
         const { data: optionRows, error: optError } = await scopedDb
@@ -1228,9 +1282,11 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
           const carrierIds = new Set<string>();
           optionRows.forEach((o: any) => {
              if (o.carrier_id && isValidUUID(o.carrier_id)) carrierIds.add(o.carrier_id);
+             if (o.provider_id && isValidUUID(o.provider_id)) carrierIds.add(o.provider_id);
           });
           legRows?.forEach((l: any) => {
              if (l.carrier_id && isValidUUID(l.carrier_id)) carrierIds.add(l.carrier_id);
+             if (l.provider_id && isValidUUID(l.provider_id)) carrierIds.add(l.provider_id);
           });
 
           // Fetch Carrier Rates
@@ -1300,6 +1356,11 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
             chargeRows = [];
           }
           logger.info(`[UnifiedComposer] Found ${chargeRows?.length || 0} charges`);
+          const isSystemBalancingCharge = (note: unknown) => {
+            if (typeof note !== 'string') return false;
+            const normalized = note.trim().toLowerCase();
+            return normalized === 'unitemized surcharges' || normalized === 'bundle discount adjustment';
+          };
 
           // Helper to group charges into buy/sell pairs
           const groupCharges = (charges: any[]) => {
@@ -1432,10 +1493,13 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
               .map((l: any) => {
                 // Get charges for this leg
                 const legChargesRaw = (chargeRows || []).filter((c: any) => c.leg_id === l.id);
-                const legCharges = groupCharges(legChargesRaw);
+                const legCharges = groupCharges(legChargesRaw).filter((charge: any) => !isSystemBalancingCharge(charge?.note));
                 
                 // Resolve carrier name
-                const carrierName = carriersMap[l.carrier_id]?.carrier_name || l.carrier_name || 'Unknown Carrier';
+                const explicitCarrierName = typeof l?.carrier_name === 'string' ? l.carrier_name.trim() : '';
+                const providerCarrierName = l?.provider_id ? carriersMap[l.provider_id]?.carrier_name : '';
+                const mappedCarrierName = l?.carrier_id ? carriersMap[l.carrier_id]?.carrier_name : '';
+                const carrierName = explicitCarrierName || providerCarrierName || mappedCarrierName || 'Unknown Carrier';
 
                 return {
                     id: l.id,
@@ -1457,7 +1521,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
 
             // Filter global charges (no leg_id)
             const globalChargesRaw = (chargeRows || []).filter((c: any) => c.quote_option_id === opt.id && !c.leg_id);
-            const globalCharges = groupCharges(globalChargesRaw);
+            const globalCharges = groupCharges(globalChargesRaw).filter((charge: any) => !isSystemBalancingCharge(charge?.note));
             
             // Calculate total price from all charges (legs + global)
             const legChargesTotal = myLegs.reduce((sum: number, leg: any) => {
@@ -1474,14 +1538,24 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
             const carrierRate = opt.carrier_rate_id ? carrierRatesMap[opt.carrier_rate_id] : null;
 
             // Resolve carrier name from option or related carrier rate
-            let resolvedCarrierName = carriersMap[opt.carrier_id]?.carrier_name;
+            const optionCarrierName = typeof opt?.carrier_name === 'string' ? opt.carrier_name.trim() : '';
+            let resolvedCarrierName = optionCarrierName || carriersMap[opt.provider_id]?.carrier_name || carriersMap[opt.carrier_id]?.carrier_name;
             
             if (!resolvedCarrierName && carrierRate?.carrier_id) {
                resolvedCarrierName = carriersMap[carrierRate.carrier_id]?.carrier_name;
             }
             
             if (!resolvedCarrierName) {
-               resolvedCarrierName = opt.option_name || 'Saved Option';
+               const legCarrierName = myLegs
+                 .map((leg: any) => {
+                   const explicitName = typeof leg?.carrier === 'string' ? leg.carrier.trim() : '';
+                   if (explicitName) return explicitName;
+                   if (leg?.provider_id) return carriersMap[leg.provider_id]?.carrier_name || '';
+                   if (leg?.carrier_id) return carriersMap[leg.carrier_id]?.carrier_name || '';
+                   return '';
+                 })
+                 .find((value: string) => value.length > 0);
+               resolvedCarrierName = legCarrierName || 'Unknown Carrier';
             }
             
             // Resolve currency
@@ -1489,12 +1563,13 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
             // Resolve transit time
             const resolvedTransitTime = opt.transit_time || 
                 (opt.transit_time_days ? `${opt.transit_time_days} days` : 'TBD');
+            const totalAmount = totalPrice > 0 ? totalPrice : (Number(opt.total_amount) || 0);
 
             return {
                id: opt.id,
                carrier: resolvedCarrierName,
                name: resolvedCarrierName,
-               price: totalPrice || opt.total_amount || 0,
+               price: totalAmount,
                currency: resolvedCurrency,
                transitTime: resolvedTransitTime,
                tier: 'custom',
@@ -1504,41 +1579,19 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
                charges: globalCharges,
                // Other fields
                is_selected: opt.is_selected,
-               total_amount: totalPrice || opt.total_amount || 0,
+               total_amount: totalAmount,
                marginPercent: opt.margin_percentage,
                rank_score: opt.rank_score, // Preserve rank score
                rank_details: opt.rank_details // Preserve rank details
              } as RateOption;
            });
  
-           setManualOptions(reconstructedOptions);
-           
-           // Find selected option
-           // Priority: 1. optionId from URL, 2. is_selected flag, 3. first available
-           const paramOptionId = searchParams.get('optionId');
-           const selected = reconstructedOptions.find(o => o.id === paramOptionId) 
-             || reconstructedOptions.find(o => (o as any).is_selected) 
-             || reconstructedOptions[0];
+          hydratedOptionsCacheRef.current[cacheKey] = {
+            data: reconstructedOptions,
+            cachedAt: Date.now(),
+          };
+          applyReconstructedOptions(reconstructedOptions);
 
-           if (selected) {
-             setSelectedOption(selected);
-             dispatch({ type: 'INITIALIZE', payload: { optionId: selected.id } });
-           }
-
-           // Seed drafts for every loaded option so each option has independent, complete charge state.
-           setOptionDrafts((prev) => {
-             const next = { ...prev };
-             reconstructedOptions.forEach((opt) => {
-               next[opt.id] = {
-                 ...(next[opt.id] || {}),
-                 legs: Array.isArray(opt.legs) ? opt.legs : [],
-                 charges: flattenOptionCharges(opt),
-                 marginPercent: (opt as any).marginPercent || form.getValues('marginPercent') || 15,
-               };
-             });
-             return next;
-           });
-           
            // Log success
            logAudit('reload_success', { quoteId, versionId: targetVersionId || 'current' });
         }
@@ -1550,7 +1603,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
     } finally {
       setEditLoading(false);
     }
-  }, [quoteId, versionId, normalizeCommodityText, flattenOptionCharges]);
+  }, [quoteId, versionId, normalizeCommodityText, applyReconstructedOptions]);
 
   useEffect(() => {
     if (!quoteId) return;
@@ -2766,6 +2819,8 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
       breadcrumbs={breadcrumbs}
       title={pageTitle}
       actions={actions}
+      hideLabelSection
+      hideTopStrip
     >
       <FormProvider {...form}>
         <div className="space-y-6 w-full max-w-full">
@@ -2811,58 +2866,84 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
 
           {renderValidationSummary()}
 
-          {/* Form Zone */}
-          <FormZone
-              onGetRates={handleGetRates}
-              onSaveDraft={handleSaveDraft}
-              onValidationFailed={handleValidationFailed}
-              loading={rateFetching.loading}
-              crmLoading={isCrmLoading}
-              initialValues={initialFormValues}
-              initialExtended={initialExtended}
-              accounts={accounts}
-              contacts={contacts}
-              opportunities={opportunities}
-              onChange={handleFormChange}
-          />
-
-          <Separator />
-
-          {/* Results Zone */}
-          <ResultsZone
-              results={(!lastFormData && displayResults.length === 0 && !rateFetching.loading && !editLoading && !isSmartMode && !quoteId) ? null : displayResults}
-              loading={rateFetching.loading || editLoading}
-              smartMode={isSmartMode}
-              marketAnalysis={rateFetching.marketAnalysis}
-              confidenceScore={rateFetching.confidenceScore}
-              anomalies={rateFetching.anomalies}
-              complianceCheck={complianceCheck}
-              onSelect={handleSelectOption}
-              selectedOptionId={selectedOption?.id}
-              onRerunRates={lastFormData ? handleRerunRates : undefined}
-              onAddManualOption={handleAddManualOption}
-              onRemoveOption={handleRemoveOption}
-              availableOptions={availableOptions}
-              onAddRateOption={handleAddRateOption}
-              onRenameOption={handleRenameOption}
-          />
-
-          {/* Finalize Section — shown when option selected */}
-          {selectedOption && (
-            <>
-              <Separator />
-              <FinalizeSection
-                selectedOption={selectedOption}
-                onSaveQuote={handleSaveQuote}
-                onGeneratePdf={handleGeneratePdf}
-                saving={saving}
-                draft={optionDrafts[selectedOption.id]}
-                onDraftChange={handleDraftChange}
-                onRenameOption={handleRenameOption}
-                referenceData={referenceData}
+          <Tabs
+            value={activeComposerSection}
+            onValueChange={(value) => setActiveComposerSection(value as ComposerSection)}
+            className="w-full"
+          >
+            <TabsList className="w-full justify-start border-b rounded-none h-auto p-0 bg-transparent space-x-6">
+              <TabsTrigger
+                value="form"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none py-3"
+              >
+                Quote Form
+              </TabsTrigger>
+              <TabsTrigger
+                value="results"
+                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none py-3"
+              >
+                Results & Finalize
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="form" className="pt-6">
+              <FormZone
+                onGetRates={handleGetRates}
+                onSaveDraft={handleSaveDraft}
+                onValidationFailed={handleValidationFailed}
+                loading={rateFetching.loading}
+                crmLoading={isCrmLoading}
+                initialValues={initialFormValues}
+                initialExtended={initialExtended}
+                accounts={accounts}
+                contacts={contacts}
+                opportunities={opportunities}
+                onChange={handleFormChange}
               />
-            </>
-          )}
+            </TabsContent>
+            <TabsContent value="results" className="pt-6">
+              <div className="space-y-6">
+                <ResultsZone
+                  results={(!lastFormData && displayResults.length === 0 && !rateFetching.loading && !editLoading && !isSmartMode && !quoteId) ? null : displayResults}
+                  loading={rateFetching.loading || editLoading}
+                  smartMode={isSmartMode}
+                  marketAnalysis={rateFetching.marketAnalysis}
+                  confidenceScore={rateFetching.confidenceScore}
+                  anomalies={rateFetching.anomalies}
+                  complianceCheck={complianceCheck}
+                  onSelect={handleSelectOption}
+                  selectedOptionId={selectedOption?.id}
+                  onRerunRates={lastFormData ? handleRerunRates : undefined}
+                  onAddManualOption={handleAddManualOption}
+                  onRemoveOption={handleRemoveOption}
+                  availableOptions={availableOptions}
+                  onAddRateOption={handleAddRateOption}
+                  onRenameOption={handleRenameOption}
+                />
+
+                {selectedOption ? (
+                  <FinalizeSection
+                    selectedOption={selectedOption}
+                    onSaveQuote={handleSaveQuote}
+                    onGeneratePdf={handleGeneratePdf}
+                    saving={saving}
+                    draft={optionDrafts[selectedOption.id]}
+                    onDraftChange={handleDraftChange}
+                    onRenameOption={handleRenameOption}
+                    referenceData={referenceData}
+                  />
+                ) : (
+                  <div className="rounded-lg border p-6 text-sm text-muted-foreground">
+                    Select a rate option to unlock finalization.
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+            <TabsContent value="finalize" className="pt-6">
+              <div className="rounded-lg border p-6 text-sm text-muted-foreground">
+                Finalization has been moved into the Results & Finalize tab.
+              </div>
+            </TabsContent>
+          </Tabs>
 
           {/* PDF Generation Modal */}
           <Dialog open={showPdfModal} onOpenChange={setShowPdfModal}>

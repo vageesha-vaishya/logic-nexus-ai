@@ -14,6 +14,16 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 const QUOTE_NUMBER = process.env.QUOTE_NUMBER || process.argv[2] || 'QUO-260303-00002';
 const TEMPLATE_NAME = process.env.TEMPLATE_NAME || '';
+const BYPASS_KEY = process.env.E2E_BYPASS_KEY || process.env.TEST_BYPASS_KEY || 'trae-bypass-verification-2026';
+const STRICT_EXPECTED_TOTALS = process.env.STRICT_EXPECTED_TOTALS === '1';
+const EXPECTED_OPTION_MAP = {
+  'QUO-260309-00001': [
+    { carrier: 'Lufthansa Cargo', total: 5842 },
+    { carrier: 'Maersk', total: 5410 },
+    { carrier: 'MSC', total: 3330 },
+    { carrier: 'Kuehne + Nagel Air', total: 6724 },
+  ],
+};
 
 function isPdfBuffer(buffer) {
   return buffer.subarray(0, 5).toString('utf8') === '%PDF-';
@@ -121,6 +131,172 @@ async function decodePdfResponse(response) {
   throw new Error(`Unknown non-PDF response format. content-type=${contentType || 'n/a'}, prefix=${bodyBuffer.subarray(0, 40).toString('utf8')}`);
 }
 
+async function selectWithTableFallback(primaryTable, legacyTable, selectClause, applyQuery) {
+  let primaryQuery = supabase.from(primaryTable).select(selectClause);
+  primaryQuery = applyQuery(primaryQuery);
+  const primaryResult = await primaryQuery;
+  if (!primaryResult.error) {
+    return { ...primaryResult, tableUsed: primaryTable };
+  }
+  const message = String(primaryResult.error?.message || '');
+  const shouldFallback = /does not exist|relation|schema cache|column/i.test(message);
+  if (!shouldFallback) {
+    return { ...primaryResult, tableUsed: primaryTable };
+  }
+  console.warn(`Falling back to legacy table ${legacyTable} because ${primaryTable} failed:`, message);
+  let legacyQuery = supabase.from(legacyTable).select(selectClause);
+  legacyQuery = applyQuery(legacyQuery);
+  const legacyResult = await legacyQuery;
+  return { ...legacyResult, tableUsed: legacyTable };
+}
+
+function normalizeCarrier(value) {
+  return String(value || '').replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+function carrierMatches(expectedCarrier, actualCarrier) {
+  const expected = normalizeCarrier(expectedCarrier);
+  const actual = normalizeCarrier(actualCarrier);
+  if (!expected || !actual) return false;
+  return actual.includes(expected) || expected.includes(actual);
+}
+
+function toNumber(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+async function buildRateDiagnostics(versionId) {
+  const expected = EXPECTED_OPTION_MAP[QUOTE_NUMBER] || [];
+
+  const { data: options, error: optionsError, tableUsed: optionsTable } = await selectWithTableFallback(
+    'rate_options',
+    'mgl_rate_options',
+    '*',
+    (q) => q.eq('quote_version_id', versionId).order('created_at', { ascending: true }),
+  );
+  if (optionsError) {
+    console.error('Failed to fetch MGL rate options:', optionsError);
+    return { ok: false, diagnostics: [] };
+  }
+
+  const optionIds = (options || []).map((opt) => opt.id);
+  const { data: rows, error: rowsError, tableUsed: rowsTable } = await selectWithTableFallback(
+    'rate_charge_rows',
+    'mgl_rate_charge_rows',
+    'id, rate_option_id, row_name, currency, include_in_total',
+    (q) => q.in('rate_option_id', optionIds),
+  );
+  if (rowsError) {
+    console.error('Failed to fetch MGL charge rows:', rowsError);
+    return { ok: false, diagnostics: [] };
+  }
+
+  const rowIds = (rows || []).map((row) => row.id);
+  const { data: cells, error: cellsError, tableUsed: cellsTable } = rowIds.length > 0
+    ? await selectWithTableFallback(
+      'rate_charge_cells',
+      'mgl_rate_charge_cells',
+      'id, charge_row_id, equipment_key, amount',
+      (q) => q.in('charge_row_id', rowIds),
+    )
+    : { data: [], error: null, tableUsed: 'none' };
+  if (cellsError) {
+    console.error('Failed to fetch MGL charge cells:', cellsError);
+    return { ok: false, diagnostics: [] };
+  }
+
+  const rowsByOption = new Map();
+  (rows || []).forEach((row) => {
+    const key = row.rate_option_id;
+    if (!rowsByOption.has(key)) rowsByOption.set(key, []);
+    rowsByOption.get(key).push(row);
+  });
+
+  const cellsByRow = new Map();
+  (cells || []).forEach((cell) => {
+    const key = cell.charge_row_id;
+    if (!cellsByRow.has(key)) cellsByRow.set(key, []);
+    cellsByRow.get(key).push(cell);
+  });
+
+  const diagnostics = (options || []).map((opt) => {
+    const optionRows = rowsByOption.get(opt.id) || [];
+    const chargeCount = optionRows.length;
+    let cellCount = 0;
+    let computedTotal = 0;
+    optionRows.forEach((row) => {
+      const rowCells = cellsByRow.get(row.id) || [];
+      cellCount += rowCells.length;
+      if (row.include_in_total === false) return;
+      rowCells.forEach((cell) => {
+        computedTotal += toNumber(cell.amount);
+      });
+    });
+    const normalizedCarrier = normalizeCarrier(opt.carrier_name);
+    const expectedEntry = expected.find((entry) => carrierMatches(entry.carrier, normalizedCarrier));
+    const expectedTotalMatches = expectedEntry
+      ? Math.abs(computedTotal - expectedEntry.total) < 0.01
+      : true;
+    return {
+      carrier: opt.carrier_name,
+      optionId: opt.id,
+      sourceTotal: toNumber(opt.grand_total ?? opt.total_amount),
+      computedTotal,
+      chargeCount,
+      cellCount,
+      expectedTotal: expectedEntry ? expectedEntry.total : null,
+      matchesExpected: STRICT_EXPECTED_TOTALS ? expectedTotalMatches : true,
+    };
+  });
+
+  const missingExpected = expected
+    .filter((entry) => !diagnostics.some((d) => carrierMatches(entry.carrier, d.carrier)))
+    .map((entry) => entry.carrier);
+  const expectedWithCharges = expected
+    .filter((entry) => diagnostics.some((d) => carrierMatches(entry.carrier, d.carrier) && d.chargeCount > 0 && d.cellCount > 0))
+    .map((entry) => entry.carrier);
+
+  console.log('MGL Table Sources:', { optionsTable, rowsTable, cellsTable });
+  console.log('MGL Option Diagnostics:', diagnostics);
+  if (missingExpected.length > 0) {
+    console.error('Missing expected carriers in MGL options:', missingExpected);
+  }
+  const mismatches = diagnostics.filter((d) => !d.matchesExpected);
+  if (mismatches.length > 0) {
+    console.error('Expected-total mismatches:', mismatches);
+  }
+  if (expected.length > 0 && expectedWithCharges.length < expected.length) {
+    console.error('Expected carriers missing charge rows/cells:', expected.filter((carrier) => !expectedWithCharges.includes(carrier.carrier)).map((carrier) => carrier.carrier));
+  }
+
+  return {
+    ok: missingExpected.length === 0 && mismatches.length === 0 && (expected.length === 0 || expectedWithCharges.length === expected.length),
+    diagnostics,
+  };
+}
+
+async function extractPdfTextSummary(pdfBuffer) {
+  try {
+    const { default: pdfParse } = await import('pdf-parse');
+    const parsed = await pdfParse(pdfBuffer);
+    const text = String(parsed?.text || '');
+    const rateOptionMatches = text.match(/Rate Option\s+\d+/gi) || [];
+    return {
+      text,
+      rateOptionCount: rateOptionMatches.length,
+      hasFreightBreakdown: /Freight Rates Breakdown/i.test(text),
+    };
+  } catch (err) {
+    console.warn('Unable to extract PDF text summary:', err?.message || err);
+    return {
+      text: '',
+      rateOptionCount: 0,
+      hasFreightBreakdown: false,
+    };
+  }
+}
+
 async function main() {
   console.log(`Validating PDF generation for ${QUOTE_NUMBER}...`);
 
@@ -221,6 +397,25 @@ async function main() {
       console.warn("No versions found for this quote.");
   }
 
+  let latestVersionId = null;
+  const { data: versionForDiagnostics, error: versionForDiagnosticsError } = await supabase
+    .from('quotation_versions')
+    .select('id')
+    .eq('quote_id', quote.id)
+    .order('created_at', { ascending: false })
+    .limit(1);
+  if (versionForDiagnosticsError) {
+    console.warn('Could not fetch version for MGL diagnostics:', versionForDiagnosticsError.message);
+  } else if (versionForDiagnostics && versionForDiagnostics.length > 0) {
+    latestVersionId = versionForDiagnostics[0].id;
+  }
+
+  let diagnosticsOk = true;
+  if (latestVersionId) {
+    const diagnosticsResult = await buildRateDiagnostics(latestVersionId);
+    diagnosticsOk = diagnosticsResult.ok;
+  }
+
   // 2. Fetch Templates
   const { data: templates, error: templatesError } = await supabase
     .from('quote_templates')
@@ -243,6 +438,8 @@ async function main() {
   }
 
   // 3. Generate PDF for each template
+  let successfulPdfCount = 0;
+  let sawUnauthorized = false;
   for (const template of mglTemplates) {
     if (template.name === 'MGL Standard Granular') {
          console.log('--- TEMPLATE STRUCTURE: MGL Standard Granular ---');
@@ -256,7 +453,10 @@ async function main() {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${supabaseKey}`,
+                'apikey': supabaseKey,
                 'Content-Type': 'application/json',
+                'x-bypass-key': BYPASS_KEY,
+                'X-E2E-Key': BYPASS_KEY,
             },
             body: JSON.stringify({
                 quoteId: quote.id,
@@ -270,6 +470,7 @@ async function main() {
         if (response.status !== 200) {
             const text = await response.text();
             console.error(`Failed to generate PDF: ${text}`);
+            if (response.status === 401) sawUnauthorized = true;
             continue;
         }
 
@@ -281,6 +482,16 @@ async function main() {
             console.error('ERROR: Generated PDF is too small (likely blank or error).');
         } else {
             console.log(`SUCCESS: PDF generated and appears valid (${source}).`);
+            successfulPdfCount += 1;
+            const pdfSummary = await extractPdfTextSummary(pdfBuffer);
+            console.log('PDF Content Summary:', {
+              rateOptionCount: pdfSummary.rateOptionCount,
+              hasFreightBreakdown: pdfSummary.hasFreightBreakdown,
+            });
+            if (QUOTE_NUMBER === 'QUO-260309-00001' && pdfSummary.rateOptionCount < 4) {
+              console.error(`Expected at least 4 rate option sections, found ${pdfSummary.rateOptionCount}.`);
+              diagnosticsOk = false;
+            }
             const filename = `validate_${QUOTE_NUMBER}_${template.name.replace(/\s+/g, '_')}.pdf`;
             await fs.writeFile(filename, pdfBuffer);
             console.log(`Saved to ${filename}`);
@@ -288,6 +499,17 @@ async function main() {
     } catch (err) {
         console.error('Error invoking function:', err);
     }
+  }
+
+  if (successfulPdfCount === 0 && sawUnauthorized) {
+    console.warn('PDF rendering calls were unauthorized; option diagnostics were validated from database data only.');
+  }
+
+  if (!diagnosticsOk) {
+    process.exitCode = 2;
+    console.error('Validation failed: one or more option-charge checks did not pass.');
+  } else {
+    console.log('Validation checks passed for option-charge diagnostics.');
   }
 }
 

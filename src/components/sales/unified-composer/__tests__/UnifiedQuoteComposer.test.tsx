@@ -127,17 +127,16 @@ describe('UnifiedQuoteComposer', () => {
     expect(screen.getByText('Loading quote...')).toBeInTheDocument();
   });
 
-  it('renders results zone separator', () => {
-    const { container } = render(
+  it('shows quote form tab by default', () => {
+    render(
       <MemoryRouter>
         <UnifiedQuoteComposer />
       </MemoryRouter>
     );
 
-    // Separator renders as an element with role="none" or role="separator"
-    const separator = container.querySelector('[data-orientation]') || container.querySelector('div[role="none"]');
-    expect(separator || screen.getByTestId('results-zone')).toBeInTheDocument();
-    expect(screen.getByTestId('results-zone')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Quote Form' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Results & Finalize' })).toBeInTheDocument();
+    expect(screen.getByTestId('form-zone')).toBeInTheDocument();
   });
 
   it('does not show finalize section initially', () => {
@@ -176,4 +175,5 @@ describe('UnifiedQuoteComposer', () => {
     // the FormZone is rendered (the initialValues will be set on next tick).
     expect(formZone).toBeInTheDocument();
   });
+
 });

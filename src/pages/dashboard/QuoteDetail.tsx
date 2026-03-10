@@ -14,6 +14,8 @@ import { SendQuoteDialog } from '@/components/sales/SendQuoteDialog';
 import { QuotePreviewModal } from '@/components/sales/QuotePreviewModal';
 import { useDebug } from '@/hooks/useDebug';
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DetailScreenTemplate } from '@/components/system/DetailScreenTemplate';
 import { QuotationConfigurationService } from '@/services/quotation/QuotationConfigurationService';
 import { QuotationRankingService } from '@/services/quotation/QuotationRankingService';
@@ -21,6 +23,7 @@ import { logger } from '@/lib/logger';
 
 const RETRY_DELAYS_MS = [0, 500, 1200];
 const DEFAULT_RANKING_CRITERIA = { cost: 0.4, transit_time: 0.3, reliability: 0.3 };
+const HYDRATION_CACHE_WINDOW_MS = 1000 * 60 * 5;
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -120,13 +123,27 @@ export default function QuoteDetail() {
   const [config, setConfig] = useState<any>(null);
   const [comparisonOptions, setComparisonOptions] = useState<any[]>([]);
   const [selectedComparisonOptionId, setSelectedComparisonOptionId] = useState<string | null>(urlOptionId || null);
+  const [comparisonRequested, setComparisonRequested] = useState(Boolean(urlOptionId));
+  const [comparisonLoading, setComparisonLoading] = useState(false);
   const [selectionSaving, setSelectionSaving] = useState(false);
   const versionAbortRef = useRef<AbortController | null>(null);
+  const comparisonOptionsCacheRef = useRef<Record<string, { data: any[]; cachedAt: number }>>({});
   const [reloadToken, setReloadToken] = useState(0);
+  const [activeSection, setActiveSection] = useState<'composer' | 'versions' | 'comparison'>('composer');
 
   useEffect(() => {
     setSelectedComparisonOptionId(urlOptionId || null);
+    if (urlOptionId) {
+      setComparisonRequested(true);
+      setActiveSection('comparison');
+    }
   }, [urlOptionId]);
+
+  useEffect(() => {
+    if (!versionId || !config?.multi_option_enabled) return;
+    const timer = window.setTimeout(() => setComparisonRequested(true), 250);
+    return () => window.clearTimeout(timer);
+  }, [versionId, config?.multi_option_enabled]);
 
   // Load configuration
   useEffect(() => {
@@ -137,10 +154,34 @@ export default function QuoteDetail() {
 
   // Load comparison options if multi-option enabled
   useEffect(() => {
-    if (versionId) {
-        // Clear previous options to avoid stale data during version switch
-        setComparisonOptions([]);
-        
+    if (versionId && config?.multi_option_enabled && comparisonRequested) {
+        const cachedEntry = comparisonOptionsCacheRef.current[versionId];
+        const cacheAgeMs = cachedEntry ? (Date.now() - cachedEntry.cachedAt) : Number.POSITIVE_INFINITY;
+        const hasFreshCache = cacheAgeMs < HYDRATION_CACHE_WINDOW_MS;
+        if (cachedEntry && hasFreshCache) {
+          const cachedOptions = cachedEntry.data;
+          setComparisonOptions(cachedOptions);
+          const selected = cachedOptions.find((opt: any) => opt.id === selectedComparisonOptionId)
+            || cachedOptions.find((opt: any) => opt.is_selected)
+            || cachedOptions[0];
+          const selectedId = selected?.id ?? null;
+          setSelectedComparisonOptionId(selectedId);
+          if (selectedId && urlOptionId !== selectedId) {
+            setSearchParams((prev) => {
+              const next = new URLSearchParams(prev);
+              next.set('optionId', selectedId);
+              return next;
+            }, { replace: true });
+          }
+          return;
+        }
+        if (cachedEntry && !hasFreshCache) {
+          delete comparisonOptionsCacheRef.current[versionId];
+        }
+
+        setComparisonLoading(true);
+        let cancelled = false;
+
         const fetchOptions = async () => {
           const startedAt = Date.now();
           const { data: optionRows, error } = await scopedDb
@@ -171,44 +212,39 @@ export default function QuoteDetail() {
             if (opt?.currency_id) currencyIds.add(opt.currency_id);
           });
 
+          const chargesByOptionId: Record<string, any[]> = {};
+          const optionLegsByOptionId: Record<string, any[]> = {};
           const carrierRatesMap: Record<string, any> = {};
-          if (carrierRateIds.size > 0) {
-            const { data: rates } = await scopedDb
-              .from('carrier_rates')
-              .select('id, currency, carrier_id')
-              .in('id', Array.from(carrierRateIds));
+          const carriersMap: Record<string, any> = {};
+          if (optionIds.size > 0) {
+            const [ratesResult, chargeResult, legResult] = await Promise.all([
+              carrierRateIds.size > 0
+                ? scopedDb
+                    .from('carrier_rates')
+                    .select('id, currency, carrier_id')
+                    .in('id', Array.from(carrierRateIds))
+                : Promise.resolve({ data: [], error: null } as any),
+              scopedDb
+                .from('quote_charges')
+                .select('id, quote_option_id, category_id, amount, rate, currency_id, note, sort_order')
+                .in('quote_option_id', Array.from(optionIds)),
+              scopedDb
+                .from('quotation_version_option_legs')
+                .select('id, quotation_version_option_id, provider_id, carrier_name, transit_time_hours, sort_order')
+                .in('quotation_version_option_id', Array.from(optionIds)),
+            ]);
 
-            rates?.forEach((rate: any) => {
+            const rates = ratesResult.data || [];
+            rates.forEach((rate: any) => {
               carrierRatesMap[rate.id] = rate;
               if (rate?.carrier_id) carrierIds.add(rate.carrier_id);
             });
-          }
 
-          const carriersMap: Record<string, any> = {};
-          if (carrierIds.size > 0) {
-            const { data: carriers } = await scopedDb
-              .from('carriers')
-              .select('id, carrier_name')
-              .in('id', Array.from(carrierIds));
-
-            carriers?.forEach((carrier: any) => {
-              carriersMap[carrier.id] = carrier;
-            });
-          }
-
-          const chargesByOptionId: Record<string, any[]> = {};
-          const optionLegsByOptionId: Record<string, any[]> = {};
-          if (optionIds.size > 0) {
-            const { data: chargeRows, error: chargeError } = await scopedDb
-              .from('quote_charges')
-              .select('id, quote_option_id, category_id, amount, rate, currency_id, note, sort_order')
-              .in('quote_option_id', Array.from(optionIds));
-
-            if (chargeError) {
-              logger.error('Error fetching option charges', { versionId, error: chargeError.message });
+            if (chargeResult.error) {
+              logger.error('Error fetching option charges', { versionId, error: chargeResult.error.message });
             }
 
-            chargeRows?.forEach((charge: any) => {
+            (chargeResult.data || []).forEach((charge: any) => {
               if (charge?.currency_id) currencyIds.add(charge.currency_id);
               if (charge?.category_id) chargeCategoryIds.add(charge.category_id);
               const optionId = String(charge?.quote_option_id || '');
@@ -217,16 +253,11 @@ export default function QuoteDetail() {
               chargesByOptionId[optionId].push(charge);
             });
 
-            const { data: legRows, error: legError } = await scopedDb
-              .from('quotation_version_option_legs')
-              .select('id, quotation_version_option_id, provider_id, carrier_name, transit_time_hours, sort_order')
-              .in('quotation_version_option_id', Array.from(optionIds));
-
-            if (legError) {
-              logger.error('Error fetching option legs', { versionId, error: legError.message });
+            if (legResult.error) {
+              logger.error('Error fetching option legs', { versionId, error: legResult.error.message });
             }
 
-            legRows?.forEach((leg: any) => {
+            (legResult.data || []).forEach((leg: any) => {
               if (leg?.provider_id) carrierIds.add(leg.provider_id);
               const optionId = String(leg?.quotation_version_option_id || '');
               if (!optionId) return;
@@ -234,41 +265,40 @@ export default function QuoteDetail() {
               optionLegsByOptionId[optionId].push(leg);
             });
 
-            const missingCarrierIds = Array.from(carrierIds).filter((carrierId) => !carriersMap[carrierId]);
-            if (missingCarrierIds.length > 0) {
-              const { data: moreCarriers } = await scopedDb
+            if (carrierIds.size > 0) {
+              const { data: carriers } = await scopedDb
                 .from('carriers')
                 .select('id, carrier_name')
-                .in('id', missingCarrierIds);
-              moreCarriers?.forEach((carrier: any) => {
+                .in('id', Array.from(carrierIds));
+              carriers?.forEach((carrier: any) => {
                 carriersMap[carrier.id] = carrier;
               });
             }
           }
 
           const currenciesMap: Record<string, any> = {};
-          if (currencyIds.size > 0) {
-            const { data: currencies } = await scopedDb
-              .from('currencies')
-              .select('id, code')
-              .in('id', Array.from(currencyIds));
-
-            currencies?.forEach((currencyRow: any) => {
-              currenciesMap[currencyRow.id] = currencyRow;
-            });
-          }
-
           const chargeCategoriesMap: Record<string, string> = {};
-          if (chargeCategoryIds.size > 0) {
-            const { data: categories } = await scopedDb
-              .from('charge_categories')
-              .select('id, name')
-              .in('id', Array.from(chargeCategoryIds));
+          const [currenciesResult, categoriesResult] = await Promise.all([
+            currencyIds.size > 0
+              ? scopedDb
+                  .from('currencies')
+                  .select('id, code')
+                  .in('id', Array.from(currencyIds))
+              : Promise.resolve({ data: [], error: null } as any),
+            chargeCategoryIds.size > 0
+              ? scopedDb
+                  .from('charge_categories')
+                  .select('id, name')
+                  .in('id', Array.from(chargeCategoryIds))
+              : Promise.resolve({ data: [], error: null } as any),
+          ]);
 
-            categories?.forEach((category: any) => {
-              chargeCategoriesMap[category.id] = category.name;
-            });
-          }
+          (currenciesResult.data || []).forEach((currencyRow: any) => {
+            currenciesMap[currencyRow.id] = currencyRow;
+          });
+          (categoriesResult.data || []).forEach((category: any) => {
+            chargeCategoriesMap[category.id] = category.name;
+          });
 
           const rankableOptions = optionRows
             .filter((opt: any) => typeof opt?.id === 'string' && opt.id.length > 0)
@@ -396,8 +426,14 @@ export default function QuoteDetail() {
           const criteria = config?.auto_ranking_criteria || DEFAULT_RANKING_CRITERIA;
           const ranked = QuotationRankingService.rankOptions(rankableOptions, criteria);
           
+          if (cancelled) return;
+
+          comparisonOptionsCacheRef.current[versionId] = {
+            data: ranked,
+            cachedAt: Date.now(),
+          };
           setComparisonOptions(ranked);
-          const selected = ranked.find((opt: any) => opt.id === urlOptionId)
+          const selected = ranked.find((opt: any) => opt.id === selectedComparisonOptionId)
             || ranked.find((opt: any) => opt.is_selected)
             || ranked[0];
           const selectedId = selected?.id ?? null;
@@ -417,9 +453,15 @@ export default function QuoteDetail() {
           });
         };
 
-        fetchOptions();
+        fetchOptions().finally(() => {
+          if (!cancelled) setComparisonLoading(false);
+        });
+
+        return () => {
+          cancelled = true;
+        };
     }
-  }, [versionId, config, scopedDb, setSearchParams, urlOptionId]);
+  }, [versionId, config, scopedDb, setSearchParams, comparisonRequested]);
 
   useEffect(() => {
     // Reset state when ID changes to prevent data mismatch during transition
@@ -428,6 +470,9 @@ export default function QuoteDetail() {
     setTenantId(null);
     setQuoteNumber(null);
     setComparisonOptions([]);
+    comparisonOptionsCacheRef.current = {};
+    setComparisonRequested(false);
+    setComparisonLoading(false);
     setLoading(true);
 
     const checkQuote = async () => {
@@ -710,6 +755,12 @@ export default function QuoteDetail() {
     setReloadToken((v) => v + 1);
   };
 
+  useEffect(() => {
+    if (config?.multi_option_enabled === false && activeSection === 'comparison') {
+      setActiveSection('versions');
+    }
+  }, [config?.multi_option_enabled, activeSection]);
+
   const persistSelectedOption = async (nextOptionId: string) => {
     if (!versionId) return;
     const clearResult = await scopedDb
@@ -862,34 +913,85 @@ export default function QuoteDetail() {
         }
       >
         <div className="space-y-6">
-          {resolvedId ? (
-            <>
-              <UnifiedQuoteComposer
-                  key={resolvedId} // Force re-mount when quote changes
-                  quoteId={resolvedId}
-                  versionId={versionId || undefined}
-              />
-              <QuotationVersionHistory 
-                  quoteId={resolvedId} 
-                  key={versionId} // Force reload when version is resolved/created
-              />
-            </>
-          ) : (
+          {!resolvedId ? (
             <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
               <Loader2 className="w-8 h-8 animate-spin mb-4" />
               <p>Loading quote details...</p>
             </div>
-          )}
-          <VersionHistoryPanel
-            quoteId={resolvedId ?? (id as string)}
-            onRestore={handleRestoreVersion}
-          />
-          {resolvedId && config?.multi_option_enabled && comparisonOptions.length > 0 && (
-            <QuotationComparisonDashboard 
-              options={comparisonOptions}
-              selectedOptionId={selectedComparisonOptionId}
-              onSelect={handleSelectComparisonOption}
-            />
+          ) : null}
+          {resolvedId && (
+            <Tabs
+              value={activeSection}
+              onValueChange={(value) => {
+                const nextValue = value as 'composer' | 'versions' | 'comparison';
+                if (nextValue === 'comparison') setComparisonRequested(true);
+                setActiveSection(nextValue);
+              }}
+              className="w-full"
+            >
+              <TabsList className="w-full justify-start border-b rounded-none h-auto p-0 bg-transparent space-x-6">
+                <TabsTrigger
+                  value="composer"
+                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none py-3"
+                >
+                  Quote Form
+                </TabsTrigger>
+                <TabsTrigger
+                  value="versions"
+                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none py-3"
+                >
+                  Version & History
+                </TabsTrigger>
+                {config?.multi_option_enabled && (
+                  <TabsTrigger
+                    value="comparison"
+                    className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none py-3"
+                    disabled={selectionSaving}
+                  >
+                    Option Comparison
+                    {comparisonOptions.length > 0 && (
+                      <Badge variant="secondary" className="ml-2">
+                        {comparisonOptions.length}
+                      </Badge>
+                    )}
+                  </TabsTrigger>
+                )}
+              </TabsList>
+              <TabsContent value="composer" className="pt-6">
+                <UnifiedQuoteComposer
+                  key={resolvedId}
+                  quoteId={resolvedId}
+                  versionId={versionId || undefined}
+                />
+              </TabsContent>
+              <TabsContent value="versions" className="pt-6">
+                <div className="space-y-6">
+                  <QuotationVersionHistory
+                    quoteId={resolvedId}
+                    key={versionId}
+                  />
+                  <VersionHistoryPanel
+                    quoteId={resolvedId ?? (id as string)}
+                    onRestore={handleRestoreVersion}
+                  />
+                </div>
+              </TabsContent>
+              {config?.multi_option_enabled && (
+                <TabsContent value="comparison" className="pt-6">
+                  {comparisonLoading ? (
+                    <div className="rounded-lg border p-6 text-sm text-muted-foreground">Loading option comparison...</div>
+                  ) : comparisonOptions.length > 0 ? (
+                    <QuotationComparisonDashboard
+                      options={comparisonOptions}
+                      selectedOptionId={selectedComparisonOptionId}
+                      onSelect={handleSelectComparisonOption}
+                    />
+                  ) : (
+                    <div className="rounded-lg border p-6 text-sm text-muted-foreground">No comparison options available for this version.</div>
+                  )}
+                </TabsContent>
+              )}
+            </Tabs>
           )}
         </div>
         

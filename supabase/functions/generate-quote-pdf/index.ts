@@ -335,25 +335,6 @@ serveWithLogger(async (req, logger, adminSupabase) => {
       await enrichOptionContainers(options);
       await logger.info(`Fetched ${options.length} options for version ${versionId}`);
 
-      // --- BACKWARD COMPATIBILITY: MGL Rate Options Support ---
-      // If standard options are empty, try fetching from new MGL tables
-      if (options.length === 0) {
-        await logger.info("No standard options found. Checking for MGL Rate Options...");
-        const mglOptions = await fetchMglOptions(supabaseClient, versionId, safeSelect, logger);
-        if (mglOptions && mglOptions.length > 0) {
-             options.push(...mglOptions);
-        }
-      }
-
-      await logger.info(`Final option count after MGL check: ${options.length}`);
-      
-      // No need to fetch Legs/Charges again for MGL options as we built them above.
-      // But we have a loop below "Fetch Legs and Charges for each option".
-      // We should skip that loop for MGL options or make it safe.
-      // The loop iterates `options`. Standard options have `opt.id` from DB. MGL options have synthetic IDs.
-      // Standard fetch uses `quotation_version_option_legs` table which won't match synthetic IDs.
-      // So we must modify the loop below to skip if legs/charges are already populated.
-
       // Fetch Legs and Charges for each option
       for (const opt of options) {
           // Skip if legs are already populated (e.g. MGL options)
@@ -402,6 +383,79 @@ serveWithLogger(async (req, logger, adminSupabase) => {
              await logger.warn(`No charges found for option ${opt.id}`);
           }
       }
+
+      const getCarrierLabel = (opt: any): string => {
+        return String(
+          opt?.carrier ||
+          opt?.carrier_name ||
+          opt?.carriers?.carrier_name ||
+          opt?.provider_name ||
+          "",
+        ).trim();
+      };
+
+      const countDistinctCarriers = (opts: any[]): number => {
+        const labels = opts
+          .map((opt: any) => getCarrierLabel(opt))
+          .filter((label: string) => label.length > 0);
+        return new Set(labels).size;
+      };
+
+      const optionsWithCharges = options.filter(
+        (opt: any) => Array.isArray(opt?.charges) && opt.charges.length > 0,
+      );
+      const optionsWithChargesCount = optionsWithCharges.length;
+      const standardCarrierDiversity = countDistinctCarriers(
+        optionsWithChargesCount > 0 ? optionsWithCharges : options,
+      );
+
+      const shouldProbeMglOptions =
+        options.length === 0 ||
+        optionsWithChargesCount <= 1 ||
+        (optionsWithChargesCount > 1 && standardCarrierDiversity <= 1);
+      if (shouldProbeMglOptions) {
+        await logger.info("Checking for MGL Rate Options...");
+        const mglOptions = await fetchMglOptions(supabaseClient, versionId, safeSelect, logger);
+        const mglOptionCount = Array.isArray(mglOptions) ? mglOptions.length : 0;
+        const standardOptionCount = options.length;
+
+        if (mglOptionCount > 0) {
+          const mglOptionsWithCharges = mglOptions.filter(
+            (opt: any) => Array.isArray(opt?.charges) && opt.charges.length > 0,
+          );
+          const mglOptionsWithChargesCount = mglOptionsWithCharges.length;
+          const mglCarrierDiversity = countDistinctCarriers(
+            mglOptionsWithChargesCount > 0 ? mglOptionsWithCharges : mglOptions,
+          );
+
+          const shouldUseMglOptions =
+            options.length === 0 ||
+            optionsWithChargesCount === 0 ||
+            (optionsWithChargesCount === 1 && mglOptionCount > 1) ||
+            (
+              optionsWithChargesCount > 1 &&
+              standardCarrierDiversity <= 1 &&
+              mglOptionsWithChargesCount >= 2 &&
+              mglCarrierDiversity >= 2
+            );
+
+          if (shouldUseMglOptions) {
+            options = mglOptionsWithChargesCount > 0 ? mglOptionsWithCharges : mglOptions;
+            await enrichOptionContainers(options);
+            await logger.info(
+              `Using ${options.length} MGL options for rendering (standard options=${standardOptionCount}, optionsWithCharges=${optionsWithChargesCount}, standardCarrierDiversity=${standardCarrierDiversity}, mglOptions=${mglOptionCount}, mglOptionsWithCharges=${mglOptionsWithChargesCount}, mglCarrierDiversity=${mglCarrierDiversity})`,
+            );
+          } else {
+            await logger.info(
+              `Keeping standard options for rendering (standard options=${standardOptionCount}, optionsWithCharges=${optionsWithChargesCount}, standardCarrierDiversity=${standardCarrierDiversity}, mgl options=${mglOptionCount}, mglOptionsWithCharges=${mglOptionsWithChargesCount}, mglCarrierDiversity=${mglCarrierDiversity})`,
+            );
+          }
+        } else {
+          await logger.info("No MGL Rate Options found");
+        }
+      }
+
+      await logger.info(`Final option count after option resolution: ${options.length}`);
     }
 
     // --- TEMPLATE SELECTION LOGIC ---
@@ -862,9 +916,9 @@ serveWithLogger(async (req, logger, adminSupabase) => {
           option_group_key: o.option_group_key || o.rate_option_id || o.option_id || o.id,
           option_name: o.option_name || o.rate_option_name || o.name || null,
           rate_option_name: o.rate_option_name || o.option_name || o.name || null,
-          carrier: o.carriers?.carrier_name || 'Multi-Carrier',
-          transit_time: o.transit_time_days ? `${o.transit_time_days} Days` : (o.legs?.map((l: any) => resolveLegTransit(l)).filter(Boolean).join(" + ") || "N/A"),
-          frequency: o.frequency || o.service_level || "Weekly", // Fallback to Weekly if missing
+          carrier: o.carrier || o.carrier_name || o.carriers?.carrier_name || "",
+          transit_time: o.transit_time || (o.transit_time_days ? `${o.transit_time_days} Days` : (o.legs?.map((l: any) => resolveLegTransit(l)).filter(Boolean).join(" + ") || "")),
+          frequency: o.frequency || (Number(o.frequency_per_week) > 0 ? `${Number(o.frequency_per_week)} / week` : "") || o.service_level || "",
           container_size: resolveOptionContainerSize(o),
           container_type: resolveOptionContainerType(o),
           grand_total: Array.isArray(o.charges) 
@@ -875,7 +929,7 @@ serveWithLogger(async (req, logger, adminSupabase) => {
              mode: l.mode || l.transport_mode,
              pol: resolveLegLocation(l, "origin"),
              pod: resolveLegLocation(l, "destination"),
-             carrier: o.carriers?.carrier_name || l.carrier_name,
+             carrier: o.carrier || o.carrier_name || o.carriers?.carrier_name || l.carrier_name || l.carrier || "",
              transit_time: resolveLegTransit(l),
              transport_mode: l.transport_mode || l.mode
           })) || [],
@@ -883,7 +937,11 @@ serveWithLogger(async (req, logger, adminSupabase) => {
             description: c.description || c.charge_name || c.name || c.category?.name || "Charge",
             amount: Number(c.amount) || 0,
             currency: c.currency || "USD",
-            note: c.note || ""
+            note: c.note || "",
+            leg_id: c.leg_id || null,
+            basis: c.basis,
+            quantity: Number.isFinite(Number(c.quantity ?? c.units ?? 1)) ? Number(c.quantity ?? c.units ?? 1) : 1,
+            unit_price: Number(c.unit_price ?? c.rate ?? 0) || 0
           })) || []
         }))
       };

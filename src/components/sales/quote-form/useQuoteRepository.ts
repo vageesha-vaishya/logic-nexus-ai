@@ -38,6 +38,9 @@ function deduplicateById<T extends { id: string }>(injected: T[], queried: T[]):
   });
 }
 
+const QUOTE_HYDRATION_STALE_MS = 1000 * 60 * 5;
+const QUOTE_HYDRATION_GC_MS = 1000 * 60 * 5;
+
 // ---------------------------------------------------------------------------
 // Return types
 // ---------------------------------------------------------------------------
@@ -639,8 +642,10 @@ export function useQuoteRepositoryForm(opts: {
       };
     },
     enabled: !!quoteId,
-    staleTime: 0, // Always fetch fresh data on mount to support cross-module switches
-    refetchOnMount: true,
+    staleTime: QUOTE_HYDRATION_STALE_MS,
+    gcTime: QUOTE_HYDRATION_GC_MS,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
   });
 
   const versionsQuery = useQuery({
@@ -706,8 +711,11 @@ export function useQuoteRepositoryForm(opts: {
       
       return data;
     },
-    enabled: !!quoteId,
-    staleTime: 0, // Always fetch fresh versions
+    enabled: !!quoteId && !!coreQuery.data?.quote?.id,
+    staleTime: QUOTE_HYDRATION_STALE_MS,
+    gcTime: QUOTE_HYDRATION_GC_MS,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
   });
 
   // Log hydration data for debugging
@@ -962,24 +970,28 @@ export function useQuoteRepositoryForm(opts: {
 
     // Inject missing CRM entities into dropdowns
     const injectMissingEntities = async () => {
+      const requests: Promise<void>[] = [];
+
       if (quote.service_id) {
-        const { data: svc } = await scopedDb
-          .from('services')
-          .select('id, service_name, service_type_id')
-          .eq('id', quote.service_id)
-          .maybeSingle();
-        if (svc) {
-          setServices((prev) => {
-            if (prev.find((s) => String(s.id) === String(svc.id))) return prev;
-            return [...prev, { 
-              ...svc, 
-              id: String(svc.id), 
-              service_type_id: svc.service_type_id ? String(svc.service_type_id) : '', 
-              is_default: false, 
-              priority: 0 
-            }];
-          });
-        }
+        requests.push((async () => {
+          const { data: svc } = await scopedDb
+            .from('services')
+            .select('id, service_name, service_type_id')
+            .eq('id', quote.service_id)
+            .maybeSingle();
+          if (svc) {
+            setServices((prev) => {
+              if (prev.find((s) => String(s.id) === String(svc.id))) return prev;
+              return [...prev, {
+                ...svc,
+                id: String(svc.id),
+                service_type_id: svc.service_type_id ? String(svc.service_type_id) : '',
+                is_default: false,
+                priority: 0
+              }];
+            });
+          }
+        })());
       }
 
       const accId = quote.account_id ? String(quote.account_id) : '';
@@ -987,61 +999,71 @@ export function useQuoteRepositoryForm(opts: {
       const oppId = quote.opportunity_id ? String(quote.opportunity_id) : '';
 
       if (accId && !accounts.some((a) => String(a.id) === accId)) {
-        const { data: acc } = await scopedDb
-          .from('accounts')
-          .select('id, name')
-          .eq('id', accId)
-          .maybeSingle();
-        if (acc) {
-          setAccounts((prev) => {
-            if (prev.some((a) => String(a.id) === String(acc.id))) return prev;
-            return [{ id: String(acc.id), name: acc.name || 'Account' }, ...prev];
-          });
-        }
+        requests.push((async () => {
+          const { data: acc } = await scopedDb
+            .from('accounts')
+            .select('id, name')
+            .eq('id', accId)
+            .maybeSingle();
+          if (acc) {
+            setAccounts((prev) => {
+              if (prev.some((a) => String(a.id) === String(acc.id))) return prev;
+              return [{ id: String(acc.id), name: acc.name || 'Account' }, ...prev];
+            });
+          }
+        })());
       }
 
       if (conId && !contacts.some((c) => String(c.id) === conId)) {
-        const { data: con } = await scopedDb
-          .from('contacts')
-          .select('id, first_name, last_name, account_id')
-          .eq('id', conId)
-          .maybeSingle();
-        if (con) {
-          setContacts((prev) => {
-            if (prev.some((c) => String(c.id) === String(con.id))) return prev;
-            return [
-              {
-                id: String(con.id),
-                first_name: con.first_name || '',
-                last_name: con.last_name || '',
-                account_id: con.account_id ? String(con.account_id) : null,
-              },
-              ...prev,
-            ];
-          });
-        }
+        requests.push((async () => {
+          const { data: con } = await scopedDb
+            .from('contacts')
+            .select('id, first_name, last_name, account_id')
+            .eq('id', conId)
+            .maybeSingle();
+          if (con) {
+            setContacts((prev) => {
+              if (prev.some((c) => String(c.id) === String(con.id))) return prev;
+              return [
+                {
+                  id: String(con.id),
+                  first_name: con.first_name || '',
+                  last_name: con.last_name || '',
+                  account_id: con.account_id ? String(con.account_id) : null,
+                },
+                ...prev,
+              ];
+            });
+          }
+        })());
       }
 
       if (oppId && !opportunities.some((o) => String(o.id) === oppId)) {
-        const { data: opp } = await scopedDb
-          .from('opportunities')
-          .select('id, name, account_id, contact_id')
-          .eq('id', oppId)
-          .maybeSingle();
-        if (opp) {
-          setOpportunities((prev) => {
-            if (prev.some((o) => String(o.id) === String(opp.id))) return prev;
-            return [
-              {
-                id: String(opp.id),
-                name: opp.name || 'Opportunity',
-                account_id: opp.account_id ? String(opp.account_id) : null,
-                contact_id: opp.contact_id ? String(opp.contact_id) : null,
-              },
-              ...prev,
-            ];
-          });
-        }
+        requests.push((async () => {
+          const { data: opp } = await scopedDb
+            .from('opportunities')
+            .select('id, name, account_id, contact_id')
+            .eq('id', oppId)
+            .maybeSingle();
+          if (opp) {
+            setOpportunities((prev) => {
+              if (prev.some((o) => String(o.id) === String(opp.id))) return prev;
+              return [
+                {
+                  id: String(opp.id),
+                  name: opp.name || 'Opportunity',
+                  account_id: opp.account_id ? String(opp.account_id) : null,
+                  contact_id: opp.contact_id ? String(opp.contact_id) : null,
+                },
+                ...prev,
+              ];
+            });
+          }
+        })());
+      }
+
+      if (requests.length > 0) {
+        await Promise.all(requests);
       }
     };
 

@@ -1,6 +1,6 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import QuoteNew from '../QuoteNew';
 import { QuoteTransferSchema } from '@/lib/schemas/quote-transfer';
@@ -107,6 +107,12 @@ vi.mock('@/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }
 }));
 
+vi.mock('@/services/quotation/QuotationConfigurationService', () => ({
+  QuotationConfigurationService: class {
+    getConfiguration = vi.fn().mockResolvedValue({ default_module: 'unified' });
+  }
+}));
+
 vi.mock('@/components/debug/pipeline/PipelineContext', () => ({
   usePipeline: () => ({ capture: vi.fn() }),
   PipelineProvider: ({ children }: any) => children
@@ -114,6 +120,10 @@ vi.mock('@/components/debug/pipeline/PipelineContext', () => ({
 
 vi.mock('@/components/debug/pipeline/PipelineDashboard', () => ({
   PipelineDashboard: () => null
+}));
+
+vi.mock('@/components/layout/DashboardLayout', () => ({
+  DashboardLayout: ({ children }: any) => <div data-testid="dashboard-layout">{children}</div>
 }));
 
 describe('QuoteNew Integration Mapping', () => {
@@ -168,6 +178,24 @@ describe('QuoteNew Integration Mapping', () => {
 
     const lastCall = MockUnifiedComposer.mock.calls[MockUnifiedComposer.mock.calls.length - 1][0] as any;
     expect(lastCall.initialData).toBeUndefined();
+  });
+
+  it('uses fixed composer layout without template controls', async () => {
+    render(
+      <MemoryRouter initialEntries={['/dashboard/quotes/new']}>
+        <Routes>
+          <Route path="/dashboard/quotes/new" element={<QuoteNew />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(MockUnifiedComposer).toHaveBeenCalled();
+    });
+
+    const lastCall = MockUnifiedComposer.mock.calls[MockUnifiedComposer.mock.calls.length - 1][0] as any;
+    expect(lastCall.layoutTemplate).toBeUndefined();
+    expect(lastCall.onLayoutTemplateChange).toBeUndefined();
   });
 
   it('prioritizes carrier_id from rate option over name matching', () => {

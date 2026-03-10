@@ -19,32 +19,22 @@ export function groupOptionsForMatrix(options: any[]): MatrixGroup[] {
     
     // 1. Group by Carrier + Service Level
     options.forEach((opt: any) => {
+        const legs = Array.isArray(opt.legs) ? opt.legs : [];
+        const mainLeg = legs.find((l: any) => l.mode === 'Ocean' || l.mode === 'Air') || legs[0];
+
         // Safe access for Carrier
-        let carrier = opt.carrier;
+        let carrier = mainLeg?.carrier_name || mainLeg?.carrier || opt.carrier;
         if (!carrier && opt.carriers && typeof opt.carriers === 'object') {
-            carrier = opt.carriers.carrier_name; // From relation
-        }
-        if (!carrier && Array.isArray(opt.legs) && opt.legs.length > 0) {
-            // Try to find first leg with carrier
-            const mainLeg = opt.legs.find((l: any) => l.mode === 'Ocean' || l.mode === 'Air') || opt.legs[0];
-            carrier = mainLeg.carrier_name || mainLeg.carrier;
+            carrier = opt.carriers.carrier_name;
         }
         carrier = carrier || "Multi-Carrier";
 
         // Safe access for Transit Time
-        let transit = opt.transit_time;
-        if (!transit && Array.isArray(opt.legs) && opt.legs.length > 0) {
-             const mainLeg = opt.legs.find((l: any) => l.mode === 'Ocean' || l.mode === 'Air') || opt.legs[0];
-             transit = mainLeg.transit_time;
-        }
+        let transit = opt.transit_time || mainLeg?.transit_time;
         transit = transit || "";
 
         // Safe access for Frequency
-        let freq = opt.frequency;
-        if (!freq && Array.isArray(opt.legs) && opt.legs.length > 0) {
-             const mainLeg = opt.legs.find((l: any) => l.mode === 'Ocean' || l.mode === 'Air') || opt.legs[0];
-             freq = mainLeg.frequency;
-        }
+        let freq = opt.frequency || mainLeg?.frequency;
         freq = freq || "";
 
         const optionScope =
