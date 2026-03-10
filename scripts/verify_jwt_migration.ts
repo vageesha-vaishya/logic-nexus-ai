@@ -1,72 +1,142 @@
-
-import { createClient } from '@supabase/supabase-js';
+import fs from 'node:fs';
+import path from 'node:path';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
-const SUPABASE_URL = process.env.SUPABASE_URL || 'http://127.0.0.1:54321';
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || '';
-const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+type FunctionCheck = {
+  name: string;
+  hasRequireAuth: boolean;
+  hasConfigSection: boolean;
+  verifyJwtIsFalse: boolean;
+};
 
-if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  console.error('Missing SUPABASE_URL or SUPABASE_ANON_KEY');
-  process.exit(1);
+const REPO_ROOT = process.cwd();
+const FUNCTIONS_DIR = path.join(REPO_ROOT, 'supabase', 'functions');
+const CONFIG_PATH = path.join(REPO_ROOT, 'supabase', 'config.toml');
+const SUPABASE_URL = process.env.SUPABASE_URL || '';
+const SUPABASE_PUBLIC_KEY = process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY || '';
+
+function parseFunctionConfigToml(toml: string): Map<string, { verifyJwt?: boolean }> {
+  const map = new Map<string, { verifyJwt?: boolean }>();
+  let current: string | null = null;
+  for (const rawLine of toml.split('\n')) {
+    const line = rawLine.trim();
+    const section = line.match(/^\[functions\.([^\]]+)\]$/);
+    if (section) {
+      current = section[1];
+      map.set(current, {});
+      continue;
+    }
+    if (!current) continue;
+    const verify = line.match(/^verify_jwt\s*=\s*(true|false)$/i);
+    if (verify) {
+      map.get(current)!.verifyJwt = verify[1].toLowerCase() === 'true';
+    }
+  }
+  return map;
 }
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+function listFunctionFolders(functionsDir: string): string[] {
+  return fs
+    .readdirSync(functionsDir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort();
+}
 
-async function testAuthEndpoint(functionName: string) {
-  console.log(`Testing auth for function: ${functionName}`);
+function hasRequireAuth(indexSource: string): boolean {
+  return indexSource.includes('requireAuth') && indexSource.includes('_shared/auth.ts');
+}
 
-  // Test 1: No Authorization Header
-  console.log('  Test 1: No Authorization Header...');
-  try {
-    const { data, error } = await supabase.functions.invoke(functionName, {
-      body: { some: 'payload' },
-      headers: { } // Explicitly empty, though client might add anon key
+function analyze(): FunctionCheck[] {
+  const toml = fs.readFileSync(CONFIG_PATH, 'utf8');
+  const configMap = parseFunctionConfigToml(toml);
+  const folders = listFunctionFolders(FUNCTIONS_DIR);
+  const results: FunctionCheck[] = [];
+
+  for (const name of folders) {
+    const indexPath = path.join(FUNCTIONS_DIR, name, 'index.ts');
+    if (!fs.existsSync(indexPath)) continue;
+    const source = fs.readFileSync(indexPath, 'utf8');
+    const requireAuthUsed = hasRequireAuth(source);
+    const configSection = configMap.get(name);
+    results.push({
+      name,
+      hasRequireAuth: requireAuthUsed,
+      hasConfigSection: Boolean(configSection),
+      verifyJwtIsFalse: configSection?.verifyJwt === false,
     });
-    
-    // Note: invoke() automatically adds the anon key as Bearer if no other auth is provided? 
-    // Actually, invoke() uses the client's auth session. If client is anon, it sends anon token.
-    // To test "No Auth", we might need to use fetch directly.
-  } catch (e) {
-      console.log('  (Client error as expected or not?)', e);
   }
 
-  // Use fetch for raw control
-  const funcUrl = `${SUPABASE_URL}/functions/v1/${functionName}`;
+  return results;
+}
 
-  // 1. Missing Header
-  const res1 = await fetch(funcUrl, {
+async function smokeTest(functionName: string): Promise<{ functionName: string; missingAuth: number; invalidToken: number }> {
+  const endpoint = `${SUPABASE_URL.replace(/\/$/, '')}/functions/v1/${functionName}`;
+  const missingAuthRes = await fetch(endpoint, {
     method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(SUPABASE_PUBLIC_KEY ? { apikey: SUPABASE_PUBLIC_KEY } : {}),
+    },
     body: JSON.stringify({}),
-    headers: { 'Content-Type': 'application/json' }
   });
-  console.log(`  -> Missing Auth Status: ${res1.status} (Expected 401 or 400 depending on implementation)`);
-  if (res1.status === 401) console.log('     PASS');
-  else console.log('     FAIL/WARN');
 
-  // 2. Invalid Token
-  const res2 = await fetch(funcUrl, {
+  const invalidTokenRes = await fetch(endpoint, {
     method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(SUPABASE_PUBLIC_KEY ? { apikey: SUPABASE_PUBLIC_KEY } : {}),
+      Authorization: 'Bearer invalid-token-123',
+    },
     body: JSON.stringify({}),
-    headers: { 
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer invalid-token-123'
-    }
   });
-  console.log(`  -> Invalid Token Status: ${res2.status} (Expected 401)`);
-  if (res2.status === 401) console.log('     PASS');
-  else console.log('     FAIL');
 
-  // 3. Valid Service Role (Should pass if function supports it, else 401 or 200)
-  // ensemble-demand might not support service role directly for *user* logic but checks it?
-  // Let's check a function we know uses requireAuth.
+  return {
+    functionName,
+    missingAuth: missingAuthRes.status,
+    invalidToken: invalidTokenRes.status,
+  };
 }
 
 async function run() {
-    await testAuthEndpoint('ensemble-demand');
-    await testAuthEndpoint('ai-agent');
+  const checks = analyze();
+  const authFunctions = checks.filter((c) => c.hasRequireAuth);
+  const missingConfig = authFunctions.filter((c) => !c.hasConfigSection);
+  const wrongVerify = authFunctions.filter((c) => !c.verifyJwtIsFalse);
+
+  console.log(`Functions scanned: ${checks.length}`);
+  console.log(`Functions using requireAuth: ${authFunctions.length}`);
+  console.log(`Missing config section: ${missingConfig.length}`);
+  console.log(`verify_jwt not false: ${wrongVerify.length}`);
+
+  if (missingConfig.length > 0) {
+    console.log('Missing sections:');
+    for (const f of missingConfig) console.log(` - ${f.name}`);
+  }
+
+  if (wrongVerify.length > 0) {
+    console.log('Invalid verify_jwt settings:');
+    for (const f of wrongVerify) console.log(` - ${f.name}`);
+  }
+
+  const shouldRunLive = process.argv.includes('--live');
+  if (!shouldRunLive) return;
+
+  if (!SUPABASE_URL) {
+    console.error('SUPABASE_URL is required for --live mode');
+    process.exit(1);
+  }
+
+  const liveTargets = authFunctions.slice(0, 5).map((f) => f.name);
+  for (const fn of liveTargets) {
+    const result = await smokeTest(fn);
+    console.log(`${result.functionName}: missing-auth=${result.missingAuth}, invalid-token=${result.invalidToken}`);
+  }
 }
 
-run();
+run().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

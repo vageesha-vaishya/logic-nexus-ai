@@ -3,10 +3,15 @@ import fs from 'fs'
 import path from 'path'
 import Papa from 'papaparse'
 
-const srcUrl = process.env.SOURCE_SUPABASE_URL || 'https://pqptgpntbthrisnuwwzi.supabase.co'
-const srcAnonKey = process.env.SOURCE_SUPABASE_PUBLISHABLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBxcHRncG50YnRocmlzbnV3d3ppIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkyMzU3NzIsImV4cCI6MjA3NDgxMTc3Mn0.sfNBAUjS9EuhcNb-EPG7pKjPG9s6fx_kaWY_B7k2yjM'
-const adminEmail = process.env.SOURCE_PLATFORM_ADMIN_EMAIL || 'bahuguna.vimal@gmail.com'
-const adminPassword = process.env.SOURCE_PLATFORM_ADMIN_PASSWORD || 'Vimal@1234'
+const srcUrl = process.env.SOURCE_SUPABASE_URL || ''
+const srcAnonKey = process.env.SOURCE_SUPABASE_PUBLISHABLE_KEY || process.env.SOURCE_SUPABASE_ANON_KEY || ''
+const adminEmail = process.env.SOURCE_PLATFORM_ADMIN_EMAIL || ''
+const adminPassword = process.env.SOURCE_PLATFORM_ADMIN_PASSWORD || ''
+
+if (!srcUrl || !srcAnonKey || !adminEmail || !adminPassword) {
+  console.error('Missing SOURCE_SUPABASE_URL, SOURCE_SUPABASE_PUBLISHABLE_KEY/SOURCE_SUPABASE_ANON_KEY, SOURCE_PLATFORM_ADMIN_EMAIL, or SOURCE_PLATFORM_ADMIN_PASSWORD')
+  process.exit(1)
+}
 
 const supabase = createClient(srcUrl, srcAnonKey)
 

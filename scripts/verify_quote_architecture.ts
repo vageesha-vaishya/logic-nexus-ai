@@ -2,12 +2,17 @@
 import { createClient } from '@supabase/supabase-js';
 
 // Configuration
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321';
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'your-anon-key';
-const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || 'your-service-role-key';
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '';
+const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY || '';
+const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY || '';
+
+if (!SUPABASE_URL || (!SERVICE_ROLE_KEY && !SUPABASE_ANON_KEY)) {
+  console.error('Missing Supabase credentials');
+  process.exit(1);
+}
 
 // Initialize Client
-const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY || SUPABASE_ANON_KEY);
 
 async function verifyQuoteArchitecture() {
   console.log('🚀 Starting Quote Architecture Verification...');

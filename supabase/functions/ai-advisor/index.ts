@@ -1,5 +1,5 @@
 import { getCorsHeaders } from "../_shared/cors.ts"
-import { requireAuth } from "../_shared/auth.ts"
+import { extractBearerToken, requireAuth } from "../_shared/auth.ts"
 import { sanitizeForLLM } from "../_shared/pii-guard.ts"
 import { logAiCall } from "../_shared/audit.ts"
 import { serveWithLogger, Logger } from "../_shared/logger.ts"
@@ -75,7 +75,7 @@ serveWithLogger(async (req, logger, supabase) => {
 
     // Get User Token
     const authHeader = req.headers.get('Authorization');
-    const userToken = authHeader ? authHeader.replace('Bearer ', '') : undefined;
+    const userToken = authHeader ? extractBearerToken(authHeader) ?? undefined : undefined;
 
     let result = {};
 

@@ -1,7 +1,7 @@
 
 import { serveWithLogger } from "../_shared/logger.ts"
 import { getCorsHeaders } from "../_shared/cors.ts"
-import { requireAuth } from "../_shared/auth.ts"
+import { isServiceRoleAuthorizationHeader, requireAuth } from "../_shared/auth.ts"
 
 declare const Deno: any;
 
@@ -20,7 +20,7 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
   // Allow service role key OR authenticated user
   const authHeader = req.headers.get('Authorization');
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-  const isServiceRole = authHeader && serviceKey && authHeader.includes(serviceKey);
+  const isServiceRole = isServiceRoleAuthorizationHeader(authHeader, serviceKey);
   
   let user: any = null;
 

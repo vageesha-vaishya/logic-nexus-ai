@@ -50,13 +50,41 @@ export async function requireAuth(req: Request, logger?: Logger): Promise<AuthRe
       return { user: null, error: 'Missing Authorization header', supabaseClient: client };
     }
 
+  const token = extractBearerToken(authHeader);
+  if (!token) {
+    const client = createClient(supabaseUrl, supabaseAnonKey);
+    return { user: null, error: 'Invalid Authorization header format', supabaseClient: client };
+  }
+
   // Create client with the user's JWT — this respects RLS policies
   const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
-    global: { headers: { Authorization: authHeader } },
+    global: { headers: { Authorization: `Bearer ${token}` } },
   });
 
-  const token = authHeader.startsWith('Bearer ') ? authHeader.slice('Bearer '.length) : authHeader;
-  const { data: { user }, error } = await supabaseClient.auth.getUser(token);
+  const authApi = supabaseClient.auth as any;
+  let user: any = null;
+  let error: { message?: string } | null = null;
+
+  if (typeof authApi.getClaims === 'function') {
+    const { data, error: claimsError } = await authApi.getClaims(token);
+    if (!claimsError && data?.claims?.sub) {
+      user = {
+        id: String(data.claims.sub),
+        email: data.claims.email,
+        app_metadata: data.claims.app_metadata,
+        user_metadata: data.claims.user_metadata,
+      };
+      error = null;
+    } else if (claimsError) {
+      error = { message: claimsError.message || 'Invalid token claims' };
+    }
+  }
+
+  if (!user) {
+    const userResp = await supabaseClient.auth.getUser(token);
+    user = userResp.data?.user ?? null;
+    error = user ? null : (userResp.error ? { message: userResp.error.message } : error);
+  }
 
   if (error || !user) {
     const msg = `[requireAuth] getUser failed: ${error?.message}`;
@@ -106,4 +134,21 @@ export function createServiceClient(logger: Logger): SupabaseClient {
       throw new Error(msg);
   }
   return createClient(supabaseUrl, serviceKey);
+}
+
+export function extractBearerToken(authHeader: string): string | null {
+  const [scheme, token] = authHeader.trim().split(/\s+/, 2);
+  if (!scheme || !token || !/^bearer$/i.test(scheme)) {
+    return null;
+  }
+  return token.trim() || null;
+}
+
+export function isServiceRoleAuthorizationHeader(
+  authHeader: string | null,
+  serviceRoleKey: string | null | undefined,
+): boolean {
+  if (!authHeader || !serviceRoleKey) return false;
+  const normalized = authHeader.trim();
+  return normalized === `Bearer ${serviceRoleKey}` || normalized === serviceRoleKey;
 }

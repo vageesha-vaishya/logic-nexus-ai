@@ -99,12 +99,7 @@ for func_name in "${FUNCTIONS[@]}"; do
 
     # Step 3b: Deployment
     log "  > Deploying to $PROJECT_REF..."
-    # Deploy command: npx supabase functions deploy <name> --project-ref <ref>
-    # Note: Using --no-verify-jwt is usually for serving, not deploying. Deployment just uploads.
-    # If the function requires secrets, ensure they are set via 'supabase secrets set' beforehand, 
-    # but we assume env is configured or we'll deploy anyway.
-    
-    if run_supabase functions deploy "$func_name" --project-ref "$PROJECT_REF" 2>&1 | tee -a "$LOG_FILE"; then
+    if run_supabase functions deploy "$func_name" --project-ref "$PROJECT_REF" --no-verify-jwt 2>&1 | tee -a "$LOG_FILE"; then
         log "  > Deployment command finished." "$GREEN"
         ((DEPLOY_SUCCESS++))
         

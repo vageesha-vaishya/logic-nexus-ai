@@ -2,7 +2,7 @@
 // /// <reference types="https://esm.sh/@supabase/functions@1.3.1/types.ts" />
 import { serveWithLogger } from "../_shared/logger.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
-import { requireAuth } from "../_shared/auth.ts";
+import { isServiceRoleAuthorizationHeader, requireAuth } from "../_shared/auth.ts";
 
 declare const Deno: any;
 
@@ -15,7 +15,7 @@ serveWithLogger(async (req, logger, supabase) => {
   // Auth: verify service role key or authenticated user (admin manually triggering)
   const authHeaderCheck = req.headers.get('Authorization');
   const serviceKeyCheck = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-  if (!authHeaderCheck || !authHeaderCheck.includes(serviceKeyCheck)) {
+  if (!isServiceRoleAuthorizationHeader(authHeaderCheck, serviceKeyCheck)) {
     const { user, error: authError } = await requireAuth(req);
     if (authError || !user) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });

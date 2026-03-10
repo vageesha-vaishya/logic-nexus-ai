@@ -197,14 +197,245 @@ otp_expiry = 3600
 # subject = "You have been invited"
 # content_path = "./supabase/templates/invite.html"
 
-[functions.save-quotation-version]
+[functions.admin-reset-password]
+verify_jwt = false
+
+[functions.ai-advisor]
+verify_jwt = false
+
+[functions.ai-agent]
+verify_jwt = false
+
+[functions.ai-message-assistant]
+verify_jwt = false
+
+[functions.alert-notifier]
+verify_jwt = false
+
+[functions.analyze-cargo-damage]
+verify_jwt = false
+
+[functions.analyze-email-threat]
+verify_jwt = false
+
+[functions.anomaly-detection]
+verify_jwt = false
+
+[functions.anomaly-detector]
+verify_jwt = false
+
+[functions.autonomous-email]
+verify_jwt = false
+
+[functions.calculate-lead-score]
+verify_jwt = false
+
+[functions.carrier-scoring]
+verify_jwt = false
+
+[functions.categorize-document]
+verify_jwt = false
+
+[functions.check-expiring-documents]
 verify_jwt = false
 
 [functions.classify-email]
 verify_jwt = false
 
-[functions.suggest-transport-mode]
+[functions.cleanup-logs]
+verify_jwt = false
+
+[functions.container-demand]
+verify_jwt = false
+
+[functions.create-user]
+verify_jwt = false
+
+[functions.delete-user]
+verify_jwt = false
+
+[functions.domains-register]
+verify_jwt = false
+
+[functions.domains-verify]
+verify_jwt = false
+
+[functions.email-scan]
+verify_jwt = false
+
+[functions.email-stats]
+verify_jwt = false
+
+[functions.ensemble-demand]
+verify_jwt = false
+
+[functions.escalate-message]
+verify_jwt = false
+
+[functions.exchange-oauth-token]
+verify_jwt = false
+
+[functions.execute-sql-external]
+verify_jwt = false
+
+[functions.export-data]
+verify_jwt = false
+
+[functions.extract-bol-fields]
+verify_jwt = false
+
+[functions.extract-invoice-items]
+verify_jwt = false
+
+[functions.fleet-utilization]
+verify_jwt = false
+
+[functions.forecast-demand]
 verify_jwt = false
 
 [functions.generate-quote-pdf]
+verify_jwt = false
+
+[functions.get-account-label]
+verify_jwt = false
+
+[functions.get-contact-label]
+verify_jwt = false
+
+[functions.get-opportunity-full]
+verify_jwt = false
+
+[functions.get-opportunity-label]
+verify_jwt = false
+
+[functions.get-service-label]
+verify_jwt = false
+
+[functions.ingest-email]
+verify_jwt = false
+
+[functions.ingest-linkedin]
+verify_jwt = false
+
+[functions.ingest-telegram]
+verify_jwt = false
+
+[functions.ingest-web]
+verify_jwt = false
+
+[functions.lead-event-webhook]
+verify_jwt = false
+
+[functions.lead-scoring]
+verify_jwt = false
+
+[functions.list-edge-functions]
+verify_jwt = false
+
+[functions.margin-optimizer]
+verify_jwt = false
+
+[functions.metrics-quotation]
+verify_jwt = false
+
+[functions.mgl-quotation-api]
+verify_jwt = false
+
+[functions.moderate-message]
+verify_jwt = false
+
+[functions.nexus-copilot]
+verify_jwt = false
+
+[functions.plan-event-webhook]
+verify_jwt = false
+
+[functions.portal-chatbot]
+verify_jwt = false
+
+[functions.predict-eta]
+verify_jwt = false
+
+[functions.process-email-retention]
+verify_jwt = false
+
+[functions.process-franchise-import]
+verify_jwt = false
+
+[functions.process-lead-assignments]
+verify_jwt = false
+
+[functions.process-scheduled-emails]
+verify_jwt = false
+
+[functions.process-sequences]
+verify_jwt = false
+
+[functions.push-migrations-to-target]
+verify_jwt = false
+
+[functions.rate-engine]
+verify_jwt = false
+
+[functions.remote-import]
+verify_jwt = false
+
+[functions.restore-quotation-version]
+verify_jwt = false
+
+[functions.revenue-forecasting]
+verify_jwt = false
+
+[functions.risk-scoring]
+verify_jwt = false
+
+[functions.route-email]
+verify_jwt = false
+
+[functions.route-optimization]
+verify_jwt = false
+
+[functions.salesforce-sync-opportunity]
+verify_jwt = false
+
+[functions.save-quotation-version]
+verify_jwt = false
+
+[functions.search-emails]
+verify_jwt = false
+
+[functions.send-email]
+verify_jwt = false
+
+[functions.send-web]
+verify_jwt = false
+
+[functions.send-whatsapp]
+verify_jwt = false
+
+[functions.smart-reply]
+verify_jwt = false
+
+[functions.subscription-plans]
+verify_jwt = false
+
+[functions.suggest-transport-mode]
+verify_jwt = false
+
+[functions.sync-all-mailboxes]
+verify_jwt = false
+
+[functions.sync-cn-hs-data]
+verify_jwt = false
+
+[functions.sync-emails]
+verify_jwt = false
+
+[functions.sync-emails-v2]
+verify_jwt = false
+
+[functions.sync-hts-data]
+verify_jwt = false
+
+[functions.win-probability]
 verify_jwt = false

@@ -2,7 +2,7 @@ import { SupabaseClient } from "@supabase/supabase-js";
 // @ts-ignore
 import nodemailer from "nodemailer";
 import { getCorsHeaders } from "../_shared/cors.ts";
-import { requireAuth } from "../_shared/auth.ts";
+import { isServiceRoleAuthorizationHeader, requireAuth } from "../_shared/auth.ts";
 import { Logger, serveWithLogger } from "../_shared/logger.ts";
 
 declare const Deno: any;
@@ -816,7 +816,7 @@ serveWithLogger(async (req: Request, baseLogger: Logger, _adminSupabase: Supabas
     // Use the admin client passed by serveWithLogger for privileged operations
     const adminSupabase = _adminSupabase;
 
-    if (authHeader && authHeader.includes(serviceKey)) {
+    if (isServiceRoleAuthorizationHeader(authHeader, serviceKey)) {
         // System/Admin call (e.g. from scheduler)
         supabase = adminSupabase;
     } else if (isE2eBypass) {

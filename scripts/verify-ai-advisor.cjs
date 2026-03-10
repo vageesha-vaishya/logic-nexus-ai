@@ -1,7 +1,8 @@
 const https = require('https');
+require('dotenv').config();
 
-const SUPABASE_URL = "https://gzhxgoigflftharcmdqj.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd6aHhnb2lnZmxmdGhhcmNtZHFqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk1MTk2ODcsImV4cCI6MjA4NTA5NTY4N30.6xIZ3VYubUZ73pNPurzYuf-2RUpXj_9w-LpU-6d6kqU";
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "";
+const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY || "";
 
 const payload = {
   action: 'generate_smart_quotes',
@@ -22,6 +23,7 @@ const options = {
   method: 'POST',
   headers: {
     'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+    'apikey': SUPABASE_ANON_KEY,
     'Content-Type': 'application/json'
   }
 };
