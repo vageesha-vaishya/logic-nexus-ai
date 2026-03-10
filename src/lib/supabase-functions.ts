@@ -241,9 +241,9 @@ export async function invokeFunction<T = any>(
                     'Content-Type': 'application/json',
                     'apikey': publicKey,
                     ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-                    ...(options.headers || {})
+                    ...customHeaders
                 },
-                body: options.body ? JSON.stringify(options.body) : undefined,
+                body: options.body ? JSON.stringify(enrichPayload(options.body)) : undefined,
                 signal: controller.signal
           });
           clearTimeout(timeoutId);
@@ -312,7 +312,7 @@ export async function invokeFunction<T = any>(
                                 'Content-Type': 'application/json',
                                 'apikey': publicKey,
                                 'Authorization': `Bearer ${newToken}`,
-                                ...(options.headers || {})
+                                ...customHeaders
                             },
                             body: options.body ? JSON.stringify(enrichPayload(options.body)) : undefined,
                         });
