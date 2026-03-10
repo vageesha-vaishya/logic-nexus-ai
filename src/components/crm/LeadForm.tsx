@@ -33,7 +33,7 @@ export const leadSchema = z.object({
   expected_close_date: z.string().min(1, 'Expected Close Date is required'),
   description: z.string().optional(),
   notes: z.string().optional(),
-  tenant_id: z.string().optional(),
+  tenant_id: z.string().min(1, 'Tenant is required'),
   franchise_id: z.string().optional(),
   service_id: z.string().min(1, 'Interested Service is required'),
   attachments: z.array(z.any()).default([]),
@@ -234,10 +234,6 @@ export function LeadForm({ initialData, onSubmit, onCancel, suggestedService, is
 
   const handleConfirm = async () => {
     if (pendingData) {
-      if (context.isPlatformAdmin && (!pendingData.tenant_id || String(pendingData.tenant_id).trim() === '')) {
-        toast.error('Tenant is required to create a lead. Please select a tenant.');
-        return;
-      }
       setShowConfirmDialog(false);
       await onSubmit(pendingData);
       setPendingData(null);
@@ -275,7 +271,7 @@ export function LeadForm({ initialData, onSubmit, onCancel, suggestedService, is
               render={({ field }) => (
                 <FormItem className="col-span-2">
                   <FormLabel>Tenant *</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value || undefined}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select tenant" />
@@ -302,7 +298,7 @@ export function LeadForm({ initialData, onSubmit, onCancel, suggestedService, is
               render={({ field }) => (
                 <FormItem className="col-span-2">
                   <FormLabel>Franchise</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value || undefined}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select franchise" />
