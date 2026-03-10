@@ -442,55 +442,7 @@ serveWithLogger(async (req, logger, adminSupabase) => {
         templateContent = await getTemplate(supabaseClient, selectedTemplateId, logger);
     }
 
-    // 3. If still no template, check for Multi-Modal heuristic
-    if (!templateContent) {
-        // Check if any option has > 1 leg OR distinct modes
-        // We look at the legs we fetched
-        const isMultiModal = options.some((opt: any) => {
-             if (opt.legs && opt.legs.length > 1) return true;
-             // Check if distinct transport modes exist across legs
-             const modes = new Set(opt.legs.map((l: any) => l.mode || l.transport_mode));
-             if (modes.size > 1) return true;
-             return false;
-        });
-
-        if (isMultiModal) {
-            await log("Detected Multi-Modal Quote. Attempting to load 'Standard Multi-Modal' template.");
-            // Try to find the template by name
-            let query = supabaseClient
-                 .from("quote_templates")
-                 .select("content, tenant_id, name")
-                 .eq("name", "Standard Multi-Modal");
-             
-            if ((quote as any).tenant_id) {
-                 query = query.or(`tenant_id.eq.${(quote as any).tenant_id},tenant_id.is.null`);
-            } else {
-                 query = query.is("tenant_id", null);
-            }
-
-            const { data: templates, error: mmError } = await query;
-            
-            let mmTemplate = null;
-            if (templates && templates.length > 0) {
-                 // Sort: tenant-specific first
-                 templates.sort((a: any, b: any) => {
-                     if (a.tenant_id && !b.tenant_id) return -1;
-                     if (!a.tenant_id && b.tenant_id) return 1;
-                     return 0;
-                 });
-                 mmTemplate = templates[0];
-            }
-            
-            if (!mmError && mmTemplate && mmTemplate.content) {
-                 templateContent = { ...mmTemplate.content, name: mmTemplate.name };
-                 await log("Loaded 'Standard Multi-Modal' template.");
-            } else {
-                 await logWarn(`'Standard Multi-Modal' template not found or error: ${mmError?.message || 'Unknown'}`);
-            }
-        }
-    }
-
-    // 4. Try loading 'MGL-Main-Template' as the preferred default
+    // 3. Try loading 'MGL-Main-Template' as the preferred default
     if (!templateContent) {
         await log("Attempting to load 'MGL-Main-Template' as preferred default.");
         let query = supabaseClient
@@ -522,6 +474,49 @@ serveWithLogger(async (req, logger, adminSupabase) => {
              await log("Loaded 'MGL-Main-Template'.");
         } else {
              await logWarn(`'MGL-Main-Template' not found or error: ${defError?.message || 'Unknown'}`);
+        }
+    }
+
+    // 4. If still no template, check for Multi-Modal heuristic
+    if (!templateContent) {
+        const isMultiModal = options.some((opt: any) => {
+             if (opt.legs && opt.legs.length > 1) return true;
+             const modes = new Set(opt.legs.map((l: any) => l.mode || l.transport_mode));
+             if (modes.size > 1) return true;
+             return false;
+        });
+
+        if (isMultiModal) {
+            await log("Detected Multi-Modal Quote. Attempting to load 'Standard Multi-Modal' template.");
+            let query = supabaseClient
+                 .from("quote_templates")
+                 .select("content, tenant_id, name")
+                 .eq("name", "Standard Multi-Modal");
+             
+            if ((quote as any).tenant_id) {
+                 query = query.or(`tenant_id.eq.${(quote as any).tenant_id},tenant_id.is.null`);
+            } else {
+                 query = query.is("tenant_id", null);
+            }
+
+            const { data: templates, error: mmError } = await query;
+            
+            let mmTemplate = null;
+            if (templates && templates.length > 0) {
+                 templates.sort((a: any, b: any) => {
+                     if (a.tenant_id && !b.tenant_id) return -1;
+                     if (!a.tenant_id && b.tenant_id) return 1;
+                     return 0;
+                 });
+                 mmTemplate = templates[0];
+            }
+            
+            if (!mmError && mmTemplate && mmTemplate.content) {
+                 templateContent = { ...mmTemplate.content, name: mmTemplate.name };
+                 await log("Loaded 'Standard Multi-Modal' template.");
+            } else {
+                 await logWarn(`'Standard Multi-Modal' template not found or error: ${mmError?.message || 'Unknown'}`);
+            }
         }
     }
 
@@ -700,7 +695,12 @@ serveWithLogger(async (req, logger, adminSupabase) => {
 
     await log("Using V2 Rendering Engine");
 
-    const mode = body.mode || 'single';
+    const requestedMode = typeof body.mode === "string" ? body.mode : undefined;
+    const hasMultipleOptions = options.length > 1;
+    const mode = requestedMode || (hasMultipleOptions ? "consolidated" : "single");
+    if (!requestedMode && hasMultipleOptions) {
+      await logger.info(`Auto-selected consolidated mode for ${options.length} options`);
+    }
     let pdfBytes: Uint8Array | null = null;
     const finalWarnings: string[] = [];
 
@@ -732,14 +732,60 @@ serveWithLogger(async (req, logger, adminSupabase) => {
               const duplicate = mappedCargoComboItems.some((comboItem: any) =>
                 String(comboItem?.container_type || "").trim().toLowerCase() === String(item?.container_type || "").trim().toLowerCase() &&
                 String(comboItem?.container_size || "").trim().toLowerCase() === String(item?.container_size || "").trim().toLowerCase() &&
-                Number(comboItem?.quantity ?? comboItem?.qty ?? 0) === Number(item?.quantity ?? item?.qty ?? 0),
+                String(comboItem?.commodity || "").trim().toLowerCase() === String(item?.commodity || "").trim().toLowerCase(),
               );
               return !duplicate;
             }),
           ]
         : mappedQuoteItems;
-      const mappedItems = comboDrivenItems;
+      const mergedItems = new Map<string, any>();
+      comboDrivenItems.forEach((item: any) => {
+        const key = [
+          String(item?.container_type || "").trim().toLowerCase(),
+          String(item?.container_size || "").trim().toLowerCase(),
+          String(item?.commodity || "").trim().toLowerCase(),
+        ].join("|");
+        if (!mergedItems.has(key)) {
+          mergedItems.set(key, { ...item });
+          return;
+        }
+        const existing = mergedItems.get(key);
+        existing.quantity = (Number(existing?.quantity ?? existing?.qty ?? 0) || 0) + (Number(item?.quantity ?? item?.qty ?? 0) || 0);
+        existing.weight = Math.max(Number(existing?.weight ?? existing?.total_weight ?? 0) || 0, Number(item?.weight ?? item?.total_weight ?? 0) || 0);
+        existing.volume = Math.max(Number(existing?.volume ?? existing?.total_volume ?? 0) || 0, Number(item?.volume ?? item?.total_volume ?? 0) || 0);
+        mergedItems.set(key, existing);
+      });
+      const mappedItems = Array.from(mergedItems.values());
       const fallbackItem = mappedItems.find((item: any) => item?.container_size || item?.container_type);
+
+      const resolveLegLocation = (leg: any, type: "origin" | "destination") => {
+        if (!leg || typeof leg !== "object") return "N/A";
+        if (type === "origin") {
+          return (
+            leg.pol ||
+            leg.origin_name ||
+            leg.origin_code ||
+            leg.origin?.location_name ||
+            leg.origin?.name ||
+            leg.origin ||
+            "N/A"
+          );
+        }
+        return (
+          leg.pod ||
+          leg.destination_name ||
+          leg.destination_code ||
+          leg.destination?.location_name ||
+          leg.destination?.name ||
+          leg.destination ||
+          "N/A"
+        );
+      };
+
+      const resolveLegTransit = (leg: any) =>
+        leg?.transit_time ||
+        (Number.isFinite(Number(leg?.transit_days)) ? `${Number(leg.transit_days)} Days` : "") ||
+        "";
 
       const resolveOptionContainerSize = (opt: any) =>
         opt?.container_sizes?.code ||
@@ -793,8 +839,8 @@ serveWithLogger(async (req, logger, adminSupabase) => {
           service_level: quote.service_level,
           notes: quote.notes,
           terms_conditions: quote.terms_conditions,
-          origin: quote.origin,
-          destination: quote.destination,
+          origin: quote.origin || quote.origin_port_data || quote.origin_location || quote.origin_name || quote.origin_code,
+          destination: quote.destination || quote.destination_port_data || quote.destination_location || quote.destination_name || quote.destination_code,
           incoterms: quote.incoterms,
         },
         customer: {
@@ -816,10 +862,10 @@ serveWithLogger(async (req, logger, adminSupabase) => {
           option?.legs?.map((l: any) => ({
             sequence_id: l.sequence_id || 0,
             mode: l.mode || l.transport_mode || "Unknown",
-            pol: l.origin?.location_name || "N/A",
-            pod: l.destination?.location_name || "N/A",
+            pol: resolveLegLocation(l, "origin"),
+            pod: resolveLegLocation(l, "destination"),
             carrier: option.carriers?.carrier_name || l.carrier_name || "TBD",
-            transit_time: l.transit_time || "",
+            transit_time: resolveLegTransit(l),
           })) || [],
         charges:
           option?.charges?.map((c: any) => ({
@@ -835,8 +881,12 @@ serveWithLogger(async (req, logger, adminSupabase) => {
         items: mappedItems,
         options: options.map((o: any) => ({
           id: o.id,
+          rate_option_id: o.rate_option_id || o.option_id || o.id,
+          option_group_key: o.option_group_key || o.rate_option_id || o.option_id || o.id,
+          option_name: o.option_name || o.rate_option_name || o.name || null,
+          rate_option_name: o.rate_option_name || o.option_name || o.name || null,
           carrier: o.carriers?.carrier_name || 'Multi-Carrier',
-          transit_time: o.transit_time_days ? `${o.transit_time_days} Days` : (o.legs?.map((l: any) => l.transit_time).filter(Boolean).join(" + ") || "N/A"),
+          transit_time: o.transit_time_days ? `${o.transit_time_days} Days` : (o.legs?.map((l: any) => resolveLegTransit(l)).filter(Boolean).join(" + ") || "N/A"),
           frequency: o.frequency || o.service_level || "Weekly", // Fallback to Weekly if missing
           container_size: resolveOptionContainerSize(o),
           container_type: resolveOptionContainerType(o),
@@ -846,10 +896,10 @@ serveWithLogger(async (req, logger, adminSupabase) => {
           legs: o.legs?.map((l: any) => ({
              sequence_id: l.sequence_id || 0,
              mode: l.mode || l.transport_mode,
-             pol: l.origin?.location_name,
-             pod: l.destination?.location_name,
+             pol: resolveLegLocation(l, "origin"),
+             pod: resolveLegLocation(l, "destination"),
              carrier: o.carriers?.carrier_name || l.carrier_name,
-             transit_time: l.transit_time,
+             transit_time: resolveLegTransit(l),
              transport_mode: l.transport_mode || l.mode
           })) || [],
           charges: o.charges?.map((c: any) => ({
@@ -977,7 +1027,8 @@ serveWithLogger(async (req, logger, adminSupabase) => {
     const skipCacheForCargoCombos = hasCargoContainerCombos;
 
     // Check for cached PDF first if single mode and not forcing re-render
-    if (mode === 'single' && !store_result && !forceRerender && !skipCacheForCargoCombos && version && (version as any).storage_path) {
+    const skipCacheForMultiOptions = hasMultipleOptions;
+    if (mode === 'single' && !store_result && !forceRerender && !skipCacheForCargoCombos && !skipCacheForMultiOptions && version && (version as any).storage_path) {
       try {
         const storagePath = (version as any).storage_path as string;
         const { data: file, error: downloadError } = await supabaseClient.storage
@@ -994,8 +1045,12 @@ serveWithLogger(async (req, logger, adminSupabase) => {
       } catch (e: any) {
         await logger.warn(`Cached PDF retrieval failed: ${e?.message || String(e)}`);
       }
-    } else if (skipCacheForCargoCombos) {
-      await logger.info("Skipping cached PDF because cargo_details.container_combos must be freshly mapped into items");
+    } else if (skipCacheForCargoCombos || skipCacheForMultiOptions) {
+      const cacheSkipReasons = [
+        ...(skipCacheForCargoCombos ? ["cargo_details.container_combos require fresh mapping"] : []),
+        ...(skipCacheForMultiOptions ? ["multi-option quotes require fresh consolidated output"] : []),
+      ];
+      await logger.info(`Skipping cached PDF: ${cacheSkipReasons.join("; ")}`);
     }
 
     let contentType = "application/pdf";
@@ -1014,6 +1069,15 @@ serveWithLogger(async (req, logger, adminSupabase) => {
                 const summaryRawData: any = createRawData({}); 
                 summaryRawData.options = options.map((o: any) => ({
                     id: o.id,
+                    option_name: o.option_name || o.rate_option_name || o.name || null,
+                    rate_option_name: o.rate_option_name || o.option_name || o.name || null,
+                    option_group_key: o.option_group_key || o.rate_option_id || o.option_id || o.id,
+                    rate_option_id: o.rate_option_id || o.option_id || o.id,
+                    carrier: o.carriers?.carrier_name || o.carrier || "Multi-Carrier",
+                    transit_time: o.transit_time_days ? `${o.transit_time_days} Days` : (o.transit_time || "N/A"),
+                    frequency: o.frequency || o.service_level || "N/A",
+                    container_size: o.container_sizes?.code || o.container_sizes?.name || o.container_size || "N/A",
+                    container_type: o.container_types?.code || o.container_types?.name || o.container_type || "N/A",
                     grand_total: Array.isArray(o.charges) 
                         ? o.charges.reduce((sum: number, c: any) => sum + (Number(c.amount) || 0), 0)
                         : 0,

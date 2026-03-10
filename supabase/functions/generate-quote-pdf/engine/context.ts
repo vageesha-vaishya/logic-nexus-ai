@@ -380,6 +380,10 @@ export interface SafeContext {
   // Multi-rate support
   options?: Array<{
     id: string;
+    rate_option_id?: string;
+    option_group_key?: string;
+    option_name?: string;
+    rate_option_name?: string;
     legs: Array<{
       seq: number;
       mode: string;
@@ -565,6 +569,10 @@ export function buildSafeContextWithValidation(
     mode: data.mode || 'single',
     options: (data.options || []).map((opt: any) => ({
         id: opt.id,
+        rate_option_id: opt.rate_option_id || opt.option_id || opt.id,
+        option_group_key: opt.option_group_key || opt.rate_option_id || opt.option_id || opt.id,
+        option_name: opt.option_name || opt.rate_option_name || opt.name,
+        rate_option_name: opt.rate_option_name || opt.option_name || opt.name,
         grand_total: opt.grand_total || opt.total_amount || 0,
         carrier: opt.carrier || opt.carrier_name || opt.carriers?.carrier_name,
         transit_time: opt.transit_time,

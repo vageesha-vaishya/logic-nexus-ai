@@ -259,4 +259,37 @@ describe("buildSafeContextWithValidation", () => {
     expect(result.context.charges[0].qty).toBe(-1);
     expect(result.context.charges[0].unit_price).toBe(-100);
   });
+
+  it("preserves option scope fields for matrix grouping", () => {
+    const payload = {
+      quote: {
+        quote_number: "Q-4",
+        created_at: new Date().toISOString(),
+        status: "draft",
+        total_amount: 100,
+        currency: "USD",
+      },
+      charges: [{ description: "Freight", amount: 100, currency: "USD" }],
+      options: [
+        {
+          id: "opt-1",
+          option_group_key: "scope-1",
+          option_name: "Rate Option 1",
+          rate_option_name: "Rate Option 1",
+          grand_total: 1000,
+          legs: [],
+          charges: [],
+        },
+      ],
+    };
+
+    const result = buildSafeContextWithValidation(payload);
+    expect(result.context.options?.[0]).toMatchObject({
+      id: "opt-1",
+      option_group_key: "scope-1",
+      option_name: "Rate Option 1",
+      rate_option_name: "Rate Option 1",
+      rate_option_id: "opt-1",
+    });
+  });
 });

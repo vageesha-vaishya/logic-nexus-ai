@@ -14,6 +14,7 @@ PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 ENV_FILE="${PROJECT_ROOT}/.env.migration"
 SQL_FILE="${1:-}"
+DB_URL="${SUPABASE_DB_URL:-}"
 
 if [[ -z "${SQL_FILE}" ]]; then
   echo "Error: SQL file path is required"
@@ -26,29 +27,26 @@ if [[ ! -f "${SQL_FILE}" ]]; then
   exit 1
 fi
 
-if [[ ! -f "${ENV_FILE}" ]]; then
-  echo "Error: .env.migration not found at ${ENV_FILE}"
-  echo "Please create it with SUPABASE_DB_URL and SUPABASE_ACCESS_TOKEN if needed."
-  exit 1
+if [[ -z "${DB_URL}" && -f "${ENV_FILE}" ]]; then
+  set -a
+  . "${ENV_FILE}"
+  set +a
+  DB_URL="${SUPABASE_DB_URL:-}"
 fi
 
-# Load .env.migration safely into current shell
-set -a
-. "${ENV_FILE}"
-set +a
-
-if [[ -z "${SUPABASE_DB_URL:-}" ]]; then
-  echo "Error: SUPABASE_DB_URL not defined in .env.migration"
+if [[ -z "${DB_URL}" ]]; then
+  echo "Error: SUPABASE_DB_URL is not defined in environment or ${ENV_FILE}"
   exit 1
 fi
 
 echo "Executing SQL via Supabase CLI:"
 echo "  File: ${SQL_FILE}"
-echo "  DB:   ${SUPABASE_DB_URL}"
+SAFE_DB_URL=$(echo "${DB_URL}" | sed -E 's#(postgres(ql)?://[^:]+:)[^@]+@#\1****@#')
+echo "  DB:   ${SAFE_DB_URL}"
 
 # Execute SQL file against remote DB URL
 # Strip pgbouncer param which causes psql error
-CLEAN_DB_URL=$(echo "${SUPABASE_DB_URL}" | sed 's/?pgbouncer=true//g' | sed 's/&pgbouncer=true//g')
+CLEAN_DB_URL=$(echo "${DB_URL}" | sed 's/?pgbouncer=true//g' | sed 's/&pgbouncer=true//g')
 
 if command -v psql >/dev/null 2>&1; then
   psql "${CLEAN_DB_URL}" -f "${SQL_FILE}"
@@ -57,4 +55,3 @@ else
   exit 1
 fi
 echo "✅ SQL executed successfully"
-

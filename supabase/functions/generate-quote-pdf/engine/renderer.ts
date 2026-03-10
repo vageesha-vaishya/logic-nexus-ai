@@ -133,6 +133,7 @@ export class PdfRenderer {
            // If fixed height, deduct it. 
            // Note: dynamic tables handle their own cursor movement.
            const dynamicSections = [
+               "header",
                "dynamic_table", 
                "matrix_rate_table", 
                "detailed_matrix_rate_table", 
@@ -334,17 +335,23 @@ export class PdfRenderer {
 
          // Data Extraction
          const optionName = `Option ${index + 1}`;
-         // Try to find main carrier from legs
-              const mainLeg = opt.legs.find((l: any) => {
-                  const normalizedMode = this.normalizeTransportMode(l.mode || l.transport_mode);
-                  return normalizedMode === "ocean" || normalizedMode === "air";
-              }) || opt.legs[0];
-               
-               const carrier = mainLeg?.carrier_name || "Multi-Carrier";
-         const transit = opt.legs.map((l: any) => l.transit_time).filter(Boolean).join(" + ") || "N/A";
+         const legs = Array.isArray(opt.legs) ? opt.legs : [];
+         const mainLeg = legs.find((l: any) => {
+             const normalizedMode = this.normalizeTransportMode(l.mode || l.transport_mode);
+             return normalizedMode === "ocean" || normalizedMode === "air";
+         }) || legs[0];
+         const carrier = mainLeg?.carrier_name || opt.carrier || "Multi-Carrier";
+         const origin = legs[0]?.pol || legs[0]?.origin || "N/A";
+         const destination = legs[legs.length - 1]?.pod || legs[legs.length - 1]?.destination || "N/A";
+         const carrierWithRoute = `${carrier} | ${origin} -> ${destination}`;
+         const transit =
+           opt.transit_time ||
+           mainLeg?.transit_time ||
+           legs.map((l: any) => l.transit_time).filter(Boolean).join(" + ") ||
+           "N/A";
          const total = this.i18n.formatCurrency(opt.grand_total, this.context.quote.currency, this.context.meta?.locale);
 
-         const rowData = [optionName, carrier, transit, total];
+         const rowData = [optionName, carrierWithRoute, transit, total];
 
          rowData.forEach((val, i) => {
              // Alignment
@@ -508,6 +515,7 @@ export class PdfRenderer {
 
     if (section.config?.showContainerBreakdown) {
         await this.renderContainerBreakdownTable();
+        this.cursorY -= 10;
     }
 
     let optionsToRender = this.context.options && this.context.options.length > 0 
@@ -659,7 +667,7 @@ export class PdfRenderer {
              font: this.font,
              color: rgb(0.5, 0.5, 0.5)
         });
-        this.cursorY -= 40;
+        this.cursorY -= 24;
         return;
     }
 
@@ -702,17 +710,59 @@ export class PdfRenderer {
         return a.localeCompare(b);
     });
 
+    const getOptionScopeKey = (opt: any) =>
+      String(
+        opt.option_group_key ||
+          opt.rate_option_id ||
+          opt.option_id ||
+          opt.id ||
+          "",
+      );
+
+    const getOptionLabel = (opt: any) =>
+      String(
+        opt.option_name ||
+          opt.rate_option_name ||
+          opt.name ||
+          "",
+      ).trim();
+
+    const baseKeyToOptionScopes = new Map<string, Set<string>>();
+    optionsToRender.forEach((opt: any) => {
+      const carrier = opt.carrier || "Multi-Carrier";
+      const transit = opt.transit_time || "N/A";
+      const baseKey = `${carrier}|${transit}`;
+      if (!baseKeyToOptionScopes.has(baseKey)) {
+        baseKeyToOptionScopes.set(baseKey, new Set<string>());
+      }
+      const scopeKey = getOptionScopeKey(opt);
+      if (scopeKey) {
+        baseKeyToOptionScopes.get(baseKey)!.add(scopeKey);
+      }
+    });
+
+    const hasCollapsedOptionScopes = Array.from(baseKeyToOptionScopes.values()).some(
+      (scopes) => scopes.size > 1,
+    );
+    const hasOptionScopeKey = optionsToRender.some((opt: any) => Boolean(getOptionScopeKey(opt)));
+    const shouldUseOptionScopeRows = section.config?.show_per_option_charges === true ||
+      (hasOptionScopeKey && hasCollapsedOptionScopes);
+
     // 2. Group options by Carrier + Transit Time (Rows)
     const rows = new Map<string, any>();
     
     optionsToRender.forEach((opt: any) => {
         const carrier = opt.carrier || "Multi-Carrier";
         const transit = opt.transit_time || "N/A";
-        const key = `${carrier}|${transit}`;
+        const optionScopeKey = getOptionScopeKey(opt);
+        const key = shouldUseOptionScopeRows && optionScopeKey
+          ? `${carrier}|${transit}|${optionScopeKey}`
+          : `${carrier}|${transit}`;
         
         if (!rows.has(key)) {
+            const optionLabel = getOptionLabel(opt);
             rows.set(key, {
-                carrier,
+                carrier: shouldUseOptionScopeRows && optionLabel ? `${carrier} (${optionLabel})` : carrier,
                 transit,
                 prices: {}
             });
@@ -869,6 +919,7 @@ export class PdfRenderer {
             } as TemplateSection);
         }
         await this.renderContainerBreakdownTable();
+        this.cursorY -= 10;
         return;
     }
 
@@ -948,14 +999,55 @@ export class PdfRenderer {
   }
 
   private buildContainerBreakdownRows(items: any[]): any[] {
-    return items.map((item: any, index: number) => ({
-      sequence_number: item?.sequence_number ?? index + 1,
-      container_type: String(item?.container_type || item?.type || "Container"),
-      container_size: String(item?.container_size || item?.size || "-"),
-      quantity: this.resolveItemQuantity(item),
-      commodity: String(item?.commodity || item?.details || "General Cargo"),
-      weight: Number(item?.weight ?? item?.total_weight ?? 0),
-      volume: Number(item?.volume ?? item?.total_volume ?? 0),
+    const normalizedRows = items.map((item: any, index: number) => {
+      const quantityRaw = Number(item?.quantity ?? item?.qty);
+      const quantity = Number.isFinite(quantityRaw) && quantityRaw > 0 ? quantityRaw : 1;
+      const weightRaw = Number(item?.weight ?? item?.total_weight ?? item?.weight_kg ?? 0);
+      const volumeRaw = Number(item?.volume ?? item?.total_volume ?? item?.volume_cbm ?? 0);
+      return {
+        sequence_number: item?.sequence_number ?? index + 1,
+        container_type: String(item?.container_type || item?.type || "Container"),
+        container_size: String(item?.container_size || item?.size || "-"),
+        quantity,
+        commodity: String(item?.commodity || item?.details || "General Cargo"),
+        weight: Number.isFinite(weightRaw) ? weightRaw : 0,
+        volume: Number.isFinite(volumeRaw) ? volumeRaw : 0,
+      };
+    });
+
+    const positiveWeight = normalizedRows.find((row) => row.weight > 0)?.weight || 0;
+    const positiveVolume = normalizedRows.find((row) => row.volume > 0)?.volume || 0;
+
+    const merged = new Map<string, any>();
+    normalizedRows.forEach((row) => {
+      const normalizedType = row.container_type.trim().toLowerCase();
+      const normalizedSize = row.container_size.trim().toLowerCase();
+      const normalizedCommodity = row.commodity.trim().toLowerCase();
+      const key = `${normalizedType}|${normalizedSize}|${normalizedCommodity}`;
+      const nextRow = {
+        ...row,
+        weight: row.weight > 0 ? row.weight : positiveWeight,
+        volume: row.volume > 0 ? row.volume : positiveVolume,
+      };
+      if (!merged.has(key)) {
+        merged.set(key, nextRow);
+        return;
+      }
+      const existing = merged.get(key);
+      existing.quantity = (Number(existing.quantity) || 0) + (Number(nextRow.quantity) || 0);
+      existing.weight = Math.max(Number(existing.weight) || 0, Number(nextRow.weight) || 0);
+      existing.volume = Math.max(Number(existing.volume) || 0, Number(nextRow.volume) || 0);
+      merged.set(key, existing);
+    });
+
+    const rows = Array.from(merged.values()).filter((row) =>
+      (Number(row.quantity) || 0) > 0 &&
+      ((Number(row.weight) || 0) > 0 || (Number(row.volume) || 0) > 0),
+    );
+
+    return rows.map((row, index) => ({
+      ...row,
+      sequence_number: index + 1,
     }));
   }
 
@@ -964,6 +1056,7 @@ export class PdfRenderer {
     const sourceItems = Array.isArray(this.context.items) ? this.context.items : [];
     if (sourceItems.length === 0) return;
     const rows = this.buildContainerBreakdownRows(sourceItems);
+    if (rows.length === 0) return;
     const totalQty = rows.reduce((sum, row) => sum + (Number(row.quantity) || 0), 0);
     const tableSourceKey = "__container_breakdown_rows__";
     (this.context as any)[tableSourceKey] = rows;
@@ -1384,7 +1477,7 @@ export class PdfRenderer {
 
     const cyanColor = this.hexToRgb("#66c2cd"); // Cyan from screenshot approx
 
-    // 1. Render Commodity & Cargo Details (Once at the top)
+    let optionCounter = 1;
     await this.renderCargoDetails();
 
     for (const group of groups) {
@@ -1409,19 +1502,40 @@ export class PdfRenderer {
 
         const transit = group.transit;
         const frequency = group.frequency;
+        const rateOptionLabel =
+          firstOpt.option_name ||
+          firstOpt.name ||
+          firstOpt.rate_option_name ||
+          firstOpt.rate_option_id ||
+          `Option ${optionCounter}`;
+        const routeOrigin = this.resolveLegLocation(legs[0], "origin");
+        const routeDestination = this.resolveLegLocation(legs[legs.length - 1], "destination");
+        const derivedTransit = transit || this.resolveLegTransitTime(legs[0]) || "N/A";
+
+        if (this.cursorY < this.margins.bottom + 40) {
+             this.addNewPage();
+             this.cursorY -= 20;
+        }
+        this.currentPage!.drawText(`Rate Option ${optionCounter}: ${rateOptionLabel}`, {
+            x: this.margins.left,
+            y: this.cursorY - 12,
+            size: 11,
+            font: this.boldFont!,
+            color: this.hexToRgb(this.context.branding.primary_color || "#0087b5")
+        });
+        this.cursorY -= 22;
         
-        // Draw Header Bar (Cyan)
-        const headerHeight = 25;
+        const headerHeight = 36;
         const pageWidth = this.currentPage!.getSize().width;
         const tableWidth = pageWidth - this.margins.left - this.margins.right;
         
         this.drawRect(this.margins.left, this.cursorY - headerHeight, tableWidth, headerHeight, cyanColor, true);
 
-        // Header Text
-        const textY = this.cursorY - 18;
+        const lineOneY = this.cursorY - 14;
+        const lineTwoY = this.cursorY - 27;
         this.currentPage!.drawText(`Carrier: ${carrierDisplay}`, {
             x: this.margins.left + 5,
-            y: textY,
+            y: lineOneY,
             size: 10,
             font: this.boldFont!,
             color: rgb(0,0,0)
@@ -1436,16 +1550,23 @@ export class PdfRenderer {
         );
         this.currentPage!.drawText(`Mode: ${mainMode}`, {
             x: this.margins.left + (tableWidth * 0.4),
-            y: textY,
+            y: lineOneY,
             size: 10,
             font: this.boldFont!,
             color: rgb(0,0,0)
         });
 
-        this.currentPage!.drawText(`Transit: ${transit} | Freq: ${frequency}`, {
-            x: this.margins.left + (tableWidth * 0.7),
-            y: textY,
-            size: 10,
+        this.currentPage!.drawText(`Route: ${routeOrigin} -> ${routeDestination}`, {
+            x: this.margins.left + 5,
+            y: lineTwoY,
+            size: 9,
+            font: this.boldFont!,
+            color: rgb(0,0,0)
+        });
+        this.currentPage!.drawText(`Transit: ${derivedTransit} | Freq: ${frequency || "N/A"}`, {
+            x: this.margins.left + (tableWidth * 0.58),
+            y: lineTwoY,
+            size: 9,
             font: this.boldFont!,
             color: rgb(0,0,0)
         });
@@ -1632,16 +1753,25 @@ export class PdfRenderer {
         this.drawRect(this.margins.left, this.cursorY - rowHeight, tableWidth, rowHeight, cyanColor, true);
         
         x = this.margins.left;
-        this.currentPage!.drawText("Grand Total", { x: x + 2, y: this.cursorY - 14, size: 9, font: this.boldFont!, color: rgb(0,0,0) });
-        // Skip static cols
-        x += usedWidth - notesColWidth; // Totals align with containers
+        this.currentPage!.drawText("Option Total", { x: x + 2, y: this.cursorY - 14, size: 9, font: this.boldFont!, color: rgb(0,0,0) });
+        const staticWidth = staticCols.reduce((s, c) => s + c.width, 0);
+        x += staticWidth;
 
         sortedContainers.forEach(ct => {
-            const opt = opts.find((o: any) => (o.container_size || o.container_type || o._derived_container_type || "Standard") === ct);
-            const total = opt ? opt.grand_total : 0;
+            const total = opts
+              .filter((o: any) => (o.container_size || o.container_type || o._derived_container_type || "Standard") === ct)
+              .reduce((sum: number, o: any) => sum + (Number(o.grand_total) || 0), 0);
             const txt = total !== undefined ? total.toFixed(2) : "0.00";
             this.currentPage!.drawText(txt, { x: x + 2, y: this.cursorY - 14, size: 9, font: this.boldFont!, color: rgb(0,0,0) });
             x += containerColWidth;
+        });
+        const optionGrandTotal = opts.reduce((sum: number, opt: any) => sum + (Number(opt?.grand_total) || 0), 0);
+        this.currentPage!.drawText(`Grand Total: ${optionGrandTotal.toFixed(2)}`, {
+            x: x + 2,
+            y: this.cursorY - 14,
+            size: 9,
+            font: this.boldFont!,
+            color: rgb(0, 0, 0)
         });
 
         this.cursorY -= rowHeight;
@@ -1653,6 +1783,7 @@ export class PdfRenderer {
              this.drawTextCentered(remarks, this.cursorY, 9, false, rgb(0.3, 0.3, 0.3));
              this.cursorY -= 15;
         }
+        optionCounter += 1;
     }
 
     // Terms
@@ -1661,93 +1792,22 @@ export class PdfRenderer {
 
   private async renderCargoDetails() {
       if (!this.currentPage || !this.font || !this.boldFont) return;
-      
-      const font = this.font;
-      const boldFont = this.boldFont;
-      
-      const quote = this.context.quote;
-      const items = this.context.items || [];
-      const toFiniteNumber = (value: unknown, fallback = 0): number => {
-          const parsed = Number(value);
-          return Number.isFinite(parsed) ? parsed : fallback;
-      };
-      
-      // Group by Type + Size for display
-      const groups = new Map<string, { type: string, size: string, qty: number }>();
-      items.forEach((item: any) => {
-          const type = item.container_type || "Container";
-          const size = item.container_size || "-";
-          const key = `${type}|${size}`;
-          if (!groups.has(key)) {
-              groups.set(key, { type, size, qty: 0 });
-          }
-          const entry = groups.get(key)!;
-          entry.qty += toFiniteNumber(item.quantity ?? item.qty ?? 0, 0);
-      });
-      const distinctConfigs = Array.from(groups.values());
-
-      // Calculate dynamic height
-      // Header (15) + Commodity (15) + Weight/Vol (15) + Configs (N * 15) + Padding (10)
-      const contentHeight = 45 + (distinctConfigs.length * 15) + 10;
-      const boxHeight = Math.max(80, contentHeight);
-      
-      if (this.cursorY < this.margins.bottom + boxHeight + 20) { this.addNewPage(); this.cursorY -= 20; }
-
-      const width = this.currentPage!.getSize().width - this.margins.left - this.margins.right;
-      
-      this.drawRect(this.margins.left, this.cursorY - boxHeight, width, boxHeight, rgb(0.98, 0.98, 0.98), true);
-      this.drawRect(this.margins.left, this.cursorY - boxHeight, width, boxHeight, rgb(0.8, 0.8, 0.8));
-
-      let textY = this.cursorY - 15;
-
-      // Row 1: Commodity
-      const commodity = items.map((i:any) => i.commodity).filter((v:any, i:any, a:any) => a.indexOf(v) === i).join(", ") || "General Cargo";
-      this.currentPage!.drawText(`Commodity: ${commodity}`, { x: this.margins.left + 5, y: textY, size: 9, font: boldFont, color: rgb(0,0,0) });
-      
-      // Details/Dimensions on right
-      const dimensions = items[0]?.dimensions || "N/A";
-      this.currentPage!.drawText(`Dims: ${dimensions}`, { x: this.margins.left + 350, y: textY, size: 9, font: font, color: rgb(0,0,0) });
-
-      textY -= 15;
-
-      // Row 2: Weight | Volume | Value
-      const totalWt = items.reduce((s:number, i:any) => s + toFiniteNumber(i.weight, 0), 0);
-      const totalVol = items.reduce((s:number, i:any) => s + toFiniteNumber(i.volume, 0), 0);
-      const shipmentValue = (quote as any)?.declared_value || (items[0] as any)?.declared_value || "N/A";
-
-      this.currentPage!.drawText(`Total Weight: ${totalWt} kg`, { x: this.margins.left + 5, y: textY, size: 9, font: font, color: rgb(0,0,0) });
-      this.currentPage!.drawText(`Total Volume: ${totalVol} cbm`, { x: this.margins.left + 150, y: textY, size: 9, font: font, color: rgb(0,0,0) });
-      this.currentPage!.drawText(`Value: ${shipmentValue}`, { x: this.margins.left + 300, y: textY, size: 9, font: font, color: rgb(0,0,0) });
-
-      // Hazmat Flags
-      const isHaz = items.some((i:any) => i.is_hazmat);
-      const isStack = items.some((i:any) => i.is_stackable);
-      const flags = [];
-      if (isHaz) flags.push("HAZMAT");
-      if (isStack) flags.push("Stackable");
-      if (flags.length > 0) {
-           this.currentPage!.drawText(flags.join(", "), { x: this.margins.left + 450, y: textY, size: 9, font: boldFont, color: rgb(1,0,0) });
+      const items = Array.isArray(this.context.items) ? this.context.items : [];
+      if (items.length === 0) return;
+      if (this.cursorY < this.margins.bottom + 80) {
+        this.addNewPage();
+        this.cursorY -= 20;
       }
-
-      textY -= 20; // Extra gap for container list
-
-      // Row 3+: Container Configurations
-      distinctConfigs.forEach(config => {
-           // "Type : Dry Standard   Size : 20FT   Qty : 1"
-           let x = this.margins.left + 5;
-           
-           this.currentPage!.drawText(`Type : ${config.type}`, { x, y: textY, size: 9, font: boldFont, color: rgb(0,0,0) });
-           x += 180;
-           
-           this.currentPage!.drawText(`Size : ${config.size}`, { x, y: textY, size: 9, font: boldFont, color: rgb(0,0,0) });
-           x += 100;
-           
-           this.currentPage!.drawText(`Qty : ${config.qty}`, { x, y: textY, size: 9, font: boldFont, color: rgb(0,0,0) });
-           
-           textY -= 15;
+      this.currentPage.drawText("Commodity and Cargo Details", {
+        x: this.margins.left,
+        y: this.cursorY - 5,
+        size: 12,
+        font: this.boldFont,
+        color: rgb(0, 0, 0),
       });
-
-      this.cursorY -= (boxHeight + 15);
+      this.cursorY -= 24;
+      await this.renderContainerBreakdownTable();
+      this.cursorY -= 8;
   }
 
   private getCarrierCode(carrierName: string, legs: any[]): string | undefined {
@@ -1760,6 +1820,37 @@ export class PdfRenderer {
       if (match) return match[1];
       
       return undefined;
+  }
+
+  private resolveLegLocation(leg: any, type: "origin" | "destination"): string {
+      if (!leg || typeof leg !== "object") return "N/A";
+      if (type === "origin") {
+          return String(
+            leg.pol ||
+            leg.origin_name ||
+            leg.origin_code ||
+            leg.origin?.location_name ||
+            leg.origin?.name ||
+            leg.origin ||
+            "N/A",
+          );
+      }
+      return String(
+        leg.pod ||
+        leg.destination_name ||
+        leg.destination_code ||
+        leg.destination?.location_name ||
+        leg.destination?.name ||
+        leg.destination ||
+        "N/A",
+      );
+  }
+
+  private resolveLegTransitTime(leg: any): string {
+      if (!leg || typeof leg !== "object") return "";
+      const direct = leg.transit_time || leg.transit_days || leg.duration;
+      if (direct) return String(direct);
+      return "";
   }
 
   private normalizeTransportMode(value: any): string {

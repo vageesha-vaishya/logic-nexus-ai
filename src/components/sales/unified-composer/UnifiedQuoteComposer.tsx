@@ -1059,6 +1059,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
       };
 
       setInitialFormValues({
+        quoteNumber: raw.quote_number || '',
         accountId: raw.account_id || '',
         opportunityId: raw.opportunity_id || '',
         contactId: raw.contact_id || '',
@@ -1087,12 +1088,14 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
         commodity: primaryCommodity,
         weight: String(totalWeight),
         volume: String(totalVolume),
+        unit: cargoDetails?.weight_unit === 'lb' ? 'lb' : 'kg',
       });
       
       // Sync to form directly
       if (form) {
         form.reset({
             ...form.getValues(),
+            quoteNumber: raw.quote_number || '',
             accountId: raw.account_id || '',
             opportunityId: raw.opportunity_id || '',
             contactId: raw.contact_id || '',
@@ -1121,6 +1124,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
             commodity: primaryCommodity,
             weight: String(totalWeight),
             volume: String(totalVolume),
+            unit: cargoDetails?.weight_unit === 'lb' ? 'lb' : 'kg',
         });
       }
 
@@ -1137,6 +1141,9 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
         dangerousGoods: !!(raw.dangerous_goods || cargoDetails?.dangerous_goods || cargoHazmat),
         specialHandling: cargoDetails?.special_handling || '',
         vehicleType: raw.vehicle_type || 'van',
+        containerType: containerCombos[0]?.type || '',
+        containerSize: containerCombos[0]?.size || '',
+        containerQty: String(containerCombos.reduce((sum: number, c: any) => sum + (Number(c.qty) || 0), 0) || 1),
         containerCombos: containerCombos,
         attachments: docs,
         cargoItem: cargoItemFromSnapshot as any,
@@ -1184,7 +1191,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
           const optionIds = optionRows.map((o: any) => o.id);
 
           // Fetch legs for these options (without joins first)
-          const { data: legRows, error: legError } = await scopedDb
+          const { data: legRowsRaw, error: legError } = await scopedDb
             .from('quotation_version_option_legs')
             .select(`
                 *,
@@ -1194,9 +1201,11 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
             .in('quotation_version_option_id', optionIds)
             .order('sort_order');
 
+          let legRows = legRowsRaw || [];
           if (legError) {
             logger.error('[UnifiedComposer] Failed to load legs', legError);
-            throw legError;
+            setLoadErrors(prev => [...prev, 'Failed to load option legs']);
+            legRows = [];
           }
           logger.info(`[UnifiedComposer] Found ${legRows?.length || 0} legs`);
 
@@ -1253,7 +1262,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
           }
 
           // Fetch charges for these options
-          const { data: chargeRows, error: chargeError } = await scopedDb
+          let { data: chargeRows, error: chargeError } = await scopedDb
             .from('quote_charges')
             .select(`
               *,
@@ -1265,8 +1274,19 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
             .in('quote_option_id', optionIds);
             
           if (chargeError) {
+            logger.warn('[UnifiedComposer] Joined charge query failed, retrying without relations', chargeError);
+            const fallbackCharges = await scopedDb
+              .from('quote_charges')
+              .select('*')
+              .in('quote_option_id', optionIds);
+            chargeRows = fallbackCharges.data || [];
+            chargeError = fallbackCharges.error;
+          }
+
+          if (chargeError) {
             logger.error('[UnifiedComposer] Failed to load charges', chargeError);
-            throw chargeError;
+            setLoadErrors(prev => [...prev, 'Failed to load option charges']);
+            chargeRows = [];
           }
           logger.info(`[UnifiedComposer] Found ${chargeRows?.length || 0} charges`);
 

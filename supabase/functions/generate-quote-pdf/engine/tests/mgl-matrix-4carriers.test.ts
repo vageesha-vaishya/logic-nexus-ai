@@ -100,6 +100,28 @@ describe("MGL Matrix 4-Carriers Renderer", () => {
     expect(groups.length).toBe(4);
   });
 
+  it("should keep same carrier options separated by option scope", () => {
+    const scopedOptions = [
+      {
+        ...createOption("MSC", "N/A", "N/A", "Standard - 20'", 3330, "Option 3"),
+        id: "opt-msc-1",
+        option_group_key: "option-3",
+      },
+      {
+        ...createOption("MSC", "N/A", "N/A", "Standard - 20'", 3500, "Option 5"),
+        id: "opt-msc-2",
+        option_group_key: "option-5",
+      },
+    ];
+
+    const groups = groupOptionsForMatrix(scopedOptions);
+    expect(groups).toHaveLength(2);
+    expect(groups.map((g) => g.key)).toEqual([
+      "option-3|MSC|N/A|N/A",
+      "option-5|MSC|N/A|N/A",
+    ]);
+  });
+
   it("should render 4-carrier matrix without errors", async () => {
     const renderer = new PdfRenderer(template, context, mockLogger);
     await renderer.init();

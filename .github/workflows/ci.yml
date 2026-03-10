@@ -23,6 +23,9 @@ jobs:
     - name: Install dependencies
       run: npm ci
 
+    - name: Install PostgreSQL client
+      run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
     - name: Linting
       run: npm run lint
 
@@ -31,6 +34,13 @@ jobs:
 
     - name: Unit Tests
       run: npm run test
+
+    - name: Seed Integrity Check (QUO-260309-00001)
+      env:
+        SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      run: |
+        test -n "$SUPABASE_DB_URL" || (echo "Missing required secret: SUPABASE_DB_URL" && exit 1)
+        npm run seed:verify:quo260309
 
     - name: Build Test
       run: npm run build

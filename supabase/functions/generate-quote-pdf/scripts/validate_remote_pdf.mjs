@@ -12,7 +12,8 @@ if (!supabaseUrl || !supabaseKey) {
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-const QUOTE_NUMBER = 'QUO-260303-00002';
+const QUOTE_NUMBER = process.env.QUOTE_NUMBER || process.argv[2] || 'QUO-260303-00002';
+const TEMPLATE_NAME = process.env.TEMPLATE_NAME || '';
 
 function isPdfBuffer(buffer) {
   return buffer.subarray(0, 5).toString('utf8') === '%PDF-';
@@ -124,16 +125,18 @@ async function main() {
   console.log(`Validating PDF generation for ${QUOTE_NUMBER}...`);
 
   // 1. Get Quote ID
-  const { data: quote, error: quoteError } = await supabase
+  const { data: quotes, error: quoteError } = await supabase
     .from('quotes')
-    .select('id, quote_number, tenant_id')
+    .select('id, quote_number, tenant_id, created_at')
     .eq('quote_number', QUOTE_NUMBER)
-    .single();
+    .order('created_at', { ascending: false })
+    .limit(1);
 
-  if (quoteError) {
+  if (quoteError || !quotes || quotes.length === 0) {
     console.error('Error fetching quote:', quoteError);
     process.exit(1);
   }
+  const quote = quotes[0];
 
   console.log(`Quote found: ${quote.quote_number} (${quote.id})`);
 
@@ -229,7 +232,9 @@ async function main() {
     process.exit(1);
   }
 
-  const mglTemplates = templates.filter(t => t.name.includes('MGL'));
+  const mglTemplates = templates
+    .filter((t) => t.name.includes('MGL'))
+    .filter((t) => (TEMPLATE_NAME ? t.name === TEMPLATE_NAME : true));
   console.log('Found MGL Templates:', mglTemplates.map(t => t.name));
 
   if (mglTemplates.length === 0) {

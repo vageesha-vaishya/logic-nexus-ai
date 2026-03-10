@@ -38,6 +38,7 @@
     "migrate:auto": "node scripts/automated_migration.js",
     "auth:setup": "node scripts/configure_supabase_token.js",
     "supabase:exec": "bash ./scripts/supabase-exec.sh",
+    "seed:verify:quo260309": "bash ./scripts/supabase-exec.sh ./supabase/migrations/20260310090000_seed_quo_260309_00001_comprehensive.sql && bash ./scripts/supabase-exec.sh ./verify_seed.sql",
     "supabase:status": "npm exec -- supabase status",
     "supabase:start": "npm exec -- supabase start",
     "supabase:stop": "npm exec -- supabase stop",

@@ -22,6 +22,7 @@ DECLARE
   v_qvo_count integer;
   v_rate_row_count integer;
   v_quote_charge_count integer;
+  v_total_records_seeded integer := 0;
   v_has_dynamic_trigger_conditions boolean := false;
   v_has_qvo_sort_order boolean := false;
   v_dynamic_surcharge_seed_count integer := 0;
@@ -590,7 +591,7 @@ BEGIN
   (v_option2, v_tenant_id, 2, 'air', 'transport', 'DXB', 'DEL', 'Dubai International Airport', 'Indira Gandhi International Airport', 'Emirates SkyCargo', 2, 7, '{"service_level":"standard","capacity_available":true,"reliability_score":0.92}'::jsonb),
   (v_option2, v_tenant_id, 3, 'road', 'transport', 'DEL', 'DED', 'Indira Gandhi International Airport', 'Jolly Grant Airport', 'North India Truck Network', 2, 7, '{"service_level":"standard","capacity_available":true,"reliability_score":0.90}'::jsonb),
   (v_option3, v_tenant_id, 1, 'ocean', 'transport', 'PANYNJ', 'DEL', 'Port Authority of NY/NJ', 'Indira Gandhi International Airport', 'MSC', 24, 2, '{"service_level":"economy","capacity_available":true,"reliability_score":0.84}'::jsonb),
-  (v_option3, v_tenant_id, 2, 'road', 'transport', 'DEL', 'DED', 'Indira Gandhi International Airport', 'Jolly Grant Airport', 'India Regional Haulage', 2, 7, '{"service_level":"economy","capacity_available":true,"reliability_score":0.87}'::jsonb),
+  (v_option3, v_tenant_id, 2, 'rail', 'transport', 'DEL', 'DED', 'Indira Gandhi International Airport', 'Jolly Grant Airport', 'Indian Railways Freight Corridor', 2, 7, '{"service_level":"economy","capacity_available":true,"reliability_score":0.87}'::jsonb),
   (v_option4, v_tenant_id, 1, 'air', 'transport', 'EWR', 'DEL', 'Newark Liberty International Airport', 'Indira Gandhi International Airport', 'Kuehne + Nagel Air', 3, 7, '{"service_level":"express","capacity_available":true,"reliability_score":0.94}'::jsonb),
   (v_option4, v_tenant_id, 2, 'road', 'transport', 'DEL', 'DED', 'Indira Gandhi International Airport', 'Jolly Grant Airport', 'Temperature-Controlled Trucking', 1, 7, '{"service_level":"express","capacity_available":true,"reliability_score":0.92}'::jsonb);
 
@@ -1126,47 +1127,25 @@ BEGIN
     RAISE EXCEPTION 'Negative charge detected for %', v_seed_ref;
   END IF;
 
-  CREATE TABLE IF NOT EXISTS public.quotation_seeding_metrics (
-    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id uuid NOT NULL,
-    quotation_number text NOT NULL,
-    total_records_seeded integer NOT NULL DEFAULT 0,
-    seeding_duration_ms integer NOT NULL DEFAULT 0,
-    data_integrity_score numeric(5,4) NOT NULL DEFAULT 1.0,
-    created_at timestamptz NOT NULL DEFAULT now(),
-    UNIQUE (tenant_id, quotation_number)
-  );
-
   v_end_ts := clock_timestamp();
 
-  INSERT INTO public.quotation_seeding_metrics (
-    tenant_id, quotation_number, total_records_seeded, seeding_duration_ms, data_integrity_score, created_at
-  ) VALUES (
-    v_tenant_id,
+  SELECT
+    v_dynamic_surcharge_seed_count +
+    (SELECT COUNT(*) FROM public.transfer_points tp WHERE tp.tenant_id = v_tenant_id AND tp.code IN ('JFK','EWR','PANYNJ','DXB','DEL','DED')) +
+    (SELECT COUNT(*) FROM public.quote_items qi WHERE qi.quote_id = v_quote_id) +
+    (SELECT COUNT(*) FROM public.quote_documents qd WHERE qd.quote_id = v_quote_id) +
+    (SELECT COUNT(*) FROM public.quotation_version_options qvo WHERE qvo.quotation_version_id = v_quote_version_id) +
+    (SELECT COUNT(*) FROM public.quotation_version_option_legs qvol WHERE qvol.quotation_version_option_id IN (v_qvo1, v_qvo2, v_qvo3, v_qvo4)) +
+    (SELECT COUNT(*) FROM public.rate_options ro WHERE ro.id IN (v_option1, v_option2, v_option3, v_option4)) +
+    (SELECT COUNT(*) FROM public.rate_option_legs rl WHERE rl.rate_option_id IN (v_option1, v_option2, v_option3, v_option4)) +
+    (SELECT COUNT(*) FROM public.leg_connections lc WHERE lc.rate_option_id IN (v_option1, v_option2, v_option3, v_option4)) +
+    (SELECT COUNT(*) FROM public.rate_charge_rows rr WHERE rr.rate_option_id IN (v_option1, v_option2, v_option3, v_option4)) +
+    (SELECT COUNT(*) FROM public.rate_charge_cells rc JOIN public.rate_charge_rows rr ON rr.id = rc.charge_row_id WHERE rr.rate_option_id IN (v_option1, v_option2, v_option3, v_option4)) +
+    (SELECT COUNT(*) FROM public.quote_charges qc WHERE qc.quote_option_id IN (v_qvo1, v_qvo2, v_qvo3, v_qvo4))
+  INTO v_total_records_seeded;
+
+  RAISE NOTICE 'Seed % completed: total_records=%, duration_ms=%',
     v_seed_ref,
-    (
-      SELECT
-        v_dynamic_surcharge_seed_count +
-        (SELECT COUNT(*) FROM public.transfer_points tp WHERE tp.tenant_id = v_tenant_id AND tp.code IN ('JFK','EWR','PANYNJ','DXB','DEL','DED')) +
-        (SELECT COUNT(*) FROM public.quote_items qi WHERE qi.quote_id = v_quote_id) +
-        (SELECT COUNT(*) FROM public.quote_documents qd WHERE qd.quote_id = v_quote_id) +
-        (SELECT COUNT(*) FROM public.quotation_version_options qvo WHERE qvo.quotation_version_id = v_quote_version_id) +
-        (SELECT COUNT(*) FROM public.quotation_version_option_legs qvol WHERE qvol.quotation_version_option_id IN (v_qvo1, v_qvo2, v_qvo3, v_qvo4)) +
-        (SELECT COUNT(*) FROM public.rate_options ro WHERE ro.id IN (v_option1, v_option2, v_option3, v_option4)) +
-        (SELECT COUNT(*) FROM public.rate_option_legs rl WHERE rl.rate_option_id IN (v_option1, v_option2, v_option3, v_option4)) +
-        (SELECT COUNT(*) FROM public.leg_connections lc WHERE lc.rate_option_id IN (v_option1, v_option2, v_option3, v_option4)) +
-        (SELECT COUNT(*) FROM public.rate_charge_rows rr WHERE rr.rate_option_id IN (v_option1, v_option2, v_option3, v_option4)) +
-        (SELECT COUNT(*) FROM public.rate_charge_cells rc JOIN public.rate_charge_rows rr ON rr.id = rc.charge_row_id WHERE rr.rate_option_id IN (v_option1, v_option2, v_option3, v_option4)) +
-        (SELECT COUNT(*) FROM public.quote_charges qc WHERE qc.quote_option_id IN (v_qvo1, v_qvo2, v_qvo3, v_qvo4))
-    ),
-    GREATEST(1, FLOOR(EXTRACT(EPOCH FROM (v_end_ts - v_start_ts)) * 1000)::int),
-    1.0000,
-    NOW()
-  )
-  ON CONFLICT (tenant_id, quotation_number)
-  DO UPDATE SET
-    total_records_seeded = EXCLUDED.total_records_seeded,
-    seeding_duration_ms = EXCLUDED.seeding_duration_ms,
-    data_integrity_score = EXCLUDED.data_integrity_score,
-    created_at = NOW();
+    v_total_records_seeded,
+    GREATEST(1, FLOOR(EXTRACT(EPOCH FROM (v_end_ts - v_start_ts)) * 1000)::int);
 END $$;

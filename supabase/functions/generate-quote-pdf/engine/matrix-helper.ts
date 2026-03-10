@@ -13,6 +13,9 @@ export interface MatrixGroup {
 
 export function groupOptionsForMatrix(options: any[]): MatrixGroup[] {
     const groups = new Map<string, any[]>();
+    const hasOptionScopedGrouping = options.some((opt: any) =>
+      Boolean(opt?.rate_option_id || opt?.option_group_key || opt?.option_name || opt?.rate_option_name)
+    );
     
     // 1. Group by Carrier + Service Level
     options.forEach((opt: any) => {
@@ -44,7 +47,15 @@ export function groupOptionsForMatrix(options: any[]): MatrixGroup[] {
         }
         freq = freq || "";
 
-        const key = `${carrier}|${transit}|${freq}`;
+        const optionScope =
+          opt.rate_option_id ||
+          opt.option_group_key ||
+          opt.option_name ||
+          opt.rate_option_name ||
+          "";
+        const key = hasOptionScopedGrouping
+          ? `${optionScope}|${carrier}|${transit}|${freq}`
+          : `${carrier}|${transit}|${freq}`;
         
         // Store derived values on the option for later use if needed, 
         // or just rely on the group key. 
