@@ -1191,7 +1191,7 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
           const optionIds = optionRows.map((o: any) => o.id);
 
           // Fetch legs for these options (without joins first)
-          const { data: legRowsRaw, error: legError } = await scopedDb
+          let { data: legRowsRaw, error: legError } = await scopedDb
             .from('quotation_version_option_legs')
             .select(`
                 *,
@@ -1200,6 +1200,17 @@ function UnifiedQuoteComposerContent({ quoteId, versionId, initialData }: Unifie
             `)
             .in('quotation_version_option_id', optionIds)
             .order('sort_order');
+
+          if (legError) {
+            logger.warn('[UnifiedComposer] Joined leg query failed, retrying without relations', legError);
+            const fallbackLegs = await scopedDb
+              .from('quotation_version_option_legs')
+              .select('*')
+              .in('quotation_version_option_id', optionIds)
+              .order('sort_order');
+            legRowsRaw = fallbackLegs.data || [];
+            legError = fallbackLegs.error;
+          }
 
           let legRows = legRowsRaw || [];
           if (legError) {

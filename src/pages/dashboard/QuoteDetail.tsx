@@ -862,14 +862,6 @@ export default function QuoteDetail() {
         }
       >
         <div className="space-y-6">
-          {config?.multi_option_enabled && comparisonOptions.length > 0 && (
-            <QuotationComparisonDashboard 
-              options={comparisonOptions}
-              selectedOptionId={selectedComparisonOptionId}
-              onSelect={handleSelectComparisonOption}
-            />
-          )}
-          
           {resolvedId ? (
             <>
               <UnifiedQuoteComposer
@@ -892,6 +884,13 @@ export default function QuoteDetail() {
             quoteId={resolvedId ?? (id as string)}
             onRestore={handleRestoreVersion}
           />
+          {resolvedId && config?.multi_option_enabled && comparisonOptions.length > 0 && (
+            <QuotationComparisonDashboard 
+              options={comparisonOptions}
+              selectedOptionId={selectedComparisonOptionId}
+              onSelect={handleSelectComparisonOption}
+            />
+          )}
         </div>
         
         <SaveVersionDialog
