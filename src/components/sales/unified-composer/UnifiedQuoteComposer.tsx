@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { quoteComposerSchema, QuoteComposerValues } from './schema';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -2496,6 +2497,19 @@ function UnifiedQuoteComposerContent({
     }
   }, [lastFormData, handleGetRates]);
 
+  const handleRunFromResults = useCallback(async () => {
+    const isValid = await form.trigger();
+    if (!isValid) {
+      handleValidationFailed();
+      setActiveComposerSection('form');
+      return;
+    }
+    const values = form.getValues() as FormZoneValues;
+    const fallbackExtended = values as unknown as ExtendedFormData;
+    const extended = lastFormData?.extended || fallbackExtended;
+    await handleGetRates(values, extended, isSmartMode);
+  }, [form, handleGetRates, handleValidationFailed, isSmartMode, lastFormData?.extended]);
+
   // ---------------------------------------------------------------------------
   // Draft save (manual)
   // ---------------------------------------------------------------------------
@@ -2898,10 +2912,54 @@ function UnifiedQuoteComposerContent({
                 contacts={contacts}
                 opportunities={opportunities}
                 onChange={handleFormChange}
+                smartMode={isSmartMode}
+                onSmartModeChange={setIsSmartMode}
+                showExecutionControls={false}
               />
             </TabsContent>
             <TabsContent value="results" className="pt-6">
               <div className="space-y-6">
+                <div className="rounded-md border border-purple-100 bg-purple-50 p-4 dark:border-purple-900 dark:bg-purple-950/30">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 text-purple-600" />
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium text-purple-900 dark:text-purple-200">Smart Quote Mode</span>
+                        <span className="text-[10px] text-purple-600 dark:text-purple-400">AI-optimized routes & pricing</span>
+                      </div>
+                    </div>
+                    <Switch
+                      checked={isSmartMode}
+                      onCheckedChange={setIsSmartMode}
+                      data-testid="smart-mode-switch"
+                    />
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-3">
+                    <Button
+                      type="button"
+                      className={isSmartMode ? "bg-primary text-primary-foreground hover:bg-primary/90" : "bg-green-600 text-white hover:bg-green-700"}
+                      disabled={rateFetching.loading || editLoading}
+                      data-testid="quotation-composer-btn"
+                      onClick={handleRunFromResults}
+                    >
+                      {rateFetching.loading ? (
+                        <><Timer className="mr-2 h-4 w-4 animate-spin" /> {isSmartMode ? "Calculating..." : "Creating..."}</>
+                      ) : isSmartMode ? (
+                        "Get Rates (AI Enhanced)"
+                      ) : (
+                        <><FileText className="mr-2 h-4 w-4" /> Quotation Composer</>
+                      )}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={rateFetching.loading || editLoading}
+                      onClick={handleSaveDraft}
+                    >
+                      <Save className="mr-2 h-4 w-4" /> Draft
+                    </Button>
+                  </div>
+                </div>
                 <ResultsZone
                   results={(!lastFormData && displayResults.length === 0 && !rateFetching.loading && !editLoading && !isSmartMode && !quoteId) ? null : displayResults}
                   loading={rateFetching.loading || editLoading}

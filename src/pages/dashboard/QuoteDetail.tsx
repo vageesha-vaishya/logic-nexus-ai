@@ -139,12 +139,6 @@ export default function QuoteDetail() {
     }
   }, [urlOptionId]);
 
-  useEffect(() => {
-    if (!versionId || !config?.multi_option_enabled) return;
-    const timer = window.setTimeout(() => setComparisonRequested(true), 250);
-    return () => window.clearTimeout(timer);
-  }, [versionId, config?.multi_option_enabled]);
-
   // Load configuration
   useEffect(() => {
     if (context.tenantId) {
