@@ -234,6 +234,10 @@ export function LeadForm({ initialData, onSubmit, onCancel, suggestedService, is
 
   const handleConfirm = async () => {
     if (pendingData) {
+      if (context.isPlatformAdmin && (!pendingData.tenant_id || String(pendingData.tenant_id).trim() === '')) {
+        toast.error('Tenant is required to create a lead. Please select a tenant.');
+        return;
+      }
       setShowConfirmDialog(false);
       await onSubmit(pendingData);
       setPendingData(null);

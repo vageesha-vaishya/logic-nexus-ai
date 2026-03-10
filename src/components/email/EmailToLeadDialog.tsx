@@ -472,7 +472,7 @@ export function EmailToLeadDialog({ open, onOpenChange, email, onSuccess }: Emai
               from_email: email.from_email,
               received_at: email.received_at,
             },
-            tenant_id: context.tenantId || null,
+            tenant_id: (sanitizeLeadDataForInsert(data) as any)?.tenant_id || context.tenantId || null,
           });
       } catch (err) {
         console.error("Error recording lead email conversion activity", err);
