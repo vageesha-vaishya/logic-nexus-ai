@@ -228,8 +228,17 @@ export class RoleService {
     if (replace) {
       await this.db.from('user_roles').delete().eq('user_id', userId);
     }
-    if (assignments.length > 0) {
-      const rows = assignments.map(a => ({
+    const uniqueAssignments: { role: string; tenant_id?: string | null; franchise_id?: string | null }[] = [];
+    const seenRoles = new Set<string>();
+    for (const a of assignments) {
+      const role = String(a.role || '').trim();
+      if (!role) continue;
+      if (seenRoles.has(role)) continue;
+      seenRoles.add(role);
+      uniqueAssignments.push({ ...a, role });
+    }
+    if (uniqueAssignments.length > 0) {
+      const rows = uniqueAssignments.map(a => ({
         user_id: userId,
         role: a.role,
         tenant_id: a.tenant_id ?? null,
@@ -242,7 +251,7 @@ export class RoleService {
     await this.db.client.from('audit_logs').insert({
       action: 'user.roles.assign',
       resource_type: 'user',
-      details: { userId, count: assignments.length, replace }
+      details: { userId, count: uniqueAssignments.length, replace }
     });
   }
 
@@ -257,8 +266,9 @@ export class RoleService {
       tenant_id: assignment.tenant_id ?? null,
       franchise_id: assignment.franchise_id ?? null
     }));
-    // Use ScopedDataAccess for insert
-    const { error } = await this.db.from('user_roles').insert(rows);
+    const { error } = await (this.db.client as any)
+      .from('user_roles')
+      .upsert(rows, { onConflict: 'user_id,role', ignoreDuplicates: true });
     if (error) throw error;
     await this.db.client.from('audit_logs').insert({
       action: 'user.roles.bulk_assign',
