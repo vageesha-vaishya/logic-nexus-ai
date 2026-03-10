@@ -6,6 +6,7 @@ const password = process.env.VPS_PASSWORD;
 const gatewayPort = process.env.GATEWAY_PORT || '8100';
 const appPort = process.env.APP_PORT || '8099';
 const anonKey = process.env.SUPABASE_ANON_KEY;
+const deployBranch = (process.env.DEPLOY_BRANCH || process.env.BRANCH_NAME || 'main').trim();
 
 if (!host || !password) {
   console.error('Missing VPS_IP or VPS_PASSWORD environment variables');
@@ -25,9 +26,16 @@ console.log(`Deploying LogicPro web to ${host}:${appPort} ...`);
 conn.on('ready', () => {
   console.log('SSH ready');
   const escapedAnon = anonKey.replace(/'/g, "'\\''");
+  const escapedBranch = deployBranch.replace(/[^a-zA-Z0-9/_-]/g, '');
+  const targetBranch = escapedBranch || 'main';
   const buildCmd = [
     `cd ${REMOTE_APP_DIR}`,
     `test -f ${REMOTE_APP_DIR}/Dockerfile || (echo "Missing Dockerfile at ${REMOTE_APP_DIR}/Dockerfile" && exit 1)`,
+    `test -d ${REMOTE_APP_DIR}/.git || (echo "Missing git repository at ${REMOTE_APP_DIR}" && exit 1)`,
+    `git fetch --all --prune`,
+    `git checkout -f ${targetBranch}`,
+    `git reset --hard origin/${targetBranch}`,
+    `echo "Building commit $(git rev-parse --short HEAD) on branch ${targetBranch}"`,
     `docker build -t logicpro-web --build-arg VITE_SUPABASE_URL='${SUPABASE_URL}' --build-arg VITE_SUPABASE_ANON_KEY='${escapedAnon}' --build-arg VITE_SUPABASE_PUBLISHABLE_KEY='${escapedAnon}' -f ${REMOTE_APP_DIR}/Dockerfile ${REMOTE_APP_DIR}`,
     `(docker ps -a --format '{{.Names}}' | grep -q '^logicpro-web$' && docker rm -f logicpro-web || true)`,
     `docker run -d --name logicpro-web --restart unless-stopped -p ${appPort}:80 logicpro-web`
