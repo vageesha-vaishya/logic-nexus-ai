@@ -2,8 +2,21 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY;
+const runtimeEnv =
+  typeof window !== 'undefined'
+    ? ((window as any).__ENV__ || (window as any).__APP_CONFIG__ || {})
+    : {};
+
+const SUPABASE_URL =
+  import.meta.env.VITE_SUPABASE_URL ||
+  runtimeEnv.VITE_SUPABASE_URL ||
+  runtimeEnv.SUPABASE_URL;
+const SUPABASE_PUBLISHABLE_KEY =
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+  import.meta.env.VITE_SUPABASE_ANON_KEY ||
+  runtimeEnv.VITE_SUPABASE_PUBLISHABLE_KEY ||
+  runtimeEnv.VITE_SUPABASE_ANON_KEY ||
+  runtimeEnv.SUPABASE_ANON_KEY;
 
 export const isSupabaseConfigured = Boolean(SUPABASE_URL && SUPABASE_PUBLISHABLE_KEY);
 

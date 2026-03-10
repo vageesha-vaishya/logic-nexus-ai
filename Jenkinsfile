@@ -360,7 +360,10 @@ fi
                         sh 'npm install --no-save ssh2'
                         withEnv([
                             "SUPABASE_URL=${env.SELECTED_SUPABASE_URL}",
-                            "SUPABASE_ANON_KEY=${env.SELECTED_ANON_KEY}"
+                            "SUPABASE_ANON_KEY=${env.SELECTED_ANON_KEY}",
+                            "VITE_SUPABASE_URL=${env.SELECTED_SUPABASE_URL}",
+                            "VITE_SUPABASE_ANON_KEY=${env.SELECTED_ANON_KEY}",
+                            "VITE_SUPABASE_PUBLISHABLE_KEY=${env.SELECTED_ANON_KEY}"
                         ]) {
                             echo "App Port: ${env.APP_PORT}, Using Supabase: ${env.SELECTED_SUPABASE_URL}"
                             sh 'node scripts/deploy_web_app_vps.cjs'

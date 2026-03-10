@@ -5,11 +5,26 @@ import { schemaForEvent } from '@/lib/schemas/avro/events';
 import { ensureSchemaId } from '@/lib/avro/registry';
 
 function getSupabaseProjectUrl(): string {
-  return String(import.meta.env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
+  const runtimeEnv =
+    typeof window !== 'undefined'
+      ? ((window as any).__ENV__ || (window as any).__APP_CONFIG__ || {})
+      : {};
+  return String(import.meta.env.VITE_SUPABASE_URL || runtimeEnv.VITE_SUPABASE_URL || runtimeEnv.SUPABASE_URL || '').replace(/\/$/, '');
 }
 
 function getSupabasePublicKey(): string {
-  return String(import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY || '');
+  const runtimeEnv =
+    typeof window !== 'undefined'
+      ? ((window as any).__ENV__ || (window as any).__APP_CONFIG__ || {})
+      : {};
+  return String(
+    import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+      import.meta.env.VITE_SUPABASE_ANON_KEY ||
+      runtimeEnv.VITE_SUPABASE_PUBLISHABLE_KEY ||
+      runtimeEnv.VITE_SUPABASE_ANON_KEY ||
+      runtimeEnv.SUPABASE_ANON_KEY ||
+      ''
+  );
 }
 
 function createJwtErrorLog(error: unknown, context: Record<string, unknown>) {
@@ -149,7 +164,13 @@ export async function invokeFunction<T = any>(
       return { data: null, error: new Error(`Circuit open for ${functionName}`) };
     }
 
-    const { Authorization, authorization, ...customHeaders } = options.headers || {};
+    const { Authorization, authorization, ...customHeadersRaw } = options.headers || {};
+    const customHeaders = Object.entries(customHeadersRaw).reduce((acc, [key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        acc[key] = String(value);
+      }
+      return acc;
+    }, {} as Record<string, string>);
     const publicKey = getSupabasePublicKey();
     if (!publicKey) {
         console.error('Missing VITE_SUPABASE_PUBLISHABLE_KEY (or VITE_SUPABASE_ANON_KEY fallback)');
@@ -167,11 +188,18 @@ export async function invokeFunction<T = any>(
       const { data: refreshData } = await supabase.auth.refreshSession();
       token = refreshData?.session?.access_token;
     }
+    if (!token) {
+      return {
+        data: null,
+        error: {
+          message: 'Unauthorized: no active Supabase user session found. Please sign in again.',
+          status: 401,
+        },
+      };
+    }
     
     const getHeaders = (t?: string) => {
-        // Do not explicitly add apikey here as Supabase SDK adds it automatically.
-        // Adding it manually might cause duplication or override issues.
-        const headers: Record<string, string> = { ...customHeaders };
+        const headers: Record<string, string> = { apikey: publicKey, ...customHeaders };
         if (t) headers.Authorization = `Bearer ${t}`;
         return headers;
     };
