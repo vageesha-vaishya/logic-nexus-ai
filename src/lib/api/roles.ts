@@ -22,6 +22,39 @@ export interface DbPermission {
 export class RoleService {
   constructor(private db: ScopedDataAccess) {}
 
+  private async getActorUserId(): Promise<string | null> {
+    const ctxUserId = this.db.accessContext?.userId;
+    if (ctxUserId) return ctxUserId;
+    try {
+      const { data } = await this.db.client.auth.getUser();
+      return data.user?.id || null;
+    } catch {
+      return null;
+    }
+  }
+
+  private async writeAuditLog(action: string, resourceType: string, details: any) {
+    const actorUserId = await this.getActorUserId();
+    if (!actorUserId) return;
+
+    const payload: any = {
+      user_id: actorUserId,
+      action,
+      resource_type: resourceType,
+      details: details ?? {},
+    };
+
+    const ctx = this.db.accessContext;
+    if (ctx?.tenantId) payload.tenant_id = ctx.tenantId;
+    if (ctx?.franchiseId) payload.franchise_id = ctx.franchiseId;
+
+    try {
+      await this.db.client.from('audit_logs').insert(payload);
+    } catch {
+      return;
+    }
+  }
+
   /**
    * Fetches all defined roles from the database
    */
@@ -123,10 +156,10 @@ export class RoleService {
     }
 
     // 3. Log Audit
-    await this.db.client.from('audit_logs').insert({
-      action: 'role.permissions.update',
-      resource_type: 'auth_role',
-      details: { roleId, permissionCount: permissionIds.length, justification: justification || null }
+    await this.writeAuditLog('role.permissions.update', 'auth_role', {
+      roleId,
+      permissionCount: permissionIds.length,
+      justification: justification || null
     });
   }
 
@@ -137,11 +170,7 @@ export class RoleService {
     const payload = { ...role, is_system: role.is_system ?? false };
     const { data, error } = await (this.db.client as any).from('auth_roles').insert(payload).select().single();
     if (error) throw error;
-    await this.db.client.from('audit_logs').insert({
-      action: 'role.create',
-      resource_type: 'auth_role',
-      details: { id: data.id }
-    });
+    await this.writeAuditLog('role.create', 'auth_role', { id: data.id });
     return data as DbRole;
   }
 
@@ -156,11 +185,7 @@ export class RoleService {
       .select()
       .single();
     if (error) throw error;
-    await this.db.client.from('audit_logs').insert({
-      action: 'role.update',
-      resource_type: 'auth_role',
-      details: { id: roleId, updates }
-    });
+    await this.writeAuditLog('role.update', 'auth_role', { id: roleId, updates });
     return data as DbRole;
   }
 
@@ -174,11 +199,7 @@ export class RoleService {
     }
     const { error } = await (this.db.client as any).from('auth_roles').delete().eq('id', roleId);
     if (error) throw error;
-    await this.db.client.from('audit_logs').insert({
-      action: 'role.delete',
-      resource_type: 'auth_role',
-      details: { id: roleId }
-    });
+    await this.writeAuditLog('role.delete', 'auth_role', { id: roleId });
   }
 
   /**
@@ -214,11 +235,7 @@ export class RoleService {
         throw insError;
       }
     }
-    await this.db.client.from('audit_logs').insert({
-      action: 'role.inheritance.update',
-      resource_type: 'auth_role',
-      details: { roleId: selectedRoleId, parents: parentRoleIds }
-    });
+    await this.writeAuditLog('role.inheritance.update', 'auth_role', { roleId: selectedRoleId, parents: parentRoleIds });
   }
 
   /**
@@ -228,8 +245,17 @@ export class RoleService {
     if (replace) {
       await this.db.from('user_roles').delete().eq('user_id', userId);
     }
-    if (assignments.length > 0) {
-      const rows = assignments.map(a => ({
+    const uniqueAssignments: { role: string; tenant_id?: string | null; franchise_id?: string | null }[] = [];
+    const seenRoles = new Set<string>();
+    for (const a of assignments) {
+      const role = String(a.role || '').trim();
+      if (!role) continue;
+      if (seenRoles.has(role)) continue;
+      seenRoles.add(role);
+      uniqueAssignments.push({ ...a, role });
+    }
+    if (uniqueAssignments.length > 0) {
+      const rows = uniqueAssignments.map(a => ({
         user_id: userId,
         role: a.role,
         tenant_id: a.tenant_id ?? null,
@@ -239,11 +265,7 @@ export class RoleService {
       const { error } = await this.db.from('user_roles').insert(rows);
       if (error) throw error;
     }
-    await this.db.client.from('audit_logs').insert({
-      action: 'user.roles.assign',
-      resource_type: 'user',
-      details: { userId, count: assignments.length, replace }
-    });
+    await this.writeAuditLog('user.roles.assign', 'user', { userId, count: uniqueAssignments.length, replace });
   }
 
   /**
@@ -257,14 +279,11 @@ export class RoleService {
       tenant_id: assignment.tenant_id ?? null,
       franchise_id: assignment.franchise_id ?? null
     }));
-    // Use ScopedDataAccess for insert
-    const { error } = await this.db.from('user_roles').insert(rows);
+    const { error } = await (this.db.client as any)
+      .from('user_roles')
+      .upsert(rows, { onConflict: 'user_id,role', ignoreDuplicates: true });
     if (error) throw error;
-    await this.db.client.from('audit_logs').insert({
-      action: 'user.roles.bulk_assign',
-      resource_type: 'user',
-      details: { userIdsCount: userIds.length, role: assignment.role }
-    });
+    await this.writeAuditLog('user.roles.bulk_assign', 'user', { userIdsCount: userIds.length, role: assignment.role });
   }
 
   /**
