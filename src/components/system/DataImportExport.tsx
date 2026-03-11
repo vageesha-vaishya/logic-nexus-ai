@@ -81,6 +81,12 @@ interface DataImportExportProps {
   defaultDuplicateCriteria?: DuplicateCriteria;
   initialTemplateName?: string;
   autoRunExportFormat?: 'csv' | 'xlsx' | 'json';
+  onCustomExport?: (input: {
+    format: 'xlsx' | 'csv' | 'json';
+    selectedTemplate: ExportTemplate;
+    currentExportFields: string[];
+    exportIncludeCustomFields: boolean;
+  }) => Promise<boolean> | boolean;
   // Navigation
   listPath: string; // e.g., "/dashboard/leads"
   enableAutoCorrection?: boolean;
@@ -198,6 +204,7 @@ export default function DataImportExport({
   defaultDuplicateCriteria = 'email_or_phone',
   initialTemplateName,
   autoRunExportFormat,
+  onCustomExport,
 }: DataImportExportProps) {
   const navigate = useNavigate();
   const { supabase, context, scopedDb } = useCRM();
@@ -983,8 +990,21 @@ export default function DataImportExport({
   const handleExport = useCallback(async (format: 'xlsx' | 'csv' | 'json') => {
     setExportStage('counting');
     try {
-      let query: any = db.from(tableName as any).select('*');
       const selectedTemplate = exportTemplates.find((t) => t.name === selectedTemplateName) || defaultExportTemplate;
+      if (onCustomExport) {
+        const handled = await onCustomExport({
+          format,
+          selectedTemplate,
+          currentExportFields,
+          exportIncludeCustomFields,
+        });
+        if (handled) {
+          setExportStage('idle');
+          return;
+        }
+      }
+
+      let query: any = db.from(tableName as any).select('*');
       if (onExportFilterApply) {
          query = onExportFilterApply(query, selectedTemplate?.filters || {}) || query;
       }
@@ -1070,6 +1090,7 @@ export default function DataImportExport({
     currentExportFields,
     exportFields,
     exportIncludeCustomFields,
+    onCustomExport,
     entityName,
     context.userId,
   ]);

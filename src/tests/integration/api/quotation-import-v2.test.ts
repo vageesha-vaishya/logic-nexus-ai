@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import importHandler from '@/pages/api/v2/quotations/import';
 import rollbackHandler from '@/pages/api/v2/quotations/import/rollback';
 import jobHandler from '@/pages/api/v2/quotations/import/job';
+import exportHandler from '@/pages/api/v2/quotations/export';
 
 type Row = Record<string, any>;
 
@@ -26,6 +27,8 @@ function createMockDb() {
       let mode: 'select' | 'insert' | 'update' | 'upsert' | 'delete' = 'select';
       let pendingPayload: any = null;
       let pendingRange: { from: number; to: number } | null = null;
+      let pendingOrder: { key: string; ascending: boolean } | null = null;
+      let pendingSearch: string | null = null;
 
       const query: any = {
         select: (_fields?: string) => {
@@ -71,14 +74,27 @@ function createMockDb() {
             (state as any)[table] = rows.filter((r) => !values.includes(r[key]));
             return Promise.resolve({ data: null, error: null });
           }
-          return Promise.resolve({
-            data: ((state as any)[table] as Row[]).filter((r) => {
-              const eqPass = Object.entries(filters).every(([k, v]) => (Array.isArray(v) ? true : r[k] === v));
-              const inPass = values.includes(r[key]);
-              return eqPass && inPass;
-            }),
-            error: null,
-          });
+          return query;
+        },
+        order: (key: string, options?: { ascending?: boolean }) => {
+          pendingOrder = { key, ascending: options?.ascending !== false };
+          return query;
+        },
+        limit: (size: number) => {
+          pendingRange = { from: 0, to: Math.max(0, size - 1) };
+          return query;
+        },
+        or: (expr: string) => {
+          const parts = String(expr || '').split(',').map((item) => item.trim()).filter(Boolean);
+          const parsedTerms = parts
+            .map((part) => {
+              const match = part.match(/^(quote_number|title)\.ilike\.%(.*)%$/);
+              if (!match) return null;
+              return String(match[2] || '').toLowerCase();
+            })
+            .filter((term): term is string => Boolean(term));
+          pendingSearch = parsedTerms.length > 0 ? parsedTerms.join(' ') : null;
+          return query;
         },
         range: (from: number, to: number) => {
           pendingRange = { from, to };
@@ -113,12 +129,30 @@ function createMockDb() {
         },
         then: (resolve: any) => {
           if (mode === 'select') {
-            const rows = ((state as any)[table] as Row[]).filter((r) =>
+            let rows = ((state as any)[table] as Row[]).filter((r) =>
               Object.entries(filters).every(([k, v]) => {
                 if (Array.isArray(v)) return v.includes(r[k]);
                 return r[k] === v;
               })
             );
+            if (pendingSearch) {
+              const needle = pendingSearch.toLowerCase();
+              rows = rows.filter((row) =>
+                String(row.quote_number || '').toLowerCase().includes(needle) ||
+                String(row.title || '').toLowerCase().includes(needle)
+              );
+            }
+            if (pendingOrder) {
+              const { key, ascending } = pendingOrder;
+              rows = [...rows].sort((a, b) => {
+                const av = a[key];
+                const bv = b[key];
+                if (av === bv) return 0;
+                if (av === undefined || av === null) return ascending ? 1 : -1;
+                if (bv === undefined || bv === null) return ascending ? -1 : 1;
+                return String(av).localeCompare(String(bv), undefined, { numeric: true }) * (ascending ? 1 : -1);
+              });
+            }
             resolve({ data: pendingRange ? rows.slice(pendingRange.from, pendingRange.to + 1) : rows, error: null });
             return;
           }
@@ -209,6 +243,9 @@ describe('Quotation import v2 API', () => {
       buy_price: 500,
       currency: 'USD',
       status: 'draft',
+      account_id: 'account-1',
+      contact_id: 'contact-1',
+      opportunity_id: 'opportunity-1',
     });
   });
 
@@ -368,5 +405,68 @@ describe('Quotation import v2 API', () => {
     await jobHandler(cancelCall.req, cancelCall.res);
     expect(cancelCall.res._getStatusCode()).toBe(200);
     expect(cancelCall.res._getData().job.status).toBe('cancelled');
+  });
+
+  it('exports selected quotations with signed report metadata', async () => {
+    const { req, res } = mockReqRes({
+      method: 'POST',
+      headers: authHeaders(),
+      body: {
+        format: 'json',
+        scope: 'selected',
+        ids: ['quote-existing-1'],
+      },
+    });
+
+    await exportHandler(req, res);
+    expect(res._getStatusCode()).toBe(200);
+    const data = res._getData();
+    expect(data.version).toBe('v2');
+    expect(data.report.rowCount).toBe(1);
+    expect(data.report.checksumSha256).toMatch(/^[a-f0-9]{64}$/);
+    expect(data.report.digitalSignature.value).toMatch(/^[a-f0-9]{64}$/);
+
+    const decoded = JSON.parse(Buffer.from(String(data.export.data), 'base64').toString('utf8'));
+    expect(decoded.rowCount).toBe(1);
+    expect(decoded.rows[0].quote_number).toBe('QUO-EXIST');
+    expect(decoded.rows[0].buy_price).toBeUndefined();
+  });
+
+  it('rejects sensitive export without sensitive permission', async () => {
+    const { req, res } = mockReqRes({
+      method: 'POST',
+      headers: authHeaders({ 'x-user-permissions': 'export_quotation' }),
+      body: {
+        format: 'json',
+        scope: 'selected',
+        ids: ['quote-existing-1'],
+        includeSensitive: true,
+      },
+    });
+
+    await exportHandler(req, res);
+    expect(res._getStatusCode()).toBe(403);
+    expect(String(res._getData().error || '')).toMatch(/Forbidden/i);
+  });
+
+  it('allows sensitive export with sensitive permission', async () => {
+    const { req, res } = mockReqRes({
+      method: 'POST',
+      headers: authHeaders({ 'x-user-permissions': 'export_quotation,export_quotation_sensitive' }),
+      body: {
+        format: 'json',
+        scope: 'selected',
+        ids: ['quote-existing-1'],
+        includeSensitive: true,
+        fields: ['quote_number', 'buy_price', 'account_id'],
+      },
+    });
+
+    await exportHandler(req, res);
+    expect(res._getStatusCode()).toBe(200);
+    const data = res._getData();
+    const decoded = JSON.parse(Buffer.from(String(data.export.data), 'base64').toString('utf8'));
+    expect(decoded.rows[0].buy_price).toBe(500);
+    expect(decoded.rows[0].account_id).toBe('account-1');
   });
 });

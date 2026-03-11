@@ -16,19 +16,31 @@ const {
     mockConfig
 } = vi.hoisted(() => {
     // Helper inside hoisted block
-    const createChain = (data: any = [], error: any = null) => ({
-        select: vi.fn(() => ({
-            eq: vi.fn(() => ({
-                single: vi.fn().mockResolvedValue({ data: Array.isArray(data) ? data[0] : data, error }),
-                maybeSingle: vi.fn().mockResolvedValue({ data: Array.isArray(data) ? data[0] : data, error }),
-                order: vi.fn().mockResolvedValue({ data, error }),
-            })),
-            order: vi.fn().mockResolvedValue({ data, error }),
-        })),
-        insert: vi.fn().mockResolvedValue({ data: Array.isArray(data) ? data[0] : data, error: null }),
-        upsert: vi.fn().mockResolvedValue({ data: Array.isArray(data) ? data[0] : data, error: null }),
-        delete: vi.fn().mockResolvedValue({ data: null, error: null }),
-    });
+    const createChain = (data: any = [], error: any = null) => {
+        const selectedRow = Array.isArray(data) ? data[0] : data;
+        const query: any = {
+            eq: vi.fn(),
+            neq: vi.fn(),
+            ilike: vi.fn(),
+            order: vi.fn(),
+            limit: vi.fn(),
+            single: vi.fn().mockResolvedValue({ data: selectedRow, error }),
+            maybeSingle: vi.fn().mockResolvedValue({ data: selectedRow, error }),
+        };
+        query.eq.mockReturnValue(query);
+        query.neq.mockReturnValue(query);
+        query.ilike.mockReturnValue(query);
+        query.order.mockResolvedValue({ data, error });
+        query.limit.mockResolvedValue({ data, error });
+
+        return {
+            select: vi.fn(() => query),
+            insert: vi.fn().mockResolvedValue({ data: selectedRow, error: null }),
+            upsert: vi.fn().mockResolvedValue({ data: selectedRow, error: null }),
+            update: vi.fn(() => ({ eq: vi.fn().mockResolvedValue({ data: null, error: null }) })),
+            delete: vi.fn().mockResolvedValue({ data: null, error: null }),
+        };
+    };
 
     const mockConfig = {
         smart_mode_enabled: false
@@ -108,19 +120,31 @@ const {
 });
 
 // Helper for test cases (re-defined outside for usage in tests)
-const createSafeChain = (_name: string, data: any = [], error: any = null) => ({
-    select: vi.fn(() => ({
-        eq: vi.fn(() => ({
-            single: vi.fn().mockResolvedValue({ data: Array.isArray(data) ? data[0] : data, error }),
-            maybeSingle: vi.fn().mockResolvedValue({ data: Array.isArray(data) ? data[0] : data, error }),
-            order: vi.fn().mockResolvedValue({ data, error }),
-        })),
-        order: vi.fn().mockResolvedValue({ data, error }),
-    })),
-    insert: vi.fn().mockResolvedValue({ data: Array.isArray(data) ? data[0] : data, error: null }),
-    upsert: vi.fn().mockResolvedValue({ data: Array.isArray(data) ? data[0] : data, error: null }),
-    delete: vi.fn().mockResolvedValue({ data: null, error: null }),
-});
+const createSafeChain = (_name: string, data: any = [], error: any = null) => {
+    const selectedRow = Array.isArray(data) ? data[0] : data;
+    const query: any = {
+        eq: vi.fn(),
+        neq: vi.fn(),
+        ilike: vi.fn(),
+        order: vi.fn(),
+        limit: vi.fn(),
+        single: vi.fn().mockResolvedValue({ data: selectedRow, error }),
+        maybeSingle: vi.fn().mockResolvedValue({ data: selectedRow, error }),
+    };
+    query.eq.mockReturnValue(query);
+    query.neq.mockReturnValue(query);
+    query.ilike.mockReturnValue(query);
+    query.order.mockResolvedValue({ data, error });
+    query.limit.mockResolvedValue({ data, error });
+
+    return {
+        select: vi.fn(() => query),
+        insert: vi.fn().mockResolvedValue({ data: selectedRow, error: null }),
+        upsert: vi.fn().mockResolvedValue({ data: selectedRow, error: null }),
+        update: vi.fn(() => ({ eq: vi.fn().mockResolvedValue({ data: null, error: null }) })),
+        delete: vi.fn().mockResolvedValue({ data: null, error: null }),
+    };
+};
 
 // Mock logger
 vi.mock('@/lib/logger', () => ({

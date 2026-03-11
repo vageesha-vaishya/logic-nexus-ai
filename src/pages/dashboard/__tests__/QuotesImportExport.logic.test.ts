@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseJsonField, prepareQuoteImportBatch, quoteSchema, transformQuoteRecord } from '../QuotesImportExport';
+import { buildFullQuoteExportSheets, parseJsonField, prepareQuoteImportBatch, quoteSchema, splitQuoteReferences, transformQuoteRecord } from '../QuotesImportExport';
 
 describe('QuotesImportExport validation and mapping', () => {
   it('normalizes valid quote schema payload', () => {
@@ -66,5 +66,62 @@ describe('QuotesImportExport validation and mapping', () => {
         { custom_fields: { credit_status: 'blocked' } },
       ])
     ).rejects.toThrow(/blocked credit status/i);
+  });
+
+  it('splits mixed quote references into ids and quote numbers', () => {
+    const refs = [
+      '00000000-0000-0000-0000-000000000111',
+      'QUO-260309-00001',
+      '  QUO-260309-00001  ',
+      '00000000-0000-0000-0000-000000000111',
+      'QUO-260309-00002',
+    ];
+    expect(splitQuoteReferences(refs)).toEqual({
+      ids: ['00000000-0000-0000-0000-000000000111'],
+      quoteNumbers: ['QUO-260309-00001', 'QUO-260309-00002'],
+    });
+  });
+
+  it('builds full export sheets with legs and charges', () => {
+    const sheets = buildFullQuoteExportSheets(
+      [{ id: 'q-1', quote_number: 'QUO-260309-00001', title: 'Quote A' }],
+      [{ quote_id: 'q-1', line_number: 1, product_name: 'Freight' }],
+      [{ quote_id: 'q-1', cargo_type: 'General', quantity: 2 }],
+      [{
+        id: 'v-1',
+        quote_id: 'q-1',
+        version_number: 3,
+        quotation_version_options: [{
+          id: 'o-1',
+          is_selected: true,
+          total_amount: 1200,
+          quote_currency: { code: 'USD' },
+          total_transit_days: 12,
+          quotation_version_option_legs: [{
+            id: 'l-1',
+            sort_order: 1,
+            mode: 'ocean',
+            origin_location: 'Miami',
+            destination_location: 'Santos',
+            quotation_version_option_leg_charges: [{
+              id: 'c-1',
+              amount: 1200,
+              rate: 1200,
+              quantity: 1,
+              currency: { code: 'USD' },
+              description: { name: 'Ocean Freight' },
+              charge_sides: { code: 'SELL' },
+              basis: { code: 'PER_CONTAINER' },
+            }],
+          }],
+        }],
+      }]
+    );
+
+    expect(sheets.Summary.length).toBe(1);
+    expect(sheets.Transport_Legs.length).toBe(1);
+    expect(sheets.Charges.length).toBe(1);
+    expect(sheets.Charges[0].quote_number).toBe('QUO-260309-00001');
+    expect(sheets.Options[0].version_number).toBe(3);
   });
 });
