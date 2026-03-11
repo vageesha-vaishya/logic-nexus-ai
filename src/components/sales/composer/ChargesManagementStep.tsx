@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Globe, Loader2 } from 'lucide-react';
+import { Plus, Globe, Loader2, AlertTriangle } from 'lucide-react';
 import { LegChargesTabContent } from './LegChargesTabContent';
 import { VirtualChargesList } from './VirtualChargesList';
 import { HelpTooltip } from './HelpTooltip';
@@ -19,6 +19,109 @@ import { normalizeModeCode } from '@/lib/mode-utils';
 import { calculateChargeableWeight, TransportMode } from '@/utils/freightCalculations';
 import { logger } from '@/lib/logger';
 import { getSafeName } from './utils';
+
+const normalizeQuantity = (value: any) => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return 1;
+  return parsed;
+};
+
+const findBasisCode = (charge: any, chargeBases: any[]) => {
+  const fromRef = chargeBases.find((b: any) => b.id === charge?.basis_id)?.code;
+  const code = String(fromRef || charge?.basis || charge?.unit || '').toLowerCase();
+  return code;
+};
+
+const isCargoQuantityBasis = (basisCode: string) => {
+  return basisCode.includes('container')
+    || basisCode.includes('kg')
+    || basisCode.includes('weight')
+    || basisCode.includes('cbm')
+    || basisCode.includes('volume');
+};
+
+const isContainerQuantityBasis = (basisCode: string) => basisCode.includes('container');
+
+export const normalizeCargoChargeQuantities = (charge: any, chargeBases: any[], expectedUnits?: number | null) => {
+  const basisCode = findBasisCode(charge, chargeBases);
+  if (!isCargoQuantityBasis(basisCode)) return charge;
+
+  const buyQty = normalizeQuantity(charge?.buy?.quantity);
+  const sellQty = normalizeQuantity(charge?.sell?.quantity);
+  const normalizedQty = isContainerQuantityBasis(basisCode) && Number(expectedUnits || 0) > 0
+    ? Number(expectedUnits)
+    : Math.max(buyQty, sellQty, 1);
+
+  return {
+    ...charge,
+    buy: { ...(charge?.buy || {}), quantity: normalizedQty },
+    sell: { ...(charge?.sell || {}), quantity: normalizedQty },
+  };
+};
+
+export const applyChargeFieldUpdate = (charge: any, field: string, value: any, chargeBases: any[]) => {
+  const next = { ...charge };
+  if (field.includes('.')) {
+    const [parent, child] = field.split('.');
+    const parentObj = { ...(next as any)[parent] };
+    (parentObj as any)[child] = value;
+    (next as any)[parent] = parentObj;
+  } else {
+    (next as any)[field] = value;
+  }
+
+  const basisCode = findBasisCode(next, chargeBases);
+  if (!isCargoQuantityBasis(basisCode)) return next;
+  return normalizeCargoChargeQuantities(next, chargeBases, null);
+};
+
+const resolveExpectedCargoUnits = (quoteData: any) => {
+  const cargoDetails = quoteData?.cargo_details;
+  const combos = Array.isArray(cargoDetails?.containerCombos)
+    ? cargoDetails.containerCombos
+    : (Array.isArray(quoteData?.containerCombos) ? quoteData.containerCombos : []);
+  const comboQty = combos.reduce((sum: number, combo: any) => sum + (Number(combo?.quantity || combo?.qty || 0) || 0), 0);
+  const direct = Number(cargoDetails?.quantity || quoteData?.container_count || quoteData?.containerQty || 0) || 0;
+  const expected = comboQty > 0 ? comboQty : direct;
+  return expected > 0 ? expected : null;
+};
+
+export const buildCargoUnitWarnings = (legs: any[], combinedCharges: any[], quoteData: any, chargeBases: any[]) => {
+  const warnings: string[] = [];
+  const expectedUnits = resolveExpectedCargoUnits(quoteData);
+
+  legs.forEach((leg: any, legIndex: number) => {
+    (leg?.charges || []).forEach((charge: any, chargeIndex: number) => {
+      const basisCode = findBasisCode(charge, chargeBases);
+      if (!isCargoQuantityBasis(basisCode)) return;
+
+      const buyQty = normalizeQuantity(charge?.buy?.quantity);
+      const sellQty = normalizeQuantity(charge?.sell?.quantity);
+      if (buyQty !== sellQty) {
+        warnings.push(`Leg ${legIndex + 1}: charge ${chargeIndex + 1} buy/sell cargo units differ (${buyQty} vs ${sellQty}).`);
+      }
+      if (expectedUnits && (buyQty !== expectedUnits || sellQty !== expectedUnits)) {
+        warnings.push(`Leg ${legIndex + 1}: charge ${chargeIndex + 1} cargo units (${buyQty}) do not match quote cargo units (${expectedUnits}).`);
+      }
+    });
+  });
+
+  (combinedCharges || []).forEach((charge: any, chargeIndex: number) => {
+    const basisCode = findBasisCode(charge, chargeBases);
+    if (!isCargoQuantityBasis(basisCode)) return;
+
+    const buyQty = normalizeQuantity(charge?.buy?.quantity);
+    const sellQty = normalizeQuantity(charge?.sell?.quantity);
+    if (buyQty !== sellQty) {
+      warnings.push(`Combined charge ${chargeIndex + 1}: buy/sell cargo units differ (${buyQty} vs ${sellQty}).`);
+    }
+    if (expectedUnits && (buyQty !== expectedUnits || sellQty !== expectedUnits)) {
+      warnings.push(`Combined charge ${chargeIndex + 1}: cargo units (${buyQty}) do not match quote cargo units (${expectedUnits}).`);
+    }
+  });
+
+  return Array.from(new Set(warnings));
+};
 
 export function ChargesManagementStep() {
   const { state, dispatch } = useQuoteStore();
@@ -67,6 +170,19 @@ export function ChargesManagementStep() {
     currencies,
     serviceTypes
   } = referenceData;
+  const cargoUnitWarnings = useMemo(
+    () => buildCargoUnitWarnings(legs || [], combinedCharges || [], quoteData || {}, chargeBases || []),
+    [legs, combinedCharges, quoteData, chargeBases]
+  );
+
+  useEffect(() => {
+    if (cargoUnitWarnings.length === 0) return;
+    logger.warn('[ChargesManagement] Cargo unit mismatch warnings detected', {
+      quoteNumber: quoteData?.quote_number || null,
+      warningCount: cargoUnitWarnings.length,
+      warnings: cargoUnitWarnings,
+    });
+  }, [cargoUnitWarnings, quoteData?.quote_number]);
 
   const handleFetchRates = useCallback(async (legId: string) => {
     const legs = legsRef.current;
@@ -321,16 +437,17 @@ export function ChargesManagementStep() {
     const updatedCharges = [...(leg.charges || [])];
     if (!updatedCharges[chargeIdx]) return;
 
-    const existing = { ...updatedCharges[chargeIdx] };
-    if (field.includes('.')) {
-      const [parent, child] = field.split('.');
-      const parentObj = { ...(existing as any)[parent] };
-      (parentObj as any)[child] = value;
-      (existing as any)[parent] = parentObj;
-    } else {
-      (existing as any)[field] = value;
-    }
-    updatedCharges[chargeIdx] = existing;
+    const existing = applyChargeFieldUpdate(
+      updatedCharges[chargeIdx],
+      field,
+      value,
+      referenceDataRef.current.chargeBases || []
+    );
+    updatedCharges[chargeIdx] = normalizeCargoChargeQuantities(
+      existing,
+      referenceDataRef.current.chargeBases || [],
+      resolveExpectedCargoUnits(quoteDataRef.current)
+    );
 
     dispatch({ type: 'UPDATE_LEG', payload: { id: legId, updates: { charges: updatedCharges } } });
 
@@ -390,11 +507,25 @@ export function ChargesManagementStep() {
   }, [dispatch]);
 
   const handleUpdateCombinedCharge = useCallback((chargeIdx: number, field: string, value: any) => {
-    // We need the current charge to update it
     const charge = combinedChargesRef.current[chargeIdx];
     if (charge) {
-       const updatedCharge = { ...charge, [field]: value };
-       dispatch({ type: 'UPDATE_COMBINED_CHARGE', payload: { index: chargeIdx, charge: updatedCharge } });
+       const updatedCharge = applyChargeFieldUpdate(
+         charge,
+         field,
+         value,
+         referenceDataRef.current.chargeBases || []
+       );
+       dispatch({
+         type: 'UPDATE_COMBINED_CHARGE',
+         payload: {
+           index: chargeIdx,
+           charge: normalizeCargoChargeQuantities(
+             updatedCharge,
+             referenceDataRef.current.chargeBases || [],
+             resolveExpectedCargoUnits(quoteDataRef.current)
+           )
+         }
+       });
     }
   }, [dispatch]);
 
@@ -499,6 +630,19 @@ export function ChargesManagementStep() {
             </div>
           )}
         </div>
+        {cargoUnitWarnings.length > 0 && (
+          <div className="border border-amber-300 bg-amber-50 rounded-lg p-3 text-amber-900 space-y-1">
+            <div className="flex items-center gap-2 text-sm font-semibold">
+              <AlertTriangle className="h-4 w-4" />
+              Cargo unit mismatch detected
+            </div>
+            {cargoUnitWarnings.map((warning) => (
+              <div key={warning} className="text-xs">
+                {warning}
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Legs Tabs */}
         <Tabs defaultValue={legs[0]?.id}>
@@ -512,10 +656,11 @@ export function ChargesManagementStep() {
               );
               const legName = (typeof serviceType?.name === 'string' ? serviceType.name : String(serviceType?.name || '')) || leg.mode.toUpperCase();
               const hasError = validationErrors.some(e => e.startsWith(`Leg ${idx + 1}`));
+              const hasCargoWarning = cargoUnitWarnings.some(w => w.startsWith(`Leg ${idx + 1}:`));
               
               return (
-                <TabsTrigger key={leg.id} value={leg.id} className={hasError ? "text-destructive" : ""}>
-                  Leg {idx + 1} - {legName} {hasError && "*"}
+                <TabsTrigger key={leg.id} value={leg.id} className={hasError || hasCargoWarning ? "text-destructive" : ""}>
+                  Leg {idx + 1} - {legName} {(hasError || hasCargoWarning) && "*"}
                 </TabsTrigger>
               );
             })}

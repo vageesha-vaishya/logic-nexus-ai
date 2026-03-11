@@ -12,7 +12,7 @@ import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
-import { Save, FileText, Plus, ChevronDown, ChevronUp, Ship, Plane, Truck, TrainFront, Package, BarChart3, ArrowRight, Pencil, Check, X } from 'lucide-react';
+import { Save, FileText, Plus, ChevronDown, ChevronUp, Ship, Plane, Truck, TrainFront, Package, BarChart3, ArrowRight, Pencil, Check, X, AlertTriangle } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { RateOption, TransportLeg, Charge } from '@/types/quote-breakdown';
 import { ChargesAnalysisGraph } from '@/components/sales/common/ChargesAnalysisGraph';
@@ -124,7 +124,7 @@ export const FinalizeSection = memo(function FinalizeSection({
     // However, if we are allowing renaming, we should just show carrier as is, unless it's the default "Manual Quote X" pattern which we want to localize.
     // For now, let's keep localization logic but apply it only if it matches standard pattern.
     const match = carrier.match(/Manual (Entry|Quote|Option) (\d+)$/i);
-    return match ? `${manualQuoteLabel} ${match[2]}` : carrier;
+    return match ? `${manualQuoteLabel} ${match[2]}` : (carrier || manualQuoteLabel);
   })();
 
   const [expanded, setExpanded] = useState(true);
@@ -163,6 +163,7 @@ export const FinalizeSection = memo(function FinalizeSection({
     setLegs,
     chargesByLeg,
     allCharges,
+    unitWarnings,
     addCharge,
     updateCharge,
     removeCharge,
@@ -314,6 +315,20 @@ export const FinalizeSection = memo(function FinalizeSection({
           </div>
 
           <Separator />
+
+          {unitWarnings.length > 0 && (
+            <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-amber-900">
+              <div className="mb-1 flex items-center gap-2 text-sm font-medium">
+                <AlertTriangle className="h-4 w-4" />
+                Cargo unit mismatch detected
+              </div>
+              <div className="space-y-1">
+                {unitWarnings.map((warning) => (
+                  <div key={warning} className="text-xs">{warning}</div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Dynamic Charge Configuration Panel */}
           <div className="space-y-4">

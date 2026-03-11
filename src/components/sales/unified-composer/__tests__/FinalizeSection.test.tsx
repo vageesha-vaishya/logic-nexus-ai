@@ -52,6 +52,10 @@ vi.mock('@/components/sales/common/ChargeBreakdown', () => ({
   ),
 }));
 
+vi.mock('@/components/sales/composer/LegManager', () => ({
+  LegManager: () => <div data-testid="leg-manager">LegManager</div>,
+}));
+
 // Mock ChargeRow to avoid complex Select/UI dependencies
 vi.mock('@/components/sales/composer/ChargeRow', () => ({
   ChargeRow: ({ charge, onUpdate, onRemove }: any) => (
@@ -112,6 +116,13 @@ const mockOptionWithLegs: any = {
   ],
 };
 
+const mockManualOptionWithoutCarrier: any = {
+  ...mockOption,
+  carrier: '',
+  is_manual: true,
+  source_attribution: 'Manual Quote',
+};
+
 describe('FinalizeSection', () => {
   it('renders finalize section with carrier name', () => {
     render(
@@ -121,6 +132,14 @@ describe('FinalizeSection', () => {
     expect(screen.getByTestId('finalize-section')).toBeInTheDocument();
     const matches = screen.getAllByText(/Test Carrier/);
     expect(matches.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('falls back to manual label when manual carrier is empty', () => {
+    render(
+      <FinalizeSection selectedOption={mockManualOptionWithoutCarrier} onSaveQuote={vi.fn()} />
+    );
+
+    expect(screen.getAllByText('quotation.manualQuote').length).toBeGreaterThan(0);
   });
 
   it('creates a charge from price when no legs/charges provided', () => {

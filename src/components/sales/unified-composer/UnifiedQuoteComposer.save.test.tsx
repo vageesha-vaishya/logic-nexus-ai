@@ -733,6 +733,56 @@ describe('UnifiedQuoteComposer - Save Functionality', () => {
         });
     });
 
+    it('normalizes container-based charge quantities to cargo units on save', async () => {
+        mockFormReturn.getValues.mockReturnValue({
+            ...mockFormReturn.getValues(),
+            mode: 'ocean',
+            origin: 'Origin',
+            destination: 'Dest',
+            originId: 'origin-uuid',
+            destinationId: 'dest-uuid',
+            commodity: 'Commodity',
+            weight: '1000',
+            volume: '10',
+            containerType: '00000000-0000-0000-0000-000000000001',
+            containerSize: '00000000-0000-0000-0000-000000000002',
+            containerQty: '3',
+            containerCombos: [
+                {
+                    type: '00000000-0000-0000-0000-000000000001',
+                    size: '00000000-0000-0000-0000-000000000002',
+                    qty: 3,
+                }
+            ],
+        });
+
+        render(
+            <MemoryRouter>
+                <UnifiedQuoteComposer
+                    initialData={{
+                        mode: 'ocean',
+                        origin: 'Origin',
+                        destination: 'Dest',
+                    }}
+                />
+            </MemoryRouter>
+        );
+
+        fireEvent.click(await screen.findByTestId('select-option-btn'));
+        fireEvent.click(await screen.findByTestId('save-quote-with-charges-btn'));
+
+        await waitFor(() => {
+            const saveCall = (mockScopedDb.rpc as any).mock.calls.find((call: any[]) => call[0] === 'save_quote_atomic');
+            const payload = saveCall?.[1]?.p_payload;
+            const legCharges = payload?.options?.[0]?.legs?.[0]?.charges || [];
+            const buy = legCharges.find((c: any) => c.side === 'buy');
+            const sell = legCharges.find((c: any) => c.side === 'sell');
+
+            expect(buy).toEqual(expect.objectContaining({ quantity: 3, unit_price: 100, amount: 300 }));
+            expect(sell).toEqual(expect.objectContaining({ quantity: 3, unit_price: 120, amount: 360 }));
+        });
+    });
+
     it('saves standalone quote while clearing CRM linkage fields', async () => {
         mockFormReturn.getValues.mockReturnValue({
             ...mockFormReturn.getValues(),

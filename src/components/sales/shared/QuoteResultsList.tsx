@@ -211,7 +211,7 @@ const mapLegsForVisualizer = (legs: TransportLeg[] | undefined) => {
         from: leg.origin,
         to: leg.destination,
         mode: leg.mode,
-        carrier: leg.carrier,
+        carrier: leg.carrier || 'Unknown Carrier',
         transit_time: leg.transit_time,
         origin: leg.origin,
         destination: leg.destination
@@ -734,10 +734,11 @@ export function QuoteResultsList({
 
 function getCarrierLabel(option: RateOption, manualQuoteLabel: string) {
   if (!option) return manualQuoteLabel;
-  const carrier = option.carrier || '';
+  const carrier = (option.carrier || '').trim();
+  const fallbackCarrier = (option.name || '').trim() || 'Unknown Carrier';
   const source = option.source_attribution || '';
   const isManual = !!option.is_manual || source === 'Manual Entry' || source === 'Manual Quote' || carrier === 'Manual Entry' || carrier.startsWith('Manual Quote');
-  if (!isManual) return carrier;
+  if (!isManual) return carrier || fallbackCarrier;
   const match = carrier.match(/(\d+)\s*$/);
-  return match ? `${manualQuoteLabel} ${match[1]}` : manualQuoteLabel;
+  return match ? `${manualQuoteLabel} ${match[1]}` : (carrier || fallbackCarrier || manualQuoteLabel);
 }

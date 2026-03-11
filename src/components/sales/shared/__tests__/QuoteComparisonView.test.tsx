@@ -168,4 +168,19 @@ describe('QuoteComparisonView', () => {
       expect(getByText('USD 3555')).toBeDefined();
     });
   });
+
+  it('falls back to option name when carrier is empty', async () => {
+    const optionWithoutCarrier: RateOption = {
+      ...mockRateOption,
+      id: 'opt-3',
+      carrier: '',
+      name: 'Fallback Carrier Name',
+    };
+
+    const { getAllByText } = render(<QuoteComparisonView options={[optionWithoutCarrier]} onSelect={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(getAllByText('Fallback Carrier Name').length).toBeGreaterThan(0);
+    });
+  });
 });

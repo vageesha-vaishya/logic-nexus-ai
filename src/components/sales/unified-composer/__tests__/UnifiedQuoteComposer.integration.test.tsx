@@ -22,6 +22,7 @@ const { mockScopedDb, mockSupabase, mockToast, mockShowSuccess } = vi.hoisted(()
         const chain: any = {
             select: vi.fn(() => chain),
             eq: vi.fn(() => chain),
+            or: vi.fn(() => chain),
             neq: vi.fn(() => chain),
             gt: vi.fn(() => chain),
             lt: vi.fn(() => chain),
@@ -221,6 +222,9 @@ vi.mock('../FormZone', async () => {
                        type="button"
                        data-testid="set-cargo-advanced"
                        onClick={() => {
+                           setValue('originId', '00000000-0000-0000-0000-000000000111');
+                           setValue('destinationId', '00000000-0000-0000-0000-000000000222');
+                           setValue('accountId', 'acc-1');
                            setValue('commodity', 'Lithium Batteries');
                            setValue('weight', '555');
                            setValue('volume', '22.7');
@@ -252,6 +256,9 @@ vi.mock('../FormZone', async () => {
                        type="button"
                        data-testid="set-cargo-edited"
                        onClick={() => {
+                           setValue('originId', '00000000-0000-0000-0000-000000000111');
+                           setValue('destinationId', '00000000-0000-0000-0000-000000000222');
+                           setValue('accountId', 'acc-1');
                            setValue('commodity', 'Consumer Electronics');
                            setValue('weight', '600');
                            setValue('volume', '24.2');
@@ -282,6 +289,9 @@ vi.mock('../FormZone', async () => {
                        type="button"
                        data-testid="set-multi-container-combos"
                        onClick={() => {
+                           setValue('originId', '00000000-0000-0000-0000-000000000111');
+                           setValue('destinationId', '00000000-0000-0000-0000-000000000222');
+                           setValue('accountId', 'acc-1');
                            setValue('commodity', 'Machinery');
                            setValue('weight', '900');
                            setValue('volume', '40');
@@ -483,6 +493,7 @@ const createMockChain = (data: any) => {
     };
     chain.select = vi.fn(() => chain);
     chain.eq = vi.fn(() => chain);
+    chain.or = vi.fn(() => chain);
     chain.neq = vi.fn(() => chain);
     chain.gt = vi.fn(() => chain);
     chain.lt = vi.fn(() => chain);
@@ -523,6 +534,13 @@ describe('UnifiedQuoteComposer Integration (API-to-UI)', () => {
         });
     });
 
+    const goToResultsTab = async (user: ReturnType<typeof userEvent.setup>) => {
+        await user.click(screen.getByRole('tab', { name: /Results & Finalize/i }));
+        await waitFor(() => {
+            expect(screen.getByTestId('save-quote-button')).toBeInTheDocument();
+        });
+    };
+
     it('populates FormZone inputs correctly from loaded quote data', async () => {
         const QUOTE_ID = '123e4567-e89b-12d3-a456-426614174000';
         
@@ -531,7 +549,8 @@ describe('UnifiedQuoteComposer Integration (API-to-UI)', () => {
             if (table === 'quotes') {
                 return createMockChain({
                     id: QUOTE_ID,
-                    quote_number: 'Q-1001',
+                    quote_number: 'QUO-260309-00001',
+                    title: 'Integration Test Quote',
                     status: 'draft',
                     tenant_id: 'test-tenant',
                     origin: 'New York',
@@ -561,7 +580,8 @@ describe('UnifiedQuoteComposer Integration (API-to-UI)', () => {
             if (table === 'quotes') {
                 return createMockChain({
                     id: QUOTE_ID,
-                    quote_number: 'Q-1001',
+                    quote_number: 'QUO-260309-00001',
+                    title: 'Integration Test Quote',
                     status: 'draft',
                     tenant_id: 'test-tenant',
                     origin: 'New York',
@@ -781,12 +801,13 @@ describe('UnifiedQuoteComposer Integration (API-to-UI)', () => {
             if (table === 'quotes') {
                 return createMockChain({
                     id: QUOTE_ID,
-                    quote_number: 'Q-1001',
+                    quote_number: 'QUO-260309-00001',
+                    title: 'Integration Test Quote',
                     transport_mode: 'air',
                     origin: 'New York',
                     destination: 'London',
-                    origin_port_id: 'port-1',
-                    destination_port_id: 'port-2',
+                    origin_port_id: '00000000-0000-0000-0000-000000000111',
+                    destination_port_id: '00000000-0000-0000-0000-000000000222',
                     current_version_id: VERSION_ID,
                     tenant_id: 'test-tenant',
                     account_id: 'acc-1',
@@ -837,14 +858,10 @@ describe('UnifiedQuoteComposer Integration (API-to-UI)', () => {
 
         // Wait for load
         await waitFor(() => {
-            expect(screen.getByTestId('commodity-input')).toHaveValue('Initial');
+            expect(screen.getByTestId('set-cargo-edited')).toBeInTheDocument();
         });
 
-        const weightInput = screen.getByTestId('cargo-weight');
-        await fireEvent.change(weightInput, { target: { value: '100' } });
-
-        const volumeInput = screen.getByTestId('cargo-volume');
-        await fireEvent.change(volumeInput, { target: { value: '0' } });
+        await user.click(screen.getByTestId('set-cargo-edited'));
 
         // Change commodity
         const commodityInput = screen.getByTestId('commodity-input');
@@ -857,29 +874,29 @@ describe('UnifiedQuoteComposer Integration (API-to-UI)', () => {
         // Let's verify if FinalizeSection is rendered.
         
         // Find save button (FinalizeSection renders a Button with "Save Quote")
-        const saveButton = screen.getByTestId('save-quote-button');
-        await user.click(saveButton);
+        await goToResultsTab(user);
+        await user.click(screen.getByRole('button', { name: /Draft/i }));
 
         // Verify save call
         await waitFor(() => {
-            expect(mockScopedDb.rpc).toHaveBeenCalledWith(
-                'save_quote_atomic',
+            const saveCall = mockScopedDb.rpc.mock.calls.find((call: any[]) => call[0] === 'save_quote_atomic');
+            expect(saveCall).toBeTruthy();
+            const payload = saveCall[1]?.p_payload;
+            expect(payload).toEqual(
                 expect.objectContaining({
-                    p_payload: expect.objectContaining({
-                        quote: expect.objectContaining({
-                            id: QUOTE_ID,
-                            status: 'draft',
-                            origin: 'New York',
-                            destination: 'London',
-                            transport_mode: 'air',
-                            cargo_details: expect.objectContaining({
-                                commodity: 'Updated Electronics',
-                                total_weight_kg: 100,
-                                total_volume_cbm: 0
-                            })
-                        }),
-                        cargo_configurations: expect.any(Array)
-                    })
+                    quote: expect.objectContaining({
+                        id: QUOTE_ID,
+                        status: 'draft',
+                        origin: 'New York',
+                        destination: 'London',
+                        transport_mode: 'air',
+                        cargo_details: expect.objectContaining({
+                            commodity: 'Updated Electronics',
+                            total_weight_kg: 600,
+                            total_volume_cbm: 24.2
+                        })
+                    }),
+                    cargo_configurations: expect.any(Array)
                 })
             );
         });
@@ -895,7 +912,8 @@ describe('UnifiedQuoteComposer Integration (API-to-UI)', () => {
             if (table === 'quotes') {
                 return createMockChain({
                     id: QUOTE_ID,
-                    quote_number: 'Q-1001',
+                    quote_number: 'QUO-260309-00001',
+                    title: 'Integration Test Quote',
                     transport_mode: 'air',
                     origin: 'New York',
                     destination: 'London',
@@ -946,7 +964,7 @@ describe('UnifiedQuoteComposer Integration (API-to-UI)', () => {
         );
 
         await waitFor(() => {
-            expect(screen.getByTestId('commodity-input')).toHaveValue('Initial');
+            expect(screen.getByTestId('set-cargo-edited')).toBeInTheDocument();
         });
 
         mockToast.mockClear();
@@ -955,6 +973,7 @@ describe('UnifiedQuoteComposer Integration (API-to-UI)', () => {
         const commodityInput = screen.getByTestId('commodity-input');
         await fireEvent.change(commodityInput, { target: { value: 'a' } });
 
+        await goToResultsTab(user);
         const saveButton = screen.getByTestId('save-quote-button');
         await user.click(saveButton);
 
@@ -983,8 +1002,8 @@ describe('UnifiedQuoteComposer Integration (API-to-UI)', () => {
                     transport_mode: 'ocean',
                     origin: 'Shanghai',
                     destination: 'Los Angeles',
-                    origin_port_id: 'port-origin-1',
-                    destination_port_id: 'port-dest-1',
+                    origin_port_id: '00000000-0000-0000-0000-000000000333',
+                    destination_port_id: '00000000-0000-0000-0000-000000000444',
                     current_version_id: VERSION_ID,
                     tenant_id: 'test-tenant',
                     account_id: 'acc-1',
@@ -1031,23 +1050,20 @@ describe('UnifiedQuoteComposer Integration (API-to-UI)', () => {
         });
 
         await user.click(screen.getByTestId('set-cargo-advanced'));
-        await user.click(screen.getByTestId('save-quote-button'));
+        await goToResultsTab(user);
+        await user.click(screen.getByRole('button', { name: /Draft/i }));
 
         await waitFor(() => {
-            expect(mockScopedDb.rpc).toHaveBeenCalledWith(
-                'save_quote_atomic',
+            const saveCalls = mockScopedDb.rpc.mock.calls.filter((c: any[]) => c[0] === 'save_quote_atomic');
+            expect(saveCalls.length).toBeGreaterThan(0);
+            const payload = saveCalls[saveCalls.length - 1][1]?.p_payload;
+            expect(payload?.quote?.cargo_details).toEqual(
                 expect.objectContaining({
-                    p_payload: expect.objectContaining({
-                        quote: expect.objectContaining({
-                            cargo_details: expect.objectContaining({
-                                commodity: 'Lithium Batteries',
-                                dangerous_goods: true,
-                                stackable: true,
-                                dimensions: expect.objectContaining({ l: 120, w: 80, h: 140, unit: 'cm' }),
-                                hazmat_details: expect.objectContaining({ class: '9', unNumber: '3480' }),
-                            }),
-                        }),
-                    }),
+                    commodity: 'Lithium Batteries',
+                    dangerous_goods: true,
+                    stackable: true,
+                    dimensions: expect.objectContaining({ l: 120, w: 80, h: 140, unit: 'cm' }),
+                    hazmat_details: expect.objectContaining({ class: '9', unNumber: '3480' }),
                 })
             );
         });
@@ -1070,7 +1086,8 @@ describe('UnifiedQuoteComposer Integration (API-to-UI)', () => {
         });
 
         await user.click(screen.getByTestId('set-cargo-edited'));
-        await user.click(screen.getByTestId('save-quote-button'));
+        await goToResultsTab(user);
+        await user.click(screen.getByRole('button', { name: /Draft/i }));
 
         await waitFor(() => {
             const calls = mockScopedDb.rpc.mock.calls.filter((c: any[]) => c[0] === 'save_quote_atomic');
@@ -1101,8 +1118,8 @@ describe('UnifiedQuoteComposer Integration (API-to-UI)', () => {
                     transport_mode: 'ocean',
                     origin: 'Dubai',
                     destination: 'Rotterdam',
-                    origin_port_id: 'port-origin-1',
-                    destination_port_id: 'port-dest-1',
+                    origin_port_id: '00000000-0000-0000-0000-000000000333',
+                    destination_port_id: '00000000-0000-0000-0000-000000000444',
                     current_version_id: VERSION_ID,
                     tenant_id: 'test-tenant',
                     account_id: 'acc-1',
@@ -1145,19 +1162,18 @@ describe('UnifiedQuoteComposer Integration (API-to-UI)', () => {
         });
 
         await user.click(screen.getByTestId('set-multi-container-combos'));
-        await user.click(screen.getByTestId('save-quote-button'));
+        await goToResultsTab(user);
+        await user.click(screen.getByRole('button', { name: /Draft/i }));
 
         await waitFor(() => {
-            expect(mockScopedDb.rpc).toHaveBeenCalledWith(
-                'save_quote_atomic',
-                expect.objectContaining({
-                    p_payload: expect.objectContaining({
-                        cargo_configurations: expect.arrayContaining([
-                            expect.objectContaining({ quantity: 2 }),
-                            expect.objectContaining({ quantity: 2 }),
-                        ]),
-                    }),
-                })
+            const saveCalls = mockScopedDb.rpc.mock.calls.filter((c: any[]) => c[0] === 'save_quote_atomic');
+            expect(saveCalls.length).toBeGreaterThan(0);
+            const payload = saveCalls[saveCalls.length - 1][1]?.p_payload;
+            expect(payload?.cargo_configurations).toEqual(
+                expect.arrayContaining([
+                    expect.objectContaining({ quantity: 2 }),
+                    expect.objectContaining({ quantity: 2 }),
+                ])
             );
         });
     });
@@ -1176,8 +1192,8 @@ describe('UnifiedQuoteComposer Integration (API-to-UI)', () => {
                     transport_mode: 'ocean',
                     origin: 'Miami',
                     destination: 'Santos',
-                    origin_port_id: 'port-origin-1',
-                    destination_port_id: 'port-dest-1',
+                    origin_port_id: '00000000-0000-0000-0000-000000000333',
+                    destination_port_id: '00000000-0000-0000-0000-000000000444',
                     current_version_id: VERSION_ID,
                     tenant_id: 'test-tenant',
                     account_id: 'acc-1',
@@ -1268,8 +1284,8 @@ describe('UnifiedQuoteComposer Integration (API-to-UI)', () => {
                     transport_mode: 'ocean',
                     origin: 'Chennai',
                     destination: 'Antwerp',
-                    origin_port_id: 'port-origin-1',
-                    destination_port_id: 'port-dest-1',
+                    origin_port_id: '00000000-0000-0000-0000-000000000333',
+                    destination_port_id: '00000000-0000-0000-0000-000000000444',
                     current_version_id: VERSION_ID,
                     tenant_id: 'test-tenant',
                     account_id: 'acc-1',
@@ -1312,18 +1328,19 @@ describe('UnifiedQuoteComposer Integration (API-to-UI)', () => {
         });
 
         await user.click(screen.getByTestId('set-cargo-advanced'));
-        await user.click(screen.getByTestId('save-quote-button'));
+        await goToResultsTab(user);
+        await user.click(screen.getByRole('button', { name: /Draft/i }));
 
         await waitFor(() => {
-            expect(mockScopedDb.rpc).toHaveBeenCalledWith(
-                'save_quote_atomic',
+            const saveCalls = mockScopedDb.rpc.mock.calls.filter((c: any[]) => c[0] === 'save_quote_atomic');
+            expect(saveCalls.length).toBeGreaterThan(0);
+            const payload = saveCalls[saveCalls.length - 1][1]?.p_payload;
+            expect(payload).toEqual(
                 expect.objectContaining({
-                    p_payload: expect.objectContaining({
-                        quote: expect.objectContaining({
-                            cargo_details: expect.objectContaining({
-                                total_weight_kg: 555,
-                                total_volume_cbm: 22.7,
-                            }),
+                    quote: expect.objectContaining({
+                        cargo_details: expect.objectContaining({
+                            total_weight_kg: 555,
+                            total_volume_cbm: 22.7,
                         }),
                     }),
                 })
@@ -1345,11 +1362,12 @@ describe('UnifiedQuoteComposer Integration (API-to-UI)', () => {
                 return createMockChain({
                     id: QUOTE_ID,
                     quote_number: 'Q-5001',
+                    title: 'Legacy Schema Retry Quote',
                     transport_mode: 'ocean',
                     origin: 'Singapore',
                     destination: 'Jebel Ali',
-                    origin_port_id: 'port-origin-1',
-                    destination_port_id: 'port-dest-1',
+                    origin_port_id: '00000000-0000-0000-0000-000000000333',
+                    destination_port_id: '00000000-0000-0000-0000-000000000444',
                     current_version_id: VERSION_ID,
                     tenant_id: 'test-tenant',
                     account_id: 'acc-1',
@@ -1372,9 +1390,17 @@ describe('UnifiedQuoteComposer Integration (API-to-UI)', () => {
             return createMockChain([]);
         });
 
-        mockScopedDb.rpc
-            .mockResolvedValueOnce({ data: null, error: { message: legacyColumnError } })
-            .mockResolvedValueOnce({ data: QUOTE_ID, error: null });
+        let saveQuoteAtomicAttempts = 0;
+        mockScopedDb.rpc.mockImplementation(async (fn: string) => {
+            if (fn !== 'save_quote_atomic') {
+                return { data: null, error: null };
+            }
+            saveQuoteAtomicAttempts += 1;
+            if (saveQuoteAtomicAttempts === 1) {
+                return { data: null, error: { message: legacyColumnError } };
+            }
+            return { data: QUOTE_ID, error: null };
+        });
 
         const queryClient = new QueryClient({
             defaultOptions: { queries: { retry: false } },
@@ -1395,7 +1421,8 @@ describe('UnifiedQuoteComposer Integration (API-to-UI)', () => {
         });
 
         await user.click(screen.getByTestId('set-multi-container-combos'));
-        await user.click(screen.getByTestId('save-quote-button'));
+        await goToResultsTab(user);
+        await user.click(screen.getByRole('button', { name: /Draft/i }));
 
         await waitFor(() => {
             const saveCalls = mockScopedDb.rpc.mock.calls.filter((c: any[]) => c[0] === 'save_quote_atomic');

@@ -1814,13 +1814,37 @@ function UnifiedQuoteComposerContent({
             const normalized = note.trim().toLowerCase();
             return normalized === 'unitemized surcharges' || normalized === 'bundle discount adjustment';
           };
+          const normalizeQuantity = (value: any) => {
+            const parsed = Number(value);
+            if (!Number.isFinite(parsed) || parsed <= 0) return 1;
+            return parsed;
+          };
+          const expectedCargoUnits =
+            (() => {
+              const comboUnits = Array.isArray(containerCombos)
+                ? containerCombos.reduce((sum: number, combo: any) => sum + (Number(combo?.qty || combo?.quantity || 0) || 0), 0)
+                : 0;
+              const fallbackUnits = Number(cargoDetails?.quantity || raw?.container_count || 0) || 0;
+              const resolved = comboUnits > 0 ? comboUnits : fallbackUnits;
+              return resolved > 0 ? resolved : null;
+            })();
+          const normalizeBasisCode = (basisCode: string) => String(basisCode || '').toLowerCase();
+          const isContainerQuantityBasis = (basisCode: string) => normalizeBasisCode(basisCode).includes('container');
+          const isCargoQuantityBasis = (basisCode: string) => {
+            const normalized = normalizeBasisCode(basisCode);
+            return normalized.includes('container')
+              || normalized.includes('kg')
+              || normalized.includes('weight')
+              || normalized.includes('cbm')
+              || normalized.includes('volume');
+          };
 
           // Helper to group charges into buy/sell pairs
           const groupCharges = (charges: any[]) => {
              const pairs: any[] = [];
              const pendingBuys: any[] = [];
              const pendingSells: any[] = [];
-             const pairKey = (row: any) => {
+             const pairKey = (row: any, includeQuantity: boolean) => {
                const category = row?.category_id || '';
                const basis = row?.basis_id || '';
                const leg = row?.leg_id || '';
@@ -1828,7 +1852,48 @@ function UnifiedQuoteComposerContent({
                const quantity = Number(row?.quantity ?? 1).toFixed(4);
                const unit = row?.unit || '';
                const note = String(row?.note || '').trim().toLowerCase();
-               return `${category}|${basis}|${leg}|${currency}|${quantity}|${unit}|${note}`;
+               return includeQuantity
+                 ? `${category}|${basis}|${leg}|${currency}|${quantity}|${unit}|${note}`
+                 : `${category}|${basis}|${leg}|${currency}|${unit}|${note}`;
+             };
+             const normalizePairQuantities = (pair: any) => {
+               const basisCode = String(pair?.basis || '').toLowerCase();
+               const unitCode = String(pair?.unit || '').toLowerCase();
+               const isCargoBasis = isCargoQuantityBasis(basisCode) || isCargoQuantityBasis(unitCode);
+               if (!isCargoBasis) return pair;
+               const currentBuyQty = normalizeQuantity(pair?.buy?.quantity);
+               const currentSellQty = normalizeQuantity(pair?.sell?.quantity);
+               const normalizedQty = isContainerQuantityBasis(basisCode) && expectedCargoUnits
+                 ? expectedCargoUnits
+                 : Math.max(currentBuyQty, currentSellQty, 1);
+               if (pair?.buy) {
+                 pair.buy.quantity = normalizedQty;
+                 pair.buy.amount = Number((normalizedQty * (Number(pair?.buy?.rate) || 0)).toFixed(2));
+               }
+               if (pair?.sell) {
+                 pair.sell.quantity = normalizedQty;
+                 pair.sell.amount = Number((normalizedQty * (Number(pair?.sell?.rate) || 0)).toFixed(2));
+               }
+              const differsBySide = currentBuyQty !== currentSellQty;
+              const differsFromExpected = Boolean(
+                expectedCargoUnits
+                && isContainerQuantityBasis(basisCode)
+                && (currentBuyQty !== expectedCargoUnits || currentSellQty !== expectedCargoUnits)
+              );
+              if (differsBySide || differsFromExpected) {
+                 logger.warn('[UnifiedComposer] Normalized mismatched cargo quantities while loading option charges', {
+                   optionId: pair?.quote_option_id || null,
+                   legId: pair?.legId || pair?.leg_id || null,
+                   basis: pair?.basis,
+                   buyQty: currentBuyQty,
+                   sellQty: currentSellQty,
+                  expectedCargoUnits,
+                  differsBySide,
+                  differsFromExpected,
+                   normalizedQty,
+                 });
+               }
+               return pair;
              };
              
              charges.forEach(c => {
@@ -1839,13 +1904,22 @@ function UnifiedQuoteComposerContent({
              
              // Match sells to buys
              pendingSells.forEach(sell => {
-                 const targetKey = pairKey(sell);
-                 const matchIndex = pendingBuys.findIndex((buy) => pairKey(buy) === targetKey);
+                const strictKey = pairKey(sell, true);
+                const looseKey = pairKey(sell, false);
+                const sellBasisCode = String(sell?.basis?.code || sell?.basis?.name || '').toLowerCase();
+                const sellUnitCode = String(sell?.unit || '').toLowerCase();
+                const cargoBasis = isCargoQuantityBasis(sellBasisCode) || isCargoQuantityBasis(sellUnitCode);
+                const matchIndex = pendingBuys.findIndex((buy) => {
+                  const buyStrict = pairKey(buy, true);
+                  if (buyStrict === strictKey) return true;
+                  if (!cargoBasis) return false;
+                  return pairKey(buy, false) === looseKey;
+                });
                  
                  if (matchIndex >= 0) {
                      const buy = pendingBuys[matchIndex];
                      pendingBuys.splice(matchIndex, 1);
-                     pairs.push({
+                    pairs.push(normalizePairQuantities({
                          id: buy.id, 
                          leg_id: buy.leg_id,
                          legId: buy.leg_id,
@@ -1872,9 +1946,9 @@ function UnifiedQuoteComposerContent({
                              dbChargeId: sell.id
                          },
                          note: buy.note || sell.note
-                     });
+                    }));
                  } else {
-                     pairs.push({
+                    pairs.push(normalizePairQuantities({
                          id: sell.id,
                          leg_id: sell.leg_id,
                          legId: sell.leg_id,
@@ -1893,12 +1967,12 @@ function UnifiedQuoteComposerContent({
                              dbChargeId: sell.id
                          },
                          note: sell.note
-                     });
+                    }));
                  }
              });
              
              pendingBuys.forEach(buy => {
-                 pairs.push({
+                pairs.push(normalizePairQuantities({
                      id: buy.id,
                      leg_id: buy.leg_id,
                      legId: buy.leg_id,
@@ -1917,7 +1991,7 @@ function UnifiedQuoteComposerContent({
                          dbChargeId: buy.id
                      },
                      note: buy.note
-                 });
+                }));
              });
 
              // Deduplicate paired rows (guards against malformed/duplicated quote_charges records)
@@ -2680,6 +2754,47 @@ function UnifiedQuoteComposerContent({
         repoData?.chargeBases?.find((b: any) => b.id === id)?.code || '';
       const findCurrencyCodeById = (id: string) =>
         repoData?.currencies?.find((c: any) => c.id === id)?.code || 'USD';
+      const expectedCargoUnitsForSave =
+        (() => {
+          const comboUnits = Array.isArray(combos)
+            ? combos.reduce((sum: number, combo: any) => sum + (Number(combo?.qty || combo?.quantity || 0) || 0), 0)
+            : 0;
+          const fallbackUnits = Number(formData?.values?.containerQty || 0) || 0;
+          const resolved = comboUnits > 0 ? comboUnits : fallbackUnits;
+          return resolved > 0 ? resolved : null;
+        })();
+      const normalizeBasisCode = (basisCode: string) => String(basisCode || '').toLowerCase();
+      const isContainerQuantityBasis = (basisCode: string) => normalizeBasisCode(basisCode).includes('container');
+      const isCargoQuantityBasis = (basisCode: string) => {
+        const normalized = normalizeBasisCode(basisCode);
+        return normalized.includes('container')
+          || normalized.includes('kg')
+          || normalized.includes('weight')
+          || normalized.includes('cbm')
+          || normalized.includes('volume');
+      };
+      const normalizeSideQuantity = (charge: any, side: 'buy' | 'sell') => {
+        const basisCode = findBasisCodeById(charge?.basis_id) || charge?.basis || charge?.unit || '';
+        if (!isCargoQuantityBasis(basisCode)) {
+          return Number(side === 'buy' ? charge?.buy?.quantity : charge?.sell?.quantity) || 1;
+        }
+        const sideQty = Number(side === 'buy' ? charge?.buy?.quantity : charge?.sell?.quantity) || 0;
+        const otherQty = Number(side === 'buy' ? charge?.sell?.quantity : charge?.buy?.quantity) || 0;
+        const normalizedQty = isContainerQuantityBasis(basisCode) && expectedCargoUnitsForSave
+          ? expectedCargoUnitsForSave
+          : Math.max(sideQty || 1, otherQty || 1);
+        if (sideQty > 0 && otherQty > 0 && sideQty !== otherQty) {
+          logger.warn('[UnifiedComposer] Normalized mismatched cargo quantities before save', {
+            quoteId: currentQuoteId || null,
+            optionId: selectedOption?.id || null,
+            basisCode,
+            buyQty: Number(charge?.buy?.quantity || 0) || 0,
+            sellQty: Number(charge?.sell?.quantity || 0) || 0,
+            normalizedQty,
+          });
+        }
+        return normalizedQty;
+      };
 
       const buildChargePayload = (c: any, side: 'buy' | 'sell') => {
         if (!c) return {
@@ -2696,9 +2811,12 @@ function UnifiedQuoteComposerContent({
           note: null
         };
 
-        const quantity = side === 'buy' ? c.buy?.quantity : c.sell?.quantity;
+        const quantity = normalizeSideQuantity(c, side);
         const unitPrice = side === 'buy' ? c.buy?.rate : c.sell?.rate;
-        const amount = side === 'buy' ? c.buy?.amount : c.sell?.amount;
+        const basisCode = findBasisCodeById(c.basis_id) || c.basis || c.unit || '';
+        const amount = isCargoQuantityBasis(basisCode)
+          ? Number((Number(quantity || 0) * Number(unitPrice || 0)).toFixed(2))
+          : (side === 'buy' ? c.buy?.amount : c.sell?.amount);
         return {
           charge_code: c.category_id || null,
           basis_id: c.basis_id || null,

@@ -109,4 +109,22 @@ describe('QuoteResultsList Badge Logic', () => {
         const manualBadge = screen.getByText('Manual');
         expect(manualBadge).toBeInTheDocument();
     });
+
+    it('falls back to option name when market carrier is empty', () => {
+        const optionWithoutCarrier: RateOption = {
+            ...mockMarketOption,
+            id: 'market-2',
+            carrier: '',
+            name: 'Fallback Carrier Name',
+        };
+
+        render(
+            <QuoteResultsList
+                results={[optionWithoutCarrier]}
+                onSelect={() => {}}
+            />
+        );
+
+        expect(screen.getAllByText('Fallback Carrier Name').length).toBeGreaterThan(0);
+    });
 });

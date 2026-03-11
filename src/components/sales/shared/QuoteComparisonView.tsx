@@ -487,10 +487,11 @@ export function QuoteComparisonView({
 
 function getCarrierLabel(option: RateOption, manualQuoteLabel: string) {
   if (!option) return manualQuoteLabel;
-  const carrier = option.carrier || '';
+  const carrier = (option.carrier || '').trim();
+  const fallbackCarrier = (option.name || '').trim() || 'Unknown Carrier';
   const source = option.source_attribution || '';
   const isManual = !!option.is_manual || source === 'Manual Entry' || source === 'Manual Quote' || carrier === 'Manual Entry' || carrier.startsWith('Manual Quote');
-  if (!isManual) return carrier;
+  if (!isManual) return carrier || fallbackCarrier;
   const match = carrier.match(/(\d+)\s*$/);
-  return match ? `${manualQuoteLabel} ${match[1]}` : manualQuoteLabel;
+  return match ? `${manualQuoteLabel} ${match[1]}` : (carrier || fallbackCarrier || manualQuoteLabel);
 }

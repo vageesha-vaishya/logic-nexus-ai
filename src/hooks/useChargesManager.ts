@@ -46,6 +46,7 @@ export interface UseChargesManagerReturn {
   setLegs: (legs: TransportLeg[]) => void;
   chargesByLeg: Record<string, ManagedCharge[]>;
   allCharges: ManagedCharge[];
+  unitWarnings: string[];
   addCharge: (legId: string | null) => void;
   updateCharge: (chargeId: string, field: string, value: any) => void;
   removeCharge: (chargeId: string) => void;
@@ -80,6 +81,26 @@ function findRefName(items: { id: string; name: string }[], id: string): string 
   return items.find((i) => i.id === id)?.name || '';
 }
 
+function normalizeQuantity(value: any): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return 1;
+  return parsed;
+}
+
+function isCargoQuantityBasisCode(code: string): boolean {
+  const normalized = String(code || '').toLowerCase();
+  return normalized.includes('container')
+    || normalized.includes('kg')
+    || normalized.includes('weight')
+    || normalized.includes('cbm')
+    || normalized.includes('volume');
+}
+
+function isCargoQuantityBasisId(refData: ReferenceData, basisId: string): boolean {
+  const code = refData.chargeBases.find((basis) => basis.id === basisId)?.code || '';
+  return isCargoQuantityBasisCode(code);
+}
+
 function buildManagedCharge(
   charge: Charge,
   legId: string | null,
@@ -87,20 +108,29 @@ function buildManagedCharge(
   marginPercent: number,
   autoMargin: boolean
 ): ManagedCharge {
+  const rawCharge = charge as any;
   const categoryId = findRefId(refData.chargeCategories, charge.category || '');
   const basisId = findRefId(refData.chargeBases, charge.basis || 'shipment');
   const currencyId = findRefId(refData.currencies, charge.currency || 'USD');
 
-  const sellQty = Number(charge?.sell?.quantity ?? charge.quantity ?? 1) || 1;
-  const sellRate = Number(charge?.sell?.rate ?? charge.rate ?? charge.amount ?? 0) || 0;
-  const rawSellAmount = Number(charge?.sell?.amount ?? (sellQty * sellRate)) || 0;
-  const sellAmount = Number(rawSellAmount.toFixed(2));
+  let sellQty = Number(rawCharge?.sell?.quantity ?? charge.quantity ?? 1) || 1;
+  const sellRate = Number(rawCharge?.sell?.rate ?? charge.rate ?? charge.amount ?? 0) || 0;
+  const rawSellAmount = Number(rawCharge?.sell?.amount ?? (sellQty * sellRate)) || 0;
+  let sellAmount = Number(rawSellAmount.toFixed(2));
 
-  const buyQty = Number(charge?.buy?.quantity ?? sellQty) || 1;
+  let buyQty = Number(rawCharge?.buy?.quantity ?? sellQty) || 1;
   const computedBuyRate = autoMargin ? Number((sellRate / (1 + marginPercent / 100)).toFixed(2)) : sellRate;
-  const buyRate = Number(charge?.buy?.rate ?? computedBuyRate) || 0;
-  const rawBuyAmount = Number(charge?.buy?.amount ?? (buyQty * buyRate)) || 0;
-  const buyAmount = Number(rawBuyAmount.toFixed(2));
+  const buyRate = Number(rawCharge?.buy?.rate ?? computedBuyRate) || 0;
+  const rawBuyAmount = Number(rawCharge?.buy?.amount ?? (buyQty * buyRate)) || 0;
+  let buyAmount = Number(rawBuyAmount.toFixed(2));
+
+  if (isCargoQuantityBasisId(refData, basisId)) {
+    const normalizedQty = Math.max(normalizeQuantity(buyQty), normalizeQuantity(sellQty));
+    buyQty = normalizedQty;
+    sellQty = normalizedQty;
+    buyAmount = Number((buyQty * buyRate).toFixed(2));
+    sellAmount = Number((sellQty * sellRate).toFixed(2));
+  }
 
   return {
     id: charge.id || generateId(),
@@ -115,6 +145,7 @@ function buildManagedCharge(
     buy: { quantity: buyQty, rate: buyRate, amount: Number(buyAmount) },
     sell: { quantity: sellQty, rate: sellRate, amount: Number(sellAmount) },
     note: charge.note || '',
+    basisDetails: (charge as any)?.basisDetails,
   };
 }
 
@@ -262,6 +293,19 @@ export function useChargesManager({
     return grouped;
   }, [charges]);
 
+  const unitWarnings = useMemo(() => {
+    const warnings: string[] = [];
+    charges.forEach((charge, index) => {
+      if (!isCargoQuantityBasisId(referenceData, charge.basis_id)) return;
+      const buyQty = normalizeQuantity(charge.buy.quantity);
+      const sellQty = normalizeQuantity(charge.sell.quantity);
+      if (buyQty !== sellQty) {
+        warnings.push(`Charge ${index + 1} has mismatched cargo units (${buyQty} vs ${sellQty}).`);
+      }
+    });
+    return Array.from(new Set(warnings));
+  }, [charges, referenceData]);
+
   const addCharge = useCallback(
     (legId: string | null) => {
       const defaultCatId = referenceData.chargeCategories.find((c) => c.code === 'fee')?.id || referenceData.chargeCategories[0]?.id || '';
@@ -302,6 +346,21 @@ export function useChargesManager({
             // Recalculate amount
             updated[parent].amount = Number((updated[parent].quantity * updated[parent].rate).toFixed(2));
 
+            const cargoBasis = isCargoQuantityBasisId(referenceData, updated.basis_id);
+            if (cargoBasis && child === 'quantity') {
+              const normalizedQty = normalizeQuantity(value);
+              updated.buy = {
+                ...updated.buy,
+                quantity: normalizedQty,
+                amount: Number((normalizedQty * updated.buy.rate).toFixed(2)),
+              };
+              updated.sell = {
+                ...updated.sell,
+                quantity: normalizedQty,
+                amount: Number((normalizedQty * updated.sell.rate).toFixed(2)),
+              };
+            }
+
             // Auto-margin: if buy rate changes, recalculate sell
             if (autoMarginRef.current && parent === 'buy' && child === 'rate') {
               const newSellRate = Number((value * (1 + marginPercentRef.current / 100)).toFixed(2));
@@ -325,6 +384,22 @@ export function useChargesManager({
           } else if (field === 'basis_id') {
             updated.basis_id = value;
             updated.basisName = findRefName(referenceData.chargeBases, value);
+            if (isCargoQuantityBasisId(referenceData, updated.basis_id)) {
+              const normalizedQty = Math.max(
+                normalizeQuantity(updated.buy?.quantity),
+                normalizeQuantity(updated.sell?.quantity)
+              );
+              updated.buy = {
+                ...updated.buy,
+                quantity: normalizedQty,
+                amount: Number((normalizedQty * updated.buy.rate).toFixed(2)),
+              };
+              updated.sell = {
+                ...updated.sell,
+                quantity: normalizedQty,
+                amount: Number((normalizedQty * updated.sell.rate).toFixed(2)),
+              };
+            }
           } else if (field === 'currency_id') {
             updated.currency_id = value;
             updated.currencyCode = referenceData.currencies.find((c) => c.id === value)?.code || '';
@@ -362,6 +437,7 @@ export function useChargesManager({
     setLegs: setInternalLegs,
     chargesByLeg,
     allCharges: charges,
+    unitWarnings,
     addCharge,
     updateCharge,
     removeCharge,

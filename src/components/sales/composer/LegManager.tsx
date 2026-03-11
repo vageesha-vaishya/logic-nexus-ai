@@ -88,7 +88,7 @@ const LegItem = memo(({
                 mode={leg.mode}
                 value={leg.carrier_id}
                 onChange={handleCarrierChange}
-                placeholder="Select carrier..."
+                placeholder={leg.carrier || 'Select carrier...'}
                 className="h-8 text-xs"
               />
             </div>
