@@ -928,6 +928,70 @@ describe('UnifiedQuoteComposer - Save Functionality', () => {
         });
     });
 
+    it('retries draft save after auto-seeding missing charge sides', async () => {
+        const chargeSidesChain = createSafeChain('charge_sides', []);
+        mockScopedDb.from.mockImplementation((table: string) => {
+            if (table === 'charge_sides') return chargeSidesChain;
+            return createSafeChain(table, []);
+        });
+        mockScopedDb.rpc
+            .mockResolvedValueOnce({ data: null, error: { message: 'save_quote_atomic: no sell-side entry found' } })
+            .mockResolvedValueOnce({ data: 'new-quote-id', error: null });
+
+        render(
+            <MemoryRouter>
+                <UnifiedQuoteComposer initialData={{ mode: 'air', origin: 'Miami', destination: 'Santos' }} />
+            </MemoryRouter>
+        );
+
+        const draftBtn = await screen.findByTestId('draft-btn');
+        fireEvent.click(draftBtn);
+
+        await waitFor(() => {
+            expect(mockScopedDb.rpc).toHaveBeenCalledTimes(2);
+            expect(chargeSidesChain.insert).toHaveBeenCalledWith(
+                expect.arrayContaining([
+                    expect.objectContaining({ code: 'buy', tenant_id: 'tenant-123' }),
+                    expect.objectContaining({ code: 'sell', tenant_id: 'tenant-123' }),
+                ])
+            );
+        });
+    });
+
+    it('retries final save after auto-seeding missing charge sides', async () => {
+        const chargeSidesChain = createSafeChain('charge_sides', []);
+        mockScopedDb.from.mockImplementation((table: string) => {
+            if (table === 'charge_sides') return chargeSidesChain;
+            if (table === 'quotes') return createSafeChain('quotes', { quote_number: 'QUO-260309-00001' });
+            return createSafeChain(table, []);
+        });
+        mockScopedDb.rpc
+            .mockResolvedValueOnce({ data: null, error: { message: 'save_quote_atomic: no buy-side entry found' } })
+            .mockResolvedValueOnce({ data: 'new-quote-id', error: null });
+
+        render(
+            <MemoryRouter>
+                <UnifiedQuoteComposer initialData={{ mode: 'ocean', origin: 'Miami', destination: 'Santos' }} />
+            </MemoryRouter>
+        );
+
+        const selectBtn = await screen.findByTestId('select-option-btn');
+        fireEvent.click(selectBtn);
+
+        const saveBtn = await screen.findByTestId('save-quote-btn');
+        fireEvent.click(saveBtn);
+
+        await waitFor(() => {
+            expect(mockScopedDb.rpc).toHaveBeenCalledTimes(2);
+            expect(chargeSidesChain.insert).toHaveBeenCalledWith(
+                expect.arrayContaining([
+                    expect.objectContaining({ code: 'buy', tenant_id: 'tenant-123' }),
+                    expect.objectContaining({ code: 'sell', tenant_id: 'tenant-123' }),
+                ])
+            );
+        });
+    });
+
     it('shows validation summary and blocks save when form has errors', async () => {
         const scrollSpy = vi.fn();
         Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {

@@ -66,6 +66,16 @@ type ValidationIssue = {
 type ComposerSection = 'form' | 'results' | 'finalize';
 
 const HYDRATION_CACHE_WINDOW_MS = 1000 * 60 * 5;
+const CRM_REFERENCE_CACHE_WINDOW_MS = 1000 * 60 * 10;
+const CONFIG_CACHE_WINDOW_MS = 1000 * 60 * 10;
+const crmReferenceCache: {
+  data: { accounts: any[]; contacts: any[]; opportunities: any[]; ports: any[] } | null;
+  cachedAt: number;
+} = {
+  data: null,
+  cachedAt: 0,
+};
+const quotationConfigCache: Record<string, { config: any; cachedAt: number }> = {};
 
 // ---------------------------------------------------------------------------
 // Wrapped export (provides QuoteStoreProvider)
@@ -134,6 +144,11 @@ function UnifiedQuoteComposerContent({
   const [showNetworkWarning, setShowNetworkWarning] = useState(false);
   const [showValidationSummary, setShowValidationSummary] = useState(false);
   const [activeComposerSection, setActiveComposerSection] = useState<ComposerSection>('form');
+  const [hydratedSections, setHydratedSections] = useState<Record<ComposerSection, boolean>>({
+    form: true,
+    results: false,
+    finalize: false,
+  });
 
   // PDF Generation State
   const [showPdfModal, setShowPdfModal] = useState(false);
@@ -147,6 +162,16 @@ function UnifiedQuoteComposerContent({
     if (activeComposerSection === 'finalize') {
       setActiveComposerSection('results');
     }
+  }, [activeComposerSection]);
+
+  useEffect(() => {
+    setHydratedSections((prev) => {
+      if (prev[activeComposerSection]) return prev;
+      return {
+        ...prev,
+        [activeComposerSection]: true,
+      };
+    });
   }, [activeComposerSection]);
   
   // Clear deleted options when new search starts
@@ -180,6 +205,8 @@ function UnifiedQuoteComposerContent({
 
   // Load CRM Data and Ports
   useEffect(() => {
+    let cancelled = false;
+
     // Retry helper with exponential backoff
     const retryFetch = async <T,>(fn: () => Promise<T>, retries = 3, delay = 500): Promise<T> => {
       try {
@@ -193,16 +220,38 @@ function UnifiedQuoteComposerContent({
 
     const loadCrmData = async () => {
       logger.debug('loadCrmData started');
+      const cacheAgeMs = Date.now() - crmReferenceCache.cachedAt;
+      if (crmReferenceCache.data && cacheAgeMs < CRM_REFERENCE_CACHE_WINDOW_MS) {
+        if (cancelled) return;
+        setAccounts(crmReferenceCache.data.accounts);
+        setContacts(crmReferenceCache.data.contacts);
+        setOpportunities(crmReferenceCache.data.opportunities);
+        dispatch({
+          type: 'SET_REFERENCE_DATA',
+          payload: {
+            accounts: crmReferenceCache.data.accounts,
+            contacts: crmReferenceCache.data.contacts,
+            ports: crmReferenceCache.data.ports,
+          }
+        });
+        setIsCrmLoading(false);
+        logger.debug('[UnifiedComposer] CRM reference cache hit', { cacheAgeMs });
+        return;
+      }
+
       setIsCrmLoading(true);
+      const startedAt = performance.now();
       try {
         const portsService = new PortsService(scopedDb);
         logger.debug('Fetching CRM data and ports');
-        
-        // Execute parallel fetch with retry mechanism
-        const [accRes, conRes, oppRes, ports] = await retryFetch(() => Promise.all([
-          scopedDb.from('accounts').select('id, name').order('name'),
+
+        const deferredFetch = retryFetch(() => Promise.all([
           scopedDb.from('contacts').select('id, first_name, last_name, account_id').order('last_name'),
           scopedDb.from('opportunities').select('id, name, account_id, contact_id').order('created_at', { ascending: false }),
+        ]));
+
+        const [accRes, ports] = await retryFetch(() => Promise.all([
+          scopedDb.from('accounts').select('id, name').order('name'),
           portsService.getAllPorts()
         ]));
 
@@ -211,28 +260,66 @@ function UnifiedQuoteComposerContent({
             accountsLength: accRes.data?.length 
         });
 
-        if (accRes.data) setAccounts(accRes.data);
-        if (conRes.data) setContacts(conRes.data);
-        if (oppRes.data) setOpportunities(oppRes.data);
+        const accountsData = accRes.data || [];
+        const portsData = ports || [];
+        if (!cancelled) {
+          setAccounts(accountsData);
+          setIsCrmLoading(false);
+        }
 
         // Populate store reference data
         dispatch({
           type: 'SET_REFERENCE_DATA',
           payload: {
-            accounts: accRes.data || [],
-            contacts: conRes.data || [],
-            ports: ports || []
+            accounts: accountsData,
+            contacts: [],
+            ports: portsData
           }
+        });
+
+        const [conRes, oppRes] = await deferredFetch;
+        const contactsData = conRes.data || [];
+        const opportunitiesData = oppRes.data || [];
+        if (!cancelled) {
+          setContacts(contactsData);
+          setOpportunities(opportunitiesData);
+        }
+        dispatch({
+          type: 'SET_REFERENCE_DATA',
+          payload: {
+            accounts: accountsData,
+            contacts: contactsData,
+            ports: portsData
+          }
+        });
+        crmReferenceCache.data = {
+          accounts: accountsData,
+          contacts: contactsData,
+          opportunities: opportunitiesData,
+          ports: portsData,
+        };
+        crmReferenceCache.cachedAt = Date.now();
+        logger.info('[UnifiedComposer] CRM references loaded', {
+          totalDurationMs: Math.round(performance.now() - startedAt),
+          accountsCount: accountsData.length,
+          contactsCount: contactsData.length,
+          opportunitiesCount: opportunitiesData.length,
+          portsCount: portsData.length,
         });
       } catch (err) {
         logger.error('Failed to load CRM data after retries', { error: err });
         // Optional: Show toast error here
       } finally {
-        setIsCrmLoading(false);
+        if (!cancelled) {
+          setIsCrmLoading(false);
+        }
       }
     };
 
     loadCrmData();
+    return () => {
+      cancelled = true;
+    };
   }, [scopedDb, dispatch]);
    const { profile } = useAuth();
    // Temporary override: Allow all users to override quote numbers during development
@@ -250,9 +337,32 @@ function UnifiedQuoteComposerContent({
 
   // Load configuration
   useEffect(() => {
+    let cancelled = false;
     if (context.tenantId) {
-      new QuotationConfigurationService(supabase).getConfiguration(context.tenantId).then(setConfig);
+      const tenantId = context.tenantId;
+      const cachedConfig = quotationConfigCache[tenantId];
+      const cacheAgeMs = cachedConfig ? (Date.now() - cachedConfig.cachedAt) : Number.POSITIVE_INFINITY;
+      if (cachedConfig && cacheAgeMs < CONFIG_CACHE_WINDOW_MS) {
+        setConfig(cachedConfig.config);
+      } else {
+        const startedAt = performance.now();
+        new QuotationConfigurationService(supabase).getConfiguration(tenantId).then((nextConfig) => {
+          if (cancelled) return;
+          setConfig(nextConfig);
+          quotationConfigCache[tenantId] = {
+            config: nextConfig,
+            cachedAt: Date.now(),
+          };
+          logger.debug('[UnifiedComposer] Loaded quotation config', {
+            tenantId,
+            durationMs: Math.round(performance.now() - startedAt),
+          });
+        });
+      }
     }
+    return () => {
+      cancelled = true;
+    };
   }, [context.tenantId]);
 
   // Container resolver for rate fetching
@@ -629,6 +739,66 @@ function UnifiedQuoteComposerContent({
     return /column\s+"?(name|iso_code)"?\s+does not exist/i.test(message);
   }, []);
 
+  const isMissingChargeSidesError = useCallback((error: any): boolean => {
+    const message = String(error?.message || '');
+    return /save_quote_atomic:\s*no\s+(sell|buy)-side\s+entry\s+found/i.test(message);
+  }, []);
+
+  const ensureChargeSidesForTenant = useCallback(async (tenantId: string): Promise<boolean> => {
+    try {
+      const { data: existingRows, error: fetchError } = await (scopedDb as any)
+        .from('charge_sides')
+        .select('code')
+        .order('created_at');
+      if (fetchError) {
+        logger.warn('[UnifiedComposer] charge_sides probe failed', { tenantId, error: fetchError });
+        return false;
+      }
+
+      const existingCodes = new Set(
+        (Array.isArray(existingRows) ? existingRows : [])
+          .map((row: any) => String(row?.code || '').toLowerCase())
+          .filter(Boolean)
+      );
+
+      const seedRows: Array<Record<string, any>> = [];
+      if (!existingCodes.has('buy') && !existingCodes.has('cost')) {
+        seedRows.push({
+          tenant_id: tenantId,
+          code: 'buy',
+          name: 'Buy',
+          description: 'Auto-created by quotation save fallback',
+        });
+      }
+      if (!existingCodes.has('sell') && !existingCodes.has('revenue')) {
+        seedRows.push({
+          tenant_id: tenantId,
+          code: 'sell',
+          name: 'Sell',
+          description: 'Auto-created by quotation save fallback',
+        });
+      }
+
+      if (seedRows.length === 0) return true;
+
+      const { error: insertError } = await (scopedDb as any)
+        .from('charge_sides')
+        .insert(seedRows);
+      if (insertError) {
+        logger.warn('[UnifiedComposer] charge_sides auto-seed failed', { tenantId, error: insertError });
+        return false;
+      }
+      logger.warn('[UnifiedComposer] charge_sides auto-seeded for tenant save recovery', {
+        tenantId,
+        insertedCodes: seedRows.map((row) => row.code),
+      });
+      return true;
+    } catch (error) {
+      logger.warn('[UnifiedComposer] charge_sides auto-seed threw', { tenantId, error });
+      return false;
+    }
+  }, [scopedDb]);
+
   const displayResults = useMemo(() => {
     if (!combinedResults || combinedResults.length === 0) return [];
     const criteria = config?.auto_ranking_criteria || { cost: 0.4, transit_time: 0.3, reliability: 0.3 };
@@ -803,23 +973,25 @@ function UnifiedQuoteComposerContent({
   }, []);
 
   const extractContainerCombos = useCallback((values: any, extended: any) => {
-    const direct = Array.isArray(values?.containerCombos) ? values.containerCombos : [];
-    if (direct.length > 0) return direct;
-
-    const ext = Array.isArray(extended?.containerCombos) ? extended.containerCombos : [];
-    if (ext.length > 0) return ext;
+    const normalizeCombos = (input: any[]) => input.map((c: any) => ({
+      type: c.type || c.typeId || c.container_type_id || c.container_type || '',
+      size: c.size || c.sizeId || c.container_size_id || c.container_size || '',
+      qty: Number(c.qty ?? c.quantity ?? 1) || 1,
+    }));
 
     const cargoCombos = Array.isArray(values?.cargoItem?.containerCombos)
       ? values.cargoItem.containerCombos
       : (Array.isArray(extended?.cargoItem?.containerCombos) ? extended.cargoItem.containerCombos : []);
 
     if (cargoCombos.length > 0) {
-      return cargoCombos.map((c: any) => ({
-        type: c.type || c.typeId || '',
-        size: c.size || c.sizeId || '',
-        qty: Number(c.qty ?? c.quantity ?? 1) || 1,
-      }));
+      return normalizeCombos(cargoCombos);
     }
+
+    const direct = Array.isArray(values?.containerCombos) ? values.containerCombos : [];
+    if (direct.length > 0) return normalizeCombos(direct);
+
+    const ext = Array.isArray(extended?.containerCombos) ? extended.containerCombos : [];
+    if (ext.length > 0) return normalizeCombos(ext);
 
     return [];
   }, []);
@@ -1272,30 +1444,77 @@ function UnifiedQuoteComposerContent({
 
           logger.info(`[UnifiedComposer] Found ${optionRows.length} options`);
           const optionIds = optionRows.map((o: any) => o.id);
+          const carrierRateIds = optionRows
+            .map((o: any) => o.carrier_rate_id)
+            .filter((id: any) => id && isValidUUID(id));
 
-          // Fetch legs for these options (without joins first)
-          let { data: legRowsRaw, error: legError } = await scopedDb
-            .from('quotation_version_option_legs')
-            .select(`
-                *,
-                origin_loc:origin_location_id(location_name),
-                dest_loc:destination_location_id(location_name)
-            `)
-            .in('quotation_version_option_id', optionIds)
-            .order('sort_order');
-
-          if (legError) {
-            logger.warn('[UnifiedComposer] Joined leg query failed, retrying without relations', legError);
-            const fallbackLegs = await scopedDb
+          const loadLegRows = async () => {
+            let { data: legRowsRaw, error: legError } = await scopedDb
               .from('quotation_version_option_legs')
-              .select('*')
+              .select(`
+                  *,
+                  origin_loc:origin_location_id(location_name),
+                  dest_loc:destination_location_id(location_name)
+              `)
               .in('quotation_version_option_id', optionIds)
               .order('sort_order');
-            legRowsRaw = fallbackLegs.data || [];
-            legError = fallbackLegs.error;
-          }
 
-          let legRows = legRowsRaw || [];
+            if (legError) {
+              logger.warn('[UnifiedComposer] Joined leg query failed, retrying without relations', legError);
+              const fallbackLegs = await scopedDb
+                .from('quotation_version_option_legs')
+                .select('*')
+                .in('quotation_version_option_id', optionIds)
+                .order('sort_order');
+              legRowsRaw = fallbackLegs.data || [];
+              legError = fallbackLegs.error;
+            }
+
+            return { data: legRowsRaw || [], error: legError };
+          };
+
+          const loadChargeRows = async () => {
+            let { data: chargeRowsRaw, error: chargeError } = await scopedDb
+              .from('quote_charges')
+              .select(`
+                *,
+                category:category_id(name, code),
+                basis:basis_id(name, code),
+                currency:currency_id(code),
+                side:charge_side_id(name, code)
+              `)
+              .in('quote_option_id', optionIds);
+
+            if (chargeError) {
+              logger.warn('[UnifiedComposer] Joined charge query failed, retrying without relations', chargeError);
+              const fallbackCharges = await scopedDb
+                .from('quote_charges')
+                .select('*')
+                .in('quote_option_id', optionIds);
+              chargeRowsRaw = fallbackCharges.data || [];
+              chargeError = fallbackCharges.error;
+            }
+
+            return { data: chargeRowsRaw || [], error: chargeError };
+          };
+
+          const [legsResult, chargesResult, ratesResult] = await Promise.all([
+            loadLegRows(),
+            loadChargeRows(),
+            carrierRateIds.length > 0
+              ? scopedDb
+                .from('carrier_rates')
+                .select(`
+                  id,
+                  currency,
+                  carrier_id
+                `)
+                .in('id', carrierRateIds)
+              : Promise.resolve({ data: [], error: null })
+          ]);
+
+          let legRows = legsResult.data || [];
+          const legError = legsResult.error;
           if (legError) {
             logger.error('[UnifiedComposer] Failed to load legs', legError);
             setLoadErrors(prev => [...prev, 'Failed to load option legs']);
@@ -1303,11 +1522,15 @@ function UnifiedQuoteComposerContent({
           }
           logger.info(`[UnifiedComposer] Found ${legRows?.length || 0} legs`);
 
-          // Collect all related IDs for manual hydration
-          const carrierRateIds = optionRows
-            .map((o: any) => o.carrier_rate_id)
-            .filter((id: any) => id && isValidUUID(id));
-          
+          const carrierRatesMap: Record<string, any> = {};
+          if (!ratesResult.error && ratesResult.data) {
+            ratesResult.data.forEach((r: any) => {
+              carrierRatesMap[r.id] = r;
+            });
+          } else if (ratesResult.error) {
+            logger.warn('[UnifiedComposer] Failed to load carrier rates details', ratesResult.error);
+          }
+
           const carrierIds = new Set<string>();
           optionRows.forEach((o: any) => {
              if (o.carrier_id && isValidUUID(o.carrier_id)) carrierIds.add(o.carrier_id);
@@ -1317,28 +1540,9 @@ function UnifiedQuoteComposerContent({
              if (l.carrier_id && isValidUUID(l.carrier_id)) carrierIds.add(l.carrier_id);
              if (l.provider_id && isValidUUID(l.provider_id)) carrierIds.add(l.provider_id);
           });
-
-          // Fetch Carrier Rates
-          const carrierRatesMap: Record<string, any> = {};
-          if (carrierRateIds.length > 0) {
-             const { data: rates, error: ratesError } = await scopedDb
-               .from('carrier_rates')
-               .select(`
-                  id,
-                  currency,
-                  carrier_id
-               `)
-               .in('id', carrierRateIds);
-               
-             if (!ratesError && rates) {
-                rates.forEach((r: any) => {
-                   carrierRatesMap[r.id] = r;
-                   if (r.carrier_id && isValidUUID(r.carrier_id)) carrierIds.add(r.carrier_id);
-                });
-             } else {
-                logger.warn('[UnifiedComposer] Failed to load carrier rates details', ratesError);
-             }
-          }
+          Object.values(carrierRatesMap).forEach((rate: any) => {
+            if (rate?.carrier_id && isValidUUID(rate.carrier_id)) carrierIds.add(rate.carrier_id);
+          });
 
           // Fetch Carriers
           const carriersMap: Record<string, any> = {};
@@ -1357,28 +1561,8 @@ function UnifiedQuoteComposerContent({
              }
           }
 
-          // Fetch charges for these options
-          let { data: chargeRows, error: chargeError } = await scopedDb
-            .from('quote_charges')
-            .select(`
-              *,
-              category:category_id(name, code),
-              basis:basis_id(name, code),
-              currency:currency_id(code),
-              side:charge_side_id(name, code)
-            `)
-            .in('quote_option_id', optionIds);
-            
-          if (chargeError) {
-            logger.warn('[UnifiedComposer] Joined charge query failed, retrying without relations', chargeError);
-            const fallbackCharges = await scopedDb
-              .from('quote_charges')
-              .select('*')
-              .in('quote_option_id', optionIds);
-            chargeRows = fallbackCharges.data || [];
-            chargeError = fallbackCharges.error;
-          }
-
+          let chargeRows = chargesResult.data || [];
+          const chargeError = chargesResult.error;
           if (chargeError) {
             logger.error('[UnifiedComposer] Failed to load charges', chargeError);
             setLoadErrors(prev => [...prev, 'Failed to load option charges']);
@@ -1514,14 +1698,35 @@ function UnifiedQuoteComposerContent({
              });
           };
 
+          const legRowsByOptionId = new Map<string, any[]>();
+          (legRows || []).forEach((leg: any) => {
+            const optionLegs = legRowsByOptionId.get(leg.quotation_version_option_id);
+            if (optionLegs) optionLegs.push(leg);
+            else legRowsByOptionId.set(leg.quotation_version_option_id, [leg]);
+          });
+
+          const chargesByLegId = new Map<string, any[]>();
+          const globalChargesByOptionId = new Map<string, any[]>();
+          (chargeRows || []).forEach((charge: any) => {
+            if (charge.leg_id) {
+              const byLeg = chargesByLegId.get(charge.leg_id);
+              if (byLeg) byLeg.push(charge);
+              else chargesByLegId.set(charge.leg_id, [charge]);
+              return;
+            }
+
+            const optionCharges = globalChargesByOptionId.get(charge.quote_option_id);
+            if (optionCharges) optionCharges.push(charge);
+            else globalChargesByOptionId.set(charge.quote_option_id, [charge]);
+          });
+
           // Reconstruct RateOption objects
           const reconstructedOptions: RateOption[] = optionRows.map((opt: any) => {
             // Filter legs for this option
-            const myLegs = (legRows || [])
-              .filter((l: any) => l.quotation_version_option_id === opt.id)
+            const myLegs = (legRowsByOptionId.get(opt.id) || [])
               .map((l: any) => {
                 // Get charges for this leg
-                const legChargesRaw = (chargeRows || []).filter((c: any) => c.leg_id === l.id);
+                const legChargesRaw = chargesByLegId.get(l.id) || [];
                 const legCharges = groupCharges(legChargesRaw).filter((charge: any) => !isSystemBalancingCharge(charge?.note));
                 
                 // Resolve carrier name
@@ -1536,6 +1741,7 @@ function UnifiedQuoteComposerContent({
                     leg_type: 'transport',
                     carrier: carrierName,
                     carrier_id: l.carrier_id,
+                    provider_id: l.provider_id,
                     origin: l.origin_loc?.location_name || l.origin_location || '',
                     destination: l.dest_loc?.location_name || l.destination_location || '',
                     transit_time: l.transit_time_hours ? `${Math.ceil(l.transit_time_hours / 24)} days` : 'TBD',
@@ -1549,7 +1755,7 @@ function UnifiedQuoteComposerContent({
               });
 
             // Filter global charges (no leg_id)
-            const globalChargesRaw = (chargeRows || []).filter((c: any) => c.quote_option_id === opt.id && !c.leg_id);
+            const globalChargesRaw = globalChargesByOptionId.get(opt.id) || [];
             const globalCharges = groupCharges(globalChargesRaw).filter((charge: any) => !isSystemBalancingCharge(charge?.note));
             
             // Calculate total price from all charges (legs + global)
@@ -2334,6 +2540,23 @@ function UnifiedQuoteComposerContent({
         rpcError = fallback.error;
       }
 
+      if (rpcError && isMissingChargeSidesError(rpcError) && tenantId) {
+        logger.warn('[UnifiedComposer] save fallback: attempting charge_sides auto-seed and retry', {
+          error: rpcError.message,
+          tenantId,
+        });
+        const seeded = await ensureChargeSidesForTenant(tenantId);
+        if (seeded) {
+          const chargeSideRetry = await saveWithRetry(async () => {
+            return scopedDb.rpc('save_quote_atomic', {
+              p_payload: safePayload
+            });
+          });
+          savedId = chargeSideRetry.data;
+          rpcError = chargeSideRetry.error;
+        }
+      }
+
       if (rpcError) {
         logger.error('[UnifiedComposer] save_quote_atomic RPC Error', { error: rpcError });
         throw new Error(rpcError.message || 'Failed to save quotation');
@@ -2511,7 +2734,9 @@ function UnifiedQuoteComposerContent({
     buildCargoSnapshot,
     syncQuoteCargoDetails,
     flattenOptionCharges,
-    isLegacyCargoSchemaError
+    isLegacyCargoSchemaError,
+    isMissingChargeSidesError,
+    ensureChargeSidesForTenant
   ]);
 
   // ---------------------------------------------------------------------------
@@ -2695,6 +2920,23 @@ function UnifiedQuoteComposerContent({
         rpcError = fallback.error;
       }
 
+      if (rpcError && isMissingChargeSidesError(rpcError) && tenantId) {
+        logger.warn('[UnifiedComposer] draft-save fallback: attempting charge_sides auto-seed and retry', {
+          error: rpcError.message,
+          tenantId,
+        });
+        const seeded = await ensureChargeSidesForTenant(tenantId);
+        if (seeded) {
+          const chargeSideRetry = await saveWithRetry(async () => {
+            return scopedDb.rpc('save_quote_atomic', {
+              p_payload: safePayload,
+            });
+          });
+          savedId = chargeSideRetry.data;
+          rpcError = chargeSideRetry.error;
+        }
+      }
+
       if (rpcError) throw new Error(rpcError.message || 'Failed to save draft');
 
       if (savedId) {
@@ -2745,7 +2987,7 @@ function UnifiedQuoteComposerContent({
     } finally {
       setSaving(false);
     }
-  }, [lastFormData, storeState, context, quoteId, user, scopedDb, toast, dispatch, setSearchParams, logAudit, buildCargoSnapshot, syncQuoteCargoDetails, extractContainerCombos, isLegacyCargoSchemaError]);
+  }, [lastFormData, storeState, context, quoteId, user, scopedDb, toast, dispatch, setSearchParams, logAudit, buildCargoSnapshot, syncQuoteCargoDetails, extractContainerCombos, isLegacyCargoSchemaError, isMissingChargeSidesError, ensureChargeSidesForTenant]);
 
   // ---------------------------------------------------------------------------
   // PDF Generation
