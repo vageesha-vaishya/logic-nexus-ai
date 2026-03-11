@@ -28,6 +28,7 @@ export interface SharedCargoInputProps {
 export function SharedCargoInput({ value, onChange, onCommodityChange, onRemove, className, errors, disableMultiContainer }: SharedCargoInputProps) {
   const [showHazmat, setShowHazmat] = useState(!!value.hazmat);
   const [showWizard, setShowWizard] = useState(false);
+  const weightErrorId = React.useId();
   const { containerTypes, containerSizes, formatSize, loading: containerRefsLoading, error: containerRefsError, retry: retryContainerRefs } = useContainerRefs();
 
   // Initialize container combos if in container mode but combos missing
@@ -183,7 +184,8 @@ export function SharedCargoInput({ value, onChange, onCommodityChange, onRemove,
   }
 
   const updateWeight = (val: string) => {
-    const num = parseFloat(val) || 0;
+    const parsed = Number((val || '').replace(/,/g, '').trim());
+    const num = Number.isFinite(parsed) ? parsed : 0;
     onChange({
       ...value,
       weight: { ...value.weight, value: num },
@@ -534,18 +536,28 @@ export function SharedCargoInput({ value, onChange, onCommodityChange, onRemove,
             </div>
 
             {/* Weight */}
-            <div className="space-y-2">
+            <div className="space-y-2" data-field-name="weight" aria-invalid={!!errors?.weight}>
                 <div className="flex items-center gap-2">
                     <Scale className={cn("w-4 h-4", errors?.weight ? "text-destructive" : "text-muted-foreground")} />
                     <Label className={cn("text-xs font-semibold", errors?.weight ? "text-destructive" : "")}>Weight (Per Unit)</Label>
                 </div>
-                <div className="flex items-center gap-2">
+                <div
+                  className={cn(
+                    "flex items-center gap-2 rounded-md border border-transparent px-2 py-1 transition-all duration-200 ease-out",
+                    errors?.weight && "border-destructive/60 bg-destructive/5 ring-1 ring-destructive/40"
+                  )}
+                >
                      <Input 
+                        data-testid="cargo-weight"
+                        id="weight-input"
+                        name="weight"
                         placeholder="Weight" 
                         value={value.weight.value || ''} 
                         onChange={(e) => updateWeight(e.target.value)}
-                        className={cn("h-8 text-sm", errors?.weight && "border-destructive focus-visible:ring-destructive")}
+                        className={cn("h-8 text-sm transition-colors duration-200", errors?.weight && "border-destructive bg-destructive/5 focus-visible:ring-destructive")}
                         aria-invalid={!!errors?.weight}
+                        aria-describedby={errors?.weight ? weightErrorId : undefined}
+                        aria-errormessage={errors?.weight ? weightErrorId : undefined}
                     />
                     <Select 
                         value={value.weight.unit} 
@@ -560,7 +572,11 @@ export function SharedCargoInput({ value, onChange, onCommodityChange, onRemove,
                         </SelectContent>
                     </Select>
                 </div>
-                {errors?.weight && <p className="text-[10px] text-destructive mt-0.5">{errors.weight.message || "Required"}</p>}
+                {errors?.weight && (
+                  <p id={weightErrorId} role="alert" aria-live="polite" className="text-[10px] text-destructive mt-0.5">
+                    {errors.weight.message || "Required"}
+                  </p>
+                )}
             </div>
         </div>
 

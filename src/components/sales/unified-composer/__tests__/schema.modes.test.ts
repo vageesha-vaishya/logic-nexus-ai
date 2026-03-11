@@ -7,7 +7,9 @@ describe('quoteComposerSchema modes', () => {
       standalone: true,
       mode: 'ocean',
       origin: 'Shanghai',
+      originId: 'origin-1',
       destination: 'Los Angeles',
+      destinationId: 'dest-1',
     });
     expect(result.success).toBe(false);
   });
@@ -17,7 +19,9 @@ describe('quoteComposerSchema modes', () => {
       standalone: true,
       mode: 'ocean',
       origin: 'Shanghai',
+      originId: 'origin-1',
       destination: 'Los Angeles',
+      destinationId: 'dest-1',
       commodity: 'Electronics',
       // Container details for ocean
       containerType: 'Dry',
@@ -40,7 +44,9 @@ describe('quoteComposerSchema modes', () => {
       standalone: true,
       mode: 'ocean',
       origin: 'Shanghai',
+      originId: 'origin-1',
       destination: 'Los Angeles',
+      destinationId: 'dest-1',
       commodity: 'Electronics',
       containerType: 'Dry',
       containerSize: '40ft',
@@ -62,7 +68,9 @@ describe('quoteComposerSchema modes', () => {
       standalone: false,
       mode: 'ocean',
       origin: 'Shanghai',
+      originId: 'origin-1',
       destination: 'Los Angeles',
+      destinationId: 'dest-1',
       commodity: 'Electronics',
       containerType: 'Dry',
       containerSize: '40ft',
@@ -76,7 +84,9 @@ describe('quoteComposerSchema modes', () => {
       standalone: false,
       mode: 'ocean',
       origin: 'Shanghai',
+      originId: 'origin-1',
       destination: 'Los Angeles',
+      destinationId: 'dest-1',
       commodity: 'Electronics',
       containerType: 'Dry',
       containerSize: '40ft',
@@ -91,7 +101,9 @@ describe('quoteComposerSchema modes', () => {
       standalone: false,
       mode: 'ocean',
       origin: 'Shanghai',
+      originId: 'origin-1',
       destination: 'Los Angeles',
+      destinationId: 'dest-1',
       commodity: 'Electronics',
       containerType: 'Dry',
       containerSize: '40ft',
@@ -99,5 +111,41 @@ describe('quoteComposerSchema modes', () => {
       accountId: 'acc-1',
     });
     expect(result.success).toBe(true);
+  });
+
+  it('accepts air mode with comma-formatted weight', () => {
+    const result = quoteComposerSchema.safeParse({
+      standalone: false,
+      mode: 'air',
+      origin: 'Shanghai',
+      originId: 'origin-1',
+      destination: 'Los Angeles',
+      destinationId: 'dest-1',
+      commodity: 'Electronics',
+      weight: '1,250.5',
+      accountId: 'acc-1',
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects air mode when weight is zero', () => {
+    const result = quoteComposerSchema.safeParse({
+      standalone: false,
+      mode: 'air',
+      origin: 'Shanghai',
+      originId: 'origin-1',
+      destination: 'Los Angeles',
+      destinationId: 'dest-1',
+      commodity: 'Electronics',
+      weight: '0',
+      accountId: 'acc-1',
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const issues = result.error.issues.map((issue) => issue.message);
+      expect(issues).toContain('Air freight requires a valid weight greater than 0');
+    }
   });
 });

@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCRM } from '@/hooks/useCRM';
+import { useAuth } from '@/hooks/useAuth';
 import { Quote } from './quotes-data';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { FirstScreenTemplate } from '@/components/system/FirstScreenTemplate';
@@ -22,6 +23,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useUrlFilters } from '@/hooks/useUrlFilters';
 import Papa from 'papaparse';
 import { AdvancedSearchFilter, FilterCriterion } from '@/components/sales/AdvancedSearchFilter';
+import { FEATURE_FLAGS, useAppFeatureFlag } from '@/lib/feature-flags';
 
 interface QuoteWithRelations extends Quote {
   accounts?: { id: string; name: string };
@@ -71,11 +73,15 @@ const isRetryableError = (error: unknown): boolean => {
 export default function Quotes() {
   const navigate = useNavigate();
   const { scopedDb, supabase } = useCRM();
+  const { hasPermission } = useAuth();
+  const { enabled: quoteImportExportEnabled } = useAppFeatureFlag(FEATURE_FLAGS.QUOTATION_IMPORT_EXPORT_V2, true);
+  const canUseQuoteImportExport = quoteImportExportEnabled && (hasPermission('quotes.import_export') || hasPermission('import_quotation') || hasPermission('export_quotation'));
   const [quotes, setQuotes] = useState<QuoteWithRelations[]>([]);
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
   const [error, setError] = useState<Error | null>(null);
+  const [selectedQuoteIds, setSelectedQuoteIds] = useState<string[]>([]);
 
   // Advanced Filters State
   const [activeFilters, setActiveFilters] = useState<FilterCriterion[]>([]);
@@ -701,8 +707,45 @@ export default function Quotes() {
                   }))
                 }
               ]}
+              selection={{
+                selectedIds: selectedQuoteIds,
+                onSelectionChange: setSelectedQuoteIds,
+                rowId: (row) => String(row.id),
+              }}
               actions={
                 <div className="flex items-center gap-1 border rounded-md p-0.5 bg-muted/50">
+                  {canUseQuoteImportExport && (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2"
+                        onClick={() => navigate(`/dashboard/quotes/import-export?scope=selected&ids=${encodeURIComponent(selectedQuoteIds.join(','))}`)}
+                        title="Export Selected"
+                        disabled={selectedQuoteIds.length === 0}
+                      >
+                        Export Selected ({selectedQuoteIds.length})
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2"
+                        onClick={() => navigate('/dashboard/quotes/import-export?scope=filtered')}
+                        title="Export All Filtered"
+                      >
+                        Export All Filtered
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2"
+                        onClick={() => navigate('/dashboard/quotes/import-export?mode=import')}
+                        title="Import Quotations"
+                      >
+                        Import Quotations
+                      </Button>
+                    </>
+                  )}
                   <Button
                     variant="ghost"
                     size="icon"

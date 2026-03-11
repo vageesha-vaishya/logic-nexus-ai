@@ -34,6 +34,10 @@ export function sendErrorResponse(res: ApiResponse, error: unknown, correlationI
     res.status(403).json({ error: message, correlationId });
     return;
   }
+  if (message === 'CSRF validation failed') {
+    res.status(403).json({ error: message, correlationId });
+    return;
+  }
   if (message.startsWith('Invalid')) {
     const code = message.includes('typeId') ? 'INVALID_TYPE_ID' : 'INVALID_REQUEST';
     res.status(400).json({ error: message, code, correlationId });

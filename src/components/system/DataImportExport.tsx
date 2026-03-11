@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import { Download, Upload, FileText, AlertCircle, CheckCircle2, Pause, Play, XCircle, ChevronLeft, ChevronRight, Eye } from 'lucide-react';
@@ -37,7 +37,7 @@ export interface ImportResult {
 
 export type FileFormat = 'csv' | 'xlsx' | 'json';
 export type DuplicateMode = 'skip' | 'update' | 'allow';
-export type DuplicateCriteria = 'email' | 'phone' | 'email_or_phone' | 'email_and_phone' | 'name' | 'website' | 'custom';
+export type DuplicateCriteria = 'email' | 'phone' | 'email_or_phone' | 'email_and_phone' | 'name' | 'website' | 'quote_number' | 'custom';
 export type CsvDelimiter = 'auto' | 'comma' | 'tab' | 'pipe';
 export type ImportErrorMode = 'skip' | 'stop';
 
@@ -76,6 +76,11 @@ interface DataImportExportProps {
   onExportFilterApply?: (query: any, filters: any) => any;
   // Function to process data before export (e.g. resolve FKs)
   onPrepareExportData?: (data: any[]) => Promise<any[]>;
+  onPrepareImportBatch?: (batch: any[]) => Promise<any[]>;
+  duplicateCriteriaOptions?: Array<{ value: DuplicateCriteria; label: string }>;
+  defaultDuplicateCriteria?: DuplicateCriteria;
+  initialTemplateName?: string;
+  autoRunExportFormat?: 'csv' | 'xlsx' | 'json';
   // Navigation
   listPath: string; // e.g., "/dashboard/leads"
   enableAutoCorrection?: boolean;
@@ -133,7 +138,7 @@ const parseJsonPayloadToRows = (parsed: unknown): ParsedRow[] => {
   if (Array.isArray(parsed)) {
     candidates = parsed;
   } else if (isRecord(parsed)) {
-    const maybe = (parsed as any).leads ?? (parsed as any).data ?? (parsed as any).rows ?? (parsed as any).items;
+    const maybe = (parsed as any).leads ?? (parsed as any).quotes ?? (parsed as any).quotations ?? (parsed as any).data ?? (parsed as any).rows ?? (parsed as any).items;
     if (Array.isArray(maybe)) candidates = maybe;
   }
   return candidates.filter(isRecord) as ParsedRow[];
@@ -157,7 +162,12 @@ const validateFileContent = async (file: File, fmt: FileFormat) => {
 const getFileFormat = (file: File): FileFormat | null => {
   const name = file.name.toLowerCase();
   if (name.endsWith('.csv') || file.type === 'text/csv') return 'csv';
-  if (name.endsWith('.xlsx') || file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') return 'xlsx';
+  if (
+    name.endsWith('.xlsx') ||
+    name.endsWith('.xlsm') ||
+    file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+    file.type === 'application/vnd.ms-excel.sheet.macroEnabled.12'
+  ) return 'xlsx';
   if (name.endsWith('.json') || file.type === 'application/json') return 'json';
   return null;
 };
@@ -184,9 +194,12 @@ export default function DataImportExport({
   onExportFilterApply,
   onPrepareExportData,
   onPrepareImportBatch,
+  duplicateCriteriaOptions,
+  defaultDuplicateCriteria = 'email_or_phone',
+  initialTemplateName,
+  autoRunExportFormat,
 }: DataImportExportProps) {
   const navigate = useNavigate();
-  const location = useLocation();
   const { supabase, context, scopedDb } = useCRM();
   const db = scopedDb;
   const MAX_IMPORT_FILE_BYTES = DEFAULT_MAX_IMPORT_FILE_BYTES;
@@ -206,7 +219,7 @@ export default function DataImportExport({
   const [fieldMapping, setFieldMapping] = useState<Record<string, string>>({});
   const [includeUnmappedAsCustom, setIncludeUnmappedAsCustom] = useState(true);
   const [duplicateMode, setDuplicateMode] = useState<DuplicateMode>('skip');
-  const [duplicateCriteria, setDuplicateCriteria] = useState<DuplicateCriteria>('email_or_phone');
+  const [duplicateCriteria, setDuplicateCriteria] = useState<DuplicateCriteria>(defaultDuplicateCriteria);
   const [csvDelimiter, setCsvDelimiter] = useState<CsvDelimiter>('auto');
   const [importErrorMode, setImportErrorMode] = useState<ImportErrorMode>('skip');
   const [importBatchSize, setImportBatchSize] = useState<number>(IMPORT_BATCH_SIZE);
@@ -278,12 +291,22 @@ export default function DataImportExport({
   const [selectedTemplateName, setSelectedTemplateName] = useState<string>(defaultExportTemplate.name);
   const [currentExportFields, setCurrentExportFields] = useState<string[]>(defaultExportTemplate.fields);
   const [exportIncludeCustomFields, setExportIncludeCustomFields] = useState(defaultExportTemplate.includeCustomFields);
+  const autoExportTriggeredRef = useRef(false);
 
   const exportTemplatesStorageKey = useMemo(() => {
     const t = context.tenantId || 'global';
     const f = context.franchiseId || 'global';
     return `${entityName.toLowerCase()}.exportTemplates.${t}.${f}`;
   }, [context.tenantId, context.franchiseId, entityName]);
+
+  useEffect(() => {
+    if (!initialTemplateName) return;
+    const matched = exportTemplates.find((t) => t.name === initialTemplateName);
+    if (!matched) return;
+    setSelectedTemplateName(matched.name);
+    setCurrentExportFields(matched.fields);
+    setExportIncludeCustomFields(!!matched.includeCustomFields);
+  }, [initialTemplateName, exportTemplates]);
 
   // --- Handlers ---
 
@@ -296,7 +319,7 @@ export default function DataImportExport({
   const onNewFile = async (file: File) => {
     const fmt = getFileFormat(file);
     if (!fmt) {
-      toast.error('Please select a valid CSV, Excel (.xlsx), or JSON file');
+      toast.error('Please select a valid CSV, Excel (.xlsx/.xlsm), or JSON file');
       return;
     }
     if (file.size > MAX_IMPORT_FILE_BYTES) {
@@ -533,6 +556,7 @@ export default function DataImportExport({
           tenant_id: effectiveTenantId,
           franchise_id: effectiveFranchiseId,
         }));
+        const preparedRecords = onPrepareImportBatch ? await onPrepareImportBatch(records) : records;
 
         const importDetails: ImportDetail[] = [];
         const recordsToInsert: any[] = [];
@@ -540,31 +564,58 @@ export default function DataImportExport({
 
         // Duplicate Check
         if (duplicateMode === 'allow') {
-            recordsToInsert.push(...records);
+            recordsToInsert.push(...preparedRecords);
         } else {
-            // Fetch existing
-            const emails = records.map(r => r.email).filter(Boolean);
-            const phones = records.map(r => r.phone).filter(Boolean);
-            
             let existingRecords: any[] = [];
-            if (emails.length > 0 || phones.length > 0) {
-                const orParts = [];
-                // Format array for Supabase .in() filter: "val1","val2"
-                if (emails.length) orParts.push(`email.in.(${JSON.stringify(emails).slice(1,-1)})`);
-                if (phones.length) orParts.push(`phone.in.(${JSON.stringify(phones).slice(1,-1)})`);
-                
-                if (orParts.length) {
-                   const { data } = await importDb.from(tableName as any).select('*').or(orParts.join(','));
-                   if (data) existingRecords = data;
+            const criteriaFieldMap: Record<Exclude<DuplicateCriteria, 'custom'>, string[]> = {
+              email: ['email'],
+              phone: ['phone'],
+              email_or_phone: ['email', 'phone'],
+              email_and_phone: ['email', 'phone'],
+              name: ['name', 'title'],
+              website: ['website'],
+              quote_number: ['quote_number'],
+            };
+            const criteriaFields = duplicateCriteria === 'custom' ? [] : criteriaFieldMap[duplicateCriteria];
+            if (criteriaFields.length > 0) {
+              const existingById = new Map<string, any>();
+              for (const field of criteriaFields) {
+                const values = Array.from(new Set(preparedRecords.map((r) => safeString(r[field]).trim()).filter(Boolean)));
+                for (let i = 0; i < values.length; i += DUPLICATE_QUERY_BATCH_SIZE) {
+                  const chunk = values.slice(i, i + DUPLICATE_QUERY_BATCH_SIZE);
+                  if (!chunk.length) continue;
+                  const { data, error } = await importDb.from(tableName as any).select('*').in(field, chunk as any);
+                  if (error) {
+                    result.errors.push(`Duplicate lookup failed for ${field}: ${error.message}`);
+                    continue;
+                  }
+                  (data || []).forEach((row: any) => {
+                    if (row?.id) existingById.set(String(row.id), row);
+                  });
                 }
+              }
+              existingRecords = Array.from(existingById.values());
             }
             
             // Match records
-            for (const record of records) {
-                const match = existingRecords.find(e => 
-                   (record.email && e.email === record.email) || 
-                   (record.phone && e.phone === record.phone)
-                );
+            for (const record of preparedRecords) {
+                const match = existingRecords.find((existing) => {
+                  if (duplicateCriteria === 'custom') return false;
+                  if (duplicateCriteria === 'email_and_phone') {
+                    return Boolean(
+                      safeString(record.email).trim() &&
+                      safeString(record.phone).trim() &&
+                      safeString(existing.email).trim() === safeString(record.email).trim() &&
+                      safeString(existing.phone).trim() === safeString(record.phone).trim()
+                    );
+                  }
+                  const fieldsToMatch = criteriaFieldMap[duplicateCriteria];
+                  return fieldsToMatch.some((field) => {
+                    const sourceValue = safeString(record[field]).trim();
+                    if (!sourceValue) return false;
+                    return safeString(existing[field]).trim() === sourceValue;
+                  });
+                });
                 
                 if (match) {
                     if (duplicateMode === 'skip') {
@@ -648,9 +699,10 @@ export default function DataImportExport({
         result.failed += batch.length;
         result.errors.push(`Batch exception: ${e.message}`);
       } finally {
+        const processedRows = batch.length;
         batch.length = 0; // Clear batch
         batchErrors.length = 0;
-        setImportProcessedRows(prev => prev + batch.length);
+        setImportProcessedRows(prev => prev + processedRows);
         
         // Calculate ETA
         if (importStartedAtRef.current && result.success + result.failed > 0) {
@@ -928,17 +980,13 @@ export default function DataImportExport({
     }
   };
 
-  const handleExport = async (format: 'xlsx' | 'csv') => {
+  const handleExport = useCallback(async (format: 'xlsx' | 'csv' | 'json') => {
     setExportStage('counting');
     try {
-      const query = db.from(tableName as any).select('*');
-      
-      // ScopedDataAccess automatically applies context filters
-      
-      // Apply custom filters from props
+      let query: any = db.from(tableName as any).select('*');
+      const selectedTemplate = exportTemplates.find((t) => t.name === selectedTemplateName) || defaultExportTemplate;
       if (onExportFilterApply) {
-         // This needs the query builder to be passed out, or we assume a certain structure
-         // For now, let's just fetch all and filter in memory if needed, or rely on simple select
+         query = onExportFilterApply(query, selectedTemplate?.filters || {}) || query;
       }
 
       setExportStage('fetching');
@@ -978,7 +1026,24 @@ export default function DataImportExport({
       
       setExportStage('downloading');
       
-      if (format === 'csv') {
+      if (format === 'json') {
+        const jsonPayload = JSON.stringify({
+          schemaVersion: '2.0',
+          entity: entityName,
+          exportedAt: new Date().toISOString(),
+          rowCount: exportData.length,
+          rows: exportData,
+        });
+        const blob = new Blob([jsonPayload], { type: 'application/json;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${entityName}_Export_${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+      } else if (format === 'csv') {
         XLSX.writeFile(wb, `${entityName}_Export_${new Date().toISOString().split('T')[0]}.csv`);
       } else {
         XLSX.writeFile(wb, `${entityName}_Export_${new Date().toISOString().split('T')[0]}.xlsx`);
@@ -994,7 +1059,27 @@ export default function DataImportExport({
     } finally {
       setExportStage('idle');
     }
-  };
+  }, [
+    db,
+    tableName,
+    exportTemplates,
+    selectedTemplateName,
+    defaultExportTemplate,
+    onExportFilterApply,
+    onPrepareExportData,
+    currentExportFields,
+    exportFields,
+    exportIncludeCustomFields,
+    entityName,
+    context.userId,
+  ]);
+
+  useEffect(() => {
+    if (!autoRunExportFormat || autoExportTriggeredRef.current) return;
+    if (exportStage !== 'idle') return;
+    autoExportTriggeredRef.current = true;
+    void handleExport(autoRunExportFormat);
+  }, [autoRunExportFormat, exportStage, handleExport]);
 
   // --- History Logic ---
 
@@ -1271,7 +1356,7 @@ export default function DataImportExport({
               {importStep === 3 && (
                 <div className="space-y-6">
                    <div className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                         <div className="space-y-2">
                           <Label>Duplicate Handling</Label>
                           <Select value={duplicateMode} onValueChange={(v: any) => setDuplicateMode(v)}>
@@ -1282,6 +1367,26 @@ export default function DataImportExport({
                               <SelectItem value="skip">Skip duplicates</SelectItem>
                               <SelectItem value="update">Update existing</SelectItem>
                               <SelectItem value="allow">Allow duplicates</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Duplicate Match Field</Label>
+                          <Select value={duplicateCriteria} onValueChange={(v: DuplicateCriteria) => setDuplicateCriteria(v)}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {(duplicateCriteriaOptions || [
+                                { value: 'email_or_phone', label: 'Email or Phone' },
+                                { value: 'email_and_phone', label: 'Email and Phone' },
+                                { value: 'email', label: 'Email' },
+                                { value: 'phone', label: 'Phone' },
+                                { value: 'name', label: 'Name' },
+                                { value: 'website', label: 'Website' },
+                                { value: 'quote_number', label: 'Quote Number' },
+                                { value: 'custom', label: 'None (Allow all)' },
+                              ]).map((opt) => (
+                                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                              ))}
                             </SelectContent>
                           </Select>
                         </div>
@@ -1433,7 +1538,7 @@ export default function DataImportExport({
                 <Download className="h-5 w-5" /> Export {entityName}
               </CardTitle>
               <CardDescription>
-                Download your data in CSV, Excel, or PDF format.
+                Download your data in CSV, Excel, or JSON format.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -1487,6 +1592,10 @@ export default function DataImportExport({
                  <Button variant="outline" className="flex-1" onClick={() => handleExport('csv')} disabled={exportStage !== 'idle'}>
                    <FileText className="h-4 w-4 mr-2" /> 
                    {exportStage !== 'idle' ? 'Exporting...' : 'Export to CSV'}
+                 </Button>
+                 <Button variant="outline" className="flex-1" onClick={() => handleExport('json')} disabled={exportStage !== 'idle'}>
+                   <FileText className="h-4 w-4 mr-2" /> 
+                   {exportStage !== 'idle' ? 'Exporting...' : 'Export to JSON'}
                  </Button>
                </div>
             </CardContent>

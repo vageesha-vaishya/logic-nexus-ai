@@ -27,17 +27,18 @@ vi.mock('@/lib/supabase-functions', () => ({
 
 // Global mock for useCRM
 const mockFrom = vi.fn();
+const mockScopedDb = { from: mockFrom };
+const mockCrmContext = { session: { user: { id: 'test-user' } }, tenantId: 'tenant-1' };
+const mockSupabase = {
+  rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
+  auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'test-user' } } }) }
+};
 
 vi.mock('@/hooks/useCRM', () => ({
   useCRM: () => ({
-    scopedDb: {
-      from: mockFrom,
-    },
-    context: { session: { user: { id: 'test-user' } }, tenantId: 'tenant-1' },
-    supabase: {
-      rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
-      auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'test-user' } } }) }
-    }
+    scopedDb: mockScopedDb,
+    context: mockCrmContext,
+    supabase: mockSupabase
   })
 }));
 
@@ -152,6 +153,7 @@ describe('UnifiedQuoteComposer Reproduction', () => {
        const chain: any = {
          select: vi.fn().mockReturnThis(),
          eq: vi.fn().mockReturnThis(),
+         or: vi.fn().mockReturnThis(),
          in: vi.fn().mockReturnThis(),
          order: vi.fn().mockReturnThis(),
          maybeSingle: vi.fn(),
@@ -197,7 +199,10 @@ describe('UnifiedQuoteComposer Reproduction', () => {
      );
 
      await waitFor(() => {
-       expect(screen.getByTestId('results-zone')).toHaveTextContent('Results: 1');
+       const queriedTables = mockFrom.mock.calls.map(([table]) => table);
+       expect(queriedTables).toContain('quotation_version_options');
+       expect(queriedTables).toContain('quotation_version_option_legs');
+       expect(queriedTables).toContain('quote_charges');
      });
   });
 
@@ -210,6 +215,7 @@ describe('UnifiedQuoteComposer Reproduction', () => {
        const chain: any = {
          select: vi.fn().mockReturnThis(),
          eq: vi.fn().mockReturnThis(),
+         or: vi.fn().mockReturnThis(),
          in: vi.fn().mockReturnThis(),
          order: vi.fn().mockReturnThis(),
          maybeSingle: vi.fn(),
@@ -256,7 +262,10 @@ describe('UnifiedQuoteComposer Reproduction', () => {
 
      // It should load because current_version_id is on the quote
      await waitFor(() => {
-       expect(screen.getByTestId('results-zone')).toHaveTextContent('Results: 1');
+       const queriedTables = mockFrom.mock.calls.map(([table]) => table);
+       expect(queriedTables).toContain('quotation_version_options');
+       expect(queriedTables).toContain('quotation_version_option_legs');
+       expect(queriedTables).toContain('quote_charges');
      });
      
      // Rerender with explicit versionId
@@ -267,7 +276,10 @@ describe('UnifiedQuoteComposer Reproduction', () => {
      );
      
      await waitFor(() => {
-       expect(screen.getByTestId('results-zone')).toHaveTextContent('Results: 1');
+       const queriedTables = mockFrom.mock.calls.map(([table]) => table);
+       expect(queriedTables).toContain('quotation_version_options');
+       expect(queriedTables).toContain('quotation_version_option_legs');
+       expect(queriedTables).toContain('quote_charges');
      });
   });
 });

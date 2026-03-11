@@ -21,6 +21,51 @@ const supabase = createClient(
 );
 
 const versionService = new QuotationVersionService(supabase);
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+async function resolveQuoteId(quoteRef: string, tenantId: string): Promise<string | null> {
+  const normalizedQuoteRef = String(quoteRef || '').trim();
+  if (!normalizedQuoteRef) return null;
+
+  const quoteRefIsUuid = UUID_REGEX.test(normalizedQuoteRef);
+  let primaryQuery = supabase
+    .from('quotes')
+    .select('id')
+    .eq('tenant_id', tenantId);
+
+  if (quoteRefIsUuid) {
+    primaryQuery = primaryQuery.or(`id.eq.${normalizedQuoteRef},quote_number.eq.${normalizedQuoteRef}`);
+  } else {
+    primaryQuery = primaryQuery.eq('quote_number', normalizedQuoteRef);
+  }
+
+  const primaryResult = await primaryQuery
+    .limit(1)
+    .maybeSingle();
+
+  if (primaryResult.error) {
+    throw new Error(primaryResult.error.message);
+  }
+
+  let resolvedQuote = primaryResult.data as { id?: string } | null;
+
+  if (!resolvedQuote && !quoteRefIsUuid) {
+    const fallbackResult = await supabase
+      .from('quotes')
+      .select('id')
+      .eq('tenant_id', tenantId)
+      .eq('id', normalizedQuoteRef)
+      .limit(1)
+      .maybeSingle();
+
+    if (fallbackResult.error) {
+      throw new Error(fallbackResult.error.message);
+    }
+    resolvedQuote = fallbackResult.data as { id?: string } | null;
+  }
+
+  return resolvedQuote?.id ? String(resolvedQuote.id) : null;
+}
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {
   const rawId = req.query['id'];
@@ -36,6 +81,11 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
   const userId = (req.headers['x-user-id'] as string) || 'system';
 
   try {
+    const resolvedQuoteId = await resolveQuoteId(quoteIdStr, tenantId);
+    if (!resolvedQuoteId) {
+      return res.status(404).json({ error: 'Quote not found' });
+    }
+
     switch (req.method) {
       case 'GET': {
         // List versions
@@ -53,7 +103,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
             : Array.isArray(limitRaw)
             ? parseInt(String(limitRaw[0]))
             : 10;
-        const result = await versionService.listVersions(quoteIdStr, page, limit);
+        const result = await versionService.listVersions(resolvedQuoteId, page, limit);
         return res.status(200).json(result);
       }
 
@@ -67,7 +117,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         
         const kind = type === 'major' || type === 'minor' || type === 'draft' ? type : 'minor';
         const newVersion = await versionService.saveVersion(
-          quoteIdStr,
+          resolvedQuoteId,
           tenantId,
           data as Record<string, unknown>,
           kind,

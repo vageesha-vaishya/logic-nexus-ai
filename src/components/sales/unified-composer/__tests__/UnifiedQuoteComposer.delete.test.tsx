@@ -6,7 +6,7 @@ import { QuotationOptionCrudService } from '@/services/quotation/QuotationOption
 import { useToast } from '@/hooks/use-toast';
 
 // Mock useCRM
-const { mockScopedDb } = vi.hoisted(() => {
+const { mockScopedDb, mockCrmContext, mockSupabase } = vi.hoisted(() => {
   const createChain = (data: any = [], error: any = null) => {
     const chain: any = {
       then: (resolve: any) => {
@@ -16,9 +16,11 @@ const { mockScopedDb } = vi.hoisted(() => {
     };
     chain.select = vi.fn(() => chain);
     chain.eq = vi.fn(() => chain);
+    chain.or = vi.fn(() => chain);
     chain.in = vi.fn(() => chain);
     chain.order = vi.fn(() => chain);
     chain.limit = vi.fn(() => chain);
+    chain.abortSignal = vi.fn(() => chain);
     chain.single = vi.fn(() => chain);
     chain.maybeSingle = vi.fn(() => chain);
     chain.insert = vi.fn(() => chain);
@@ -30,15 +32,17 @@ const { mockScopedDb } = vi.hoisted(() => {
   return {
     mockScopedDb: {
       from: vi.fn((..._args: any[]) => createChain([])) as any,
-    }
+    },
+    mockCrmContext: { tenantId: 'test-tenant' },
+    mockSupabase: {},
   };
 });
 
 vi.mock('@/hooks/useCRM', () => ({
   useCRM: () => ({
     scopedDb: mockScopedDb,
-    context: { tenantId: 'test-tenant' },
-    supabase: {},
+    context: mockCrmContext,
+    supabase: mockSupabase,
   }),
 }));
 
@@ -95,9 +99,8 @@ vi.mock('@/hooks/use-toast', () => ({
   useToast: () => ({ toast: mockToast }),
 }));
 
-vi.mock('@/components/sales/composer/store/QuoteStore', () => ({
-  QuoteStoreProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  useQuoteStore: () => ({
+const { quoteStoreMock } = vi.hoisted(() => ({
+  quoteStoreMock: {
     state: {
       quoteId: 'test-quote',
       versionId: 'test-version',
@@ -108,7 +111,12 @@ vi.mock('@/components/sales/composer/store/QuoteStore', () => ({
       charges: [],
     },
     dispatch: vi.fn(),
-  }),
+  },
+}));
+
+vi.mock('@/components/sales/composer/store/QuoteStore', () => ({
+  QuoteStoreProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  useQuoteStore: () => quoteStoreMock,
 }));
 
 vi.mock('@/components/sales/quote-form/useQuoteRepository', () => ({
@@ -139,6 +147,19 @@ vi.mock('@/components/sales/unified-composer/FormZone', () => ({
 
 vi.mock('@/components/sales/unified-composer/FinalizeSection', () => ({
   FinalizeSection: () => <div data-testid="finalize-section">FinalizeSection</div>,
+}));
+
+vi.mock('@/components/ui/tabs', () => ({
+  Tabs: ({ children }: any) => <div data-testid="tabs-root">{children}</div>,
+  TabsList: ({ children }: any) => <div role="tablist">{children}</div>,
+  TabsTrigger: ({ children, ...props }: any) => (
+    <button role="tab" {...props}>
+      {children}
+    </button>
+  ),
+  TabsContent: ({ children, value }: any) => (
+    <div data-testid={`tab-content-${value}`}>{children}</div>
+  ),
 }));
 
 // Crucial: Mock ResultsZone to expose onRemoveOption
@@ -248,8 +269,10 @@ vi.mock('@/components/sales/unified-composer/ResultsZone', () => ({
          const chain = {
              select: () => chain,
              eq: () => chain,
+            or: () => chain,
              in: () => chain,
              order: () => chain,
+            limit: () => chain,
              maybeSingle: () => Promise.resolve({ data: null, error: null }),
              then: (resolve: any) => resolve({ data: [], error: null }) // simplified promise
          };
@@ -340,7 +363,7 @@ vi.mock('@/components/sales/unified-composer/ResultsZone', () => ({
     
     render(
       <MemoryRouter>
-        <UnifiedQuoteComposer quoteId="test-quote" versionId="test-version" />
+        <UnifiedQuoteComposer />
       </MemoryRouter>
     );
 
@@ -374,7 +397,7 @@ vi.mock('@/components/sales/unified-composer/ResultsZone', () => ({
 
     render(
       <MemoryRouter>
-        <UnifiedQuoteComposer quoteId="test-quote" versionId="test-version" />
+        <UnifiedQuoteComposer />
       </MemoryRouter>
     );
     

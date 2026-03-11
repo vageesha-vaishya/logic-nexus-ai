@@ -1,11 +1,12 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { UnifiedQuoteComposer } from '../UnifiedQuoteComposer';
 
 // Mock useCRM
-const { mockScopedDb } = vi.hoisted(() => {
+const { mockScopedDb, quoteStoreMock, rateFetchingMock, quoteRepositoryMock } = vi.hoisted(() => {
   return {
     mockScopedDb: {
       from: vi.fn().mockReturnThis(),
@@ -14,7 +15,48 @@ const { mockScopedDb } = vi.hoisted(() => {
       eq: vi.fn().mockReturnThis(),
       in: vi.fn().mockReturnThis(),
       maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-      then: vi.fn(), // for promise chaining
+      then: vi.fn(),
+    },
+    quoteStoreMock: {
+      state: {
+        quoteId: null,
+        versionId: null,
+        optionId: null,
+        tenantId: 'test-tenant-id',
+        quoteData: null,
+        legs: [],
+        charges: [],
+      },
+      dispatch: vi.fn(),
+    },
+    rateFetchingMock: {
+      results: [],
+      loading: false,
+      error: null,
+      fetchRates: vi.fn(),
+      clearResults: vi.fn(),
+      marketAnalysis: null,
+      confidenceScore: null,
+      anomalies: [],
+    },
+    quoteRepositoryMock: {
+      chargeCategories: [],
+      chargeBases: [],
+      currencies: [],
+      chargeSides: [],
+      serviceTypes: [],
+      services: [],
+      carriers: [],
+      ports: [],
+      shippingTerms: [],
+      serviceModes: [],
+      tradeDirections: [],
+      serviceLegCategories: [],
+      containerTypes: [],
+      containerSizes: [],
+      accounts: [],
+      contacts: [],
+      opportunities: [],
     }
   };
 });
@@ -47,16 +89,7 @@ vi.mock('@/services/quotation/QuotationConfigurationService', () => {
 
 // Mock other hooks
 vi.mock('@/hooks/useRateFetching', () => ({
-  useRateFetching: () => ({
-    results: [],
-    loading: false,
-    error: null,
-    fetchRates: vi.fn(),
-    clearResults: vi.fn(),
-    marketAnalysis: null,
-    confidenceScore: null,
-    anomalies: [],
-  }),
+  useRateFetching: () => rateFetchingMock,
 }));
 
 vi.mock('@/hooks/useContainerRefs', () => ({
@@ -79,40 +112,11 @@ vi.mock('@/hooks/use-toast', () => ({
 
 vi.mock('@/components/sales/composer/store/QuoteStore', () => ({
   QuoteStoreProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  useQuoteStore: () => ({
-    state: {
-      quoteId: null,
-      versionId: null,
-      optionId: null,
-      tenantId: 'test-tenant-id',
-      quoteData: null,
-      legs: [],
-      charges: [],
-    },
-    dispatch: vi.fn(),
-  }),
+  useQuoteStore: () => quoteStoreMock,
 }));
 
 vi.mock('@/components/sales/quote-form/useQuoteRepository', () => ({
-  useQuoteRepositoryContext: () => ({
-    chargeCategories: [],
-    chargeBases: [],
-    currencies: [],
-    chargeSides: [],
-    serviceTypes: [],
-    services: [],
-    carriers: [],
-    ports: [],
-    shippingTerms: [],
-    serviceModes: [],
-    tradeDirections: [],
-    serviceLegCategories: [],
-    containerTypes: [],
-    containerSizes: [],
-    accounts: [],
-    contacts: [],
-    opportunities: [],
-  }),
+  useQuoteRepositoryContext: () => quoteRepositoryMock,
 }));
 
 vi.mock('@/components/sales/unified-composer/FormZone', () => ({
@@ -181,20 +185,27 @@ describe('UnifiedQuoteComposer - Edit Mode', () => {
       const chain = {
         select: () => chain,
         eq: () => chain,
+        or: () => chain,
         in: () => chain,
+        is: () => chain,
+        neq: () => chain,
+        limit: () => chain,
+        range: () => chain,
+        abortSignal: () => chain,
         order: () => chain,
         maybeSingle: () => Promise.resolve({ data: null, error: null }),
-        then: (resolve: any) => resolve({ data: [], error: null })
+        single: () => Promise.resolve({ data: null, error: null }),
+        then: (resolve: any) => Promise.resolve(resolve({ data: [], error: null }))
       };
 
       if (table === 'quotes') {
         chain.maybeSingle = () => Promise.resolve({ data: mockQuote, error: null });
       }
       if (table === 'quote_cargo_configurations') {
-         chain.then = (resolve: any) => resolve({ data: mockCargoConfigs, error: null });
+         chain.then = (resolve: any) => Promise.resolve(resolve({ data: mockCargoConfigs, error: null }));
       }
       if (table === 'quote_items') {
-         chain.then = (resolve: any) => resolve({ data: mockQuoteItems, error: null });
+         chain.then = (resolve: any) => Promise.resolve(resolve({ data: mockQuoteItems, error: null }));
       }
       if (table === 'quotation_version_options') {
         chain.order = () => Promise.resolve({ data: mockOptions, error: null }) as any;
@@ -230,7 +241,10 @@ describe('UnifiedQuoteComposer - Edit Mode', () => {
         expect(initialValues.commodity).toBe('Electronics');
     });
 
-    // Wait for options to be loaded
+    const user = userEvent.setup();
+    const resultsTab = await screen.findByRole('tab', { name: /Results & Finalize/i });
+    await user.click(resultsTab);
+
     await waitFor(() => {
         expect(screen.getByTestId('results-count')).toHaveTextContent('2');
     });

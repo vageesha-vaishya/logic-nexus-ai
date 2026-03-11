@@ -9,7 +9,7 @@ import { MemoryRouter } from 'react-router-dom';
 // -----------------------------------------------------------------------------
 
 // Hoist mock objects to ensure stable references across renders
-const { mockCRMReturn, mockScopedDbFrom } = vi.hoisted(() => {
+const { mockCRMReturn, mockScopedDbFrom, quoteStoreMock, rateFetchingMock } = vi.hoisted(() => {
   const mockScopedDbFrom = vi.fn();
   const mockCRMReturn = {
     scopedDb: { from: mockScopedDbFrom },
@@ -21,14 +21,31 @@ const { mockCRMReturn, mockScopedDbFrom } = vi.hoisted(() => {
     refreshContext: vi.fn(),
     isPlatformAdmin: false
   };
-  return { mockCRMReturn, mockScopedDbFrom };
+  const quoteStoreMock = {
+    state: {
+      quoteId: null,
+      versionId: null,
+      selectedOption: null,
+      manualOptions: [],
+      mode: 'ocean'
+    },
+    dispatch: vi.fn()
+  };
+  const rateFetchingMock = {
+    results: [],
+    loading: false,
+    error: null,
+    fetchRates: vi.fn(),
+    clearResults: vi.fn()
+  };
+  return { mockCRMReturn, mockScopedDbFrom, quoteStoreMock, rateFetchingMock };
 });
 
-vi.mock('../../../hooks/useCRM', () => ({
+vi.mock('@/hooks/useCRM', () => ({
   useCRM: vi.fn(() => mockCRMReturn)
 }));
 
-vi.mock('../../../hooks/useAuth', () => ({
+vi.mock('@/hooks/useAuth', () => ({
   useAuth: () => ({
     session: { access_token: 'fake-token', user: { id: 'user-123' } },
     user: { id: 'user-123' },
@@ -36,14 +53,14 @@ vi.mock('../../../hooks/useAuth', () => ({
   })
 }));
 
-vi.mock('../../../hooks/useContainerRefs', () => ({
+vi.mock('@/hooks/useContainerRefs', () => ({
   useContainerRefs: () => ({
     containerTypes: [],
     containerSizes: []
   })
 }));
 
-vi.mock('../../../hooks/useAiAdvisor', () => ({
+vi.mock('@/hooks/useAiAdvisor', () => ({
   useAiAdvisor: () => ({
     invokeAiAdvisor: vi.fn()
   })
@@ -88,28 +105,14 @@ vi.mock('./FormZone', () => ({
 }));
 
 // Mock QuoteStore
-vi.mock('../composer/store/QuoteStore', () => ({
+vi.mock('@/components/sales/composer/store/QuoteStore', () => ({
   QuoteStoreProvider: ({ children }: any) => <div>{children}</div>,
-  useQuoteStore: () => ({
-    state: {
-      quoteId: null,
-      versionId: null,
-      selectedOption: null,
-      manualOptions: [],
-      mode: 'ocean'
-    },
-    dispatch: vi.fn()
-  })
+  useQuoteStore: () => quoteStoreMock
 }));
 
 // Mock Hooks
-vi.mock('../../../hooks/useRateFetching', () => ({
-  useRateFetching: () => ({
-    results: [],
-    loading: false,
-    error: null,
-    fetchRates: vi.fn()
-  })
+vi.mock('@/hooks/useRateFetching', () => ({
+  useRateFetching: () => rateFetchingMock
 }));
 
 // Mock QuotationConfigurationService
@@ -134,7 +137,7 @@ const createSafeChain = (name: string, data: any = []) => {
   const chain: any = {};
   
   // Methods that return the chain itself
-  const methods = ['select', 'eq', 'in', 'order', 'limit', 'range', 'is'];
+  const methods = ['select', 'eq', 'or', 'in', 'order', 'limit', 'range', 'is', 'neq', 'abortSignal'];
   
   methods.forEach(m => {
     // Return SELF by default to avoid infinite object creation depth
@@ -142,9 +145,7 @@ const createSafeChain = (name: string, data: any = []) => {
   });
   
   // Promise-like behavior
-  chain.then = (resolve: any, reject: any) => {
-      resolve({ data, error: null });
-  };
+  chain.then = (resolve: any) => Promise.resolve(resolve({ data, error: null }));
 
   // Terminal methods that return promises
   const singleResult = { data: Array.isArray(data) ? (data[0] || null) : data, error: null };
@@ -162,6 +163,16 @@ describe('UnifiedQuoteComposer - Version Fallback', () => {
   
   beforeEach(() => {
     vi.clearAllMocks();
+    quoteStoreMock.state.quoteId = null;
+    quoteStoreMock.state.versionId = null;
+    quoteStoreMock.state.selectedOption = null;
+    quoteStoreMock.state.manualOptions = [];
+    quoteStoreMock.dispatch.mockReset();
+    rateFetchingMock.results = [];
+    rateFetchingMock.loading = false;
+    rateFetchingMock.error = null;
+    rateFetchingMock.fetchRates.mockReset();
+    rateFetchingMock.clearResults.mockReset();
     
     // Default fallback for any table not explicitly handled
     mockScopedDbFrom.mockImplementation((table: string) => {

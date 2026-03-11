@@ -5,8 +5,28 @@ import { MemoryRouter } from 'react-router-dom';
 import { UnifiedQuoteComposer } from './UnifiedQuoteComposer';
 
 // Hoist the mock function
-const { mockScopedDbFrom } = vi.hoisted(() => {
-  return { mockScopedDbFrom: vi.fn() };
+const { mockScopedDbFrom, quoteStoreMock, rateFetchingMock } = vi.hoisted(() => {
+  return {
+    mockScopedDbFrom: vi.fn(),
+    quoteStoreMock: {
+      state: {
+        quoteId: 'test-quote',
+        versionId: 'test-version',
+        referenceData: {
+          containerTypes: [],
+          containerSizes: []
+        }
+      },
+      dispatch: vi.fn()
+    },
+    rateFetchingMock: {
+      results: [],
+      loading: false,
+      error: null,
+      fetchRates: vi.fn(),
+      clearResults: vi.fn()
+    }
+  };
 });
 
 // Mock dependencies
@@ -31,26 +51,11 @@ vi.mock('@/hooks/useAuth', () => ({
 
 vi.mock('@/components/sales/composer/store/QuoteStore', () => ({
   QuoteStoreProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  useQuoteStore: () => ({
-    state: {
-      quoteId: 'test-quote',
-      versionId: 'test-version',
-      referenceData: {
-         containerTypes: [],
-         containerSizes: []
-      }
-    },
-    dispatch: vi.fn()
-  })
+  useQuoteStore: () => quoteStoreMock
 }));
 
 vi.mock('@/hooks/useRateFetching', () => ({
-  useRateFetching: () => ({
-    results: [],
-    loading: false,
-    error: null,
-    fetchRates: vi.fn()
-  })
+  useRateFetching: () => rateFetchingMock
 }));
 
 vi.mock('@/hooks/useAiAdvisor', () => ({
@@ -67,7 +72,7 @@ vi.mock('@/hooks/useContainerRefs', () => ({
   })
 }));
 
-vi.mock('@/components/ui/use-toast', () => ({
+vi.mock('@/hooks/use-toast', () => ({
   useToast: () => ({
     toast: vi.fn()
   })

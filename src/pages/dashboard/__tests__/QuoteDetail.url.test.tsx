@@ -262,6 +262,31 @@ describe('QuoteDetail URL Parameters', () => {
     });
   });
 
+  it('resolves route id through legacy identifier fallback when quote_number lookup is empty', async () => {
+    const quoteData = { id: 'q-legacy', tenant_id: 't1', quote_number: 'Q-LEGACY' };
+    const versionData = { id: 'v-legacy', version_number: 1, tenant_id: 't1' };
+
+    mockMaybeSingle.mockReturnValueOnce(createMockResponse(null));
+    mockMaybeSingle.mockReturnValueOnce(createMockResponse(quoteData));
+    mockMaybeSingle.mockReturnValueOnce(createMockResponse(versionData));
+
+    render(
+      <MemoryRouter initialEntries={['/dashboard/quotes/legacy-quote-001?versionId=v-legacy']}>
+        <Routes>
+          <Route path="/dashboard/quotes/:id" element={<QuoteDetail />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      const composer = screen.getByTestId('composer');
+      expect(composer).toHaveTextContent('Composer: quoteId=q-legacy, versionId=v-legacy');
+    });
+
+    expect(mockEq).toHaveBeenCalledWith('quote_number', 'legacy-quote-001');
+    expect(mockEq).toHaveBeenCalledWith('id', 'legacy-quote-001');
+  });
+
   it('respects optionId from URL for comparison selection state', async () => {
     const quoteData = { id: 'q-123', tenant_id: 't1', quote_number: 'Q-100' };
     const versionData = { id: 'v-999', version_number: 2, tenant_id: 't1' };

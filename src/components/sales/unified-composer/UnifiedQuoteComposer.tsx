@@ -68,6 +68,180 @@ type ComposerSection = 'form' | 'results' | 'finalize';
 const HYDRATION_CACHE_WINDOW_MS = 1000 * 60 * 5;
 const CRM_REFERENCE_CACHE_WINDOW_MS = 1000 * 60 * 10;
 const CONFIG_CACHE_WINDOW_MS = 1000 * 60 * 10;
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const FIELD_LABELS: Record<string, string> = {
+  quote_number: 'Quote Number',
+  title: 'Quote Title',
+  account_id: 'Account',
+  contact_id: 'Contact',
+  opportunity_id: 'Opportunity',
+  origin_port_id: 'Origin Port',
+  destination_port_id: 'Destination Port',
+  service_type_id: 'Service Type',
+  service_id: 'Service',
+  currency_id: 'Currency',
+  carrier_id: 'Carrier',
+  incoterm_id: 'Incoterm',
+  pickup_date: 'Pickup Date',
+  delivery_deadline: 'Delivery Deadline',
+};
+
+function toFieldLabel(field: string): string {
+  return FIELD_LABELS[field] || field.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function parseSaveFieldErrors(err: any): ValidationIssue[] {
+  const message = String(err?.message || '');
+  const details = String(err?.details || '');
+  const hint = String(err?.hint || '');
+  const combined = `${message} ${details} ${hint}`.trim();
+
+  const uniqueMatch = combined.match(/Key\s+\(([^)]+)\)=\(([^)]*)\)\s+already exists/i);
+  if (uniqueMatch) {
+    const field = uniqueMatch[1].trim();
+    const value = uniqueMatch[2].trim();
+    return [{
+      path: field,
+      label: toFieldLabel(field),
+      message: value ? `${toFieldLabel(field)} "${value}" already exists.` : `${toFieldLabel(field)} already exists.`,
+    }];
+  }
+
+  const nullMatch = combined.match(/null value in column "([^"]+)"/i);
+  if (nullMatch) {
+    const field = nullMatch[1].trim();
+    return [{
+      path: field,
+      label: toFieldLabel(field),
+      message: `${toFieldLabel(field)} is required.`,
+    }];
+  }
+
+  const fkMatch = combined.match(/Key\s+\(([^)]+)\)=\(([^)]*)\)\s+is not present in table "([^"]+)"/i);
+  if (fkMatch) {
+    const field = fkMatch[1].trim();
+    return [{
+      path: field,
+      label: toFieldLabel(field),
+      message: `${toFieldLabel(field)} is invalid or no longer exists.`,
+    }];
+  }
+
+  if (/save_quote_atomic:\s*unknown charge basis code/i.test(combined)) {
+    return [{
+      path: 'charges',
+      label: 'Charges',
+      message: 'One or more charge basis values are invalid.',
+    }];
+  }
+
+  if (/save_quote_atomic:\s*no\s+sell-side\s+entry\s+found/i.test(combined)) {
+    return [{
+      path: 'charges',
+      label: 'Charges',
+      message: 'Sell-side charge configuration is missing.',
+    }];
+  }
+
+  if (/save_quote_atomic:\s*no\s+buy-side\s+entry\s+found/i.test(combined)) {
+    return [{
+      path: 'charges',
+      label: 'Charges',
+      message: 'Buy-side charge configuration is missing.',
+    }];
+  }
+
+  if (/quote_number/i.test(combined) && /(duplicate|already exists|unique)/i.test(combined)) {
+    return [{
+      path: 'quote_number',
+      label: 'Quote Number',
+      message: 'Quote Number already exists. Please use a different value.',
+    }];
+  }
+
+  return [];
+}
+
+export function getSaveErrorMessage(err: any): { errorMessage: string; fieldErrors: ValidationIssue[] } {
+  const fieldErrors = parseSaveFieldErrors(err);
+  if (fieldErrors.length > 0) {
+    return {
+      errorMessage: `Please fix: ${fieldErrors.map((issue) => `${issue.label} - ${issue.message}`).join('; ')}`,
+      fieldErrors,
+    };
+  }
+
+  const message = String(err?.message || '');
+  const code = String(err?.code || '');
+  const isNetworkError = (
+    err?.name === 'AbortError' ||
+    message.includes('signal is aborted') ||
+    message.includes('aborted') ||
+    message.includes('Failed to fetch') ||
+    message.includes('NetworkError') ||
+    message.includes('fetch') ||
+    code === 'NETWORK_ERROR' ||
+    err?.status === 0 ||
+    (err instanceof TypeError && message.includes('fetch'))
+  );
+  const isSupabaseError = (
+    code.startsWith('PGRST') ||
+    message.includes('supabase') ||
+    message.includes('JWT') ||
+    message.includes('permission')
+  );
+
+  if (isNetworkError) {
+    return {
+      errorMessage: 'Network connection issue. Please check your internet connection and try again.',
+      fieldErrors,
+    };
+  }
+
+  if (
+    message.includes('relation "quotation_legs" does not exist') ||
+    message.includes('relation "quotation_charges" does not exist')
+  ) {
+    return {
+      errorMessage: 'Database migration missing. Please apply latest Supabase migrations for save_quote_atomic and try again.',
+      fieldErrors,
+    };
+  }
+
+  if (code === 'PGRST116') {
+    return {
+      errorMessage: 'Database error: The quotation could not be verified after saving.',
+      fieldErrors,
+    };
+  }
+
+  if (message.includes('permission') || message.includes('unauthorized') || code === '42501') {
+    return {
+      errorMessage: 'Permission denied. You may not have the required permissions to save quotes.',
+      fieldErrors,
+    };
+  }
+
+  if (message.includes('timeout')) {
+    return {
+      errorMessage: 'Request timeout. The save operation took too long. Please try again.',
+      fieldErrors,
+    };
+  }
+
+  if (isSupabaseError) {
+    return {
+      errorMessage: 'Database connection error. Please try again or contact support if the issue persists.',
+      fieldErrors,
+    };
+  }
+
+  return {
+    errorMessage: message || 'An error occurred while saving the quotation.',
+    fieldErrors,
+  };
+}
+
 const crmReferenceCache: {
   data: { accounts: any[]; contacts: any[]; opportunities: any[]; ports: any[] } | null;
   cachedAt: number;
@@ -1046,13 +1220,6 @@ function UnifiedQuoteComposerContent({
 
   const loadExistingQuote = useCallback(async () => {
     if (!quoteId) return;
-    
-    // Validate UUID format to prevent Postgres errors
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(quoteId);
-    if (!isUuid) {
-        logger.warn('[UnifiedComposer] Invalid quoteId format (expected UUID)', { quoteId });
-        return;
-    }
 
     setEditLoading(true);
     setLoadErrors([]);
@@ -1083,11 +1250,37 @@ function UnifiedQuoteComposerContent({
       const quoteRow = await fetchQuoteWithRetry();
       */
       
-      const { data: quoteRow, error: quoteError } = await scopedDb
+      const quoteRef = String(quoteId || '').trim();
+      const quoteRefIsUuid = UUID_REGEX.test(quoteRef);
+      let primaryQuery = scopedDb
         .from('quotes')
-        .select('*, origin_port_data:origin_port_id(location_name, location_code), destination_port_data:destination_port_id(location_name, location_code)')
-        .eq('id', quoteId)
+        .select('*, origin_port_data:origin_port_id(location_name, location_code), destination_port_data:destination_port_id(location_name, location_code)');
+
+      if (quoteRefIsUuid) {
+        primaryQuery = primaryQuery.or(`id.eq.${quoteRef},quote_number.eq.${quoteRef}`);
+      } else {
+        primaryQuery = primaryQuery
+          .eq('quote_number', quoteRef)
+          .order('updated_at', { ascending: false })
+          .order('created_at', { ascending: false });
+      }
+
+      const primaryResult = await primaryQuery
+        .limit(1)
         .maybeSingle();
+
+      let quoteRow = primaryResult.data as any;
+      let quoteError = primaryResult.error;
+      if (!quoteError && !quoteRow && !quoteRefIsUuid) {
+        const fallbackResult = await scopedDb
+          .from('quotes')
+          .select('*, origin_port_data:origin_port_id(location_name, location_code), destination_port_data:destination_port_id(location_name, location_code)')
+          .eq('id', quoteRef)
+          .limit(1)
+          .maybeSingle();
+        quoteRow = fallbackResult.data as any;
+        quoteError = fallbackResult.error;
+      }
      
       /*
       const { data: quoteRow, error: quoteError } = await scopedDb
@@ -1102,8 +1295,8 @@ function UnifiedQuoteComposerContent({
       }
 
       if (!quoteRow) {
-        logger.error('[UnifiedComposer] Failed to load quote after retries', { quoteId });
-        logAudit('reload_failure', { error: 'Failed to load quote after retries', quoteId }, 'failure');
+        logger.error('[UnifiedComposer] Failed to resolve quote by identifier', { quoteId: quoteRef });
+        logAudit('reload_failure', { error: 'Failed to resolve quote by identifier', quoteId: quoteRef }, 'failure');
         toast({ title: 'Error', description: 'Failed to load quote data. Please try again.', variant: 'destructive' });
         setEditLoading(false);
         return;
@@ -1117,26 +1310,20 @@ function UnifiedQuoteComposerContent({
         destination: (quoteRow as any).destination_port_data?.location_name
       });
       
-      const raw = quoteRow as any;
+      const activeQuoteId = String((quoteRow as any).id || quoteRef);
+      let raw = quoteRow as any;
       setQuoteTenantId(raw.tenant_id);
+      let cargoDetails = parseJsonObject(raw.cargo_details);
 
-      const cargoDetails = parseJsonObject(raw.cargo_details);
-      const standaloneProfile = parseJsonObject(raw.billing_address);
-      const isStandaloneQuote = !!standaloneProfile && !raw.account_id && !raw.opportunity_id;
-      const billingAddressData = (standaloneProfile?.billing_address && typeof standaloneProfile.billing_address === 'object')
-        ? standaloneProfile.billing_address
-        : undefined;
-      const shippingAddressData = (standaloneProfile?.shipping_address && typeof standaloneProfile.shipping_address === 'object')
-        ? standaloneProfile.shipping_address
-        : undefined;
+      const hasObjectData = (value: Record<string, any> | null) => !!value && Object.keys(value).length > 0;
 
       // Parallel fetch for detailed configurations (Cargo, Items, Documents, Versions)
       // We use allSettled to allow partial failures
       const [cargoConfigResult, quoteItemsResult, docsResult, versionsResult] = await Promise.allSettled([
-        scopedDb.from('quote_cargo_configurations').select('*').eq('quote_id', quoteId),
-        scopedDb.from('quote_items').select('*').eq('quote_id', quoteId),
-        scopedDb.from('quote_documents').select('*').eq('quote_id', quoteId),
-        scopedDb.from('quotation_versions').select('*').eq('quote_id', quoteId).order('version_number', { ascending: false })
+        scopedDb.from('quote_cargo_configurations').select('*').eq('quote_id', activeQuoteId),
+        scopedDb.from('quote_items').select('*').eq('quote_id', activeQuoteId),
+        scopedDb.from('quote_documents').select('*').eq('quote_id', activeQuoteId),
+        scopedDb.from('quotation_versions').select('*').eq('quote_id', activeQuoteId).order('version_number', { ascending: false })
       ]);
       
       // Handle Cargo Configs
@@ -1177,7 +1364,7 @@ function UnifiedQuoteComposerContent({
             const { data: coreItems, error: coreError } = await scopedDb
                 .from('quote_items_core')
                 .select('*')
-                .eq('quote_id', quoteId);
+                .eq('quote_id', activeQuoteId);
                 
             if (!coreError && coreItems) {
                 items = coreItems;
@@ -1210,11 +1397,53 @@ function UnifiedQuoteComposerContent({
         // Non-critical
       }
 
+      const resolvedItems = quoteItemsResult.status === 'fulfilled' && !quoteItemsResult.value.error
+        ? (quoteItemsResult.value.data || [])
+        : [];
+      const rawCargoDetails = cargoDetails;
+      const latestVersion = versionsResult.status === 'fulfilled' && !versionsResult.value.error
+        ? (versionsResult.value.data || [])[0]
+        : null;
+      const latestVersionMetadata = parseJsonObject(latestVersion?.metadata);
+      const latestVersionSnapshot = parseJsonObject(latestVersionMetadata?.snapshot);
+      const latestSnapshotQuote = parseJsonObject(latestVersionSnapshot?.quote);
+      const snapshotCargoDetails = parseJsonObject(latestSnapshotQuote?.cargo_details);
+      const quoteLooksEmpty = !raw.origin && !raw.destination && !raw.origin_port_id && !raw.destination_port_id
+        && !hasObjectData(rawCargoDetails) && containerCombos.length === 0 && resolvedItems.length === 0;
+      const canRecoverFromSnapshot = quoteLooksEmpty && (latestSnapshotQuote || hasObjectData(snapshotCargoDetails));
+
+      if (canRecoverFromSnapshot) {
+        raw = {
+          ...raw,
+          ...(latestSnapshotQuote || {}),
+          cargo_details: raw.cargo_details || latestSnapshotQuote?.cargo_details || snapshotCargoDetails || null,
+        };
+        setLoadErrors((prev) => [...prev, 'Recovered draft data from latest version snapshot']);
+        toast({
+          title: 'Draft recovered',
+          description: 'Primary draft fields were empty. Recovered latest snapshot data.',
+        });
+        logger.warn('[UnifiedComposer] Recovered quote from latest version snapshot', {
+          quoteId: activeQuoteId,
+          versionId: latestVersion?.id || null,
+        });
+      }
+
+      cargoDetails = parseJsonObject(raw.cargo_details);
+      const standaloneProfile = parseJsonObject(raw.billing_address);
+      const isStandaloneQuote = !!standaloneProfile && !raw.account_id && !raw.opportunity_id;
+      const billingAddressData = (standaloneProfile?.billing_address && typeof standaloneProfile.billing_address === 'object')
+        ? standaloneProfile.billing_address
+        : undefined;
+      const shippingAddressData = (standaloneProfile?.shipping_address && typeof standaloneProfile.shipping_address === 'object')
+        ? standaloneProfile.shipping_address
+        : undefined;
+
       // Initialize store
       dispatch({
         type: 'INITIALIZE',
         payload: {
-          quoteId,
+          quoteId: activeQuoteId,
           versionId: versionId || raw.current_version_id || null, // Use current_version_id if available
           tenantId: raw.tenant_id || tenantId,
           franchiseId: raw.franchise_id || context?.franchiseId || null,
@@ -1301,6 +1530,17 @@ function UnifiedQuoteComposerContent({
           : undefined,
       };
 
+      const resolvedOriginLabel = raw.origin_port_data?.location_name || raw.origin || raw.origin_port_id || '';
+      const resolvedDestinationLabel = raw.destination_port_data?.location_name || raw.destination || raw.destination_port_id || '';
+      const usedOriginIdFallback = !raw.origin_port_data?.location_name && !raw.origin && !!raw.origin_port_id;
+      const usedDestinationIdFallback = !raw.destination_port_data?.location_name && !raw.destination && !!raw.destination_port_id;
+      if (usedOriginIdFallback) {
+        setLoadErrors((prev) => [...prev, 'Origin name unavailable; loaded using stored location identifier']);
+      }
+      if (usedDestinationIdFallback) {
+        setLoadErrors((prev) => [...prev, 'Destination name unavailable; loaded using stored location identifier']);
+      }
+
       setInitialFormValues({
         quoteNumber: raw.quote_number || '',
         accountId: raw.account_id || '',
@@ -1324,8 +1564,8 @@ function UnifiedQuoteComposerContent({
         internalNotes: raw.notes || '',
         specialInstructions: cargoDetails?.special_handling || '',
         mode: (raw.transport_mode || 'ocean') as any,
-        origin: raw.origin_port_data?.location_name || raw.origin || '',
-        destination: raw.destination_port_data?.location_name || raw.destination || '',
+        origin: resolvedOriginLabel,
+        destination: resolvedDestinationLabel,
         originId: raw.origin_port_id || '',
         destinationId: raw.destination_port_id || '',
         commodity: primaryCommodity,
@@ -1360,8 +1600,8 @@ function UnifiedQuoteComposerContent({
             internalNotes: raw.notes || '',
             specialInstructions: cargoDetails?.special_handling || '',
             mode: (raw.transport_mode || 'ocean') as any,
-            origin: raw.origin_port_data?.location_name || raw.origin || '',
-            destination: raw.destination_port_data?.location_name || raw.destination || '',
+            origin: resolvedOriginLabel,
+            destination: resolvedDestinationLabel,
             originId: raw.origin_port_id || '',
             destinationId: raw.destination_port_id || '',
             commodity: primaryCommodity,
@@ -1416,13 +1656,13 @@ function UnifiedQuoteComposerContent({
       
       if (targetVersionId && isValidUUID(targetVersionId)) {
         logger.info('[UnifiedComposer] Loading version', { targetVersionId });
-        const cacheKey = `${quoteId}:${targetVersionId}`;
+        const cacheKey = `${activeQuoteId}:${targetVersionId}`;
         const cachedEntry = hydratedOptionsCacheRef.current[cacheKey];
         const cacheAgeMs = cachedEntry ? (Date.now() - cachedEntry.cachedAt) : Number.POSITIVE_INFINITY;
         const hasFreshCache = cacheAgeMs < HYDRATION_CACHE_WINDOW_MS;
         if (cachedEntry && hasFreshCache) {
           applyReconstructedOptions(cachedEntry.data);
-          logAudit('reload_success', { quoteId, versionId: targetVersionId, source: 'cache' });
+          logAudit('reload_success', { quoteId: activeQuoteId, versionId: targetVersionId, source: 'cache' });
           return;
         }
         if (cachedEntry && !hasFreshCache) {
@@ -1828,7 +2068,7 @@ function UnifiedQuoteComposerContent({
           applyReconstructedOptions(reconstructedOptions);
 
            // Log success
-           logAudit('reload_success', { quoteId, versionId: targetVersionId || 'current' });
+           logAudit('reload_success', { quoteId: activeQuoteId, versionId: targetVersionId || 'current' });
         }
       }
     } catch (err: any) {
@@ -2078,12 +2318,17 @@ function UnifiedQuoteComposerContent({
         const newFiles = currentAttachments.filter(a => a instanceof File);
         
         if (newFiles.length > 0) {
+            const storageClient = supabase?.storage;
+            if (!storageClient) {
+                logger.warn('Storage client unavailable; skipping attachment upload', { quoteId, count: newFiles.length });
+                return;
+            }
             for (const file of newFiles) {
                 const fileExt = file.name.split('.').pop();
                 const fileName = `${quoteId}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
                 
                 // Upload to storage
-                const { data: uploadData, error: uploadError } = await supabase.storage
+                const { data: uploadData, error: uploadError } = await storageClient
                     .from('commodity-docs')
                     .upload(fileName, file);
 
@@ -2127,7 +2372,7 @@ function UnifiedQuoteComposerContent({
         logger.error('Error syncing attachments', error);
         toast({ title: 'Attachment Error', description: 'Failed to sync attachments.', variant: 'destructive' });
     }
-  }, [loadedAttachments, scopedDb, supabase.storage, user?.id, toast]);
+  }, [loadedAttachments, scopedDb, supabase?.storage, user?.id, toast]);
 
   // ---------------------------------------------------------------------------
   // Handle save quote
@@ -2135,6 +2380,45 @@ function UnifiedQuoteComposerContent({
 
   const isUUID = useCallback((v: any) =>
     typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v), []);
+
+  const resolveQuoteIdByNumber = useCallback(async (rawQuoteRef?: string | null) => {
+    const quoteRef = typeof rawQuoteRef === 'string' ? rawQuoteRef.trim() : '';
+    if (!quoteRef) return null;
+
+    const tenantId = storeState.tenantId || context?.tenantId || null;
+    try {
+      const lookupQuery = scopedDb
+        .from('quotes')
+        .select('id, tenant_id')
+        .eq('quote_number', quoteRef);
+
+      const { data, error } = await lookupQuery
+        .order('updated_at', { ascending: false });
+      if (error || !Array.isArray(data) || data.length === 0) return null;
+
+      const matchingRow = data.find((row: any) =>
+        isUUID(row?.id) && (!tenantId || !row?.tenant_id || String(row.tenant_id) === String(tenantId))
+      );
+      return matchingRow?.id ? String(matchingRow.id) : null;
+    } catch (error) {
+      logger.warn('[UnifiedComposer] Failed to resolve quote id from quote number', {
+        quoteRef,
+        error: (error as any)?.message || error,
+      });
+      return null;
+    }
+  }, [context?.tenantId, isUUID, scopedDb, storeState.tenantId]);
+
+  const resolveCurrentQuoteId = useCallback(async () => {
+    const stateQuoteId = isUUID((storeState.quoteData as any)?.id)
+      ? String((storeState.quoteData as any).id)
+      : (isUUID(storeState.quoteId) ? storeState.quoteId : null);
+    if (stateQuoteId) return stateQuoteId;
+
+    if (isUUID(quoteId)) return quoteId;
+
+    return resolveQuoteIdByNumber(quoteId);
+  }, [isUUID, quoteId, resolveQuoteIdByNumber, storeState.quoteData, storeState.quoteId]);
 
   const handleSaveQuote = useCallback(async (charges: any[], marginPercent: number, notes: string) => {
     setSaving(true);
@@ -2149,7 +2433,7 @@ function UnifiedQuoteComposerContent({
 
       // Ensure version exists
       const currentVersionId = storeState.versionId || versionId;
-      const currentQuoteId = storeState.quoteId || quoteId;
+      let currentQuoteId = await resolveCurrentQuoteId();
 
       // Validate form before saving
       const isValid = await form.trigger();
@@ -2205,6 +2489,10 @@ function UnifiedQuoteComposerContent({
       // Determine quote number
       let finalQuoteNumber = formData?.values.quoteNumber?.trim();
       if (finalQuoteNumber) {
+        if (!currentQuoteId) {
+          currentQuoteId = await resolveQuoteIdByNumber(finalQuoteNumber);
+        }
+
         // Manual override
         if (!canOverrideQuoteNumber) {
           toast({ title: 'Not allowed', description: 'You do not have permission to override quote numbers.', variant: 'destructive' });
@@ -2332,7 +2620,7 @@ function UnifiedQuoteComposerContent({
 
       const cargoSnapshot = buildCargoSnapshot(formData?.values, formData?.extended);
       const quotePayload: any = {
-        id: isUUID(currentQuoteId) ? currentQuoteId : undefined,
+        id: currentQuoteId || undefined,
         quote_number: finalQuoteNumber,
         title: (formData?.values.quoteTitle || storeState.quoteData?.title) || `Quote - ${formData?.values.origin || ''} to ${formData?.values.destination || ''}`,
         transport_mode: formData?.values.mode || 'ocean',
@@ -2363,7 +2651,8 @@ function UnifiedQuoteComposerContent({
 
       const options: any[] = [];
 
-      if (!selectedOption) {
+      const effectiveSelectedOption = selectedOption || (isStandalone ? (displayResults[0] || null) : null);
+      if (!effectiveSelectedOption && !isStandalone) {
         toast({ title: 'Select an option', description: 'Pick a quote option before saving.', variant: 'destructive' });
         setSaving(false);
         return;
@@ -2425,11 +2714,15 @@ function UnifiedQuoteComposerContent({
         };
       };
 
-      const selectedId = selectedOption.id;
+      const selectedId = effectiveSelectedOption?.id || null;
       
-      const optionsSource = displayResults.some((o) => o.id === selectedOption.id)
-        ? displayResults
-        : [...displayResults, selectedOption];
+      const optionsSource = effectiveSelectedOption
+        ? (
+          displayResults.some((o) => o.id === effectiveSelectedOption.id)
+            ? displayResults
+            : [...displayResults, effectiveSelectedOption]
+        )
+        : [];
 
       for (const opt of optionsSource) {
         const isSelected = opt.id === selectedId;
@@ -2559,7 +2852,7 @@ function UnifiedQuoteComposerContent({
 
       if (rpcError) {
         logger.error('[UnifiedComposer] save_quote_atomic RPC Error', { error: rpcError });
-        throw new Error(rpcError.message || 'Failed to save quotation');
+        throw Object.assign(new Error(rpcError.message || 'Failed to save quotation'), rpcError);
       }
 
       // logger.info('[UnifiedComposer] save_quote_atomic success', { savedId });
@@ -2581,15 +2874,15 @@ function UnifiedQuoteComposerContent({
             const { data: existing } = await scopedDb.from('quotes').select('quote_number, notes').eq('id', savedId).single();
             const prevNo = existing?.quote_number || null;
             // Uniqueness enforcement (best-effort)
-            const tenantIdStr = storeState.tenantId || context?.tenantId;
-            if (tenantIdStr) {
-              const unique = await QuotationNumberService.isUnique(supabase, tenantIdStr, manualNo);
-              if (!unique) {
-                toast({ title: 'Duplicate number', description: 'This quote number already exists. Please choose another.', variant: 'destructive' });
-                return;
-              }
-            }
             if (prevNo !== manualNo) {
+              const tenantIdStr = storeState.tenantId || context?.tenantId;
+              if (tenantIdStr) {
+                const unique = await QuotationNumberService.isUnique(supabase, tenantIdStr, manualNo);
+                if (!unique) {
+                  toast({ title: 'Duplicate number', description: 'This quote number already exists. Please choose another.', variant: 'destructive' });
+                  return;
+                }
+              }
               const auditLine = `[${new Date().toISOString()}] Quote number changed ${prevNo ? `from ${prevNo} ` : ''}to ${manualNo}`;
               const newNotes = existing?.notes ? `${existing.notes}\n${auditLine}` : auditLine;
               await scopedDb.from('quotes').update({ quote_number: manualNo, notes: newNotes }).eq('id', savedId);
@@ -2643,56 +2936,27 @@ function UnifiedQuoteComposerContent({
       }
     } catch (err: any) {
       logger.error('[UnifiedComposer] Save failed:', err);
-      
-      let errorMessage = err.message || 'An error occurred while saving the quotation.';
-      
-      // More specific network error detection
-      const isNetworkError = (
-        err?.name === 'AbortError' ||
-        err?.message?.includes('signal is aborted') ||
-        err?.message?.includes('aborted') ||
-        err.message?.includes('Failed to fetch') ||
-        err.message?.includes('NetworkError') ||
-        err.message?.includes('fetch') ||
-        err.code === 'NETWORK_ERROR' ||
-        err.status === 0 ||
-        (err instanceof TypeError && err.message?.includes('fetch'))
-      );
-      
-      // Check for Supabase specific errors
-      const isSupabaseError = (
-        err.code?.startsWith('PGRST') ||
-        err.message?.includes('supabase') ||
-        err.message?.includes('JWT') ||
-        err.message?.includes('permission')
-      );
-      
-      if (isNetworkError) {
-        errorMessage = 'Network connection issue. Please check your internet connection and try again.';
+      const { errorMessage, fieldErrors } = getSaveErrorMessage(err);
+      const networkError = /Network connection issue/i.test(errorMessage);
+
+      if (networkError) {
         logger.warn('[UnifiedComposer] Network error detected', { error: err, message: err.message });
-        setShowNetworkWarning(true); // Show network warning only on actual network errors
+        setShowNetworkWarning(true);
       } else if (
-        err.message?.includes('relation "quotation_legs" does not exist') ||
-        err.message?.includes('relation "quotation_charges" does not exist')
+        String(err?.message || '').includes('relation "quotation_legs" does not exist') ||
+        String(err?.message || '').includes('relation "quotation_charges" does not exist')
       ) {
-        errorMessage = 'Database migration missing. Please apply latest Supabase migrations for save_quote_atomic and try again.';
         logger.error('[UnifiedComposer] Outdated save_quote_atomic function detected', { error: err.message });
-      } else if (isSupabaseError) {
-        errorMessage = 'Database connection error. Please try again or contact support if the issue persists.';
+      } else if (String(err?.code || '').startsWith('PGRST') || String(err?.message || '').includes('supabase')) {
         logger.warn('[UnifiedComposer] Supabase error detected', { error: err, code: err.code });
-      } else if (err.code === 'PGRST116') {
-        errorMessage = 'Database error: The quotation could not be verified after saving.';
-      } else if (err.message?.includes('permission') || err.message?.includes('unauthorized')) {
-        errorMessage = 'Permission denied. You may not have the required permissions to save quotes.';
-      } else if (err.message?.includes('timeout')) {
-        errorMessage = 'Request timeout. The save operation took too long. Please try again.';
       }
 
       logAudit('save_quote_failure', {
         quoteId: quoteId || 'new',
         error: errorMessage,
         originalError: err.message,
-        errorType: isNetworkError ? 'network' : isSupabaseError ? 'database' : 'application',
+        errorType: networkError ? 'network' : fieldErrors.length > 0 ? 'validation' : 'application',
+        fieldErrors,
         stack: err.stack
       }, 'failure');
 
@@ -2736,7 +3000,8 @@ function UnifiedQuoteComposerContent({
     flattenOptionCharges,
     isLegacyCargoSchemaError,
     isMissingChargeSidesError,
-    ensureChargeSidesForTenant
+    ensureChargeSidesForTenant,
+    resolveCurrentQuoteId
   ]);
 
   // ---------------------------------------------------------------------------
@@ -2852,8 +3117,15 @@ function UnifiedQuoteComposerContent({
       } as ExtendedFormData;
       const formData = { values: mergedValues, extended: mergedExtended };
       const cargoSnapshot = buildCargoSnapshot(formData.values, formData.extended);
+      const isStandalone = !!formData.values.standalone;
+      const manualQuoteNumber = formData.values.quoteNumber?.trim() || null;
+      let currentQuoteId = await resolveCurrentQuoteId();
+      if (!currentQuoteId && manualQuoteNumber) {
+        currentQuoteId = await resolveQuoteIdByNumber(manualQuoteNumber);
+      }
       const quotePayload: any = {
-        id: isUUID(storeState.quoteId) ? storeState.quoteId : (isUUID(quoteId) ? quoteId : undefined),
+        id: currentQuoteId || undefined,
+        quote_number: manualQuoteNumber,
         title: (formData.values.quoteTitle || storeState.quoteData?.title) || `Draft - ${formData.values.origin || ''} to ${formData.values.destination || ''}`,
         transport_mode: formData.values.mode || 'ocean',
         origin: formData.values.origin || '',
@@ -2864,9 +3136,23 @@ function UnifiedQuoteComposerContent({
         pickup_date: formData.extended.pickupDate || null,
         delivery_deadline: formData.extended.deliveryDeadline || null,
         incoterms: formData.extended.incoterms || null,
-        account_id: formData.values.accountId || storeState.quoteData?.account_id || null,
-        contact_id: formData.values.contactId || storeState.quoteData?.contact_id || null,
-        opportunity_id: formData.values.opportunityId || null,
+        billing_address: isStandalone ? {
+          company: formData.values.guestCompany || null,
+          name: formData.values.guestName || null,
+          email: formData.values.guestEmail || null,
+          phone: formData.values.guestPhone || null,
+          job_title: formData.values.guestJobTitle || null,
+          department: formData.values.guestDepartment || null,
+          billing_address: formData.values.billingAddress || null,
+          shipping_address: formData.values.shippingAddress || null,
+          tax_id: formData.values.taxId || null,
+          customer_po: formData.values.customerPo || null,
+          vendor_ref: formData.values.vendorRef || null,
+          project_code: formData.values.projectCode || null,
+        } : null,
+        account_id: isStandalone ? null : (formData.values.accountId || storeState.quoteData?.account_id || null),
+        contact_id: isStandalone ? null : (formData.values.contactId || storeState.quoteData?.contact_id || null),
+        opportunity_id: isStandalone ? null : (formData.values.opportunityId || null),
         owner_id: user?.id || null,
         created_by: user?.id || null,
         cargo_details: cargoSnapshot
@@ -2937,7 +3223,7 @@ function UnifiedQuoteComposerContent({
         }
       }
 
-      if (rpcError) throw new Error(rpcError.message || 'Failed to save draft');
+      if (rpcError) throw Object.assign(new Error(rpcError.message || 'Failed to save draft'), rpcError);
 
       if (savedId) {
            // Simplified success handling (removed versionId fetching for auto-save)
@@ -2982,19 +3268,27 @@ function UnifiedQuoteComposerContent({
       });
     } catch (err: any) {
       logger.error('[UnifiedComposer] Draft save failed:', err);
-      logAudit('save_draft_failure', { quoteId: quoteId || 'new', error: err.message, stack: err.stack }, 'failure');
-      toast({ title: 'Save Failed', description: err.message || 'Could not save draft', variant: 'destructive' });
+      const { errorMessage, fieldErrors } = getSaveErrorMessage(err);
+      logAudit('save_draft_failure', {
+        quoteId: quoteId || 'new',
+        error: errorMessage,
+        originalError: err.message,
+        errorType: fieldErrors.length > 0 ? 'validation' : 'application',
+        fieldErrors,
+        stack: err.stack
+      }, 'failure');
+      toast({ title: 'Save Failed', description: errorMessage || 'Could not save draft', variant: 'destructive' });
     } finally {
       setSaving(false);
     }
-  }, [lastFormData, storeState, context, quoteId, user, scopedDb, toast, dispatch, setSearchParams, logAudit, buildCargoSnapshot, syncQuoteCargoDetails, extractContainerCombos, isLegacyCargoSchemaError, isMissingChargeSidesError, ensureChargeSidesForTenant]);
+  }, [lastFormData, storeState, context, quoteId, user, scopedDb, toast, dispatch, setSearchParams, logAudit, buildCargoSnapshot, syncQuoteCargoDetails, extractContainerCombos, isLegacyCargoSchemaError, isMissingChargeSidesError, ensureChargeSidesForTenant, resolveCurrentQuoteId, resolveQuoteIdByNumber]);
 
   // ---------------------------------------------------------------------------
   // PDF Generation
   // ---------------------------------------------------------------------------
 
   const handleConfirmGeneratePdf = useCallback(async () => {
-    const currentQuoteId = storeState.quoteId || quoteId;
+    const currentQuoteId = await resolveCurrentQuoteId();
     const currentVersionId = storeState.versionId || versionId;
     if (!currentQuoteId) {
       toast({ title: 'Save First', description: 'Please save the quote before generating a PDF.', variant: 'destructive' });
@@ -3064,7 +3358,7 @@ function UnifiedQuoteComposerContent({
     } finally {
       setIsGeneratingPdf(false);
     }
-  }, [storeState.quoteId, storeState.versionId, quoteId, versionId, toast, logAudit, selectedTemplateId]);
+  }, [storeState.versionId, versionId, toast, logAudit, selectedTemplateId, resolveCurrentQuoteId]);
 
   const handleGeneratePdf = useCallback(() => {
     setShowPdfModal(true);

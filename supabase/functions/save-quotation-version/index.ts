@@ -2,6 +2,45 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { requireAuth } from "../_shared/auth.ts";
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+async function resolveQuoteRecord(supabaseClient: any, quoteRef: string) {
+  const normalizedQuoteRef = String(quoteRef || '').trim();
+  const quoteRefIsUuid = UUID_REGEX.test(normalizedQuoteRef);
+
+  let primaryQuery = supabaseClient
+    .from('quotes')
+    .select('*');
+
+  if (quoteRefIsUuid) {
+    primaryQuery = primaryQuery.or(`id.eq.${normalizedQuoteRef},quote_number.eq.${normalizedQuoteRef}`);
+  } else {
+    primaryQuery = primaryQuery.eq('quote_number', normalizedQuoteRef);
+  }
+
+  const primaryResult = await primaryQuery.limit(1).maybeSingle();
+  if (primaryResult.error) {
+    throw primaryResult.error;
+  }
+
+  let quote = primaryResult.data;
+  if (!quote && !quoteRefIsUuid) {
+    const fallbackResult = await supabaseClient
+      .from('quotes')
+      .select('*')
+      .eq('id', normalizedQuoteRef)
+      .limit(1)
+      .maybeSingle();
+
+    if (fallbackResult.error) {
+      throw fallbackResult.error;
+    }
+    quote = fallbackResult.data;
+  }
+
+  return quote || null;
+}
+
 serve(async (req: Request) => {
   const corsHeaders = getCorsHeaders(req);
 
@@ -30,22 +69,19 @@ serve(async (req: Request) => {
     }
 
     // 2. Fetch current quote data (Subject to RLS)
-    const { data: quote, error: quoteError } = await supabaseClient
-      .from('quotes')
-      .select('*')
-      .eq('id', quoteId)
-      .single();
+    const quote = await resolveQuoteRecord(supabaseClient, quoteId);
 
-    if (quoteError || !quote) {
-       console.error('[save-quotation-version] Quote fetch failed or not found:', quoteError);
+    if (!quote) {
+       console.error('[save-quotation-version] Quote fetch failed or not found');
        return new Response(JSON.stringify({ error: 'Quote not found or permission denied' }), {
         status: 404,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const { data: items } = await supabaseClient.from('quote_items').select('*').eq('quote_id', quoteId);
-    const { data: cargo } = await supabaseClient.from('quote_cargo_configurations').select('*').eq('quote_id', quoteId);
+    const resolvedQuoteId = String(quote.id);
+    const { data: items } = await supabaseClient.from('quote_items').select('*').eq('quote_id', resolvedQuoteId);
+    const { data: cargo } = await supabaseClient.from('quote_cargo_configurations').select('*').eq('quote_id', resolvedQuoteId);
     
     const snapshot = {
         quote,
@@ -57,7 +93,7 @@ serve(async (req: Request) => {
     const { data: latest } = await supabaseClient
       .from('quotation_versions')
       .select('major, minor, version_number')
-      .eq('quote_id', quoteId)
+      .eq('quote_id', resolvedQuoteId)
       .order('version_number', { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -78,7 +114,7 @@ serve(async (req: Request) => {
     const { data: newVersion, error: versionError } = await supabaseClient
       .from('quotation_versions')
       .insert({
-        quote_id: quoteId,
+        quote_id: resolvedQuoteId,
         tenant_id: quote.tenant_id,
         major: major,
         minor: minor,
@@ -104,7 +140,7 @@ serve(async (req: Request) => {
     const { error: updateError } = await supabaseClient
         .from('quotes')
         .update({ current_version_id: newVersion.id })
-        .eq('id', quoteId);
+        .eq('id', resolvedQuoteId);
 
     if (updateError) {
         console.warn('[save-quotation-version] Failed to update current_version_id on quote:', updateError);

@@ -1197,10 +1197,10 @@ export function FormZone({
         <div
           className={cn(
             "space-y-2 rounded-md transition-colors",
-            hasFieldError('commodity') && "border border-destructive/40 bg-destructive/5 ring-1 ring-destructive/40 p-2"
+            (hasFieldError('commodity') || hasFieldError('weight')) && "border border-destructive/40 bg-destructive/5 ring-1 ring-destructive/40 p-2"
           )}
           data-field-name="commodity"
-          aria-invalid={hasFieldError('commodity')}
+          aria-invalid={hasFieldError('commodity') || hasFieldError('weight')}
         >
           <Label className="flex justify-between">
             <span>Commodity & Cargo {hasFieldError('commodity') && <span className="ml-2"><InlineError message={getFieldErrorMessage('commodity')} /></span>}</span>

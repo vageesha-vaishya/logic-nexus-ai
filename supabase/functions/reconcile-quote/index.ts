@@ -1,6 +1,40 @@
 import { serveWithLogger } from "../_shared/logger.ts"
 import { getCorsHeaders } from "../_shared/cors.ts"
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+async function resolveQuoteRecord(supabase: any, quoteRef: string) {
+  const normalizedQuoteRef = String(quoteRef || "").trim()
+  const quoteRefIsUuid = UUID_REGEX.test(normalizedQuoteRef)
+
+  let primaryQuery = supabase
+    .from("quotes")
+    .select("id, quote_number, origin_port_id, destination_port_id, currency, shipping_amount, accounts(name)")
+
+  if (quoteRefIsUuid) {
+    primaryQuery = primaryQuery.or(`id.eq.${normalizedQuoteRef},quote_number.eq.${normalizedQuoteRef}`)
+  } else {
+    primaryQuery = primaryQuery.eq("quote_number", normalizedQuoteRef)
+  }
+
+  const primaryResult = await primaryQuery.limit(1).maybeSingle()
+  if (primaryResult.error) throw primaryResult.error
+
+  let quote = primaryResult.data
+  if (!quote && !quoteRefIsUuid) {
+    const fallbackResult = await supabase
+      .from("quotes")
+      .select("id, quote_number, origin_port_id, destination_port_id, currency, shipping_amount, accounts(name)")
+      .eq("id", normalizedQuoteRef)
+      .limit(1)
+      .maybeSingle()
+    if (fallbackResult.error) throw fallbackResult.error
+    quote = fallbackResult.data
+  }
+
+  return quote || null
+}
+
 serveWithLogger(async (req, logger, supabase) => {
   try {
     if (req.method === "OPTIONS") {
@@ -12,17 +46,14 @@ serveWithLogger(async (req, logger, supabase) => {
       return new Response(JSON.stringify({ error: "Missing quoteId" }), { status: 400, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } })
     }
 
-    const { data: quote, error: qErr } = await supabase
-      .from("quotes")
-      .select("id, quote_number, origin_port_id, destination_port_id, currency, shipping_amount, accounts(name)")
-      .eq("id", quoteId)
-      .single()
-    if (qErr) throw qErr
+    const quote = await resolveQuoteRecord(supabase, quoteId)
+    if (!quote) throw new Error("Quote not found")
+    const resolvedQuoteId = String(quote.id)
 
     const { data: version, error: vErr } = await supabase
       .from("quotation_versions")
       .select("id, version_number")
-      .eq("quote_id", quoteId)
+      .eq("quote_id", resolvedQuoteId)
       .order("created_at", { ascending: false })
       .limit(1)
       .single()
@@ -44,7 +75,7 @@ serveWithLogger(async (req, logger, supabase) => {
     }
 
     const { data: previewResp, error: pErr } = await supabase.functions.invoke("generate-quote-pdf", {
-      body: { quoteId, versionId: version.id, engine_v2: true, source: "reconcile", action: "generate-pdf" },
+      body: { quoteId: resolvedQuoteId, versionId: version.id, engine_v2: true, source: "reconcile", action: "generate-pdf" },
       method: "POST"
     })
     if (pErr) {

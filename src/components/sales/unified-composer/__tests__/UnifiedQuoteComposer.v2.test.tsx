@@ -23,30 +23,44 @@ vi.mock('@/components/ui/sheet', () => ({
   SheetTitle: ({ children }: any) => <div>{children}</div>,
   SheetTrigger: ({ children }: any) => <div>{children}</div>
 }));
+vi.mock('@/components/ui/dialog', () => ({
+  Dialog: ({ children }: any) => <div>{children}</div>,
+  DialogContent: ({ children }: any) => <div>{children}</div>,
+  DialogHeader: ({ children }: any) => <div>{children}</div>,
+  DialogTitle: ({ children }: any) => <div>{children}</div>,
+  DialogDescription: ({ children }: any) => <div>{children}</div>,
+  DialogFooter: ({ children }: any) => <div>{children}</div>,
+  DialogTrigger: ({ children }: any) => <div>{children}</div>,
+  DialogClose: ({ children }: any) => <div>{children}</div>,
+}));
 
 // Mock icons
-vi.mock('lucide-react', () => ({
-  Plane: () => <span>Plane</span>,
-  Ship: () => <span>Ship</span>,
-  Truck: () => <span>Truck</span>,
-  Train: () => <span>Train</span>,
-  Timer: () => <span>Timer</span>,
-  Sparkles: () => <span>Sparkles</span>,
-  ChevronDown: () => <span>ChevronDown</span>,
-  ChevronRight: () => <span>ChevronRight</span>,
-  Search: () => <span>Search</span>,
-  ChevronLeft: () => <span>ChevronLeft</span>,
-  Save: () => <span>Save</span>,
-  Settings2: () => <span>Settings2</span>,
-  Building2: () => <span>Building2</span>,
-  User: () => <span>User</span>,
-  FileText: () => <span>FileText</span>,
-  Loader2: () => <span>Loader2</span>,
-  AlertCircle: () => <span>AlertCircle</span>,
-  History: () => <span>History</span>,
-  ExternalLink: () => <span>ExternalLink</span>,
-  LayoutGrid: () => <span>LayoutGrid</span>,
-}));
+vi.mock('lucide-react', async () => {
+  const actual = await vi.importActual<typeof import('lucide-react')>('lucide-react');
+  return {
+    ...actual,
+    Plane: () => <span>Plane</span>,
+    Ship: () => <span>Ship</span>,
+    Truck: () => <span>Truck</span>,
+    Train: () => <span>Train</span>,
+    Timer: () => <span>Timer</span>,
+    Sparkles: () => <span>Sparkles</span>,
+    ChevronDown: () => <span>ChevronDown</span>,
+    ChevronRight: () => <span>ChevronRight</span>,
+    Search: () => <span>Search</span>,
+    ChevronLeft: () => <span>ChevronLeft</span>,
+    Save: () => <span>Save</span>,
+    Settings2: () => <span>Settings2</span>,
+    Building2: () => <span>Building2</span>,
+    User: () => <span>User</span>,
+    FileText: () => <span>FileText</span>,
+    Loader2: () => <span>Loader2</span>,
+    AlertCircle: () => <span>AlertCircle</span>,
+    History: () => <span>History</span>,
+    ExternalLink: () => <span>ExternalLink</span>,
+    LayoutGrid: () => <span>LayoutGrid</span>,
+  };
+});
 
 // Mock hooks
 const mockDispatch = vi.fn();

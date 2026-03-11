@@ -97,6 +97,7 @@ const Quotes = lazy(() => import("./pages/dashboard/Quotes"));
 const QuoteTemplates = lazy(() => import("./pages/dashboard/QuoteTemplates"));
 const QuoteNew = lazy(() => import("./pages/dashboard/QuoteNew"));
 const QuoteDetail = lazy(() => import("./pages/dashboard/QuoteDetail"));
+const QuotesImportExport = lazy(() => import("./pages/dashboard/QuotesImportExport"));
 const QuotesPipeline = lazy(() => 
   import("./pages/dashboard/QuotesPipeline").catch(() => {
     // Retry once after 1s in case of network glitch
@@ -498,6 +499,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <Quotes />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/dashboard/quotes/import-export" 
+              element={
+                <ProtectedRoute requiredPermissions={["quotes.import_export"]}>
+                  <QuotesImportExport />
                 </ProtectedRoute>
               } 
             />

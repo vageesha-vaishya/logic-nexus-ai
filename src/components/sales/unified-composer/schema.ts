@@ -1,5 +1,15 @@
 import * as z from 'zod';
 
+const parseNumericInput = (val?: string | null) => {
+  if (!val) return NaN;
+  const normalized = String(val).trim().replace(/[, ]/g, '');
+  if (!normalized) return NaN;
+  const match = normalized.match(/-?\d+(?:\.\d+)?/);
+  if (!match) return NaN;
+  const n = Number(match[0]);
+  return Number.isFinite(n) ? n : NaN;
+};
+
 export const quoteComposerSchema = z.object({
   // Phase 0: General Info
   accountId: z.string().optional(),
@@ -60,12 +70,12 @@ export const quoteComposerSchema = z.object({
   preferredCarriers: z.array(z.string()).optional(),
   weight: z.string().optional().refine((val) => {
     if (!val) return true;
-    const n = Number(val);
+    const n = parseNumericInput(val);
     return !isNaN(n) && n >= 0;
   }, { message: 'Please enter a valid positive weight' }),
   volume: z.string().optional().refine((val) => {
     if (!val) return true;
-    const n = Number(val);
+    const n = parseNumericInput(val);
     return !isNaN(n) && n >= 0;
   }, { message: 'Please enter a valid positive volume' }),
   unit: z.enum(['kg', 'lb', 'cbm']).optional(),
@@ -120,8 +130,9 @@ export const quoteComposerSchema = z.object({
   }
   
   if (data.mode === 'air') {
-    if (!data.weight || isNaN(Number(data.weight)) || Number(data.weight) <= 0) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Air freight requires a valid weight', path: ['weight'] });
+    const parsedWeight = parseNumericInput(data.weight);
+    if (!Number.isFinite(parsedWeight) || parsedWeight <= 0) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Air freight requires a valid weight greater than 0', path: ['weight'] });
     }
   }
   if (data.mode === 'ocean' || data.mode === 'rail') {

@@ -10,7 +10,11 @@ export default defineConfig({
     setupFiles: './test/setup.ts',
     pool: 'forks',
     maxWorkers: 1,
-    vmMemoryLimit: '1024MB',
+    vmMemoryLimit: '4096MB',
+    forks: {
+      singleFork: true,
+      execArgv: ['--max-old-space-size=4096'],
+    },
     exclude: [...configDefaults.exclude, 'tests/e2e/**'],
   },
   resolve: {

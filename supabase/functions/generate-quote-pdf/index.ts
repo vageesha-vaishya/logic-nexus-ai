@@ -19,6 +19,7 @@ import JSZip from "https://esm.sh/jszip@3.10.1";
 import Handlebars from "https://esm.sh/handlebars@4.7.7";
 
 declare const Deno: any;
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 serveWithLogger(async (req, logger, adminSupabase) => {
   try {
@@ -212,7 +213,9 @@ serveWithLogger(async (req, logger, adminSupabase) => {
     await logger.info(`Sell Side ID: ${sellSideId}`);
 
     // Fetch Quote Data (without embedding items to avoid view relationship issues)
-    const { data: quote, error: quoteError } = await supabaseClient
+    const quoteRef = String(quoteId || '').trim();
+    const quoteRefIsUuid = UUID_REGEX.test(quoteRef);
+    let primaryQuoteQuery = supabaseClient
       .from("quotes")
       .select(`
         *,
@@ -221,12 +224,42 @@ serveWithLogger(async (req, logger, adminSupabase) => {
         contacts:contacts!contact_id (first_name, last_name, email, phone),
         origin:ports_locations!origin_port_id(location_name, country_id),
         destination:ports_locations!destination_port_id(location_name, country_id)
-      `)
-      .eq("id", quoteId)
-      .single();
+      `);
 
-    if (quoteError) throw new Error(`Error fetching quote: ${quoteError.message}`);
+    if (quoteRefIsUuid) {
+      primaryQuoteQuery = primaryQuoteQuery.or(`id.eq.${quoteRef},quote_number.eq.${quoteRef}`);
+    } else {
+      primaryQuoteQuery = primaryQuoteQuery.eq("quote_number", quoteRef);
+    }
+
+    const primaryQuoteResult = await primaryQuoteQuery
+      .limit(1)
+      .maybeSingle();
+
+    if (primaryQuoteResult.error) throw new Error(`Error fetching quote: ${primaryQuoteResult.error.message}`);
+    let quote = primaryQuoteResult.data;
+
+    if (!quote && !quoteRefIsUuid) {
+      const fallbackQuoteResult = await supabaseClient
+        .from("quotes")
+        .select(`
+          *,
+          currency_meta:currencies!currency_id(code),
+          accounts (name, billing_street, billing_city, billing_state, billing_postal_code, billing_country, phone, email, account_number),
+          contacts:contacts!contact_id (first_name, last_name, email, phone),
+          origin:ports_locations!origin_port_id(location_name, country_id),
+          destination:ports_locations!destination_port_id(location_name, country_id)
+        `)
+        .eq("id", quoteRef)
+        .limit(1)
+        .maybeSingle();
+
+      if (fallbackQuoteResult.error) throw new Error(`Error fetching quote: ${fallbackQuoteResult.error.message}`);
+      quote = fallbackQuoteResult.data;
+    }
+
     if (!quote) throw new Error("Quote not found");
+    quoteId = String((quote as any).id || quoteRef);
 
     // Explicit tenant/franchise access checks for authenticated user context.
     if (authenticatedUserId) {

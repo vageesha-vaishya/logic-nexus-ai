@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
-import { UnifiedQuoteComposer } from './UnifiedQuoteComposer';
+import { UnifiedQuoteComposer, getSaveErrorMessage } from './UnifiedQuoteComposer';
 /* import { UnifiedQuoteComposer } from './UnifiedQuoteComposer'; */
 import { MemoryRouter } from 'react-router-dom';
 
@@ -108,7 +108,7 @@ const {
 });
 
 // Helper for test cases (re-defined outside for usage in tests)
-const createSafeChain = (name: string, data: any = [], error: any = null) => ({
+const createSafeChain = (_name: string, data: any = [], error: any = null) => ({
     select: vi.fn(() => ({
         eq: vi.fn(() => ({
             single: vi.fn().mockResolvedValue({ data: Array.isArray(data) ? data[0] : data, error }),
@@ -328,6 +328,9 @@ vi.mock('./FormZone', () => ({
             </div>
             <div data-field-name="commodity">
                 <input name="commodity" data-testid="commodity-field" />
+            </div>
+            <div data-field-name="weight">
+                <input name="weight" data-testid="weight-field" />
             </div>
             <button
                 data-testid="search-btn"
@@ -706,6 +709,252 @@ describe('UnifiedQuoteComposer - Save Functionality', () => {
         });
     });
 
+    it('saves standalone quote while clearing CRM linkage fields', async () => {
+        mockFormReturn.getValues.mockReturnValue({
+            ...mockFormReturn.getValues(),
+            standalone: true,
+            guestCompany: '',
+            accountId: '',
+            contactId: '',
+            opportunityId: '',
+            quoteTitle: 'Standalone Quote',
+        });
+
+        render(
+            <MemoryRouter>
+                <UnifiedQuoteComposer initialData={{ mode: 'ocean', standalone: true }} />
+            </MemoryRouter>
+        );
+
+        fireEvent.click(await screen.findByTestId('select-option-btn'));
+        const saveBtn = await screen.findByTestId('save-quote-btn');
+        fireEvent.click(saveBtn);
+
+        await waitFor(() => {
+            expect(mockScopedDb.rpc).toHaveBeenCalledWith(
+                'save_quote_atomic',
+                expect.objectContaining({
+                    p_payload: expect.objectContaining({
+                        quote: expect.objectContaining({
+                            account_id: null,
+                            contact_id: null,
+                            opportunity_id: null,
+                        }),
+                        options: expect.any(Array),
+                    }),
+                })
+            );
+        });
+    });
+
+    it('resolves quote UUID from quote number using tenant-scoped match', async () => {
+        const matchingQuoteId = '00000000-0000-0000-0000-000000000123';
+        const quoteRows = [
+            { id: '00000000-0000-0000-0000-000000000999', tenant_id: 'tenant-other' },
+            { id: matchingQuoteId, tenant_id: 'tenant-123' },
+        ];
+
+        const quoteBuilder: any = {
+            eq: vi.fn(),
+            neq: vi.fn(),
+            ilike: vi.fn(),
+            order: vi.fn(),
+            limit: vi.fn(),
+            single: vi.fn(),
+            maybeSingle: vi.fn(),
+        };
+        quoteBuilder.eq.mockReturnValue(quoteBuilder);
+        quoteBuilder.neq.mockReturnValue(quoteBuilder);
+        quoteBuilder.ilike.mockReturnValue(quoteBuilder);
+        quoteBuilder.order.mockResolvedValue({ data: quoteRows, error: null });
+        quoteBuilder.limit.mockResolvedValue({ data: [], error: null });
+        quoteBuilder.single.mockResolvedValue({ data: { quote_number: 'QUO-260309-00001' }, error: null });
+        quoteBuilder.maybeSingle.mockResolvedValue({ data: quoteRows[1], error: null });
+
+        const quoteChain = {
+            select: vi.fn(() => quoteBuilder),
+            update: vi.fn(() => ({ eq: vi.fn().mockResolvedValue({ data: null, error: null }) })),
+            insert: vi.fn().mockResolvedValue({ data: null, error: null }),
+            upsert: vi.fn().mockResolvedValue({ data: null, error: null }),
+            delete: vi.fn().mockResolvedValue({ data: null, error: null }),
+        };
+
+        mockScopedDb.from.mockReturnValue(quoteChain as any);
+
+        render(
+            <MemoryRouter>
+                <UnifiedQuoteComposer quoteId="QUO-260309-00001" initialData={{ mode: 'ocean', origin: 'Miami', destination: 'Santos' }} />
+            </MemoryRouter>
+        );
+
+        fireEvent.click(await screen.findByTestId('select-option-btn'));
+        fireEvent.click(await screen.findByTestId('save-quote-btn'));
+
+        await waitFor(() => {
+            expect(mockScopedDb.rpc).toHaveBeenCalledWith(
+                'save_quote_atomic',
+                expect.objectContaining({
+                    p_payload: expect.objectContaining({
+                        quote: expect.objectContaining({
+                            id: matchingQuoteId,
+                        }),
+                    }),
+                })
+            );
+        });
+    });
+
+    it('treats matching tenant quote_number as update instead of duplicate in standalone mode', async () => {
+        const matchingQuoteId = '00000000-0000-0000-0000-000000000123';
+        const { QuotationNumberService } = await import('@/services/quotation/QuotationNumberService');
+        (QuotationNumberService.isUnique as any).mockResolvedValueOnce(false);
+
+        mockFormReturn.getValues.mockReturnValue({
+            ...mockFormReturn.getValues(),
+            standalone: true,
+            quoteNumber: 'QUO-260309-00001',
+            quoteTitle: 'Standalone Quote',
+            accountId: '',
+            contactId: '',
+            opportunityId: '',
+        });
+
+        (mockScopedDb.from as any).mockImplementation((...args: any[]) => {
+            const table = args[0];
+            if (table === 'quotes') {
+                const quoteBuilder: any = {
+                    eq: vi.fn(),
+                    neq: vi.fn(),
+                    ilike: vi.fn(),
+                    order: vi.fn(),
+                    limit: vi.fn(),
+                    single: vi.fn(),
+                    maybeSingle: vi.fn(),
+                };
+                quoteBuilder.eq.mockReturnValue(quoteBuilder);
+                quoteBuilder.neq.mockReturnValue(quoteBuilder);
+                quoteBuilder.ilike.mockReturnValue(quoteBuilder);
+                quoteBuilder.order.mockResolvedValue({
+                    data: [{ id: matchingQuoteId, tenant_id: 'tenant-123' }],
+                    error: null,
+                });
+                quoteBuilder.limit.mockResolvedValue({ data: [], error: null });
+                quoteBuilder.single.mockResolvedValue({
+                    data: { quote_number: 'QUO-260309-00001', notes: null },
+                    error: null,
+                });
+                quoteBuilder.maybeSingle.mockResolvedValue({ data: null, error: null });
+                return {
+                    select: vi.fn(() => quoteBuilder),
+                    update: vi.fn(() => ({ eq: vi.fn().mockResolvedValue({ data: null, error: null }) })),
+                    insert: vi.fn().mockResolvedValue({ data: null, error: null }),
+                    upsert: vi.fn().mockResolvedValue({ data: null, error: null }),
+                    delete: vi.fn().mockResolvedValue({ data: null, error: null }),
+                } as any;
+            }
+            return createSafeChain('default', []);
+        });
+
+        render(
+            <MemoryRouter>
+                <UnifiedQuoteComposer initialData={{ mode: 'ocean', standalone: true, origin: 'Miami', destination: 'Santos' }} />
+            </MemoryRouter>
+        );
+
+        fireEvent.click(await screen.findByTestId('select-option-btn'));
+        fireEvent.click(await screen.findByTestId('save-quote-btn'));
+
+        await waitFor(() => {
+            expect(mockScopedDb.rpc).toHaveBeenCalledWith(
+                'save_quote_atomic',
+                expect.objectContaining({
+                    p_payload: expect.objectContaining({
+                        quote: expect.objectContaining({
+                            id: matchingQuoteId,
+                        }),
+                    }),
+                })
+            );
+        });
+    });
+
+    it('updates matching standalone draft by quote_number and clears CRM linkage', async () => {
+        const matchingQuoteId = '00000000-0000-0000-0000-000000000321';
+        mockFormReturn.getValues.mockReturnValue({
+            ...mockFormReturn.getValues(),
+            standalone: true,
+            quoteNumber: 'QUO-260309-00001',
+            quoteTitle: 'Standalone Draft Quote',
+            accountId: 'acc-legacy',
+            contactId: 'con-legacy',
+            opportunityId: 'opp-legacy',
+            guestCompany: 'Miami Global Line',
+            guestName: 'Ops Team',
+            guestEmail: 'ops@miamigloballine.com',
+            billingAddress: {
+                street: '100 Biscayne Blvd',
+                city: 'Miami',
+                country: 'USA',
+            },
+        });
+
+        (mockScopedDb.from as any).mockImplementation((...args: any[]) => {
+            const table = args[0];
+            if (table === 'quotes') {
+                const quoteBuilder: any = {
+                    eq: vi.fn(),
+                    order: vi.fn(),
+                    single: vi.fn(),
+                };
+                quoteBuilder.eq.mockReturnValue(quoteBuilder);
+                quoteBuilder.order.mockResolvedValue({
+                    data: [{ id: matchingQuoteId, tenant_id: 'tenant-123' }],
+                    error: null,
+                });
+                quoteBuilder.single.mockResolvedValue({
+                    data: { quote_number: 'QUO-260309-00001' },
+                    error: null,
+                });
+
+                return {
+                    select: vi.fn(() => quoteBuilder),
+                    update: vi.fn(() => ({ eq: vi.fn().mockResolvedValue({ data: null, error: null }) })),
+                    insert: vi.fn().mockResolvedValue({ data: null, error: null }),
+                    upsert: vi.fn().mockResolvedValue({ data: null, error: null }),
+                    delete: vi.fn().mockResolvedValue({ data: null, error: null }),
+                } as any;
+            }
+            return createSafeChain('default', []);
+        });
+
+        mockScopedDb.rpc.mockResolvedValue({ data: matchingQuoteId, error: null });
+
+        render(
+            <MemoryRouter>
+                <UnifiedQuoteComposer initialData={{ mode: 'ocean', standalone: true, origin: 'Miami', destination: 'Santos' }} />
+            </MemoryRouter>
+        );
+
+        fireEvent.click(await screen.findByTestId('draft-btn'));
+
+        await waitFor(() => {
+            expect(mockScopedDb.rpc).toHaveBeenCalledWith(
+                'save_quote_atomic',
+                expect.objectContaining({
+                    p_payload: expect.objectContaining({
+                        quote: expect.objectContaining({
+                            id: matchingQuoteId,
+                            quote_number: 'QUO-260309-00001',
+                            account_id: null,
+                            contact_id: null,
+                            opportunity_id: null,
+                        }),
+                    }),
+                })
+            );
+        });
+    });
+
     it('persists commodity inside quote.cargo_details when saving', async () => {
         const initialData = {
             mode: 'ocean',
@@ -930,10 +1179,7 @@ describe('UnifiedQuoteComposer - Save Functionality', () => {
 
     it('retries draft save after auto-seeding missing charge sides', async () => {
         const chargeSidesChain = createSafeChain('charge_sides', []);
-        mockScopedDb.from.mockImplementation((table: string) => {
-            if (table === 'charge_sides') return chargeSidesChain;
-            return createSafeChain(table, []);
-        });
+        mockScopedDb.from.mockImplementation(() => chargeSidesChain);
         mockScopedDb.rpc
             .mockResolvedValueOnce({ data: null, error: { message: 'save_quote_atomic: no sell-side entry found' } })
             .mockResolvedValueOnce({ data: 'new-quote-id', error: null });
@@ -960,11 +1206,7 @@ describe('UnifiedQuoteComposer - Save Functionality', () => {
 
     it('retries final save after auto-seeding missing charge sides', async () => {
         const chargeSidesChain = createSafeChain('charge_sides', []);
-        mockScopedDb.from.mockImplementation((table: string) => {
-            if (table === 'charge_sides') return chargeSidesChain;
-            if (table === 'quotes') return createSafeChain('quotes', { quote_number: 'QUO-260309-00001' });
-            return createSafeChain(table, []);
-        });
+        mockScopedDb.from.mockImplementation(() => chargeSidesChain);
         mockScopedDb.rpc
             .mockResolvedValueOnce({ data: null, error: { message: 'save_quote_atomic: no buy-side entry found' } })
             .mockResolvedValueOnce({ data: 'new-quote-id', error: null });
@@ -1023,6 +1265,26 @@ describe('UnifiedQuoteComposer - Save Functionality', () => {
 
         await waitFor(() => {
             expect(scrollSpy).toHaveBeenCalled();
+        });
+    });
+
+    it('focuses weight input when air weight validation fails on save', async () => {
+        mockFormReturn.trigger.mockResolvedValue(false);
+        mockFormReturn.formState.errors = {
+            weight: { message: 'Air freight requires a valid weight greater than 0' },
+        };
+
+        render(
+            <MemoryRouter>
+                <UnifiedQuoteComposer initialData={{ mode: 'air' }} />
+            </MemoryRouter>
+        );
+
+        fireEvent.click(await screen.findByTestId('select-option-btn'));
+        fireEvent.click(await screen.findByTestId('save-quote-btn'));
+
+        await waitFor(() => {
+            expect(screen.getByTestId('weight-field')).toHaveFocus();
         });
     });
 
@@ -1105,4 +1367,37 @@ describe('UnifiedQuoteComposer - Save Functionality', () => {
             })
         );
     });
+});
+
+describe('getSaveErrorMessage', () => {
+  it('returns field-specific message for duplicate quote number', () => {
+    const { errorMessage, fieldErrors } = getSaveErrorMessage({
+      code: '23505',
+      message: 'duplicate key value violates unique constraint "quotes_quote_number_key"',
+      details: 'Key (quote_number)=(QUO-260309-00001) already exists.',
+    });
+
+    expect(errorMessage).toContain('Quote Number');
+    expect(errorMessage).toContain('QUO-260309-00001');
+    expect(fieldErrors[0]).toEqual({
+      path: 'quote_number',
+      label: 'Quote Number',
+      message: 'Quote Number "QUO-260309-00001" already exists.',
+    });
+  });
+
+  it('returns field-specific message for required title', () => {
+    const { errorMessage, fieldErrors } = getSaveErrorMessage({
+      code: '23502',
+      message: 'null value in column "title" of relation "quotes" violates not-null constraint',
+      details: 'Failing row contains (...)',
+    });
+
+    expect(errorMessage).toContain('Quote Title');
+    expect(fieldErrors[0]).toEqual({
+      path: 'title',
+      label: 'Quote Title',
+      message: 'Quote Title is required.',
+    });
+  });
 });

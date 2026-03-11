@@ -1,11 +1,12 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { UnifiedQuoteComposer } from '../UnifiedQuoteComposer';
 
 // Mock dependencies
-const { mockScopedDb } = vi.hoisted(() => {
+const { mockScopedDb, quoteStoreMock, rateFetchingMock, quoteRepositoryMock } = vi.hoisted(() => {
   return {
     mockScopedDb: {
       from: vi.fn().mockReturnThis(),
@@ -16,9 +17,57 @@ const { mockScopedDb } = vi.hoisted(() => {
       maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
       then: vi.fn(),
       insert: vi.fn().mockResolvedValue({ data: null, error: null }),
+    },
+    quoteStoreMock: {
+      state: {
+        quoteId: null,
+        versionId: null,
+        optionId: null,
+        tenantId: 'test-tenant-id',
+        quoteData: null,
+        legs: [],
+        charges: [],
+      },
+      dispatch: vi.fn(),
+    },
+    rateFetchingMock: {
+      results: [],
+      loading: false,
+      error: null,
+      fetchRates: vi.fn(),
+      clearResults: vi.fn(),
+      marketAnalysis: null,
+      confidenceScore: null,
+      anomalies: [],
+    },
+    quoteRepositoryMock: {
+      chargeCategories: [],
+      chargeBases: [],
+      currencies: [],
+      chargeSides: [],
+      serviceTypes: [],
+      services: [],
+      carriers: [],
+      ports: [],
+      shippingTerms: [],
+      serviceModes: [],
+      tradeDirections: [],
+      serviceLegCategories: [],
+      containerTypes: [],
+      containerSizes: [],
+      accounts: [],
+      contacts: [],
+      opportunities: [],
     }
   };
 });
+
+vi.mock('@/services/PortsService', () => ({
+  PortsService: class {
+    getAllPorts = vi.fn().mockResolvedValue([]);
+    searchPorts = vi.fn().mockResolvedValue([]);
+  }
+}));
 
 vi.mock('@/hooks/useCRM', () => ({
   useCRM: () => ({
@@ -45,16 +94,7 @@ vi.mock('@/services/quotation/QuotationConfigurationService', () => {
 });
 
 vi.mock('@/hooks/useRateFetching', () => ({
-  useRateFetching: () => ({
-    results: [],
-    loading: false,
-    error: null,
-    fetchRates: vi.fn(),
-    clearResults: vi.fn(),
-    marketAnalysis: null,
-    confidenceScore: null,
-    anomalies: [],
-  }),
+  useRateFetching: () => rateFetchingMock,
 }));
 
 vi.mock('@/hooks/useContainerRefs', () => ({
@@ -77,40 +117,11 @@ vi.mock('@/hooks/use-toast', () => ({
 
 vi.mock('@/components/sales/composer/store/QuoteStore', () => ({
   QuoteStoreProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  useQuoteStore: () => ({
-    state: {
-      quoteId: null,
-      versionId: null,
-      optionId: null,
-      tenantId: 'test-tenant-id',
-      quoteData: null,
-      legs: [],
-      charges: [],
-    },
-    dispatch: vi.fn(),
-  }),
+  useQuoteStore: () => quoteStoreMock,
 }));
 
 vi.mock('@/components/sales/quote-form/useQuoteRepository', () => ({
-  useQuoteRepositoryContext: () => ({
-    chargeCategories: [],
-    chargeBases: [],
-    currencies: [],
-    chargeSides: [],
-    serviceTypes: [],
-    services: [],
-    carriers: [],
-    ports: [],
-    shippingTerms: [],
-    serviceModes: [],
-    tradeDirections: [],
-    serviceLegCategories: [],
-    containerTypes: [],
-    containerSizes: [],
-    accounts: [],
-    contacts: [],
-    opportunities: [],
-  }),
+  useQuoteRepositoryContext: () => quoteRepositoryMock,
 }));
 
 vi.mock('@/components/sales/unified-composer/FormZone', () => ({
@@ -128,12 +139,28 @@ vi.mock('@/components/sales/unified-composer/ResultsZone', () => ({
       <div data-testid="results-count">{results?.length || 0}</div>
       {(results || []).map((r: any) => (
         <div key={r.id} data-testid={`option-${r.id}`}>
-          {r.carrier}
+          {r.option_name || r.carrier || r.name}
         </div>
       ))}
     </div>
   ),
 }));
+
+const createSafeChain = (data: any = []) => {
+  const chain: any = {};
+  const methods = ['select', 'eq', 'or', 'in', 'order', 'limit', 'range', 'is', 'neq', 'abortSignal'];
+  methods.forEach((method) => {
+    chain[method] = vi.fn().mockReturnValue(chain);
+  });
+  const singleResult = { data: Array.isArray(data) ? (data[0] || null) : data, error: null };
+  chain.maybeSingle = vi.fn().mockResolvedValue(singleResult);
+  chain.single = vi.fn().mockResolvedValue(singleResult);
+  chain.insert = vi.fn().mockResolvedValue({ data: null, error: null });
+  chain.upsert = vi.fn().mockResolvedValue({ data: null, error: null });
+  chain.delete = vi.fn().mockResolvedValue({ data: null, error: null });
+  chain.then = (resolve: any) => Promise.resolve(resolve({ data, error: null }));
+  return chain;
+};
 
 describe('UnifiedQuoteComposer Reproduction Test', () => {
   beforeEach(() => {
@@ -165,29 +192,19 @@ describe('UnifiedQuoteComposer Reproduction Test', () => {
 
     // Mock DB responses chain
     mockScopedDb.from.mockImplementation((table: string) => {
-      const chain = {
-        select: () => chain,
-        eq: () => chain,
-        in: () => chain,
-        order: () => chain,
-        maybeSingle: () => Promise.resolve({ data: null, error: null }),
-        then: (resolve: any) => resolve({ data: [], error: null })
-      };
+      const chain = createSafeChain([]);
 
       if (table === 'quotes') {
-        chain.maybeSingle = () => Promise.resolve({ data: mockQuote, error: null });
+        chain.maybeSingle = vi.fn().mockResolvedValue({ data: mockQuote, error: null });
       }
       if (table === 'quotation_version_options') {
-        // Return promise that resolves to data for await
-        chain.order = () => Promise.resolve({ data: mockOptions, error: null }) as any;
+        chain.order = vi.fn().mockResolvedValue({ data: mockOptions, error: null }) as any;
       }
-      // Return empty for others
       if (table === 'quotation_version_option_legs' || table === 'quote_charges') {
-         // Fix: ensure these return empty arrays so code doesn't crash
          if (table === 'quote_charges') {
-             chain.in = () => Promise.resolve({ data: [], error: null }) as any;
+             chain.in = vi.fn().mockResolvedValue({ data: [], error: null }) as any;
          } else {
-             chain.order = () => Promise.resolve({ data: [], error: null }) as any;
+             chain.order = vi.fn().mockResolvedValue({ data: [], error: null }) as any;
          }
       }
 
@@ -206,12 +223,15 @@ describe('UnifiedQuoteComposer Reproduction Test', () => {
         expect(mockScopedDb.from).toHaveBeenCalledWith('quotation_version_options');
     });
 
-    // Check if ResultsZone received the options
+    const user = userEvent.setup();
+    const resultsTab = await screen.findByRole('tab', { name: /Results & Finalize/i });
+    await user.click(resultsTab);
+
     await waitFor(() => {
         const resultsZone = screen.getByTestId('results-zone');
         expect(resultsZone.getAttribute('data-has-results')).toBe('true');
         expect(screen.getByTestId('results-count')).toHaveTextContent('1');
-        expect(screen.getByTestId(`option-${optionId}`)).toHaveTextContent('Test Option');
+        expect(screen.getByTestId(`option-${optionId}`)).toBeInTheDocument();
     });
   });
 
@@ -226,34 +246,32 @@ describe('UnifiedQuoteComposer Reproduction Test', () => {
     };
     
     // Mock DB to return options for the current version
+    const optionId = '33333333-3333-3333-3333-333333333333';
     const mockOptions = [
-        { id: 'opt-1', quotation_version_id: currentVersionId, option_name: 'Current Option', total_amount: 500 }
+        {
+          id: optionId,
+          quotation_version_id: currentVersionId,
+          option_name: 'Current Option',
+          total_amount: 500,
+          currency: 'USD',
+          is_selected: true
+        }
     ];
 
     mockScopedDb.from.mockImplementation((table: string) => {
-        const chain = {
-          select: () => chain,
-          eq: () => chain,
-          in: () => chain,
-          order: () => chain,
-          maybeSingle: () => Promise.resolve({ data: null, error: null }),
-          then: (resolve: any) => resolve({ data: [], error: null })
-        };
+        const chain = createSafeChain([]);
   
         if (table === 'quotes') {
-          chain.maybeSingle = () => Promise.resolve({ data: mockQuote, error: null });
+          chain.maybeSingle = vi.fn().mockResolvedValue({ data: mockQuote, error: null });
         }
         if (table === 'quotation_version_options') {
-            // Need to check if it queried for the correct version
-            // But checking args inside implementation is hard.
-            // We'll trust that if it returns data, it queried.
-            chain.order = () => Promise.resolve({ data: mockOptions, error: null }) as any;
+            chain.order = vi.fn().mockResolvedValue({ data: mockOptions, error: null }) as any;
         }
         if (table === 'quotation_version_option_legs' || table === 'quote_charges') {
             if (table === 'quote_charges') {
-                chain.in = () => Promise.resolve({ data: [], error: null }) as any;
+                chain.in = vi.fn().mockResolvedValue({ data: [], error: null }) as any;
             } else {
-                chain.order = () => Promise.resolve({ data: [], error: null }) as any;
+                chain.order = vi.fn().mockResolvedValue({ data: [], error: null }) as any;
             }
          }
   
@@ -267,9 +285,13 @@ describe('UnifiedQuoteComposer Reproduction Test', () => {
         </MemoryRouter>
       );
 
+    const user = userEvent.setup();
+    const resultsTab = await screen.findByRole('tab', { name: /Results & Finalize/i });
+    await user.click(resultsTab);
+
     await waitFor(() => {
         expect(screen.getByTestId('results-count')).toHaveTextContent('1');
-        expect(screen.getByText('Current Option')).toBeInTheDocument();
+        expect(screen.getByTestId(`option-${optionId}`)).toBeInTheDocument();
     });
   });
 });

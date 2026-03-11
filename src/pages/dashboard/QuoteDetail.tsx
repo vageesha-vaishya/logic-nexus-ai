@@ -20,10 +20,14 @@ import { DetailScreenTemplate } from '@/components/system/DetailScreenTemplate';
 import { QuotationConfigurationService } from '@/services/quotation/QuotationConfigurationService';
 import { QuotationRankingService } from '@/services/quotation/QuotationRankingService';
 import { logger } from '@/lib/logger';
+import { useAuth } from '@/hooks/useAuth';
+import { FEATURE_FLAGS, useAppFeatureFlag } from '@/lib/feature-flags';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 const RETRY_DELAYS_MS = [0, 500, 1200];
 const DEFAULT_RANKING_CRITERIA = { cost: 0.4, transit_time: 0.3, reliability: 0.3 };
 const HYDRATION_CACHE_WINDOW_MS = 1000 * 60 * 5;
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -130,6 +134,9 @@ export default function QuoteDetail() {
   const comparisonOptionsCacheRef = useRef<Record<string, { data: any[]; cachedAt: number }>>({});
   const [reloadToken, setReloadToken] = useState(0);
   const [activeSection, setActiveSection] = useState<'composer' | 'versions' | 'comparison'>('composer');
+  const { hasPermission } = useAuth();
+  const { enabled: quoteImportExportEnabled } = useAppFeatureFlag(FEATURE_FLAGS.QUOTATION_IMPORT_EXPORT_V2, true);
+  const canUseQuoteImportExport = quoteImportExportEnabled && (hasPermission('quotes.import_export') || hasPermission('import_quotation') || hasPermission('export_quotation'));
 
   useEffect(() => {
     setSelectedComparisonOptionId(urlOptionId || null);
@@ -471,45 +478,65 @@ export default function QuoteDetail() {
 
     const checkQuote = async () => {
       setError(null);
-      if (!id) {
+      const quoteRef = String(id || '').trim();
+      if (!quoteRef) {
         setError('Missing quote identifier');
         setLoading(false);
         return;
       }
-      debug.info('Resolving quote', { id });
-
-      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+      debug.info('Resolving quote', { id: quoteRef });
+      const quoteRefIsUuid = UUID_REGEX.test(quoteRef);
       let lastError: unknown = null;
 
       for (let i = 0; i < RETRY_DELAYS_MS.length; i += 1) {
         const attempt = i + 1;
         try {
-          let query = scopedDb
+          let primaryQuery = scopedDb
             .from('quotes')
             .select('id, tenant_id, quote_number');
 
-          if (isUuid) {
-            query = query.or(`id.eq.${id},quote_number.eq.${id}`);
+          if (quoteRefIsUuid) {
+            primaryQuery = primaryQuery.or(`id.eq.${quoteRef},quote_number.eq.${quoteRef}`);
           } else {
-            query = query.eq('quote_number', id);
+            primaryQuery = primaryQuery.eq('quote_number', quoteRef);
           }
 
-          const { data, error } = await query
+          const primaryResult = await primaryQuery
             .limit(1)
             .maybeSingle();
 
-          if (error) throw error;
+          let data = primaryResult.data as any;
+          if (!primaryResult.error && !data && !quoteRefIsUuid) {
+            const fallbackResult = await scopedDb
+              .from('quotes')
+              .select('id, tenant_id, quote_number')
+              .eq('id', quoteRef)
+              .limit(1)
+              .maybeSingle();
+            if (!fallbackResult.error && fallbackResult.data) {
+              logger.warn('Quote resolved via legacy identifier fallback', {
+                quoteRef,
+                resolvedId: (fallbackResult.data as any)?.id || null,
+              });
+            }
+            if (fallbackResult.error) {
+              throw fallbackResult.error;
+            }
+            data = fallbackResult.data as any;
+          }
+
+          if (primaryResult.error) throw primaryResult.error;
           if (!data) throw new Error('Quote not found');
 
-          logger.info('Quote resolved', { id, resolvedId: (data as any)?.id, attempt });
-          setResolvedId((data as any)?.id ?? null);
-          setTenantId((data as any)?.tenant_id ?? null);
-          setQuoteNumber((data as any)?.quote_number ?? null);
+          logger.info('Quote resolved', { id: quoteRef, resolvedId: data?.id, attempt });
+          setResolvedId(data?.id ?? null);
+          setTenantId(data?.tenant_id ?? null);
+          setQuoteNumber(data?.quote_number ?? quoteRef);
           return;
         } catch (err: any) {
           lastError = err;
           logger.error('Quote resolution attempt failed', {
-            id,
+            id: quoteRef,
             attempt,
             maxAttempts: RETRY_DELAYS_MS.length,
             error: err?.message || String(err),
@@ -884,6 +911,14 @@ export default function QuoteDetail() {
               >
                   Save Version
               </Button>
+              {canUseQuoteImportExport && (
+                <Button
+                  variant="outline"
+                  onClick={() => navigate(`/dashboard/quotes/import-export?mode=import&quoteId=${resolvedId}`)}
+                >
+                  Import Update
+                </Button>
+              )}
               <Button 
                   variant="outline" 
                   onClick={() => navigate(`/dashboard/bookings/new?quoteId=${resolvedId}`)}
@@ -891,6 +926,24 @@ export default function QuoteDetail() {
               >
                   Convert to Booking
               </Button>
+              {canUseQuoteImportExport && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline">Export This Quote</Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onSelect={() => navigate(`/dashboard/quotes/import-export?mode=export&scope=single&quoteId=${resolvedId}&format=csv`)}>
+                      Export as CSV
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => navigate(`/dashboard/quotes/import-export?mode=export&scope=single&quoteId=${resolvedId}&format=xlsx`)}>
+                      Export as Excel
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => navigate(`/dashboard/quotes/import-export?mode=export&scope=single&quoteId=${resolvedId}&format=json`)}>
+                      Export as JSON
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
               <QuotePreviewModal 
                 quoteId={resolvedId} 
                 quoteNumber={quoteNumber ?? (resolvedId ?? '')} 

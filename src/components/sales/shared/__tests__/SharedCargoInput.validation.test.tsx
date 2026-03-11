@@ -126,8 +126,42 @@ describe('SharedCargoInput Validation', () => {
 
     render(<SharedCargoInput {...propsWithErrors} />);
     
-    const weightInput = screen.getByPlaceholderText('Weight');
+    const weightInput = screen.getByTestId('cargo-weight');
     expect(weightInput).toHaveAttribute('aria-invalid', 'true');
+    expect(weightInput).toHaveAttribute('name', 'weight');
+    expect(screen.getByText('Invalid weight')).toBeInTheDocument();
+  });
+
+  it('links weight input to inline error for accessible feedback', () => {
+    const propsWithErrors = {
+      ...defaultProps,
+      errors: {
+        weight: { message: 'Air freight requires a valid weight greater than 0' }
+      }
+    };
+
+    render(<SharedCargoInput {...propsWithErrors} />);
+
+    const weightInput = screen.getByTestId('cargo-weight');
+    const error = screen.getByText('Air freight requires a valid weight greater than 0');
+
+    expect(error).toHaveAttribute('role', 'alert');
+    expect(weightInput).toHaveAttribute('aria-errormessage', error.getAttribute('id') || '');
+    expect(weightInput).toHaveAttribute('aria-describedby', error.getAttribute('id') || '');
+  });
+
+  it('renders weight error highlight container when validation fails', () => {
+    const propsWithErrors = {
+      ...defaultProps,
+      errors: {
+        weight: { message: 'Invalid weight' }
+      }
+    };
+
+    const { container } = render(<SharedCargoInput {...propsWithErrors} />);
+
+    const weightWrapper = container.querySelector('[data-field-name="weight"]');
+    expect(weightWrapper).toHaveAttribute('aria-invalid', 'true');
   });
 
   it('applies aria-invalid to hazmat inputs when errors are present', () => {
