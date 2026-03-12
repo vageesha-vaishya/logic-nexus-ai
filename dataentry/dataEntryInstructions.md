@@ -187,3 +187,12 @@ Test structure requirements:
 # Command To Run User Creation Program
 DATAENTRY_EMAIL="your-email" DATAENTRY_PASSWORD="your-password" \
 npx playwright test dataentry/UserCreation.spec.ts --config playwright.config.ts --project=chromium --headed
+
+
+Use this command from the project root:
+DATAENTRY_EMAIL="your-email" DATAENTRY_PASSWORD="your-password" npx playwright test /Users/sarvesh/workspace/SOS-CRM_LogicProEnt/logic-nexus-ai/dataentry/UserCreation.spec.ts --config /Users/sarvesh/workspace/SOS-CRM_LogicProEnt/logic-nexus-ai/playwright.config.ts --project=chromium --headed
+
+
+
+If your app is already running, add this to reuse existing server:
+PLAYWRIGHT_REUSE_EXISTING_SERVER=true DATAENTRY_EMAIL="mgl.tenant.admin.001@gmail.com" DATAENTRY_PASSWORD="Vimal@1234" npx playwright test /Users/sarvesh/workspace/SOS-CRM_LogicProEnt/logic-nexus-ai/dataentry/UserCreation.spec.ts --config /Users/sarvesh/workspace/SOS-CRM_LogicProEnt/logic-nexus-ai/playwright.config.ts --project=chromium --headed

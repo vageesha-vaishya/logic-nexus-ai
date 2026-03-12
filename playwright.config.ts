@@ -2,7 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 
 const firefoxNoSandbox = process.env.PW_FIREFOX_NO_SANDBOX === '1';
 const baseURL = process.env.PLAYWRIGHT_BASE_URL || process.env.BASE_URL || 'http://localhost:4173';
-const enableDevServer = process.env.PLAYWRIGHT_REUSE_EXISTING_SERVER !== 'true';
+const reuseExistingServer = process.env.PLAYWRIGHT_REUSE_EXISTING_SERVER === 'true';
 
 export default defineConfig({
   testDir: '.',
@@ -82,11 +82,9 @@ export default defineConfig({
       use: { ...devices['Pixel 7'] },
     },
   ],
-  webServer: enableDevServer
-    ? {
-        command: 'npm run dev -- --host 0.0.0.0 --port 4173',
-        url: baseURL,
-        reuseExistingServer: true,
-      }
-    : undefined,
+  webServer: {
+    command: 'npm run dev -- --host 0.0.0.0 --port 4173',
+    url: baseURL,
+    reuseExistingServer,
+  },
 });
