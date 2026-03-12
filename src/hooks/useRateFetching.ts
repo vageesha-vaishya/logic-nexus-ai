@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useRef } from 'react';
 import { useCRM } from '@/hooks/useCRM';
 import { useAiAdvisor } from '@/hooks/useAiAdvisor';
 import { useToast } from '@/hooks/use-toast';
@@ -8,6 +8,9 @@ import { generateSimulatedRates } from '@/lib/simulation-engine';
 import { formatContainerSize } from '@/lib/container-utils';
 import { RateOption } from '@/types/quote-breakdown';
 import { logger } from '@/lib/logger';
+import { buildHybridRouteConfiguration, type RealtimeCarrierValidationRequest, type RealtimeCarrierValidationResult } from '@/services/quotation/hybrid-route-configuration';
+import { FEATURE_FLAGS, useAppFeatureFlag } from '@/lib/feature-flags';
+import { HybridRouteMetricsService, type QuoteGenerationStage } from '@/services/quotation/HybridRouteMetricsService';
 
 import { QuotationRankingService } from '@/services/quotation/QuotationRankingService';
 
@@ -80,6 +83,283 @@ const rankAiOptions = (options: RateOption[], preferredCarriers: string[]): Rate
   });
 };
 
+const normalizeLocationValue = (value: unknown): string => {
+  const normalized = String(value || '').trim();
+  if (!normalized) return '';
+  if (normalized.toLowerCase() === 'origin') return '';
+  if (normalized.toLowerCase() === 'destination') return '';
+  return normalized;
+};
+
+const ORIGIN_LOCATION_KEYS = [
+  'origin',
+  'from',
+  'origin_name',
+  'origin_location_name',
+  'origin_port',
+  'origin_airport',
+  'origin_station',
+  'origin_city',
+  'origin_terminal',
+  'pickup',
+  'pickup_location',
+  'pickup_address',
+  'pickup_city',
+  'from_location',
+  'from_city',
+  'from_port',
+  'from_airport',
+  'from_station',
+  'pol',
+  'port_of_loading',
+  'portOfLoading',
+  'departure_airport',
+  'departureAirport',
+  'departure_station',
+  'departureStation',
+];
+
+const DESTINATION_LOCATION_KEYS = [
+  'destination',
+  'to',
+  'destination_name',
+  'destination_location_name',
+  'destination_port',
+  'destination_airport',
+  'destination_station',
+  'destination_city',
+  'destination_terminal',
+  'delivery',
+  'delivery_location',
+  'delivery_address',
+  'delivery_city',
+  'dropoff',
+  'dropoff_location',
+  'dropoff_address',
+  'to_location',
+  'to_city',
+  'to_port',
+  'to_airport',
+  'to_station',
+  'pod',
+  'port_of_discharge',
+  'portOfDischarge',
+  'arrival_airport',
+  'arrivalAirport',
+  'arrival_station',
+  'arrivalStation',
+];
+
+const resolveLocationFromSources = (sources: any[], keys: string[]): string => {
+  for (const source of sources) {
+    if (!source || typeof source !== 'object') continue;
+    for (const key of keys) {
+      const value = normalizeLocationValue(source[key]);
+      if (value) return value;
+    }
+  }
+  return '';
+};
+
+const resolveOptionLocation = (option: any, keys: string[]): string => {
+  return resolveLocationFromSources(
+    [
+      option,
+      option?.route,
+      option?.locations,
+      option?.location,
+      option?.shipment,
+      option?.request,
+      option?.input,
+      option?.metadata,
+    ],
+    keys
+  );
+};
+
+const resolveLegLocation = (leg: any, keys: string[]): string => {
+  return resolveLocationFromSources(
+    [
+      leg,
+      leg?.route,
+      leg?.location,
+      leg?.locations,
+      leg?.segment,
+      leg?.shipment,
+      leg?.metadata,
+    ],
+    keys
+  );
+};
+
+const normalizeLegDate = (value: unknown): string => {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  const ddmmyyyy = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (ddmmyyyy) return `${ddmmyyyy[3]}-${ddmmyyyy[2]}-${ddmmyyyy[1]}`;
+  const yyyymmdd = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (yyyymmdd) return raw;
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) return '';
+  const year = parsed.getFullYear();
+  const month = String(parsed.getMonth() + 1).padStart(2, '0');
+  const day = String(parsed.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const resolveCarrierName = (leg: any, option: any): string => {
+  const candidates = [
+    leg?.carrier_name,
+    typeof leg?.carrier === 'object' ? leg?.carrier?.name : '',
+    leg?.carrier,
+    leg?.provider_name,
+    leg?.provider?.name,
+    leg?.operator_name,
+    leg?.line_name,
+    option?.carrier_name,
+    typeof option?.carrier === 'object' ? option?.carrier?.name : '',
+    option?.carrier,
+    option?.name,
+  ];
+  for (const candidate of candidates) {
+    const value =
+      typeof candidate === 'object'
+        ? String(candidate?.name || candidate?.label || '').trim()
+        : String(candidate || '').trim();
+    if (value && value.toLowerCase() !== 'unknown carrier') return value;
+  }
+  return 'Unknown Carrier';
+};
+
+const resolveDepartureDate = (leg: any, option: any): string => {
+  const candidates = [
+    leg?.departure_date,
+    leg?.departureDate,
+    leg?.departure,
+    leg?.etd,
+    leg?.estimated_departure,
+    leg?.estimated_departure_date,
+    leg?.departure_datetime,
+    leg?.schedule?.departure,
+    option?.departure_date,
+    option?.departureDate,
+    option?.departure,
+    option?.etd,
+    option?.estimated_departure,
+    option?.estimated_departure_date,
+    option?.schedule?.departure,
+  ];
+  for (const candidate of candidates) {
+    const normalized = normalizeLegDate(candidate);
+    if (normalized) return normalized;
+  }
+  return '';
+};
+
+const fillLegContinuity = (
+  legs: Array<{ origin: string; destination: string; [key: string]: any }>,
+  route: { origin: string; destination: string }
+) => {
+  if (legs.length === 0) return legs;
+
+  const normalizedLegs = legs.map((leg) => ({
+    ...leg,
+    origin: normalizeLocationValue(leg.origin),
+    destination: normalizeLocationValue(leg.destination),
+  }));
+
+  if (!normalizedLegs[0].origin) normalizedLegs[0].origin = route.origin;
+  if (!normalizedLegs[normalizedLegs.length - 1].destination) {
+    normalizedLegs[normalizedLegs.length - 1].destination = route.destination;
+  }
+
+  for (let i = 1; i < normalizedLegs.length; i += 1) {
+    if (!normalizedLegs[i].origin && normalizedLegs[i - 1].destination) {
+      normalizedLegs[i].origin = normalizedLegs[i - 1].destination;
+    }
+  }
+
+  for (let i = normalizedLegs.length - 2; i >= 0; i -= 1) {
+    if (!normalizedLegs[i].destination && normalizedLegs[i + 1].origin) {
+      normalizedLegs[i].destination = normalizedLegs[i + 1].origin;
+    }
+  }
+
+  for (let i = 0; i < normalizedLegs.length; i += 1) {
+    const previousDestination = i > 0 ? normalizedLegs[i - 1].destination : route.origin;
+    const nextOrigin = i < normalizedLegs.length - 1 ? normalizedLegs[i + 1].origin : route.destination;
+    if (!normalizedLegs[i].origin) normalizedLegs[i].origin = previousDestination || route.origin;
+    if (!normalizedLegs[i].destination) normalizedLegs[i].destination = nextOrigin || route.destination;
+  }
+
+  for (let i = 0; i < normalizedLegs.length - 1; i += 1) {
+    const currentDestination = normalizeLocationValue(normalizedLegs[i].destination);
+    const nextOrigin = normalizeLocationValue(normalizedLegs[i + 1].origin);
+    if (!currentDestination && nextOrigin) {
+      normalizedLegs[i].destination = nextOrigin;
+    } else if (!nextOrigin && currentDestination) {
+      normalizedLegs[i + 1].origin = currentDestination;
+    }
+  }
+
+  return normalizedLegs;
+};
+
+const enrichOptionRouteData = (option: any, fallbackRoute: { origin: string; destination: string }) => {
+  const optionOrigin = resolveOptionLocation(option, ORIGIN_LOCATION_KEYS) || fallbackRoute.origin;
+  const optionDestination = resolveOptionLocation(option, DESTINATION_LOCATION_KEYS) || fallbackRoute.destination;
+
+  const sourceLegs = Array.isArray(option?.legs) ? option.legs : [];
+  const normalizedLegs = sourceLegs.map((leg: any) => {
+    const origin = resolveLegLocation(leg, ORIGIN_LOCATION_KEYS);
+    const destination = resolveLegLocation(leg, DESTINATION_LOCATION_KEYS);
+    return {
+      ...leg,
+      carrier: resolveCarrierName(leg, option),
+      departure_date: resolveDepartureDate(leg, option),
+      origin: origin || '',
+      destination: destination || '',
+      from: origin || '',
+      to: destination || '',
+    };
+  });
+  const continuityLegs = fillLegContinuity(normalizedLegs, {
+    origin: optionOrigin || fallbackRoute.origin,
+    destination: optionDestination || fallbackRoute.destination,
+  }).map((leg) => ({
+    ...leg,
+    carrier: leg.carrier || resolveCarrierName(leg, option),
+    departure_date: leg.departure_date || resolveDepartureDate(leg, option),
+    from: leg.origin || optionOrigin || 'Origin',
+    to: leg.destination || optionDestination || 'Destination',
+  }));
+
+  const legs =
+    continuityLegs.length > 0
+      ? continuityLegs
+      : [
+          {
+            id: option?.id ? `${option.id}-route-leg` : `route-leg-${Date.now()}`,
+            mode: option?.mode || option?.transport_mode || 'ocean',
+            sequence: 1,
+            leg_type: 'transport',
+            carrier: option?.carrier || option?.carrier_name || 'Unknown Carrier',
+            origin: optionOrigin || 'Origin',
+            destination: optionDestination || 'Destination',
+            from: optionOrigin || 'Origin',
+            to: optionDestination || 'Destination',
+            charges: Array.isArray(option?.charges) ? option.charges : [],
+          },
+        ];
+
+  return {
+    ...option,
+    origin: optionOrigin || legs[0]?.origin || '',
+    destination: optionDestination || legs[legs.length - 1]?.destination || '',
+    legs,
+  };
+};
+
 // --- Types ---
 
 export interface ContainerCombo {
@@ -133,6 +413,10 @@ export function useRateFetching(): RateFetchingResult {
   const { supabase, context } = useCRM();
   const { invokeAiAdvisor } = useAiAdvisor();
   const { toast } = useToast();
+  const { enabled: hybridRouteEnabled } = useAppFeatureFlag(FEATURE_FLAGS.HYBRID_ROUTE_CONFIGURATION_V1, true);
+  const { enabled: hybridMetricsEnabled } = useAppFeatureFlag(FEATURE_FLAGS.HYBRID_ROUTE_METRICS_DASHBOARD_V1, false);
+  const metricsService = useMemo(() => new HybridRouteMetricsService(supabase), [supabase]);
+  const latestRequestSeqRef = useRef(0);
 
   const clearResults = useCallback(() => {
     setResults(null);
@@ -143,6 +427,8 @@ export function useRateFetching(): RateFetchingResult {
   }, []);
 
   const fetchRates = useCallback(async (params: RateFetchParams, containerResolver: ContainerResolver): Promise<RateOption[]> => {
+    const requestSeq = latestRequestSeqRef.current + 1;
+    latestRequestSeqRef.current = requestSeq;
     setLoading(true);
     setResults(null);
     setError(null);
@@ -152,7 +438,40 @@ export function useRateFetching(): RateFetchingResult {
 
     const { preferredCarriers = [], smartMode = true, ...payload } = params;
 
+    const requestId = `rates-${Date.now()}`;
+    const requestTimestamp = new Date().toISOString();
+    const requestStartAt = Date.now();
+    const timeline: QuoteGenerationStage[] = [];
+    const markStage = (stage: string, details?: Record<string, unknown>, optionCount?: number, unknownCarrierCount?: number, routeGapCount?: number) => {
+      timeline.push({
+        stage,
+        elapsed_ms: Date.now() - requestStartAt,
+        option_count: optionCount,
+        unknown_carrier_count: unknownCarrierCount,
+        route_gap_count: routeGapCount,
+        details,
+      });
+    };
+    const isStaleRequest = () => latestRequestSeqRef.current !== requestSeq;
+    const routeContext = {
+      origin: normalizeLocationValue(params.origin),
+      destination: normalizeLocationValue(params.destination),
+    };
+
     try {
+      markStage('request_started', {
+        smartMode,
+        mode: params.mode,
+        origin: routeContext.origin,
+        destination: routeContext.destination,
+      });
+      logger.info('[useRateFetching] Fetch started', {
+        requestId,
+        requestTimestamp,
+        smartMode,
+        routeContext,
+        mode: params.mode,
+      });
       // Build container combos
       const combos: ContainerCombo[] =
         (payload.mode === 'ocean' || payload.mode === 'rail') && payload.containerCombos && payload.containerCombos.length > 0
@@ -179,6 +498,11 @@ export function useRateFetching(): RateFetchingResult {
         : Promise.resolve({ data: null, error: null });
 
       const [legacyResList, aiRes] = await Promise.all([Promise.all(legacyPromises), aiPromise]);
+      markStage('rate_sources_resolved', {
+        legacySourceCount: legacyResList.length,
+        aiAvailable: !!aiRes?.data,
+        aiError: aiRes?.error ? String(aiRes.error.message || aiRes.error) : null,
+      });
 
       const pricingService = new PricingService(supabase);
 
@@ -214,7 +538,7 @@ export function useRateFetching(): RateFetchingResult {
           const { size: sizeName } = containerResolver.resolveContainerInfo(combo.type, combo.size);
           let legacyOptions = await Promise.all(
             rawOptions.map(async (opt: any) => {
-              const mapped = mapOptionToQuote(opt);
+              const mapped = enrichOptionRouteData(mapOptionToQuote(opt), routeContext);
               const qty = combo.qty || 1;
               const sell = (mapped.total_amount || 0) * qty;
               const calc = await pricingService.calculateFinancials(sell, 15, false);
@@ -226,6 +550,7 @@ export function useRateFetching(): RateFetchingResult {
                 ...mapped,
                 price: sell,
                 currency: mapped.currency || 'USD',
+                is_manual: false,
                 carrier: mapped.carrier || 'Unknown Carrier',
                 markupPercent,
                 verified: true,
@@ -244,6 +569,9 @@ export function useRateFetching(): RateFetchingResult {
       if (legacyOptionsAll.length > 0) {
         combinedOptions = [...combinedOptions, ...selectMarketTrendOptions(legacyOptionsAll)];
       }
+      markStage('legacy_options_processed', {
+        legacyOptionsAll: legacyOptionsAll.length,
+      }, combinedOptions.length);
 
       // 3. Process AI results
       if (smartMode) {
@@ -260,7 +588,7 @@ export function useRateFetching(): RateFetchingResult {
           if (aiData.options) {
             const aiOptionsRaw = await Promise.all(
               aiData.options.map(async (opt: any) => {
-                const mapped = mapOptionToQuote(opt);
+                const mapped = enrichOptionRouteData(mapOptionToQuote(opt), routeContext);
                 const calc = await pricingService.calculateFinancials(mapped.total_amount, 15, false);
                 let markupPercent = 0;
                 if (calc.buyPrice > 0) {
@@ -270,6 +598,7 @@ export function useRateFetching(): RateFetchingResult {
                   ...mapped,
                   id: mapped.id || `ai-${Math.random().toString(36).substr(2, 9)}`,
                   source_attribution: 'AI Smart Engine',
+                  is_manual: false,
                   carrier: mapped.carrier_name || mapped.carrier || opt?.carrier?.name || opt?.carrier || 'AI Carrier',
                   price: mapped.total_amount,
                   currency: mapped.currency || 'USD',
@@ -292,6 +621,10 @@ export function useRateFetching(): RateFetchingResult {
             setMarketAnalysis(aiData.market_analysis);
             setConfidenceScore(aiData.confidence_score);
             setAnomalies(aiData.anomalies || []);
+            markStage('ai_options_processed', {
+              aiOptions: aiOptionsRaw.length,
+              confidence: aiData.confidence_score,
+            }, combinedOptions.length);
           }
         }
       }
@@ -315,7 +648,7 @@ export function useRateFetching(): RateFetchingResult {
         if (simulated.length > 0) {
           let simOptions = await Promise.all(
             simulated.map(async (opt: any) => {
-              const mapped = mapOptionToQuote(opt);
+                const mapped = enrichOptionRouteData(mapOptionToQuote(opt), routeContext);
               const sell = mapped.total_amount || 0;
               const calc = await pricingService.calculateFinancials(sell, 15, false);
               let markupPercent = 0;
@@ -326,6 +659,7 @@ export function useRateFetching(): RateFetchingResult {
                 ...mapped,
                 price: sell,
                 currency: mapped.currency || 'USD',
+                is_manual: false,
                 carrier: mapped.carrier || 'Unknown Carrier',
                 markupPercent,
                 verified: true,
@@ -335,6 +669,9 @@ export function useRateFetching(): RateFetchingResult {
           );
           simOptions = simOptions.sort((a: any, b: any) => a.price - b.price).slice(0, 3);
           combinedOptions = [...combinedOptions, ...simOptions];
+          markStage('simulation_fallback_applied', {
+            simulationOptions: simOptions.length,
+          }, combinedOptions.length);
           toast({
             title: 'Showing Simulated Rates',
             description: 'Legacy and AI engines were unavailable. Displaying simulated market rates.',
@@ -346,7 +683,78 @@ export function useRateFetching(): RateFetchingResult {
       }
 
       // 5. Final Ranking and Recommendations
-      const rankableOptions = combinedOptions.map(opt => ({
+      const realtimeCarrierValidator = smartMode
+        ? async (request: RealtimeCarrierValidationRequest): Promise<RealtimeCarrierValidationResult[]> => {
+            try {
+              const response = await invokeAiAdvisor({
+                action: 'validate_carrier_service_availability',
+                payload: request,
+              });
+              if (response?.error) return [];
+              const data = response?.data;
+              if (Array.isArray(data)) return data as RealtimeCarrierValidationResult[];
+              if (Array.isArray(data?.results)) return data.results as RealtimeCarrierValidationResult[];
+              return [];
+            } catch {
+              return [];
+            }
+          }
+        : undefined;
+
+      const hybridConfig = hybridRouteEnabled
+        ? await buildHybridRouteConfiguration({
+            options: combinedOptions.map((option) => ({
+              ...option,
+              is_manual: false,
+              source_attribution: option.source_attribution || (smartMode ? 'Smart Quote Mode' : 'Market Rate'),
+            })),
+            routeInput: {
+              origin: routeContext.origin,
+              destination: routeContext.destination,
+              mode: payload.mode || params.mode,
+              requested_departure_date: payload.departure_date || payload.pickupDate,
+              preferred_carriers: preferredCarriers,
+              max_options: smartMode ? 5 : 3,
+            },
+            realtimeValidator: realtimeCarrierValidator,
+          })
+        : {
+            options: combinedOptions,
+            validationIssues: [],
+            auditTrail: [],
+          };
+
+      const normalizedCombinedOptions = hybridConfig.options.map((opt) => enrichOptionRouteData(opt, routeContext));
+      const hybridAnomalies = hybridConfig.validationIssues.map((issue) => `${issue.option_id}: ${issue.message}`);
+      const optionsWithRouteFallback = normalizedCombinedOptions.filter((opt) => {
+        const firstLeg = Array.isArray(opt.legs) ? opt.legs[0] : null;
+        const lastLeg = Array.isArray(opt.legs) ? opt.legs[opt.legs.length - 1] : null;
+        return (
+          normalizeLocationValue(firstLeg?.origin) === routeContext.origin &&
+          normalizeLocationValue(lastLeg?.destination) === routeContext.destination
+        );
+      }).length;
+      const unknownCarrierCount = normalizedCombinedOptions.filter(
+        (opt) => String(opt.carrier || '').trim().toLowerCase() === 'unknown carrier'
+      ).length;
+      const routeGapCount = normalizedCombinedOptions.length - optionsWithRouteFallback;
+
+      markStage('hybrid_route_configured', {
+        hybridRouteEnabled,
+        validationIssues: hybridConfig.validationIssues.length,
+        auditEvents: hybridConfig.auditTrail.length,
+      }, normalizedCombinedOptions.length, unknownCarrierCount, routeGapCount);
+
+      logger.info('[useRateFetching] Route population summary', {
+        requestId,
+        requestTimestamp,
+        totalOptions: normalizedCombinedOptions.length,
+        optionsWithRouteFallback,
+        validationIssueCount: hybridConfig.validationIssues.length,
+        auditEvents: hybridConfig.auditTrail.length,
+      });
+
+      const rankableOptions = normalizedCombinedOptions.map(opt => ({
         ...opt,
         // Map RateOption fields to RankableOption interface
         total_amount: opt.price || 0,
@@ -356,8 +764,19 @@ export function useRateFetching(): RateFetchingResult {
 
       // Apply ranking service
       const rankedResults = QuotationRankingService.rankOptions(rankableOptions);
+      markStage('ranking_completed', {
+        rankedCount: rankedResults.length,
+      }, rankedResults.length, unknownCarrierCount, routeGapCount);
+
+      if (isStaleRequest()) {
+        logger.warn('[useRateFetching] Stale request ignored after ranking', { requestId, requestSeq });
+        return [];
+      }
 
       setResults(rankedResults);
+      if (hybridAnomalies.length > 0) {
+        setAnomalies((current) => Array.from(new Set([...current, ...hybridAnomalies])));
+      }
 
       // 6. Save to history
       try {
@@ -372,7 +791,7 @@ export function useRateFetching(): RateFetchingResult {
               tenant_id: tenantId,
               request_payload: payload,
               response_payload: {
-                options: combinedOptions,
+                options: normalizedCombinedOptions,
                 market_analysis: smartMode && aiRes?.data?.market_analysis ? aiRes.data.market_analysis : null,
                 confidence_score: smartMode && aiRes?.data?.confidence_score ? aiRes.data.confidence_score : null,
                 anomalies: smartMode && aiRes?.data?.anomalies ? aiRes.data.anomalies : [],
@@ -385,16 +804,69 @@ export function useRateFetching(): RateFetchingResult {
         logger.error('[useRateFetching] Failed to save history:', err);
       }
 
-      return combinedOptions;
+      logger.info('[useRateFetching] Fetch completed', {
+        requestId,
+        requestTimestamp,
+        rankedCount: rankedResults.length,
+      });
+
+      if (hybridMetricsEnabled && context?.tenantId && !isStaleRequest()) {
+        try {
+          await metricsService.record({
+            tenant_id: String(context.tenantId),
+            user_id: context.userId ? String(context.userId) : undefined,
+            request_id: requestId,
+            mode: String(params.mode || payload.mode || ''),
+            smart_mode: smartMode,
+            duration_ms: Date.now() - requestStartAt,
+            total_options: rankedResults.length,
+            issues_count: hybridConfig.validationIssues.length,
+            unknown_carrier_count: unknownCarrierCount,
+            route_gap_count: routeGapCount,
+            status: 'success',
+            timeline,
+          });
+        } catch (metricsError) {
+          logger.warn('[useRateFetching] Failed to persist quote generation metrics', { requestId, metricsError });
+        }
+      }
+
+      return normalizedCombinedOptions;
     } catch (err: any) {
       const message = err.message || 'Failed to calculate rates.';
-      setError(message);
-      toast({ title: 'Error', description: message, variant: 'destructive' });
+      markStage('request_failed', { message });
+      if (!isStaleRequest()) {
+        setError(message);
+        toast({ title: 'Error', description: message, variant: 'destructive' });
+      }
+      if (hybridMetricsEnabled && context?.tenantId && !isStaleRequest()) {
+        try {
+          await metricsService.record({
+            tenant_id: String(context.tenantId),
+            user_id: context.userId ? String(context.userId) : undefined,
+            request_id: requestId,
+            mode: String(params.mode || payload.mode || ''),
+            smart_mode: smartMode,
+            duration_ms: Date.now() - requestStartAt,
+            total_options: 0,
+            issues_count: 1,
+            unknown_carrier_count: 0,
+            route_gap_count: 0,
+            status: 'failure',
+            error_message: message,
+            timeline,
+          });
+        } catch (metricsError) {
+          logger.warn('[useRateFetching] Failed to persist failed metrics', { requestId, metricsError });
+        }
+      }
       return [];
     } finally {
-      setLoading(false);
+      if (!isStaleRequest()) {
+        setLoading(false);
+      }
     }
-  }, [supabase, context, invokeAiAdvisor, toast]);
+  }, [supabase, context, invokeAiAdvisor, toast, hybridRouteEnabled, hybridMetricsEnabled, metricsService]);
 
   return useMemo(() => ({
     results,

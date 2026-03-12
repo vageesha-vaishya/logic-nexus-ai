@@ -15,6 +15,7 @@ import { hasRouteContinuityGap } from './routeContinuity';
 interface LegManagerProps {
   legs: TransportLeg[];
   onChange: (legs: TransportLeg[]) => void;
+  allowStructureChanges?: boolean;
 }
 
 const LegItem = memo(({ 
@@ -23,7 +24,8 @@ const LegItem = memo(({
   prevLeg,
   onUpdate, 
   onRemove,
-  ports
+  ports,
+  allowStructureChanges
 }: {
   leg: TransportLeg;
   index: number;
@@ -31,6 +33,7 @@ const LegItem = memo(({
   onUpdate: (id: string, updates: Partial<TransportLeg>) => void;
   onRemove: (id: string) => void;
   ports: any[];
+  allowStructureChanges: boolean;
 }) => {
   const handleModeChange = useCallback((v: string) => {
     onUpdate(leg.id, { mode: v, carrier_id: undefined, carrier: undefined });
@@ -68,7 +71,7 @@ const LegItem = memo(({
             {/* Mode Selector */}
             <div className="w-32 flex-shrink-0">
               <Label className="text-[10px] uppercase text-muted-foreground mb-1">Mode</Label>
-              <Select value={leg.mode} onValueChange={handleModeChange}>
+              <Select value={leg.mode} onValueChange={handleModeChange} disabled={!allowStructureChanges}>
                 <SelectTrigger className="h-8 text-xs">
                   <SelectValue />
                 </SelectTrigger>
@@ -147,9 +150,11 @@ const LegItem = memo(({
                </div>
             </div>
 
-            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive flex-shrink-0" onClick={handleRemove}>
-              <Trash2 className="w-4 h-4" />
-            </Button>
+            {allowStructureChanges && (
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive flex-shrink-0" onClick={handleRemove}>
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            )}
           </div>
         </div>
 
@@ -164,7 +169,7 @@ const LegItem = memo(({
   );
 });
 
-export const LegManager = memo(function LegManager({ legs, onChange }: LegManagerProps) {
+export const LegManager = memo(function LegManager({ legs, onChange, allowStructureChanges = true }: LegManagerProps) {
   const { state } = useQuoteStore();
 
   const addLeg = useCallback(() => {
@@ -203,16 +208,22 @@ export const LegManager = memo(function LegManager({ legs, onChange }: LegManage
           </h3>
           <p className="text-xs text-muted-foreground">Define the multi-leg journey from origin to destination.</p>
         </div>
-        <Button size="sm" onClick={addLeg} variant="outline" className="h-8">
-          <Plus className="w-3.5 h-3.5 mr-1" /> Add Leg
-        </Button>
+        {allowStructureChanges && (
+          <Button size="sm" onClick={addLeg} variant="outline" className="h-8">
+            <Plus className="w-3.5 h-3.5 mr-1" /> Add Leg
+          </Button>
+        )}
       </div>
 
       <div className="space-y-3">
         {legs.length === 0 && (
           <div className="text-center p-8 border-2 border-dashed rounded-lg bg-muted/20">
             <p className="text-sm text-muted-foreground mb-2">No transport legs defined.</p>
-            <Button size="sm" onClick={addLeg}>Start Routing</Button>
+            {allowStructureChanges ? (
+              <Button size="sm" onClick={addLeg}>Start Routing</Button>
+            ) : (
+              <p className="text-xs text-muted-foreground">No editable route legs available.</p>
+            )}
           </div>
         )}
 
@@ -245,6 +256,7 @@ export const LegManager = memo(function LegManager({ legs, onChange }: LegManage
               onUpdate={updateLeg}
               onRemove={removeLeg}
               ports={state.referenceData?.ports}
+              allowStructureChanges={allowStructureChanges}
             />
             {index < legs.length - 1 && (
                <div className="absolute left-[2px] top-[40px] bottom-[-20px] w-[2px] bg-border z-0 hidden" />

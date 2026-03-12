@@ -51,3 +51,27 @@ If critical issues are encountered:
 ## Completed Features
 
 -   **Create Task**: Implemented the "Add Task" dialog with `CreateTaskDialog` and backend integration via `ScopedDataAccess`.
+
+## Quotation Delete Pipeline Migration (2026-03)
+
+### Scope
+- Replaces direct `DELETE FROM quotes` application flows with RPC-based transactional orchestration.
+- Preserves backward compatibility by keeping `delete_quotes_cascade(uuid[])` callable with original signature.
+- Adds extended reporting path through `delete_quotes_cascade_detailed(uuid[], text, boolean, boolean)`.
+
+### What Changed
+- `delete_quotes_cascade` now delegates to `delete_quotes_cascade_detailed` in atomic mode.
+- UI delete flows use `QuotationDeleteService` and consume detailed per-quote results.
+- Bulk and single delete paths enforce `quotes.delete` permission checks before executing.
+
+### Action Required for Downstream Integrations
+- If integration only calls `delete_quotes_cascade(uuid[])`: no change required.
+- If integration needs per-quote outcomes, rollback metadata, or audit context:
+  - switch to `delete_quotes_cascade_detailed(...)`
+  - persist `summary` and `results` fields for operational monitoring
+  - handle `atomic_rolled_back = true` as a no-op rollback event
+
+### Compatibility Notes
+- Existing API/UI routes remain valid.
+- Quote states with protected references may be soft-deleted instead of hard-deleted unless `force_hard_delete = true`.
+- Tenant isolation and role checks are enforced server-side for both legacy and detailed RPCs.

@@ -5,9 +5,11 @@ import { vi } from 'vitest';
 
 // Mock useCarriersByMode
 const mockGetCarriersForMode = vi.fn();
+const mockGetAllCarriers = vi.fn();
 vi.mock('@/hooks/useCarriersByMode', () => ({
   useCarriersByMode: () => ({
     getCarriersForMode: mockGetCarriersForMode,
+    getAllCarriers: mockGetAllCarriers,
     isLoading: false,
     error: null,
   }),
@@ -27,6 +29,7 @@ const mockCarriers = [
 describe('CarrierSelect', () => {
   beforeEach(() => {
     mockGetCarriersForMode.mockReturnValue(mockCarriers);
+    mockGetAllCarriers.mockReturnValue(mockCarriers);
   });
 
   afterEach(() => {
@@ -72,6 +75,29 @@ describe('CarrierSelect', () => {
     expect(handleChange).toHaveBeenCalledWith('2', 'Air Cargo Inc');
   });
 
+  it('shows edit and delete actions after selecting a carrier', async () => {
+    const ControlledCarrierSelect = () => {
+      const [selected, setSelected] = React.useState<string | null>(null);
+      return (
+        <CarrierSelect
+          onChange={(carrierId) => setSelected(carrierId)}
+          value={selected}
+          mode="ocean"
+        />
+      );
+    };
+
+    render(<ControlledCarrierSelect />);
+
+    fireEvent.click(screen.getByRole('combobox'));
+    fireEvent.click(screen.getByText('Ocean Express'));
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Edit Carrier')).toBeInTheDocument();
+      expect(screen.getByLabelText('Delete Carrier')).toBeInTheDocument();
+    });
+  });
+
   it('displays preferred badge for preferred carriers', async () => {
     render(<CarrierSelect onChange={() => {}} mode="ocean" />);
     
@@ -82,5 +108,33 @@ describe('CarrierSelect', () => {
     const oceanExpress = screen.getByText('Ocean Express');
     // We expect the badge "Pref" to be visible
     expect(screen.getAllByText('Pref')[0]).toBeInTheDocument();
+  });
+
+  it('falls back to all carriers when mode list is empty', async () => {
+    mockGetCarriersForMode.mockReturnValueOnce([]);
+    mockGetAllCarriers.mockReturnValueOnce(mockCarriers);
+
+    render(<CarrierSelect onChange={() => {}} mode="ocean" />);
+
+    fireEvent.click(screen.getByRole('combobox'));
+    expect(screen.getByText('Ocean Express')).toBeInTheDocument();
+    expect(screen.getByText('Air Cargo Inc')).toBeInTheDocument();
+  });
+
+  it('renders and selects carriers with empty names using safe fallback', async () => {
+    const carriersWithMissingName = [
+      { id: '9', carrier_name: '', carrier_code: 'MSCU', is_preferred: false },
+    ];
+    const handleChange = vi.fn();
+    mockGetCarriersForMode.mockReturnValueOnce(carriersWithMissingName);
+    mockGetAllCarriers.mockReturnValueOnce(carriersWithMissingName);
+
+    render(<CarrierSelect onChange={handleChange} mode="ocean" />);
+
+    fireEvent.click(screen.getByRole('combobox'));
+    const option = screen.getByText('MSCU');
+    fireEvent.click(option);
+
+    expect(handleChange).toHaveBeenCalledWith('9', 'MSCU');
   });
 });

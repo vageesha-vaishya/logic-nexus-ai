@@ -97,4 +97,34 @@ describe('QuoteResultsList', () => {
     fireEvent.click(screen.getByText('Delete'));
     expect(onRemoveOption).toHaveBeenCalledWith('opt-1');
   });
+
+  it('fills sparse leg endpoints from route context for visual continuity', () => {
+    render(
+      <QuoteResultsList
+        results={[
+          {
+            id: 'opt-sparse-1',
+            carrier: 'Carrier Sparse',
+            name: 'Option Sparse',
+            price: 1200,
+            currency: 'USD',
+            transitTime: '12 days',
+            tier: 'custom',
+            origin: 'Factory A',
+            destination: 'Warehouse D',
+            legs: [
+              { id: 'l1', mode: 'road', origin: 'Factory A' },
+              { id: 'l2', mode: 'ocean' },
+              { id: 'l3', mode: 'rail' },
+            ],
+          },
+        ]}
+        onSelect={vi.fn()}
+        selectedIds={[]}
+      />
+    );
+
+    expect(screen.getByText('Factory A')).toBeInTheDocument();
+    expect(screen.getAllByText('Warehouse D').length).toBeGreaterThan(0);
+  });
 });

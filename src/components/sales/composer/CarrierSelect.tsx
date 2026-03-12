@@ -19,7 +19,6 @@ import {
 import { useCarriersByMode } from '@/hooks/useCarriersByMode';
 import { normalizeModeCode } from '@/lib/mode-utils';
 import { Badge } from '@/components/ui/badge';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { CreateCarrierDialog } from './CreateCarrierDialog';
 import { EditCarrierDialog } from './EditCarrierDialog';
 import { Pencil, Trash2 } from 'lucide-react';
@@ -61,14 +60,36 @@ export const CarrierSelect = React.memo(function CarrierSelect({
   const [createDialogOpen, setCreateDialogOpen] = React.useState(false);
   const [editDialogOpen, setEditDialogOpen] = React.useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
-  const { getCarriersForMode, isLoading, error: fetchError, refetch } = useCarriersByMode();
+  const { getCarriersForMode, getAllCarriers, isLoading, error: fetchError, refetch } = useCarriersByMode();
   const { toast } = useToast();
 
   const carriers = React.useMemo(() => {
     if (!mode) return [];
     const normalizedMode = normalizeModeCode(mode);
-    return getCarriersForMode(normalizedMode);
-  }, [mode, getCarriersForMode]);
+    const modeCarriers = getCarriersForMode(normalizedMode);
+    if (modeCarriers.length > 0) return modeCarriers;
+
+    const uniqueById = new Map<string, ReturnType<typeof getCarriersForMode>[number]>();
+    getAllCarriers().forEach((carrier) => {
+      if (!uniqueById.has(carrier.id)) {
+        uniqueById.set(carrier.id, carrier);
+      }
+    });
+    const allUnique = Array.from(uniqueById.values());
+    const strictFallback = allUnique.filter((carrier) => {
+      const modeFromModeField = normalizeModeCode(carrier.mode || '');
+      const modeFromTypeField = normalizeModeCode(carrier.carrier_type || '');
+      return modeFromModeField === normalizedMode || modeFromTypeField === normalizedMode;
+    });
+
+    if (strictFallback.length > 0) return strictFallback;
+    return allUnique;
+  }, [mode, getCarriersForMode, getAllCarriers]);
+
+  const getCarrierLabel = React.useCallback((carrier: { carrier_name: string; carrier_code: string | null; id: string }) => {
+    const normalizedName = carrier.carrier_name?.trim();
+    return normalizedName || carrier.carrier_code || carrier.id;
+  }, []);
 
   const selectedCarrier = React.useMemo(
     () => carriers.find((c) => c.id === value),
@@ -128,7 +149,7 @@ export const CarrierSelect = React.memo(function CarrierSelect({
 
   const handleSelect = (carrierId: string) => {
     const carrier = carriers.find((c) => c.id === carrierId);
-    onChange(carrierId, carrier?.carrier_name || null);
+    onChange(carrierId, carrier ? getCarrierLabel(carrier) : null);
     setOpen(false);
   };
 
@@ -150,7 +171,7 @@ export const CarrierSelect = React.memo(function CarrierSelect({
             disabled={disabled || isLoading}
           >
             <span className="truncate">
-              {selectedCarrier ? selectedCarrier.carrier_name : placeholder}
+              {selectedCarrier ? getCarrierLabel(selectedCarrier) : placeholder}
             </span>
             {isLoading ? (
               <Loader2 className="ml-2 h-3 w-3 animate-spin opacity-50" />
@@ -193,7 +214,7 @@ export const CarrierSelect = React.memo(function CarrierSelect({
                   {preferred.map((carrier) => (
                     <CommandItem
                       key={carrier.id}
-                      value={carrier.carrier_name} // Use name for search filtering
+                      value={getCarrierLabel(carrier)}
                       onSelect={() => handleSelect(carrier.id)}
                       className="text-xs"
                     >
@@ -203,7 +224,7 @@ export const CarrierSelect = React.memo(function CarrierSelect({
                           value === carrier.id ? "opacity-100" : "opacity-0"
                         )}
                       />
-                      {carrier.carrier_name}
+                      {getCarrierLabel(carrier)}
                       <Badge variant="secondary" className="ml-auto text-[10px] h-4 px-1">Pref</Badge>
                     </CommandItem>
                   ))}
@@ -214,7 +235,7 @@ export const CarrierSelect = React.memo(function CarrierSelect({
                 {others.map((carrier) => (
                   <CommandItem
                     key={carrier.id}
-                    value={carrier.carrier_name}
+                    value={getCarrierLabel(carrier)}
                     onSelect={() => handleSelect(carrier.id)}
                     className="text-xs"
                   >
@@ -224,7 +245,7 @@ export const CarrierSelect = React.memo(function CarrierSelect({
                         value === carrier.id ? "opacity-100" : "opacity-0"
                       )}
                     />
-                    {carrier.carrier_name}
+                    {getCarrierLabel(carrier)}
                     {carrier.scac && <span className="ml-2 text-[10px] text-muted-foreground">({carrier.scac})</span>}
                   </CommandItem>
                 ))}
@@ -246,27 +267,27 @@ export const CarrierSelect = React.memo(function CarrierSelect({
 
       {selectedCarrier && (
         <div className="flex gap-1">
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setEditDialogOpen(true)}>
-                  <Pencil className="h-4 w-4 text-muted-foreground hover:text-primary" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Edit Carrier</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => setEditDialogOpen(true)}
+            title="Edit Carrier"
+            aria-label="Edit Carrier"
+          >
+            <Pencil className="h-4 w-4 text-muted-foreground hover:text-primary" />
+          </Button>
 
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setDeleteDialogOpen(true)}>
-                  <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Delete Carrier</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => setDeleteDialogOpen(true)}
+            title="Delete Carrier"
+            aria-label="Delete Carrier"
+          >
+            <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
+          </Button>
         </div>
       )}
     </div>
@@ -290,7 +311,7 @@ export const CarrierSelect = React.memo(function CarrierSelect({
         <AlertDialogHeader>
           <AlertDialogTitle>Are you sure?</AlertDialogTitle>
           <AlertDialogDescription>
-            This action will delete the carrier "{selectedCarrier?.carrier_name}". This cannot be undone.
+            This action will delete the carrier "{selectedCarrier ? getCarrierLabel(selectedCarrier) : ''}". This cannot be undone.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

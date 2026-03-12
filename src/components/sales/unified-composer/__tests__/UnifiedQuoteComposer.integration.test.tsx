@@ -10,7 +10,7 @@ import userEvent from '@testing-library/user-event';
 // Hoisted Mocks
 // ---------------------------------------------------------------------------
 
-const { mockScopedDb, mockSupabase, mockToast, mockShowSuccess } = vi.hoisted(() => {
+const { mockScopedDb, mockSupabase, mockToast, mockShowSuccess, mockFetchRates, mockClearResults } = vi.hoisted(() => {
     const mockStorageFrom = vi.fn(() => ({
         upload: vi.fn().mockResolvedValue({ data: { path: 'test/path' }, error: null }),
         remove: vi.fn().mockResolvedValue({ data: [], error: null }),
@@ -49,6 +49,8 @@ const { mockScopedDb, mockSupabase, mockToast, mockShowSuccess } = vi.hoisted(()
     return {
         mockToast: vi.fn(),
         mockShowSuccess: vi.fn(),
+        mockFetchRates: vi.fn(),
+        mockClearResults: vi.fn(),
         mockScopedDb: {
             from: vi.fn((...args: any[]) => createChain([])),
             rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
@@ -61,7 +63,6 @@ const { mockScopedDb, mockSupabase, mockToast, mockShowSuccess } = vi.hoisted(()
         }
     };
 });
-
 
 
 // ---------------------------------------------------------------------------
@@ -287,6 +288,27 @@ vi.mock('../FormZone', async () => {
                    </button>
                    <button
                        type="button"
+                       data-testid="set-cargo-no-location-ids"
+                       onClick={() => {
+                           setValue('originId', '');
+                           setValue('destinationId', '');
+                           setValue('accountId', 'acc-1');
+                           setValue('commodity', 'Consumer Electronics');
+                           setValue('weight', '600');
+                           setValue('volume', '24.2');
+                           setValue('dangerousGoods', false);
+                           setValue('htsCode', '8517.12');
+                           setValue('containerType', 'ct-1');
+                           setValue('containerSize', 'cs-1');
+                           setValue('containerQty', '3');
+                           setValue('containerCombos', [{ type: 'ct-1', size: 'cs-1', qty: 3 }]);
+                           sync();
+                       }}
+                   >
+                       Set Cargo Without IDs
+                   </button>
+                   <button
+                       type="button"
                        data-testid="set-multi-container-combos"
                        onClick={() => {
                            setValue('originId', '00000000-0000-0000-0000-000000000111');
@@ -381,8 +403,8 @@ vi.mock('@/hooks/useRateFetching', () => {
     const stableResult = {
         results: [],
         loading: false,
-        fetchRates: vi.fn(),
-        clearResults: vi.fn(),
+        fetchRates: mockFetchRates,
+        clearResults: mockClearResults,
     };
     return {
         useRateFetching: () => stableResult,
@@ -523,6 +545,8 @@ describe('UnifiedQuoteComposer Integration (API-to-UI)', () => {
     
     beforeEach(() => {
         vi.clearAllMocks();
+        mockFetchRates.mockReset();
+        mockClearResults.mockReset();
         vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({}), { status: 200, headers: { 'Content-Type': 'application/json' } })) as any);
 
         // Default mock setup for CRM data loading
@@ -979,6 +1003,130 @@ describe('UnifiedQuoteComposer Integration (API-to-UI)', () => {
 
         expect(mockScopedDb.rpc).not.toHaveBeenCalled();
         expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ title: 'Validation Error' }));
+    });
+
+    it('keeps Results & Finalize active when Quotation Composer is clicked from results', async () => {
+        const QUOTE_ID = '123e4567-e89b-12d3-a456-426614174210';
+        const VERSION_ID = '123e4567-e89b-12d3-a456-426614174211';
+        const OPTION_ID = '123e4567-e89b-12d3-a456-426614174212';
+        const user = userEvent.setup();
+
+        mockScopedDb.from.mockImplementation((table: string) => {
+            if (table === 'quotes') {
+                return createMockChain({
+                    id: QUOTE_ID,
+                    quote_number: 'Q-4001',
+                    transport_mode: 'ocean',
+                    origin: 'Shanghai',
+                    destination: 'Los Angeles',
+                    origin_port_id: '00000000-0000-0000-0000-000000000333',
+                    destination_port_id: '00000000-0000-0000-0000-000000000444',
+                    current_version_id: VERSION_ID,
+                    tenant_id: 'test-tenant',
+                    account_id: 'acc-1',
+                    cargo_details: { commodity: 'Initial Commodity', total_weight_kg: 100 },
+                });
+            } else if (table === 'quotation_versions') {
+                return createMockChain([{ id: VERSION_ID, version_number: 1 }]);
+            } else if (table === 'quotation_version_options') {
+                return createMockChain([{
+                    id: OPTION_ID,
+                    quotation_version_id: VERSION_ID,
+                    is_selected: true,
+                    option_name: 'Selected Option',
+                    total_amount: 1200,
+                    currency: 'USD'
+                }]);
+            } else if (table === 'quotation_version_option_legs' || table === 'quote_charges' || table === 'quote_items' || table === 'quote_documents' || table === 'quote_cargo_configurations') {
+                return createMockChain([]);
+            }
+            return createMockChain([]);
+        });
+
+        render(
+            <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+                <MemoryRouter initialEntries={[`/quotes/edit/${QUOTE_ID}`]}>
+                    <Routes>
+                        <Route path="/quotes/edit/:quoteId" element={<UnifiedQuoteComposer quoteId={QUOTE_ID} />} />
+                    </Routes>
+                </MemoryRouter>
+            </QueryClientProvider>
+        );
+
+        await waitFor(() => {
+            expect(screen.getByTestId('set-cargo-edited')).toBeInTheDocument();
+        });
+
+        await user.click(screen.getByTestId('set-cargo-edited'));
+        await goToResultsTab(user);
+
+        await user.click(screen.getByTestId('quotation-composer-btn'));
+
+        await waitFor(() => {
+            expect(screen.getByTestId('quotation-composer-btn')).toBeInTheDocument();
+            expect(screen.queryByTestId('form-zone')).not.toBeInTheDocument();
+        });
+    });
+
+    it('runs smart re-fetch from results without forcing origin and destination ids', async () => {
+        const QUOTE_ID = '123e4567-e89b-12d3-a456-426614174010';
+        const VERSION_ID = '123e4567-e89b-12d3-a456-426614174011';
+        const OPTION_ID = '123e4567-e89b-12d3-a456-426614174012';
+        const user = userEvent.setup();
+
+        mockScopedDb.from.mockImplementation((table: string) => {
+            if (table === 'quotes') {
+                return createMockChain({
+                    id: QUOTE_ID,
+                    quote_number: 'Q-3100',
+                    transport_mode: 'ocean',
+                    origin: 'Shanghai',
+                    destination: 'Los Angeles',
+                    current_version_id: VERSION_ID,
+                    tenant_id: 'test-tenant',
+                    account_id: 'acc-1',
+                    cargo_details: { commodity: 'Electronics', total_weight_kg: 100 },
+                });
+            } else if (table === 'quotation_versions') {
+                return createMockChain([{ id: VERSION_ID, version_number: 1 }]);
+            } else if (table === 'quotation_version_options') {
+                return createMockChain([{
+                    id: OPTION_ID,
+                    quotation_version_id: VERSION_ID,
+                    is_selected: true,
+                    option_name: 'Selected Option',
+                    total_amount: 1200,
+                    currency: 'USD'
+                }]);
+            } else if (table === 'quotation_version_option_legs' || table === 'quote_charges' || table === 'quote_items' || table === 'quote_documents' || table === 'quote_cargo_configurations') {
+                return createMockChain([]);
+            }
+            return createMockChain([]);
+        });
+
+        render(
+            <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+                <MemoryRouter initialEntries={[`/quotes/edit/${QUOTE_ID}`]}>
+                    <Routes>
+                        <Route path="/quotes/edit/:quoteId" element={<UnifiedQuoteComposer quoteId={QUOTE_ID} />} />
+                    </Routes>
+                </MemoryRouter>
+            </QueryClientProvider>
+        );
+
+        await waitFor(() => {
+            expect(screen.getByTestId('set-cargo-edited')).toBeInTheDocument();
+        });
+
+        await user.click(screen.getByTestId('set-cargo-no-location-ids'));
+        await goToResultsTab(user);
+        await user.click(screen.getByTestId('smart-mode-switch'));
+        await user.click(screen.getByTestId('quotation-composer-btn'));
+
+        await waitFor(() => {
+            expect(mockFetchRates).toHaveBeenCalledTimes(1);
+            expect(screen.queryByTestId('form-zone')).not.toBeInTheDocument();
+        });
     });
 
     it('persists cargo snapshot across save -> reopen -> edit -> resave', async () => {

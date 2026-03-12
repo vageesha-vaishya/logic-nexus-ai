@@ -1,9 +1,13 @@
 DO $$
 DECLARE
   v_quote_id uuid;
+  v_quote_tenant_id uuid;
+  v_version_id uuid;
+  v_has_is_selected boolean := false;
+  v_has_is_active boolean := false;
 BEGIN
-  SELECT id
-  INTO v_quote_id
+  SELECT id, tenant_id
+  INTO v_quote_id, v_quote_tenant_id
   FROM public.quotes
   WHERE quote_number = 'QUO-260309-00001'
   LIMIT 1;
@@ -12,18 +16,59 @@ BEGIN
     RETURN;
   END IF;
 
+  SELECT EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'quotation_versions'
+      AND column_name = 'is_selected'
+  )
+  INTO v_has_is_selected;
+
+  SELECT EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'quotation_versions'
+      AND column_name = 'is_active'
+  )
+  INTO v_has_is_active;
+
+  IF v_has_is_selected THEN
+    EXECUTE
+      'SELECT id
+       FROM public.quotation_versions
+       WHERE quote_id = $1 AND is_selected = true
+       ORDER BY created_at DESC, id DESC
+       LIMIT 1'
+    INTO v_version_id
+    USING v_quote_id;
+  ELSIF v_has_is_active THEN
+    EXECUTE
+      'SELECT id
+       FROM public.quotation_versions
+       WHERE quote_id = $1 AND is_active = true
+       ORDER BY created_at DESC, id DESC
+       LIMIT 1'
+    INTO v_version_id
+    USING v_quote_id;
+  ELSE
+    SELECT id
+    INTO v_version_id
+    FROM public.quotation_versions
+    WHERE quote_id = v_quote_id
+    ORDER BY created_at DESC, id DESC
+    LIMIT 1;
+  END IF;
+
+  IF v_version_id IS NULL THEN
+    RETURN;
+  END IF;
+
   WITH target_quote AS (
-    SELECT q.id AS quote_id, q.tenant_id
+    SELECT q.id AS quote_id
     FROM public.quotes q
     WHERE q.id = v_quote_id
-  ),
-  target_version AS (
-    SELECT qv.id AS quotation_version_id
-    FROM public.quotation_versions qv
-    JOIN target_quote tq ON tq.quote_id = qv.quote_id
-    WHERE qv.is_selected = true
-    ORDER BY qv.version_no DESC
-    LIMIT 1
   ),
   option_legs AS (
     SELECT
@@ -44,7 +89,8 @@ BEGIN
       ) AS prev_destination_location_id
     FROM public.quotation_version_option_legs l
     JOIN public.quotation_version_options qvo ON qvo.id = l.quotation_version_option_id
-    JOIN target_version tv ON tv.quotation_version_id = qvo.quotation_version_id
+    JOIN target_quote tq ON tq.quote_id = v_quote_id
+    WHERE qvo.quotation_version_id = v_version_id
   ),
   mismatches AS (
     SELECT
@@ -92,9 +138,9 @@ BEGIN
     user_id
   )
   SELECT
-    tq.tenant_id,
+    v_quote_tenant_id,
     tq.quote_id,
-    tv.quotation_version_id,
+    v_version_id,
     u.quotation_version_option_id,
     'quotation_version_option_leg',
     u.id,
@@ -117,6 +163,5 @@ BEGIN
     ),
     null
   FROM updated u
-  CROSS JOIN target_quote tq
-  CROSS JOIN target_version tv;
+  CROSS JOIN target_quote tq;
 END $$;

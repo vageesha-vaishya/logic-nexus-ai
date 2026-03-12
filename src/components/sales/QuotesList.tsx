@@ -30,6 +30,9 @@ interface QuotesListProps {
   onToggleSelection: (id: string) => void;
   onSelectAll: (checked: boolean) => void;
   bulkMode: boolean;
+  onDeleteQuote?: (id: string) => void;
+  canDelete?: boolean;
+  deleteInProgress?: boolean;
 }
 
 export function QuotesList({
@@ -38,6 +41,9 @@ export function QuotesList({
   onToggleSelection,
   onSelectAll,
   bulkMode,
+  onDeleteQuote,
+  canDelete = false,
+  deleteInProgress = false,
 }: QuotesListProps) {
   const navigate = useNavigate();
 
@@ -182,7 +188,11 @@ export function QuotesList({
                         Edit Quote
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem className="text-destructive">
+                      <DropdownMenuItem
+                        className="text-destructive"
+                        disabled={!canDelete || deleteInProgress}
+                        onClick={() => onDeleteQuote?.(quote.id)}
+                      >
                         Delete Quote
                       </DropdownMenuItem>
                     </DropdownMenuContent>

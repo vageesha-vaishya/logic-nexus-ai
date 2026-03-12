@@ -49,16 +49,125 @@ export const mapOptionToQuote = (opt: any) => {
         return token;
     };
 
+    const normalizeDateValue = (value: any): string | null => {
+        const raw = String(value || '').trim();
+        if (!raw) return null;
+        const ddmmyyyy = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+        if (ddmmyyyy) return `${ddmmyyyy[3]}-${ddmmyyyy[2]}-${ddmmyyyy[1]}`;
+        const yyyymmdd = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (yyyymmdd) return raw;
+        const parsed = new Date(raw);
+        if (Number.isNaN(parsed.getTime())) return null;
+        return parsed.toISOString().slice(0, 10);
+    };
+
+    const resolveCarrierName = (source: any, fallback?: any): string => {
+        const candidates = [
+            source?.carrier_name,
+            typeof source?.carrier === 'object' ? source?.carrier?.name : source?.carrier,
+            source?.provider_name,
+            source?.provider?.name,
+            source?.operator_name,
+            source?.line_name,
+            fallback?.carrier_name,
+            typeof fallback?.carrier === 'object' ? fallback?.carrier?.name : fallback?.carrier,
+            fallback?.name,
+        ];
+        for (const candidate of candidates) {
+            const name = String(candidate || '').trim();
+            if (name && name.toLowerCase() !== 'unknown carrier') return name;
+        }
+        return 'Unknown Carrier';
+    };
+
     const modeLabel =
         opt.transport_mode ||
         opt.name ||
         opt.mode ||
         canonicalMode;
+
+    const resolveLocation = (sources: any[], keys: string[]): string => {
+        for (const source of sources) {
+            if (!source || typeof source !== 'object') continue;
+            for (const key of keys) {
+                const raw = source[key];
+                const normalizedValue = String(raw || '').trim();
+                if (!normalizedValue) continue;
+                if (normalizedValue.toLowerCase() === 'origin' || normalizedValue.toLowerCase() === 'destination') continue;
+                return normalizedValue;
+            }
+        }
+        return '';
+    };
+
+    const originKeys = [
+        'origin',
+        'from',
+        'origin_name',
+        'origin_location_name',
+        'origin_port',
+        'origin_airport',
+        'origin_station',
+        'pickup',
+        'pickup_location',
+        'pickup_address',
+        'pickup_city',
+        'from_location',
+        'from_city',
+        'from_port',
+        'from_airport',
+        'from_station',
+        'pol',
+        'port_of_loading',
+        'portOfLoading',
+        'departure_airport',
+        'departureAirport',
+        'departure_station',
+        'departureStation',
+    ];
+
+    const destinationKeys = [
+        'destination',
+        'to',
+        'destination_name',
+        'destination_location_name',
+        'destination_port',
+        'destination_airport',
+        'destination_station',
+        'delivery',
+        'delivery_location',
+        'delivery_address',
+        'delivery_city',
+        'dropoff',
+        'dropoff_location',
+        'dropoff_address',
+        'to_location',
+        'to_city',
+        'to_port',
+        'to_airport',
+        'to_station',
+        'pod',
+        'port_of_discharge',
+        'portOfDischarge',
+        'arrival_airport',
+        'arrivalAirport',
+        'arrival_station',
+        'arrivalStation',
+    ];
+
+    const normalizedOptionOrigin = resolveLocation(
+        [opt, opt?.route, opt?.location, opt?.locations, opt?.shipment, opt?.request, opt?.input, opt?.metadata],
+        originKeys
+    );
+    const normalizedOptionDestination = resolveLocation(
+        [opt, opt?.route, opt?.location, opt?.locations, opt?.shipment, opt?.request, opt?.input, opt?.metadata],
+        destinationKeys
+    );
     
     const normalized = {
         ...opt,
         carrier_id: opt.carrier_id || (typeof opt.carrier === 'object' ? opt.carrier?.id : undefined),
-        carrier_name: opt.carrier_name || (typeof opt.carrier === 'object' ? opt.carrier?.name : opt.carrier) || 'Unknown Carrier',
+        carrier_name: resolveCarrierName(opt),
         option_name: opt.option_name || opt.name,
         total_amount: safeNumber(opt.total_amount) || safeNumber(opt.price),
         mode: canonicalMode,
@@ -71,6 +180,8 @@ export const mapOptionToQuote = (opt: any) => {
         marginAmount: safeNumber(opt.marginAmount ?? opt.margin_amount),
         marginPercent: safeNumber(opt.marginPercent ?? opt.margin_percent),
         markupPercent: safeNumber(opt.markupPercent ?? opt.markup_percent ?? opt.margin_percentage),
+        origin: normalizedOptionOrigin || opt.origin || opt.route?.origin || '',
+        destination: normalizedOptionDestination || opt.destination || opt.route?.destination || '',
         
         source: opt.source || 'manual',
         source_attribution: opt.source_attribution || 'manual',
@@ -175,7 +286,7 @@ export const mapOptionToQuote = (opt: any) => {
         }];
         charges = []; 
     } else {
-        legs = legs.map((leg: any, index: number) => {
+        const mappedLegs = legs.map((leg: any, index: number) => {
             const normalizedLegMode =
                 normalizeTransportMode(leg.mode) ||
                 normalizeTransportMode(leg.transport_mode) ||
@@ -183,33 +294,49 @@ export const mapOptionToQuote = (opt: any) => {
                 normalized.mode ||
                 'ocean';
             const origin =
-                leg.origin ||
-                leg.from ||
-                leg.origin_name ||
-                leg.origin_location_name ||
-                (index === 0 ? normalized.origin : undefined) ||
-                'Origin';
+                resolveLocation([leg, leg?.route, leg?.location, leg?.locations, leg?.segment, leg?.metadata], originKeys) ||
+                '';
             const destination =
-                leg.destination ||
-                leg.to ||
-                leg.destination_name ||
-                leg.destination_location_name ||
-                (index === legs.length - 1 ? normalized.destination : undefined) ||
-                'Destination';
+                resolveLocation([leg, leg?.route, leg?.location, leg?.locations, leg?.segment, leg?.metadata], destinationKeys) ||
+                '';
 
             return {
             ...leg,
             id: leg.id || `leg-${index}-${Date.now()}`,
             mode: normalizedLegMode,
             leg_type: normalizeLegType(leg.leg_type || leg.type || leg.segment_type),
-            carrier: leg.carrier || leg.carrier_name || leg.provider || normalized.carrier_name || 'Unknown Carrier',
+            carrier: resolveCarrierName(leg, normalized),
             sequence: Number(leg.sequence ?? leg.sort_order ?? leg.order ?? index + 1),
             origin,
             destination,
+            from: origin,
+            to: destination,
             origin_location_id: leg.origin_location_id || leg.originId || null,
             destination_location_id: leg.destination_location_id || leg.destinationId || null,
-            departure_date: leg.departure_date || leg.departureDate || leg.etd || null,
-            arrival_date: leg.arrival_date || leg.arrivalDate || leg.eta || null,
+            departure_date: normalizeDateValue(
+                leg.departure_date ||
+                leg.departureDate ||
+                leg.departure ||
+                leg.departure_datetime ||
+                leg.etd ||
+                leg.estimated_departure ||
+                leg.estimated_departure_date ||
+                leg.schedule?.departure ||
+                normalized.departure_date ||
+                normalized.departureDate ||
+                normalized.departure_datetime ||
+                normalized.etd ||
+                normalized.estimated_departure
+            ),
+            arrival_date: normalizeDateValue(
+                leg.arrival_date ||
+                leg.arrivalDate ||
+                leg.arrival ||
+                leg.eta ||
+                leg.estimated_arrival ||
+                leg.estimated_arrival_date ||
+                leg.schedule?.arrival
+            ),
             transit_time: leg.transit_time || leg.transitTime || null,
             charges: (leg.charges || []).map((c: any) => {
                 // Hoist sell amount if available (fixes issue with Saved Quotes loaded as pairs)
@@ -228,6 +355,47 @@ export const mapOptionToQuote = (opt: any) => {
                 return c;
             })
         }});
+        const continuityLegs = mappedLegs.map((leg: any) => ({
+            ...leg,
+            origin: String(leg.origin || '').trim(),
+            destination: String(leg.destination || '').trim(),
+        }));
+        if (continuityLegs.length > 0) {
+            if (!continuityLegs[0].origin) continuityLegs[0].origin = normalized.origin || '';
+            if (!continuityLegs[continuityLegs.length - 1].destination) {
+                continuityLegs[continuityLegs.length - 1].destination = normalized.destination || '';
+            }
+            for (let i = 1; i < continuityLegs.length; i += 1) {
+                if (!continuityLegs[i].origin && continuityLegs[i - 1].destination) {
+                    continuityLegs[i].origin = continuityLegs[i - 1].destination;
+                }
+            }
+            for (let i = continuityLegs.length - 2; i >= 0; i -= 1) {
+                if (!continuityLegs[i].destination && continuityLegs[i + 1].origin) {
+                    continuityLegs[i].destination = continuityLegs[i + 1].origin;
+                }
+            }
+            for (let i = 0; i < continuityLegs.length; i += 1) {
+                const previousDestination = i > 0 ? continuityLegs[i - 1].destination : (normalized.origin || '');
+                const nextOrigin = i < continuityLegs.length - 1 ? continuityLegs[i + 1].origin : (normalized.destination || '');
+                if (!continuityLegs[i].origin) continuityLegs[i].origin = previousDestination || 'Origin';
+                if (!continuityLegs[i].destination) continuityLegs[i].destination = nextOrigin || 'Destination';
+            }
+            for (let i = 0; i < continuityLegs.length - 1; i += 1) {
+                if (!continuityLegs[i].destination && continuityLegs[i + 1].origin) {
+                    continuityLegs[i].destination = continuityLegs[i + 1].origin;
+                } else if (!continuityLegs[i + 1].origin && continuityLegs[i].destination) {
+                    continuityLegs[i + 1].origin = continuityLegs[i].destination;
+                }
+            }
+            legs = continuityLegs.map((leg: any) => ({
+                ...leg,
+                from: leg.origin || 'Origin',
+                to: leg.destination || 'Destination',
+            }));
+        } else {
+            legs = mappedLegs;
+        }
 
         if (charges.length > 0) {
             const initialCount = charges.length;

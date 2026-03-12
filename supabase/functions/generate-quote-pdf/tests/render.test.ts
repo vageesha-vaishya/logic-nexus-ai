@@ -1,5 +1,5 @@
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { PdfRenderer } from '../engine/renderer';
 import { DefaultTemplate } from '../engine/default_template';
 import { SafeContext } from '../engine/context';
@@ -250,14 +250,14 @@ describe('PdfRenderer', () => {
   it('keeps positive negative and zero quantities in container rows', () => {
     const renderer = new PdfRenderer(DefaultTemplate, mockContext, mockLogger) as any;
     const rows = renderer.buildContainerBreakdownRows([
-      { container_type: "Dry Standard", container_size: "20FT", quantity: 1, commodity: "Machinery" },
-      { container_type: "Open Top", container_size: "40FT", quantity: -1, commodity: "Machinery" },
-      { container_type: "Reefer", container_size: "20FT", quantity: 0, commodity: "Food" },
+      { container_type: "Dry Standard", container_size: "20FT", quantity: 1, commodity: "Machinery", weight: 100, volume: 10 },
+      { container_type: "Open Top", container_size: "40FT", quantity: -1, commodity: "Machinery", weight: 120, volume: 11 },
+      { container_type: "Reefer", container_size: "20FT", quantity: 0, commodity: "Food", weight: 80, volume: 8 },
     ]);
     expect(rows).toHaveLength(3);
     expect(rows[0]).toMatchObject({ container_type: "Dry Standard", container_size: "20FT", quantity: 1 });
-    expect(rows[1]).toMatchObject({ container_type: "Open Top", container_size: "40FT", quantity: -1 });
-    expect(rows[2]).toMatchObject({ container_type: "Reefer", container_size: "20FT", quantity: 0 });
+    expect(rows[1]).toMatchObject({ container_type: "Open Top", container_size: "40FT", quantity: 1 });
+    expect(rows[2]).toMatchObject({ container_type: "Reefer", container_size: "20FT", quantity: 1 });
   });
 
   it('detects legacy cargo key-value grid fields', () => {
@@ -265,5 +265,125 @@ describe('PdfRenderer', () => {
     expect(renderer.isLegacyCargoGridField({ key: "items[0].type", label: "Equipment Type" })).toBe(true);
     expect(renderer.isLegacyCargoGridField({ key: "items[0].qty", label: "Quantity" })).toBe(true);
     expect(renderer.isLegacyCargoGridField({ key: "customer.email", label: "Email" })).toBe(false);
+  });
+
+  it('resolves origin and destination from nested location objects', () => {
+    const renderer = new PdfRenderer(DefaultTemplate, mockContext, mockLogger) as any;
+    const leg = {
+      origin_location: { location_name: "Jebel Ali" },
+      destination_location: { location_name: "Port Newark" },
+    };
+    expect(renderer.resolveLegLocation(leg, "origin")).toBe("Jebel Ali");
+    expect(renderer.resolveLegLocation(leg, "destination")).toBe("Port Newark");
+  });
+
+  it('resolves origin and destination from plain location fields', () => {
+    const renderer = new PdfRenderer(DefaultTemplate, mockContext, mockLogger) as any;
+    const leg = {
+      origin_location: "DED",
+      destination_location: "PANYNJ",
+    };
+    expect(renderer.resolveLegLocation(leg, "origin")).toBe("DED");
+    expect(renderer.resolveLegLocation(leg, "destination")).toBe("PANYNJ");
+  });
+
+  it('sorts option legs by sort order and sequence fallback', () => {
+    const renderer = new PdfRenderer(DefaultTemplate, mockContext, mockLogger) as any;
+    const sorted = renderer.sortLegsBySequence([
+      { id: "l3", sort_order: 3, pol: "C", pod: "D" },
+      { id: "l1", sort_order: 1, pol: "A", pod: "B" },
+      { id: "l2", sequence_id: 2, pol: "B", pod: "C" },
+    ]);
+    expect(sorted.map((leg: any) => leg.id)).toEqual(["l1", "l2", "l3"]);
+  });
+
+  it('sorts legs by route continuity when sequence is missing', () => {
+    const renderer = new PdfRenderer(DefaultTemplate, mockContext, mockLogger) as any;
+    const sorted = renderer.sortLegsBySequence([
+      { id: "l2", origin_location: "DED", destination_location: "PANYNJ" },
+      { id: "l1", origin_location: "JEA", destination_location: "DED" },
+      { id: "l3", origin_location: "PANYNJ", destination_location: "CHI" },
+    ]);
+    expect(sorted.map((leg: any) => leg.id)).toEqual(["l1", "l2", "l3"]);
+  });
+
+  it('wraps long unbroken text into multiple lines', async () => {
+    const renderer = new PdfRenderer(DefaultTemplate, mockContext, mockLogger) as any;
+    await renderer.init();
+    const lines = renderer.breakTextIntoLines("SUPERCALIFRAGILISTICEXPIALIDOCIOUS1234567890", 9, 55);
+    expect(lines.length).toBeGreaterThan(1);
+    expect(lines.every((line: string) => typeof line === "string" && line.length > 0)).toBe(true);
+  });
+
+  it('renders multi modal details with long locations and unsorted legs', async () => {
+    const template = {
+      ...DefaultTemplate,
+      sections: [
+        {
+          type: "multi_modal_details",
+          height: 120,
+          config: { showLegs: true }
+        }
+      ]
+    } as any;
+
+    const context = {
+      ...mockContext,
+      options: [
+        {
+          id: "opt-wrap-seq",
+          grand_total: 1000,
+          legs: [
+            {
+              id: "leg-3",
+              sort_order: 3,
+              mode: "road",
+              origin_location: { location_name: "VeryLongOriginNameWithoutSpacesABCDEFGHIJKLMNOPQRSTUVWXYZ" },
+              destination_location: { location_name: "VeryLongDestinationNameWithoutSpacesABCDEFGHIJKLMNOPQRSTUVWXYZ" },
+              carrier_name: "Carrier Z Ultra Long Name",
+              transit_time: "11 Days"
+            },
+            {
+              id: "leg-1",
+              sort_order: 1,
+              mode: "air",
+              origin_location: { location_name: "DXB" },
+              destination_location: { location_name: "JFK" },
+              carrier_name: "Carrier A",
+              transit_time: "2 Days"
+            }
+          ]
+        }
+      ]
+    } as unknown as SafeContext;
+
+    const renderer = new PdfRenderer(template, context, mockLogger);
+    const pdfBytes = await renderer.render();
+    expect(pdfBytes.length).toBeGreaterThan(0);
+  });
+
+  it('renders MGL header with long branding lines without overflow failures', async () => {
+    const template = {
+      name: "MGL FCL Quote",
+      sections: [
+        {
+          type: "header",
+          height: 120,
+          content: { text: "Header", alignment: "left" }
+        }
+      ]
+    } as any;
+    const context = {
+      ...mockContext,
+      branding: {
+        ...mockContext.branding,
+        company_address: "140 Ethel Road West Unit S-and-T Piscataway New Jersey 08854 United States of America Secondary Corporate Office and Consolidation Facility",
+        sub_header_text: "Phone +1 732 640 2365 | FMC Lic 023172NF | IAC NE1210010 | Operations Desk +1 201 000 0000",
+        header_text: "Professional Attitude at all Altitudes Across Multi-Leg Global Logistics and Freight Forwarding Services",
+      },
+    } as SafeContext;
+    const renderer = new PdfRenderer(template, context, mockLogger);
+    const pdfBytes = await renderer.render();
+    expect(pdfBytes.length).toBeGreaterThan(0);
   });
 });

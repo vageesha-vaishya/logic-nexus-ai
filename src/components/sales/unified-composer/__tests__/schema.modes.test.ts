@@ -113,6 +113,48 @@ describe('quoteComposerSchema modes', () => {
     expect(result.success).toBe(true);
   });
 
+  it('accepts CRM mode when guestEmail is blank', () => {
+    const result = quoteComposerSchema.safeParse({
+      standalone: false,
+      mode: 'ocean',
+      origin: 'Shanghai',
+      originId: 'origin-1',
+      destination: 'Los Angeles',
+      destinationId: 'dest-1',
+      commodity: 'Electronics',
+      containerType: 'Dry',
+      containerSize: '40ft',
+      containerQty: '1',
+      accountId: 'acc-1',
+      guestEmail: '',
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects CRM mode when guestEmail has invalid format', () => {
+    const result = quoteComposerSchema.safeParse({
+      standalone: false,
+      mode: 'ocean',
+      origin: 'Shanghai',
+      originId: 'origin-1',
+      destination: 'Los Angeles',
+      destinationId: 'dest-1',
+      commodity: 'Electronics',
+      containerType: 'Dry',
+      containerSize: '40ft',
+      containerQty: '1',
+      accountId: 'acc-1',
+      guestEmail: 'invalid-email',
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const messages = result.error.issues.map((issue) => issue.message);
+      expect(messages).toContain('Invalid email format');
+    }
+  });
+
   it('accepts air mode with comma-formatted weight', () => {
     const result = quoteComposerSchema.safeParse({
       standalone: false,

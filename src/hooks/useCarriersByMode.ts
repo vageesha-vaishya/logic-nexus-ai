@@ -19,6 +19,18 @@ export interface CarriersByModeMap {
   [modeCode: string]: CarrierOption[];
 }
 
+function normalizeCarrierTypeToMode(value: string | null): string {
+  const carrierType = (value || '').toLowerCase().trim();
+  if (!carrierType) return '';
+  if (carrierType.includes('ocean') || carrierType.includes('sea') || carrierType.includes('maritime')) return 'ocean';
+  if (carrierType.includes('air')) return 'air';
+  if (carrierType.includes('rail') || carrierType.includes('train')) return 'rail';
+  if (carrierType.includes('truck') || carrierType.includes('road') || carrierType.includes('ground')) return 'road';
+  if (carrierType.includes('courier') || carrierType.includes('express') || carrierType.includes('parcel')) return 'courier';
+  if (carrierType.includes('move') || carrierType.includes('packer')) return 'movers_packers';
+  return carrierType;
+}
+
 export function useCarriersByMode() {
   const { data: carrierMap = {}, isLoading, error, refetch } = useQuery<CarriersByModeMap>({
     queryKey: ['carriers_by_mode'],
@@ -36,12 +48,14 @@ export function useCarriersByMode() {
       const grouped: CarriersByModeMap = {};
       
       data?.forEach((carrier) => {
+        const safeCarrierName = carrier.carrier_name || carrier.carrier_code || carrier.id;
+        const safeCarrierType = carrier.carrier_type || '';
         // Map to CarrierOption interface
         const option: CarrierOption = {
           id: carrier.id,
-          carrier_name: carrier.carrier_name,
+          carrier_name: safeCarrierName,
           carrier_code: carrier.carrier_code,
-          carrier_type: carrier.carrier_type,
+          carrier_type: safeCarrierType,
           scac: carrier.scac,
           iata: carrier.iata,
           mc_dot: carrier.mc_dot,
@@ -50,11 +64,20 @@ export function useCarriersByMode() {
           service_types: [],   // Default empty array
         };
 
-        const modeKey = carrier.mode ? normalizeModeCode(carrier.mode) : 'unknown';
-        if (!grouped[modeKey]) {
-          grouped[modeKey] = [];
-        }
-        grouped[modeKey].push(option);
+        const candidateModes = new Set<string>();
+        const normalizedMode = normalizeModeCode(carrier.mode || '');
+        const modeFromType = normalizeCarrierTypeToMode(safeCarrierType);
+
+        if (normalizedMode) candidateModes.add(normalizedMode);
+        if (modeFromType) candidateModes.add(modeFromType);
+        if (candidateModes.size === 0) candidateModes.add('unknown');
+
+        candidateModes.forEach((modeKey) => {
+          if (!grouped[modeKey]) {
+            grouped[modeKey] = [];
+          }
+          grouped[modeKey].push(option);
+        });
       });
 
       return grouped;
@@ -87,4 +110,3 @@ export function useCarriersByMode() {
     refetch,
   };
 }
-

@@ -237,6 +237,101 @@ describe('mapOptionToQuote', () => {
         expect(result.legs[1].carrier).toBe('Ocean Line');
     });
 
+    it('maps mode-specific location aliases for ocean air road and rail legs', () => {
+        const option = {
+            id: 'multi-alias-1',
+            carrier: 'Alias Carrier',
+            total_amount: 4200,
+            currency: 'USD',
+            origin_port: 'Shenzhen Port',
+            destination_station: 'Hamburg Rail Hub',
+            legs: [
+                { sequence: 1, mode: 'truck', pickup_location: 'Shenzhen Factory', dropoff_location: 'Shenzhen Port' },
+                { sequence: 2, mode: 'ocean', pol: 'Shenzhen Port', pod: 'Frankfurt Port' },
+                { sequence: 3, mode: 'air', departure_airport: 'Frankfurt Airport', arrival_airport: 'Berlin Airport' },
+                { sequence: 4, mode: 'rail', origin_station: 'Berlin Rail Terminal', destination_station: 'Hamburg Rail Hub' },
+            ],
+        };
+
+        const result = mapOptionToQuote(option);
+        expect(result.origin).toBe('Shenzhen Port');
+        expect(result.destination).toBe('Hamburg Rail Hub');
+        expect(result.legs[0].origin).toBe('Shenzhen Factory');
+        expect(result.legs[0].destination).toBe('Shenzhen Port');
+        expect(result.legs[1].origin).toBe('Shenzhen Port');
+        expect(result.legs[1].destination).toBe('Frankfurt Port');
+        expect(result.legs[2].origin).toBe('Frankfurt Airport');
+        expect(result.legs[2].destination).toBe('Berlin Airport');
+        expect(result.legs[3].origin).toBe('Berlin Rail Terminal');
+        expect(result.legs[3].destination).toBe('Hamburg Rail Hub');
+        expect(result.legs[1].from).toBe('Shenzhen Port');
+        expect(result.legs[1].to).toBe('Frankfurt Port');
+    });
+
+    it('maps smart quote alias fields for carrier and departure dates', () => {
+        const option = {
+            id: 'smart-alias-1',
+            carrier_name: 'Global Smart Lines',
+            total_amount: 3100,
+            currency: 'USD',
+            origin: 'Factory Alpha',
+            destination: 'Warehouse Omega',
+            legs: [
+                {
+                    sequence: 1,
+                    mode: 'road',
+                    from_location: 'Factory Alpha',
+                    to_location: 'Port One',
+                    provider_name: 'Road Partner',
+                    estimated_departure_date: '12/03/2026',
+                },
+                {
+                    sequence: 2,
+                    mode: 'ocean',
+                    from_port: 'Port One',
+                    to_port: 'Port Two',
+                    carrier: { name: 'Ocean Partner' },
+                    departure_datetime: '2026-03-13T12:00:00Z',
+                },
+            ],
+        };
+
+        const result = mapOptionToQuote(option);
+        expect(result.legs[0].origin).toBe('Factory Alpha');
+        expect(result.legs[0].destination).toBe('Port One');
+        expect(result.legs[0].carrier).toBe('Road Partner');
+        expect(result.legs[0].departure_date).toBe('2026-03-12');
+        expect(result.legs[1].origin).toBe('Port One');
+        expect(result.legs[1].destination).toBe('Port Two');
+        expect(result.legs[1].carrier).toBe('Ocean Partner');
+        expect(result.legs[1].departure_date).toBe('2026-03-13');
+    });
+
+    it('fills missing intermediate leg endpoints to preserve route continuity', () => {
+        const option = {
+            id: 'continuity-1',
+            carrier: 'Continuity Carrier',
+            total_amount: 2500,
+            currency: 'USD',
+            origin: 'Factory A',
+            destination: 'Warehouse D',
+            legs: [
+                { sequence: 1, mode: 'road', pickup_location: 'Factory A' },
+                { sequence: 2, mode: 'ocean' },
+                { sequence: 3, mode: 'rail', destination_station: 'Warehouse D' },
+            ],
+        };
+
+        const result = mapOptionToQuote(option);
+        expect(result.legs[0].origin).toBe('Factory A');
+        expect(result.legs[0].destination).toBeTruthy();
+        expect(result.legs[1].origin).toBe(result.legs[0].destination);
+        expect(result.legs[1].destination).toBeTruthy();
+        expect(result.legs[2].origin).toBe(result.legs[1].destination);
+        expect(result.legs[2].destination).toBe('Warehouse D');
+        expect(result.legs[2].to).toBe('Warehouse D');
+    });
+
     it('removes duplicate global charges that mirror leg charges', () => {
         const option = {
             id: 'dup-charge-1',

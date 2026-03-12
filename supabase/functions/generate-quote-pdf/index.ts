@@ -364,7 +364,33 @@ serveWithLogger(async (req, logger, adminSupabase) => {
            throw new Error(`Error fetching options: ${oError.message}`);
       }
       
-      options = oData || [];
+      const getOrderValue = (record: any, keys: string[]): number => {
+        for (const key of keys) {
+          const parsed = Number(record?.[key]);
+          if (Number.isFinite(parsed)) return parsed;
+        }
+        return Number.MAX_SAFE_INTEGER;
+      };
+      const sortOptionsBySequence = (input: any[]): any[] =>
+        [...(Array.isArray(input) ? input : [])].sort((a: any, b: any) => {
+          const aSeq = getOrderValue(a, ["sort_order", "sequence_id", "sequence_no", "option_sequence", "rank", "index"]);
+          const bSeq = getOrderValue(b, ["sort_order", "sequence_id", "sequence_no", "option_sequence", "rank", "index"]);
+          if (aSeq !== bSeq) return aSeq - bSeq;
+          const aLabel = String(a?.option_name || a?.rate_option_name || a?.name || a?.id || "");
+          const bLabel = String(b?.option_name || b?.rate_option_name || b?.name || b?.id || "");
+          return aLabel.localeCompare(bLabel);
+        });
+      const sortLegsBySequence = (input: any[]): any[] =>
+        [...(Array.isArray(input) ? input : [])].sort((a: any, b: any) => {
+          const aSeq = getOrderValue(a, ["sort_order", "sequence_id", "sequence_no", "seq", "leg_sequence", "index"]);
+          const bSeq = getOrderValue(b, ["sort_order", "sequence_id", "sequence_no", "seq", "leg_sequence", "index"]);
+          if (aSeq !== bSeq) return aSeq - bSeq;
+          const aId = String(a?.id || a?.leg_id || "");
+          const bId = String(b?.id || b?.leg_id || "");
+          return aId.localeCompare(bId);
+        });
+
+      options = sortOptionsBySequence(oData || []);
       await enrichOptionContainers(options);
       await logger.info(`Fetched ${options.length} options for version ${versionId}`);
 
@@ -387,7 +413,7 @@ serveWithLogger(async (req, logger, adminSupabase) => {
           );
           
           if (legsError) await logger.warn(`Error fetching legs for option ${opt.id}: ${legsError.message}`);
-          opt.legs = legs || [];
+          opt.legs = sortLegsBySequence(legs || []);
 
           // Charges
           const { data: charges, error: chargesError } = await safeSelect(
@@ -994,8 +1020,44 @@ serveWithLogger(async (req, logger, adminSupabase) => {
       const mappedItems = Array.from(mergedItems.values());
       const fallbackItem = mappedItems.find((item: any) => item?.container_size || item?.container_type);
 
+      const resolveLocationValue = (value: any): string => {
+        if (!value) return "";
+        if (typeof value === "string") return value.trim();
+        if (typeof value === "object") {
+          return String(value.location_name || value.name || value.code || value.port_name || "").trim();
+        }
+        return String(value).trim();
+      };
+
       const resolveLegLocation = (leg: any, type: "origin" | "destination") => {
         if (!leg || typeof leg !== "object") return "N/A";
+        const candidates = type === "origin"
+          ? [
+              leg.pol,
+              leg.origin_name,
+              leg.origin_code,
+              leg.origin_location,
+              leg.origin_location_name,
+              leg.origin_port,
+              leg.origin_port_name,
+              leg.origin,
+              leg.origin_location_data,
+            ]
+          : [
+              leg.pod,
+              leg.destination_name,
+              leg.destination_code,
+              leg.destination_location,
+              leg.destination_location_name,
+              leg.destination_port,
+              leg.destination_port_name,
+              leg.destination,
+              leg.destination_location_data,
+            ];
+        for (const candidate of candidates) {
+          const resolved = resolveLocationValue(candidate);
+          if (resolved) return resolved;
+        }
         if (type === "origin") {
           return (
             leg.pol ||
@@ -1003,6 +1065,8 @@ serveWithLogger(async (req, logger, adminSupabase) => {
             leg.origin_code ||
             leg.origin?.location_name ||
             leg.origin?.name ||
+            leg.origin_location?.location_name ||
+            leg.origin_location?.name ||
             leg.origin ||
             "N/A"
           );
@@ -1013,6 +1077,8 @@ serveWithLogger(async (req, logger, adminSupabase) => {
           leg.destination_code ||
           leg.destination?.location_name ||
           leg.destination?.name ||
+          leg.destination_location?.location_name ||
+          leg.destination_location?.name ||
           leg.destination ||
           "N/A"
         );
@@ -1071,6 +1137,90 @@ serveWithLogger(async (req, logger, adminSupabase) => {
         };
       };
 
+      const getSequenceOrder = (record: any, keys: string[]): number => {
+        for (const key of keys) {
+          const parsed = Number(record?.[key]);
+          if (Number.isFinite(parsed)) return parsed;
+        }
+        return Number.MAX_SAFE_INTEGER;
+      };
+
+      const legOrderKeys = ["sort_order", "sequence_id", "sequence_no", "seq", "leg_sequence", "leg_order", "order_index", "display_order", "segment_order", "index"];
+      const resolveTimestampOrder = (record: any): number => {
+        const raw = record?.created_at || record?.updated_at || null;
+        if (!raw) return Number.MAX_SAFE_INTEGER;
+        const timestamp = Date.parse(String(raw));
+        return Number.isFinite(timestamp) ? timestamp : Number.MAX_SAFE_INTEGER;
+      };
+      const reorderLegsByContinuity = (legs: any[]): any[] => {
+        if (!Array.isArray(legs) || legs.length < 3) return legs;
+        const normalized = legs.map((leg: any, index: number) => ({
+          index,
+          leg,
+          origin: resolveLegLocation(leg, "origin").trim().toLowerCase(),
+          destination: resolveLegLocation(leg, "destination").trim().toLowerCase(),
+        }));
+        const destinationSet = new Set(
+          normalized
+            .map((entry) => entry.destination)
+            .filter((value) => value.length > 0 && value !== "n/a"),
+        );
+        const start = normalized.find(
+          (entry) =>
+            entry.origin.length > 0 &&
+            entry.origin !== "n/a" &&
+            !destinationSet.has(entry.origin),
+        ) || normalized[0];
+        const route: typeof normalized = [];
+        const used = new Set<number>();
+        let current = start;
+
+        while (current && !used.has(current.index)) {
+          route.push(current);
+          used.add(current.index);
+          const next = normalized.find(
+            (entry) =>
+              !used.has(entry.index) &&
+              entry.origin.length > 0 &&
+              entry.origin === current.destination,
+          );
+          if (!next) break;
+          current = next;
+        }
+
+        normalized.forEach((entry) => {
+          if (!used.has(entry.index)) route.push(entry);
+        });
+        return route.map((entry) => entry.leg);
+      };
+      const sortLegsBySequence = (input: any[]): any[] => {
+        const baseSorted = [...(Array.isArray(input) ? input : [])].sort((a: any, b: any) => {
+          const aSeq = getSequenceOrder(a, legOrderKeys);
+          const bSeq = getSequenceOrder(b, legOrderKeys);
+          if (aSeq !== bSeq) return aSeq - bSeq;
+          const aTime = resolveTimestampOrder(a);
+          const bTime = resolveTimestampOrder(b);
+          if (aTime !== bTime) return aTime - bTime;
+          const aId = String(a?.id || a?.leg_id || "");
+          const bId = String(b?.id || b?.leg_id || "");
+          return aId.localeCompare(bId);
+        });
+
+        const hasExplicitOrder = baseSorted.some((leg: any) => getSequenceOrder(leg, legOrderKeys) !== Number.MAX_SAFE_INTEGER);
+        if (hasExplicitOrder) return baseSorted;
+        return reorderLegsByContinuity(baseSorted);
+      };
+
+      const sortOptionsBySequence = (input: any[]): any[] =>
+        [...(Array.isArray(input) ? input : [])].sort((a: any, b: any) => {
+          const aSeq = getSequenceOrder(a, ["sort_order", "sequence_id", "sequence_no", "option_sequence", "rank", "index"]);
+          const bSeq = getSequenceOrder(b, ["sort_order", "sequence_id", "sequence_no", "option_sequence", "rank", "index"]);
+          if (aSeq !== bSeq) return aSeq - bSeq;
+          const aLabel = String(a?.option_name || a?.rate_option_name || a?.name || a?.id || "");
+          const bLabel = String(b?.option_name || b?.rate_option_name || b?.name || b?.id || "");
+          return aLabel.localeCompare(bLabel);
+        });
+
       const materializeQuoteLevelCharges = (baseCharges: any[]) => {
         const normalizedBaseCharges = baseCharges
           .filter((charge: any) => charge && typeof charge === "object")
@@ -1128,9 +1278,9 @@ serveWithLogger(async (req, logger, adminSupabase) => {
       };
 
       const optionLevelCharges = materializeQuoteLevelCharges(Array.isArray(option?.charges) ? option.charges : []);
-      const optionLegs = Array.isArray(option?.legs)
+      const optionLegs = sortLegsBySequence(Array.isArray(option?.legs)
         ? option.legs.filter((leg: any) => leg && typeof leg === "object")
-        : [];
+        : []);
 
       // Calculate option specific total if possible
       const optionTotal = optionLevelCharges.length > 0
@@ -1212,13 +1362,13 @@ serveWithLogger(async (req, logger, adminSupabase) => {
             note: c.note || "",
           })) || [],
         items: mappedItems,
-        options: optionSource
+        options: sortOptionsBySequence(optionSource)
           .filter((o: any) => o && typeof o === "object")
           .map((o: any) => {
           const normalizedOptionCharges = materializeQuoteLevelCharges(Array.isArray(o.charges) ? o.charges : []);
-          const normalizedOptionLegs = Array.isArray(o?.legs)
+          const normalizedOptionLegs = sortLegsBySequence(Array.isArray(o?.legs)
             ? o.legs.filter((leg: any) => leg && typeof leg === "object")
-            : [];
+            : []);
           return ({
           id: o.id,
           rate_option_id: o.rate_option_id || o.option_id || o.id,

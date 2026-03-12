@@ -14,9 +14,7 @@ import { format } from 'date-fns';
 import { statusConfig } from '@/config/statusConfig';
 import { QuoteMetrics } from '@/components/sales/QuoteMetrics';
 import { QuoteStatusChart } from '@/components/sales/QuoteStatusChart';
-import { useUndo } from '@/hooks/useUndo';
 import { toast } from 'sonner';
-// fix: corrected logger import
 import { logger } from '@/lib/logger';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -24,6 +22,7 @@ import { useUrlFilters } from '@/hooks/useUrlFilters';
 import Papa from 'papaparse';
 import { AdvancedSearchFilter, FilterCriterion } from '@/components/sales/AdvancedSearchFilter';
 import { FEATURE_FLAGS, useAppFeatureFlag } from '@/lib/feature-flags';
+import { QuotationDeleteService } from '@/services/quotation/QuotationDeleteService';
 
 interface QuoteWithRelations extends Quote {
   accounts?: { id: string; name: string };
@@ -82,6 +81,7 @@ export default function Quotes() {
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
   const [error, setError] = useState<Error | null>(null);
   const [selectedQuoteIds, setSelectedQuoteIds] = useState<string[]>([]);
+  const [deleteInProgress, setDeleteInProgress] = useState(false);
 
   // Advanced Filters State
   const [activeFilters, setActiveFilters] = useState<FilterCriterion[]>([]);
@@ -403,7 +403,7 @@ export default function Quotes() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [fetchQuotes, navigate]);
 
-  const { performDeleteWithUndo } = useUndo();
+  const quotationDeleteService = useMemo(() => new QuotationDeleteService(scopedDb), [scopedDb]);
 
   // Handle Advanced Filter Apply
   const handleFilterApply = (newFilters: FilterCriterion[], mode: 'all' | 'any') => {
@@ -515,6 +515,52 @@ export default function Quotes() {
     }
   }, [quotes]);
 
+  const handleDeleteQuotes = useCallback(
+    async (quoteIds: string[], reason?: string) => {
+      if (quoteIds.length === 0) return;
+      if (!hasPermission('quotes.delete')) {
+        toast.error('You do not have permission to delete quotes');
+        return;
+      }
+
+      const confirmationMessage =
+        quoteIds.length === 1
+          ? 'Delete this quote?'
+          : `Delete ${quoteIds.length} selected quotes?`;
+
+      if (!window.confirm(confirmationMessage)) return;
+
+      try {
+        setDeleteInProgress(true);
+        const report = await quotationDeleteService.deleteQuotes(quoteIds, reason, {
+          atomic: true,
+          forceHardDelete: false,
+        });
+
+        if (report.ok) {
+          const { hard_deleted, soft_deleted } = report.summary;
+          const deletedCount = hard_deleted + soft_deleted;
+          toast.success(
+            `Processed ${deletedCount} quote${deletedCount === 1 ? '' : 's'} (${hard_deleted} hard, ${soft_deleted} soft)`,
+          );
+        } else {
+          const firstFailure = report.results.find((r) => !r.success);
+          const message = firstFailure?.error || report.message || 'Some quotes failed to delete';
+          toast.error(message);
+        }
+
+        setSelectedQuoteIds([]);
+        await fetchQuotes();
+      } catch (err: any) {
+        logger.error('Quote deletion failed', err);
+        toast.error(err?.message || 'Failed to delete quotes');
+      } finally {
+        setDeleteInProgress(false);
+      }
+    },
+    [fetchQuotes, hasPermission, quotationDeleteService],
+  );
+
   const columns: ColumnDef<Quote>[] = [
     { 
       key: 'quote_number', 
@@ -594,6 +640,7 @@ export default function Quotes() {
             variant="ghost" 
             size="icon" 
             className="text-destructive hover:text-destructive hover:bg-destructive/10"
+            disabled={!hasPermission('quotes.delete') || deleteInProgress}
             onClick={(e) => {
               e.stopPropagation();
               handleDelete(q.id);
@@ -607,15 +654,9 @@ export default function Quotes() {
   ];
 
   const handleDelete = async (id: string) => {
-    const quoteToDelete = quotes.find(q => q.id === id);
+    const quoteToDelete = quotes.find((q) => q.id === id);
     if (!quoteToDelete) return;
-
-    await performDeleteWithUndo({
-      table: 'quotes',
-      data: quoteToDelete,
-      label: 'Quote',
-      onSuccess: () => fetchQuotes()
-    });
+    await handleDeleteQuotes([id], `Deleted quote ${quoteToDelete.quote_number}`);
   };
 
   return (
@@ -746,6 +787,16 @@ export default function Quotes() {
                       </Button>
                     </>
                   )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-destructive disabled:text-muted-foreground"
+                    onClick={() => handleDeleteQuotes(selectedQuoteIds, 'Bulk delete from quote list')}
+                    disabled={selectedQuoteIds.length === 0 || !hasPermission('quotes.delete') || deleteInProgress}
+                    title="Delete Selected"
+                  >
+                    Delete Selected ({selectedQuoteIds.length})
+                  </Button>
                   <Button
                     variant="ghost"
                     size="icon"

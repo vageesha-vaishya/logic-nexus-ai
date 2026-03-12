@@ -27,6 +27,28 @@
 - POST /api/documents/generate { shipment_id, template }
 - GET /api/documents/:id
 
+## Quotations
+- POST /api/quotes/delete
+- Request:
+  - quote_ids: string[] (UUID, required)
+  - reason: string | null
+  - force_hard_delete: boolean (default false)
+  - atomic: boolean (default true)
+- Behavior:
+  - Validates `quotes.delete` permission and tenant scope before deletion
+  - Applies soft delete for protected states/referenced quotes and hard delete otherwise
+  - Cascades dependent cleanup (items, charges, comments, documents, approvals, access logs)
+  - Writes immutable audit records and quote event entries
+  - Releases inventory or serial reservations when linked to the quote
+  - Recomputes tenant quote status counts and emits `quote_stats_refresh` notification
+- Response:
+  - ok: boolean
+  - message: string
+  - atomic_rolled_back: boolean
+  - summary: { requested, processed, hard_deleted, soft_deleted, failed, inventory_released, approvals_cancelled, cache_cleaned }
+  - results: per-quote action/error entries
+  - stats: per-tenant post-delete status counts
+
 ## Localization & Language Policy
 - All API responses are strictly in **English (en-US)**.
 - Response Header: `Content-Language: en` is included in all Edge Function responses.

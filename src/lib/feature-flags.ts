@@ -5,6 +5,8 @@ export const FEATURE_FLAGS = {
   QUOTATION_PHASE2_GUARDS: 'quotation_phase2_guards',
   COMPOSER_MULTI_LEG_AUTOFILL: 'composer_multi_leg_autofill',
   QUOTATION_IMPORT_EXPORT_V2: 'quotation_import_export_v2',
+  HYBRID_ROUTE_CONFIGURATION_V1: 'hybrid_route_configuration_v1',
+  HYBRID_ROUTE_METRICS_DASHBOARD_V1: 'hybrid_route_metrics_dashboard_v1',
 } as const;
 
 export type FeatureFlagKey = (typeof FEATURE_FLAGS)[keyof typeof FEATURE_FLAGS];

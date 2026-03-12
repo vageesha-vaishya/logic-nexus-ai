@@ -6,7 +6,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { UnifiedQuoteComposer } from '../UnifiedQuoteComposer';
 
 // Mock useCRM
-const { mockScopedDb, quoteStoreMock, rateFetchingMock, quoteRepositoryMock } = vi.hoisted(() => {
+const { mockScopedDb, mockSupabase, quoteStoreMock, rateFetchingMock, quoteRepositoryMock } = vi.hoisted(() => {
   return {
     mockScopedDb: {
       from: vi.fn().mockReturnThis(),
@@ -16,6 +16,11 @@ const { mockScopedDb, quoteStoreMock, rateFetchingMock, quoteRepositoryMock } = 
       in: vi.fn().mockReturnThis(),
       maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
       then: vi.fn(),
+    },
+    mockSupabase: {
+      from: vi.fn(() => ({
+        insert: vi.fn().mockResolvedValue({ error: null }),
+      })),
     },
     quoteStoreMock: {
       state: {
@@ -65,7 +70,7 @@ vi.mock('@/hooks/useCRM', () => ({
   useCRM: () => ({
     scopedDb: mockScopedDb,
     context: { tenantId: 'test-tenant' },
-    supabase: {},
+    supabase: mockSupabase,
   }),
 }));
 
@@ -124,21 +129,49 @@ vi.mock('@/components/sales/unified-composer/FormZone', () => ({
 }));
 
 vi.mock('@/components/sales/unified-composer/FinalizeSection', () => ({
-  FinalizeSection: () => <div data-testid="finalize-section">FinalizeSection</div>,
+  FinalizeSection: ({ selectedOption, onRouteOptionChange, routeValidationIssues }: any) => (
+    <div data-testid="finalize-section">
+      <div data-testid="finalize-selected-option">{selectedOption?.id || ''}</div>
+      <div data-testid="finalize-route-issues">{(routeValidationIssues || []).join('|')}</div>
+      <button
+        data-testid="apply-route-edit"
+        onClick={() => onRouteOptionChange?.(selectedOption.id, [
+          {
+            id: `${selectedOption.id}-leg-1`,
+            mode: 'ocean',
+            origin: 'Busan Port',
+            destination: 'Long Beach Terminal',
+            departure_date: '2026-03-22',
+            carrier: 'Edited Ocean Carrier',
+          },
+        ])}
+      >
+        Apply Route Edit
+      </button>
+    </div>
+  ),
 }));
 
 vi.mock('@/components/sales/unified-composer/ResultsZone', () => ({
-  ResultsZone: ({ results, selectedOptionId }: any) => (
-    <div data-testid="results-zone">
-      <div data-testid="results-count">{results?.length || 0}</div>
-      <div data-testid="selected-option-id">{selectedOptionId || 'none'}</div>
-      {(results || []).map((r: any) => (
-        <div key={r.id} data-testid={`option-${r.id}`}>
-          Option {r.id}
-        </div>
-      ))}
-    </div>
-  ),
+  ResultsZone: ({ results, selectedOptionId }: any) => {
+    const selected = (results || []).find((r: any) => r.id === selectedOptionId);
+    return (
+      <div data-testid="results-zone">
+        <div data-testid="results-count">{results?.length || 0}</div>
+        <div data-testid="selected-option-id">{selectedOptionId || 'none'}</div>
+        <div data-testid="selected-option-carrier">{selected?.carrier || ''}</div>
+        <div data-testid="selected-option-is-manual">{String(!!selected?.is_manual)}</div>
+        <div data-testid="selected-option-origin">{selected?.legs?.[0]?.origin || ''}</div>
+        <div data-testid="selected-option-destination">{selected?.legs?.[0]?.destination || ''}</div>
+        <div data-testid="selected-option-departure">{selected?.legs?.[0]?.departure_date || ''}</div>
+        {(results || []).map((r: any) => (
+          <div key={r.id} data-testid={`option-${r.id}`}>
+            Option {r.id}
+          </div>
+        ))}
+      </div>
+    );
+  },
 }));
 
 describe('UnifiedQuoteComposer - Edit Mode', () => {
@@ -193,6 +226,7 @@ describe('UnifiedQuoteComposer - Edit Mode', () => {
         range: () => chain,
         abortSignal: () => chain,
         order: () => chain,
+        insert: () => Promise.resolve({ data: [], error: null }),
         maybeSingle: () => Promise.resolve({ data: null, error: null }),
         single: () => Promise.resolve({ data: null, error: null }),
         then: (resolve: any) => Promise.resolve(resolve({ data: [], error: null }))
@@ -255,5 +289,187 @@ describe('UnifiedQuoteComposer - Edit Mode', () => {
 
     // Verify correct option is selected (Option 2 was is_selected: true)
     expect(screen.getByTestId('selected-option-id')).toHaveTextContent(option2Id);
+  });
+
+  it('hydrates loaded option leg fields from *_location_name columns', async () => {
+    const quoteId = '00000000-0000-0000-0000-000000000011';
+    const versionId = '00000000-0000-0000-0000-000000000012';
+    const optionId = '33333333-3333-3333-3333-333333333333';
+
+    const mockQuote = {
+      id: quoteId,
+      tenant_id: 'test-tenant',
+      title: 'Hydration Quote',
+      origin: 'Shenzhen',
+      destination: 'Hamburg',
+      total_weight: 0,
+      total_volume: 0,
+    };
+
+    const mockOptions = [
+      {
+        id: optionId,
+        total_amount: 4813,
+        is_selected: true,
+        currency: 'USD',
+        option_name: 'Smart Option',
+        carrier_name: 'Global Smart Lines',
+        source_attribution: 'AI Smart Engine',
+      },
+    ];
+
+    const mockLegs = [
+      {
+        id: '44444444-4444-4444-4444-444444444444',
+        quotation_version_option_id: optionId,
+        transport_mode: 'ocean',
+        sort_order: 1,
+        carrier_name: 'Ocean Partner',
+        origin_location_name: 'Shenzhen Factory',
+        destination_location_name: 'Yantian Port',
+        departure_date: '2026-03-12',
+      },
+    ];
+
+    mockScopedDb.from.mockImplementation((table: string) => {
+      const chain = {
+        select: () => chain,
+        eq: () => chain,
+        or: () => chain,
+        in: () => chain,
+        is: () => chain,
+        neq: () => chain,
+        limit: () => chain,
+        range: () => chain,
+        abortSignal: () => chain,
+        order: () => chain,
+        insert: () => Promise.resolve({ data: [], error: null }),
+        maybeSingle: () => Promise.resolve({ data: null, error: null }),
+        single: () => Promise.resolve({ data: null, error: null }),
+        then: (resolve: any) => Promise.resolve(resolve({ data: [], error: null })),
+      };
+
+      if (table === 'quotes') chain.maybeSingle = () => Promise.resolve({ data: mockQuote, error: null });
+      if (table === 'quotation_version_options') chain.order = () => Promise.resolve({ data: mockOptions, error: null }) as any;
+      if (table === 'quotation_version_option_legs') chain.order = () => Promise.resolve({ data: mockLegs, error: null }) as any;
+      if (table === 'quote_cargo_configurations') chain.then = (resolve: any) => Promise.resolve(resolve({ data: [], error: null }));
+      if (table === 'quote_items') chain.then = (resolve: any) => Promise.resolve(resolve({ data: [], error: null }));
+      if (table === 'quote_charges') chain.in = () => Promise.resolve({ data: [], error: null }) as any;
+
+      return chain;
+    });
+
+    render(
+      <MemoryRouter>
+        <UnifiedQuoteComposer quoteId={quoteId} versionId={versionId} />
+      </MemoryRouter>
+    );
+
+    const user = userEvent.setup();
+    const resultsTab = await screen.findByRole('tab', { name: /Results & Finalize/i });
+    await user.click(resultsTab);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('selected-option-id')).toHaveTextContent(optionId);
+      expect(screen.getByTestId('selected-option-is-manual')).toHaveTextContent('false');
+      expect(screen.getByTestId('selected-option-carrier')).toHaveTextContent('Global Smart Lines');
+      expect(screen.getByTestId('selected-option-origin')).toHaveTextContent('Shenzhen Factory');
+      expect(screen.getByTestId('selected-option-destination')).toHaveTextContent('Yantian Port');
+      expect(screen.getByTestId('selected-option-departure')).toHaveTextContent('2026-03-12');
+    });
+  });
+
+  it('recalculates smart option route fields after finalize route edit', async () => {
+    const quoteId = '00000000-0000-0000-0000-000000000021';
+    const versionId = '00000000-0000-0000-0000-000000000022';
+    const optionId = '55555555-5555-5555-5555-555555555555';
+
+    const mockQuote = {
+      id: quoteId,
+      tenant_id: 'test-tenant',
+      title: 'Editable Smart Quote',
+      origin: 'Shanghai',
+      destination: 'Los Angeles',
+      total_weight: 0,
+      total_volume: 0,
+    };
+
+    const mockOptions = [
+      {
+        id: optionId,
+        total_amount: 4200,
+        is_selected: true,
+        currency: 'USD',
+        option_name: 'Smart Option',
+        carrier_name: 'Global Smart Lines',
+        source_attribution: 'AI Smart Engine',
+      },
+    ];
+
+    const mockLegs = [
+      {
+        id: '66666666-6666-6666-6666-666666666666',
+        quotation_version_option_id: optionId,
+        transport_mode: 'ocean',
+        sort_order: 1,
+        carrier_name: 'Ocean Partner',
+        origin_location_name: 'Shanghai Port',
+        destination_location_name: 'LA Harbor',
+        departure_date: '2026-03-14',
+      },
+    ];
+
+    mockScopedDb.from.mockImplementation((table: string) => {
+      const chain = {
+        select: () => chain,
+        eq: () => chain,
+        or: () => chain,
+        in: () => chain,
+        is: () => chain,
+        neq: () => chain,
+        limit: () => chain,
+        range: () => chain,
+        abortSignal: () => chain,
+        order: () => chain,
+        insert: () => Promise.resolve({ data: [], error: null }),
+        maybeSingle: () => Promise.resolve({ data: null, error: null }),
+        single: () => Promise.resolve({ data: null, error: null }),
+        then: (resolve: any) => Promise.resolve(resolve({ data: [], error: null })),
+      };
+
+      if (table === 'quotes') chain.maybeSingle = () => Promise.resolve({ data: mockQuote, error: null });
+      if (table === 'quotation_version_options') chain.order = () => Promise.resolve({ data: mockOptions, error: null }) as any;
+      if (table === 'quotation_version_option_legs') chain.order = () => Promise.resolve({ data: mockLegs, error: null }) as any;
+      if (table === 'quote_cargo_configurations') chain.then = (resolve: any) => Promise.resolve(resolve({ data: [], error: null }));
+      if (table === 'quote_items') chain.then = (resolve: any) => Promise.resolve(resolve({ data: [], error: null }));
+      if (table === 'quote_charges') chain.in = () => Promise.resolve({ data: [], error: null }) as any;
+      if (table === 'carriers') chain.order = () => Promise.resolve({ data: [{ id: 'carrier-1', carrier_name: 'Edited Ocean Carrier', carrier_type: 'shipping_line' }], error: null }) as any;
+      return chain;
+    });
+
+    render(
+      <MemoryRouter>
+        <UnifiedQuoteComposer quoteId={quoteId} versionId={versionId} />
+      </MemoryRouter>
+    );
+
+    const user = userEvent.setup();
+    const resultsTab = await screen.findByRole('tab', { name: /Results & Finalize/i });
+    await user.click(resultsTab);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('selected-option-id')).toHaveTextContent(optionId);
+      expect(screen.getByTestId('selected-option-origin')).toHaveTextContent('Shanghai Port');
+      expect(screen.getByTestId('selected-option-destination')).toHaveTextContent('LA Harbor');
+    });
+
+    await user.click(screen.getByTestId('apply-route-edit'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('selected-option-origin')).toHaveTextContent('Busan Port');
+      expect(screen.getByTestId('selected-option-destination')).toHaveTextContent('Long Beach Terminal');
+      expect(screen.getByTestId('selected-option-departure')).toHaveTextContent('2026-03-22');
+      expect(screen.getByTestId('selected-option-id')).toHaveTextContent(optionId);
+    });
   });
 });

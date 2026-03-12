@@ -19,6 +19,7 @@
 | 6.1 | 2026-01-20 | Trae AI | Added Breakbulk & RORO specifications; Defined detailed charge types for all modes. |
 | 6.2 | 2026-01-20 | Trae AI | Added Service Relationship Definitions (SD/Port, Port/Port, etc.) with operational flows and rules. |
 | 6.3 | 2026-01-20 | Trae AI | Added International Trade Direction architecture and Top 10 Platform competitive analysis. |
+| 6.4 | 2026-03-12 | Trae AI | Added implemented Smart Quote Mode architecture, API validation contract, and benchmark targets. |
 
 ### Approval Workflow
 | Role | Name | Signature | Date |
@@ -345,6 +346,224 @@ The system must explicitly categorize quotes based on trade direction to trigger
 | **Incoterm Mismatch** | quoting "EXW" for an Export where Shipper expects to control freight. | **Logic Validation:** Warn if `Direction=Export` and `Incoterm=EXW` (Buyer controls freight). |
 | **Currency Fluctuation** | Exchange rates changing between Quote and Invoice. | **Currency Buffer:** Option to add `Risk %` to ROE or fix ROE for validity period. |
 | **Cabotage** | Foreign carrier performing domestic transport. | **Carrier Selection:** Filter valid carriers based on `Domestic` flag and carrier nationality rules. |
+
+---
+
+## 9. Implemented Hybrid Route Configuration Architecture
+
+### 9.1 Smart Quote Mode Data Flow
+
+```mermaid
+flowchart TD
+  A[Quotation Composer: Generate Smart Quote] --> B[useRateFetching.fetchRates]
+  B --> C[Legacy Rate Engine]
+  B --> D[AI Smart Quote Engine]
+  C --> E[Route + Leg Normalization]
+  D --> E
+  E --> F[Hybrid Route Configuration Service]
+  F --> G[Carrier Selection per Leg]
+  F --> H[Route Recalculation origin destination departure]
+  F --> I[Realtime Carrier Service Validation API]
+  G --> J[Ranked Smart Options]
+  H --> J
+  I --> J
+  J --> K[Finalize Quote UI]
+  K --> L[Audit Log smart_quote_generation_*]
+```
+
+### 9.2 Finalize Screen Synchronization Flow
+
+```mermaid
+sequenceDiagram
+  participant U as User
+  participant QC as Quotation Composer
+  participant RF as useRateFetching
+  participant HR as Hybrid Route Service
+  participant API as Carrier API Validator
+  participant UI as Finalize Quote
+
+  U->>QC: Click Generate Smart Quote
+  QC->>RF: fetchRates(routeInput, smartMode=true)
+  RF->>HR: buildHybridRouteConfiguration(options, routeInput)
+  HR->>API: validate_carrier_service_availability
+  API-->>HR: availability + pricing flags
+  HR-->>RF: synchronized options + issues + audit trail
+  RF-->>QC: ranked options (carrier/origin/destination/departure hydrated)
+  QC-->>UI: selected option state update
+```
+
+### 9.3 Smart Quote Mode Subsystem Contract
+
+| Capability | Implementation |
+| :--- | :--- |
+| Carrier auto-selection | Leg-level carrier scoring by preferred list, mode compatibility, route support, reliability, and pricing index |
+| Route parameter recalculation | Mandatory normalization of carrier, origin, destination, and departure date for each leg and option |
+| Real-time validation | External validator action `validate_carrier_service_availability` invoked during smart generation |
+| Dynamic UI updates | Options rehydrated and pushed into composer state; finalize screen updates without page refresh |
+
+### 9.4 Generate Smart Options Module Contract
+
+| Capability | Implementation |
+| :--- | :--- |
+| Multi-alternative generation | Baseline options expanded into carrier alternatives with deduplication and max-option limit |
+| Accurate carrier assignments | Leg-level assignment enforced prior to ranking |
+| Multi-modal handling | Continuity normalization across all legs with mode normalization (`ocean/air/road/rail/courier`) |
+| Stale-field prevention | Unknown/placeholder route values replaced from normalized route input and leg continuity propagation |
+
+### 9.5 Quotation Composer Module Enhancements
+
+| Capability | Implementation |
+| :--- | :--- |
+| Input validation | `validateSmartRouteInput` executed before rate generation |
+| Carrier-service compatibility verification | Validation issues emitted when carrier type mismatches normalized mode |
+| External API integration | Real-time carrier availability and price validity adapter integrated in fetch pipeline |
+| Audit trail | `smart_quote_generation_attempt`, `smart_quote_generation_success`, `smart_quote_validation_failure` logged to `audit_logs` |
+
+### 9.6 API Integration Specification
+
+#### 9.6.1 Carrier Availability Validation
+
+**Endpoint Action:** `validate_carrier_service_availability`  
+**Invocation Channel:** AI advisor service action from quotation rate-fetch pipeline
+
+**Request Schema**
+
+```json
+{
+  "route": {
+    "origin": "Shanghai",
+    "destination": "Rotterdam",
+    "mode": "ocean",
+    "requested_departure_date": "2026-03-20"
+  },
+  "options": [
+    {
+      "option_id": "opt-1",
+      "carrier": "Maersk",
+      "mode": "ocean",
+      "origin": "Shanghai",
+      "destination": "Rotterdam",
+      "departure_date": "2026-03-20",
+      "total_amount": 4813,
+      "currency": "USD"
+    }
+  ]
+}
+```
+
+**Response Schema**
+
+```json
+[
+  {
+    "option_id": "opt-1",
+    "available": true,
+    "price_valid": true,
+    "message": "Space and pricing confirmed"
+  }
+]
+```
+
+#### 9.6.2 Hybrid Metrics Aggregation
+
+**Storage Table:** `quote_generation_metrics`  
+**Writer:** `HybridRouteMetricsService.record` during fetch lifecycle completion  
+**Reader:** `HybridRouteMetricsService.getSummary` for dashboard widgets and SLA monitoring
+
+**Persisted Metric Payload**
+
+```json
+{
+  "tenant_id": "c5cb4f0d-b178-496f-b5d0-7ec7f6b4d8a4",
+  "request_id": "d16e63aa-f85b-4ed7-b6f4-1eb932dc8f14",
+  "mode": "ocean",
+  "smart_mode": true,
+  "duration_ms": 1248,
+  "total_options": 4,
+  "issues_count": 1,
+  "unknown_carrier_count": 0,
+  "route_gap_count": 0,
+  "status": "success",
+  "timeline": [
+    { "stage": "request_started", "elapsed_ms": 0 },
+    { "stage": "legacy_rates_loaded", "elapsed_ms": 388 },
+    { "stage": "hybrid_configuration_completed", "elapsed_ms": 903 },
+    { "stage": "completed", "elapsed_ms": 1248 }
+  ]
+}
+```
+
+#### 9.6.3 Post-Generation Route Edit Revalidation
+
+**Trigger:** Finalize panel leg edits (`origin`, `destination`, `departure_date`, `carrier`)  
+**Execution Path:** `FinalizeSection.onRouteOptionChange` -> `UnifiedQuoteComposer.handleRouteOptionChange` -> `buildHybridRouteConfiguration`
+
+**Revalidation Input Contract**
+
+```json
+{
+  "option_id": "opt-1",
+  "route_input": {
+    "origin": "Busan Port",
+    "destination": "Long Beach Terminal",
+    "mode": "ocean",
+    "requested_departure_date": "2026-03-22",
+    "preferred_carriers": ["Edited Ocean Carrier"],
+    "max_options": 1
+  },
+  "option_snapshot": {
+    "carrier": "Edited Ocean Carrier",
+    "legs": [
+      {
+        "id": "opt-1-leg-1",
+        "mode": "ocean",
+        "origin": "Busan Port",
+        "destination": "Long Beach Terminal",
+        "departure_date": "2026-03-22"
+      }
+    ]
+  }
+}
+```
+
+**Behavioral Contract**
+
+- Validates carrier-mode compatibility against loaded carrier directory profiles.
+- Recomputes continuity and fills route gaps before persisting edited option state.
+- Recalculates displayed sell total from global plus leg-level charges after edit.
+- Emits per-option validation issues back to Finalize view without page refresh.
+- Appends audit entry `smart_option_route_edited` with tenant and issue metadata.
+
+**Summary Output Contract**
+
+```json
+{
+  "totalRequests": 320,
+  "successfulRequests": 309,
+  "failedRequests": 11,
+  "successRate": 96.56,
+  "p95DurationMs": 1738,
+  "p50DurationMs": 984,
+  "averageOptions": 3.61,
+  "unknownCarrierIncidents": 2,
+  "routeGapIncidents": 4
+}
+```
+
+### 9.7 Test and Benchmark Acceptance
+
+| Requirement | Target | Validation Artifact |
+| :--- | :--- | :--- |
+| Unit test coverage | >= 90% on hybrid route service module | `src/services/quotation/__tests__/hybrid-route-configuration.test.ts` with branch-rich assertions |
+| Performance SLA | <= 2 seconds p95 quote generation for 95% requests | `tests/performance/hybrid-route-configuration.performance.test.ts` computes p95 over 120 runs |
+| Workflow reliability | No stale carrier/origin/destination/departure fields in finalized smart options | Smart-route hydration assertions in quotation and rate-fetch tests |
+| Route edit reliability | Edited smart option legs revalidate and hydrate selected option fields | `src/components/sales/unified-composer/__tests__/UnifiedQuoteComposer.edit.test.tsx` route-edit recalculation test |
+
+**Latest Validation Snapshot (2026-03-12)**
+
+- Hybrid service unit coverage: 91.48% statements, 93.12% lines (`hybrid-route-configuration.ts`).
+- Hybrid performance benchmark: p95 SLA test passes under 2-second threshold.
+- Composer route-edit regression: selected option origin/destination/departure refresh verified after edit.
 
 ---
 

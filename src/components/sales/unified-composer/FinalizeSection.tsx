@@ -41,6 +41,8 @@ export interface FinalizeSectionProps {
     marginPercent: number;
   }) => void;
   onRenameOption?: (optionId: string, newName: string) => void;
+  onRouteOptionChange?: (optionId: string, legs: TransportLeg[]) => void;
+  routeValidationIssues?: string[];
   referenceData?: {
     chargeCategories: any[];
     chargeBases: any[];
@@ -110,6 +112,8 @@ export const FinalizeSection = memo(function FinalizeSection({
   draft,
   onDraftChange,
   onRenameOption,
+  onRouteOptionChange,
+  routeValidationIssues = [],
   referenceData,
 }: FinalizeSectionProps) {
   const { t } = useTranslation();
@@ -204,6 +208,11 @@ export const FinalizeSection = memo(function FinalizeSection({
     onSaveQuote(savableCharges, mp, form.getValues('notes') || '');
   };
 
+  const handleLegsChange = (nextLegs: TransportLeg[]) => {
+    setLegs(nextLegs);
+    onRouteOptionChange?.(selectedOption.id, nextLegs);
+  };
+
   // Convert managed charges to TransportLeg[] + Charge[] for visualization
   const { vizLegs, vizGlobalCharges } = useMemo(() => {
     const mapCharge = (mc: ManagedCharge): Charge => ({
@@ -286,13 +295,27 @@ export const FinalizeSection = memo(function FinalizeSection({
 
       {expanded && (
         <CardContent className="space-y-6">
-          {/* Leg Management (Manual Mode Only) */}
-          {selectedOption.is_manual && (
-            <>
-              <LegManager legs={legs} onChange={setLegs} />
-              <Separator />
-            </>
+          <LegManager
+            legs={legs}
+            onChange={handleLegsChange}
+            allowStructureChanges={selectedOption.is_manual}
+          />
+
+          {routeValidationIssues.length > 0 && (
+            <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3">
+              <div className="mb-1 flex items-center gap-2 text-sm font-medium text-destructive">
+                <AlertTriangle className="h-4 w-4" />
+                Route validation requires attention
+              </div>
+              <div className="space-y-1">
+                {routeValidationIssues.map((issue) => (
+                  <div key={issue} className="text-xs text-destructive">{issue}</div>
+                ))}
+              </div>
+            </div>
           )}
+
+          <Separator />
 
           {/* Option Summary */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">

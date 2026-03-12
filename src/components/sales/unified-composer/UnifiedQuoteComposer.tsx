@@ -29,7 +29,7 @@ import { useAiAdvisor } from '@/hooks/useAiAdvisor';
 import { PricingService } from '@/services/pricing.service';
 import { QuoteOptionService } from '@/services/QuoteOptionService';
 import { PortsService } from '@/services/PortsService';
-import { RateOption } from '@/types/quote-breakdown';
+import { RateOption, TransportLeg } from '@/types/quote-breakdown';
 import { invokeFunction } from '@/lib/supabase-functions';
 import { logger } from '@/lib/logger';
 import { sanitizePayload } from '@/lib/utils/sanitizer';
@@ -44,6 +44,8 @@ import { FinalizeSection } from './FinalizeSection';
 import { QuotationConfigurationService } from '@/services/quotation/QuotationConfigurationService';
 import { QuotationOptionCrudService } from '@/services/quotation/QuotationOptionCrudService';
 import { QuotationRankingService } from '@/services/quotation/QuotationRankingService';
+import { buildHybridRouteConfiguration, validateSmartRouteInput } from '@/services/quotation/hybrid-route-configuration';
+import { QuoteTransformService } from '@/lib/services/quote-transform.service';
 import { showQuotationSuccessToast } from '@/components/notifications/QuotationSuccessToast';
 import { EnterpriseFormLayout } from '@/components/ui/enterprise';
 
@@ -312,6 +314,9 @@ function UnifiedQuoteComposerContent({
   const [complianceCheck, setComplianceCheck] = useState<{ compliant: boolean; issues: any[] } | null>(null);
   const [lastFormData, setLastFormData] = useState<{ values: FormZoneValues; extended: ExtendedFormData } | null>(null);
   const [manualOptions, setManualOptions] = useState<RateOption[]>([]);
+  const [editedOptions, setEditedOptions] = useState<Record<string, RateOption>>({});
+  const [routeValidationIssues, setRouteValidationIssues] = useState<Record<string, string[]>>({});
+  const [carrierDirectory, setCarrierDirectory] = useState<Array<{ id: string; carrier_name: string; carrier_type?: string | null }>>([]);
   const [deletedOptionIds, setDeletedOptionIds] = useState<string[]>([]);
   const [optionDrafts, setOptionDrafts] = useState<Record<string, any>>({});
   const [networkStatus, setNetworkStatus] = useState<'online' | 'offline' | 'checking'>('online');
@@ -370,6 +375,31 @@ function UnifiedQuoteComposerContent({
       }
     }
   }, [rateFetching.results, isSmartMode]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data, error } = await scopedDb
+          .from('carriers')
+          .select('id, carrier_name, carrier_type')
+          .eq('is_active', true)
+          .order('carrier_name');
+        if (error) {
+          logger.warn('[UnifiedComposer] Failed to load carrier directory for validation', { error });
+          return;
+        }
+        if (!cancelled) {
+          setCarrierDirectory(Array.isArray(data) ? data : []);
+        }
+      } catch (error) {
+        logger.warn('[UnifiedComposer] Carrier directory probe failed', { error });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [scopedDb]);
   
   // CRM Data
   const [accounts, setAccounts] = useState<any[]>([]);
@@ -810,7 +840,7 @@ function UnifiedQuoteComposerContent({
     return (
       <Alert
         variant="destructive"
-        className="mb-6 animate-in fade-in slide-in-from-top-2"
+        className="mb-6 animate-in fade-in slide-in-from-top-2 border-destructive bg-destructive/10 text-foreground shadow-sm"
         role="alert"
         aria-live="assertive"
         aria-label="Validation summary"
@@ -819,24 +849,24 @@ function UnifiedQuoteComposerContent({
         <AlertCircle className="h-4 w-4" />
         <AlertTitle className="ml-2 flex items-center justify-between">
           <span>Please fix the following errors before proceeding:</span>
-          <Button 
+          <Button
             variant="ghost" 
             size="sm" 
-            className="h-6 w-6 p-0 hover:bg-destructive/20 text-destructive-foreground"
+            className="h-6 w-6 p-0 text-foreground hover:bg-destructive/20"
             onClick={() => setShowValidationSummary(false)}
             aria-label="Close validation summary"
           >
             <X className="h-4 w-4" />
           </Button>
         </AlertTitle>
-        <AlertDescription className="mt-2 ml-2">
+        <AlertDescription className="mt-2 ml-2 text-foreground">
           <ul className="list-disc pl-5 space-y-1 text-sm">
             {validationIssues.map((issue) => (
-              <li key={issue.path} className="text-destructive-foreground/90">
+              <li key={issue.path} className="text-foreground">
                 <button 
                   type="button" 
                   onClick={() => scrollToField(issue.path)}
-                  className="hover:underline text-left font-medium"
+                  className="text-left font-medium text-foreground hover:underline"
                   aria-label={`Go to ${issue.label} field error`}
                 >
                   {issue.label}: {issue.message}
@@ -887,9 +917,10 @@ function UnifiedQuoteComposerContent({
     const fetched = rateFetching.results || [];
     // Only include fetched rates that are explicitly visible
     const visibleFetched = fetched.filter(opt => visibleRateIds.includes(opt.id));
-    const all = [...visibleFetched, ...manualOptions];
+    const all = [...visibleFetched, ...manualOptions]
+      .map((option) => editedOptions[option.id] || option);
     return all.filter(opt => !deletedOptionIds.includes(opt.id));
-  }, [rateFetching.results, manualOptions, deletedOptionIds, visibleRateIds]);
+  }, [rateFetching.results, manualOptions, deletedOptionIds, visibleRateIds, editedOptions]);
 
   // Available options (fetched but not yet added/visible)
   const availableOptions = useMemo(() => {
@@ -905,6 +936,184 @@ function UnifiedQuoteComposerContent({
     if (!val) return null;
     const m = String(val).match(/(\d+)/);
     return m ? Number(m[1]) : null;
+  };
+
+  const normalizeLegPoint = (value: unknown) => {
+    const normalized = String(value || '').trim();
+    if (!normalized) return '';
+    if (normalized.toLowerCase() === 'origin') return '';
+    if (normalized.toLowerCase() === 'destination') return '';
+    return normalized;
+  };
+
+  const normalizeLegDate = (value: unknown) => {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    const ddmmyyyy = raw.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (ddmmyyyy) return `${ddmmyyyy[3]}-${ddmmyyyy[2]}-${ddmmyyyy[1]}`;
+    const yyyymmdd = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (yyyymmdd) return raw;
+    const parsed = new Date(raw);
+    if (Number.isNaN(parsed.getTime())) return '';
+    const year = parsed.getFullYear();
+    const month = String(parsed.getMonth() + 1).padStart(2, '0');
+    const day = String(parsed.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const calculateOptionTotalSell = useCallback((option: RateOption): number => {
+    const collectAmount = (charge: any): number =>
+      Number(charge?.sell?.amount ?? charge?.amount ?? 0) || 0;
+    const globalTotal = (Array.isArray(option?.charges) ? option.charges : []).reduce(
+      (sum: number, charge: any) => sum + collectAmount(charge),
+      0
+    );
+    const legTotal = (Array.isArray(option?.legs) ? option.legs : []).reduce((sum: number, leg: any) => {
+      const legCharges = Array.isArray(leg?.charges) ? leg.charges : [];
+      return sum + legCharges.reduce((legSum: number, charge: any) => legSum + collectAmount(charge), 0);
+    }, 0);
+    const total = globalTotal + legTotal;
+    if (total > 0) return Number(total.toFixed(2));
+    return Number(option.total_amount ?? option.price ?? 0) || 0;
+  }, []);
+
+  const getRouteValidationMessages = useCallback((issues: Array<{ message: string }>): string[] => {
+    const deduped = new Set<string>();
+    for (const issue of issues) {
+      const message = String(issue?.message || '').trim();
+      if (message) deduped.add(message);
+    }
+    return Array.from(deduped);
+  }, []);
+
+  const resolveLegCarrier = (leg: any, option: any) => {
+    const candidates = [
+      leg?.carrier,
+      leg?.carrier_name,
+      typeof leg?.carrier === 'object' ? leg?.carrier?.name : '',
+      leg?.provider_name,
+      leg?.provider?.name,
+      option?.carrier,
+      option?.carrier_name,
+      option?.name,
+      typeof option?.carrier === 'object' ? option?.carrier?.name : '',
+    ];
+    for (const candidate of candidates) {
+      const name = String(candidate || '').trim();
+      if (name && name.toLowerCase() !== 'unknown carrier') return name;
+    }
+    return String(option?.carrier || option?.carrier_name || '').trim() || 'Unknown Carrier';
+  };
+
+  const resolveLegDepartureDate = (leg: any, option: any) => {
+    const candidates = [
+      leg?.departure_date,
+      leg?.departureDate,
+      leg?.departure,
+      leg?.etd,
+      leg?.estimated_departure,
+      leg?.estimated_departure_date,
+      leg?.departure_datetime,
+      leg?.schedule?.departure,
+      option?.departure_date,
+      option?.departureDate,
+      option?.departure,
+      option?.etd,
+      option?.estimated_departure,
+      option?.estimated_departure_date,
+      option?.schedule?.departure,
+    ];
+    for (const candidate of candidates) {
+      const normalized = normalizeLegDate(candidate);
+      if (normalized) return normalized;
+    }
+    return '';
+  };
+
+  const resolveLegOrigin = (leg: any) => {
+    const candidates = [
+      leg?.origin,
+      leg?.from,
+      leg?.origin_name,
+      leg?.origin_location_name,
+      leg?.origin_port,
+      leg?.origin_airport,
+      leg?.origin_station,
+      leg?.pickup_location,
+      leg?.pickup,
+      leg?.pol,
+      leg?.port_of_loading,
+      leg?.portOfLoading,
+    ];
+    for (const candidate of candidates) {
+      const normalized = normalizeLegPoint(candidate);
+      if (normalized) return normalized;
+    }
+    return '';
+  };
+
+  const resolveLegDestination = (leg: any) => {
+    const candidates = [
+      leg?.destination,
+      leg?.to,
+      leg?.destination_name,
+      leg?.destination_location_name,
+      leg?.destination_port,
+      leg?.destination_airport,
+      leg?.destination_station,
+      leg?.delivery_location,
+      leg?.delivery,
+      leg?.dropoff_location,
+      leg?.dropoff,
+      leg?.pod,
+      leg?.port_of_discharge,
+      leg?.portOfDischarge,
+    ];
+    for (const candidate of candidates) {
+      const normalized = normalizeLegPoint(candidate);
+      if (normalized) return normalized;
+    }
+    return '';
+  };
+
+  const normalizeLegContinuity = (
+    legs: any[],
+    route: { origin: string; destination: string },
+    option?: any
+  ) => {
+    if (!Array.isArray(legs) || legs.length === 0) return [];
+    const normalized = legs.map((leg) => ({
+      ...leg,
+      origin: resolveLegOrigin(leg),
+      destination: resolveLegDestination(leg),
+      carrier: resolveLegCarrier(leg, option),
+      departure_date: resolveLegDepartureDate(leg, option),
+    }));
+    if (!normalized[0].origin) normalized[0].origin = normalizeLegPoint(route.origin);
+    if (!normalized[normalized.length - 1].destination) {
+      normalized[normalized.length - 1].destination = normalizeLegPoint(route.destination);
+    }
+    for (let i = 1; i < normalized.length; i += 1) {
+      if (!normalized[i].origin && normalized[i - 1].destination) {
+        normalized[i].origin = normalized[i - 1].destination;
+      }
+    }
+    for (let i = normalized.length - 2; i >= 0; i -= 1) {
+      if (!normalized[i].destination && normalized[i + 1].origin) {
+        normalized[i].destination = normalized[i + 1].origin;
+      }
+    }
+    for (let i = 0; i < normalized.length; i += 1) {
+      const previousDestination = i > 0 ? normalized[i - 1].destination : normalizeLegPoint(route.origin);
+      const nextOrigin = i < normalized.length - 1 ? normalized[i + 1].origin : normalizeLegPoint(route.destination);
+      if (!normalized[i].origin) normalized[i].origin = previousDestination || normalizeLegPoint(route.origin);
+      if (!normalized[i].destination) normalized[i].destination = nextOrigin || normalizeLegPoint(route.destination);
+      normalized[i].from = normalized[i].origin;
+      normalized[i].to = normalized[i].destination;
+      if (!normalized[i].carrier) normalized[i].carrier = resolveLegCarrier(normalized[i], option);
+      if (!normalized[i].departure_date) normalized[i].departure_date = resolveLegDepartureDate(normalized[i], option);
+    }
+    return normalized;
   };
 
   const isLegacyCargoSchemaError = useCallback((error: any): boolean => {
@@ -1006,6 +1215,16 @@ function UnifiedQuoteComposerContent({
     const isMarketRate = rateFetching.results?.some(r => r.id === optionId);
     if (isMarketRate) {
       setVisibleRateIds(prev => prev.filter(id => id !== optionId));
+      setEditedOptions((prev) => {
+        const next = { ...prev };
+        delete next[optionId];
+        return next;
+      });
+      setRouteValidationIssues((prev) => {
+        const next = { ...prev };
+        delete next[optionId];
+        return next;
+      });
       if (selectedOption?.id === optionId) {
         const next = displayResults.find((o) => o.id !== optionId) || null;
         setSelectedOption(next);
@@ -1025,6 +1244,16 @@ function UnifiedQuoteComposerContent({
               delete next[optionId];
               return next;
             });
+            setEditedOptions((prev) => {
+              const next = { ...prev };
+              delete next[optionId];
+              return next;
+            });
+            setRouteValidationIssues((prev) => {
+              const next = { ...prev };
+              delete next[optionId];
+              return next;
+            });
 
             if (selectedOption?.id === optionId) {
               const next = displayResults.find((o) => o.id !== optionId) || null;
@@ -1040,6 +1269,16 @@ function UnifiedQuoteComposerContent({
       setManualOptions((prev) => prev.filter((o) => o.id !== optionId));
       setDeletedOptionIds((prev) => [...prev, optionId]); // Ensure it's hidden even if somehow still present in fetched results
       setOptionDrafts((prev) => {
+        const next = { ...prev };
+        delete next[optionId];
+        return next;
+      });
+      setEditedOptions((prev) => {
+        const next = { ...prev };
+        delete next[optionId];
+        return next;
+      });
+      setRouteValidationIssues((prev) => {
         const next = { ...prev };
         delete next[optionId];
         return next;
@@ -2047,7 +2286,53 @@ function UnifiedQuoteComposerContent({
                 const explicitCarrierName = typeof l?.carrier_name === 'string' ? l.carrier_name.trim() : '';
                 const providerCarrierName = l?.provider_id ? carriersMap[l.provider_id]?.carrier_name : '';
                 const mappedCarrierName = l?.carrier_id ? carriersMap[l.carrier_id]?.carrier_name : '';
-                const carrierName = explicitCarrierName || providerCarrierName || mappedCarrierName || 'Unknown Carrier';
+                const objectCarrierName = typeof l?.carrier === 'object'
+                  ? String(l.carrier?.name || l.carrier?.label || '').trim()
+                  : '';
+                const rawCarrierName = typeof l?.carrier === 'string' ? l.carrier.trim() : '';
+                const carrierName = explicitCarrierName || providerCarrierName || mappedCarrierName || objectCarrierName || rawCarrierName || 'Unknown Carrier';
+
+                const originName = (
+                  l.origin_loc?.location_name
+                  || l.origin_location_name
+                  || l.origin_location
+                  || l.origin_name
+                  || l.origin
+                  || l.from_location
+                  || l.from
+                  || ''
+                );
+                const destinationName = (
+                  l.dest_loc?.location_name
+                  || l.destination_location_name
+                  || l.destination_location
+                  || l.destination_name
+                  || l.destination
+                  || l.to_location
+                  || l.to
+                  || ''
+                );
+                const departureDate = normalizeLegDate(
+                  l.departure_date
+                  || l.departure_datetime
+                  || l.departure
+                  || l.etd
+                  || l.estimated_departure
+                  || l.estimated_departure_date
+                );
+                const arrivalDate = normalizeLegDate(
+                  l.arrival_date
+                  || l.arrival_datetime
+                  || l.arrival
+                  || l.eta
+                  || l.estimated_arrival
+                  || l.estimated_arrival_date
+                );
+                const transitTime = l.transit_time
+                  || l.transitTime
+                  || (l.transit_time_days ? `${l.transit_time_days} days` : '')
+                  || (l.transit_time_hours ? `${Math.ceil(l.transit_time_hours / 24)} days` : '')
+                  || 'TBD';
 
                 return {
                     id: l.id,
@@ -2056,11 +2341,13 @@ function UnifiedQuoteComposerContent({
                     carrier: carrierName,
                     carrier_id: l.carrier_id,
                     provider_id: l.provider_id,
-                    origin: l.origin_loc?.location_name || l.origin_location || '',
-                    destination: l.dest_loc?.location_name || l.destination_location || '',
-                    transit_time: l.transit_time_hours ? `${Math.ceil(l.transit_time_hours / 24)} days` : 'TBD',
-                    departure_date: l.departure_date,
-                    arrival_date: l.arrival_date,
+                    origin: originName,
+                    destination: destinationName,
+                    from: originName,
+                    to: destinationName,
+                    transit_time: transitTime,
+                    departure_date: departureDate || null,
+                    arrival_date: arrivalDate || null,
                     sequence: l.sort_order,
                     origin_location_id: l.origin_location_id,
                     destination_location_id: l.destination_location_id,
@@ -2114,6 +2401,11 @@ function UnifiedQuoteComposerContent({
                 (opt.transit_time_days ? `${opt.transit_time_days} days` : 'TBD');
             const totalAmount = totalPrice > 0 ? totalPrice : (Number(opt.total_amount) || 0);
 
+            const optionSource = String(opt?.source_attribution || opt?.source || '').toLowerCase();
+            const isManualOption = Boolean(opt?.is_manual)
+              || optionSource.includes('manual')
+              || String(opt?.id || '').startsWith('manual-');
+
             return {
                id: opt.id,
                carrier: resolvedCarrierName,
@@ -2122,7 +2414,7 @@ function UnifiedQuoteComposerContent({
                currency: resolvedCurrency,
                transitTime: resolvedTransitTime,
                tier: 'custom',
-               is_manual: true, // Treat loaded options as manual so they are editable
+               is_manual: isManualOption,
                source_attribution: 'Saved Quote',
                legs: myLegs,
                charges: globalCharges,
@@ -2250,6 +2542,7 @@ function UnifiedQuoteComposerContent({
   // ---------------------------------------------------------------------------
 
   const handleComposerMode = useCallback(() => {
+    rateFetching.clearResults();
     const newOption: RateOption = {
         id: `manual-${Date.now()}`,
         carrier: '',
@@ -2265,10 +2558,11 @@ function UnifiedQuoteComposerContent({
     };
     
     setManualOptions([newOption]);
-    setVisibleRateIds([newOption.id]);
+    setVisibleRateIds([]);
     setSelectedOption(newOption);
     setIsSmartMode(false);
     setDeletedOptionIds([]);
+    setActiveComposerSection('results');
     
     // Initialize draft
     setOptionDrafts({
@@ -2278,7 +2572,7 @@ function UnifiedQuoteComposerContent({
             marginPercent: 15
         }
     });
-  }, []);
+  }, [rateFetching]);
 
   // ---------------------------------------------------------------------------
   // Handle "Get Rates"
@@ -2294,6 +2588,32 @@ function UnifiedQuoteComposerContent({
     // For now, we will pass it through to fetchRates.
 
     setSelectedOption(null);
+    const routeValidationErrors = validateSmartRouteInput({
+      origin: formValues.origin || '',
+      destination: formValues.destination || '',
+      mode: formValues.mode || 'ocean',
+      requested_departure_date: String((formValues as any).pickup_date || ''),
+      preferred_carriers: [],
+    });
+    if (routeValidationErrors.length > 0) {
+      const validationMessage = routeValidationErrors.join('. ');
+      toast({ title: 'Route Validation Failed', description: validationMessage, variant: 'destructive' });
+      logAudit('smart_quote_validation_failure', {
+        quoteId: quoteId || 'new',
+        smart,
+        errors: routeValidationErrors,
+        origin: formValues.origin || '',
+        destination: formValues.destination || '',
+      }, 'failure');
+      return;
+    }
+    logAudit('smart_quote_generation_attempt', {
+      quoteId: quoteId || 'new',
+      smart,
+      origin: formValues.origin || '',
+      destination: formValues.destination || '',
+      mode: formValues.mode || 'ocean',
+    });
 
     // Fire compliance in parallel (non-blocking)
     runComplianceCheck({ ...formValues, ...extendedData } as any);
@@ -2304,7 +2624,7 @@ function UnifiedQuoteComposerContent({
     if (smart) {
       // Smart Mode requested
       if (smartEnabled) {
-        await rateFetching.fetchRates(
+        const generatedOptions = await rateFetching.fetchRates(
           {
             ...formValues,
             ...extendedData,
@@ -2314,22 +2634,22 @@ function UnifiedQuoteComposerContent({
           } as any,
           containerResolver
         );
+        logAudit('smart_quote_generation_success', {
+          quoteId: quoteId || 'new',
+          optionCount: generatedOptions.length,
+          smartMode: true,
+          mode: formValues.mode || 'ocean',
+        });
       } else {
         // Tenant has Smart Mode disabled: fallback to Manual Composer
+        logAudit('smart_quote_generation_fallback', {
+          quoteId: quoteId || 'new',
+          reason: 'tenant_smart_mode_disabled',
+        });
         handleComposerMode();
       }
     } else {
-      // Standard Mode: fetch market rates and show highest-ranked by default
-      await rateFetching.fetchRates(
-        {
-          ...formValues,
-          ...extendedData,
-          mode: (formValues.mode || 'ocean') as any,
-          smartMode: false,
-          account_id: storeState.quoteData?.account_id,
-        } as any,
-        containerResolver
-      );
+      handleComposerMode();
     }
   }, [
     runComplianceCheck, 
@@ -2337,16 +2657,76 @@ function UnifiedQuoteComposerContent({
     rateFetching, 
     storeState.quoteData, 
     containerResolver, 
-    handleComposerMode
+    handleComposerMode,
+    toast,
+    logAudit,
+    quoteId,
   ]);
 
   // ---------------------------------------------------------------------------
   // Handle option selection
   // ---------------------------------------------------------------------------
 
+  const syncFormRouteFromOption = useCallback((option: RateOption) => {
+    const legs = Array.isArray(option?.legs) ? option.legs : [];
+    const firstLeg = legs[0];
+    const lastLeg = legs[legs.length - 1];
+    const nextOrigin = String((option as any)?.origin || firstLeg?.origin || form.getValues('origin') || '').trim();
+    const nextDestination = String((option as any)?.destination || lastLeg?.destination || form.getValues('destination') || '').trim();
+    const nextDeparture = normalizeLegDate(
+      firstLeg?.departure_date
+      || (option as any)?.departure_date
+      || (option as any)?.pickupDate
+      || form.getValues('pickupDate')
+    );
+
+    if (nextOrigin) {
+      form.setValue('origin', nextOrigin, { shouldDirty: true, shouldValidate: true });
+    }
+    if (nextDestination) {
+      form.setValue('destination', nextDestination, { shouldDirty: true, shouldValidate: true });
+    }
+    if (nextDeparture) {
+      form.setValue('pickupDate', nextDeparture, { shouldDirty: true, shouldValidate: true });
+    }
+  }, [form]);
+
   const handleSelectOption = useCallback((option: RateOption) => {
-    setSelectedOption(option);
-  }, []);
+    const baseOption = editedOptions[option.id] || option;
+    const normalizedLegs = normalizeLegContinuity(Array.isArray(baseOption?.legs) ? baseOption.legs : [], {
+      origin: form.getValues('origin') || (baseOption as any)?.origin || '',
+      destination: form.getValues('destination') || (baseOption as any)?.destination || '',
+    }, baseOption);
+    const hydratedOption = {
+      ...baseOption,
+      carrier: String((baseOption as any)?.carrier || (baseOption as any)?.carrier_name || '').trim() || (
+        normalizedLegs.find((leg: any) => String(leg?.carrier || '').trim())?.carrier || 'Unknown Carrier'
+      ),
+      origin: (baseOption as any)?.origin || normalizedLegs[0]?.origin || form.getValues('origin') || '',
+      destination: (baseOption as any)?.destination || normalizedLegs[normalizedLegs.length - 1]?.destination || form.getValues('destination') || '',
+      legs: normalizedLegs,
+    } as RateOption;
+    setSelectedOption(hydratedOption);
+    setRouteValidationIssues((prev) => ({
+      ...prev,
+      [hydratedOption.id]: prev[hydratedOption.id] || [],
+    }));
+    syncFormRouteFromOption(hydratedOption);
+    setOptionDrafts((prev) => ({
+      ...prev,
+      [hydratedOption.id]: {
+        ...(prev[hydratedOption.id] || {}),
+        legs: normalizedLegs,
+        charges: Array.isArray(prev[hydratedOption.id]?.charges) ? prev[hydratedOption.id].charges : flattenOptionCharges(hydratedOption),
+        marginPercent: prev[hydratedOption.id]?.marginPercent ?? form.getValues('marginPercent') ?? 15,
+      },
+    }));
+  }, [editedOptions, flattenOptionCharges, form, syncFormRouteFromOption]);
+
+  useEffect(() => {
+    if (!selectedOption) return;
+    syncFormRouteFromOption(selectedOption);
+  }, [selectedOption, syncFormRouteFromOption]);
 
   const handleRenameOption = useCallback((optionId: string, newName: string) => {
     setManualOptions(prev => prev.map(opt => {
@@ -2355,7 +2735,16 @@ function UnifiedQuoteComposerContent({
         }
         return opt;
     }));
-    
+
+    setEditedOptions((prev) => {
+      const current = prev[optionId];
+      if (!current) return prev;
+      return {
+        ...prev,
+        [optionId]: { ...current, carrier: newName, name: newName },
+      };
+    });
+
     setSelectedOption(prev => {
         if (prev?.id === optionId) {
             return { ...prev, carrier: newName, name: newName };
@@ -2363,6 +2752,119 @@ function UnifiedQuoteComposerContent({
         return prev;
     });
   }, []);
+
+  const handleRouteOptionChange = useCallback(async (optionId: string, legs: TransportLeg[]) => {
+    const baseOption =
+      selectedOption?.id === optionId
+        ? selectedOption
+        : editedOptions[optionId] || combinedResults.find((opt) => opt.id === optionId) || null;
+    if (!baseOption) return;
+
+    const routeOrigin = String(legs[0]?.origin || (baseOption as any)?.origin || form.getValues('origin') || '').trim();
+    const routeDestination = String(
+      legs[legs.length - 1]?.destination || (baseOption as any)?.destination || form.getValues('destination') || ''
+    ).trim();
+    const routeDeparture =
+      normalizeLegDate(legs[0]?.departure_date)
+      || normalizeLegDate((baseOption as any)?.departure_date)
+      || normalizeLegDate(form.getValues('pickupDate'))
+      || new Date().toISOString().slice(0, 10);
+
+    const normalizedLegs = normalizeLegContinuity(legs as any[], {
+      origin: routeOrigin,
+      destination: routeDestination,
+    }, baseOption);
+
+    const optionCandidate: RateOption = {
+      ...baseOption,
+      origin: routeOrigin,
+      destination: routeDestination,
+      departure_date: routeDeparture as any,
+      legs: normalizedLegs as any,
+    } as RateOption;
+
+    const routeInput = {
+      origin: routeOrigin,
+      destination: routeDestination,
+      mode: String(optionCandidate.transport_mode || normalizedLegs[0]?.mode || form.getValues('mode') || 'ocean'),
+      requested_departure_date: routeDeparture,
+      preferred_carriers: [String(optionCandidate.carrier || '').trim()].filter(Boolean),
+      max_options: 1,
+    };
+
+    const carrierProfiles = carrierDirectory.map((carrier) => ({
+      id: carrier.id,
+      carrier_name: carrier.carrier_name,
+      carrier_type: carrier.carrier_type || undefined,
+    }));
+
+    const validation = await buildHybridRouteConfiguration({
+      options: [optionCandidate],
+      routeInput,
+      carrierProfiles,
+    });
+    const validationMessages = getRouteValidationMessages(validation.validationIssues);
+
+    const validatedOption = (validation.options?.[0] || optionCandidate) as RateOption;
+    const nextOption: RateOption = {
+      ...validatedOption,
+      id: optionId,
+      origin: routeOrigin,
+      destination: routeDestination,
+      legs: normalizeLegContinuity(Array.isArray(validatedOption.legs) ? validatedOption.legs : normalizedLegs, {
+        origin: routeOrigin,
+        destination: routeDestination,
+      }, validatedOption),
+    } as RateOption;
+    const nextTotal = calculateOptionTotalSell(nextOption);
+    const pricedOption: RateOption = {
+      ...nextOption,
+      total_amount: nextTotal,
+      price: nextTotal,
+    } as RateOption;
+
+    setEditedOptions((prev) => ({ ...prev, [optionId]: pricedOption }));
+    setRouteValidationIssues((prev) => ({ ...prev, [optionId]: validationMessages }));
+    setOptionDrafts((prev) => ({
+      ...prev,
+      [optionId]: {
+        ...(prev[optionId] || {}),
+        legs: pricedOption.legs || [],
+      },
+    }));
+
+    if (selectedOption?.id === optionId) {
+      setSelectedOption(pricedOption);
+      syncFormRouteFromOption(pricedOption);
+    }
+
+    if (context?.tenantId && user?.id) {
+      await QuoteTransformService.logTransferEvent(supabase as any, {
+        action: 'smart_option_route_edited',
+        status: validationMessages.length > 0 ? 'failure' : 'success',
+        userId: user.id,
+        resourceId: optionId,
+        details: {
+          tenantId: context.tenantId,
+          issueCount: validationMessages.length,
+          routeInput,
+        },
+      });
+    }
+  }, [
+    calculateOptionTotalSell,
+    carrierDirectory,
+    combinedResults,
+    context?.tenantId,
+    editedOptions,
+    form,
+    getRouteValidationMessages,
+    normalizeLegContinuity,
+    selectedOption,
+    supabase,
+    syncFormRouteFromOption,
+    user?.id,
+  ]);
 
   // ---------------------------------------------------------------------------
   // Handle Attachment Sync
@@ -2873,16 +3375,23 @@ function UnifiedQuoteComposerContent({
              console.warn('[UnifiedComposer] draftCharges is not iterable for option', opt.id);
         }
 
-        const legsPayload = draftLegs.map((leg: any) => ({
+        const normalizedDraftLegs = normalizeLegContinuity(draftLegs, {
+          origin: formData?.values.origin || (opt as any).origin || '',
+          destination: formData?.values.destination || (opt as any).destination || '',
+        }, opt);
+        const legsPayload = normalizedDraftLegs.map((leg: any) => ({
           id: isUUID(leg.id) ? leg.id : undefined,
           transport_mode: leg.mode || formData?.values.mode || 'ocean',
           leg_type: leg.leg_type || 'transport',
-          origin_location_name: leg.origin || '',
-          destination_location_name: leg.destination || '',
+          origin_location_name: leg.origin || leg.from || '',
+          destination_location_name: leg.destination || leg.to || '',
           origin_location_id: isUUID(leg.origin_location_id) ? leg.origin_location_id : (isUUID(leg.originId) ? leg.originId : null),
           destination_location_id: isUUID(leg.destination_location_id) ? leg.destination_location_id : (isUUID(leg.destinationId) ? leg.destinationId : null),
           carrier_id: leg.carrier_id || null,
           carrier_name: leg.carrier || leg.carrier_name || null,
+          departure_date: normalizeLegDate(leg.departure_date || leg.departureDate || leg.departure || leg.etd) || null,
+          arrival_date: normalizeLegDate(leg.arrival_date || leg.arrivalDate || leg.arrival || leg.eta) || null,
+          transit_time: leg.transit_time || leg.transitTime || null,
           charges: (chargesByLegId[leg.id] || []).flatMap((c: any) => [
             buildChargePayload(c, 'buy'),
             buildChargePayload(c, 'sell'),
@@ -3128,19 +3637,24 @@ function UnifiedQuoteComposerContent({
 
   const handleRerunRates = useCallback(() => {
     if (lastFormData) {
-      // Pass false for smart mode as rollback default
-      handleGetRates(lastFormData.values, lastFormData.extended, false);
+      handleGetRates(lastFormData.values, lastFormData.extended, isSmartMode);
     }
-  }, [lastFormData, handleGetRates]);
+  }, [lastFormData, handleGetRates, isSmartMode]);
 
   const handleRunFromResults = useCallback(async () => {
-    const isValid = await form.trigger();
-    if (!isValid) {
-      handleValidationFailed();
-      setActiveComposerSection('form');
+    if (!isSmartMode) {
+      handleComposerMode();
       return;
     }
+
     const values = form.getValues() as FormZoneValues;
+    let isValid = await form.trigger();
+    if (!isValid) {
+      const schemaValidation = quoteComposerSchema.safeParse(values);
+      if (schemaValidation.success) {
+        isValid = true;
+      }
+    }
     const priorExtended = (lastFormData?.extended || initialExtended || {}) as Partial<ExtendedFormData>;
     const fallbackExtended: ExtendedFormData = {
       containerType: values.containerType || '',
@@ -3177,8 +3691,32 @@ function UnifiedQuoteComposerContent({
       ...(lastFormData?.extended || {}),
       ...fallbackExtended,
     } as ExtendedFormData;
+    if (!isValid && lastFormData) {
+      await handleGetRates(lastFormData.values, lastFormData.extended, true);
+      return;
+    }
+    if (!isValid) {
+      const hasCoreRouteData = Boolean(
+        values.mode &&
+        values.origin?.trim() &&
+        values.destination?.trim()
+      );
+      const hasModeSpecificData = values.mode === 'ocean' || values.mode === 'rail'
+        ? Boolean(
+            (values.containerType || extended.containerType) &&
+            (values.containerSize || extended.containerSize) &&
+            Number(values.containerQty || extended.containerQty || 0) > 0
+          )
+        : true;
+      if (hasCoreRouteData && hasModeSpecificData) {
+        await handleGetRates(values, extended, true);
+        return;
+      }
+      handleValidationFailed();
+      return;
+    }
     await handleGetRates(values, extended, isSmartMode);
-  }, [form, handleGetRates, handleValidationFailed, isSmartMode, lastFormData?.extended, initialExtended]);
+  }, [form, handleGetRates, handleValidationFailed, isSmartMode, lastFormData, initialExtended, handleComposerMode]);
 
   // ---------------------------------------------------------------------------
   // Draft save (manual)
@@ -3507,10 +4045,29 @@ function UnifiedQuoteComposerContent({
   }), [repoData.chargeCategories, repoData.chargeBases, repoData.currencies, repoData.chargeSides]);
 
   const handleDraftChange = useCallback((draft: any) => {
-    if (selectedOption?.id) {
-      setOptionDrafts((prev) => ({ ...prev, [selectedOption.id]: draft }));
-    }
-  }, [selectedOption?.id]);
+    if (!selectedOption?.id) return;
+    const normalizedLegs = normalizeLegContinuity(
+      Array.isArray(draft?.legs) ? draft.legs : (Array.isArray(selectedOption.legs) ? selectedOption.legs : []),
+      {
+        origin: form.getValues('origin') || (selectedOption as any).origin || '',
+        destination: form.getValues('destination') || (selectedOption as any).destination || '',
+      },
+      selectedOption
+    );
+    setOptionDrafts((prev) => ({
+      ...prev,
+      [selectedOption.id]: {
+        ...(prev[selectedOption.id] || {}),
+        ...draft,
+        legs: normalizedLegs,
+        charges: Array.isArray(draft?.charges)
+          ? draft.charges
+          : (Array.isArray(prev[selectedOption.id]?.charges)
+            ? prev[selectedOption.id].charges
+            : flattenOptionCharges(selectedOption)),
+      },
+    }));
+  }, [flattenOptionCharges, form, selectedOption]);
 
   // ---------------------------------------------------------------------------
   // Render
@@ -3735,13 +4292,15 @@ function UnifiedQuoteComposerContent({
 
                 {selectedOption ? (
                   <FinalizeSection
-                    selectedOption={selectedOption}
+                    selectedOption={editedOptions[selectedOption.id] || selectedOption}
                     onSaveQuote={handleSaveQuote}
                     onGeneratePdf={handleGeneratePdf}
                     saving={saving}
                     draft={optionDrafts[selectedOption.id]}
                     onDraftChange={handleDraftChange}
                     onRenameOption={handleRenameOption}
+                    onRouteOptionChange={handleRouteOptionChange}
+                    routeValidationIssues={routeValidationIssues[selectedOption.id] || []}
                     referenceData={referenceData}
                   />
                 ) : (

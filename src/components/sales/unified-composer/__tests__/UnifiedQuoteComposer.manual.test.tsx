@@ -6,6 +6,17 @@ import { QuotationOptionCrudService } from '@/services/quotation/QuotationOption
 import { useToast } from '@/hooks/use-toast';
 import React from 'react';
 
+vi.mock('@/components/ui/tabs', () => ({
+  Tabs: ({ children }: any) => <div>{children}</div>,
+  TabsList: ({ children }: any) => <div>{children}</div>,
+  TabsTrigger: ({ children, onClick }: any) => (
+    <button type="button" role="tab" onClick={onClick}>
+      {children}
+    </button>
+  ),
+  TabsContent: ({ children }: any) => <div>{children}</div>,
+}));
+
 // Mock useCRM
 const { mockScopedDb } = vi.hoisted(() => {
   return {
@@ -216,6 +227,10 @@ vi.mock('@/lib/supabase-functions', () => ({
 }));
 
 describe('UnifiedQuoteComposer Manual Options', () => {
+  const openResultsTab = () => {
+    fireEvent.click(screen.getByRole('tab', { name: /results & finalize/i }));
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
     // Reset mock results
@@ -230,6 +245,7 @@ describe('UnifiedQuoteComposer Manual Options', () => {
         <UnifiedQuoteComposer quoteId={undefined} versionId={undefined} />
       </MemoryRouter>
     );
+    openResultsTab();
 
     // Initially should show 1 auto result (from mock)
     expect(screen.getByTestId('results-count')).toHaveTextContent('1');
@@ -261,6 +277,7 @@ describe('UnifiedQuoteComposer Manual Options', () => {
         <UnifiedQuoteComposer />
       </MemoryRouter>
     );
+    openResultsTab();
 
     // Initial check
     expect(screen.getByTestId('results-count')).toHaveTextContent('1');
@@ -296,6 +313,7 @@ describe('UnifiedQuoteComposer Manual Options', () => {
         <UnifiedQuoteComposer />
       </MemoryRouter>
     );
+    openResultsTab();
     
     // Initially 1 auto option
     expect(screen.getByTestId('results-count')).toHaveTextContent('1');

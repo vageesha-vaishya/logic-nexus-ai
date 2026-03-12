@@ -25,7 +25,7 @@ export const quoteComposerSchema = z.object({
   // Standalone guest fields
   guestCompany: z.string().optional(),
   guestName: z.string().optional(),
-  guestEmail: z.string().email('Invalid email format').optional(),
+  guestEmail: z.string().optional(),
   guestPhone: z.string().optional(),
   guestJobTitle: z.string().optional(),
   guestDepartment: z.string().optional(),
@@ -144,6 +144,8 @@ export const quoteComposerSchema = z.object({
   if (data.origin.trim().toLowerCase() === data.destination.trim().toLowerCase()) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Origin and Destination ports cannot be the same', path: ['destination'] });
   }
+  const guestEmail = (data.guestEmail || '').trim();
+  const isGuestEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guestEmail);
   if (data.standalone) {
     if (!data.guestCompany || data.guestCompany.trim().length < 2) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Guest company name is required', path: ['guestCompany'] });
@@ -151,8 +153,8 @@ export const quoteComposerSchema = z.object({
     if (!data.guestName || data.guestName.trim().length < 2) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Contact name is required', path: ['guestName'] });
     }
-    if (!data.guestEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.guestEmail)) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Please enter a valid email address', path: ['guestEmail'] });
+    if (!guestEmail || !isGuestEmailValid) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Invalid email format', path: ['guestEmail'] });
     }
     // Phone validation (E.164-ish)
     if (data.guestPhone && !/^\+?[1-9]\d{1,14}$/.test(data.guestPhone.replace(/[\s-()]/g, ''))) {
@@ -164,10 +166,13 @@ export const quoteComposerSchema = z.object({
     }
     
     // Billing Address Mandatory
-    if (!data.billingAddress?.street) ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Billing street address is required', path: ['billingAddress', 'street'] });
-    if (!data.billingAddress?.city) ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Billing city is required', path: ['billingAddress', 'city'] });
-    if (!data.billingAddress?.country) ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Billing country is required', path: ['billingAddress', 'country'] });
+    if (!data.billingAddress?.street?.trim()) ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Billing street address is required', path: ['billingAddress', 'street'] });
+    if (!data.billingAddress?.city?.trim()) ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Billing city is required', path: ['billingAddress', 'city'] });
+    if (!data.billingAddress?.country?.trim()) ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Billing country is required', path: ['billingAddress', 'country'] });
   } else {
+    if (guestEmail && !isGuestEmailValid) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Invalid email format', path: ['guestEmail'] });
+    }
     if (!data.opportunityId && !data.accountId) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Please link this quote to an Opportunity or Account', path: ['opportunityId'] });
     }

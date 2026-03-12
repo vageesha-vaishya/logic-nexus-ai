@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useCRM } from "@/hooks/useCRM";
+import { useAuth } from "@/hooks/useAuth";
 import { QuotationManagerLayout } from "@/components/sales/QuotationManagerLayout";
 import { QuotesKanbanBoard } from "@/components/sales/kanban/QuotesKanbanBoard";
 import { QuotesList } from "@/components/sales/QuotesList";
@@ -7,10 +8,12 @@ import { FilterCriterion } from "@/components/sales/AdvancedSearchFilter";
 import { ViewMode } from "@/components/ui/view-toggle";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle, RefreshCcw } from "lucide-react";
+import { AlertCircle, CheckSquare, RefreshCcw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Quote, QuoteStatus } from "./quotes-data";
 import { logger } from "@/lib/logger";
+import { QuotationDeleteService } from "@/services/quotation/QuotationDeleteService";
 
 import { SalesDashboardProvider } from "@/contexts/SalesDashboardContext";
 
@@ -24,6 +27,7 @@ export default function QuotationManager() {
 
 function QuotationManagerContent() {
   const { scopedDb } = useCRM();
+  const { hasPermission } = useAuth();
   const { toast } = useToast();
   
   // View State
@@ -50,6 +54,8 @@ function QuotationManagerContent() {
   // Selection State (for List View)
   const [selectedQuotes, setSelectedQuotes] = useState<Set<string>>(new Set());
   const [bulkMode, setBulkMode] = useState(false);
+  const [deleteInProgress, setDeleteInProgress] = useState(false);
+  const quotationDeleteService = useMemo(() => new QuotationDeleteService(scopedDb), [scopedDb]);
 
   useEffect(() => {
     localStorage.setItem('quotesViewMode', viewMode);
@@ -177,6 +183,68 @@ function QuotationManagerContent() {
     }
   };
 
+  const canDeleteQuotes = hasPermission('quotes.delete');
+
+  const handleDeleteQuotes = async (quoteIds: string[], reason: string) => {
+    if (quoteIds.length === 0) return;
+    if (!canDeleteQuotes) {
+      toast({
+        title: "Permission denied",
+        description: "You do not have permission to delete quotations.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const confirmationMessage =
+      quoteIds.length === 1
+        ? "Delete this quotation?"
+        : `Delete ${quoteIds.length} selected quotations?`;
+
+    if (!window.confirm(confirmationMessage)) return;
+
+    try {
+      setDeleteInProgress(true);
+      const report = await quotationDeleteService.deleteQuotes(quoteIds, reason, {
+        forceHardDelete: false,
+        atomic: true,
+      });
+
+      if (report.ok) {
+        const { hard_deleted, soft_deleted } = report.summary;
+        const processed = hard_deleted + soft_deleted;
+        toast({
+          title: "Quotations processed",
+          description: `Processed ${processed} quotations (${hard_deleted} hard, ${soft_deleted} soft).`,
+        });
+      } else {
+        const firstFailure = report.results.find((item) => !item.success);
+        toast({
+          title: "Delete failed",
+          description: firstFailure?.error || report.message || "Some quotations failed to delete.",
+          variant: "destructive",
+        });
+      }
+
+      setSelectedQuotes(new Set());
+      setBulkMode(false);
+      await fetchQuotes();
+    } catch (error: any) {
+      logger.error('Failed to delete quotes', error);
+      toast({
+        title: "Delete failed",
+        description: error?.message || "Could not delete quotations.",
+        variant: "destructive",
+      });
+    } finally {
+      setDeleteInProgress(false);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    await handleDeleteQuotes(Array.from(selectedQuotes), 'Bulk delete from quotation manager');
+  };
+
   // Filter Handlers
   const handleFilterApply = (filters: FilterCriterion[], matchMode: 'all' | 'any') => {
     setActiveFilters([...activeFilters, ...filters]);
@@ -224,10 +292,40 @@ function QuotationManagerContent() {
         </div>
       ) : (
         <>
+          <div className="mb-4 flex items-center gap-2">
+            <Button
+              variant={bulkMode ? "default" : "outline"}
+              size="sm"
+              onClick={() => {
+                setBulkMode(!bulkMode);
+                setSelectedQuotes(new Set());
+              }}
+            >
+              <CheckSquare className="h-4 w-4 mr-2" />
+              {bulkMode ? "Cancel Selection" : "Bulk Select"}
+            </Button>
+            {bulkMode && selectedQuotes.size > 0 && (
+              <>
+                <Badge variant="secondary">{selectedQuotes.size} selected</Badge>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={!canDeleteQuotes || deleteInProgress}
+                  onClick={handleBulkDelete}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete
+                </Button>
+              </>
+            )}
+          </div>
           {viewMode === 'board' ? (
             <QuotesKanbanBoard 
               quotes={quotes} 
               onStatusChange={handleStatusChange}
+              bulkMode={bulkMode}
+              selectedQuotes={selectedQuotes}
+              onToggleSelection={handleToggleSelection}
             />
           ) : (
             <QuotesList 
@@ -236,6 +334,9 @@ function QuotationManagerContent() {
               onToggleSelection={handleToggleSelection}
               onSelectAll={handleSelectAll}
               bulkMode={bulkMode}
+              onDeleteQuote={(quoteId) => handleDeleteQuotes([quoteId], `Deleted quote ${quoteId}`)}
+              canDelete={canDeleteQuotes}
+              deleteInProgress={deleteInProgress}
             />
           )}
         </>

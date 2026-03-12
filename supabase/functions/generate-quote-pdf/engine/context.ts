@@ -465,6 +465,136 @@ export function buildSafeContextWithValidation(
     "Miami Global Lines",
   ).trim() || "Miami Global Lines";
 
+  const resolveLocationValue = (value: any): string => {
+    if (!value) return "";
+    if (typeof value === "string") return value.trim();
+    if (typeof value === "object") {
+      return String(value.location_name || value.name || value.code || value.port_name || "").trim();
+    }
+    return String(value).trim();
+  };
+
+  const resolveLegLocation = (leg: any, type: "origin" | "destination"): string => {
+    if (!leg || typeof leg !== "object") return "N/A";
+    const candidates = type === "origin"
+      ? [
+          leg.pol,
+          leg.origin_name,
+          leg.origin_code,
+          leg.origin_location,
+          leg.origin_location_name,
+          leg.origin_port,
+          leg.origin_port_name,
+          leg.origin,
+          leg.origin_location_data,
+        ]
+      : [
+          leg.pod,
+          leg.destination_name,
+          leg.destination_code,
+          leg.destination_location,
+          leg.destination_location_name,
+          leg.destination_port,
+          leg.destination_port_name,
+          leg.destination,
+          leg.destination_location_data,
+        ];
+    for (const candidate of candidates) {
+      const resolved = resolveLocationValue(candidate);
+      if (resolved) return resolved;
+    }
+    return "N/A";
+  };
+
+  const getOrderValue = (record: any, keys: string[]): number => {
+    for (const key of keys) {
+      const parsed = Number(record?.[key]);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+    return Number.MAX_SAFE_INTEGER;
+  };
+
+  const resolveTimestampOrder = (record: any): number => {
+    const raw = record?.created_at || record?.updated_at || null;
+    if (!raw) return Number.MAX_SAFE_INTEGER;
+    const timestamp = Date.parse(String(raw));
+    return Number.isFinite(timestamp) ? timestamp : Number.MAX_SAFE_INTEGER;
+  };
+
+  const legOrderKeys = ["sort_order", "sequence_id", "sequence_no", "seq", "leg_sequence", "leg_order", "order_index", "display_order", "segment_order", "index"];
+
+  const reorderLegsByContinuity = (legs: any[]): any[] => {
+    if (!Array.isArray(legs) || legs.length < 3) return legs;
+    const normalized = legs.map((leg: any, index: number) => ({
+      index,
+      leg,
+      origin: resolveLegLocation(leg, "origin").trim().toLowerCase(),
+      destination: resolveLegLocation(leg, "destination").trim().toLowerCase(),
+    }));
+    const destinationSet = new Set(
+      normalized
+        .map((entry) => entry.destination)
+        .filter((value) => value.length > 0 && value !== "n/a"),
+    );
+    const start = normalized.find(
+      (entry) =>
+        entry.origin.length > 0 &&
+        entry.origin !== "n/a" &&
+        !destinationSet.has(entry.origin),
+    ) || normalized[0];
+    const route: typeof normalized = [];
+    const used = new Set<number>();
+    let current = start;
+
+    while (current && !used.has(current.index)) {
+      route.push(current);
+      used.add(current.index);
+      const next = normalized.find(
+        (entry) =>
+          !used.has(entry.index) &&
+          entry.origin.length > 0 &&
+          entry.origin === current.destination,
+      );
+      if (!next) break;
+      current = next;
+    }
+
+    normalized.forEach((entry) => {
+      if (!used.has(entry.index)) route.push(entry);
+    });
+    return route.map((entry) => entry.leg);
+  };
+
+  const sortLegsBySequence = (legs: any[]): any[] => {
+    const baseSorted = [...(Array.isArray(legs) ? legs : [])].sort((a: any, b: any) => {
+      const aSeq = getOrderValue(a, legOrderKeys);
+      const bSeq = getOrderValue(b, legOrderKeys);
+      if (aSeq !== bSeq) return aSeq - bSeq;
+      const aTime = resolveTimestampOrder(a);
+      const bTime = resolveTimestampOrder(b);
+      if (aTime !== bTime) return aTime - bTime;
+      const aId = String(a?.id || a?.leg_id || "");
+      const bId = String(b?.id || b?.leg_id || "");
+      return aId.localeCompare(bId);
+    });
+    const hasExplicitOrder = baseSorted.some((leg: any) => getOrderValue(leg, legOrderKeys) !== Number.MAX_SAFE_INTEGER);
+    if (hasExplicitOrder) return baseSorted;
+    return reorderLegsByContinuity(baseSorted);
+  };
+
+  const sortOptionsBySequence = (options: any[]): any[] =>
+    [...(Array.isArray(options) ? options : [])].sort((a: any, b: any) => {
+      const aSeq = getOrderValue(a, ["sort_order", "sequence_id", "sequence_no", "option_sequence", "rank", "index"]);
+      const bSeq = getOrderValue(b, ["sort_order", "sequence_id", "sequence_no", "option_sequence", "rank", "index"]);
+      if (aSeq !== bSeq) return aSeq - bSeq;
+      const aTime = resolveTimestampOrder(a);
+      const bTime = resolveTimestampOrder(b);
+      if (aTime !== bTime) return aTime - bTime;
+      const aName = String(a?.option_name || a?.rate_option_name || a?.name || a?.id || "");
+      const bName = String(b?.option_name || b?.rate_option_name || b?.name || b?.id || "");
+      return aName.localeCompare(bName);
+    });
+
   const safeCtx: SafeContext = {
     meta: {
       generated_at: new Date().toISOString(),
@@ -512,27 +642,9 @@ export function buildSafeContextWithValidation(
       code: data.customer?.code || "",
       inquiry_number: data.customer?.inquiry_number || "",
     },
-    legs: (data.legs || []).map((l: any) => {
-      const origin =
-        l.pol ||
-        l.origin_name ||
-        l.origin_code ||
-        l.origin?.location_name ||
-        l.origin?.name ||
-        l.origin_location?.location_name ||
-        l.origin_location?.name ||
-        l.origin ||
-        "N/A";
-      const destination =
-        l.pod ||
-        l.destination_name ||
-        l.destination_code ||
-        l.destination?.location_name ||
-        l.destination?.name ||
-        l.destination_location?.location_name ||
-        l.destination_location?.name ||
-        l.destination ||
-        "N/A";
+    legs: sortLegsBySequence(data.legs || []).map((l: any) => {
+      const origin = resolveLegLocation(l, "origin");
+      const destination = resolveLegLocation(l, "destination");
       return {
         id: l.id || l.leg_id || null,
         seq: l.sequence_id || l.sort_order || 0,
@@ -586,7 +698,7 @@ export function buildSafeContextWithValidation(
       };
     }),
     mode: data.mode || 'single',
-    options: (data.options || []).map((opt: any) => ({
+    options: sortOptionsBySequence(data.options || []).map((opt: any) => ({
         id: opt.id,
         rate_option_id: opt.rate_option_id || opt.option_id || opt.id,
         option_group_key: opt.option_group_key || opt.rate_option_id || opt.option_id || opt.id,
@@ -599,27 +711,9 @@ export function buildSafeContextWithValidation(
         container_size: opt.container_size || opt.container_sizes?.name || opt.container_sizes?.code,
         container_type: opt.container_type || opt.container_types?.name || opt.container_types?.code,
         remarks: opt.remarks,
-        legs: (opt.legs || []).map((l: any) => {
-            const origin =
-              l.pol ||
-              l.origin_name ||
-              l.origin_code ||
-              l.origin?.location_name ||
-              l.origin?.name ||
-              l.origin_location?.location_name ||
-              l.origin_location?.name ||
-              l.origin ||
-              "N/A";
-            const destination =
-              l.pod ||
-              l.destination_name ||
-              l.destination_code ||
-              l.destination?.location_name ||
-              l.destination?.name ||
-              l.destination_location?.location_name ||
-              l.destination_location?.name ||
-              l.destination ||
-              "N/A";
+        legs: sortLegsBySequence(opt.legs || []).map((l: any) => {
+            const origin = resolveLegLocation(l, "origin");
+            const destination = resolveLegLocation(l, "destination");
             return {
               id: l.id || l.leg_id || null,
               seq: l.sequence_id || l.sort_order || 0,

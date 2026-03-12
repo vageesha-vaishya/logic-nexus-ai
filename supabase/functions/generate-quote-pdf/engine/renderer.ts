@@ -534,7 +534,7 @@ export class PdfRenderer {
         }];
     }
 
-    for (const [index, opt] of optionsToRender.entries()) {
+    for (const [index, opt] of this.sortOptionsBySequence(optionsToRender).entries()) {
         // Option Header (only if multiple options)
         if (this.context.options && this.context.options.length > 1) {
             if (this.cursorY < this.margins.bottom + 40) {
@@ -554,7 +554,7 @@ export class PdfRenderer {
         }
 
         // Render Legs Table
-        const legs = opt.legs || [];
+        const legs = this.sortLegsBySequence(opt.legs || []);
         if (legs.length === 0) continue;
         
         const headers = ["Mode", "Origin", "Destination", "Carrier", "Transit Time"];
@@ -571,68 +571,74 @@ export class PdfRenderer {
         const rowHeight = 20;
         const headerHeight = 25;
 
-        // Header
+        const secondaryColor = this.hexToRgb(this.context.branding.secondary_color || "#dceef2");
+        const drawLegHeader = () => {
+            if (!this.currentPage || !this.boldFont) return;
+            let hx = this.margins.left;
+            this.drawRect(hx, this.cursorY - headerHeight, tableWidth, headerHeight, secondaryColor, true);
+            headers.forEach((h, i) => {
+               this.currentPage!.drawText(h, {
+                   x: hx + 5,
+                   y: this.cursorY - 18,
+                   size: 10,
+                   font: this.boldFont!,
+                   color: rgb(0, 0, 0)
+               });
+               hx += colWidths[i];
+            });
+            this.cursorY -= headerHeight;
+        };
+
         if (this.cursorY < this.margins.bottom + headerHeight + rowHeight) {
             this.addNewPage();
             this.cursorY -= 20;
         }
-
-        let x = this.margins.left;
-        const secondaryColor = this.hexToRgb(this.context.branding.secondary_color || "#dceef2");
-        this.drawRect(x, this.cursorY - headerHeight, tableWidth, headerHeight, secondaryColor, true);
-
-        headers.forEach((h, i) => {
-           this.currentPage!.drawText(h, {
-               x: x + 5,
-               y: this.cursorY - 18,
-               size: 10,
-               font: this.boldFont!,
-               color: rgb(0, 0, 0)
-           });
-           x += colWidths[i];
-        });
-        this.cursorY -= headerHeight;
+        drawLegHeader();
 
         // Rows
         for (const leg of legs) {
-            if (this.cursorY < this.margins.bottom + rowHeight) {
-                this.addNewPage();
-                this.cursorY -= 20;
-                this.drawLine(this.margins.left, this.cursorY, this.margins.left + tableWidth, this.cursorY);
-            }
-
-            x = this.margins.left;
-            // Border
-            this.drawRect(x, this.cursorY - rowHeight, tableWidth, rowHeight); 
-
             const rowData = [
                 this.formatTransportMode(leg.mode || leg.transport_mode),
-                leg.pol || leg.origin || "",
-                leg.pod || leg.destination || "",
-                leg.carrier_name || leg.carrier || "",
-                leg.transit_time || ""
+                this.resolveLegLocation(leg, "origin"),
+                this.resolveLegLocation(leg, "destination"),
+                String(leg.carrier_name || leg.carrier || "N/A"),
+                String(leg.transit_time || "N/A")
             ];
 
-            rowData.forEach((val, i) => {
-               const text = String(val || "");
-               // Simple truncation
-               // const maxWidth = colWidths[i] - 10;
-               // ... truncation logic omitted for brevity
-               
-               this.currentPage!.drawText(text, {
-                   x: x + 5,
-                   y: this.cursorY - 14,
-                   size: 9,
-                   font: this.font!,
-                   color: rgb(0, 0, 0)
+            const rowLines = rowData.map((val, i) =>
+              this.breakTextIntoLines(String(val || ""), 9, Math.max(colWidths[i] - 10, 24))
+            );
+            const maxLines = Math.max(1, ...rowLines.map((lines) => lines.length));
+            const rowInnerHeight = maxLines * 11;
+            const dynamicRowHeight = Math.max(rowHeight, rowInnerHeight + 8);
+
+            if (this.cursorY < this.margins.bottom + dynamicRowHeight) {
+                this.addNewPage();
+                this.cursorY -= 20;
+                drawLegHeader();
+            }
+
+            let x = this.margins.left;
+            this.drawRect(x, this.cursorY - dynamicRowHeight, tableWidth, dynamicRowHeight);
+
+            rowLines.forEach((lines, i) => {
+               const textStartY = this.cursorY - 12;
+               lines.forEach((line, lineIndex) => {
+                 const lineY = textStartY - (lineIndex * 11);
+                 if (lineY >= this.cursorY - dynamicRowHeight + 2) {
+                   this.currentPage!.drawText(line, {
+                     x: x + 5,
+                     y: lineY,
+                     size: 9,
+                     font: this.font!,
+                     color: rgb(0, 0, 0)
+                   });
+                 }
                });
-               
-               // Vertical line
-               this.drawLine(x + colWidths[i], this.cursorY, x + colWidths[i], this.cursorY - rowHeight);
-               
+               this.drawLine(x + colWidths[i], this.cursorY, x + colWidths[i], this.cursorY - dynamicRowHeight);
                x += colWidths[i];
             });
-            this.cursorY -= rowHeight;
+            this.cursorY -= dynamicRowHeight;
         }
         this.cursorY -= 15; // Gap between options
     }
@@ -1106,7 +1112,6 @@ export class PdfRenderer {
     
     const { width, height } = this.currentPage.getSize();
     
-    // Dynamic Colors & Text
     const primaryColor = this.hexToRgb(this.context.branding.primary_color || "#0087b5");
     const companyName = this.context.branding.company_name || "MIAMI GLOBAL LINES";
     const companyAddress = this.context.branding.company_address || "140 Ethel Road West; Unit 'S&T', Piscataway, NJ 08854-USA";
@@ -1114,11 +1119,26 @@ export class PdfRenderer {
     const headerText = this.context.branding.header_text || "Professional Attitude at all Altitudes";
 
     const logoText = companyName.length > 10 ? companyName.substring(0, 3).toUpperCase() : companyName;
+    const contentWidth = width - this.margins.left - this.margins.right;
+    const drawWrappedCentered = (
+      text: string,
+      startY: number,
+      fontSize: number,
+      isBold = false,
+      color = rgb(0, 0, 0),
+      maxWidth = contentWidth,
+    ): number => {
+      const lines = this.breakTextIntoLines(String(text || ""), fontSize, maxWidth);
+      const lineHeight = fontSize + 2;
+      let currentY = startY;
+      lines.forEach((line) => {
+        this.drawTextCentered(line, currentY, fontSize, isBold, color);
+        currentY -= lineHeight;
+      });
+      return currentY;
+    };
 
-    // Standard Layout (Logo + Centered Info)
-    // We default to this layout if branding is present or if it's the MGL template
     if ((this.template.name && String(this.template.name).includes("MGL")) || this.context.branding?.logo_base64) {
-        // Logo
         const logoW = 150;
         const logoH = 60;
         const logoX = (width - logoW) / 2;
@@ -1131,34 +1151,36 @@ export class PdfRenderer {
              this.drawTextCentered(companyName.toUpperCase(), height - 60, 16, true, primaryColor);
         }
 
-        // Address & Contact Info
         const addrY = height - 85;
-        this.drawTextCentered(companyAddress, addrY, 10, true);
-        this.drawTextCentered(subHeader, addrY - 12, 10, true);
-        this.drawTextCentered(headerText, addrY - 24, 10, true, rgb(0, 0, 0));
+        let textY = drawWrappedCentered(companyAddress, addrY, 10, true, rgb(0, 0, 0), contentWidth);
+        textY = drawWrappedCentered(subHeader, textY - 2, 10, true, rgb(0, 0, 0), contentWidth);
+        textY = drawWrappedCentered(headerText, textY - 2, 10, true, rgb(0, 0, 0), contentWidth);
 
-        this.cursorY = addrY - 50;
+        this.cursorY = textY - 14;
 
-        // Quote Box
         const y = this.cursorY;
-        this.drawRect(40, y - 20, 180, 20);
-        this.currentPage.drawText("QUOTE", { x: 45, y: y - 14, size: 9, font: this.boldFont });
-        this.currentPage.drawText(this.context.quote.number, { x: 120, y: y - 14, size: 9, font: this.font });
+        const boxWidth = Math.min(220, (contentWidth - 20) / 2);
+        const leftBoxX = this.margins.left;
+        const rightBoxX = width - this.margins.right - boxWidth;
+        const boxPadding = 6;
+        this.drawRect(leftBoxX, y - 20, boxWidth, 20);
+        this.currentPage.drawText("QUOTE", { x: leftBoxX + boxPadding, y: y - 14, size: 9, font: this.boldFont });
+        const quoteValue = this.fitTextToWidth(String(this.context.quote.number || "N/A"), this.font, 9, boxWidth - 66);
+        this.currentPage.drawText(quoteValue, { x: leftBoxX + 64, y: y - 14, size: 9, font: this.font });
 
-        // Valid Till Box
-        this.drawRect(370, y - 20, 180, 20);
-        this.currentPage.drawText("Valid Till", { x: 375, y: y - 14, size: 9, font: this.boldFont });
+        this.drawRect(rightBoxX, y - 20, boxWidth, 20);
+        this.currentPage.drawText("Valid Till", { x: rightBoxX + boxPadding, y: y - 14, size: 9, font: this.boldFont });
         
         let expiryDate = "N/A";
         if (this.context.quote.expiry) {
              // Audit Compliance: Use i18n formatter
              expiryDate = this.i18n.formatDate(this.context.quote.expiry, this.context.meta?.locale);
         }
-        this.currentPage.drawText(expiryDate, { x: 470, y: y - 14, size: 9, font: this.font });
+        const expiryValue = this.fitTextToWidth(expiryDate, this.font, 9, boxWidth - 66);
+        this.currentPage.drawText(expiryValue, { x: rightBoxX + 64, y: y - 14, size: 9, font: this.font });
 
         this.cursorY -= 40;
     } else {
-        // Fallback Header
         const logoRendered = await this.renderLogo(this.margins.left, this.cursorY, 200, 50);
 
         if (logoRendered) {
@@ -1375,24 +1397,48 @@ export class PdfRenderer {
   }
 
   private breakTextIntoLines(text: string, fontSize: number, maxWidth: number): string[] {
-      if (!this.font) return [text];
-      
-      const words = text.split(' ');
-      const lines: string[] = [];
-      let currentLine = words[0];
+     if (!this.font) return [String(text || "")];
+     const raw = String(text || "").replace(/\s+/g, " ").trim();
+     if (!raw) return [""];
+     if (!(maxWidth > 0)) return [raw];
 
-      for (let i = 1; i < words.length; i++) {
-          const word = words[i];
-          const width = this.font.widthOfTextAtSize(currentLine + " " + word, fontSize);
-          if (width < maxWidth) {
-              currentLine += " " + word;
-          } else {
-              lines.push(currentLine);
-              currentLine = word;
-          }
-      }
-      lines.push(currentLine);
-      return lines;
+     const lines: string[] = [];
+     let currentLine = "";
+     const words = raw.split(" ");
+
+     const pushWordInChunks = (word: string) => {
+       let chunk = "";
+       for (const ch of word) {
+         const next = chunk + ch;
+         if (this.font!.widthOfTextAtSize(next, fontSize) <= maxWidth) {
+           chunk = next;
+         } else {
+           if (chunk) lines.push(chunk);
+           chunk = ch;
+         }
+       }
+       currentLine = chunk;
+     };
+
+     for (const word of words) {
+       const candidate = currentLine ? `${currentLine} ${word}` : word;
+       if (this.font.widthOfTextAtSize(candidate, fontSize) <= maxWidth) {
+         currentLine = candidate;
+         continue;
+       }
+       if (currentLine) {
+         lines.push(currentLine);
+         currentLine = "";
+       }
+       if (this.font.widthOfTextAtSize(word, fontSize) <= maxWidth) {
+         currentLine = word;
+       } else {
+         pushWordInChunks(word);
+       }
+     }
+
+     if (currentLine) lines.push(currentLine);
+     return lines.length > 0 ? lines : [raw];
   }
 
   private async renderLogo(x: number, y: number, maxWidth: number, maxHeight: number) {
@@ -1494,7 +1540,7 @@ export class PdfRenderer {
         const carrier = group.carrier;
         // Try to find carrier code
         const firstOpt = opts[0];
-        const legs = firstOpt.legs || [];
+        const legs = this.sortLegsBySequence(firstOpt.legs || []);
         
         // Get Carrier Code from first leg with same carrier name, or fallback
         const carrierCode = this.getCarrierCode(group.carrier, legs) || ""; 
@@ -1533,7 +1579,8 @@ export class PdfRenderer {
 
         const lineOneY = this.cursorY - 14;
         const lineTwoY = this.cursorY - 27;
-        this.currentPage!.drawText(`Carrier: ${carrierDisplay}`, {
+        const carrierText = this.fitTextToWidth(`Carrier: ${carrierDisplay}`, this.boldFont!, 10, tableWidth * 0.38);
+        this.currentPage!.drawText(carrierText, {
             x: this.margins.left + 5,
             y: lineOneY,
             size: 10,
@@ -1548,7 +1595,8 @@ export class PdfRenderer {
                 return normalizedMode === "ocean" || normalizedMode === "air";
             })?.mode || legs[0]?.mode || legs[0]?.transport_mode || "multimodal"
         );
-        this.currentPage!.drawText(`Mode: ${mainMode}`, {
+        const modeText = this.fitTextToWidth(`Mode: ${mainMode}`, this.boldFont!, 10, tableWidth * 0.18);
+        this.currentPage!.drawText(modeText, {
             x: this.margins.left + (tableWidth * 0.4),
             y: lineOneY,
             size: 10,
@@ -1556,14 +1604,16 @@ export class PdfRenderer {
             color: rgb(0,0,0)
         });
 
-        this.currentPage!.drawText(`Route: ${routeOrigin} -> ${routeDestination}`, {
+        const routeText = this.fitTextToWidth(`Route: ${routeOrigin} -> ${routeDestination}`, this.boldFont!, 9, tableWidth * 0.55);
+        this.currentPage!.drawText(routeText, {
             x: this.margins.left + 5,
             y: lineTwoY,
             size: 9,
             font: this.boldFont!,
             color: rgb(0,0,0)
         });
-        this.currentPage!.drawText(`Transit: ${derivedTransit} | Freq: ${frequency || "N/A"}`, {
+        const transitText = this.fitTextToWidth(`Transit: ${derivedTransit} | Freq: ${frequency || "N/A"}`, this.boldFont!, 9, tableWidth * 0.40);
+        this.currentPage!.drawText(transitText, {
             x: this.margins.left + (tableWidth * 0.58),
             y: lineTwoY,
             size: 9,
@@ -1618,7 +1668,7 @@ export class PdfRenderer {
         this.cursorY -= rowHeight;
 
         // --- Iterate Legs ---
-        for (const leg of legs) {
+        for (const leg of this.sortLegsBySequence(legs)) {
             // Leg Header
             if (this.cursorY < this.margins.bottom + 40) { this.addNewPage(); this.cursorY -= 20; }
             
@@ -1628,16 +1678,22 @@ export class PdfRenderer {
             const legCarrierDisplay = legCarrierCode ? `${legCarrier} (${legCarrierCode})` : legCarrier;
 
             const legMode = this.formatTransportMode(leg.mode || leg.transport_mode || "leg");
-            const legTitle = `${legCarrierDisplay} | ${legMode} : ${leg.pol || 'Origin'} -> ${leg.pod || 'Destination'}`;
-            this.drawRect(this.margins.left, this.cursorY - 18, tableWidth, 18, rgb(0.95, 0.95, 0.95), true);
-            this.currentPage!.drawText(legTitle, {
-                x: this.margins.left + 5,
-                y: this.cursorY - 13,
-                size: 9,
-                font: this.boldFont!,
-                color: rgb(0.3, 0.3, 0.3)
+            const legOrigin = this.resolveLegLocation(leg, "origin");
+            const legDestination = this.resolveLegLocation(leg, "destination");
+            const legTitle = `${legCarrierDisplay} | ${legMode} : ${legOrigin} -> ${legDestination}`;
+            const legTitleLines = this.breakTextIntoLines(legTitle, 9, tableWidth - 10);
+            const legHeaderHeight = Math.max(18, (legTitleLines.length * 10) + 6);
+            this.drawRect(this.margins.left, this.cursorY - legHeaderHeight, tableWidth, legHeaderHeight, rgb(0.95, 0.95, 0.95), true);
+            legTitleLines.forEach((line, idx) => {
+              this.currentPage!.drawText(line, {
+                  x: this.margins.left + 5,
+                  y: this.cursorY - 13 - (idx * 10),
+                  size: 9,
+                  font: this.boldFont!,
+                  color: rgb(0.3, 0.3, 0.3)
+              });
             });
-            this.cursorY -= 18;
+            this.cursorY -= legHeaderHeight;
 
             // Collect charges for this leg across all container options
             const legCharges = this.aggregateChargesForLeg(opts, leg, sortedContainers);
@@ -1824,6 +1880,41 @@ export class PdfRenderer {
 
   private resolveLegLocation(leg: any, type: "origin" | "destination"): string {
       if (!leg || typeof leg !== "object") return "N/A";
+      const resolveValue = (value: any): string => {
+        if (!value) return "";
+        if (typeof value === "string") return value.trim();
+        if (typeof value === "object") {
+          return String(value.location_name || value.name || value.code || value.port_name || "").trim();
+        }
+        return String(value).trim();
+      };
+      const candidates = type === "origin"
+        ? [
+            leg.pol,
+            leg.origin_name,
+            leg.origin_code,
+            leg.origin_location,
+            leg.origin_location_name,
+            leg.origin_port,
+            leg.origin_port_name,
+            leg.origin,
+            leg.origin_location_data,
+          ]
+        : [
+            leg.pod,
+            leg.destination_name,
+            leg.destination_code,
+            leg.destination_location,
+            leg.destination_location_name,
+            leg.destination_port,
+            leg.destination_port_name,
+            leg.destination,
+            leg.destination_location_data,
+          ];
+      for (const candidate of candidates) {
+        const resolved = resolveValue(candidate);
+        if (resolved) return resolved;
+      }
       if (type === "origin") {
           return String(
             leg.pol ||
@@ -1831,6 +1922,8 @@ export class PdfRenderer {
             leg.origin_code ||
             leg.origin?.location_name ||
             leg.origin?.name ||
+            leg.origin_location?.location_name ||
+            leg.origin_location?.name ||
             leg.origin ||
             "N/A",
           );
@@ -1841,9 +1934,105 @@ export class PdfRenderer {
         leg.destination_code ||
         leg.destination?.location_name ||
         leg.destination?.name ||
+        leg.destination_location?.location_name ||
+        leg.destination_location?.name ||
         leg.destination ||
         "N/A",
       );
+  }
+
+  private fitTextToWidth(text: string, font: PDFFont, fontSize: number, maxWidth: number): string {
+    const value = String(text || "");
+    if (!(maxWidth > 0)) return value;
+    if (font.widthOfTextAtSize(value, fontSize) <= maxWidth) return value;
+    const ellipsis = "...";
+    let trimmed = value;
+    while (trimmed.length > 0 && font.widthOfTextAtSize(`${trimmed}${ellipsis}`, fontSize) > maxWidth) {
+      trimmed = trimmed.slice(0, -1);
+    }
+    return trimmed ? `${trimmed}${ellipsis}` : ellipsis;
+  }
+
+  private sortOptionsBySequence(options: any[]): any[] {
+    return [...(Array.isArray(options) ? options : [])].sort((a: any, b: any) => {
+      const aSeq = this.getOrderValue(a, ["sort_order", "sequence_id", "sequence_no", "option_sequence", "rank", "index"]);
+      const bSeq = this.getOrderValue(b, ["sort_order", "sequence_id", "sequence_no", "option_sequence", "rank", "index"]);
+      if (aSeq !== bSeq) return aSeq - bSeq;
+      const aName = String(a?.option_name || a?.rate_option_name || a?.name || a?.id || "");
+      const bName = String(b?.option_name || b?.rate_option_name || b?.name || b?.id || "");
+      return aName.localeCompare(bName);
+    });
+  }
+
+  private sortLegsBySequence(legs: any[]): any[] {
+    const orderKeys = ["sort_order", "sequence_id", "sequence_no", "seq", "leg_sequence", "leg_order", "order_index", "display_order", "segment_order", "index"];
+    const resolveTimestampOrder = (record: any): number => {
+      const raw = record?.created_at || record?.updated_at || null;
+      if (!raw) return Number.MAX_SAFE_INTEGER;
+      const timestamp = Date.parse(String(raw));
+      return Number.isFinite(timestamp) ? timestamp : Number.MAX_SAFE_INTEGER;
+    };
+    const baseSorted = [...(Array.isArray(legs) ? legs : [])].sort((a: any, b: any) => {
+      const aSeq = this.getOrderValue(a, orderKeys);
+      const bSeq = this.getOrderValue(b, orderKeys);
+      if (aSeq !== bSeq) return aSeq - bSeq;
+      const aTime = resolveTimestampOrder(a);
+      const bTime = resolveTimestampOrder(b);
+      if (aTime !== bTime) return aTime - bTime;
+      const aId = String(a?.id || a?.leg_id || "");
+      const bId = String(b?.id || b?.leg_id || "");
+      return aId.localeCompare(bId);
+    });
+    const hasExplicitOrder = baseSorted.some((leg: any) => this.getOrderValue(leg, orderKeys) !== Number.MAX_SAFE_INTEGER);
+    if (hasExplicitOrder || baseSorted.length < 3) return baseSorted;
+
+    const normalized = baseSorted.map((leg: any, index: number) => ({
+      index,
+      leg,
+      origin: this.resolveLegLocation(leg, "origin").trim().toLowerCase(),
+      destination: this.resolveLegLocation(leg, "destination").trim().toLowerCase(),
+    }));
+    const destinationSet = new Set(
+      normalized
+        .map((entry) => entry.destination)
+        .filter((value) => value.length > 0 && value !== "n/a"),
+    );
+    const start = normalized.find(
+      (entry) =>
+        entry.origin.length > 0 &&
+        entry.origin !== "n/a" &&
+        !destinationSet.has(entry.origin),
+    ) || normalized[0];
+    const route: typeof normalized = [];
+    const used = new Set<number>();
+    let current = start;
+
+    while (current && !used.has(current.index)) {
+      route.push(current);
+      used.add(current.index);
+      const next = normalized.find(
+        (entry) =>
+          !used.has(entry.index) &&
+          entry.origin.length > 0 &&
+          entry.origin === current.destination,
+      );
+      if (!next) break;
+      current = next;
+    }
+
+    normalized.forEach((entry) => {
+      if (!used.has(entry.index)) route.push(entry);
+    });
+    return route.map((entry) => entry.leg);
+  }
+
+  private getOrderValue(record: any, keys: string[]): number {
+    for (const key of keys) {
+      const raw = record?.[key];
+      const value = Number(raw);
+      if (Number.isFinite(value)) return value;
+    }
+    return Number.MAX_SAFE_INTEGER;
   }
 
   private resolveLegTransitTime(leg: any): string {
