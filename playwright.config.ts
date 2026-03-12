@@ -3,7 +3,8 @@ import { defineConfig, devices } from '@playwright/test';
 const firefoxNoSandbox = process.env.PW_FIREFOX_NO_SANDBOX === '1';
 
 export default defineConfig({
-  testDir: './tests/e2e',
+  testDir: '.',
+  testMatch: ['tests/e2e/**/*.spec.ts', 'dataentry/**/*.spec.ts'],
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
