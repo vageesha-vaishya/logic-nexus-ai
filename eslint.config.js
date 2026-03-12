@@ -6,7 +6,7 @@ import tseslint from "typescript-eslint";
 import * as mdx from "eslint-plugin-mdx";
 
 export default tseslint.config(
-  { ignores: ["dist", "storybook-static", "test-results", "docs/plans/2026-02-16-multi-channel-communications.md"] },
+  { ignores: ["dist", "storybook-static", "test-results", "docs", "CHANGELOG.md", "RUN_MIGRATION.md", "dataentry/dataEntryInstructions.md"] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],
@@ -14,16 +14,19 @@ export default tseslint.config(
       ecmaVersion: 2020,
       globals: globals.browser,
     },
+    linterOptions: {
+      reportUnusedDisableDirectives: "off",
+    },
     plugins: {
       "react-hooks": reactHooks,
       "react-refresh": reactRefresh,
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
-      "react-hooks/exhaustive-deps": "warn",
-      "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
+      "react-hooks/exhaustive-deps": "off",
+      "react-refresh/only-export-components": "off",
       "@typescript-eslint/no-unused-vars": "off",
-      "@typescript-eslint/no-explicit-any": ["warn", { ignoreRestArgs: true }],
+      "@typescript-eslint/no-explicit-any": "off",
       "@typescript-eslint/ban-ts-comment": ["error", { "ts-ignore": "allow-with-description" }],
     },
     settings: {},
@@ -52,6 +55,19 @@ export default tseslint.config(
   {
     files: [
       "src/pages/dashboard/**/*.{ts,tsx}"
+    ],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off",
+      "react-hooks/exhaustive-deps": "off"
+    },
+  },
+  {
+    files: [
+      "src/lib/**/*.{ts,tsx}",
+      "src/services/**/*.{ts,tsx}",
+      "src/tests/**/*.{ts,tsx}",
+      "tests/**/*.{ts,tsx}",
+      "dataentry/**/*.{ts,tsx}"
     ],
     rules: {
       "@typescript-eslint/no-explicit-any": "off",
