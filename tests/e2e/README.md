@@ -1,53 +1,45 @@
 # E2E Quotation Testing Framework
 
-This directory contains the End-to-End (E2E) testing framework for the Quotation System, designed to verify the entire flow from quote creation to email delivery.
+This directory includes the Playwright-based quotation automation framework with Page Object Model architecture, data-driven testing, multi-browser CI execution, and runtime diagnostics.
 
-## Structure
+## Directory Structure
 
-- `helpers/`: Contains helper classes for interacting with Supabase, creating test data, and verifying results.
-  - `SupabaseHelper.ts`: Manages Supabase client and authentication.
-  - `QuoteFactory.ts`: Facilitates creation of quotes, items, versions, and options.
-  - `PDFValidator.ts`: Validates generated PDF content (mocked/stubbed for now, can be expanded).
-- `scenarios/`: Contains the actual test scenarios.
-  - `quotation_system.test.ts`: Main test file implementing the requested scenarios.
+- `quotation/config/environments.ts`: Environment profile resolver (`dev`, `staging`, `production`) and runtime toggles.
+- `quotation/fixtures/quotation.fixture.ts`: Shared fixtures, API mock setup, page-object wiring, and failure DOM attachments.
+- `quotation/pom/*`: Reusable page objects (`AuthPage`, `QuotationComposerPage`, `QuotationListPage`, `BasePage`).
+- `quotation/utils/*`: Runtime monitor, mock API router, JSON/CSV loaders.
+- `quotation/data/*`: Data-driven scenario inputs for validation and boundary testing.
+- `quotation/quotation-comprehensive.spec.ts`: End-to-end suite covering validations, UX, CRUD, resiliency, visuals, and concurrency.
 
-## Scenarios
-
-### 1. Default Rates (Quick Quote Flow)
-- Creates a quote with default parameters.
-- Adds standard container items.
-- Generates a PDF version using the "Standard" layout.
-- Verifies email delivery trigger.
-
-### 2. Custom Data (Maersk Multi-Leg Flow)
-- Creates a complex multi-leg quote (Road -> Ocean).
-- Adds items with granular charges mimicking a Maersk Line invoice.
-- Uses system-provided data for container sizes and types.
-- Generates a PDF and verifies email delivery.
-
-## Prerequisites
-
-- Node.js (v20+ recommended)
-- Supabase instance (local or remote) running.
-- `.env` file with the following variables:
-  - `VITE_SUPABASE_URL`
-  - `VITE_SUPABASE_ANON_KEY`
-  - `SUPABASE_SERVICE_ROLE_KEY` (Required for bypassing RLS/admin tasks in tests)
-
-## Running Tests
-
-To run the E2E tests:
+## Execution Commands
 
 ```bash
-npm run test:e2e
+npm run test:playwright
 ```
-
-To run a specific test file:
 
 ```bash
-npx vitest run tests/e2e/scenarios/quotation_system.test.ts --config vitest.config.e2e.ts
+npm run test:playwright:quotation
 ```
 
-## CI/CD Integration
+```bash
+npm run test:playwright:quotation:headed
+```
 
-The tests are integrated into GitHub Actions via `.github/workflows/e2e-quotation.yml`. Ensure the necessary secrets are configured in your repository settings.
+## Environment Configuration
+
+The framework uses these environment variables:
+
+- `PLAYWRIGHT_ENV`: `dev`, `staging`, or `production`.
+- `PLAYWRIGHT_BASE_URL` or `BASE_URL`: App URL (defaults to `http://localhost:4173`).
+- `PLAYWRIGHT_USE_MOCK_API`: Enables deterministic mocked REST/auth API responses.
+- `E2E_ADMIN_EMAIL` and `E2E_ADMIN_PASSWORD`: Login credentials for non-mock flows.
+- `PLAYWRIGHT_REUSE_EXISTING_SERVER`: Set to `true` when a local dev server is already running.
+
+## CI Integration
+
+Quotation end-to-end execution is integrated in:
+
+- `.github/workflows/e2e-quotation.yml` for quotation-focused matrix runs.
+- `.github/workflows/playwright.yml` for broader Playwright project coverage.
+
+Both workflows shard test execution, upload `playwright-report/` and `test-results/` artifacts, and retain results for trend comparisons across runs.

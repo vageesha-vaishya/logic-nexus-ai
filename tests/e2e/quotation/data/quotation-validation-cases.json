@@ -1,0 +1,50 @@
+[
+  {
+    "caseId": "valid-ocean-standalone",
+    "mode": "ocean",
+    "origin": "Shanghai",
+    "destination": "New York",
+    "commodity": "Electronics",
+    "weight": "1200",
+    "volume": "40",
+    "quoteTitle": "Valid Ocean Scenario",
+    "guestCompany": "Acme Logistics",
+    "guestName": "Rita Buyer",
+    "guestEmail": "rita.buyer@acme.com",
+    "guestPhone": "+1 202 555 0171",
+    "expected": "valid",
+    "expectedError": ""
+  },
+  {
+    "caseId": "invalid-email-format",
+    "mode": "ocean",
+    "origin": "Shanghai",
+    "destination": "New York",
+    "commodity": "Consumer Goods",
+    "weight": "800",
+    "volume": "25",
+    "quoteTitle": "Invalid Email Scenario",
+    "guestCompany": "Test Industries",
+    "guestName": "Invalid User",
+    "guestEmail": "bad-email-format",
+    "guestPhone": "+1 202 555 0123",
+    "expected": "invalid",
+    "expectedError": "Invalid email"
+  },
+  {
+    "caseId": "invalid-negative-weight",
+    "mode": "air",
+    "origin": "Shanghai",
+    "destination": "New York",
+    "commodity": "Medical Supplies",
+    "weight": "-10",
+    "volume": "3",
+    "quoteTitle": "Invalid Weight Scenario",
+    "guestCompany": "Health Forwarders",
+    "guestName": "Marco Trent",
+    "guestEmail": "marco.trent@healthforwarders.com",
+    "guestPhone": "+1 202 555 0189",
+    "expected": "invalid",
+    "expectedError": "Weight"
+  }
+]

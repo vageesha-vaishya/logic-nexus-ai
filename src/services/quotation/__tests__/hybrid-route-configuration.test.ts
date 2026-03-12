@@ -219,4 +219,50 @@ describe('hybrid-route-configuration', () => {
 
     expect(result.options[0].carrier).toBe('LowPrice');
   });
+
+  it('hydrates realtime validation request payload with normalized fallback values', async () => {
+    const realtimeValidator = vi.fn().mockResolvedValue([]);
+    await buildHybridRouteConfiguration({
+      options: [
+        {
+          ...baseOptions[0],
+          id: 'opt-schema-1',
+          carrier: '',
+          currency: '',
+          departure_date: '',
+          transport_mode: '',
+          legs: [
+            {
+              id: 'schema-leg-1',
+              mode: '',
+              origin: '',
+              destination: '',
+            },
+          ],
+        },
+      ],
+      routeInput: {
+        origin: 'Shanghai',
+        destination: 'Rotterdam',
+        mode: 'ocean',
+      },
+      realtimeValidator,
+    });
+
+    expect(realtimeValidator).toHaveBeenCalledTimes(1);
+    const request = realtimeValidator.mock.calls[0][0];
+    expect(request.route.origin).toBe('Shanghai');
+    expect(request.route.destination).toBe('Rotterdam');
+    expect(request.route.mode).toBe('ocean');
+    expect(request.route.requested_departure_date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(request.options[0]).toMatchObject({
+      option_id: 'opt-schema-1',
+      carrier: 'Unknown Carrier',
+      mode: 'ocean',
+      origin: 'Shanghai',
+      destination: 'Rotterdam',
+      currency: 'USD',
+    });
+    expect(request.options[0].departure_date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
 });

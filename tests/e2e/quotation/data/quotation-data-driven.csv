@@ -1,0 +1,6 @@
+caseId,scenario,mode,origin,destination,commodity,weight,volume,email,phone,expected,expectedError
+csv-valid-01,Valid baseline ocean,ocean,Shanghai,New York,General cargo,1000,30,ops@freight-example.com,+12025550111,valid,
+csv-invalid-empty-origin,Missing origin,ocean,,New York,General cargo,1000,30,ops@freight-example.com,+12025550111,invalid,Origin
+csv-invalid-email,Invalid email format,air,Shanghai,New York,Spare parts,420,6,not-an-email,+12025550122,invalid,Invalid email
+csv-invalid-weight-max,Weight over boundary,air,Shanghai,New York,Spare parts,9999999999,6,ops@freight-example.com,+12025550122,invalid,Weight
+csv-invalid-special-char,Injection payload,road,Shanghai,New York,' OR 1=1; <script>alert(1)</script>,500,12,ops@freight-example.com,+12025550133,invalid,Commodity

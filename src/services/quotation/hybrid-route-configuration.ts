@@ -475,27 +475,35 @@ const applyRealtimeValidation = (
 const createRealtimeRequest = (
   options: RateOption[],
   routeInput: SmartRouteInput
-): RealtimeCarrierValidationRequest => ({
-  route: {
-    origin: normalizeLocation(routeInput.origin),
-    destination: normalizeLocation(routeInput.destination),
-    mode: normalizeModeCode(routeInput.mode),
-    requested_departure_date: normalizeDate(routeInput.requested_departure_date),
-  },
-  options: options.map((option) => {
-    const legs = Array.isArray(option.legs) ? option.legs : [];
-    return {
-      option_id: option.id,
-      carrier: normalizeText(option.carrier),
-      mode: normalizeModeCode(option.transport_mode || legs[0]?.mode || routeInput.mode),
-      origin: normalizeLocation((option as any).origin || legs[0]?.origin),
-      destination: normalizeLocation((option as any).destination || legs[legs.length - 1]?.destination),
-      departure_date: normalizeDate((option as any).departure_date || legs[0]?.departure_date || routeInput.requested_departure_date),
-      total_amount: Number(option.total_amount || option.price || 0),
-      currency: normalizeText(option.currency) || 'USD',
-    };
-  }),
-});
+): RealtimeCarrierValidationRequest => {
+  const requestDate =
+    normalizeDate(routeInput.requested_departure_date) || new Date().toISOString().slice(0, 10);
+  const routeOrigin = normalizeLocation(routeInput.origin);
+  const routeDestination = normalizeLocation(routeInput.destination);
+  const routeMode = normalizeModeCode(routeInput.mode);
+
+  return {
+    route: {
+      origin: routeOrigin,
+      destination: routeDestination,
+      mode: routeMode,
+      requested_departure_date: requestDate,
+    },
+    options: options.map((option) => {
+      const legs = Array.isArray(option.legs) ? option.legs : [];
+      return {
+        option_id: option.id,
+        carrier: normalizeText(option.carrier) || 'Unknown Carrier',
+        mode: normalizeModeCode(option.transport_mode || legs[0]?.mode || routeMode),
+        origin: normalizeLocation((option as any).origin || legs[0]?.origin || routeOrigin),
+        destination: normalizeLocation((option as any).destination || legs[legs.length - 1]?.destination || routeDestination),
+        departure_date: normalizeDate((option as any).departure_date || legs[0]?.departure_date || requestDate) || requestDate,
+        total_amount: Number(option.total_amount || option.price || 0),
+        currency: normalizeText(option.currency) || 'USD',
+      };
+    }),
+  };
+};
 
 export const validateSmartRouteInput = (input: SmartRouteInput): string[] => {
   const errors: string[] = [];

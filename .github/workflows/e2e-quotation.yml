@@ -2,33 +2,44 @@ name: E2E Quotation Tests
 
 on:
   push:
-    branches: [ main, master, develop ]
+    branches: [main, master, develop]
   pull_request:
-    branches: [ main, master, develop ]
+    branches: [main, master, develop]
   workflow_dispatch:
 
 jobs:
   e2e-tests:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+        project: [chromium, firefox, webkit]
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-
+          cache: npm
       - name: Install dependencies
         run: npm ci
-
-      - name: Run E2E Tests
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps
+      - name: Run quotation E2E suite
         env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          TEST_USER_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
-          TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
-        run: npm run test:e2e
+          PLAYWRIGHT_ENV: staging
+          PLAYWRIGHT_USE_MOCK_API: true
+          PLAYWRIGHT_REUSE_EXISTING_SERVER: false
+          E2E_ADMIN_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
+          E2E_ADMIN_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
+        run: npm run test:playwright:quotation -- --project=${{ matrix.project }} --shard=${{ matrix.shard }}/2
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: quotation-e2e-report-${{ matrix.project }}-shard-${{ matrix.shard }}
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 30
