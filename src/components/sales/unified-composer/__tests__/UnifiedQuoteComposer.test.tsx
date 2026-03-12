@@ -127,15 +127,15 @@ describe('UnifiedQuoteComposer', () => {
     expect(screen.getByText('Loading quote...')).toBeInTheDocument();
   });
 
-  it('shows quote form tab by default', () => {
+  it('shows renamed composer tabs by default', () => {
     render(
       <MemoryRouter>
         <UnifiedQuoteComposer />
       </MemoryRouter>
     );
 
-    expect(screen.getByRole('tab', { name: 'Quote Form' })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'Results & Finalize' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'General Information' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Quotation Composer' })).toBeInTheDocument();
     expect(screen.getByTestId('form-zone')).toBeInTheDocument();
   });
 

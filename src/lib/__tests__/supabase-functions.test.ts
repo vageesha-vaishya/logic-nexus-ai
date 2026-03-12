@@ -72,9 +72,10 @@ describe('invokeFunction', () => {
     // Check second call arguments
     const secondCallArgs = (supabase.functions.invoke as any).mock.calls[1];
     expect(secondCallArgs[0]).toBe('test-func');
-    expect(secondCallArgs[1].headers).toEqual({
-      Authorization: 'Bearer new-token'
+    expect(secondCallArgs[1].headers).toMatchObject({
+      Authorization: 'Bearer new-token',
     });
+    expect(secondCallArgs[1].headers.apikey).toBeTruthy();
     
     expect(result.data).toEqual(mockData);
     expect(result.error).toBeNull();

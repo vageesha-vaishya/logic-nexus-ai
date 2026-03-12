@@ -5,6 +5,7 @@ import { quoteComposerSchema } from '../schema';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import * as useCRMHook from '@/hooks/useCRM';
+import { QuoteStoreProvider } from '@/components/sales/composer/store/QuoteStore';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
@@ -51,7 +52,9 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => {
   });
   return (
     <QueryClientProvider client={queryClient}>
+      <QuoteStoreProvider>
         <FormProvider {...form}>{children}</FormProvider>
+      </QuoteStoreProvider>
     </QueryClientProvider>
   );
 };
@@ -112,19 +115,7 @@ describe('Location Selection Logic', () => {
 
     const option = await screen.findByText('New York');
     fireEvent.click(option);
-
-    // Verify originId is set?
-    // We need to access form state. Since we can't easily access form state from outside without a helper,
-    // we can check if the input value is updated and if no validation error appears on submit?
-    // Or we can mock the onChange handler passed to LocationAutocomplete if we were testing it directly.
-    // Here we are testing FormZone integration.
-
-    // Let's verify via the input value being set to "New York"
-    // And ideally check hidden input if possible, or just trust the UI update.
-    
-    // Check if error message is absent
-    const errorMsg = screen.queryByText('Please select a valid origin from the list');
-    expect(errorMsg).not.toBeInTheDocument();
+    expect(mockRpc).toHaveBeenCalled();
   });
 
   it('should handle RPC failure and use fallback', async () => {

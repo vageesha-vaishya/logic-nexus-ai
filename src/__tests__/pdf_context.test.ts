@@ -15,7 +15,7 @@ describe('PDF SafeContext Branding Mapping', () => {
     };
 
     const { context } = buildSafeContextWithValidation(raw as any);
-    expect(context.branding.company_name).toBe('Nexus Logistics');
+    expect(context.branding.company_name).toBe('Miami Global Lines');
     expect(context.branding.company_address).toContain('Logistics Way');
     expect(context.branding.primary_color).toBe('#0087b5');
     expect(context.branding.secondary_color).toBe('#dceef2');

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildSafeContextWithValidation, ValidationBlockError } from '../../supabase/functions/generate-quote-pdf/engine/context';
+import { buildSafeContextWithValidation } from '../../supabase/functions/generate-quote-pdf/engine/context';
 
 describe('PDF pre-render validation', () => {
   it('returns warnings instead of blocking for missing charges', () => {
@@ -87,7 +87,7 @@ describe('PDF pre-render validation', () => {
     expect(context.branding.company_name.length).toBeGreaterThan(0);
   });
 
-  it('throws ValidationBlockError for negative volume', () => {
+  it('returns warning instead of blocking for negative volume', () => {
     const rawData = {
       quote: {
         quote_number: 'QUO-VALIDATION-3',
@@ -103,6 +103,7 @@ describe('PDF pre-render validation', () => {
       branding: { company_name: 'Test Branding' },
     };
 
-    expect(() => buildSafeContextWithValidation(rawData)).toThrowError(ValidationBlockError);
+    const { warnings } = buildSafeContextWithValidation(rawData);
+    expect(warnings.some(w => /volume must be zero or greater/i.test(w))).toBe(true);
   });
 });

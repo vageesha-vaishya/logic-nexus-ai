@@ -78,7 +78,7 @@ describe('Quote Data Pipeline Integration', () => {
       origin: 'Shanghai',
       destination: 'Hamburg',
       mode: 'Sea',
-      selectedRates: [],
+      selectedRates: [{ id: 'rate-1' }],
       marketAnalysis: 'Test',
       confidenceScore: 80
     };

@@ -276,7 +276,7 @@ describe('UnifiedQuoteComposer - Edit Mode', () => {
     });
 
     const user = userEvent.setup();
-    const resultsTab = await screen.findByRole('tab', { name: /Results & Finalize/i });
+    const resultsTab = await screen.findByRole('tab', { name: /Quotation Composer/i });
     await user.click(resultsTab);
 
     await waitFor(() => {
@@ -366,7 +366,7 @@ describe('UnifiedQuoteComposer - Edit Mode', () => {
     );
 
     const user = userEvent.setup();
-    const resultsTab = await screen.findByRole('tab', { name: /Results & Finalize/i });
+    const resultsTab = await screen.findByRole('tab', { name: /Quotation Composer/i });
     await user.click(resultsTab);
 
     await waitFor(() => {
@@ -454,7 +454,7 @@ describe('UnifiedQuoteComposer - Edit Mode', () => {
     );
 
     const user = userEvent.setup();
-    const resultsTab = await screen.findByRole('tab', { name: /Results & Finalize/i });
+    const resultsTab = await screen.findByRole('tab', { name: /Quotation Composer/i });
     await user.click(resultsTab);
 
     await waitFor(() => {

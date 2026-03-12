@@ -12,6 +12,7 @@ vi.mock('@/hooks/useAuth');
 vi.mock('@/components/ui/sidebar', () => ({
   useSidebar: vi.fn(),
   Sidebar: ({ children }: { children: React.ReactNode }) => <div data-testid="sidebar">{children}</div>,
+  SidebarHeader: ({ children }: { children: React.ReactNode }) => <div data-testid="sidebar-header">{children}</div>,
   SidebarContent: ({ children }: { children: React.ReactNode }) => <div data-testid="sidebar-content">{children}</div>,
   SidebarGroup: ({ children }: { children: React.ReactNode }) => <div data-testid="sidebar-group">{children}</div>,
   SidebarGroupContent: ({ children }: { children: React.ReactNode }) => <div data-testid="sidebar-group-content">{children}</div>,
@@ -49,6 +50,9 @@ describe('AppSidebar Sign Out', () => {
     });
     (useSidebar as any).mockReturnValue({
       state: 'expanded',
+      setOpen: vi.fn(),
+      isMobile: false,
+      setOpenMobile: vi.fn(),
     });
   });
 

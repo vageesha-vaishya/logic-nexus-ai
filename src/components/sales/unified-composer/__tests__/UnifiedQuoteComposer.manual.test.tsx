@@ -228,7 +228,7 @@ vi.mock('@/lib/supabase-functions', () => ({
 
 describe('UnifiedQuoteComposer Manual Options', () => {
   const openResultsTab = () => {
-    fireEvent.click(screen.getByRole('tab', { name: /results & finalize/i }));
+    fireEvent.click(screen.getByRole('tab', { name: /quotation composer/i }));
   };
 
   beforeEach(() => {

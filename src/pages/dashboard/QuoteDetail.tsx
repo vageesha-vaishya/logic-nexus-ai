@@ -142,7 +142,6 @@ export default function QuoteDetail() {
     setSelectedComparisonOptionId(urlOptionId || null);
     if (urlOptionId) {
       setComparisonRequested(true);
-      setActiveSection('comparison');
     }
   }, [urlOptionId]);
 

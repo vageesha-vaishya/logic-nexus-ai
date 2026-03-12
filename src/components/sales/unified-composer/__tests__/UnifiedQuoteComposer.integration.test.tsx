@@ -559,7 +559,7 @@ describe('UnifiedQuoteComposer Integration (API-to-UI)', () => {
     });
 
     const goToResultsTab = async (user: ReturnType<typeof userEvent.setup>) => {
-        await user.click(screen.getByRole('tab', { name: /Results & Finalize/i }));
+        await user.click(screen.getByRole('tab', { name: /Quotation Composer/i }));
         await waitFor(() => {
             expect(screen.getByTestId('save-quote-button')).toBeInTheDocument();
         });
@@ -1005,7 +1005,7 @@ describe('UnifiedQuoteComposer Integration (API-to-UI)', () => {
         expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ title: 'Validation Error' }));
     });
 
-    it('keeps Results & Finalize active when Quotation Composer is clicked from results', async () => {
+    it('keeps Quotation Composer active when Quotation Composer is clicked from results', async () => {
         const QUOTE_ID = '123e4567-e89b-12d3-a456-426614174210';
         const VERSION_ID = '123e4567-e89b-12d3-a456-426614174211';
         const OPTION_ID = '123e4567-e89b-12d3-a456-426614174212';
@@ -1390,7 +1390,7 @@ describe('UnifiedQuoteComposer Integration (API-to-UI)', () => {
         });
 
         await user.click(screen.getByTestId('set-cargo-edited'));
-        await user.click(screen.getByRole('tab', { name: /Results & Finalize/i }));
+        await user.click(screen.getByRole('tab', { name: /Quotation Composer/i }));
         await user.click(screen.getByRole('button', { name: /^Draft$/i }));
 
         await waitFor(() => {

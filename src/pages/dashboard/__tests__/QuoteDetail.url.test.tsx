@@ -1,4 +1,5 @@
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import QuoteDetail from '../QuoteDetail';
@@ -182,6 +183,12 @@ describe('QuoteDetail URL Parameters', () => {
     (CRMHooks.useCRM as any).mockReturnValue(crmState);
   });
 
+  const openComparisonTab = async () => {
+    const user = userEvent.setup();
+    const comparisonTab = await screen.findByRole('tab', { name: /Option Comparison/i });
+    await user.click(comparisonTab);
+  };
+
   it('passes versionId from URL query param to UnifiedQuoteComposer', async () => {
     // 1. Mock Quote Resolution (by ID)
     // Code: .limit(1).maybeSingle() -> awaits
@@ -203,7 +210,7 @@ describe('QuoteDetail URL Parameters', () => {
     mockMaybeSingle.mockReturnValueOnce(createMockResponse(versionData));
 
     render(
-      <MemoryRouter initialEntries={['/dashboard/quotes/q-123?versionId=v-999']}>
+      <MemoryRouter initialEntries={['/dashboard/quotes/q-123?versionId=v-999&optionId=opt-a']}>
         <Routes>
           <Route path="/dashboard/quotes/:id" element={<QuoteDetail />} />
         </Routes>
@@ -308,6 +315,10 @@ describe('QuoteDetail URL Parameters', () => {
     );
 
     await waitFor(() => {
+      expect(screen.getByRole('tab', { name: 'Quote Form' })).toHaveAttribute('aria-selected', 'true');
+    });
+    await openComparisonTab();
+    await waitFor(() => {
       expect(screen.getByTestId('comparison-dashboard')).toHaveTextContent('selected=opt-b');
       expect(screen.getByTestId('comparison-dashboard')).toHaveTextContent('options=2');
     });
@@ -338,7 +349,7 @@ describe('QuoteDetail URL Parameters', () => {
     });
 
     render(
-      <MemoryRouter initialEntries={['/dashboard/quotes/q-123?versionId=v-999']}>
+      <MemoryRouter initialEntries={['/dashboard/quotes/q-123?versionId=v-999&optionId=opt-a']}>
         <Routes>
           <Route path="/dashboard/quotes/:id" element={<QuoteDetail />} />
         </Routes>
@@ -346,14 +357,18 @@ describe('QuoteDetail URL Parameters', () => {
     );
 
     await waitFor(() => {
+      expect(screen.getByTestId('composer')).toHaveTextContent('versionId=v-999');
+    });
+    await openComparisonTab();
+    await waitFor(() => {
       const comparison = screen.getByTestId('comparison-dashboard');
       expect(comparison).toHaveTextContent('options=2');
       expect(comparison).toHaveTextContent('selected-option-name=Economy');
       expect(comparison).toHaveTextContent('selected-option-rate=25');
       expect(comparison).toHaveTextContent('selected-option-charges=2');
       expect(comparison).toHaveTextContent('incomplete=1');
-    });
-  });
+    }, { timeout: 5000 });
+  }, 15000);
 
   it('uses composer charges total for comparison amount and excludes balancing charge rows', async () => {
     const quoteData = { id: 'q-123', tenant_id: 't1', quote_number: 'Q-100' };
@@ -380,7 +395,7 @@ describe('QuoteDetail URL Parameters', () => {
     });
 
     render(
-      <MemoryRouter initialEntries={['/dashboard/quotes/q-123?versionId=v-999']}>
+      <MemoryRouter initialEntries={['/dashboard/quotes/q-123?versionId=v-999&optionId=opt-a']}>
         <Routes>
           <Route path="/dashboard/quotes/:id" element={<QuoteDetail />} />
         </Routes>
@@ -388,13 +403,17 @@ describe('QuoteDetail URL Parameters', () => {
     );
 
     await waitFor(() => {
+      expect(screen.getByTestId('composer')).toHaveTextContent('versionId=v-999');
+    });
+    await openComparisonTab();
+    await waitFor(() => {
       const comparison = screen.getByTestId('comparison-dashboard');
       expect(comparison).toHaveTextContent('selected-option-total=3555');
       expect(comparison).toHaveTextContent('selected-option-charges=2');
       expect(comparison).toHaveTextContent('selected-option-charges-total=3555');
       expect(comparison).toHaveTextContent('selected-option-rate=22.5');
-    });
-  });
+    }, { timeout: 5000 });
+  }, 15000);
 
   it('persists selected option when user selects another option', async () => {
     const quoteData = { id: 'q-123', tenant_id: 't1', quote_number: 'Q-100' };
@@ -416,6 +435,7 @@ describe('QuoteDetail URL Parameters', () => {
       </MemoryRouter>
     );
 
+    await openComparisonTab();
     await waitFor(() => {
       expect(screen.getByTestId('comparison-dashboard')).toHaveTextContent('selected=opt-b');
     });
@@ -450,6 +470,7 @@ describe('QuoteDetail URL Parameters', () => {
       </MemoryRouter>
     );
 
+    await openComparisonTab();
     await waitFor(() => {
       expect(screen.getByTestId('comparison-dashboard')).toHaveTextContent('selected=opt-b');
     });

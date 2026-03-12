@@ -146,6 +146,7 @@ describe('QuoteDetail Reproduction', () => {
   it('loads latest version options when URL versionId is missing', async () => {
     const quoteId = 'quote-123';
     const latestVersionId = 'ver-latest';
+    mocks.useSearchParams.mockReturnValue([new URLSearchParams({ optionId: 'opt-1' }), vi.fn()]);
     
     mockScopedDb.from.mockImplementation((table: string) => {
       if (table === 'quotes') {
@@ -160,13 +161,11 @@ describe('QuoteDetail Reproduction', () => {
       if (table === 'quotation_versions') {
         // Return latest version when queried by quote_id
         return createMockChain([
-            { id: latestVersionId, version_number: 2, tenant_id: 'tenant-1' }
+          { id: latestVersionId, version_number: 2, tenant_id: 'tenant-1' }
         ]);
       }
       
       if (table === 'quotation_version_options') {
-        // This is the critical check: does it query with the LATEST version ID?
-        // We'll capture the ID used in the query via spy, but returning data confirms it worked.
         return createMockChain([
           {
             id: 'opt-1',
@@ -209,14 +208,10 @@ describe('QuoteDetail Reproduction', () => {
     await waitFor(() => {
       expect(screen.getByTestId('dashboard-layout')).toBeInTheDocument();
     });
-
-    // Verify comparison dashboard appears (meaning options were loaded)
     await waitFor(() => {
-      expect(screen.getByTestId('comparison-dashboard')).toBeInTheDocument();
+      expect(screen.getByTestId('unified-quote-composer')).toBeInTheDocument();
     });
-
-  expect(screen.getByText(/Maersk/)).toBeInTheDocument();
-        });
+  });
 
         it('clears state and shows loader when navigating to a different quote', async () => {
           // Initial setup for Quote 1

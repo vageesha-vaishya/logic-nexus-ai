@@ -2634,9 +2634,10 @@ function UnifiedQuoteComposerContent({
           } as any,
           containerResolver
         );
+        const generatedOptionCount = Array.isArray(generatedOptions) ? generatedOptions.length : 0;
         logAudit('smart_quote_generation_success', {
           quoteId: quoteId || 'new',
-          optionCount: generatedOptions.length,
+          optionCount: generatedOptionCount,
           smartMode: true,
           mode: formValues.mode || 'ocean',
         });
@@ -4202,13 +4203,13 @@ function UnifiedQuoteComposerContent({
                 value="form"
                 className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none py-3"
               >
-                Quote Form
+                General Information
               </TabsTrigger>
               <TabsTrigger
                 value="results"
                 className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none py-3"
               >
-                Results & Finalize
+                Quotation Composer
               </TabsTrigger>
             </TabsList>
             <TabsContent value="form" className="pt-6">
@@ -4312,7 +4313,7 @@ function UnifiedQuoteComposerContent({
             </TabsContent>
             <TabsContent value="finalize" className="pt-6">
               <div className="rounded-lg border p-6 text-sm text-muted-foreground">
-                Finalization has been moved into the Results & Finalize tab.
+                Finalization has been moved into the Quotation Composer tab.
               </div>
             </TabsContent>
           </Tabs>

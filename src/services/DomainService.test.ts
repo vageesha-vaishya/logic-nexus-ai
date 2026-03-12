@@ -128,13 +128,17 @@ describe('DomainService', () => {
       const newDomain = { name: 'New', code: 'new', description: 'New', is_active: true };
       const createdDomain = { ...newDomain, id: '3', created_at: 'now', updated_at: 'now' };
 
-      const mockChain = {
+      const listChain = {
+        select: vi.fn().mockReturnThis(),
+        order: vi.fn().mockResolvedValue({ data: mockDomains, error: null }),
+      };
+      const insertChain = {
         insert: vi.fn().mockReturnThis(),
         select: vi.fn().mockReturnThis(),
         single: vi.fn().mockResolvedValue({ data: createdDomain, error: null }),
       };
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (supabase.from as any).mockReturnValue(mockChain);
+      (supabase.from as any).mockReturnValueOnce(listChain).mockReturnValueOnce(insertChain);
 
       // Pre-populate cache to test invalidation
       // We can cheat by setting the private cache variable if it was accessible, 
@@ -144,7 +148,7 @@ describe('DomainService', () => {
       const result = await DomainService.createDomain(newDomain);
 
       expect(supabase.from).toHaveBeenCalledWith('platform_domains');
-      expect(mockChain.insert).toHaveBeenCalledWith(newDomain);
+      expect(insertChain.insert).toHaveBeenCalledWith(newDomain);
       expect(result).toEqual(createdDomain);
       expect(spyInvalidate).toHaveBeenCalled();
     });

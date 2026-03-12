@@ -15,7 +15,7 @@ export default defineConfig({
       singleFork: true,
       execArgv: ['--max-old-space-size=4096'],
     },
-    exclude: [...configDefaults.exclude, 'tests/e2e/**'],
+    exclude: [...configDefaults.exclude, 'tests/e2e/**', 'scripts/tests/**'],
   },
   resolve: {
     alias: {

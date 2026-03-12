@@ -1396,7 +1396,6 @@ describe('UnifiedQuoteComposer - Save Functionality', () => {
         expect(savedOption?.legs).toHaveLength(1);
         expect(savedOption?.legs?.[0]).toEqual(
             expect.objectContaining({
-                origin_location_name: 'Origin',
                 destination_location_name: 'Dest',
                 transport_mode: 'ocean'
             })

@@ -80,6 +80,7 @@ vi.mock('@/hooks/useRateFetching', () => ({
     results: mockRateResults,
     loading: false,
     fetchRates: mockFetchRates,
+    clearResults: vi.fn(),
     marketAnalysis: 'AI Analysis Content',
     confidenceScore: 85,
   }),
@@ -89,6 +90,7 @@ vi.mock('@/hooks/useRateFetching', () => ({
 vi.mock('@/components/sales/shared/QuoteResultsList', () => ({
   QuoteResultsList: ({ results }: any) => (
     <div data-testid="quote-results-list">
+      <div data-testid="results-count">{results.length}</div>
       {results.map((r: any) => (
         <div key={r.id} data-testid={`result-item-${r.id}`}>{r.carrier}</div>
       ))}
@@ -116,8 +118,18 @@ vi.mock('@/services/quotation/QuotationConfigurationService', () => {
 vi.mock('../FormZone', () => ({
   FormZone: ({ onGetRates }: any) => (
     <div data-testid="form-zone">
-      <button onClick={() => onGetRates({}, {}, false)} data-testid="get-rates-btn">Get Rates</button>
-      <button onClick={() => onGetRates({}, {}, true)} data-testid="get-smart-rates-btn">Get Smart Rates</button>
+      <button
+        onClick={() => onGetRates({ mode: 'ocean', origin: 'Shanghai', destination: 'Hamburg' }, {}, false)}
+        data-testid="get-rates-btn"
+      >
+        Get Rates
+      </button>
+      <button
+        onClick={() => onGetRates({ mode: 'ocean', origin: 'Shanghai', destination: 'Hamburg' }, {}, true)}
+        data-testid="get-smart-rates-btn"
+      >
+        Get Smart Rates
+      </button>
     </div>
   ),
 }));
@@ -127,7 +139,7 @@ describe('UnifiedQuoteComposer - Smart Mode', () => {
     vi.clearAllMocks();
   });
 
-  it('Standard Mode: Selects default option', async () => {
+it('Standard Mode: Opens manual composer without selecting market rates', async () => {
     render(
       <MemoryRouter>
         <UnifiedQuoteComposer />
@@ -142,13 +154,13 @@ describe('UnifiedQuoteComposer - Smart Mode', () => {
         expect(screen.getByTestId('quote-results-list')).toBeInTheDocument();
     });
     
-    // Should show rate-1 (default selected)
-    expect(screen.getByTestId('result-item-rate-1')).toBeInTheDocument();
-    // rate-2 should be hidden from main list
+    expect(screen.getByTestId('results-count')).toHaveTextContent('1');
+    expect(mockFetchRates).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('result-item-rate-1')).not.toBeInTheDocument();
     expect(screen.queryByTestId('result-item-rate-2')).not.toBeInTheDocument();
   });
 
-  it('Smart Mode: Does NOT select default option, shows analysis', async () => {
+it('Smart Mode: Requests AI rates without auto-selecting market options', async () => {
     render(
       <MemoryRouter>
         <UnifiedQuoteComposer />
@@ -158,15 +170,18 @@ describe('UnifiedQuoteComposer - Smart Mode', () => {
     // Click "Get Smart Rates"
     fireEvent.click(screen.getByTestId('get-smart-rates-btn'));
 
-    // Wait for analysis to appear
     await waitFor(() => {
-        expect(screen.getByTestId('ai-market-analysis')).toBeInTheDocument();
+      expect(mockFetchRates).toHaveBeenCalledWith(
+        expect.objectContaining({
+          smartMode: true,
+          origin: 'Shanghai',
+          destination: 'Hamburg',
+        }),
+        expect.any(Object)
+      );
     });
 
-    // Should NOT show any selected options in main list
+    expect(screen.getByRole('tab', { name: 'General Information' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.queryByTestId('quote-results-list')).not.toBeInTheDocument();
-    
-    // Should show Available Rates
-    expect(screen.getByText('Available Market Rates')).toBeInTheDocument();
   });
 });
