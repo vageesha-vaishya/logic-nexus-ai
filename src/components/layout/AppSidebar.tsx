@@ -97,6 +97,7 @@ export function AppSidebar() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
+          data-testid="sidebar-backdrop"
           className="fixed inset-0 bg-black/50 z-40 lg:hidden"
           onClick={() => isMobile ? setOpenMobile(false) : setOpen(false)}
         />

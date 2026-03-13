@@ -14,7 +14,7 @@ const envName = (process.env.PLAYWRIGHT_ENV as QuotationEnvironmentName) || 'dev
 const resolveBaseUrl = () => {
   if (process.env.PLAYWRIGHT_BASE_URL) return process.env.PLAYWRIGHT_BASE_URL;
   if (process.env.BASE_URL) return process.env.BASE_URL;
-  return 'http://localhost:8081';
+  return 'http://localhost:4173';
 };
 
 const configs: Record<QuotationEnvironmentName, QuotationEnvironmentConfig> = {

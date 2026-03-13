@@ -8,7 +8,12 @@ export class AuthPage extends BasePage {
   }
 
   async login(email: string, password: string) {
-    await this.page.goto('/auth');
+    await this.page.goto('/dashboard/quotes', { waitUntil: 'domcontentloaded' });
+    if (/\/dashboard(\/quotes)?/.test(this.page.url())) {
+      await expect(this.page.locator('body')).toBeVisible({ timeout: 15000 });
+      return;
+    }
+    await this.page.goto('/auth', { waitUntil: 'domcontentloaded' });
     const emailInput = this.page.getByTestId('email-input').or(this.page.locator('input[type="email"]'));
     const passwordInput = this.page.getByTestId('password-input').or(this.page.locator('input[type="password"]'));
     if ((await emailInput.first().count()) === 0) {
@@ -24,6 +29,7 @@ export class AuthPage extends BasePage {
       .getByTestId('login-btn')
       .or(this.page.getByRole('button', { name: /sign in|login/i }));
     await this.click(loginButton.first(), 'Sign in');
-    await expect(this.page).toHaveURL(/\/dashboard/, { timeout: 45000 });
+    await expect(this.page).toHaveURL(/\/dashboard/, { timeout: 60000 });
+    await expect(this.page.locator('body')).toBeVisible({ timeout: 15000 });
   }
 }

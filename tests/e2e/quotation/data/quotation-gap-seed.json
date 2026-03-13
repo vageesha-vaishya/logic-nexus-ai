@@ -1,0 +1,108 @@
+{
+  "dataset_id": "quotation_gap_seed_v1",
+  "quotes": [
+    {
+      "quote_number": "QUO-GAP-0001",
+      "mode": "air",
+      "origin": "Paris",
+      "destination": "New York",
+      "commodity": "Electronics",
+      "weight_kg": 1200,
+      "volume_cbm": 8.5,
+      "currency": "USD"
+    },
+    {
+      "quote_number": "QUO-GAP-0002",
+      "mode": "ocean",
+      "origin": "Shanghai",
+      "destination": "Rotterdam",
+      "commodity": "Furniture",
+      "weight_kg": 9000,
+      "volume_cbm": 42,
+      "currency": "USD"
+    }
+  ],
+  "options": [
+    {
+      "quote_number": "QUO-GAP-0001",
+      "option_name": "Air Express + Last Mile",
+      "transport_mode": "air",
+      "total_amount": 2500,
+      "legs": [
+        {
+          "sequence": 1,
+          "mode": "road",
+          "origin": "Paris",
+          "destination": "CDG",
+          "charges": [
+            { "name": "Pickup", "amount": 180, "unit": "shipment" }
+          ]
+        },
+        {
+          "sequence": 2,
+          "mode": "air",
+          "origin": "CDG",
+          "destination": "JFK",
+          "charges": [
+            { "name": "Main Freight", "amount": 1800, "unit": "kg" }
+          ]
+        }
+      ],
+      "charges": [
+        { "name": "Documentation", "amount": 120, "unit": "file" },
+        { "name": "Security", "amount": 95, "unit": "shipment" }
+      ]
+    },
+    {
+      "quote_number": "QUO-GAP-0002",
+      "option_name": "Ocean FCL + Delivery",
+      "transport_mode": "ocean",
+      "total_amount": 3900,
+      "legs": [
+        {
+          "sequence": 1,
+          "mode": "ocean",
+          "origin": "Shanghai",
+          "destination": "Rotterdam",
+          "charges": [
+            { "name": "Base Freight", "amount": 2800, "unit": "container" }
+          ]
+        },
+        {
+          "sequence": 2,
+          "mode": "road",
+          "origin": "Rotterdam",
+          "destination": "Venlo",
+          "charges": [
+            { "name": "Delivery", "amount": 450, "unit": "shipment" }
+          ]
+        }
+      ],
+      "charges": [
+        { "name": "THC", "amount": 220, "unit": "container" },
+        { "name": "Customs", "amount": 130, "unit": "entry" }
+      ]
+    }
+  ],
+  "negative_payloads": [
+    {
+      "name": "mixed_version_charge_payload",
+      "description": "Combines legacy and new charge schema keys in one payload",
+      "payload": {
+        "charges": [
+          { "code": "FREIGHT", "price": 1000, "basis": "PER_SHIPMENT" },
+          { "name": "Documentation", "amount": 120, "unit": "file", "legacy_amount": 130 }
+        ]
+      }
+    },
+    {
+      "name": "invalid_basis_and_unit",
+      "description": "Unknown basis code and null unit to verify fallback",
+      "payload": {
+        "charges": [
+          { "name": "Unknown Fee", "amount": 80, "basis": "PER_MYSTERY", "unit": null }
+        ]
+      }
+    }
+  ]
+}

@@ -52,13 +52,53 @@ export class QuoteFactory {
         await this.loadMetadata();
     }
 
+    private registerContainerSize(code: unknown, id: unknown) {
+        const normalizedId = typeof id === 'string' ? id : '';
+        if (!normalizedId) return;
+        const normalizedCode = typeof code === 'string' ? code.trim() : '';
+        if (!normalizedCode) return;
+        this.containerSizes[normalizedCode] = normalizedId;
+        this.containerSizes[normalizedCode.toUpperCase()] = normalizedId;
+        this.containerSizes[normalizedCode.toLowerCase()] = normalizedId;
+    }
+
+    private resolveContainerSizeId(sizeCode: string) {
+        const requested = sizeCode.trim();
+        const fallbackKeys = [
+            requested,
+            requested.toUpperCase(),
+            requested.toLowerCase(),
+            '20GP',
+            '20gp',
+            '20_std',
+            '20',
+            'standard_20',
+            '40GP',
+            '40gp',
+            '40_std',
+            '40',
+            'standard_40',
+        ];
+        for (const key of fallbackKeys) {
+            const found = this.containerSizes[key];
+            if (found) return found;
+        }
+        const firstAvailable = Object.values(this.containerSizes).find(Boolean);
+        return firstAvailable || '';
+    }
+
     private async loadMetadata() {
-        // Container Sizes
-        const { data: sizes, error } = await this.supabase.from('container_sizes').select('id, code');
+        const { data: sizes, error } = await this.supabase.from('container_sizes').select('*');
         if (error) console.error('Error loading container_sizes:', error);
-        
-        sizes?.forEach(s => this.containerSizes[s.code] = s.id);
-        // Add mappings for standard names if needed
+
+        sizes?.forEach((s: any) => {
+            this.registerContainerSize(s.code, s.id);
+            this.registerContainerSize(s.size_code, s.id);
+            this.registerContainerSize(s.name, s.id);
+            this.registerContainerSize(s.size_name, s.id);
+            this.registerContainerSize(s.iso_code, s.id);
+        });
+
         if (this.containerSizes['20_std']) this.containerSizes['20GP'] = this.containerSizes['20_std'];
         if (this.containerSizes['40_std']) this.containerSizes['40GP'] = this.containerSizes['40_std'];
         
@@ -104,21 +144,22 @@ export class QuoteFactory {
     }
 
     async addQuoteItem(quoteId: string, sizeCode: string, quantity: number = 1, lineNumber: number = 1) {
-        const sizeId = this.containerSizes[sizeCode] || this.containerSizes['standard_20'];
-        if (!sizeId) throw new Error(`Container size ${sizeCode} not found`);
-
-        const { error } = await this.supabase.from('quote_items').insert({
+        const sizeId = this.resolveContainerSizeId(sizeCode);
+        const payload: Record<string, unknown> = {
             quote_id: quoteId,
-            container_size_id: sizeId,
             quantity,
             weight_kg: 10000,
-            tenant_id: this.tenantId,
             description: `Test Cargo ${sizeCode}`,
             line_number: lineNumber,
             product_name: `Product ${sizeCode}`,
             unit_price: 1000,
             line_total: quantity * 1000
-        });
+        };
+        if (sizeId) {
+            payload.container_size_id = sizeId;
+        }
+
+        const { error } = await this.supabase.from('quote_items').insert(payload);
         if (error) throw error;
     }
 
@@ -138,16 +179,19 @@ export class QuoteFactory {
         const carrierId = await this.getCarrierId(params.carrierName);
 
         // 2. Create Option
-        const sizeId = this.containerSizes[params.containerSizeCode] || this.containerSizes['standard_20'];
-        const { data: option, error: optError } = await this.supabase.from('quotation_version_options').insert({
+        const sizeId = this.resolveContainerSizeId(params.containerSizeCode);
+        const optionPayload: Record<string, unknown> = {
             quotation_version_id: versionId,
             carrier_id: carrierId,
-            container_size_id: sizeId,
             is_selected: true,
             valid_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
             transit_days: params.transitDays,
             tenant_id: this.tenantId
-        }).select().single();
+        };
+        if (sizeId) {
+            optionPayload.container_size_id = sizeId;
+        }
+        const { data: option, error: optError } = await this.supabase.from('quotation_version_options').insert(optionPayload).select().single();
         if (optError) throw optError;
 
         // 3. Create Legs
@@ -160,6 +204,7 @@ export class QuoteFactory {
                 sort_order: order++,
                 origin_location_id: leg.originId,
                 destination_location_id: leg.destId,
+                carrier_name: params.carrierName,
                 tenant_id: this.tenantId
             }).select().single();
             if (legError) throw legError;

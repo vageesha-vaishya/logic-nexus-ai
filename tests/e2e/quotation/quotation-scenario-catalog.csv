@@ -1,0 +1,21 @@
+Scenario_ID,Requirement_ID,Scenario_Title,Scenario_Type,Priority,Automation_Level,Primary_Test_File,Seed_Data_Reference,Status
+QS-CRUD-001,R1,Create draft with required and optional quotation fields,CRUD,High,Automated,tests/e2e/quotation/quotation-comprehensive.spec.ts,tests/e2e/quotation/data/quotation-gap-seed.json,Covered
+QS-CRUD-002,R1,Read list with search sort and selection state,CRUD,High,Automated,tests/e2e/quotation/quotation-comprehensive.spec.ts,tests/e2e/quotation/data/quotation-gap-seed.json,Covered
+QS-CRUD-003,R1,Update quote title and persist modified values,CRUD,High,Automated,tests/e2e/quotation/quotation-comprehensive.spec.ts,tests/e2e/quotation/data/quotation-gap-seed.json,Covered
+QS-CRUD-004,R1,Delete single quote from list actions,CRUD,High,Automated,tests/e2e/quotation/quotation-comprehensive.spec.ts,tests/e2e/quotation/data/quotation-gap-seed.json,Covered
+QS-CRUD-005,R1,Bulk delete selected quotes with confirmation,CRUD,High,Automated,tests/e2e/quotation/quotation-comprehensive.spec.ts,tests/e2e/quotation/data/quotation-gap-seed.json,Covered
+QS-FIELD-001,R2,Validate required fields and invalid submission feedback,Field Validation,High,Automated,tests/e2e/quotation/quotation-comprehensive.spec.ts,tests/e2e/quotation/data/quotation-validation-cases.json,Covered
+QS-FIELD-002,R2,Validate JSON and CSV-driven data permutations,Field Validation,High,Automated,tests/e2e/quotation/quotation-comprehensive.spec.ts,tests/e2e/quotation/data/quotation-data-driven.csv,Covered
+QS-FIELD-003,R2,Validate mode-specific legs and continuity mapping rules,Field Validation,High,Automated,src/services/QuoteOptionService.test.ts,tests/e2e/quotation/data/quotation-gap-seed.json,Covered
+QS-FIELD-004,R2,Validate charge unit propagation for leg and global charges,Field Validation,High,Automated,src/services/QuoteOptionService.test.ts,tests/e2e/quotation/data/quotation-gap-seed.json,Covered
+QS-FIELD-005,R2,Validate auto-margin computations for sell and cost models,Field Validation,High,Automated,src/services/pricing.service.test.ts,tests/e2e/quotation/data/quotation-gap-seed.json,Covered
+QS-NEG-001,R3,Validate SQL injection payload resistance,Negative Security,High,Automated,tests/e2e/quotation/quotation-comprehensive.spec.ts,tests/e2e/quotation/data/quotation-validation-cases.json,Covered
+QS-NEG-002,R3,Validate XSS payload resistance in input fields,Negative Security,High,Automated,tests/e2e/quotation/quotation-comprehensive.spec.ts,tests/e2e/quotation/data/quotation-validation-cases.json,Covered
+QS-NEG-003,R3,Validate network offline interruption and recovery,Negative Resilience,High,Automated,tests/e2e/quotation/quotation-comprehensive.spec.ts,tests/e2e/quotation/data/quotation-gap-seed.json,Covered
+QS-NEG-004,R3,Validate malformed mixed-version charge payload fallback,Negative Resilience,High,Automated,src/services/QuoteOptionService.test.ts,tests/e2e/quotation/data/quotation-gap-seed.json,Covered
+QS-NEG-005,R3,Validate session timeout and storage reset handling,Negative Resilience,Medium,Automated,tests/e2e/quotation/quotation-comprehensive.spec.ts,tests/e2e/quotation/data/quotation-gap-seed.json,Covered
+QS-UX-001,R4,Validate responsive breakpoints keyboard and accessibility contract,UI/UX,High,Automated,tests/e2e/quotation/quotation-comprehensive.spec.ts,tests/e2e/quotation/data/quotation-gap-seed.json,Covered
+QS-UX-002,R4,Validate tooltip trigger behavior and focus safety,UI/UX,Medium,Automated,tests/e2e/quotation/quotation-comprehensive.spec.ts,tests/e2e/quotation/data/quotation-gap-seed.json,Covered
+QS-UX-003,R4,Validate visual regression baseline snapshot stability,UI/UX,Medium,Automated,tests/e2e/quotation/quotation-comprehensive.spec.ts,tests/e2e/quotation/quotation-comprehensive.spec.ts-snapshots,Covered
+QS-PERF-001,R4,Validate long-session memory trend in chromium,Performance,Medium,Automated,tests/e2e/quotation/quotation-comprehensive.spec.ts,tests/e2e/quotation/data/quotation-gap-seed.json,Covered
+QS-CONC-001,R3,Validate concurrent session draft isolation,Concurrency,High,Automated,tests/e2e/quotation/quotation-comprehensive.spec.ts,tests/e2e/quotation/data/quotation-gap-seed.json,Covered

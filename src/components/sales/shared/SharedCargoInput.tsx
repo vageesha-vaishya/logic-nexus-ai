@@ -59,10 +59,12 @@ export function SharedCargoInput({ value, onChange, onCommodityChange, onRemove,
 
   const handleCommoditySelect = (selection: CommoditySelection) => {
     console.log('[SharedCargoInput] Commodity selected:', selection);
+    const nextDescription = selection.description || '';
+    const currentDescription = value.commodity?.description || '';
     const updated = {
       ...value,
       commodity: {
-        description: selection.description,
+        description: nextDescription,
         hts_code: selection.hts_code,
         id: selection.master_commodity_id,
         aes_hts_id: selection.aes_hts_id,
@@ -81,7 +83,9 @@ export function SharedCargoInput({ value, onChange, onCommodityChange, onRemove,
 
     console.log('[SharedCargoInput] Calling onChange with updated cargo item:', updated);
     onChange(updated);
-    onCommodityChange?.(selection.description || '');
+    if (nextDescription !== currentDescription) {
+      onCommodityChange?.(nextDescription);
+    }
   };
 
   const handleCommodityInputChange = (description: string) => {

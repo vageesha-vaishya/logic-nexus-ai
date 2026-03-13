@@ -400,7 +400,7 @@ export function FormZone({
 
     const currentValue = form.getValues('commodity');
     if (displayValue && currentValue !== displayValue) {
-      form.setValue('commodity', displayValue, { shouldValidate: true, shouldDirty: true });
+      form.setValue('commodity', displayValue, { shouldValidate: false, shouldDirty: true });
     }
     
     // Sync HTS code if available
@@ -458,7 +458,7 @@ export function FormZone({
     });
 
     // Set the form value directly and immediately
-    form.setValue('commodity', displayValue, { shouldValidate: true, shouldDirty: true });
+    form.setValue('commodity', displayValue, { shouldValidate: false, shouldDirty: true });
     
     // Also update the cargo item for consistency
     setCargoItem(prev => ({
@@ -1211,7 +1211,12 @@ export function FormZone({
           <SharedCargoInput
             value={cargoItem}
             onChange={setCargoItem}
-            onCommodityChange={(value) => form.setValue('commodity', value, { shouldValidate: true, shouldDirty: true })}
+            onCommodityChange={(value) => {
+              const currentValue = form.getValues('commodity') || '';
+              if (value !== currentValue) {
+                form.setValue('commodity', value, { shouldValidate: false, shouldDirty: true });
+              }
+            }}
             errors={form.formState.errors as any}
           />
           <span className="sr-only" data-field-name="containerType" aria-hidden="true" />
@@ -1233,7 +1238,7 @@ export function FormZone({
               aria-invalid={!!form.formState.errors.commodity}
               onChange={(e) => {
                 const value = e.target.value;
-                form.setValue('commodity', value, { shouldValidate: true, shouldDirty: true });
+                form.setValue('commodity', value, { shouldValidate: false, shouldDirty: true });
                 setCargoItem(prev => ({
                   ...prev,
                   commodity: value

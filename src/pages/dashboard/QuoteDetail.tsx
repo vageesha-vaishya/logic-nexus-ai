@@ -44,6 +44,13 @@ const isRetryableError = (error: unknown): boolean => {
   );
 };
 
+const sanitizeQuoteReference = (value: string) => {
+  let normalized = value.trim();
+  normalized = normalized.replace(/[)\],;.!?:]+$/g, '');
+  normalized = normalized.replace(/-+$/g, '');
+  return normalized;
+};
+
 const normalizeCurrencyCode = (value?: string) => {
   if (!value) return 'USD';
   const normalized = String(value).toUpperCase().trim();
@@ -119,6 +126,7 @@ export default function QuoteDetail() {
   const debug = useDebug('Sales', 'QuoteDetail');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [fallbackQuote, setFallbackQuote] = useState<{ id: string; quoteNumber: string | null } | null>(null);
   const [resolvedId, setResolvedId] = useState<string | null>(null);
   const [versionId, setVersionId] = useState<string | null>(urlVersionId || null);
   const [tenantId, setTenantId] = useState<string | null>(null);
@@ -469,6 +477,7 @@ export default function QuoteDetail() {
     setVersionId(null);
     setTenantId(null);
     setQuoteNumber(null);
+    setFallbackQuote(null);
     setComparisonOptions([]);
     comparisonOptionsCacheRef.current = {};
     setComparisonRequested(false);
@@ -477,13 +486,14 @@ export default function QuoteDetail() {
 
     const checkQuote = async () => {
       setError(null);
-      const quoteRef = String(id || '').trim();
+      const rawQuoteRef = String(id || '').trim();
+      const quoteRef = sanitizeQuoteReference(rawQuoteRef);
       if (!quoteRef) {
         setError('Missing quote identifier');
         setLoading(false);
         return;
       }
-      debug.info('Resolving quote', { id: quoteRef });
+      debug.info('Resolving quote', { id: quoteRef, rawId: rawQuoteRef });
       const quoteRefIsUuid = UUID_REGEX.test(quoteRef);
       let lastError: unknown = null;
 
@@ -549,6 +559,62 @@ export default function QuoteDetail() {
       }
 
       const message = lastError instanceof Error ? lastError.message : 'Failed to load quote';
+      try {
+        const directLookup = quoteRefIsUuid
+          ? await supabase
+              .from('quotes')
+              .select('id, tenant_id, quote_number')
+              .or(`id.eq.${quoteRef},quote_number.eq.${quoteRef}`)
+              .limit(1)
+              .maybeSingle()
+          : await supabase
+              .from('quotes')
+              .select('id, tenant_id, quote_number')
+              .eq('quote_number', quoteRef)
+              .limit(1)
+              .maybeSingle();
+        if (!directLookup.error && directLookup.data?.id) {
+          logger.warn('Quote resolved via direct Supabase fallback lookup', {
+            id: quoteRef,
+            resolvedId: directLookup.data.id,
+          });
+          setResolvedId(String(directLookup.data.id));
+          setTenantId(typeof directLookup.data.tenant_id === 'string' ? directLookup.data.tenant_id : null);
+          setQuoteNumber(typeof directLookup.data.quote_number === 'string' ? directLookup.data.quote_number : quoteRef);
+          setLoading(false);
+          return;
+        }
+      } catch (directLookupErr) {
+        logger.warn('Direct Supabase fallback lookup failed', {
+          id: quoteRef,
+          error: directLookupErr instanceof Error ? directLookupErr.message : String(directLookupErr),
+        });
+      }
+      try {
+        const { data: latestQuote, error: latestQuoteError } = await supabase
+          .from('quotes')
+          .select('id, quote_number')
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (!latestQuoteError && latestQuote?.id) {
+          setFallbackQuote({
+            id: String(latestQuote.id),
+            quoteNumber: typeof latestQuote.quote_number === 'string' ? latestQuote.quote_number : null,
+          });
+          const fallbackLabel = typeof latestQuote.quote_number === 'string' && latestQuote.quote_number.length > 0
+            ? latestQuote.quote_number
+            : String(latestQuote.id);
+          setError(`Unable to load ${quoteRef}. Try available quote: ${fallbackLabel}`);
+          setLoading(false);
+          return;
+        }
+      } catch (fallbackErr) {
+        logger.warn('Unable to resolve fallback quote reference', {
+          id: quoteRef,
+          error: fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr),
+        });
+      }
       debug.error('Failed to load quote', { error: message });
       setError(message);
       setLoading(false);
@@ -882,6 +948,14 @@ export default function QuoteDetail() {
                     <Button onClick={handleRetry}>
                         Retry
                     </Button>
+                    {fallbackQuote && (
+                      <Button
+                        variant="secondary"
+                        onClick={() => navigate(`/dashboard/quotes/${fallbackQuote.quoteNumber || fallbackQuote.id}`)}
+                      >
+                        Open Available Quote
+                      </Button>
+                    )}
                     <Button variant="outline" onClick={() => navigate('/dashboard/quotes')}>
                         Back to Dashboard
                     </Button>

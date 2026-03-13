@@ -1352,6 +1352,65 @@ WHERE qvol.quote_leg_id IS NULL;
 
 ---
 
-**Test Plan Version**: 2.0  
-**Last Updated**: 2025-11-20  
+## Addendum: Quotation Module Coverage Expansion (2026-03-13)
+
+### Acceptance Criteria Matrix
+
+| Module | Scenario Type | Test Case | Acceptance Criteria | Test Data Requirements | Expected Outcome |
+|---|---|---|---|---|---|
+| Quotation Composer | Functional | Compose and save draft with mandatory fields | Draft persists with generated reference and editable state | Tenant user, origin/destination, incoterm, commodity | Draft appears in list and reopens without data loss |
+| Quotation Composer | Edge | Toggle standalone mode with mobile sidebar open | Toggle remains clickable and state is applied on mobile/desktop | iOS + Android viewport, sidebar opened | No click interception and mode updates immediately |
+| Quotation Composer | Integration | Submit get-rates from composer into option mapping service | Returned rates create option cards with totals and legs | Mocked rate response with 2 legs and 3 charges | Option cards render with matching buy/sell totals |
+| Quotation Composer | Error handling | API timeout during save | UI shows recoverable failure and keeps unsaved edits | Simulated 504 on save endpoint | Error toast shown, form values retained, retry succeeds |
+| Multi Quote Options | Functional | Create, select primary, and remove secondary options | Exactly one option is primary after mutation | Version with 3 options | Primary marker switches and deleted option removed |
+| Multi Quote Options | Edge | Remove selected option when only one remains | System auto-guards or reassigns selection | Version containing single option | No null selected state and warning shown if blocked |
+| Multi Quote Options | Integration | Persist option CRUD to quotation_version_options table | DB reflects create/update/delete in sequence | Option payload with totals and metadata | Database state matches UI card states |
+| Multi Quote Options | Error handling | Delete operation fails after optimistic update | Rollback restores removed option with same totals | Injected delete RPC failure | Option restored and user receives failure toast |
+| Multi Transport Mode Options | Functional | Add road+air+ocean modes into single quote | Modes display with correct service type defaults | Mode master data active for all three modes | Each mode row mapped to valid service type |
+| Multi Transport Mode Options | Edge | Unsupported mode code appears in payload | Unknown mode is skipped without corruption | Payload with one invalid mode value | Valid modes persist and invalid mode logged |
+| Multi Transport Mode Options | Integration | Mode IDs resolved through mapper service | Stored legs keep correct mode_id foreign keys | Mode mapping fixture with UUIDs | quotation_version_option_legs.mode_id values valid |
+| Multi Transport Mode Options | Error handling | Mapper returns null mode_id | Insert skipped for invalid mode and process continues | Forced null mapping for one mode | Remaining legs insert successfully with warning logged |
+| Multi Transport Leg | Functional | Persist ordered multi-leg route with transit times | Sort order and transit fields saved correctly | 3-leg route with sequence 1..3 | Retrieved legs preserve sequence and timings |
+| Multi Transport Leg | Edge | Duplicate sequence index in incoming legs | Service normalizes order deterministically | Payload with duplicate sequence | Stored legs have strict ascending unique order |
+| Multi Transport Leg | Integration | Leg-level references hydrate into quote repository | Edit screen reload includes all legs and locations | Saved quote ID with existing legs | Hydrated form shows matching origins/destinations |
+| Multi Transport Leg | Error handling | Invalid UUID leg reference in transformed rate | Invalid leg is skipped without crashing save | Corrupt leg_id in fallback data | Save completes and anomaly logged |
+| Multi Global Charges | Functional | Add non-leg global charges with unit propagation | Units and basis persist on buy/sell pair rows | Charges: documentation, insurance | Two-sided charges inserted with matching unit |
+| Multi Global Charges | Edge | Mixed schema charge object (price/amount/legacy) | Parser falls back to first valid numeric field | Payload mixing amount, price, legacy_amount | Charge amounts normalized and inserted once |
+| Multi Global Charges | Integration | Global charges distribute against resolved target leg | Charge-leg mapping follows bifurcation rules | 2-leg quote with pickup/delivery descriptors | Pickup mapped to first leg, delivery to last leg |
+| Multi Global Charges | Error handling | Missing category mapping | Category fallback prevents crash and preserves insert | Unknown category code | Charge uses fallback category and warning emitted |
+| Multi Leg Charges | Functional | Save per-leg charge matrix across all legs | Each charge links to expected leg_id | 2+ legs with per-leg charges | quote_charges rows grouped by leg correctly |
+| Multi Leg Charges | Edge | Nested breakdown with numeric leaf under legs_1 | Explicit leg index is honored from parent key | price_breakdown.legs_1.handling_fee number | Charge inserted against second leg |
+| Multi Leg Charges | Integration | Charge bifurcation works with transport leg matcher | Matcher and quote option service agree on leg mapping | Leg fixtures with pickup/main/delivery | End-to-end charge placement consistent |
+| Multi Leg Charges | Error handling | Invalid charge side mapping | Insertion skipped and pipeline continues | Mapper returns null side IDs | No malformed charge rows written |
+| Margin % | Functional | Calculate financials for sell-based margin | Buy, sell, margin amount/percent aligned | Amount and margin percent permutations | Values match pricing service formulas |
+| Margin % | Edge | Zero and negative amounts | Rounding and sign handling remains deterministic | Amounts: 0, -50, 0.01 | No NaN/Infinity; outputs remain numeric |
+| Margin % | Integration | Margin totals propagate into option header update | option totals reflect inserted charge sums | Option with charges and margin overrides | quotation_version_options totals updated |
+| Margin % | Error handling | Transfer mismatch between incoming and stored totals | Anomaly appended to quotation_versions metadata | Artificial mismatch fixture | Integrity anomaly persisted and logged |
+| Smart Quote Generation | Functional | Generate rate options from smart quote source | Option cards generated from AI/rate payload | Smart quote payload with carrier and transit | Options appear with populated carrier/transit |
+| Smart Quote Generation | Edge | Partial smart payload without legs | Fallback price_breakdown still produces charges | Payload missing legs and charges | Option saved using fallback charge extraction |
+| Smart Quote Generation | Integration | Smart source routes through QuoteTransformService | Service type and carrier mapping resolved | Carrier + mode mapping fixtures | Persisted options include mapped provider/service IDs |
+| Smart Quote Generation | Error handling | Carrier-mode mismatch detected | Request rejected with explicit validation error | Carrier in wrong mode | Error thrown and no partial writes |
+| PDF Generator | Functional | Generate quotation PDF from selected template | Returned payload contains pdf content metadata | Existing quote + template ID | Function returns non-empty content |
+| PDF Generator | Edge | Missing template ID invokes default strategy | Function falls back to default template path | quoteId only | PDF still generated with fallback template |
+| PDF Generator | Integration | PDF generation consumes transformed quote and template sections | Renderer receives normalized sections and charges | Quote with multi-leg, multi-charge | Output includes expected sections and totals |
+| PDF Generator | Error handling | Template fetch failure | Function returns controlled error response | Invalid template ID | Failure surfaced with stable error contract |
+| PDF File | Functional | Validate generated PDF binary/readability | Parser confirms PDF header and extractable text | Generated content buffer/string | Validation passes and content is parseable |
+| PDF File | Edge | Large quote with many charges | File generation remains within size/perf thresholds | Quote with 100+ charges | PDF produced without truncation/runtime crash |
+| PDF File | Integration | Storage/download flow for generated file | Stored file matches generated response checksum | Object storage bucket and quote metadata | Downloaded file hash equals generated hash |
+| PDF File | Error handling | Corrupt binary write/read path | Validation fails gracefully with traceable error | Injected malformed binary | User gets actionable failure and no silent corruption |
+| Template | Functional | Load tenant template list with role fallback | Tenant and global templates returned in order | User role tenant_id + null templates | Sorted list returned newest-first |
+| Template | Edge | Invalid JSON template content | Content normalization falls back safely | Template record with malformed JSON | Template still loads with minimal metadata |
+| Template | Integration | Create/update/delete template mutations invalidate cache | Queries refetch and UI updates instantly | Template CRUD payloads | Cache invalidated and list reflects mutation |
+| Template | Error handling | Mutation failures produce explicit toast messages | Error message includes operation and reason | Simulated insert/update/delete errors | Correct toast per operation and no stale state |
+
+### Execution and Coverage Gates
+
+| Gate | Command | Required Outcome | Current Result |
+|---|---|---|---|
+| Unit module coverage | `npm exec -- vitest run --coverage.enabled --coverage.provider=v8 --coverage.reporter=text --coverage.include='src/services/QuoteOptionService.ts' --coverage.include='src/components/sales/templates/useQuoteTemplates.ts' --coverage.include='supabase/functions/generate-quote-pdf/engine/template-service.ts' src/services/QuoteOptionService.test.ts src/components/sales/templates/__tests__/useQuoteTemplates.test.tsx supabase/functions/generate-quote-pdf/engine/tests/template-service.test.ts` | Each targeted module >= 90% statements | Pass (`QuoteOptionService 91.82%`, `useQuoteTemplates 93.75%`, `template-service 92.85%`) |
+| Quotation e2e full regression | `npm run test:playwright:quotation` | 0 failed, stable critical-path workflows | Pass (`66 passed`, `6 skipped`, `0 failed`) |
+| Concurrent isolation recheck | `npm run test:playwright:quotation -- --project=chromium --grep "validates concurrent sessions and draft data isolation"` | Scenario passes in isolation | Pass (`1 passed`) |
+
+**Test Plan Version**: 2.1  
+**Last Updated**: 2026-03-13  
 **Status**: Ready for Execution

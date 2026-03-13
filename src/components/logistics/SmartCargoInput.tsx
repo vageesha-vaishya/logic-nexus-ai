@@ -56,9 +56,11 @@ export function SmartCargoInput({ onSelect, className, placeholder = "Search com
     }
   }, [value, open, searchTerm]);
 
-  const updateSearchTerm = (nextValue: string) => {
+  const updateSearchTerm = (nextValue: string, notifyInput = true) => {
     setSearchTerm(nextValue);
-    onInputChange?.(nextValue);
+    if (notifyInput) {
+      onInputChange?.(nextValue);
+    }
   };
 
   // Debounce search term
@@ -164,7 +166,7 @@ export function SmartCargoInput({ onSelect, className, placeholder = "Search com
       hazmat_class: item.hazmat_class,
       master_commodity_id: item.id,
     });
-    updateSearchTerm(item.name);
+    updateSearchTerm(item.name, false);
     setOpen(false);
   };
 
@@ -174,7 +176,7 @@ export function SmartCargoInput({ onSelect, className, placeholder = "Search com
       aes_hts_id: item.id,
       hts_code: item.hts_code,
     });
-    updateSearchTerm(`${item.description} - ${item.hts_code}`);
+    updateSearchTerm(`${item.description} - ${item.hts_code}`, false);
     setOpen(false);
   };
 
@@ -185,7 +187,7 @@ export function SmartCargoInput({ onSelect, className, placeholder = "Search com
       hts_code: selection.code,
     });
     setBrowserOpen(false);
-    updateSearchTerm(`${selection.description} - ${selection.code}`);
+    updateSearchTerm(`${selection.description} - ${selection.code}`, false);
   };
 
   useEffect(() => {
@@ -197,9 +199,12 @@ export function SmartCargoInput({ onSelect, className, placeholder = "Search com
   return (
     <div className={cn("flex gap-2 w-full", className)}>
       <Popover open={open} onOpenChange={(isOpen) => {
-        // If closing and search term has changed, commit it as a custom selection
-        if (!isOpen && searchTerm !== value) {
-          onSelect({ description: searchTerm });
+        if (!isOpen && open) {
+          const trimmedSearch = searchTerm.trim();
+          const trimmedValue = (value || '').trim();
+          if (trimmedSearch && trimmedSearch !== trimmedValue) {
+            onSelect({ description: trimmedSearch });
+          }
         }
         setOpen(isOpen);
       }}>
@@ -214,7 +219,6 @@ export function SmartCargoInput({ onSelect, className, placeholder = "Search com
               !searchTerm && "text-muted-foreground",
               error && "border-destructive focus-visible:ring-destructive"
             )}
-            onFocus={() => setOpen(true)}
             onKeyDown={(e) => {
               const isPrintable = e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey;
               if (isPrintable) {
@@ -343,7 +347,10 @@ export function SmartCargoInput({ onSelect, className, placeholder = "Search com
       <Button 
         variant="outline" 
         size="icon" 
-        onClick={() => setBrowserOpen(true)}
+        onClick={() => {
+          setOpen(false);
+          setBrowserOpen(true);
+        }}
         title="Browse HTS Codes"
       >
         <FolderSearch className="h-4 w-4" />

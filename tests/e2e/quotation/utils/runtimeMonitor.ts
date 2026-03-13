@@ -33,7 +33,9 @@ export class RuntimeMonitor {
   }
 
   async highlight(locator: Locator) {
-    await locator.evaluate((element) => {
+    const handle = await locator.elementHandle({ timeout: 1000 }).catch(() => null);
+    if (!handle) return;
+    await handle.evaluate((element) => {
       const target = element as HTMLElement;
       target.style.outline = '3px solid #ef4444';
       target.style.outlineOffset = '2px';
