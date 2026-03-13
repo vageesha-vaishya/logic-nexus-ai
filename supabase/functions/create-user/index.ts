@@ -16,15 +16,101 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...headers, 'Content-Type': 'application/json' } });
     }
 
-    // Verify platform_admin role
-    // Use injected supabaseAdmin which is already service role
-    const { data: roleData } = await supabaseAdmin.from('user_roles').select('role').eq('user_id', user.id).eq('role', 'platform_admin').maybeSingle();
-    if (!roleData) {
-      return new Response(JSON.stringify({ error: 'Forbidden: platform_admin required' }), { status: 403, headers: { ...headers, 'Content-Type': 'application/json' } });
-    }
-
     const body = await req.json();
     const { email, password, first_name, last_name, phone, avatar_url, is_active, must_change_password, email_verified, role, tenant_id, franchise_id } = body;
+
+    const { data: requesterRoles, error: requesterRolesError } = await supabaseAdmin
+      .from('user_roles')
+      .select('role, tenant_id, franchise_id')
+      .eq('user_id', user.id);
+
+    if (requesterRolesError) {
+      logger.error('Failed to resolve requester roles', { error: requesterRolesError, userId: user.id });
+      return new Response(JSON.stringify({ error: 'Forbidden: cannot resolve requester role scope' }), { status: 403, headers: { ...headers, 'Content-Type': 'application/json' } });
+    }
+
+    const roles = requesterRoles || [];
+    const isPlatformAdmin = roles.some((r: any) => r.role === 'platform_admin');
+    const tenantAdminRoles = roles.filter((r: any) => r.role === 'tenant_admin');
+    const franchiseAdminRoles = roles.filter((r: any) => r.role === 'franchise_admin');
+
+    let finalTenantId: string | null = tenant_id || null;
+    let finalFranchiseId: string | null = franchise_id || null;
+    const targetRole = String(role || '').trim();
+
+    if (!isPlatformAdmin) {
+      const isTenantAdmin = tenantAdminRoles.length > 0;
+      const isFranchiseAdmin = franchiseAdminRoles.length > 0;
+
+      if (!isTenantAdmin && !isFranchiseAdmin) {
+        return new Response(JSON.stringify({ error: 'Forbidden: admin role required' }), { status: 403, headers: { ...headers, 'Content-Type': 'application/json' } });
+      }
+
+      if (isTenantAdmin) {
+        if (targetRole !== 'franchise_admin' && targetRole !== 'user') {
+          return new Response(JSON.stringify({ error: 'Forbidden: tenant admin can only create franchise_admin or user' }), { status: 403, headers: { ...headers, 'Content-Type': 'application/json' } });
+        }
+
+        const allowedTenantIds = new Set(
+          tenantAdminRoles
+            .map((r: any) => r.tenant_id)
+            .filter((id: string | null) => !!id)
+        );
+
+        if (allowedTenantIds.size === 0) {
+          return new Response(JSON.stringify({ error: 'Forbidden: tenant admin has no tenant scope' }), { status: 403, headers: { ...headers, 'Content-Type': 'application/json' } });
+        }
+
+        if (!finalTenantId) {
+          finalTenantId = Array.from(allowedTenantIds)[0] as string;
+        }
+
+        if (!finalTenantId || !allowedTenantIds.has(finalTenantId)) {
+          return new Response(JSON.stringify({ error: 'Forbidden: target tenant outside admin scope' }), { status: 403, headers: { ...headers, 'Content-Type': 'application/json' } });
+        }
+      } else if (isFranchiseAdmin) {
+        if (targetRole !== 'user') {
+          return new Response(JSON.stringify({ error: 'Forbidden: franchise admin can only create user role' }), { status: 403, headers: { ...headers, 'Content-Type': 'application/json' } });
+        }
+
+        const adminScope = franchiseAdminRoles[0];
+        if (!adminScope?.tenant_id || !adminScope?.franchise_id) {
+          return new Response(JSON.stringify({ error: 'Forbidden: franchise admin has invalid scope' }), { status: 403, headers: { ...headers, 'Content-Type': 'application/json' } });
+        }
+
+        finalTenantId = adminScope.tenant_id;
+        finalFranchiseId = adminScope.franchise_id;
+      }
+
+      if (targetRole === 'franchise_admin' || targetRole === 'user') {
+        if (!finalTenantId) {
+          return new Response(JSON.stringify({ error: 'Tenant is required for this role' }), { status: 400, headers: { ...headers, 'Content-Type': 'application/json' } });
+        }
+      }
+
+      if (targetRole === 'franchise_admin') {
+        if (!finalFranchiseId) {
+          return new Response(JSON.stringify({ error: 'Franchise is required for franchise_admin role' }), { status: 400, headers: { ...headers, 'Content-Type': 'application/json' } });
+        }
+      }
+    }
+
+    if (targetRole === 'franchise_admin' && finalFranchiseId) {
+      const { data: franchiseScope, error: franchiseScopeError } = await supabaseAdmin
+        .from('franchises')
+        .select('id, tenant_id')
+        .eq('id', finalFranchiseId)
+        .maybeSingle();
+
+      if (franchiseScopeError) {
+        logger.error('Failed to validate franchise scope', { error: franchiseScopeError, franchiseId: finalFranchiseId });
+        return new Response(JSON.stringify({ error: 'Unable to validate franchise scope' }), { status: 400, headers: { ...headers, 'Content-Type': 'application/json' } });
+      }
+
+      if (!franchiseScope || franchiseScope.tenant_id !== finalTenantId) {
+        return new Response(JSON.stringify({ error: 'Invalid tenant/franchise relationship' }), { status: 400, headers: { ...headers, 'Content-Type': 'application/json' } });
+      }
+    }
 
     logger.info('Creating new user', { email, role, tenant_id, franchise_id });
 
@@ -73,8 +159,8 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
       .insert({
         user_id: authData.user.id,
         role,
-        tenant_id: tenant_id || null,
-        franchise_id: franchise_id || null
+        tenant_id: finalTenantId,
+        franchise_id: finalFranchiseId
       });
 
     if (roleError) {

@@ -56,6 +56,16 @@ export default function Users() {
     try {
       // First, get the user IDs based on role context
       let userIds: string[] | null = null;
+      let platformAdminUserIds = new Set<string>();
+
+      if (!context.isPlatformAdmin) {
+        const { data: platformRoles } = await supabase
+          .from('user_roles')
+          .select('user_id')
+          .eq('role', 'platform_admin');
+
+        platformAdminUserIds = new Set((platformRoles || []).map((r: { user_id: string }) => r.user_id));
+      }
 
       // Only filter by user_roles if we are restricted (non-platform admin) 
       // OR if we are a platform admin with a SPECIFIC tenant override active.
@@ -105,7 +115,16 @@ export default function Users() {
         }))
       }));
 
-      setUsers(enrichedUsers || []);
+      const filteredUsers = (enrichedUsers || [])
+        .filter((user) => context.isPlatformAdmin || !platformAdminUserIds.has(user.id))
+        .map((user) => ({
+          ...user,
+          user_roles: context.isPlatformAdmin
+            ? user.user_roles
+            : (user.user_roles || []).filter((role: UserRole) => role.role !== 'platform_admin'),
+        }));
+
+      setUsers(filteredUsers);
     } catch (error: any) {
       toast({
         title: 'Error fetching users',
@@ -115,7 +134,7 @@ export default function Users() {
     } finally {
       setLoading(false);
     }
-  }, [context.isPlatformAdmin, context.adminOverrideEnabled, scopedDb, toast]);
+  }, [context.isPlatformAdmin, context.adminOverrideEnabled, scopedDb, supabase, toast]);
 
   useEffect(() => {
     fetchUsers();

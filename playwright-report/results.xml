@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 <testsuites id="" name="" tests="72" failures="0" skipped="6" errors="0" time="829.4005520000001">
 <testsuite name="tests/e2e/quotation/quotation-comprehensive.spec.ts" timestamp="2026-03-13T12:43:36.470Z" hostname="chromium" tests="12" failures="0" skipped="0" time="296.162" errors="0">
 <testcase name="Quotation module comprehensive e2e framework › validates required fields, formats, dependencies, and invalid submissions" classname="tests/e2e/quotation/quotation-comprehensive.spec.ts" time="13.852">
@@ -651,6 +652,13 @@
 <property name="step" value="2026-03-13T12:44:28.381Z Fill Quote reference with &quot;Concurrent-B&quot;">
 </property>
 </properties>
+=======
+<testsuites id="" name="" tests="1" failures="0" skipped="1" errors="0" time="0.09402599999999996">
+<testsuite name="dataentry/UserCreation.spec.ts" timestamp="2026-03-12T15:57:05.378Z" hostname="chromium" tests="1" failures="0" skipped="1" time="0" errors="0">
+<testcase name="Data Entry: User Creation (CSV) › create users from dataentry/CreateUsers_MGL.csv and update csv status" classname="dataentry/UserCreation.spec.ts" time="0">
+<skipped>
+</skipped>
+>>>>>>> 6ae8503fc91ccac2878cbfe02e7796240bb52aef
 </testcase>
 </testsuite>
 <testsuite name="tests/e2e/quotation/quotation-comprehensive.spec.ts" timestamp="2026-03-13T12:43:36.470Z" hostname="chrome-latest" tests="12" failures="0" skipped="0" time="267.832" errors="0">

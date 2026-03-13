@@ -1,9 +1,0 @@
-Email *,Temporary Password *,First Name *,Last Name *,Phone,Avatar URL,Active Status,Must Change Password,Override Email Verification,Role *
-cai_admin_001@gmail.com,Vimal@1234,Cai  Admin01,Cai User 001,,,on,off,on,Franchise Administrator
-cam_admin_001@gmail.com,Vimal@1234,Cam  Admin01,Cam User 001,,,on,off,on,Franchise Administrator
-cai_standard_user_002@gmail.com,Vimal@1234,Cai  User002,Cai  User002,,,on,off,on,Standard User
-cai_standard_user_003@gmail.com,Vimal@1234,Cai  User003,Cai  User003,,,on,off,on,Standard User
-cai_standard_user_004@gmail.com,Vimal@1234,Cai  User004,Cai  User004,,,on,off,on,Standard User
-cam_standard_user_002@gmail.com,Vimal@1234,Cam  User002,Cam  User002,,,on,off,on,Standard User
-cam_standard_user_003@gmail.com,Vimal@1234,Cam  User003,Cam  User003,,,on,off,on,Standard User
-cam_standard_user_004@gmail.com,Vimal@1234,Cam  User004,Cam  User004,,,on,off,on,Standard User
