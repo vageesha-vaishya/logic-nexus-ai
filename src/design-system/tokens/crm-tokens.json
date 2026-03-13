@@ -1,0 +1,72 @@
+{
+  "color": {
+    "primary": { "value": "217 91% 60%" },
+    "primaryForeground": { "value": "0 0% 100%" },
+    "secondary": { "value": "210 40% 96%" },
+    "secondaryForeground": { "value": "222 47% 11%" },
+    "danger": { "value": "0 84% 60%" },
+    "dangerForeground": { "value": "0 0% 100%" },
+    "success": { "value": "142 71% 45%" },
+    "warning": { "value": "38 92% 50%" },
+    "background": { "value": "0 0% 100%" },
+    "foreground": { "value": "222 47% 11%" },
+    "border": { "value": "214 32% 91%" },
+    "muted": { "value": "210 40% 96%" },
+    "mutedForeground": { "value": "215 16% 47%" }
+  },
+  "typography": {
+    "fontFamily": {
+      "sans": { "value": "\"Inter\", \"Segoe UI\", \"Roboto\", sans-serif" },
+      "mono": { "value": "\"JetBrains Mono\", \"SFMono-Regular\", monospace" }
+    },
+    "fontSize": {
+      "xs": { "value": "12px" },
+      "sm": { "value": "14px" },
+      "md": { "value": "16px" },
+      "lg": { "value": "18px" },
+      "xl": { "value": "20px" },
+      "2xl": { "value": "24px" }
+    },
+    "fontWeight": {
+      "regular": { "value": 400 },
+      "medium": { "value": 500 },
+      "semibold": { "value": 600 },
+      "bold": { "value": 700 }
+    },
+    "lineHeight": {
+      "tight": { "value": 1.2 },
+      "normal": { "value": 1.5 },
+      "relaxed": { "value": 1.7 }
+    }
+  },
+  "spacing": {
+    "0": { "value": "0px" },
+    "1": { "value": "4px" },
+    "2": { "value": "8px" },
+    "3": { "value": "12px" },
+    "4": { "value": "16px" },
+    "5": { "value": "20px" },
+    "6": { "value": "24px" },
+    "8": { "value": "32px" },
+    "10": { "value": "40px" },
+    "12": { "value": "48px" }
+  },
+  "elevation": {
+    "sm": { "value": "0 1px 2px 0 rgb(0 0 0 / 0.05)" },
+    "md": { "value": "0 4px 6px -1px rgb(0 0 0 / 0.1)" },
+    "lg": { "value": "0 10px 15px -3px rgb(0 0 0 / 0.12)" },
+    "xl": { "value": "0 20px 25px -5px rgb(0 0 0 / 0.16)" }
+  },
+  "motion": {
+    "durationFast": { "value": "150ms" },
+    "durationNormal": { "value": "250ms" },
+    "durationSlow": { "value": "350ms" },
+    "easingStandard": { "value": "cubic-bezier(0.4, 0, 0.2, 1)" },
+    "easingEmphasized": { "value": "cubic-bezier(0.2, 0, 0, 1)" }
+  },
+  "breakpoint": {
+    "mobile": { "value": "375px" },
+    "tablet": { "value": "768px" },
+    "desktop": { "value": "1280px" }
+  }
+}

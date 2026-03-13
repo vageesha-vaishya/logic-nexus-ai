@@ -1,0 +1,65 @@
+$crm-color-primary: 217 91% 60%;
+$crm-color-primary-foreground: 0 0% 100%;
+$crm-color-secondary: 210 40% 96%;
+$crm-color-secondary-foreground: 222 47% 11%;
+$crm-color-danger: 0 84% 60%;
+$crm-color-danger-foreground: 0 0% 100%;
+$crm-color-success: 142 71% 45%;
+$crm-color-warning: 38 92% 50%;
+$crm-color-background: 0 0% 100%;
+$crm-color-foreground: 222 47% 11%;
+$crm-color-border: 214 32% 91%;
+$crm-color-muted: 210 40% 96%;
+$crm-color-muted-foreground: 215 16% 47%;
+
+$crm-font-sans: "Inter", "Segoe UI", "Roboto", sans-serif;
+$crm-font-mono: "JetBrains Mono", "SFMono-Regular", monospace;
+
+$crm-spacing-0: 0px;
+$crm-spacing-1: 4px;
+$crm-spacing-2: 8px;
+$crm-spacing-3: 12px;
+$crm-spacing-4: 16px;
+$crm-spacing-5: 20px;
+$crm-spacing-6: 24px;
+$crm-spacing-8: 32px;
+$crm-spacing-10: 40px;
+$crm-spacing-12: 48px;
+
+$crm-elevation-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+$crm-elevation-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+$crm-elevation-lg: 0 10px 15px -3px rgb(0 0 0 / 0.12);
+$crm-elevation-xl: 0 20px 25px -5px rgb(0 0 0 / 0.16);
+
+$crm-motion-duration-fast: 150ms;
+$crm-motion-duration-normal: 250ms;
+$crm-motion-duration-slow: 350ms;
+$crm-motion-easing-standard: cubic-bezier(0.4, 0, 0.2, 1);
+$crm-motion-easing-emphasized: cubic-bezier(0.2, 0, 0, 1);
+
+$crm-breakpoint-mobile: 375px;
+$crm-breakpoint-tablet: 768px;
+$crm-breakpoint-desktop: 1280px;
+
+:root {
+  --crm-color-primary: #{$crm-color-primary};
+  --crm-color-primary-foreground: #{$crm-color-primary-foreground};
+  --crm-color-secondary: #{$crm-color-secondary};
+  --crm-color-secondary-foreground: #{$crm-color-secondary-foreground};
+  --crm-color-danger: #{$crm-color-danger};
+  --crm-color-danger-foreground: #{$crm-color-danger-foreground};
+  --crm-color-success: #{$crm-color-success};
+  --crm-color-warning: #{$crm-color-warning};
+  --crm-color-background: #{$crm-color-background};
+  --crm-color-foreground: #{$crm-color-foreground};
+  --crm-color-border: #{$crm-color-border};
+  --crm-color-muted: #{$crm-color-muted};
+  --crm-color-muted-foreground: #{$crm-color-muted-foreground};
+  --crm-font-sans: #{$crm-font-sans};
+  --crm-font-mono: #{$crm-font-mono};
+  --crm-motion-duration-fast: #{$crm-motion-duration-fast};
+  --crm-motion-duration-normal: #{$crm-motion-duration-normal};
+  --crm-motion-duration-slow: #{$crm-motion-duration-slow};
+  --crm-motion-easing-standard: #{$crm-motion-easing-standard};
+  --crm-motion-easing-emphasized: #{$crm-motion-easing-emphasized};
+}

@@ -1,5 +1,4 @@
-import type { StorybookConfig } from '@storybook/react-vite';
-import type { UserConfig } from 'vite';
+import type { StorybookConfig } from '@storybook/react-webpack5';
 import path from 'path';
 
 const config: StorybookConfig = {
@@ -10,27 +9,27 @@ const config: StorybookConfig = {
   addons: [
     '@storybook/addon-essentials',
     '@storybook/addon-a11y',
-    '@storybook/addon-viewport'
+    'storybook-addon-designs',
+    '@chromatic-com/storybook'
   ],
   framework: {
-    name: '@storybook/react-vite',
+    name: '@storybook/react-webpack5',
     options: {}
+  },
+  core: {
+    builder: '@storybook/builder-webpack5'
   },
   docs: {
     defaultName: 'Docs'
   },
-  viteFinal: async (config: UserConfig) => {
+  webpackFinal: async (config: any) => {
     config.resolve = config.resolve || {};
     config.resolve.alias = {
       ...(config.resolve.alias || {}),
-      '@': path.resolve(__dirname, '../src'),
-    };
-    config.optimizeDeps = {
-      ...(config.optimizeDeps || {}),
-      include: ['react', 'react-dom', '@tanstack/react-query'],
+      '@': path.resolve(__dirname, '../src')
     };
     return config;
-  },
+  }
 };
 
 export default config;
