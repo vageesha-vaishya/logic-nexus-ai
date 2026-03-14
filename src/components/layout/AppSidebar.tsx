@@ -105,8 +105,7 @@ export function AppSidebar() {
 
       <Sidebar 
         className={cn(
-          "border-r transition-all duration-300 ease-[cubic-bezier(0.4,0.0,0.2,1)] z-50",
-          collapsed ? 'w-0 -translate-x-full lg:w-[60px] lg:translate-x-0 overflow-hidden' : 'w-[280px] translate-x-0'
+          "z-50 shrink-0 border-r transition-[width,left,right] duration-300 ease-[cubic-bezier(0.4,0.0,0.2,1)]"
         )} 
         collapsible="icon"
       >
@@ -123,7 +122,7 @@ export function AppSidebar() {
           )}
         </SidebarHeader>
 
-        <SidebarContent ref={scrollRef} className="py-2">
+        <SidebarContent ref={scrollRef} className="py-2 pr-1">
           <CommandCenterNav />
         </SidebarContent>
 
