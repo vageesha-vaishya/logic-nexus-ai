@@ -38,6 +38,7 @@ export const OBJECT_GROUPS: ObjectGroup[] = [
       { name: 'Lead Assignment', to: '/dashboard/lead-assignment', icon: GitBranch, description: 'Distribute inbound leads' },
       { name: 'Lead Routing', to: '/dashboard/lead-routing', icon: GitBranch, description: 'Rules for auto-routing' },
       { name: 'Tenants', to: '/dashboard/tenants', icon: FileText, description: 'Multi-tenant administration' },
+      { name: 'Onboarding Operations', to: '/dashboard/onboarding-operations', icon: Shield, description: 'Support queue, SLA and risk monitoring' },
       { name: 'Franchises', to: '/dashboard/franchises', icon: Package, description: 'Franchise entities' },
       { name: 'Transfer Center', to: '/dashboard/transfers', icon: ArrowRightLeft, description: 'Move records between entities' },
       { name: 'Users', to: '/dashboard/users', icon: Users, description: 'Manage users and roles' },

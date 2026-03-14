@@ -115,6 +115,7 @@ export const APP_MENU: MenuModule[] = [
     label: 'Administration',
     items: [
       { name: 'Tenants', path: '/dashboard/tenants', icon: Building2, description: 'Manage tenants', roles: ['platform_admin'] },
+      { name: 'Onboarding Operations', path: '/dashboard/onboarding-operations', icon: ShieldAlert, description: 'Support queue, SLA and risk monitoring', roles: ['platform_admin', 'tenant_admin'], permissions: ['admin.settings.manage'] },
       { name: 'Franchises', path: '/dashboard/franchises', icon: Package, description: 'Franchise entities', roles: ['platform_admin', 'tenant_admin'] },
       { name: 'Users', path: '/dashboard/users', icon: Users, description: 'Manage users and roles', permissions: ['admin.users.manage'] },
       { name: 'Transfer Center', path: '/dashboard/transfers', icon: ArrowRightLeft, description: 'Move records between entities', permissions: ['transfers.view'] },

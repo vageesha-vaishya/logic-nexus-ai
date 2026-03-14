@@ -60,6 +60,7 @@ const OpportunityDetail = lazy(() => import("./pages/dashboard/OpportunityDetail
 const OpportunitiesPipeline = lazy(() => import("./pages/dashboard/OpportunitiesPipeline"));
 const LeadRouting = lazy(() => import("./pages/dashboard/LeadRouting"));
 const QueueManagement = lazy(() => import("./pages/dashboard/QueueManagement"));
+const OnboardingOperations = lazy(() => import("./pages/dashboard/OnboardingOperations"));
 const LeadAssignment = lazy(() => import("./pages/dashboard/LeadAssignment"));
 const EmailManagement = lazy(() => import("./pages/dashboard/EmailManagement"));
 const CommunicationsHub = lazy(() => import("./pages/dashboard/CommunicationsHub"));
@@ -563,6 +564,14 @@ const App = () => (
               element={
                 <ProtectedRoute requiredPermissions={["admin.lead_routing.manage"]}>
                   <QueueManagement />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/dashboard/onboarding-operations" 
+              element={
+                <ProtectedRoute requiredPermissions={["admin.settings.manage"]}>
+                  <OnboardingOperations />
                 </ProtectedRoute>
               } 
             />
