@@ -18,6 +18,7 @@ import { DomainService, PlatformDomain } from '@/services/DomainService';
 import { useCRM } from '@/hooks/useCRM';
 import { invokeFunction } from '@/lib/supabase-functions';
 import { calculateScaledPrice } from '@/utils/subscriptionScaling';
+import { THEME_PRESETS } from '@/theme/themes';
 
 const tenantSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
@@ -68,6 +69,12 @@ const tenantSchema = z.object({
   requested_user_count: z.string().optional(),
   requested_franchise_count: z.string().optional(),
   payment_provider: z.string().optional(),
+  verify_domain_immediately: z.boolean().default(true),
+  login_template_name: z.string().optional(),
+  personalization_target: z.string().optional(),
+  welcome_kit_email: z.string().email('Invalid email').optional().or(z.literal('')),
+  trigger_guided_tour: z.boolean().default(true),
+  auto_create_onboarding_checklist: z.boolean().default(true),
 });
 
 type TenantFormValues = z.infer<typeof tenantSchema>;
@@ -100,6 +107,13 @@ interface ActiveSubscription {
   metadata: any;
 }
 
+interface OnboardingPhase2Result {
+  integrated: boolean;
+  message: string | null;
+  paymentRequired?: boolean;
+  paymentVerified?: boolean;
+}
+
 export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -127,6 +141,10 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
       phase2: {
         ...((existing || {}).phase2 || {}),
         ...((next || {}).phase2 || {}),
+      },
+      phase3: {
+        ...((existing || {}).phase3 || {}),
+        ...((next || {}).phase3 || {}),
       },
     };
   };
@@ -178,10 +196,10 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
     tenantName: string;
     values: TenantFormValues;
     userId: string | null;
-  }) => {
+  }): Promise<OnboardingPhase2Result> => {
     const selectedPlanId = (values.selected_plan_id || '').trim();
     if (!selectedPlanId) {
-      return { integrated: false, message: null as string | null };
+      return { integrated: false, message: null, paymentRequired: false, paymentVerified: false };
     }
 
     const selectedPlan = availablePlans.find((p) => p.id === selectedPlanId);
@@ -298,6 +316,8 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
       return {
         integrated: true,
         message: 'Free plan activated. Onboarding moved to provisioning.',
+        paymentRequired: false,
+        paymentVerified: true,
       };
     }
 
@@ -359,6 +379,8 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
       return {
         integrated: true,
         message: 'Plan saved but payment setup needs support assistance.',
+        paymentRequired: true,
+        paymentVerified: false,
       };
     }
 
@@ -408,6 +430,318 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
       message: paymentUrl
         ? `Payment session created. Complete payment using: ${paymentUrl}`
         : 'Payment session created and awaiting completion.',
+      paymentRequired: true,
+      paymentVerified: false,
+    };
+  };
+
+  const applyPhase3DomainPersonalizationWelcome = async ({
+    tenantId,
+    tenantName,
+    values,
+    userId,
+    phase2Result,
+  }: {
+    tenantId: string;
+    tenantName: string;
+    values: TenantFormValues;
+    userId: string | null;
+    phase2Result: OnboardingPhase2Result;
+  }) => {
+    const domainName = (values.domain || '').trim().toLowerCase();
+    const shouldVerifyDomain = values.verify_domain_immediately ?? true;
+    const selectedTemplateName = (values.login_template_name || '').trim();
+    const personalizationTarget = values.personalization_target === 'franchise' ? 'franchise' : 'tenant';
+    const welcomeKitEmail = (values.welcome_kit_email || values.contact_primary_email || '').trim();
+    const shouldStartGuidedTour = values.trigger_guided_tour ?? true;
+    const shouldCreateChecklist = values.auto_create_onboarding_checklist ?? true;
+
+    if (phase2Result.paymentRequired && !phase2Result.paymentVerified) {
+      await upsertOnboardingSession(tenantId, userId, {
+        status: 'payment_pending',
+        current_step: 'payment',
+        step_payloads: {
+          phase3: {
+            queued_after_payment: true,
+            domain_name: domainName || null,
+            template_name: selectedTemplateName || null,
+            personalization_target: personalizationTarget,
+            welcome_kit_email: welcomeKitEmail || null,
+            guided_tour_enabled: shouldStartGuidedTour,
+            checklist_requested: shouldCreateChecklist,
+          },
+        },
+      });
+      return {
+        integrated: false,
+        message: 'Phase 3 preferences saved and queued until payment is verified.',
+      };
+    }
+
+    let domainProvisioningRequested = false;
+    let domainVerified = false;
+    let domainRecordId: string | null = null;
+    let domainFailureReason: string | null = null;
+
+    if (domainName) {
+      domainProvisioningRequested = true;
+      try {
+        const { data: existingDomain, error: existingDomainError } = await scopedDb
+          .from('tenant_domains')
+          .select('id, domain_name, is_verified')
+          .eq('tenant_id', tenantId)
+          .eq('domain_name', domainName)
+          .maybeSingle();
+        if (existingDomainError) throw existingDomainError;
+
+        if (existingDomain?.id) {
+          domainRecordId = existingDomain.id;
+          domainVerified = Boolean(existingDomain.is_verified);
+        } else {
+          const { data: registerData, error: registerError } = await invokeFunction<any>('domains-register', {
+            body: { domain_name: domainName, tenant_id: tenantId },
+          });
+          if (registerError) throw registerError;
+          if (registerData?.error) throw new Error(registerData.error);
+          domainRecordId = registerData?.domain?.id || null;
+          domainVerified = Boolean(registerData?.domain?.is_verified);
+        }
+
+        if (shouldVerifyDomain && domainRecordId) {
+          const { data: verifyData, error: verifyError } = await invokeFunction<any>('domains-verify', {
+            body: { domain_id: domainRecordId },
+          });
+          if (verifyError) throw verifyError;
+          if (verifyData?.error) throw new Error(verifyData.error);
+          domainVerified = Boolean(
+            verifyData?.results?.spf &&
+            verifyData?.results?.dmarc &&
+            verifyData?.results?.dkim
+          );
+        }
+      } catch (error: any) {
+        domainFailureReason = error?.message || 'Domain provisioning failed';
+      }
+    }
+
+    if (domainFailureReason) {
+      await upsertOnboardingSession(tenantId, userId, {
+        status: 'support_assisted',
+        current_step: 'domain_provisioning',
+        failure_reason: domainFailureReason,
+        step_payloads: {
+          phase3: {
+            domain_provisioning_requested: true,
+            domain_verified: false,
+            domain_name: domainName,
+            domain_id: domainRecordId,
+          },
+        },
+      });
+      await scopedDb
+        .from('activities')
+        .insert({
+          activity_type: 'task',
+          status: 'open',
+          priority: 'high',
+          subject: 'Domain provisioning support required during tenant onboarding',
+          description: `Domain provisioning failed for tenant ${tenantName}. Reason: ${domainFailureReason}`,
+          tenant_id: tenantId,
+          franchise_id: null,
+          account_id: null,
+          contact_id: null,
+          lead_id: null,
+          created_by: userId,
+        } as any);
+      return {
+        integrated: true,
+        message: 'Domain provisioning requires support assistance.',
+      };
+    }
+
+    let personalizationPublished = false;
+    if (selectedTemplateName) {
+      const selectedPreset = THEME_PRESETS.find((preset) => preset.name === selectedTemplateName);
+      if (!selectedPreset) {
+        throw new Error('Selected login template is unavailable');
+      }
+
+      const tokens = {
+        start: selectedPreset.start,
+        end: selectedPreset.end,
+        primary: selectedPreset.primary,
+        accent: selectedPreset.accent,
+        angle: selectedPreset.angle,
+        radius: selectedPreset.radius,
+        sidebarBackground: selectedPreset.sidebarBackground,
+        sidebarAccent: selectedPreset.sidebarAccent,
+        dark: selectedPreset.dark,
+        bgStart: selectedPreset.bgStart,
+        bgEnd: selectedPreset.bgEnd,
+        bgAngle: selectedPreset.bgAngle,
+        onboarding_target_scope: personalizationTarget,
+        preview_mode: true,
+        onboarding_phase: 'phase3',
+      };
+
+      await scopedDb
+        .from('ui_themes')
+        .update({ is_default: false })
+        .eq('scope', 'tenant')
+        .eq('tenant_id', tenantId);
+
+      await scopedDb
+        .from('ui_themes')
+        .delete()
+        .eq('scope', 'tenant')
+        .eq('tenant_id', tenantId)
+        .eq('name', selectedTemplateName);
+
+      const { error: themeInsertError } = await scopedDb
+        .from('ui_themes')
+        .insert({
+          name: selectedTemplateName,
+          scope: 'tenant',
+          tenant_id: tenantId,
+          franchise_id: null,
+          user_id: null,
+          is_active: true,
+          is_default: true,
+          tokens,
+        } as any);
+      if (themeInsertError) throw themeInsertError;
+      personalizationPublished = true;
+    }
+
+    if (shouldCreateChecklist) {
+      await scopedDb
+        .from('activities')
+        .insert([
+          {
+            activity_type: 'task',
+            status: 'open',
+            priority: 'medium',
+            subject: 'Welcome checklist: create first franchise',
+            description: `Create the first franchise for tenant ${tenantName} to complete activation.`,
+            tenant_id: tenantId,
+            franchise_id: null,
+            account_id: null,
+            contact_id: null,
+            lead_id: null,
+            created_by: userId,
+          },
+          {
+            activity_type: 'task',
+            status: 'open',
+            priority: 'medium',
+            subject: 'Welcome checklist: invite users',
+            description: `Invite users and assign roles for tenant ${tenantName}.`,
+            tenant_id: tenantId,
+            franchise_id: null,
+            account_id: null,
+            contact_id: null,
+            lead_id: null,
+            created_by: userId,
+          },
+          {
+            activity_type: 'task',
+            status: 'open',
+            priority: 'medium',
+            subject: 'Welcome checklist: connect communication channels',
+            description: `Configure email, WhatsApp, Telegram, X, phone, and webhook channels for tenant ${tenantName}.`,
+            tenant_id: tenantId,
+            franchise_id: null,
+            account_id: null,
+            contact_id: null,
+            lead_id: null,
+            created_by: userId,
+          },
+        ] as any);
+    }
+
+    await scopedDb
+      .from('activities')
+      .insert({
+        activity_type: 'note',
+        status: 'completed',
+        priority: 'low',
+        subject: 'Welcome kit initiated',
+        description: welcomeKitEmail
+          ? `Welcome kit initiated for ${tenantName}. Target email: ${welcomeKitEmail}. Guided tour ${shouldStartGuidedTour ? 'enabled' : 'disabled'}.`
+          : `Welcome kit initiated for ${tenantName}. Guided tour ${shouldStartGuidedTour ? 'enabled' : 'disabled'}.`,
+        tenant_id: tenantId,
+        franchise_id: null,
+        account_id: null,
+        contact_id: null,
+        lead_id: null,
+        created_by: userId,
+      } as any);
+
+    const { data: tenantSettingsRow } = await scopedDb
+      .from('tenants')
+      .select('settings')
+      .eq('id', tenantId)
+      .maybeSingle();
+    const currentSettings = (tenantSettingsRow?.settings || {}) as any;
+    const onboardingFlags = {
+      ...(currentSettings?.onboarding_flags || {}),
+      domain_provisioning_requested: domainProvisioningRequested,
+      domain_verified: domainVerified,
+      personalization_published: personalizationPublished,
+      welcome_kit_initiated: true,
+      guided_tour_enabled: shouldStartGuidedTour,
+      phase3_completed: (!domainName || !shouldVerifyDomain || domainVerified),
+    };
+    const nextSettings = {
+      ...currentSettings,
+      onboarding_flags: onboardingFlags,
+      personalization: {
+        ...(currentSettings?.personalization || {}),
+        template_name: selectedTemplateName || currentSettings?.personalization?.template_name || null,
+        target_scope: personalizationTarget,
+        preview_mode: true,
+      },
+      welcome_kit: {
+        ...(currentSettings?.welcome_kit || {}),
+        initiated: true,
+        email: welcomeKitEmail || currentSettings?.welcome_kit?.email || null,
+        guided_tour_enabled: shouldStartGuidedTour,
+        checklist_created: shouldCreateChecklist,
+      },
+    };
+    await scopedDb
+      .from('tenants')
+      .update({ settings: nextSettings })
+      .eq('id', tenantId);
+
+    const phase3Complete = !domainName || !shouldVerifyDomain || domainVerified;
+    await upsertOnboardingSession(tenantId, userId, {
+      status: phase3Complete ? 'active' : 'provisioning',
+      current_step: phase3Complete ? 'welcome_kit' : 'domain_provisioning',
+      completed_at: phase3Complete ? new Date().toISOString() : null,
+      step_payloads: {
+        phase3: {
+          domain_provisioning_requested: domainProvisioningRequested,
+          domain_verified: domainVerified,
+          domain_name: domainName || null,
+          domain_id: domainRecordId,
+          template_name: selectedTemplateName || null,
+          personalization_target: personalizationTarget,
+          personalization_published: personalizationPublished,
+          welcome_kit_initiated: true,
+          welcome_kit_email: welcomeKitEmail || null,
+          guided_tour_enabled: shouldStartGuidedTour,
+          checklist_created: shouldCreateChecklist,
+          phase3_completed: phase3Complete,
+        },
+      },
+    });
+
+    return {
+      integrated: true,
+      message: phase3Complete
+        ? 'Domain, personalization, and welcome kit completed.'
+        : 'Domain setup is pending verification. Personalization and welcome kit are initiated.',
     };
   };
 
@@ -565,6 +899,12 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
       requested_user_count: '',
       requested_franchise_count: '',
       payment_provider: 'mock',
+      verify_domain_immediately: true,
+      login_template_name: 'Default Simple',
+      personalization_target: 'tenant',
+      welcome_kit_email: tenant?.settings?.contacts?.primary?.email || '',
+      trigger_guided_tour: true,
+      auto_create_onboarding_checklist: true,
     },
   });
 
@@ -777,6 +1117,13 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
           values,
           userId,
         });
+        const phase3Result = await applyPhase3DomainPersonalizationWelcome({
+          tenantId: tenant.id,
+          tenantName: data.name,
+          values,
+          userId,
+          phase2Result,
+        });
 
         const { error: actErr } = await scopedDb
           .from('activities')
@@ -799,7 +1146,7 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
 
         toast({
           title: 'Success',
-          description: phase2Result.message || 'Tenant updated successfully',
+          description: [phase2Result.message, phase3Result.message].filter(Boolean).join(' ') || 'Tenant updated successfully',
         });
         onSuccess?.();
       } else {
@@ -849,6 +1196,13 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
           values,
           userId,
         });
+        const phase3Result = await applyPhase3DomainPersonalizationWelcome({
+          tenantId: createdTenant.id,
+          tenantName: createdTenant.name,
+          values,
+          userId,
+          phase2Result,
+        });
 
         const { error: actErr } = await scopedDb
           .from('activities')
@@ -871,7 +1225,7 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
 
         toast({
           title: 'Success',
-          description: phase2Result.message || 'Tenant created successfully',
+          description: [phase2Result.message, phase3Result.message].filter(Boolean).join(' ') || 'Tenant created successfully',
         });
         navigate('/dashboard/tenants');
       }
@@ -899,6 +1253,7 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
               { id: 'legal-tax', label: 'Legal & Tax' },
               { id: 'residency', label: 'Data Residency' },
               { id: 'plan-payment', label: 'Plan & Payment' },
+              { id: 'domain-personalization-welcome', label: 'Domain + Personalization + Welcome' },
               { id: 'demographics', label: 'Demographics' },
               { id: 'contacts', label: 'Contacts' },
               { id: 'channels', label: 'Channels' },
@@ -1309,6 +1664,123 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
               Existing active subscription detected and will be replaced after confirmation.
             </div>
           )}
+        </FormSection>
+        <Separator />
+        <FormSection title="Domain, Personalization, and Welcome">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField
+              control={form.control}
+              name="verify_domain_immediately"
+              render={({ field }) => (
+                <FormItem className="flex items-center justify-between rounded-lg border p-4">
+                  <div className="space-y-0.5">
+                    <FormLabel>Verify Domain Immediately</FormLabel>
+                    <div className="text-sm text-muted-foreground">
+                      Run provisioning verification as part of onboarding submission
+                    </div>
+                  </div>
+                  <FormControl>
+                    <Switch checked={field.value} onCheckedChange={field.onChange} />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="personalization_target"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Personalization Target</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value || 'tenant'}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select target scope" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="tenant">Tenant Login</SelectItem>
+                      <SelectItem value="franchise">Franchise Login</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+          <FormField
+            control={form.control}
+            name="login_template_name"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Login Template</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value || ''}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select template preset" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {THEME_PRESETS.map((preset) => (
+                      <SelectItem key={preset.name} value={preset.name}>
+                        {preset.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormDescription>Template is saved in preview mode and published to tenant scope.</FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField
+              control={form.control}
+              name="welcome_kit_email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Welcome Kit Email</FormLabel>
+                  <FormControl>
+                    <Input placeholder="admin@tenant.com" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="auto_create_onboarding_checklist"
+              render={({ field }) => (
+                <FormItem className="flex items-center justify-between rounded-lg border p-4">
+                  <div className="space-y-0.5">
+                    <FormLabel>Create Activation Checklist</FormLabel>
+                    <div className="text-sm text-muted-foreground">
+                      Auto-create onboarding checklist tasks for tenant admins
+                    </div>
+                  </div>
+                  <FormControl>
+                    <Switch checked={field.value} onCheckedChange={field.onChange} />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+          </div>
+          <FormField
+            control={form.control}
+            name="trigger_guided_tour"
+            render={({ field }) => (
+              <FormItem className="flex items-center justify-between rounded-lg border p-4">
+                <div className="space-y-0.5">
+                  <FormLabel>Enable Guided Tour</FormLabel>
+                  <div className="text-sm text-muted-foreground">
+                    Mark first-login guided tour as enabled in welcome kit settings
+                  </div>
+                </div>
+                <FormControl>
+                  <Switch checked={field.value} onCheckedChange={field.onChange} />
+                </FormControl>
+              </FormItem>
+            )}
+          />
         </FormSection>
         <Separator />
         <FormSection title="Demographics">
