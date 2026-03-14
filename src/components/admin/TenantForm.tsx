@@ -16,6 +16,8 @@ import { FormStepper } from '@/components/system/FormStepper';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DomainService, PlatformDomain } from '@/services/DomainService';
 import { useCRM } from '@/hooks/useCRM';
+import { invokeFunction } from '@/lib/supabase-functions';
+import { calculateScaledPrice } from '@/utils/subscriptionScaling';
 
 const tenantSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
@@ -61,6 +63,11 @@ const tenantSchema = z.object({
   data_residency_encryption_required: z.boolean().default(true),
   support_preferred_channel: z.string().optional(),
   support_escalation_level: z.string().optional(),
+  selected_plan_id: z.string().optional(),
+  selected_billing_period: z.string().optional(),
+  requested_user_count: z.string().optional(),
+  requested_franchise_count: z.string().optional(),
+  payment_provider: z.string().optional(),
 });
 
 type TenantFormValues = z.infer<typeof tenantSchema>;
@@ -68,6 +75,29 @@ type TenantFormValues = z.infer<typeof tenantSchema>;
 interface TenantFormProps {
   tenant?: any;
   onSuccess?: () => void;
+}
+
+interface SubscriptionPlan {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string | null;
+  tier: string | null;
+  price_monthly: number;
+  price_annual: number | null;
+  currency: string;
+  billing_period: string;
+  is_active: boolean;
+  user_scaling_factor?: number | null;
+  min_users?: number | null;
+  max_users?: number | null;
+}
+
+interface ActiveSubscription {
+  id: string;
+  plan_id: string;
+  status: string;
+  metadata: any;
 }
 
 export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
@@ -78,6 +108,308 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
   const [pendingData, setPendingData] = useState<TenantFormValues | null>(null);
   const [domains, setDomains] = useState<PlatformDomain[]>([]);
   const [tenantProfile, setTenantProfile] = useState<any>(null);
+  const [availablePlans, setAvailablePlans] = useState<SubscriptionPlan[]>([]);
+  const [activeSubscription, setActiveSubscription] = useState<ActiveSubscription | null>(null);
+
+  const parseRequestedCount = (value?: string) => {
+    const parsed = Number.parseInt(String(value || '').trim(), 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+  };
+
+  const mergeStepPayloads = (existing: any, next: any) => {
+    return {
+      ...(existing || {}),
+      ...(next || {}),
+      phase1: {
+        ...((existing || {}).phase1 || {}),
+        ...((next || {}).phase1 || {}),
+      },
+      phase2: {
+        ...((existing || {}).phase2 || {}),
+        ...((next || {}).phase2 || {}),
+      },
+    };
+  };
+
+  const upsertOnboardingSession = async (
+    tenantId: string,
+    userId: string | null,
+    sessionPatch: {
+      status: string;
+      current_step: string;
+      completed_at?: string | null;
+      failure_reason?: string | null;
+      step_payloads?: any;
+    }
+  ) => {
+    const { data: existingSession } = await scopedDb
+      .from('tenant_onboarding_sessions')
+      .select('step_payloads')
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+
+    const mergedPayloads = mergeStepPayloads(existingSession?.step_payloads || {}, sessionPatch.step_payloads || {});
+
+    const { error } = await scopedDb
+      .from('tenant_onboarding_sessions')
+      .upsert(
+        {
+          tenant_id: tenantId,
+          status: sessionPatch.status,
+          current_step: sessionPatch.current_step,
+          started_by: userId,
+          step_payloads: mergedPayloads,
+          failure_reason: sessionPatch.failure_reason || null,
+          completed_at: sessionPatch.completed_at === undefined ? null : sessionPatch.completed_at,
+        },
+        { onConflict: 'tenant_id' }
+      );
+
+    if (error) throw error;
+  };
+
+  const applyPhase2PlanAndPayment = async ({
+    tenantId,
+    tenantName,
+    values,
+    userId,
+  }: {
+    tenantId: string;
+    tenantName: string;
+    values: TenantFormValues;
+    userId: string | null;
+  }) => {
+    const selectedPlanId = (values.selected_plan_id || '').trim();
+    if (!selectedPlanId) {
+      return { integrated: false, message: null as string | null };
+    }
+
+    const selectedPlan = availablePlans.find((p) => p.id === selectedPlanId);
+    if (!selectedPlan) {
+      throw new Error('Selected subscription plan is unavailable');
+    }
+
+    const billingPeriod = values.selected_billing_period === 'annual' ? 'annual' : 'monthly';
+    const paymentProvider = (values.payment_provider || 'mock').trim() || 'mock';
+    const requestedUserCount = parseRequestedCount(values.requested_user_count);
+    const requestedFranchiseCount = parseRequestedCount(values.requested_franchise_count);
+    const baseMonthly = Number(selectedPlan.price_monthly || 0);
+    const scalingResult = calculateScaledPrice(
+      {
+        price_monthly: baseMonthly,
+        user_scaling_factor: Number(selectedPlan.user_scaling_factor ?? 0),
+        min_users: Number(selectedPlan.min_users ?? 0),
+        max_users: selectedPlan.max_users ?? null,
+      },
+      requestedUserCount
+    );
+    const amountDue = Number((billingPeriod === 'annual' ? scalingResult.annual_price : scalingResult.monthly_price).toFixed(2));
+    const currency = (selectedPlan.currency || 'USD').toUpperCase();
+    const isFreePlan = (selectedPlan.tier || '').toLowerCase() === 'free' || amountDue <= 0;
+    const nowIso = new Date().toISOString();
+    const periodMs = billingPeriod === 'annual' ? 365 * 24 * 60 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000;
+    const periodEndIso = new Date(Date.now() + periodMs).toISOString();
+    const dueDateIso = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+    await scopedDb
+      .from('tenant_subscriptions')
+      .update({
+        status: 'canceled',
+        canceled_at: nowIso,
+      })
+      .eq('tenant_id', tenantId)
+      .eq('status', 'active');
+
+    const { data: createdSubscription, error: subscriptionError } = await scopedDb
+      .from('tenant_subscriptions')
+      .insert({
+        tenant_id: tenantId,
+        plan_id: selectedPlan.id,
+        status: isFreePlan ? 'active' : 'trial',
+        current_period_start: nowIso,
+        current_period_end: periodEndIso,
+        metadata: {
+          source: 'tenant_onboarding_phase2',
+          billing_period: billingPeriod,
+          payment_provider: paymentProvider,
+          payment_status: isFreePlan ? 'not_required' : 'pending',
+          requested_user_count: requestedUserCount,
+          requested_franchise_count: requestedFranchiseCount,
+          plan_slug: selectedPlan.slug,
+          plan_tier: selectedPlan.tier,
+        },
+      })
+      .select('id')
+      .single();
+
+    if (subscriptionError) throw subscriptionError;
+
+    const { error: invoiceError } = await scopedDb
+      .from('subscription_invoices')
+      .insert({
+        tenant_id: tenantId,
+        subscription_id: createdSubscription.id,
+        invoice_number: `ONB-${Date.now()}`,
+        amount_due: amountDue,
+        amount_paid: isFreePlan ? amountDue : 0,
+        currency,
+        status: isFreePlan ? 'paid' : 'open',
+        due_date: isFreePlan ? null : dueDateIso,
+        paid_at: isFreePlan ? nowIso : null,
+        billing_reason: 'onboarding_plan_selection',
+        metadata: {
+          onboarding_phase: 'phase2',
+          plan_id: selectedPlan.id,
+          plan_name: selectedPlan.name,
+          billing_period: billingPeriod,
+          requested_user_count: requestedUserCount,
+          requested_franchise_count: requestedFranchiseCount,
+          payment_provider: paymentProvider,
+        },
+      });
+    if (invoiceError) throw invoiceError;
+
+    const allowedTiers = ['free', 'basic', 'starter', 'business', 'professional', 'enterprise'];
+    const normalizedTier = (selectedPlan.tier || '').toLowerCase();
+    const derivedTier = allowedTiers.includes(normalizedTier) ? normalizedTier : null;
+    if (derivedTier) {
+      await scopedDb
+        .from('tenants')
+        .update({ subscription_tier: derivedTier })
+        .eq('id', tenantId);
+    }
+
+    if (isFreePlan) {
+      await upsertOnboardingSession(tenantId, userId, {
+        status: 'provisioning',
+        current_step: 'domain_provisioning',
+        step_payloads: {
+          phase2: {
+            plan_selected: true,
+            payment_required: false,
+            payment_verified: true,
+            subscription_id: createdSubscription.id,
+            plan_id: selectedPlan.id,
+            amount_due: amountDue,
+            currency,
+          },
+        },
+      });
+      return {
+        integrated: true,
+        message: 'Free plan activated. Onboarding moved to provisioning.',
+      };
+    }
+
+    const { data: orchestratorData, error: orchestratorError } = await invokeFunction<{
+      success: boolean;
+      payment_session_id?: string;
+      payment_url?: string;
+      provider_metadata?: any;
+      message?: string;
+    }>('tenant-onboarding-orchestrator', {
+      body: {
+        action: 'create_payment_session',
+        tenant_id: tenantId,
+        subscription_id: createdSubscription.id,
+        plan_id: selectedPlan.id,
+        amount_due: amountDue,
+        currency,
+        billing_period: billingPeriod,
+        payment_provider: paymentProvider,
+        requested_user_count: requestedUserCount,
+        requested_franchise_count: requestedFranchiseCount,
+      },
+    });
+
+    if (orchestratorError || !orchestratorData?.success) {
+      const reason = orchestratorError?.message || orchestratorData?.message || 'Payment session creation failed';
+      await upsertOnboardingSession(tenantId, userId, {
+        status: 'support_assisted',
+        current_step: 'payment',
+        failure_reason: reason,
+        step_payloads: {
+          phase2: {
+            plan_selected: true,
+            payment_required: true,
+            payment_verified: false,
+            payment_session_creation_failed: true,
+            subscription_id: createdSubscription.id,
+            plan_id: selectedPlan.id,
+            amount_due: amountDue,
+            currency,
+          },
+        },
+      });
+      await scopedDb
+        .from('activities')
+        .insert({
+          activity_type: 'task',
+          status: 'open',
+          priority: 'high',
+          subject: 'Payment support required during tenant onboarding',
+          description: `Payment session creation failed for tenant ${tenantName}. Reason: ${reason}`,
+          tenant_id: tenantId,
+          franchise_id: null,
+          account_id: null,
+          contact_id: null,
+          lead_id: null,
+          created_by: userId,
+        } as any);
+      return {
+        integrated: true,
+        message: 'Plan saved but payment setup needs support assistance.',
+      };
+    }
+
+    const paymentSessionId = orchestratorData.payment_session_id || null;
+    const paymentUrl = orchestratorData.payment_url || null;
+    const providerMetadata = orchestratorData.provider_metadata || null;
+
+    await scopedDb
+      .from('tenant_subscriptions')
+      .update({
+        metadata: {
+          source: 'tenant_onboarding_phase2',
+          billing_period: billingPeriod,
+          payment_provider: paymentProvider,
+          payment_status: 'pending',
+          requested_user_count: requestedUserCount,
+          requested_franchise_count: requestedFranchiseCount,
+          payment_session_id: paymentSessionId,
+          payment_url: paymentUrl,
+          provider_metadata: providerMetadata,
+          plan_slug: selectedPlan.slug,
+          plan_tier: selectedPlan.tier,
+        },
+      })
+      .eq('id', createdSubscription.id);
+
+    await upsertOnboardingSession(tenantId, userId, {
+      status: 'payment_pending',
+      current_step: 'payment',
+      step_payloads: {
+        phase2: {
+          plan_selected: true,
+          payment_required: true,
+          payment_verified: false,
+          subscription_id: createdSubscription.id,
+          plan_id: selectedPlan.id,
+          amount_due: amountDue,
+          currency,
+          payment_session_id: paymentSessionId,
+          payment_url: paymentUrl,
+        },
+      },
+    });
+
+    return {
+      integrated: true,
+      message: paymentUrl
+        ? `Payment session created. Complete payment using: ${paymentUrl}`
+        : 'Payment session created and awaiting completion.',
+    };
+  };
 
   useEffect(() => {
     if (!DomainService) {
@@ -127,6 +459,61 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
     loadTenantProfile();
   }, [tenant?.id, scopedDb, toast]);
 
+  useEffect(() => {
+    const loadPlans = async () => {
+      try {
+        const { data, error } = await scopedDb
+          .from('subscription_plans', true)
+          .select('id, name, slug, description, tier, price_monthly, price_annual, currency, billing_period, is_active, user_scaling_factor, min_users, max_users')
+          .eq('is_active', true)
+          .eq('plan_type', 'crm_base')
+          .order('price_monthly');
+        if (error) throw error;
+        setAvailablePlans((data || []) as SubscriptionPlan[]);
+      } catch (error: any) {
+        toast({
+          title: 'Error',
+          description: error?.message || 'Failed to load subscription plans',
+          variant: 'destructive',
+        });
+      }
+    };
+    loadPlans();
+  }, [scopedDb, toast]);
+
+  useEffect(() => {
+    const loadActiveSubscription = async () => {
+      if (!tenant?.id) return;
+      try {
+        const { data, error } = await scopedDb
+          .from('tenant_subscriptions')
+          .select('id, plan_id, status, metadata')
+          .eq('tenant_id', tenant.id)
+          .eq('status', 'active')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (error) throw error;
+        if (data) {
+          const normalized = data as ActiveSubscription;
+          setActiveSubscription(normalized);
+          form.setValue('selected_plan_id', normalized.plan_id || '');
+          form.setValue('selected_billing_period', String((normalized.metadata as any)?.billing_period || 'monthly'));
+          form.setValue('payment_provider', String((normalized.metadata as any)?.payment_provider || 'mock'));
+          form.setValue('requested_user_count', String((normalized.metadata as any)?.requested_user_count || ''));
+          form.setValue('requested_franchise_count', String((normalized.metadata as any)?.requested_franchise_count || ''));
+        }
+      } catch (error: any) {
+        toast({
+          title: 'Error',
+          description: error?.message || 'Failed to load active subscription',
+          variant: 'destructive',
+        });
+      }
+    };
+    loadActiveSubscription();
+  }, [tenant?.id, scopedDb, toast]);
+
   const form = useForm<TenantFormValues>({
     resolver: zodResolver(tenantSchema),
     defaultValues: {
@@ -173,8 +560,32 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
       data_residency_encryption_required: tenant?.settings?.data_residency?.encryption_required ?? true,
       support_preferred_channel: tenant?.settings?.support?.preferred_channel || '',
       support_escalation_level: tenant?.settings?.support?.escalation_level || '',
+      selected_plan_id: '',
+      selected_billing_period: 'monthly',
+      requested_user_count: '',
+      requested_franchise_count: '',
+      payment_provider: 'mock',
     },
   });
+
+  const selectedPlanId = form.watch('selected_plan_id');
+  const selectedBillingPeriod = form.watch('selected_billing_period') || 'monthly';
+  const requestedUserCount = parseRequestedCount(form.watch('requested_user_count'));
+  const selectedPlanForPreview = availablePlans.find((p) => p.id === selectedPlanId);
+  const planPricingPreview = selectedPlanForPreview
+    ? (() => {
+        const scaled = calculateScaledPrice(
+          {
+            price_monthly: Number(selectedPlanForPreview.price_monthly || 0),
+            user_scaling_factor: Number(selectedPlanForPreview.user_scaling_factor ?? 0),
+            min_users: Number(selectedPlanForPreview.min_users ?? 0),
+            max_users: selectedPlanForPreview.max_users ?? null,
+          },
+          requestedUserCount
+        );
+        return selectedBillingPeriod === 'annual' ? scaled.annual_price : scaled.monthly_price;
+      })()
+    : null;
 
   useEffect(() => {
     if (!tenantProfile) return;
@@ -360,6 +771,13 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
           );
         if (sessionError) throw sessionError;
 
+        const phase2Result = await applyPhase2PlanAndPayment({
+          tenantId: tenant.id,
+          tenantName: data.name,
+          values,
+          userId,
+        });
+
         const { error: actErr } = await scopedDb
           .from('activities')
           .insert({
@@ -381,7 +799,7 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
 
         toast({
           title: 'Success',
-          description: 'Tenant updated successfully',
+          description: phase2Result.message || 'Tenant updated successfully',
         });
         onSuccess?.();
       } else {
@@ -425,6 +843,13 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
           );
         if (sessionError) throw sessionError;
 
+        const phase2Result = await applyPhase2PlanAndPayment({
+          tenantId: createdTenant.id,
+          tenantName: createdTenant.name,
+          values,
+          userId,
+        });
+
         const { error: actErr } = await scopedDb
           .from('activities')
           .insert({
@@ -446,7 +871,7 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
 
         toast({
           title: 'Success',
-          description: 'Tenant created successfully',
+          description: phase2Result.message || 'Tenant created successfully',
         });
         navigate('/dashboard/tenants');
       }
@@ -473,6 +898,7 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
               { id: 'details', label: 'Details' },
               { id: 'legal-tax', label: 'Legal & Tax' },
               { id: 'residency', label: 'Data Residency' },
+              { id: 'plan-payment', label: 'Plan & Payment' },
               { id: 'demographics', label: 'Demographics' },
               { id: 'contacts', label: 'Contacts' },
               { id: 'channels', label: 'Channels' },
@@ -766,6 +1192,123 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
               </FormItem>
             )}
           />
+        </FormSection>
+        <Separator />
+        <FormSection title="Plan and Payment">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField
+              control={form.control}
+              name="selected_plan_id"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Subscription Plan</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value || ''}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a plan" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {availablePlans.map((plan) => (
+                        <SelectItem key={plan.id} value={plan.id}>
+                          {plan.name} ({(plan.currency || 'USD').toUpperCase()} {plan.price_monthly}/month)
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormDescription>Required to continue onboarding beyond Phase 1</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="selected_billing_period"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Billing Period</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value || 'monthly'}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select billing period" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="monthly">Monthly</SelectItem>
+                      <SelectItem value="annual">Annual</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <FormField
+              control={form.control}
+              name="requested_user_count"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Requested Users</FormLabel>
+                  <FormControl>
+                    <Input type="number" min="0" placeholder="e.g. 25" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="requested_franchise_count"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Requested Franchises</FormLabel>
+                  <FormControl>
+                    <Input type="number" min="0" placeholder="e.g. 5" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="payment_provider"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Payment Provider</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value || 'mock'}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select provider" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="mock">Mock Gateway</SelectItem>
+                      <SelectItem value="stripe">Stripe</SelectItem>
+                      <SelectItem value="razorpay">Razorpay</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+          {selectedPlanForPreview && (
+            <div className="rounded-lg border p-4 text-sm">
+              <div className="font-medium">{selectedPlanForPreview.name}</div>
+              <div className="text-muted-foreground">
+                {(selectedPlanForPreview.currency || 'USD').toUpperCase()} {Number(planPricingPreview || 0).toFixed(2)} /{selectedBillingPeriod === 'annual' ? 'year' : 'month'}
+              </div>
+              {selectedPlanForPreview.description && (
+                <div className="mt-2 text-muted-foreground">{selectedPlanForPreview.description}</div>
+              )}
+            </div>
+          )}
+          {activeSubscription && (
+            <div className="text-xs text-muted-foreground">
+              Existing active subscription detected and will be replaced after confirmation.
+            </div>
+          )}
         </FormSection>
         <Separator />
         <FormSection title="Demographics">
