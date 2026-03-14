@@ -1,6 +1,6 @@
 import * as React from "react";
 import { useState, useEffect, useCallback } from "react";
-import { Search, Loader2, FileText, Users, Building2, Package, X } from "lucide-react";
+import { Search, Loader2, FileText, Users, Building2, Package } from "lucide-react";
 import { CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useNavigate } from "react-router-dom";
 import { useCRM } from "@/hooks/useCRM";
@@ -14,13 +14,17 @@ interface SearchResult {
   path: string;
 }
 
+const PER_ENTITY_LIMIT = 5;
+const TOTAL_RESULTS_LIMIT = 20;
+
 export function GlobalSearch() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
+  const [hasMoreResults, setHasMoreResults] = useState(false);
   const navigate = useNavigate();
-  const { supabase, context } = useCRM();
+  const { scopedDb } = useCRM();
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -34,52 +38,45 @@ export function GlobalSearch() {
   }, []);
 
   const performSearch = useCallback(async (searchQuery: string) => {
-    if (!searchQuery.trim() || !context.tenantId) {
+    if (!searchQuery.trim()) {
       setResults([]);
+      setHasMoreResults(false);
       return;
     }
 
     setLoading(true);
     try {
       const searchPattern = `%${searchQuery}%`;
-      const franchiseFilter = context.franchiseId 
-        ? { franchise_id: context.franchiseId }
-        : { tenant_id: context.tenantId };
 
       const [leads, accounts, contacts, quotes, opportunities] = await Promise.all([
-        supabase
+        scopedDb
           .from("leads")
-          .select("id, first_name, last_name, company, email")
-          .match(franchiseFilter)
+          .select("id, first_name, last_name, company, email", { count: "exact" })
           .or(`first_name.ilike.${searchPattern},last_name.ilike.${searchPattern},company.ilike.${searchPattern},email.ilike.${searchPattern}`)
-          .limit(5),
-        supabase
+          .range(0, PER_ENTITY_LIMIT - 1),
+        scopedDb
           .from("accounts")
-          .select("id, name")
-          .match(franchiseFilter)
+          .select("id, name", { count: "exact" })
           .ilike("name", searchPattern)
-          .limit(5),
-        supabase
+          .range(0, PER_ENTITY_LIMIT - 1),
+        scopedDb
           .from("contacts")
-          .select("id, first_name, last_name, email")
-          .match(franchiseFilter)
+          .select("id, first_name, last_name, email", { count: "exact" })
           .or(`first_name.ilike.${searchPattern},last_name.ilike.${searchPattern},email.ilike.${searchPattern}`)
-          .limit(5),
-        supabase
+          .range(0, PER_ENTITY_LIMIT - 1),
+        scopedDb
           .from("quotes")
-          .select("id, quote_number, account_id")
-          .match(franchiseFilter)
+          .select("id, quote_number, account_id", { count: "exact" })
           .ilike("quote_number", searchPattern)
-          .limit(5),
-        supabase
+          .range(0, PER_ENTITY_LIMIT - 1),
+        scopedDb
           .from("opportunities")
-          .select("id, name, stage")
-          .match(franchiseFilter)
+          .select("id, name, stage", { count: "exact" })
           .ilike("name", searchPattern)
-          .limit(5),
+          .range(0, PER_ENTITY_LIMIT - 1),
       ]);
 
-      const searchResults: SearchResult[] = [
+      const searchResults = [
         ...(leads.data || []).map((l) => ({
           id: l.id,
           title: l.company || `${l.first_name} ${l.last_name}`.trim() || "Unnamed Lead",
@@ -115,14 +112,24 @@ export function GlobalSearch() {
         })),
       ];
 
-      setResults(searchResults);
+      const totalMatched =
+        (leads.count ?? (leads.data || []).length) +
+        (accounts.count ?? (accounts.data || []).length) +
+        (contacts.count ?? (contacts.data || []).length) +
+        (quotes.count ?? (quotes.data || []).length) +
+        (opportunities.count ?? (opportunities.data || []).length);
+
+      const limitedResults = searchResults.slice(0, TOTAL_RESULTS_LIMIT);
+      setResults(limitedResults);
+      setHasMoreResults(totalMatched > limitedResults.length);
     } catch (error) {
       console.error("Search error:", error);
       setResults([]);
+      setHasMoreResults(false);
     } finally {
       setLoading(false);
     }
-  }, [context.tenantId, context.franchiseId, supabase]);
+  }, [scopedDb]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -207,6 +214,11 @@ export function GlobalSearch() {
                   </CommandGroup>
                 );
               })}
+              {hasMoreResults && (
+                <div className="px-3 py-2 text-xs text-muted-foreground">
+                  Showing top {results.length} results. Refine your search to narrow matches.
+                </div>
+              )}
             </>
           )}
         </CommandList>

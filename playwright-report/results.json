@@ -54,6 +54,7 @@
         "testIgnore": [],
         "testMatch": [
           "tests/e2e/**/*.spec.ts",
+          "test/integration/**/*.spec.ts",
           "dataentry/**/*.spec.ts"
         ],
         "timeout": 30000
@@ -71,6 +72,7 @@
         "testIgnore": [],
         "testMatch": [
           "tests/e2e/**/*.spec.ts",
+          "test/integration/**/*.spec.ts",
           "dataentry/**/*.spec.ts"
         ],
         "timeout": 30000
@@ -88,6 +90,7 @@
         "testIgnore": [],
         "testMatch": [
           "tests/e2e/**/*.spec.ts",
+          "test/integration/**/*.spec.ts",
           "dataentry/**/*.spec.ts"
         ],
         "timeout": 30000
@@ -105,6 +108,7 @@
         "testIgnore": [],
         "testMatch": [
           "tests/e2e/**/*.spec.ts",
+          "test/integration/**/*.spec.ts",
           "dataentry/**/*.spec.ts"
         ],
         "timeout": 30000
@@ -122,6 +126,7 @@
         "testIgnore": [],
         "testMatch": [
           "tests/e2e/**/*.spec.ts",
+          "test/integration/**/*.spec.ts",
           "dataentry/**/*.spec.ts"
         ],
         "timeout": 30000
@@ -139,6 +144,7 @@
         "testIgnore": [],
         "testMatch": [
           "tests/e2e/**/*.spec.ts",
+          "test/integration/**/*.spec.ts",
           "dataentry/**/*.spec.ts"
         ],
         "timeout": 30000
@@ -156,6 +162,7 @@
         "testIgnore": [],
         "testMatch": [
           "tests/e2e/**/*.spec.ts",
+          "test/integration/**/*.spec.ts",
           "dataentry/**/*.spec.ts"
         ],
         "timeout": 30000
@@ -175,20 +182,20 @@
   },
   "suites": [
     {
-      "title": "tests/e2e/design-system.smoke.spec.ts",
-      "file": "tests/e2e/design-system.smoke.spec.ts",
+      "title": "test/integration/diagonal-strip.playwright.spec.ts",
+      "file": "test/integration/diagonal-strip.playwright.spec.ts",
       "column": 0,
       "line": 0,
       "specs": [],
       "suites": [
         {
-          "title": "design system smoke",
-          "file": "tests/e2e/design-system.smoke.spec.ts",
+          "title": "diagonal strip visual parity",
+          "file": "test/integration/diagonal-strip.playwright.spec.ts",
           "line": 2,
           "column": 6,
           "specs": [
             {
-              "title": "loads crm shell and verifies core navigation",
+              "title": "renders consistent diagonal geometry and no focus artifacts",
               "ok": true,
               "tags": [],
               "tests": [
@@ -203,12 +210,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 3037,
+                      "duration": 5677,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-03-13T15:49:18.723Z",
+                      "startTime": "2026-03-14T04:25:29.002Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -226,12 +233,12 @@
                       "workerIndex": 1,
                       "parallelIndex": 1,
                       "status": "passed",
-                      "duration": 3004,
+                      "duration": 5023,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-03-13T15:49:18.724Z",
+                      "startTime": "2026-03-14T04:25:29.143Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -249,12 +256,12 @@
                       "workerIndex": 2,
                       "parallelIndex": 2,
                       "status": "passed",
-                      "duration": 3174,
+                      "duration": 3906,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-03-13T15:49:18.726Z",
+                      "startTime": "2026-03-14T04:25:29.042Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -272,12 +279,12 @@
                       "workerIndex": 3,
                       "parallelIndex": 3,
                       "status": "passed",
-                      "duration": 3702,
+                      "duration": 5468,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-03-13T15:49:18.717Z",
+                      "startTime": "2026-03-14T04:25:28.964Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -285,8 +292,8 @@
                   "status": "expected"
                 }
               ],
-              "id": "bdf1a361b5aabcf2f31f-917e0af542d8cccbd32f",
-              "file": "tests/e2e/design-system.smoke.spec.ts",
+              "id": "f1e6f631de0cb32ba7c2-d896311137eb7a2a92e7",
+              "file": "test/integration/diagonal-strip.playwright.spec.ts",
               "line": 3,
               "column": 3
             }
@@ -297,8 +304,8 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-03-13T15:49:16.809Z",
-    "duration": 7366.675,
+    "startTime": "2026-03-14T04:25:26.464Z",
+    "duration": 8985.48,
     "expected": 4,
     "skipped": 0,
     "unexpected": 0,

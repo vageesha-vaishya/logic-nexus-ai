@@ -26,6 +26,15 @@ export type SavedTheme = {
   // Kanban settings
   kanbanCardBg?: string;
   kanbanCardRadius?: string;
+  stripColor?: string;
+  stripOpacity?: number;
+  stripWidth?: string;
+  stripAngle?: string;
+  headerBannerVisible?: boolean;
+  headerBannerContent?: string;
+  headerBannerColor?: string;
+  headerBannerTextColor?: string;
+  headerBannerHeight?: string;
   createdAt: string;
 };
 
@@ -44,17 +53,89 @@ type ThemeContextValue = {
 
 const LS_THEMES_KEY = 'soslogicpro.themes';
 const LS_ACTIVE_KEY = 'soslogicpro.activeThemeName';
+const LS_SCOPE_KEY = 'soslogicpro.themeScope';
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
+
+const normalizeHslToken = (value: string | undefined, fallback: string) => {
+  if (typeof value !== 'string') return fallback;
+  const trimmed = value.trim().replace(/;$/, '');
+  if (!trimmed) return fallback;
+  const hslMatch = trimmed.match(/^hsl\((.+)\)$/i);
+  if (hslMatch?.[1]) {
+    const inner = hslMatch[1].trim();
+    return inner || fallback;
+  }
+  return trimmed;
+};
+
+const buildPresetTheme = (preset: (typeof THEME_PRESETS)[number]): SavedTheme => ({
+  name: preset.name,
+  start: preset.start,
+  end: preset.end,
+  primary: preset.primary,
+  accent: preset.accent,
+  angle: preset.angle,
+  radius: preset.radius,
+  sidebarBackground: preset.sidebarBackground,
+  sidebarAccent: preset.sidebarAccent,
+  dark: preset.dark,
+  bgStart: preset.bgStart,
+  bgEnd: preset.bgEnd,
+  bgAngle: preset.bgAngle,
+  stripColor: normalizeHslToken((preset as any).stripColor ?? preset.accent ?? preset.primary, '267 78% 44%'),
+  stripOpacity: typeof (preset as any).stripOpacity === 'number' ? (preset as any).stripOpacity : 0.2,
+  stripWidth: (preset as any).stripWidth ?? '22px',
+  stripAngle: (preset as any).stripAngle ?? '14deg',
+  headerBannerVisible: typeof (preset as any).headerBannerVisible === 'boolean' ? (preset as any).headerBannerVisible : preset.name === 'Default Simple',
+  headerBannerContent: (preset as any).headerBannerContent ?? 'System notification',
+  headerBannerColor: normalizeHslToken((preset as any).headerBannerColor ?? preset.accent ?? preset.primary, '217 91% 60%'),
+  headerBannerTextColor: normalizeHslToken((preset as any).headerBannerTextColor, '0 0% 100%'),
+  headerBannerHeight: (preset as any).headerBannerHeight ?? '48px',
+  createdAt: new Date().toISOString(),
+});
+
+const normalizeSavedThemeForStartup = (theme: SavedTheme): SavedTheme => {
+  const isDefaultSimpleTheme = theme.name === 'Default Simple';
+  return {
+    ...theme,
+    stripColor: normalizeHslToken(theme.stripColor || theme.accent || theme.primary, '267 78% 44%'),
+    headerBannerVisible: isDefaultSimpleTheme
+      ? true
+      : typeof theme.headerBannerVisible === 'boolean'
+        ? theme.headerBannerVisible
+        : false,
+    headerBannerContent: isDefaultSimpleTheme
+      ? (typeof theme.headerBannerContent === 'string' && theme.headerBannerContent.trim() ? theme.headerBannerContent : 'System notification')
+      : theme.headerBannerContent,
+    headerBannerColor: normalizeHslToken(theme.headerBannerColor || theme.stripColor || theme.accent || theme.primary, '217 91% 60%'),
+    headerBannerTextColor: normalizeHslToken(theme.headerBannerTextColor, '0 0% 100%'),
+    headerBannerHeight: theme.headerBannerHeight || '48px',
+  };
+};
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [themes, setThemes] = useState<SavedTheme[]>([]);
   const [activeThemeName, setActiveThemeName] = useState<string | null>(null);
   const [isDark, setIsDark] = useState(false);
-  const [scope, setScope] = useState<'platform' | 'tenant' | 'franchise' | 'user'>('user');
+  const [scope, setScopeState] = useState<'platform' | 'tenant' | 'franchise' | 'user'>(() => {
+    try {
+      const stored = localStorage.getItem(LS_SCOPE_KEY);
+      if (stored === 'platform' || stored === 'tenant' || stored === 'franchise' || stored === 'user') {
+        return stored;
+      }
+    } catch {
+      return 'user';
+    }
+    return 'user';
+  });
   const [themesFetchDisabled, setThemesFetchDisabled] = useState(false);
   const LS_DARK_KEY = 'soslogicpro.darkMode';
   const { supabase, context } = useCRM();
+  const setScope = useCallback((nextScope: 'platform' | 'tenant' | 'franchise' | 'user') => {
+    setScopeState(nextScope);
+    localStorage.setItem(LS_SCOPE_KEY, nextScope);
+  }, []);
 
   // Define applyTheme before useEffect calls
   const applyTheme = useCallback((t: Partial<SavedTheme>) => {
@@ -139,6 +220,35 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (t.kanbanCardRadius) {
       root.style.setProperty('--kanban-card-radius', t.kanbanCardRadius);
     }
+    const stripColor = normalizeHslToken(t.stripColor || t.accent || t.primary, '267 78% 44%');
+    root.style.setProperty('--strip-color', `hsl(${stripColor})`);
+    root.style.setProperty('--strip-opacity', `${typeof t.stripOpacity === 'number' ? t.stripOpacity : 0.2}`);
+    root.style.setProperty('--strip-width', t.stripWidth || '22px');
+    root.style.setProperty('--strip-angle', t.stripAngle || '14deg');
+    root.style.setProperty('--strip-strategy', 'css');
+    const isDefaultSimpleTheme = t.name === 'Default Simple';
+    const existingBannerVisible = root.getAttribute('data-header-banner-visible') === '1'
+      || getComputedStyle(root).getPropertyValue('--header-banner-visible').trim() === '1';
+    const headerBannerVisible = isDefaultSimpleTheme
+      ? true
+      : typeof t.headerBannerVisible === 'boolean'
+        ? t.headerBannerVisible
+        : existingBannerVisible;
+    const existingBannerContent = root.getAttribute('data-header-banner-content') || '';
+    const headerBannerContent = isDefaultSimpleTheme
+      ? (typeof t.headerBannerContent === 'string' && t.headerBannerContent.trim() ? t.headerBannerContent : 'System notification')
+      : typeof t.headerBannerContent === 'string'
+        ? t.headerBannerContent
+        : existingBannerContent;
+    const headerBannerColor = normalizeHslToken(t.headerBannerColor || t.accent || t.primary, '217 91% 60%');
+    const headerBannerTextColor = normalizeHslToken(t.headerBannerTextColor, '0 0% 100%');
+    const headerBannerHeight = t.headerBannerHeight || '48px';
+    root.style.setProperty('--header-banner-visible', headerBannerVisible ? '1' : '0');
+    root.style.setProperty('--header-banner-bg', `hsl(${headerBannerColor})`);
+    root.style.setProperty('--header-banner-text', `hsl(${headerBannerTextColor})`);
+    root.style.setProperty('--header-banner-height', headerBannerHeight);
+    root.setAttribute('data-header-banner-visible', headerBannerVisible ? '1' : '0');
+    root.setAttribute('data-header-banner-content', headerBannerContent);
   }, []);
 
   const toggleDark = useCallback((enabled: boolean) => {
@@ -158,29 +268,37 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const active = localStorage.getItem(LS_ACTIVE_KEY);
       const darkStored = localStorage.getItem(LS_DARK_KEY);
       const parsed = raw ? (JSON.parse(raw) as SavedTheme[]) : [];
-      setThemes(parsed);
+      const normalized = parsed.map(normalizeSavedThemeForStartup);
+      const normalizedRaw = JSON.stringify(normalized);
+      if (raw !== normalizedRaw) {
+        localStorage.setItem(LS_THEMES_KEY, normalizedRaw);
+      }
+      setThemes(normalized);
       setActiveThemeName(active);
       if (active) {
-        const found = parsed.find(t => t.name === active);
-        if (found) applyTheme(found);
+        const found = normalized.find(t => t.name === active)
+          ?? (() => {
+            const preset = THEME_PRESETS.find((p) => p.name === active);
+            return preset ? buildPresetTheme(preset) : undefined;
+          })();
+        if (found) {
+          applyTheme(found);
+        } else {
+          const fallbackPreset = THEME_PRESETS.find((p) => p.name === 'Default Simple');
+          if (fallbackPreset) {
+            const fallbackTheme = buildPresetTheme(fallbackPreset);
+            setActiveThemeName(fallbackTheme.name);
+            localStorage.setItem(LS_ACTIVE_KEY, fallbackTheme.name);
+            applyTheme(fallbackTheme);
+          }
+        }
       } else {
-        // Apply Default Simple theme by default when no active theme is set
         const preset = THEME_PRESETS.find(p => p.name === 'Default Simple');
         if (preset) {
-          applyTheme({
-            start: preset.start,
-            end: preset.end,
-            primary: preset.primary,
-            accent: preset.accent,
-            angle: preset.angle,
-            radius: preset.radius,
-            sidebarBackground: preset.sidebarBackground,
-            sidebarAccent: preset.sidebarAccent,
-            dark: preset.dark,
-            bgStart: preset.bgStart,
-            bgEnd: preset.bgEnd,
-            bgAngle: preset.bgAngle,
-          });
+          const fallbackTheme = buildPresetTheme(preset);
+          setActiveThemeName(fallbackTheme.name);
+          localStorage.setItem(LS_ACTIVE_KEY, fallbackTheme.name);
+          applyTheme(fallbackTheme);
         }
       }
       if (darkStored !== null) {
@@ -203,9 +321,23 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Choose default scope based on current context
   useEffect(() => {
-    if (context?.franchiseId) setScope('franchise');
-    else if (context?.tenantId) setScope('tenant');
-    else setScope('user');
+    const storedScope = localStorage.getItem(LS_SCOPE_KEY);
+    if (storedScope === 'platform' || storedScope === 'tenant' || storedScope === 'franchise' || storedScope === 'user') {
+      setScopeState(storedScope);
+      return;
+    }
+    if (context?.franchiseId) {
+      setScopeState('franchise');
+      localStorage.setItem(LS_SCOPE_KEY, 'franchise');
+      return;
+    }
+    if (context?.tenantId) {
+      setScopeState('tenant');
+      localStorage.setItem(LS_SCOPE_KEY, 'tenant');
+      return;
+    }
+    setScopeState('user');
+    localStorage.setItem(LS_SCOPE_KEY, 'user');
   }, [context?.tenantId, context?.franchiseId]);
 
   // Load scoped themes from Supabase when scope or context changes
@@ -236,7 +368,23 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           return;
         }
         if (Array.isArray(data)) {
-          const mapped: SavedTheme[] = data.map((row: any) => ({
+          const dedupedRowsByName = new Map<string, { row: any; score: number }>();
+          for (const row of data) {
+            const tokens = row?.tokens ?? {};
+            const score =
+              (row?.is_default ? 100 : 0) +
+              (tokens.headerBannerVisible ? 20 : 0) +
+              (tokens.headerBannerContent ? 5 : 0) +
+              (tokens.headerBannerColor ? 5 : 0) +
+              (tokens.headerBannerTextColor ? 5 : 0) +
+              (tokens.headerBannerHeight ? 5 : 0);
+            const existing = dedupedRowsByName.get(row.name);
+            if (!existing || score >= existing.score) {
+              dedupedRowsByName.set(row.name, { row, score });
+            }
+          }
+          const dedupedRows = Array.from(dedupedRowsByName.values()).map((entry) => entry.row);
+          const mapped: SavedTheme[] = dedupedRows.map((row: any) => ({
             name: row.name,
             start: row.tokens.start,
             end: row.tokens.end,
@@ -258,14 +406,37 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             bgAngle: row.tokens.bgAngle,
             kanbanCardBg: row.tokens.kanbanCardBg,
             kanbanCardRadius: row.tokens.kanbanCardRadius,
+            stripColor: normalizeHslToken(row.tokens.stripColor, row.tokens.accent || row.tokens.primary || '267 78% 44%'),
+            stripOpacity: row.tokens.stripOpacity,
+            stripWidth: row.tokens.stripWidth,
+            stripAngle: row.tokens.stripAngle,
+            headerBannerVisible: row.name === 'Default Simple'
+              ? true
+              : typeof row.tokens.headerBannerVisible === 'boolean'
+                ? row.tokens.headerBannerVisible
+                : undefined,
+            headerBannerContent: row.name === 'Default Simple'
+              ? ((typeof row.tokens.headerBannerContent === 'string' && row.tokens.headerBannerContent.trim())
+                ? row.tokens.headerBannerContent
+                : 'System notification')
+              : typeof row.tokens.headerBannerContent === 'string'
+                ? row.tokens.headerBannerContent
+                : undefined,
+            headerBannerColor: normalizeHslToken(row.tokens.headerBannerColor, row.tokens.accent || row.tokens.primary || '217 91% 60%'),
+            headerBannerTextColor: normalizeHslToken(row.tokens.headerBannerTextColor, '0 0% 100%'),
+            headerBannerHeight: row.tokens.headerBannerHeight,
             createdAt: new Date().toISOString(),
           }));
           setThemes(mapped);
-          const def = data.find((row: any) => row.is_default);
-          if (def) {
-            setActiveThemeName(def.name);
-            const found = mapped.find(t => t.name === def.name);
-            if (found) applyTheme(found);
+          const storedActive = localStorage.getItem(LS_ACTIVE_KEY);
+          const def = dedupedRows.find((row: any) => row.is_default)
+            ?? (storedActive ? dedupedRows.find((row: any) => row.name === storedActive) : undefined);
+          const fallback = mapped.find((theme) => theme.name === 'Default Simple') ?? mapped[0];
+          const selected = def ? mapped.find((theme) => theme.name === def.name) : fallback;
+          if (selected) {
+            setActiveThemeName(selected.name);
+            localStorage.setItem(LS_ACTIVE_KEY, selected.name);
+            applyTheme(selected);
           }
         }
       } catch {
@@ -275,7 +446,13 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [scope, context?.userId, context?.tenantId, context?.franchiseId, applyTheme, themesFetchDisabled]);
 
   const saveTheme = async (t: Omit<SavedTheme, 'createdAt'>) => {
-    const saved: SavedTheme = { ...t, createdAt: new Date().toISOString() };
+    const saved: SavedTheme = {
+      ...t,
+      stripColor: normalizeHslToken(t.stripColor || t.accent || t.primary, '267 78% 44%'),
+      headerBannerColor: normalizeHslToken(t.headerBannerColor || t.accent || t.primary, '217 91% 60%'),
+      headerBannerTextColor: normalizeHslToken(t.headerBannerTextColor, '0 0% 100%'),
+      createdAt: new Date().toISOString(),
+    };
     const next = [saved, ...themes.filter(x => x.name !== t.name)];
     setThemes(next);
     localStorage.setItem(LS_THEMES_KEY, JSON.stringify(next));
@@ -302,12 +479,26 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         bgAngle: t.bgAngle,
         kanbanCardBg: t.kanbanCardBg,
         kanbanCardRadius: t.kanbanCardRadius,
+        stripColor: saved.stripColor,
+        stripOpacity: t.stripOpacity,
+        stripWidth: t.stripWidth,
+        stripAngle: t.stripAngle,
+        headerBannerVisible: t.headerBannerVisible,
+        headerBannerContent: t.headerBannerContent,
+        headerBannerColor: saved.headerBannerColor,
+        headerBannerTextColor: saved.headerBannerTextColor,
+        headerBannerHeight: t.headerBannerHeight,
       };
       const payload: any = { name: t.name, tokens, scope, is_active: true };
       if (scope === 'user') payload.user_id = context?.userId;
       if (scope === 'franchise') payload.franchise_id = context?.franchiseId;
       if (scope === 'tenant') payload.tenant_id = context?.tenantId;
-      await (supabase as any).from('ui_themes').upsert(payload);
+      let removeExisting: any = (supabase as any).from('ui_themes').delete().eq('name', t.name).eq('scope', scope);
+      if (scope === 'user') removeExisting = removeExisting.eq('user_id', context?.userId);
+      if (scope === 'franchise') removeExisting = removeExisting.eq('franchise_id', context?.franchiseId);
+      if (scope === 'tenant') removeExisting = removeExisting.eq('tenant_id', context?.tenantId);
+      await removeExisting;
+      await (supabase as any).from('ui_themes').insert(payload);
     } catch {
       // ignore
     }
@@ -332,7 +523,11 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const setActive = (name: string) => {
     setActiveThemeName(name);
     localStorage.setItem(LS_ACTIVE_KEY, name);
-    const found = themes.find(t => t.name === name);
+    const found = themes.find(t => t.name === name)
+      ?? (() => {
+        const preset = THEME_PRESETS.find((p) => p.name === name);
+        return preset ? buildPresetTheme(preset) : undefined;
+      })();
     if (found) applyTheme(found);
     // Mark default in Supabase for current scope
     (async () => {

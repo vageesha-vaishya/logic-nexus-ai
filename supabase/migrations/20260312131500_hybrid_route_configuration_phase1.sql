@@ -111,7 +111,7 @@ BEGIN
       (
         SELECT jsonb_agg(
           jsonb_build_object(
-            'leg_order', qvol.leg_order,
+            'leg_order', qvol.sort_order,
             'mode', sm.code,
             'origin', qvol.origin_location,
             'destination', qvol.destination_location,
@@ -120,7 +120,7 @@ BEGIN
             'departure_date', qvol.planned_departure,
             'arrival_date', qvol.planned_arrival
           )
-          ORDER BY qvol.leg_order
+          ORDER BY qvol.sort_order
         )
         FROM public.quotation_version_option_legs qvol
         LEFT JOIN public.service_modes sm ON sm.id = qvol.mode_id

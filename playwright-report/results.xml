@@ -1,18 +1,18 @@
-<testsuites id="" name="" tests="4" failures="0" skipped="0" errors="0" time="7.366675">
-<testsuite name="tests/e2e/design-system.smoke.spec.ts" timestamp="2026-03-13T15:49:18.137Z" hostname="chromium" tests="1" failures="0" skipped="0" time="3.037" errors="0">
-<testcase name="design system smoke › loads crm shell and verifies core navigation" classname="tests/e2e/design-system.smoke.spec.ts" time="3.037">
+<testsuites id="" name="" tests="4" failures="0" skipped="0" errors="0" time="8.985479999999999">
+<testsuite name="test/integration/diagonal-strip.playwright.spec.ts" timestamp="2026-03-14T04:25:27.767Z" hostname="chromium" tests="1" failures="0" skipped="0" time="5.677" errors="0">
+<testcase name="diagonal strip visual parity › renders consistent diagonal geometry and no focus artifacts" classname="test/integration/diagonal-strip.playwright.spec.ts" time="5.677">
 </testcase>
 </testsuite>
-<testsuite name="tests/e2e/design-system.smoke.spec.ts" timestamp="2026-03-13T15:49:18.137Z" hostname="msedge-latest" tests="1" failures="0" skipped="0" time="3.004" errors="0">
-<testcase name="design system smoke › loads crm shell and verifies core navigation" classname="tests/e2e/design-system.smoke.spec.ts" time="3.004">
+<testsuite name="test/integration/diagonal-strip.playwright.spec.ts" timestamp="2026-03-14T04:25:27.767Z" hostname="msedge-latest" tests="1" failures="0" skipped="0" time="5.023" errors="0">
+<testcase name="diagonal strip visual parity › renders consistent diagonal geometry and no focus artifacts" classname="test/integration/diagonal-strip.playwright.spec.ts" time="5.023">
 </testcase>
 </testsuite>
-<testsuite name="tests/e2e/design-system.smoke.spec.ts" timestamp="2026-03-13T15:49:18.137Z" hostname="firefox" tests="1" failures="0" skipped="0" time="3.174" errors="0">
-<testcase name="design system smoke › loads crm shell and verifies core navigation" classname="tests/e2e/design-system.smoke.spec.ts" time="3.174">
+<testsuite name="test/integration/diagonal-strip.playwright.spec.ts" timestamp="2026-03-14T04:25:27.767Z" hostname="firefox" tests="1" failures="0" skipped="0" time="3.906" errors="0">
+<testcase name="diagonal strip visual parity › renders consistent diagonal geometry and no focus artifacts" classname="test/integration/diagonal-strip.playwright.spec.ts" time="3.906">
 </testcase>
 </testsuite>
-<testsuite name="tests/e2e/design-system.smoke.spec.ts" timestamp="2026-03-13T15:49:18.137Z" hostname="webkit" tests="1" failures="0" skipped="0" time="3.702" errors="0">
-<testcase name="design system smoke › loads crm shell and verifies core navigation" classname="tests/e2e/design-system.smoke.spec.ts" time="3.702">
+<testsuite name="test/integration/diagonal-strip.playwright.spec.ts" timestamp="2026-03-14T04:25:27.767Z" hostname="webkit" tests="1" failures="0" skipped="0" time="5.468" errors="0">
+<testcase name="diagonal strip visual parity › renders consistent diagonal geometry and no focus artifacts" classname="test/integration/diagonal-strip.playwright.spec.ts" time="5.468">
 </testcase>
 </testsuite>
 </testsuites>

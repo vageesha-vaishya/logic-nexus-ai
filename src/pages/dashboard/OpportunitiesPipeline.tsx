@@ -6,7 +6,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { supabase } from "@/integrations/supabase/client";
 import { useCRM } from "@/hooks/useCRM";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Search, Filter, Layers, Settings, CheckSquare, Square, Trash2, AlertCircle, TrendingUp } from "lucide-react";
@@ -21,12 +20,13 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { KanbanFunnel } from "@/components/kanban/KanbanFunnel";
 import { Opportunity, OpportunityStage as Stage, stageColors, stageLabels, stages } from "./opportunities-data";
+import { PipelineService } from "@/services/pipeline-service";
 type OpportunityStage = Stage;
 
 export default function OpportunitiesPipeline() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { context, scopedDb } = useCRM();
+  const { scopedDb } = useCRM();
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -81,22 +81,11 @@ export default function OpportunitiesPipeline() {
   const fetchOpportunities = useCallback(async () => {
     try {
       setLoading(true);
-      
-      const query = scopedDb
-        .from("opportunities")
-        .select(`
-          *,
-          accounts:account_id(name),
-          contacts:contact_id(first_name, last_name)
-        `)
-        .order("created_at", { ascending: false });
-
-      // DAO handles scoping (including admin override)
-      
-      const { data, error } = await query;
-
-      if (error) throw error;
-      setOpportunities((data as unknown as Opportunity[]) || []);
+      const { data } = await PipelineService.listOpportunities(scopedDb, {
+        page: 1,
+        pageSize: 2000,
+      });
+      setOpportunities((data as Opportunity[]) || []);
     } catch (error) {
       console.error("Error fetching opportunities:", error);
       toast({
@@ -130,17 +119,51 @@ export default function OpportunitiesPipeline() {
   }, [fetchOpportunities, fetchAccounts]);
 
   const handleStageChange = async (opportunityId: string, newStage: Stage) => {
-    try {
-      const { error } = await scopedDb
-        .from("opportunities")
-        .update({ stage: newStage })
-        .eq("id", opportunityId);
+    const previousOpportunity = opportunities.find((opportunity) => opportunity.id === opportunityId);
+    if (!previousOpportunity) return;
 
-      if (error) throw error;
+    setOpportunities((prev) =>
+      prev.map((opportunity) =>
+        opportunity.id === opportunityId ? { ...opportunity, stage: newStage } : opportunity
+      )
+    );
+
+    try {
+      const result = await PipelineService.transitionOpportunityStage(scopedDb, {
+        id: opportunityId,
+        toStage: newStage,
+        expectedUpdatedAt: previousOpportunity.updated_at || null,
+      });
+
+      if (result.ok === false) {
+        if (result.code === "conflict") {
+          if (result.current) {
+            setOpportunities((prev) =>
+              prev.map((opportunity) =>
+                opportunity.id === opportunityId
+                  ? { ...opportunity, ...result.current, accounts: opportunity.accounts, contacts: opportunity.contacts }
+                  : opportunity
+              )
+            );
+          } else {
+            fetchOpportunities();
+          }
+          toast({
+            title: "Conflict",
+            description: "Opportunity was updated by another user. Data has been refreshed.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        throw new Error(result.message);
+      }
 
       setOpportunities((prev) =>
         prev.map((opportunity) =>
-          opportunity.id === opportunityId ? { ...opportunity, stage: newStage } : opportunity
+          opportunity.id === opportunityId
+            ? { ...opportunity, ...result.data, accounts: opportunity.accounts, contacts: opportunity.contacts }
+            : opportunity
         )
       );
 
@@ -149,6 +172,11 @@ export default function OpportunitiesPipeline() {
         description: "Opportunity stage updated",
       });
     } catch (error) {
+      setOpportunities((prev) =>
+        prev.map((opportunity) =>
+          opportunity.id === opportunityId ? previousOpportunity : opportunity
+        )
+      );
       console.error("Error updating opportunity stage:", error);
       toast({
         title: "Error",

@@ -37,6 +37,15 @@ export default function ThemeManagement() {
   // Kanban settings
   const [kanbanCardBg, setKanbanCardBg] = useState<string | undefined>(undefined);
   const [kanbanCardRadius, setKanbanCardRadius] = useState('0.5rem');
+  const [stripColor, setStripColor] = useState('267 78% 44%');
+  const [stripOpacity, setStripOpacity] = useState(0.2);
+  const [stripWidth, setStripWidth] = useState('22px');
+  const [stripAngle, setStripAngle] = useState('14deg');
+  const [headerBannerVisible, setHeaderBannerVisible] = useState(false);
+  const [headerBannerContent, setHeaderBannerContent] = useState('System notification');
+  const [headerBannerColor, setHeaderBannerColor] = useState('217 91% 60%');
+  const [headerBannerTextColor, setHeaderBannerTextColor] = useState('0 0% 100%');
+  const [headerBannerHeight, setHeaderBannerHeight] = useState('48px');
   
   const [sidebarBackground, setSidebarBackground] = useState('222 47% 11%');
   const [sidebarAccent, setSidebarAccent] = useState('217 32% 17%');
@@ -49,6 +58,18 @@ export default function ThemeManagement() {
     if (activeThemeName) {
       const found = themes.find(t => t.name === activeThemeName);
       if (found) {
+        const root = document.documentElement;
+        const css = getComputedStyle(root);
+        const visibleFromAttr = root.getAttribute('data-header-banner-visible');
+        const domBannerVisible = visibleFromAttr === '1'
+          ? true
+          : visibleFromAttr === '0'
+            ? false
+            : css.getPropertyValue('--header-banner-visible').trim() === '1';
+        const domBannerContent = root.getAttribute('data-header-banner-content') || '';
+        const domBannerBg = css.getPropertyValue('--header-banner-bg').trim();
+        const domBannerText = css.getPropertyValue('--header-banner-text').trim();
+        const domBannerHeight = css.getPropertyValue('--header-banner-height').trim();
         setName(found.name);
         setStart(found.start);
         setEnd(found.end);
@@ -61,6 +82,43 @@ export default function ThemeManagement() {
         setRadius(found.radius ?? radius);
         setKanbanCardBg(found.kanbanCardBg || kanbanCardBg);
         setKanbanCardRadius(found.kanbanCardRadius || kanbanCardRadius);
+        setStripColor((found as any).stripColor || found.accent || found.primary || stripColor);
+        setStripOpacity(typeof (found as any).stripOpacity === 'number' ? (found as any).stripOpacity : 0.2);
+        setStripWidth((found as any).stripWidth || stripWidth);
+        setStripAngle((found as any).stripAngle || stripAngle);
+        setHeaderBannerVisible(
+          found.name === 'Default Simple'
+            ? true
+            : typeof (found as any).headerBannerVisible === 'boolean'
+              ? (found as any).headerBannerVisible
+              : domBannerVisible
+        );
+        setHeaderBannerContent(
+          typeof (found as any).headerBannerContent === 'string'
+            ? (found as any).headerBannerContent
+            : (found.name === 'Default Simple' ? 'System notification' : domBannerContent)
+        );
+        if (typeof (found as any).headerBannerColor === 'string') {
+          setHeaderBannerColor((found as any).headerBannerColor);
+        } else if (domBannerBg.startsWith('hsl(') && domBannerBg.endsWith(')')) {
+          setHeaderBannerColor(domBannerBg.slice(4, -1));
+        } else {
+          setHeaderBannerColor(found.accent || found.primary || '217 91% 60%');
+        }
+        if (typeof (found as any).headerBannerTextColor === 'string') {
+          setHeaderBannerTextColor((found as any).headerBannerTextColor);
+        } else if (domBannerText.startsWith('hsl(') && domBannerText.endsWith(')')) {
+          setHeaderBannerTextColor(domBannerText.slice(4, -1));
+        } else {
+          setHeaderBannerTextColor('0 0% 100%');
+        }
+        if (typeof (found as any).headerBannerHeight === 'string') {
+          setHeaderBannerHeight((found as any).headerBannerHeight);
+        } else if (domBannerHeight) {
+          setHeaderBannerHeight(domBannerHeight);
+        } else {
+          setHeaderBannerHeight('48px');
+        }
         setSidebarBackground(found.sidebarBackground || sidebarBackground);
         setSidebarAccent(found.sidebarAccent || sidebarAccent);
         setDark(found.dark ?? dark);
@@ -74,6 +132,39 @@ export default function ThemeManagement() {
       }
     }
   }, [activeThemeName, themes]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const syncBannerState = () => {
+      const css = getComputedStyle(root);
+      const visibleFromAttr = root.getAttribute('data-header-banner-visible');
+      if (visibleFromAttr === '1' || visibleFromAttr === '0') {
+        setHeaderBannerVisible(visibleFromAttr === '1');
+      } else {
+        setHeaderBannerVisible(css.getPropertyValue('--header-banner-visible').trim() === '1');
+      }
+      const contentFromAttr = root.getAttribute('data-header-banner-content');
+      if (contentFromAttr !== null) {
+        setHeaderBannerContent(contentFromAttr);
+      }
+      const bg = css.getPropertyValue('--header-banner-bg').trim();
+      const text = css.getPropertyValue('--header-banner-text').trim();
+      const heightVar = css.getPropertyValue('--header-banner-height').trim();
+      if (bg.startsWith('hsl(') && bg.endsWith(')')) {
+        setHeaderBannerColor(bg.slice(4, -1));
+      }
+      if (text.startsWith('hsl(') && text.endsWith(')')) {
+        setHeaderBannerTextColor(text.slice(4, -1));
+      }
+      if (heightVar) {
+        setHeaderBannerHeight(heightVar);
+      }
+    };
+    syncBannerState();
+    const observer = new MutationObserver(syncBannerState);
+    observer.observe(root, { attributes: true, attributeFilter: ['style', 'class', 'data-header-banner-visible', 'data-header-banner-content'] });
+    return () => observer.disconnect();
+  }, []);
 
   // Honor scope from query parameter if provided
   useEffect(() => {
@@ -92,7 +183,14 @@ export default function ThemeManagement() {
   }, [scope, context?.userId, context?.isFranchiseAdmin, context?.isTenantAdmin, context?.isPlatformAdmin]);
 
   const allThemes = useMemo(() => {
-    return [...THEME_PRESETS, ...themes];
+    const mergedByName = new Map<string, (typeof THEME_PRESETS)[number] | (typeof themes)[number]>();
+    for (const preset of THEME_PRESETS) {
+      mergedByName.set(preset.name, preset);
+    }
+    for (const savedTheme of themes) {
+      mergedByName.set(savedTheme.name, savedTheme);
+    }
+    return Array.from(mergedByName.values());
   }, [themes]);
 
   const resetTableDefaults = () => {
@@ -109,6 +207,15 @@ export default function ThemeManagement() {
       sidebarAccent,
       kanbanCardBg,
       kanbanCardRadius,
+      stripColor,
+      stripOpacity,
+      stripWidth,
+      stripAngle,
+      headerBannerVisible,
+      headerBannerContent,
+      headerBannerColor,
+      headerBannerTextColor,
+      headerBannerHeight,
       dark,
       bgStart: bgStart ?? start,
       bgEnd: bgEnd ?? end,
@@ -190,6 +297,26 @@ export default function ThemeManagement() {
               <HslPicker label="Table Text" value={tableForeground ?? (dark ? '210 40% 98%' : '222.2 84% 4.9%')} onChange={(v) => setTableForeground(v)} />
               <div className="col-span-full">
                 <Button variant="outline" size="sm" onClick={resetTableDefaults}>Reset Table Defaults</Button>
+              </div>
+              <div className="col-span-full mt-2 border-t pt-4">
+                <div className="text-sm font-medium mb-3">Header Notification Banner</div>
+                <div className="grid gap-4 md:grid-cols-6">
+                  <div className="space-y-2 flex items-center gap-2">
+                    <Switch checked={headerBannerVisible} onCheckedChange={setHeaderBannerVisible} />
+                    <Label>Visible</Label>
+                  </div>
+                  <div className="space-y-2 md:col-span-3">
+                    <label className="text-sm">Banner Content</label>
+                    <Input value={headerBannerContent} onChange={(e) => setHeaderBannerContent(e.target.value)} placeholder="Type notification content" />
+                    <p className="text-xs text-muted-foreground">Displays existing header labels and text fields exactly with the banner background.</p>
+                  </div>
+                  <HslPicker label="Banner Background" value={headerBannerColor} onChange={setHeaderBannerColor} />
+                  <HslPicker label="Banner Text" value={headerBannerTextColor} onChange={setHeaderBannerTextColor} />
+                  <div className="space-y-2">
+                    <label className="text-sm">Banner Height</label>
+                    <Input value={headerBannerHeight} onChange={(e) => setHeaderBannerHeight(e.target.value)} placeholder="e.g., 48px" />
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -293,7 +420,7 @@ export default function ThemeManagement() {
             </div>
 
             <div className="mt-6 flex items-center gap-3">
-              <Button onClick={() => applyTheme({ start, end, primary, accent, titleStrip, angle, radius, sidebarBackground, sidebarAccent, kanbanCardBg, kanbanCardRadius, dark, tableHeaderText, tableHeaderSeparator: tableHeaderSeparator ?? (dark ? '0 0% 100% / 0.75' : '0 0% 0% / 0.2'), tableHeaderBackground: tableHeaderBackground ?? titleStrip, tableBackground: tableBackground ?? (dark ? '222 47% 11%' : '0 0% 100%'), tableForeground: tableForeground ?? (dark ? '210 40% 98%' : '222.2 84% 4.9%'), bgStart: bgStart ?? start, bgEnd: bgEnd ?? end, bgAngle: bgAngle ?? angle })}>Preview</Button>
+              <Button onClick={() => applyTheme({ start, end, primary, accent, titleStrip, angle, radius, sidebarBackground, sidebarAccent, kanbanCardBg, kanbanCardRadius, stripColor, stripOpacity, stripWidth, stripAngle, headerBannerVisible, headerBannerContent, headerBannerColor, headerBannerTextColor, headerBannerHeight, dark, tableHeaderText, tableHeaderSeparator: tableHeaderSeparator ?? (dark ? '0 0% 100% / 0.75' : '0 0% 0% / 0.2'), tableHeaderBackground: tableHeaderBackground ?? titleStrip, tableBackground: tableBackground ?? (dark ? '222 47% 11%' : '0 0% 100%'), tableForeground: tableForeground ?? (dark ? '210 40% 98%' : '222.2 84% 4.9%'), bgStart: bgStart ?? start, bgEnd: bgEnd ?? end, bgAngle: bgAngle ?? angle })}>Preview</Button>
               <Button variant="secondary" onClick={() => setOpen(true)} disabled={!canWrite}>Save As</Button>
               <div className="flex-1 h-16 rounded-lg bg-gradient-primary shadow-primary flex items-center justify-between px-4">
                 <Button className="rounded-lg" variant="default">Primary Button</Button>
@@ -328,6 +455,17 @@ export default function ThemeManagement() {
                           bgAngle: (p as any).bgAngle ?? p.angle ?? angle,
                           kanbanCardBg: (p as any).kanbanCardBg,
                           kanbanCardRadius: (p as any).kanbanCardRadius,
+                          stripColor: (p as any).stripColor ?? p.accent ?? p.primary,
+                          stripOpacity: typeof (p as any).stripOpacity === 'number' ? (p as any).stripOpacity : 0.2,
+                          stripWidth: (p as any).stripWidth ?? stripWidth,
+                          stripAngle: (p as any).stripAngle ?? stripAngle,
+                          headerBannerVisible: typeof (p as any).headerBannerVisible === 'boolean'
+                            ? (p as any).headerBannerVisible
+                            : p.name === 'Default Simple',
+                          headerBannerContent: (p as any).headerBannerContent ?? 'System notification',
+                          headerBannerColor: (p as any).headerBannerColor ?? p.accent ?? p.primary ?? '217 91% 60%',
+                          headerBannerTextColor: (p as any).headerBannerTextColor ?? '0 0% 100%',
+                          headerBannerHeight: (p as any).headerBannerHeight ?? '48px',
                           radius: p.radius ?? radius,
                           sidebarBackground: p.sidebarBackground ?? sidebarBackground,
                           sidebarAccent: p.sidebarAccent ?? sidebarAccent,
@@ -357,6 +495,19 @@ export default function ThemeManagement() {
                               bgAngle: (p as any).bgAngle ?? p.angle ?? angle,
                               kanbanCardBg: (p as any).kanbanCardBg,
                               kanbanCardRadius: (p as any).kanbanCardRadius,
+                              stripColor: (p as any).stripColor ?? p.accent ?? p.primary,
+                              stripOpacity: typeof (p as any).stripOpacity === 'number' ? (p as any).stripOpacity : 0.2,
+                              stripWidth: (p as any).stripWidth ?? stripWidth,
+                              stripAngle: (p as any).stripAngle ?? stripAngle,
+                              headerBannerVisible: p.name === 'Default Simple'
+                                ? true
+                                : typeof (p as any).headerBannerVisible === 'boolean'
+                                  ? (p as any).headerBannerVisible
+                                  : false,
+                              headerBannerContent: (p as any).headerBannerContent ?? 'System notification',
+                              headerBannerColor: (p as any).headerBannerColor ?? p.accent ?? p.primary ?? '217 91% 60%',
+                              headerBannerTextColor: (p as any).headerBannerTextColor ?? '0 0% 100%',
+                              headerBannerHeight: (p as any).headerBannerHeight ?? '48px',
                               tableHeaderText: (p as any).tableHeaderText ?? '0 0% 100%',
                               tableHeaderSeparator: (p as any).tableHeaderSeparator ?? (isDarkPreset ? '0 0% 100% / 0.75' : '0 0% 0% / 0.2'),
                               tableHeaderBackground: (p as any).tableHeaderBackground ?? (p as any).titleStrip ?? p.accent ?? p.primary,
@@ -380,6 +531,19 @@ export default function ThemeManagement() {
                         setRadius(p.radius ?? radius);
                         setKanbanCardBg((p as any).kanbanCardBg || kanbanCardBg);
                         setKanbanCardRadius((p as any).kanbanCardRadius || kanbanCardRadius);
+                        setStripColor((p as any).stripColor || p.accent || p.primary || stripColor);
+                        setStripOpacity(typeof (p as any).stripOpacity === 'number' ? (p as any).stripOpacity : 0.2);
+                        setStripWidth((p as any).stripWidth || stripWidth);
+                        setStripAngle((p as any).stripAngle || stripAngle);
+                        setHeaderBannerVisible(p.name === 'Default Simple'
+                          ? true
+                          : typeof (p as any).headerBannerVisible === 'boolean'
+                            ? (p as any).headerBannerVisible
+                            : false);
+                        setHeaderBannerContent((p as any).headerBannerContent || 'System notification');
+                        setHeaderBannerColor((p as any).headerBannerColor || p.accent || p.primary || '217 91% 60%');
+                        setHeaderBannerTextColor((p as any).headerBannerTextColor || '0 0% 100%');
+                        setHeaderBannerHeight((p as any).headerBannerHeight || '48px');
                         setSidebarBackground(p.sidebarBackground ?? sidebarBackground);
                         setSidebarAccent(p.sidebarAccent ?? sidebarAccent);
                         const isDarkPreset = p.dark ?? dark;
@@ -407,10 +571,10 @@ export default function ThemeManagement() {
               <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="New theme name" />
             </div>
             <DialogFooter>
-              <Button disabled={!canWrite} onClick={() => {
-                saveTheme({ name, start, end, primary, accent, titleStrip, angle, radius, sidebarBackground, sidebarAccent, kanbanCardBg, kanbanCardRadius, dark, tableHeaderText, tableHeaderSeparator: tableHeaderSeparator ?? (dark ? '0 0% 100% / 0.75' : '0 0% 0% / 0.2'), tableHeaderBackground: tableHeaderBackground ?? titleStrip, tableBackground: tableBackground ?? (dark ? '222 47% 11%' : '0 0% 100%'), tableForeground: tableForeground ?? (dark ? '210 40% 98%' : '222.2 84% 4.9%'), bgStart: bgStart ?? start, bgEnd: bgEnd ?? end, bgAngle: bgAngle ?? angle });
+              <Button disabled={!canWrite} onClick={async () => {
+                await saveTheme({ name, start, end, primary, accent, titleStrip, angle, radius, sidebarBackground, sidebarAccent, kanbanCardBg, kanbanCardRadius, stripColor, stripOpacity, stripWidth, stripAngle, headerBannerVisible, headerBannerContent, headerBannerColor, headerBannerTextColor, headerBannerHeight, dark, tableHeaderText, tableHeaderSeparator: tableHeaderSeparator ?? (dark ? '0 0% 100% / 0.75' : '0 0% 0% / 0.2'), tableHeaderBackground: tableHeaderBackground ?? titleStrip, tableBackground: tableBackground ?? (dark ? '222 47% 11%' : '0 0% 100%'), tableForeground: tableForeground ?? (dark ? '210 40% 98%' : '222.2 84% 4.9%'), bgStart: bgStart ?? start, bgEnd: bgEnd ?? end, bgAngle: bgAngle ?? angle });
                 setActive(name);
-                applyTheme({ start, end, primary, accent, titleStrip, angle, radius, sidebarBackground, sidebarAccent, kanbanCardBg, kanbanCardRadius, dark, tableHeaderText, tableHeaderSeparator: tableHeaderSeparator ?? (dark ? '0 0% 100% / 0.75' : '0 0% 0% / 0.2'), tableHeaderBackground: tableHeaderBackground ?? titleStrip, tableBackground: tableBackground ?? (dark ? '222 47% 11%' : '0 0% 100%'), tableForeground: tableForeground ?? (dark ? '210 40% 98%' : '222.2 84% 4.9%'), bgStart: bgStart ?? start, bgEnd: bgEnd ?? end, bgAngle: bgAngle ?? angle });
+                applyTheme({ start, end, primary, accent, titleStrip, angle, radius, sidebarBackground, sidebarAccent, kanbanCardBg, kanbanCardRadius, stripColor, stripOpacity, stripWidth, stripAngle, headerBannerVisible, headerBannerContent, headerBannerColor, headerBannerTextColor, headerBannerHeight, dark, tableHeaderText, tableHeaderSeparator: tableHeaderSeparator ?? (dark ? '0 0% 100% / 0.75' : '0 0% 0% / 0.2'), tableHeaderBackground: tableHeaderBackground ?? titleStrip, tableBackground: tableBackground ?? (dark ? '222 47% 11%' : '0 0% 100%'), tableForeground: tableForeground ?? (dark ? '210 40% 98%' : '222.2 84% 4.9%'), bgStart: bgStart ?? start, bgEnd: bgEnd ?? end, bgAngle: bgAngle ?? angle });
                 setOpen(false);
               }}>Save</Button>
             </DialogFooter>

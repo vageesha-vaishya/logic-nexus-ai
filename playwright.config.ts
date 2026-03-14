@@ -70,7 +70,7 @@ const projects = [
 
 export default defineConfig({
   testDir: '.',
-  testMatch: ['tests/e2e/**/*.spec.ts', 'dataentry/**/*.spec.ts'],
+  testMatch: ['tests/e2e/**/*.spec.ts', 'test/integration/**/*.spec.ts', 'dataentry/**/*.spec.ts'],
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,

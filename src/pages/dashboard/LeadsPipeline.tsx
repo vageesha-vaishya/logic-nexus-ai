@@ -27,6 +27,7 @@ import { useLeadsViewState } from '@/hooks/useLeadsViewState';
 import { logger } from '@/lib/logger';
 import * as Sentry from '@sentry/react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { PipelineService } from '@/services/pipeline-service';
 
 // Loading skeleton for the pipeline
 function PipelineSkeleton() {
@@ -184,23 +185,22 @@ export default function LeadsPipeline() {
     
     setLoading(true);
     try {
-      let query = scopedDb
-        .from('leads')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      // Apply filters from URL params (passed from Dashboard)
       const fromDate = searchParams.get('from');
       const toDate = searchParams.get('to');
       const franchiseId = searchParams.get('franchise');
+      const statusParam = searchParams.get('status');
+      const statuses = statusParam
+        ? (statusParam.split(',').filter((s): s is LeadStatus => stages.includes(s as LeadStatus)))
+        : [];
 
-      if (fromDate) query = query.gte('created_at', new Date(fromDate).toISOString());
-      if (toDate) query = query.lte('created_at', new Date(toDate).toISOString());
-      if (franchiseId && franchiseId !== 'all') query = query.eq('franchise_id', franchiseId);
-
-      const { data, error } = await query;
-
-      if (error) throw error;
+      const { data } = await PipelineService.listLeads(scopedDb, {
+        page: 1,
+        pageSize: 2000,
+        fromDate: fromDate || undefined,
+        toDate: toDate || undefined,
+        franchiseId: franchiseId || undefined,
+        statuses,
+      });
       
       const safeLeads = ((data as any[]) || []).map(d => ({
         ...d,
@@ -388,21 +388,42 @@ export default function LeadsPipeline() {
   }), [leads]);
 
   const handleStatusChange = useCallback(async (leadId: string, newStatus: LeadStatus) => {
+    const previousLead = leads.find((l) => l.id === leadId);
+    if (!previousLead) return;
+
     setLeads(prev => prev.map(l => l.id === leadId ? { ...l, status: newStatus } : l));
 
     if (!isContextReady) return;
 
     try {
-      const { error } = await (scopedDb.from('leads') as any).update({ status: newStatus }).eq('id', leadId);
+      const result = await PipelineService.transitionLeadStage(scopedDb, {
+        id: leadId,
+        toStatus: newStatus,
+        expectedUpdatedAt: previousLead.updated_at,
+      });
 
-      if (error) throw error;
+      if (result.ok === false) {
+        if (result.code === 'conflict') {
+          if (result.current) {
+            setLeads((prev) => prev.map((l) => (l.id === leadId ? result.current! : l)));
+          } else {
+            fetchLeads();
+          }
+          toast.error('Lead was updated by another user. Board has been refreshed.');
+          return;
+        }
+
+        throw new Error(result.message);
+      }
+
+      setLeads((prev) => prev.map((l) => (l.id === leadId ? result.data : l)));
       toast.success(`Lead moved to ${statusConfig[newStatus].label}`);
     } catch (error) {
       console.error('Error updating status:', error);
       toast.error('Failed to update status');
       fetchLeads();
     }
-  }, [supabase, context, isContextReady, fetchLeads]);
+  }, [leads, isContextReady, scopedDb, fetchLeads]);
 
   const handleItemUpdate = useCallback(async (id: string, updates: Partial<KanbanItem>) => {
     const leadUpdates: Partial<Lead> = {};

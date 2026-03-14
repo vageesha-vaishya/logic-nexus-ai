@@ -4,7 +4,7 @@ import { Label } from '@/components/ui/label';
 
 type HslPickerProps = {
   label?: string;
-  value: string; // e.g., "217 91% 60%"
+  value?: string;
   onChange: (v: string) => void;
 };
 
@@ -12,8 +12,9 @@ function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
 }
 
-function parseHslString(str: string) {
-  const parts = str.trim().split(/\s+/);
+function parseHslString(str?: string) {
+  const normalized = str ?? '';
+  const parts = normalized.trim().split(/\s+/);
   const h = clamp(parseFloat(parts[0] ?? '0') || 0, 0, 360);
   const s = clamp(parseFloat((parts[1] ?? '0').replace('%', '')) || 0, 0, 100);
   const l = clamp(parseFloat((parts[2] ?? '0').replace('%', '')) || 0, 0, 100);
@@ -61,7 +62,8 @@ function hexToHslString(hex: string) {
 }
 
 export function HslPicker({ label, value, onChange }: HslPickerProps) {
-  const { h, s, l } = useMemo(() => parseHslString(value), [value]);
+  const safeValue = value ?? '';
+  const { h, s, l } = useMemo(() => parseHslString(safeValue), [safeValue]);
   const hex = useMemo(() => hslToHexString(h, s, l), [h, s, l]);
 
   return (
@@ -89,7 +91,7 @@ export function HslPicker({ label, value, onChange }: HslPickerProps) {
           <Input className="text-xs" type="number" min={0} max={100} value={l} onChange={(e) => onChange(composeHslString(h, s, Number(e.target.value))) } />
         </div>
       </div>
-      <Input value={value} onChange={(e) => onChange(e.target.value)} placeholder="e.g., 217 91% 60%" />
+      <Input value={safeValue} onChange={(e) => onChange(e.target.value)} placeholder="e.g., 217 91% 60%" />
     </div>
   );
 }

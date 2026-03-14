@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { 
   Search, 
@@ -43,12 +43,40 @@ interface MenuGroup {
   defaultOpen?: boolean;
 }
 
+const ROUTE_PREFETCHERS: Record<string, () => Promise<unknown>> = {
+  '/dashboard': () => import('@/pages/dashboard/Dashboards'),
+  '/dashboard/leads/pipeline': () => import('@/pages/dashboard/LeadsPipeline'),
+  '/dashboard/opportunities/pipeline': () => import('@/pages/dashboard/OpportunitiesPipeline'),
+  '/dashboard/accounts/pipeline': () => import('@/pages/dashboard/AccountsPipeline'),
+  '/dashboard/contacts/pipeline': () => import('@/pages/dashboard/ContactsPipeline'),
+  '/dashboard/quotes/pipeline': () => import('@/pages/dashboard/QuotesPipeline'),
+  '/dashboard/bookings': () => import('@/pages/dashboard/Bookings'),
+  '/dashboard/shipments/pipeline': () => import('@/pages/dashboard/ShipmentsPipeline'),
+  '/dashboard/settings': () => import('@/pages/dashboard/Settings'),
+};
+
+const IDLE_PREFETCH_ROUTES = [
+  '/dashboard',
+  '/dashboard/leads/pipeline',
+  '/dashboard/opportunities/pipeline',
+  '/dashboard/shipments/pipeline',
+];
+
 export function CommandCenterNav() {
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
   const location = useLocation();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
+  const prefetchedRoutes = useRef(new Set<string>());
+  const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>(() => {
+    try {
+      const saved = sessionStorage.getItem('sidebar:expandedItems');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
   
   // Manage collapsible states with persistence
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
@@ -74,6 +102,43 @@ export function CommandCenterNav() {
     setOpenGroups(prev => {
       const next = { ...prev, [group]: !prev[group] };
       sessionStorage.setItem('sidebar:groups', JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const prefetchRoute = useCallback((route: string) => {
+    if (prefetchedRoutes.current.has(route)) {
+      return;
+    }
+    const prefetcher = ROUTE_PREFETCHERS[route];
+    if (!prefetcher) {
+      return;
+    }
+    prefetchedRoutes.current.add(route);
+    prefetcher().catch(() => {
+      prefetchedRoutes.current.delete(route);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    const idleRunner = () => {
+      IDLE_PREFETCH_ROUTES.forEach(prefetchRoute);
+    };
+    if ('requestIdleCallback' in window) {
+      const id = window.requestIdleCallback(idleRunner, { timeout: 1500 });
+      return () => window.cancelIdleCallback(id);
+    }
+    const timeoutId = globalThis.setTimeout(idleRunner, 700);
+    return () => globalThis.clearTimeout(timeoutId);
+  }, [prefetchRoute]);
+
+  const toggleExpandedItems = (groupId: string) => {
+    setExpandedItems((prev) => {
+      const next = { ...prev, [groupId]: !prev[groupId] };
+      sessionStorage.setItem('sidebar:expandedItems', JSON.stringify(next));
       return next;
     });
   };
@@ -165,13 +230,13 @@ export function CommandCenterNav() {
             end={item.url === '/dashboard'} 
             className={getNavClass}
             onClick={(e) => {
-              console.log('Navigating to:', item.url);
-              // Force navigation if default behavior fails or gets blocked
               if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
                 e.preventDefault();
                 navigate(item.url);
               }
             }}
+            onMouseEnter={() => prefetchRoute(item.url)}
+            onFocus={() => prefetchRoute(item.url)}
           >
             <item.icon className="h-4 w-4 shrink-0" />
             {!collapsed && <span className="truncate">{item.title}</span>}
@@ -213,6 +278,13 @@ export function CommandCenterNav() {
         // If not searching, use collapsible behavior (except for first group usually)
         const isSearchActive = !!searchQuery.trim();
         const isOpen = isSearchActive || openGroups[group.id] || group.defaultOpen;
+        const isLowFrequencyGroup = group.id === 'logistics' || group.id === 'financials' || group.id === 'admin';
+        const isExpanded = !!expandedItems[group.id];
+        const visibleItems =
+          !isSearchActive && !collapsed && isLowFrequencyGroup && !isExpanded
+            ? group.items.slice(0, 6)
+            : group.items;
+        const hiddenCount = group.items.length - visibleItems.length;
 
         return (
           <Collapsible 
@@ -241,8 +313,26 @@ export function CommandCenterNav() {
               <CollapsibleContent forceMount={isSearchActive || group.defaultOpen ? true : undefined}>
                 <SidebarGroupContent>
                   <SidebarMenu>
-                    {group.items.map(renderMenuItem)}
+                    {visibleItems.map(renderMenuItem)}
                   </SidebarMenu>
+                  {!isSearchActive && !collapsed && isLowFrequencyGroup && hiddenCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => toggleExpandedItems(group.id)}
+                      className="mt-2 w-full rounded-md px-3 py-2 text-left text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    >
+                      Show {hiddenCount} more
+                    </button>
+                  )}
+                  {!isSearchActive && !collapsed && isLowFrequencyGroup && hiddenCount === 0 && isExpanded && group.items.length > 6 && (
+                    <button
+                      type="button"
+                      onClick={() => toggleExpandedItems(group.id)}
+                      className="mt-2 w-full rounded-md px-3 py-2 text-left text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    >
+                      Show less
+                    </button>
+                  )}
                 </SidebarGroupContent>
               </CollapsibleContent>
             </SidebarGroup>

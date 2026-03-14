@@ -175,3 +175,42 @@ To run from source:
 # Go >= 1.22
 go run . help
 ```
+
+## Diagonal Strip Module
+
+### Installation
+
+```bash
+npm install
+```
+
+### ESM Usage
+
+```js
+import { appendStrip } from '/src/diagonal-strip.esm.js';
+const strip = appendStrip(document.querySelector('header'), {
+  themeAware: true,
+  strategy: 'css'
+});
+```
+
+### CDN Usage
+
+```html
+<script type="module" nonce="__CSP_NONCE__">
+  import { appendStrip } from 'https://cdn.example.com/diagonal-strip.esm.js';
+  appendStrip(document.querySelector('header'), { color: '#5b21b6' });
+</script>
+```
+
+### CSP Nonce Support
+
+- Use `type="module"` script tags with nonce.
+- Pass the same nonce used by your CSP policy.
+- Runtime injection uses DOM APIs and does not require inline eval.
+
+### Tree-Shaking
+
+- `src/diagonal-strip.esm.js` exports named symbols.
+- `appendStrip` and `DiagonalStrip` are independently importable.
+- `src/contrast/apca.js` can be imported standalone for contrast workflows.
