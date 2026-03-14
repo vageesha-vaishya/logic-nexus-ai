@@ -1,0 +1,64 @@
+import { Meta, Canvas, Controls } from '@storybook/blocks';
+import * as CRMStories from './CRMDesignSystem.stories';
+
+<Meta of={CRMStories} title="CRM Design System/Usage Guidelines" />
+
+# Usage Guidelines
+
+## Do and Don't
+
+### Do
+
+- Use `primary` for highest-priority page actions.
+- Use `secondary` for supporting actions.
+- Use `danger` only for destructive workflows.
+- Preserve keyboard focus order for all interactive controls.
+
+### Don't
+
+- Don't use `danger` as a default visual style.
+- Don't remove `aria-label` from icon-only interactions.
+- Don't hardcode spacing outside token values.
+- Don't ship components without Storybook play coverage.
+
+## Props Table
+
+<Controls of={CRMStories.AtomButtonVariants} />
+
+## TypeScript Snippet
+
+```tsx
+import { CRMButton } from '@/design-system/components';
+
+export function SaveAction() {
+  return (
+    <CRMButton variant="primary" viewport="desktop">
+      Save Contact
+    </CRMButton>
+  );
+}
+```
+
+## JavaScript Snippet
+
+```jsx
+import { CRMButton } from '@/design-system/components';
+
+export function SaveAction() {
+  return <CRMButton variant="primary">Save Contact</CRMButton>;
+}
+```
+
+## HTML Snippet
+
+```html
+<button class="crm-button crm-button--primary" aria-label="Save Contact">
+  Save Contact
+</button>
+```
+
+## Canonical Design Spec
+
+<Canvas of={CRMStories.AtomButtonVariants} />
+
+Figma: [CRM Design System](https://www.figma.com/file/7rVZtP0crmCanonical/CRM-Design-System)

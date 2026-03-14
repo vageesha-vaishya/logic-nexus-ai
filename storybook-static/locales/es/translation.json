@@ -1,4 +1,7 @@
 {
+  "quotation": {
+    "manualQuote": "Cotización manual"
+  },
   "leads": {
     "title": "Espacio de trabajo de Clientes Potenciales",
     "subtitle": "Enfoque en pipeline y contactos activos",

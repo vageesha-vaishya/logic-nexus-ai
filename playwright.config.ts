@@ -4,9 +4,8 @@ const firefoxNoSandbox =
   process.env.PW_FIREFOX_NO_SANDBOX === '1' ||
   (process.env.PW_FIREFOX_NO_SANDBOX !== '0' && process.platform === 'darwin');
 const baseURL = process.env.PLAYWRIGHT_BASE_URL || process.env.BASE_URL || 'http://localhost:4173';
-<<<<<<< HEAD
 const enableDevServer = process.env.PLAYWRIGHT_REUSE_EXISTING_SERVER !== 'true';
-const enableEdge = process.env.PW_ENABLE_EDGE === '1';
+const enableEdge = process.env.PW_ENABLE_EDGE !== '0';
 const enableEdgeBeta = process.env.PW_ENABLE_EDGE_BETA === '1';
 
 const projects = [
@@ -16,13 +15,13 @@ const projects = [
   },
   {
     name: 'chrome-latest',
-    use: { ...devices['Desktop Chrome'], channel: 'chrome' },
+    use: { ...devices['Desktop Chrome'] },
   },
   ...(enableEdge
     ? [
         {
           name: 'msedge-latest',
-          use: { ...devices['Desktop Edge'], channel: 'msedge' },
+          use: { ...devices['Desktop Edge'] },
         },
       ]
     : []),
@@ -68,9 +67,6 @@ const projects = [
     use: { ...devices['Pixel 7'] },
   },
 ];
-=======
-const reuseExistingServer = process.env.PLAYWRIGHT_REUSE_EXISTING_SERVER === 'true';
->>>>>>> 6ae8503fc91ccac2878cbfe02e7796240bb52aef
 
 export default defineConfig({
   testDir: '.',
@@ -99,7 +95,6 @@ export default defineConfig({
     navigationTimeout: 45_000,
     ignoreHTTPSErrors: true,
   },
-<<<<<<< HEAD
   projects,
   webServer: enableDevServer
     ? {
@@ -108,62 +103,4 @@ export default defineConfig({
         reuseExistingServer: true,
       }
     : undefined,
-=======
-  projects: [
-    {
-      name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
-    },
-    {
-      name: 'chrome-latest',
-      use: { ...devices['Desktop Chrome'], channel: 'chrome' },
-    },
-    {
-      name: 'msedge-latest',
-      use: { ...devices['Desktop Edge'], channel: 'msedge' },
-    },
-    {
-      name: 'msedge-beta',
-      use: { ...devices['Desktop Edge'], channel: 'msedge-beta' },
-    },
-    {
-      name: 'firefox',
-      use: {
-        ...devices['Desktop Firefox'],
-        ...(firefoxNoSandbox
-          ? {
-              launchOptions: {
-                env: {
-                  MOZ_DISABLE_CONTENT_SANDBOX: '1',
-                  MOZ_DISABLE_GMP_SANDBOX: '1',
-                  MOZ_DISABLE_RDD_SANDBOX: '1',
-                  MOZ_DISABLE_SOCKET_PROCESS_SANDBOX: '1',
-                },
-                firefoxUserPrefs: {
-                  'security.sandbox.content.level': 0,
-                },
-              },
-            }
-          : {}),
-      },
-    },
-    {
-      name: 'webkit',
-      use: { ...devices['Desktop Safari'] },
-    },
-    {
-      name: 'ios-mobile',
-      use: { ...devices['iPhone 14 Pro'] },
-    },
-    {
-      name: 'android-mobile',
-      use: { ...devices['Pixel 7'] },
-    },
-  ],
-  webServer: {
-    command: 'npm run dev -- --host 0.0.0.0 --port 4173',
-    url: baseURL,
-    reuseExistingServer,
-  },
->>>>>>> 6ae8503fc91ccac2878cbfe02e7796240bb52aef
 });

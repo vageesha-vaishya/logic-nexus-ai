@@ -180,6 +180,10 @@ export function CRMProvider({ children }: { children: ReactNode }) {
 export function useCRM() {
   const context = useContext(CRMContext);
   if (context === undefined) {
+    const storybookMock = typeof window !== 'undefined' ? (window as any).__STORYBOOK_CRM_MOCK__ : undefined;
+    if (storybookMock) {
+      return storybookMock as CRMContextType;
+    }
     throw new Error('useCRM must be used within a CRMProvider');
   }
   return context;

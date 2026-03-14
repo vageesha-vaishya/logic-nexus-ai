@@ -1,0 +1,53 @@
+name: Design System PR Gate
+
+on:
+  pull_request:
+    branches: [main, master, develop]
+
+jobs:
+  quality-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          registry-url: https://registry.npmjs.org
+
+      - name: Install
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium firefox webkit
+
+      - name: Design system unit coverage
+        run: npm run design-system:test:coverage
+
+      - name: Lint and typecheck
+        run: |
+          npm run lint
+          npm run typecheck
+
+      - name: Cross-browser smoke
+        run: npm run design-system:smoke
+
+      - name: Performance budget
+        run: npm run design-system:perf
+
+      - name: Build Storybook
+        run: npm run build-storybook
+
+      - name: Chromatic visual regression
+        run: npm run chromatic -- --auto-accept-changes=false --exit-once-uploaded --patch-build
+        env:
+          CHROMATIC_PROJECT_TOKEN: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: design-system-coverage
+          path: coverage

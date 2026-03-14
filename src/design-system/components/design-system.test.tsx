@@ -96,7 +96,7 @@ describe('design system components', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
     expect(onConfirm).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole('heading', { name: 'Contacts' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Contact Registry' })).toBeVisible();
     expect(screen.getByRole('heading', { name: 'Deal Pipeline' })).toBeVisible();
     expect(await axe(document.body)).toHaveNoViolations();
   });

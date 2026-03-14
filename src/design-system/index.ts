@@ -1,5 +1,7 @@
 export { tokens } from './tokens';
 export * from './components';
+export * from './rolloutPlan';
+export * from './componentCatalog';
 export { Button } from '@/components/ui/button';
 export { Badge } from '@/components/ui/badge';
 export { Input } from '@/components/ui/input';

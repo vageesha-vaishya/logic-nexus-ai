@@ -8,7 +8,11 @@ export function useDashboardPreferences(defaultWidgets: WidgetInstance[]) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      setWidgets(defaultWidgets);
+      setLoading(false);
+      return;
+    }
 
     const fetchPreferences = async () => {
       try {

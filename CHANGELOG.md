@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+* Introduced centralized CRM design system foundation under `src/design-system` with JSON/SCSS tokens and atomic component exports.
+* Added Storybook modernization for webpack 5 with accessibility, design embed, and Chromatic addons.
+* Added atomic design hierarchy components and CSF 3 stories with play-function user flows.
+* Added design-system PR quality gates for Jest coverage, axe audits, cross-browser smoke checks, and performance budget validation.
+* Added semantic-release automation, migration guide generation, and npm provenance-ready package metadata for private scope publication.
+
 ### Fixed
 
 * Resolved Origin/Destination field loading failure in `UnifiedQuoteComposer` by:

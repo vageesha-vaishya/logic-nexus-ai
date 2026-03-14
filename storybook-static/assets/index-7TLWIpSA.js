@@ -1,0 +1,1 @@
+import{r as o}from"./index-pP6CS22B.js";import"./jsx-runtime-Z5uAzocK.js";function c(t,[r,e]){return Math.min(e,Math.max(r,t))}var n=o.createContext(void 0);function s(t){const r=o.useContext(n);return t||r||"ltr"}export{c,s as u};

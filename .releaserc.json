@@ -1,0 +1,38 @@
+{
+  "branches": ["main", "master"],
+  "plugins": [
+    [
+      "@semantic-release/commit-analyzer",
+      {
+        "preset": "conventionalcommits"
+      }
+    ],
+    [
+      "@semantic-release/release-notes-generator",
+      {
+        "preset": "conventionalcommits"
+      }
+    ],
+    [
+      "@semantic-release/changelog",
+      {
+        "changelogFile": "CHANGELOG.md"
+      }
+    ],
+    [
+      "@semantic-release/npm",
+      {
+        "pkgRoot": "src/design-system",
+        "tarballDir": "dist"
+      }
+    ],
+    [
+      "@semantic-release/git",
+      {
+        "assets": ["CHANGELOG.md", "src/design-system/package.json", "src/design-system/MIGRATION_GUIDE.md"],
+        "message": "chore(release): ${nextRelease.version}"
+      }
+    ],
+    "@semantic-release/github"
+  ]
+}

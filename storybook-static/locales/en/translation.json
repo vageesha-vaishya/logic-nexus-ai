@@ -1,4 +1,7 @@
 {
+  "quotation": {
+    "manualQuote": "Manual Quotation"
+  },
   "leads": {
     "title": "Leads Workspace",
     "subtitle": "Focus on pipeline and active contacts",
@@ -15,89 +18,74 @@
       "pipelineView": "Pipeline View",
       "setDefault": "Set as Default",
       "cancel": "Cancel",
-      "delete": "Delete"
+      "columns": "Columns",
+      "delete": "Delete",
+      "export": "Export"
     },
-    "filters": {
-      "search": "Search leads...",
-      "status": "Status",
-      "score": "Score",
-      "owner": "Owner",
-      "allStatuses": "All Statuses",
-      "allScores": "All Scores",
-      "anyOwner": "Any Owner",
-      "nameOp": "Name op",
-      "name": "Name",
-      "scoreMin": "Score min",
-      "scoreMax": "Score max",
-      "valueMin": "Value min",
-      "valueMax": "Value max",
-      "companyOp": "Company op",
-      "company": "Company",
-      "emailOp": "Email op",
-      "email": "Email",
-      "ops": {
-        "contains": "Contains",
-        "equals": "Equals",
-        "startsWith": "Starts With",
-        "endsWith": "Ends With"
-      },
-      "statusOptions": {
-        "new": "New",
-        "contacted": "Contacted",
-        "qualified": "Qualified",
-        "proposal": "Proposal",
-        "negotiation": "Negotiation",
-        "won": "Won",
-        "lost": "Lost"
-      },
-      "scoreOptions": {
-        "high": "High (70+)",
-        "medium": "Medium (40-69)",
-        "low": "Low (<40)"
-      },
-      "ownerOptions": {
-        "me": "Assigned to Me",
-        "unassigned": "Unassigned"
-      }
+    "tabs": {
+      "all": "All Leads",
+      "new": "New",
+      "contacted": "Contacted",
+      "qualified": "Qualified",
+      "proposal": "Proposal",
+      "negotiation": "Negotiation"
     },
-    "columns": {
-      "name": "Name",
+    "table": {
+      "lead": "Lead",
       "company": "Company",
       "email": "Email",
       "phone": "Phone",
       "status": "Status",
-      "source": "Source",
       "score": "Score",
-      "value": "Value"
+      "created": "Created",
+      "owner": "Owner",
+      "source": "Source",
+      "actions": "Actions"
     },
-    "messages": {
-      "loading": "Loading leads...",
-      "noLeads": "No leads found",
-      "noLeadsDescSearch": "Try adjusting your search",
-      "noLeadsDescNew": "Get started by creating a new lead",
-      "loadError": "Failed to load leads",
-      "defaultViewSet": "Default view set to {{view}}",
-      "defaultViewError": "Failed to update default view",
-      "deleteConfirm": "Are you sure you want to delete {{count}} leads?",
-      "deleteSuccess": "{{count}} leads deleted",
-      "deleteError": "Failed to delete leads",
-      "newLead": "New lead: {{name}}",
-      "statusUpdate": "Lead moved to {{status}}",
-      "leadUpdate": "Lead updated",
-      "updateError": "Failed to update lead",
-      "statusError": "Failed to update status"
+    "status": {
+      "new": "New",
+      "contacted": "Contacted",
+      "qualified": "Qualified",
+      "proposal": "Proposal",
+      "negotiation": "Negotiation",
+      "won": "Won",
+      "lost": "Lost"
     },
-    "tabs": {
-      "board": "Kanban Board",
-      "analytics": "Analytics"
+    "filters": {
+      "searchPlaceholder": "Search leads...",
+      "status": "Status",
+      "source": "Source",
+      "owner": "Owner",
+      "createdAfter": "Created After",
+      "createdBefore": "Created Before",
+      "scoreMin": "Min Score",
+      "scoreMax": "Max Score"
     },
-    "pipeline": {
-      "loading": "Loading pipeline...",
-      "found": "{{count}} leads found",
-      "user": "User"
-    },
-    "bulk": {
-      "selected": "{{count}} selected"
+    "empty": {
+      "title": "No leads found",
+      "description": "Try adjusting your filters or create a new lead."
     }
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "view": "View",
+    "create": "Create",
+    "update": "Update",
+    "confirm": "Confirm",
+    "close": "Close",
+    "back": "Back",
+    "next": "Next",
+    "finish": "Finish",
+    "search": "Search",
+    "filter": "Filter",
+    "sort": "Sort",
+    "actions": "Actions",
+    "noData": "No data available"
   }
 }
