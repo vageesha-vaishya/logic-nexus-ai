@@ -186,7 +186,7 @@ const App = () => (
           <DomainContextProvider>
             <ThemeProvider>
               <TooltipProvider>
-                <SidebarProvider>
+                <SidebarProvider defaultOpen={false}>
                   <StickyActionsProvider>
                     <LeadsViewStateProvider>
                       <PipelineProvider>

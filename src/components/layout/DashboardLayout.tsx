@@ -15,7 +15,7 @@ import { OnboardingTour } from '@/components/system/OnboardingTour';
 import { HelpDialog } from '@/components/system/HelpDialog';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { APP_MENU } from '@/config/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import {
   Breadcrumb,
@@ -32,7 +32,6 @@ interface DashboardLayoutProps {
 }
 
 type ActiveSurface = {
-  moduleLabel: string;
   routeName: string;
   routePath: string;
 };
@@ -49,20 +48,20 @@ function normalizePattern(pattern: string) {
   return pattern.split('#')[0];
 }
 
-function resolveActiveSurface(pathname: string): ActiveSurface | null {
-  const navEntries = APP_MENU.flatMap((module) =>
-    module.items.flatMap((item) => {
+export function resolveActiveSurface(pathname: string, hash = ''): ActiveSurface | null {
+  const navEntries = APP_MENU.flatMap(({ items }) =>
+    items.flatMap((item) => {
       const screens = (item.screens ?? []).map((screen) => ({
-        moduleLabel: module.label,
         routeName: `${item.name} / ${screen.name}`,
         routePath: normalizePattern(screen.path),
+        routeHash: screen.path.includes('#') ? `#${screen.path.split('#')[1]}` : '',
         basePath: item.path.split('/').slice(0, 3).join('/'),
       }));
       return [
         {
-          moduleLabel: module.label,
           routeName: item.name,
           routePath: item.path,
+          routeHash: '',
           basePath: item.path.split('/').slice(0, 3).join('/'),
         },
         ...screens,
@@ -70,10 +69,17 @@ function resolveActiveSurface(pathname: string): ActiveSurface | null {
     }),
   );
 
-  const exact = navEntries.find((entry) => matchPath({ path: entry.routePath, end: true }, pathname));
+  const exact = navEntries.find((entry) => {
+    if (!matchPath({ path: entry.routePath, end: true }, pathname)) {
+      return false;
+    }
+    if (entry.routeHash) {
+      return entry.routeHash === hash;
+    }
+    return true;
+  });
   if (exact) {
     return {
-      moduleLabel: exact.moduleLabel,
       routeName: exact.routeName,
       routePath: exact.routePath,
     };
@@ -88,10 +94,17 @@ function resolveActiveSurface(pathname: string): ActiveSurface | null {
 
   if (!soft) return null;
   return {
-    moduleLabel: soft.moduleLabel,
     routeName: soft.routeName,
     routePath: soft.routePath,
   };
+}
+
+export function resolveBreadcrumbTrail(activeSurface: ActiveSurface | null): string[] {
+  if (!activeSurface || activeSurface.routeName === 'Home') return [];
+  return activeSurface.routeName
+    .split(' / ')
+    .map((segment) => segment.trim())
+    .filter(Boolean);
 }
 
 function StickyActionsMount() {
@@ -112,7 +125,8 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   useKeyboardShortcuts();
   const navigate = useNavigate();
   const location = useLocation();
-  const activeSurface = resolveActiveSurface(location.pathname);
+  const activeSurface = resolveActiveSurface(location.pathname, location.hash);
+  const breadcrumbTrail = resolveBreadcrumbTrail(activeSurface);
   const [showGlobalSearch, setShowGlobalSearch] = useState(true);
   const shellRef = useRef<HTMLDivElement | null>(null);
   const headerRef = useRef<HTMLElement | null>(null);
@@ -222,22 +236,14 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                     <Link to="/dashboard">Dashboard</Link>
                   </BreadcrumbLink>
                 </BreadcrumbItem>
-                {activeSurface && (
-                  <>
+                {breadcrumbTrail.map((segment) => (
+                  <Fragment key={segment}>
                     <BreadcrumbSeparator />
                     <BreadcrumbItem>
-                      <BreadcrumbPage>{activeSurface.moduleLabel}</BreadcrumbPage>
+                      <BreadcrumbPage>{segment}</BreadcrumbPage>
                     </BreadcrumbItem>
-                  </>
-                )}
-                {activeSurface && activeSurface.routeName !== 'Home' && (
-                  <>
-                    <BreadcrumbSeparator />
-                    <BreadcrumbItem>
-                      <BreadcrumbPage>{activeSurface.routeName}</BreadcrumbPage>
-                    </BreadcrumbItem>
-                  </>
-                )}
+                  </Fragment>
+                ))}
               </BreadcrumbList>
             </Breadcrumb>
             <div className="flex-1" />
