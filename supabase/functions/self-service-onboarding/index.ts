@@ -50,6 +50,12 @@ const listDomainsSchema = z.object({
   action: z.union([z.literal('list_domains'), z.literal('get_platform_domains')])
 })
 
+const checkOrgDomainUniquenessSchema = z.object({
+  action: z.literal('check_org_domain_uniqueness'),
+  organization_name: z.string().min(2).max(120),
+  domain: z.string().min(1).max(120)
+})
+
 const removeControlCharacters = (value: string): string =>
   value
     .split('')
@@ -329,6 +335,38 @@ serveWithLogger(async (req, logger, supabase) => {
     return json(200, {
       success: true,
       domains
+    })
+  }
+
+  if (action === 'check_org_domain_uniqueness') {
+    const parsed = checkOrgDomainUniquenessSchema.safeParse(payload)
+    if (!parsed.success) {
+      return json(422, { success: false, error: 'Validation failed', issues: parsed.error.issues })
+    }
+
+    const sanitizedOrganizationName = sanitizeText(parsed.data.organization_name, 120)
+    const sanitizedDomain = sanitizeDomain(parsed.data.domain)
+
+    if (!sanitizedOrganizationName || !sanitizedDomain) {
+      return json(422, { success: false, error: 'Organization name and preferred domain are required' })
+    }
+
+    const { data: existingRequests, error: existingRequestsError } = await supabase
+      .from('self_service_onboarding_requests')
+      .select('id')
+      .ilike('organization_name', sanitizedOrganizationName)
+      .filter('request_payload->initial_config->>domain', 'eq', sanitizedDomain)
+      .limit(1)
+
+    if (existingRequestsError) {
+      await logger.error('Failed checking organization and domain uniqueness', { error: existingRequestsError.message })
+      return json(500, { success: false, error: 'Unable to validate organization and domain uniqueness' })
+    }
+
+    const isUnique = !existingRequests || existingRequests.length === 0
+    return json(200, {
+      success: true,
+      is_unique: isUnique
     })
   }
 

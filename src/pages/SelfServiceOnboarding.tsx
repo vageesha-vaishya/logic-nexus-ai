@@ -74,9 +74,15 @@ export default function SelfServiceOnboarding() {
   const [stepIndex, setStepIndex] = useState(0)
   const [submitting, setSubmitting] = useState(false)
   const [verifying, setVerifying] = useState(false)
+  const [validatingOrgDomain, setValidatingOrgDomain] = useState(false)
   const [domainsLoading, setDomainsLoading] = useState(true)
   const [domainsError, setDomainsError] = useState<string | null>(null)
   const [domainOptions, setDomainOptions] = useState<DomainOption[]>([])
+  const [fieldErrors, setFieldErrors] = useState<{
+    organization_name?: string
+    domain?: string
+    organization_domain_combination?: string
+  }>({})
   const [requestId, setRequestId] = useState<string | null>(null)
   const [verificationCode, setVerificationCode] = useState('')
   const [status, setStatus] = useState<'form' | 'verification' | 'completed'>('form')
@@ -110,6 +116,12 @@ export default function SelfServiceOnboarding() {
   const progress = ((stepIndex + 1) / stepIds.length) * 100
 
   const updateField = <K extends keyof FormState>(key: K, value: FormState[K]) => {
+    if (key === 'organization_name') {
+      setFieldErrors((prev) => ({ ...prev, organization_name: undefined, organization_domain_combination: undefined }))
+    }
+    if (key === 'domain') {
+      setFieldErrors((prev) => ({ ...prev, domain: undefined, organization_domain_combination: undefined }))
+    }
     setForm((prev) => ({ ...prev, [key]: value }))
   }
 
@@ -151,7 +163,7 @@ export default function SelfServiceOnboarding() {
     void loadDomainOptions()
   }, [])
 
-  const validateCurrentStep = (): boolean => {
+  const validateCurrentStep = async (): Promise<boolean> => {
     if (stepIds[stepIndex] === 'package') {
       if (!form.plan_tier) {
         toast.error('Select a package to continue')
@@ -160,14 +172,76 @@ export default function SelfServiceOnboarding() {
       return true
     }
     if (stepIds[stepIndex] === 'organization') {
+      const nextErrors: {
+        organization_name?: string
+        domain?: string
+        organization_domain_combination?: string
+      } = {}
+
       if (!form.organization_name.trim() || !form.country.trim()) {
-        toast.error('Organization name and country are required')
+        if (!form.organization_name.trim()) {
+          nextErrors.organization_name = 'Organization Name is required'
+        }
+        if (!form.country.trim()) {
+          toast.error('Country is required')
+        }
+      }
+      if (!form.domain.trim()) {
+        nextErrors.domain = 'Preferred Domain is required'
+      } else if (!domainOptions.some((domain) => domain.value === form.domain)) {
+        nextErrors.domain = 'Select a preferred domain from available options'
+      }
+
+      if (nextErrors.organization_name || nextErrors.domain) {
+        setFieldErrors(nextErrors)
+        toast.error(nextErrors.organization_name || nextErrors.domain || 'Please complete required fields')
         return false
       }
-      if (form.domain && !domainOptions.some((domain) => domain.value === form.domain)) {
-        toast.error('Select a preferred domain from available options')
+
+      setValidatingOrgDomain(true)
+      try {
+        const response = await invokeAnonymous<{
+          success: boolean
+          is_unique?: boolean
+          error?: string
+        }>('self-service-onboarding', {
+          action: 'check_org_domain_uniqueness',
+          organization_name: form.organization_name.trim(),
+          domain: form.domain.trim()
+        })
+
+        if (!response?.success) {
+          throw new Error(response?.error || 'Unable to validate organization and domain combination')
+        }
+
+        if (response.is_unique === false) {
+          const duplicateMessage = 'This Organization Name and Preferred Domain combination already exists. Please use a different combination.'
+          setFieldErrors({
+            organization_name: duplicateMessage,
+            domain: duplicateMessage,
+            organization_domain_combination: duplicateMessage
+          })
+          toast.error(duplicateMessage)
+          return false
+        }
+      } catch (error: any) {
+        const message = error?.message || 'Unable to validate organization and domain combination'
+        setFieldErrors((prev) => ({
+          ...prev,
+          organization_domain_combination: message
+        }))
+        toast.error(message)
         return false
+      } finally {
+        setValidatingOrgDomain(false)
       }
+
+      setFieldErrors((prev) => ({
+        ...prev,
+        organization_name: undefined,
+        domain: undefined,
+        organization_domain_combination: undefined
+      }))
       return true
     }
     if (stepIds[stepIndex] === 'admin') {
@@ -191,8 +265,8 @@ export default function SelfServiceOnboarding() {
     return true
   }
 
-  const nextStep = () => {
-    if (!validateCurrentStep()) return
+  const nextStep = async () => {
+    if (!await validateCurrentStep()) return
     setStepIndex((prev) => Math.min(prev + 1, stepIds.length - 1))
   }
 
@@ -437,8 +511,14 @@ export default function SelfServiceOnboarding() {
               {stepIds[stepIndex] === 'organization' && (
                 <div className="grid md:grid-cols-2 gap-4">
                   <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="organization_name">Organization Name</Label>
-                    <Input id="organization_name" value={form.organization_name} onChange={(e) => updateField('organization_name', e.target.value)} />
+                    <Label htmlFor="organization_name">Organization Name <span className="text-destructive">*</span></Label>
+                    <Input
+                      id="organization_name"
+                      value={form.organization_name}
+                      onChange={(e) => updateField('organization_name', e.target.value)}
+                      className={fieldErrors.organization_name ? 'border-destructive focus-visible:ring-destructive/30' : ''}
+                    />
+                    {fieldErrors.organization_name && <p className="text-xs text-destructive">{fieldErrors.organization_name}</p>}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="country">Country</Label>
@@ -449,13 +529,13 @@ export default function SelfServiceOnboarding() {
                     <Input id="website" value={form.website || ''} onChange={(e) => updateField('website', e.target.value)} placeholder="https://example.com" />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="domain">Preferred Domain</Label>
+                    <Label htmlFor="domain">Preferred Domain <span className="text-destructive">*</span></Label>
                     <Select
                       value={form.domain || '__none__'}
                       onValueChange={(value) => updateField('domain', value === '__none__' ? '' : value)}
                       disabled={domainsLoading || domainOptions.length === 0}
                     >
-                      <SelectTrigger id="domain">
+                      <SelectTrigger id="domain" className={fieldErrors.domain ? 'border-destructive focus:ring-destructive/30' : ''}>
                         <SelectValue placeholder={domainsLoading ? 'Loading domains...' : 'Select a preferred domain'} />
                       </SelectTrigger>
                       <SelectContent>
@@ -468,13 +548,17 @@ export default function SelfServiceOnboarding() {
                       </SelectContent>
                     </Select>
                     {domainsError && <p className="text-xs text-destructive">{domainsError}</p>}
+                    {fieldErrors.domain && <p className="text-xs text-destructive">{fieldErrors.domain}</p>}
+                    {fieldErrors.organization_domain_combination && (
+                      <p className="text-xs text-destructive">{fieldErrors.organization_domain_combination}</p>
+                    )}
                     {!domainsError && !domainsLoading && domainOptions.length === 0 && (
                       <p className="text-xs text-muted-foreground">No domains are currently available.</p>
                     )}
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="industry">Industry</Label>
-                    <Input id="industry" value={form.industry || ''} onChange={(e) => updateField('industry', e.target.value)} placeholder="Logistics, Manufacturing, Healthcare" />
+                    <Label htmlFor="industry">Domain Specification</Label>
+                    <Input id="industry" value={form.industry || ''} onChange={(e) => updateField('industry', e.target.value)} placeholder="Describe your domain-specific requirements" />
                   </div>
                 </div>
               )}
@@ -599,7 +683,9 @@ export default function SelfServiceOnboarding() {
                     {submitting ? 'Submitting...' : 'Start Onboarding'}
                   </Button>
                 ) : (
-                  <Button onClick={nextStep}>Continue</Button>
+                  <Button onClick={nextStep} disabled={validatingOrgDomain}>
+                    {validatingOrgDomain ? 'Validating...' : 'Continue'}
+                  </Button>
                 )}
               </div>
             </CardContent>
