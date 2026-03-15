@@ -245,14 +245,6 @@ export default function LeadsPipeline() {
     });
   }, [setSearchParams]);
 
-  const handleSelectAllStages = useCallback(() => {
-    handleStageFilterChange([...stages]);
-  }, [handleStageFilterChange]);
-
-  const handleSelectNoStages = useCallback(() => {
-    handleStageFilterChange([]);
-  }, [handleStageFilterChange]);
-
   const handleSourceFilterChange = useCallback((values: string[]) => {
     setSearchParams(prev => {
       const newParams = new URLSearchParams(prev);
@@ -947,28 +939,22 @@ export default function LeadsPipeline() {
                           <Filter className="h-3 w-3" />
                           <span>{filteredLeads.length} {t('leads.pipeline.leadsFound', 'leads found')}</span>
                         </div>
-                        <div className="flex flex-wrap items-center gap-2 px-2 pb-1">
-                          <span className="text-xs text-muted-foreground">
-                            {t('leads.filters.visibleStatuses', 'Visible statuses')}
-                          </span>
-                          {visibleStages.map((stage) => (
-                            <Badge
-                              key={`visible-stage-${stage}`}
-                              variant={selectedStages.length > 0 ? 'default' : 'secondary'}
-                              className="text-[10px] tracking-wide uppercase"
-                            >
-                              {statusConfig[stage].label}
-                            </Badge>
-                          ))}
-                          <div className="ml-auto flex items-center gap-1">
-                            <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={handleSelectAllStages}>
-                              {t('leads.filters.selectAll', 'Select All')}
-                            </Button>
-                            <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={handleSelectNoStages}>
-                              {t('leads.filters.selectNone', 'Select None')}
-                            </Button>
+                        {selectedStages.length > 0 && (
+                          <div className="flex flex-wrap items-center gap-2 px-2 pb-1">
+                            <span className="text-xs text-muted-foreground">
+                              {t('leads.filters.visibleStatuses', 'Visible statuses')}
+                            </span>
+                            {selectedStages.map((stage) => (
+                              <Badge
+                                key={`visible-stage-${stage}`}
+                                variant="default"
+                                className="text-[10px] tracking-wide uppercase"
+                              >
+                                {statusConfig[stage].label}
+                              </Badge>
+                            ))}
                           </div>
-                        </div>
+                        )}
                       </CardContent>
                     </Card>
                   </div>

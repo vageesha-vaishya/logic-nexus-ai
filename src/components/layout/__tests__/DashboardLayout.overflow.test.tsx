@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { DashboardLayout } from '../DashboardLayout';
@@ -69,5 +69,20 @@ describe('DashboardLayout overflow behavior', () => {
     const main = screen.getByRole('main');
     expect(main).toHaveClass('overflow-x-hidden');
   });
-});
 
+  it('opens global search from header search button', () => {
+    const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
+    render(
+      <MemoryRouter initialEntries={['/dashboard/leads']}>
+        <DashboardLayout>
+          <div>Content</div>
+        </DashboardLayout>
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByLabelText('Open global search'));
+    expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'shell:open-global-search' }));
+    expect(screen.getByTestId('global-search')).toBeInTheDocument();
+    dispatchSpy.mockRestore();
+  });
+});

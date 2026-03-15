@@ -79,4 +79,37 @@ describe('CRM module navigation workflow consistency', () => {
     expect(dataImportExport).toContain('showBackToListButton = true');
     expect(leadsImportExport).toContain('showBackToListButton={false}');
   });
+
+  it('removes pipeline Select All and Select None controls from filter row', () => {
+    const leadsPipeline = read('src/pages/dashboard/LeadsPipeline.tsx');
+    expect(leadsPipeline).not.toContain("t('leads.filters.selectAll', 'Select All')");
+    expect(leadsPipeline).not.toContain("t('leads.filters.selectNone', 'Select None')");
+    expect(leadsPipeline).not.toContain('handleSelectAllStages');
+    expect(leadsPipeline).not.toContain('handleSelectNoStages');
+  });
+
+  it('renders visible statuses row only for selected status filters', () => {
+    const leadsPipeline = read('src/pages/dashboard/LeadsPipeline.tsx');
+    expect(leadsPipeline).toContain('{selectedStages.length > 0 && (');
+    expect(leadsPipeline).toContain('{selectedStages.map((stage) => (');
+    expect(leadsPipeline).not.toContain('{visibleStages.map((stage) => (');
+  });
+
+  it('keeps header global search resilient with module fallback results', () => {
+    const globalSearch = read('src/components/ui/global-search.tsx');
+    const dashboardLayout = read('src/components/layout/DashboardLayout.tsx');
+    expect(globalSearch).toContain('Promise.allSettled');
+    expect(globalSearch).toContain('APP_MENU.flatMap');
+    expect(globalSearch).toContain('setResults(moduleResults)');
+    expect(globalSearch).toContain('if (!scopedDb || typeof scopedDb.from !== "function")');
+    expect(globalSearch).toContain('window.addEventListener("shell:open-global-search", openSearch)');
+    expect(globalSearch).toContain('commandProps={{ shouldFilter: false }}');
+    expect(globalSearch).toContain('value={`${result.type} ${result.title} ${result.subtitle || ""}`.toLowerCase()}');
+    expect(globalSearch).toContain('"module"');
+    expect(globalSearch).toContain('["module", "lead", "account", "contact", "quote", "opportunity"]');
+    expect(globalSearch).toContain('"w-44 sm:w-56 lg:w-64"');
+    expect(dashboardLayout).toContain("className=\"inline-flex\"");
+    expect(dashboardLayout).toContain("window.dispatchEvent(new CustomEvent('shell:open-global-search'))");
+    expect(dashboardLayout).toContain("className={cn('block', !showGlobalSearch && 'hidden')}");
+  });
 });

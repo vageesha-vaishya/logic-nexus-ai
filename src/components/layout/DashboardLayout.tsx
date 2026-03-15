@@ -175,12 +175,10 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     return () => observer.disconnect();
   }, []);
 
-  const toggleGlobalSearch = () => {
-    setShowGlobalSearch((prev) => {
-      const next = !prev;
-      localStorage.setItem('shell:showGlobalSearch', String(next));
-      return next;
-    });
+  const openGlobalSearch = () => {
+    setShowGlobalSearch(true);
+    localStorage.setItem('shell:showGlobalSearch', 'true');
+    window.dispatchEvent(new CustomEvent('shell:open-global-search'));
   };
 
   return (
@@ -248,14 +246,14 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             <Button
               variant="ghost"
               size="icon"
-              onClick={toggleGlobalSearch}
-              aria-label={showGlobalSearch ? 'Hide global search' : 'Show global search'}
-              title={showGlobalSearch ? 'Hide global search' : 'Show global search'}
-              className="hidden xl:inline-flex"
+              onClick={openGlobalSearch}
+              aria-label="Open global search"
+              title="Open global search"
+              className="inline-flex"
             >
               <Search className="h-4 w-4" />
             </Button>
-            <div className={cn('hidden xl:block', !showGlobalSearch && 'hidden')}>
+            <div className={cn('block', !showGlobalSearch && 'hidden')}>
               <GlobalSearch />
             </div>
             <HelpDialog />
