@@ -27,8 +27,11 @@ const preview = {
     viewport: {
       viewports: {
         small: { name: 'Small', styles: { width: '375px', height: '667px' } },
+        mobileLarge: { name: 'Mobile Large', styles: { width: '414px', height: '896px' } },
         tablet: { name: 'Tablet', styles: { width: '768px', height: '1024px' } },
+        laptop: { name: 'Laptop', styles: { width: '1280px', height: '800px' } },
         desktop: { name: 'Desktop', styles: { width: '1440px', height: '900px' } },
+        wide: { name: 'Wide', styles: { width: '1920px', height: '1080px' } },
       },
       defaultViewport: 'desktop',
     },

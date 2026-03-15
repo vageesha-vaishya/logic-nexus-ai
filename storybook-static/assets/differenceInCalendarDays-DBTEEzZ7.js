@@ -1,0 +1,1 @@
+import{t as f,m}from"./constants-DrTc0T0L.js";import{g as n}from"./getTimezoneOffsetInMilliseconds-DY_9x7Xo.js";function o(s){const t=f(s);return t.setHours(0,0,0,0),t}function u(s,t){const a=o(s),e=o(t),r=+a-n(a),i=+e-n(e);return Math.round((r-i)/m)}export{u as d,o as s};

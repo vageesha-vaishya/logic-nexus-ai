@@ -1,3 +1,4 @@
+import React from 'react';
 import type { Meta, StoryObj } from '@storybook/react';
 import { WidgetContainer } from './WidgetContainer';
 
@@ -5,6 +6,12 @@ const meta: Meta<typeof WidgetContainer> = {
   title: 'Dashboard/Widget',
   component: WidgetContainer,
   tags: ['autodocs'],
+  parameters: {
+    layout: 'centered',
+    controls: {
+      expanded: true,
+    },
+  },
   argTypes: {
     title: {
       control: 'text',
@@ -21,12 +28,16 @@ const meta: Meta<typeof WidgetContainer> = {
 };
 
 export default meta;
-type Story = StoryObj<typeof meta>;
+type Story = StoryObj<typeof WidgetContainer>;
+
+const WidgetBody = ({ children }: { children: React.ReactNode }) => (
+  <div className="p-4 text-center text-gray-600">{children}</div>
+);
 
 export const Small: Story = {
   args: {
     title: 'Small Widget',
-    children: <div className="p-4 text-center text-gray-600">Small widget content here</div>,
+    children: <WidgetBody>Small widget content here</WidgetBody>,
     className: 'w-48',
   },
 };
@@ -34,7 +45,7 @@ export const Small: Story = {
 export const Medium: Story = {
   args: {
     title: 'Medium Widget',
-    children: <div className="p-4 text-center text-gray-600">Medium widget content here</div>,
+    children: <WidgetBody>Medium widget content here</WidgetBody>,
     className: 'w-96',
   },
 };
@@ -42,7 +53,7 @@ export const Medium: Story = {
 export const Large: Story = {
   args: {
     title: 'Large Widget',
-    children: <div className="p-6 text-center text-gray-600">Large widget content here with more space for displaying data</div>,
+    children: <WidgetBody>Large widget content here with more space for displaying data</WidgetBody>,
     className: 'w-full',
   },
 };
@@ -50,7 +61,7 @@ export const Large: Story = {
 export const Full: Story = {
   args: {
     title: 'Full Width Widget',
-    children: <div className="p-6 text-center text-gray-600">Full width widget content spanning the entire width</div>,
+    children: <WidgetBody>Full width widget content spanning the entire width</WidgetBody>,
     className: 'w-full',
   },
 };
@@ -58,7 +69,7 @@ export const Full: Story = {
 export const WithActions: Story = {
   args: {
     title: 'Widget with Actions',
-    children: <div className="p-4 text-gray-600">Widget content with action buttons</div>,
+    children: <WidgetBody>Widget content with action buttons</WidgetBody>,
     action: (
       <div className="flex gap-2">
         <button className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600">
@@ -75,7 +86,7 @@ export const WithActions: Story = {
 
 export const WithoutTitle: Story = {
   args: {
-    children: <div className="p-4 text-center text-gray-600">Widget without a title bar</div>,
+    children: <WidgetBody>Widget without a title bar</WidgetBody>,
     className: 'w-96',
   },
 };

@@ -197,7 +197,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       <div className="flex-1 flex flex-col">
         <header
           ref={headerRef}
-          className="h-12 border-b flex items-center px-3 gap-3 bg-background sticky top-0 z-10 overflow-hidden relative"
+          className="h-12 border-b flex items-center px-3 gap-3 bg-background sticky top-0 z-10 overflow-visible relative"
           style={{
             height: headerBanner.visible ? headerBanner.height : undefined,
             color: headerBanner.visible ? headerBanner.color : undefined,

@@ -1,0 +1,6 @@
+import{c as e}from"./createLucideIcon-DEP7aKU9.js";/**
+ * @license lucide-react v0.462.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */const o=e("LayoutGrid",[["rect",{width:"7",height:"7",x:"3",y:"3",rx:"1",key:"1g98yp"}],["rect",{width:"7",height:"7",x:"14",y:"3",rx:"1",key:"6d4xhi"}],["rect",{width:"7",height:"7",x:"14",y:"14",rx:"1",key:"nxv5o0"}],["rect",{width:"7",height:"7",x:"3",y:"14",rx:"1",key:"1bb6yr"}]]),r=["new","contacted","qualified","proposal","negotiation","won","lost","converted"],l={new:{label:"New Lead",color:"bg-blue-500/10 text-blue-700 dark:text-blue-300"},contacted:{label:"Contacted",color:"bg-purple-500/10 text-purple-700 dark:text-purple-300"},qualified:{label:"Qualified",color:"bg-teal-500/10 text-teal-700 dark:text-teal-300"},proposal:{label:"Proposal Sent",color:"bg-yellow-500/10 text-yellow-700 dark:text-yellow-300"},negotiation:{label:"Negotiation",color:"bg-orange-500/10 text-orange-700 dark:text-orange-300"},won:{label:"Won",color:"bg-green-500/10 text-green-700 dark:text-green-300"},lost:{label:"Lost",color:"bg-red-500/10 text-red-700 dark:text-red-300"},converted:{label:"Converted",color:"bg-indigo-500/10 text-indigo-700 dark:text-indigo-300"}};export{o as L,l as a,r as s};
