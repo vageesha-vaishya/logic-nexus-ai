@@ -13,6 +13,8 @@ import { SalesManagerDashboard as SalesModuleSalesManager } from './sales/SalesM
 import { SalesExecutiveDashboard } from './sales/SalesExecutiveDashboard';
 
 const templateMap: Record<UserRole, React.ComponentType<any>> = {
+  enterprise_operations: LogisticsExecutiveDashboard,
+  enterprise_executive: CRMExecutiveDashboard,
   crm_sales_rep: SalesRepDashboard,
   crm_sales_manager: SalesManagerDashboard,
   crm_account_executive: AccountExecutiveDashboard,

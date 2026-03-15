@@ -25,29 +25,28 @@ const preview = {
       },
     },
     viewport: {
-      viewports: {
+      options: {
         small: { name: 'Small', styles: { width: '375px', height: '667px' } },
         mobileLarge: { name: 'Mobile Large', styles: { width: '414px', height: '896px' } },
         tablet: { name: 'Tablet', styles: { width: '768px', height: '1024px' } },
         laptop: { name: 'Laptop', styles: { width: '1280px', height: '800px' } },
         desktop: { name: 'Desktop', styles: { width: '1440px', height: '900px' } },
         wide: { name: 'Wide', styles: { width: '1920px', height: '1080px' } },
-      },
-      defaultViewport: 'desktop',
+      }
     },
     layout: 'fullscreen',
     backgrounds: {
-      default: 'light',
-      values: [
-        { name: 'light', value: '#ffffff' },
-        { name: 'muted', value: 'hsl(var(--muted))' },
-        { name: 'dark', value: '#0f172a' },
-      ],
+      options: {
+        light: { name: 'light', value: '#ffffff' },
+        muted: { name: 'muted', value: 'hsl(var(--muted))' },
+        dark: { name: 'dark', value: '#0f172a' }
+      }
     },
     docs: {
       source: { type: 'dynamic' },
     },
   },
+
   globalTypes: {
     direction: {
       name: 'Text Direction',
@@ -87,6 +86,7 @@ const preview = {
       },
     },
   },
+
   decorators: [
     (Story: any, context: any) => {
       const dir = context.globals.direction || 'ltr';
@@ -138,6 +138,17 @@ const preview = {
       );
     },
   ],
+
+  initialGlobals: {
+    viewport: {
+      value: 'desktop',
+      isRotated: false
+    },
+
+    backgrounds: {
+      value: 'light'
+    }
+  }
 };
 
 export default preview;

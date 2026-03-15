@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import type { Meta, StoryObj } from '@storybook/react';
-import { action } from '@storybook/addon-actions';
+import type { Meta, StoryObj } from '@storybook/react-vite';
+import { action } from 'storybook/actions';
 import { KanbanBoard, ColumnType } from '@/components/kanban/KanbanBoard';
 import { KanbanItem } from '@/components/kanban/KanbanCard';
 
@@ -279,10 +279,11 @@ export const MobileReview: Story = {
     showAssignees: false,
     boardHeight: 520,
   },
-  parameters: {
+  globals: {
     viewport: {
-      defaultViewport: 'small',
-    },
+      value: 'small',
+      isRotated: false
+    }
   },
 };
 
@@ -291,9 +292,10 @@ export const TabletReview: Story = {
     visualMode: 'reference',
     boardHeight: 620,
   },
-  parameters: {
+  globals: {
     viewport: {
-      defaultViewport: 'tablet',
-    },
+      value: 'tablet',
+      isRotated: false
+    }
   },
 };

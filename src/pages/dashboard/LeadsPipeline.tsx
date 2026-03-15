@@ -1,11 +1,9 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
-import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Filter, RefreshCw, Plus, Download } from 'lucide-react';
+import { ArrowLeft, Filter } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { KanbanBoard, ColumnType } from '@/components/kanban/KanbanBoard';
 import { KanbanItem } from '@/components/kanban/KanbanCard';
@@ -17,17 +15,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LayoutGrid, BarChart3 } from "lucide-react";
 import { Lead, LeadStatus, stages, statusConfig } from './leads-data';
 import { usePerformanceMonitor } from '@/hooks/usePerformanceMonitor';
-import { THEME_PRESETS } from '@/theme/themes';
 import { themeStyleFromPreset } from '@/lib/theme-utils';
-import { Palette } from 'lucide-react';
-import { ViewToggle } from '@/components/ui/view-toggle';
 import { DashboardOverview, ContactsSection, TasksSection, DashboardStats, CreateTaskDialog } from '@/components/crm/LeadsPipelineComponents';
 import { Task } from '@/components/crm/TaskScheduler';
-import { useLeadsViewState } from '@/hooks/useLeadsViewState';
+import { useLeadsViewState, LeadsPrimaryView } from '@/hooks/useLeadsViewState';
 import { logger } from '@/lib/logger';
 import * as Sentry from '@sentry/react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PipelineService } from '@/services/pipeline-service';
+import { CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
 
 // Loading skeleton for the pipeline
 function PipelineSkeleton() {
@@ -63,7 +59,6 @@ export default function LeadsPipeline() {
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const [isCreateTaskOpen, setIsCreateTaskOpen] = useState(false);
   const [isSavingTask, setIsSavingTask] = useState(false);
-  const [isSavingDefault, setIsSavingDefault] = useState(false);
 
   // URL State - memoized to prevent recalculation
   const searchQuery = searchParams.get('q') || '';
@@ -75,39 +70,6 @@ export default function LeadsPipeline() {
 
   // Stable context check
   const isContextReady = Boolean(context?.tenantId || context?.isPlatformAdmin);
-
-  const handleSetDefaultView = useCallback(async () => {
-    if (!context) return;
-    try {
-      setIsSavingDefault(true);
-      try {
-        localStorage.setItem('leadsViewMode', 'pipeline');
-        localStorage.setItem('leadsTheme', viewState.theme);
-      } catch {
-        void 0;
-      }
-      if (context.userId) {
-        const userViewKey = `user:${context.userId}:leads.default_view`;
-        const userThemeKey = `user:${context.userId}:leads.default_theme`;
-        const [{ error: vErr }, { error: tErr }] = await Promise.all([
-          scopedDb.setSystemSetting(userViewKey, 'pipeline'),
-          scopedDb.setSystemSetting(userThemeKey, viewState.theme),
-        ]);
-        if (vErr || tErr) throw (vErr || tErr);
-      }
-      toast.success(t('leads.messages.defaultSet', 'Default saved'));
-    } catch (error) {
-      logger.error('Failed to set pipeline as default view', {
-        view: 'pipeline',
-        theme: viewState.theme,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      Sentry.captureException(error);
-      toast.error(t('leads.messages.defaultSetFailed', 'Failed to save default'));
-    } finally {
-      setIsSavingDefault(false);
-    }
-  }, [context, supabase, viewState.theme, t]);
 
   // Load theme default - only once after hydration
   useEffect(() => {
@@ -426,6 +388,9 @@ export default function LeadsPipeline() {
   }, [leads, isContextReady, scopedDb, fetchLeads]);
 
   const handleItemUpdate = useCallback(async (id: string, updates: Partial<KanbanItem>) => {
+    const previousLead = leads.find((lead) => lead.id === id);
+    if (!previousLead) return;
+
     const leadUpdates: Partial<Lead> = {};
     
     if (updates.title) {
@@ -440,21 +405,62 @@ export default function LeadsPipeline() {
       leadUpdates.estimated_value = updates.value;
     }
 
-    setLeads(prev => prev.map(l => l.id === id ? { ...l, ...leadUpdates } : l));
+    const optimisticLead = { ...previousLead, ...leadUpdates };
+    setLeads(prev => prev.map(l => l.id === id ? optimisticLead : l));
+
+    if (!isContextReady) return;
 
     try {
-      const { error } = await (scopedDb.from('leads') as any)
-        .update(leadUpdates)
-        .eq('id', id);
+      const result = await PipelineService.updateLead(scopedDb, {
+        id,
+        input: {
+          first_name: optimisticLead.first_name,
+          last_name: optimisticLead.last_name,
+          company: optimisticLead.company,
+          title: optimisticLead.title,
+          email: optimisticLead.email,
+          phone: optimisticLead.phone,
+          status: optimisticLead.status,
+          source: optimisticLead.source,
+          estimated_value: optimisticLead.estimated_value,
+          expected_close_date: optimisticLead.expected_close_date,
+          description: optimisticLead.description,
+          notes: optimisticLead.notes,
+          tenant_id: optimisticLead.tenant_id,
+          franchise_id: optimisticLead.franchise_id,
+          custom_fields: optimisticLead.custom_fields,
+        },
+        expectedUpdatedAt: previousLead.updated_at,
+      });
 
-      if (error) throw error;
+      if (result.ok === false) {
+        if (result.code === 'conflict') {
+          if (result.current) {
+            setLeads((prev) => prev.map((lead) => (lead.id === id ? result.current! : lead)));
+          } else {
+            fetchLeads();
+          }
+          toast.error('Lead was updated by another user. Board has been refreshed.');
+          return;
+        }
+
+        if (result.code === 'duplicate') {
+          setLeads((prev) => prev.map((lead) => (lead.id === id ? previousLead : lead)));
+          toast.error(result.message);
+          return;
+        }
+
+        throw new Error(result.message);
+      }
+
+      setLeads((prev) => prev.map((lead) => (lead.id === id ? result.data : lead)));
       toast.success("Lead updated");
     } catch (error) {
       console.error('Error updating lead:', error);
       toast.error('Failed to update lead');
       fetchLeads();
     }
-  }, [supabase, fetchLeads]);
+  }, [leads, isContextReady, scopedDb, fetchLeads]);
 
   const onDragEnd = useCallback((activeId: string, overId: string, newStatus: string) => {
     if (stages.includes(newStatus as LeadStatus)) {
@@ -519,7 +525,7 @@ export default function LeadsPipeline() {
     }));
   }, [filteredLeads]);
 
-  const handleNavigateAway = useCallback((mode: string) => {
+  const handleNavigateAway = useCallback((mode: LeadsPrimaryView) => {
     if (mode !== 'pipeline') {
       isNavigatingAwayFromPipeline.current = true;
       try {
@@ -569,55 +575,23 @@ export default function LeadsPipeline() {
               <h1 className="text-3xl font-bold tracking-tight">{t('leads.title', 'Leads Pipeline')}</h1>
               <p className="text-muted-foreground">{t('leads.subtitle', 'Manage and track your lead progression')}</p>
             </div>
-            <div className="flex items-center gap-2">
-              <Select value={currentTheme} onValueChange={handleThemeChange}>
-                <SelectTrigger className="w-[140px] h-8 text-xs">
-                  <Palette className="mr-2 h-3 w-3" />
-                  <SelectValue placeholder="Theme" />
-                </SelectTrigger>
-                <SelectContent>
-                  {THEME_PRESETS.map(theme => (
-                    <SelectItem key={theme.name} value={theme.name}>
-                      {theme.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button variant="outline" size="sm" onClick={fetchLeads} disabled={loading}>
-                <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-                {t('leads.actions.refresh', 'Refresh')}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  const params = new URLSearchParams();
-                  if (searchQuery) params.set('q', searchQuery);
-                  if (selectedStages.length > 0) params.set('status', selectedStages.join(','));
-                  params.set('from', 'pipeline');
-                  navigate(`/dashboard/leads/import-export?${params.toString()}`);
-                }}
-              >
-                <Download className="h-4 w-4 mr-2" />
-                {t('leads.actions.importExport', 'Import/Export')}
-              </Button>
-              <ViewToggle
-                value="pipeline"
-                modes={['pipeline', 'card', 'grid', 'list']}
-                onChange={handleNavigateAway}
-              />
-              {context?.isPlatformAdmin && (
-                <Button variant="outline" size="sm" onClick={handleSetDefaultView} disabled={isSavingDefault}>
-                  {t('leads.actions.setDefault', 'Set as Default')}
-                </Button>
-              )}
-              <Button asChild size="sm">
-                <Link to="/dashboard/leads/new">
-                  <Plus className="mr-2 h-4 w-4" />
-                  {t('leads.actions.newLead', 'New Lead')}
-                </Link>
-              </Button>
-            </div>
+            <CRMModuleHeaderNavigation
+              moduleLabel="Leads"
+              viewMode="pipeline"
+              theme={currentTheme}
+              onViewModeChange={(mode) => handleNavigateAway(mode as LeadsPrimaryView)}
+              onThemeChange={handleThemeChange}
+              onCreate={() => navigate('/dashboard/leads/new')}
+              createLabel="New Lead"
+              onRefresh={fetchLeads}
+              onImportExport={() => {
+                const params = new URLSearchParams();
+                if (searchQuery) params.set('q', searchQuery);
+                if (selectedStages.length > 0) params.set('status', selectedStages.join(','));
+                params.set('from', 'pipeline');
+                navigate(`/dashboard/leads/import-export?${params.toString()}`);
+              }}
+            />
           </div>
 
           {/* Funnel */}

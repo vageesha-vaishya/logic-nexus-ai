@@ -3,10 +3,53 @@ import { Lead, LeadStatus } from '@/pages/dashboard/leads-data';
 import { Opportunity, OpportunityStage } from '@/pages/dashboard/opportunities-data';
 
 export type PipelineTransitionErrorCode = 'conflict' | 'forbidden' | 'validation' | 'unknown';
+export type LeadMutationErrorCode = PipelineTransitionErrorCode | 'duplicate';
 
 export type PipelineTransitionResult<T> =
   | { ok: true; data: T }
   | { ok: false; code: PipelineTransitionErrorCode; message: string; current?: T | null };
+
+export type LeadMutationResult<T> =
+  | { ok: true; data: T }
+  | { ok: false; code: LeadMutationErrorCode; message: string; current?: T | null };
+
+export interface LeadMutationInput {
+  first_name: string;
+  last_name: string;
+  company?: string | null;
+  title?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  status: LeadStatus;
+  source: string;
+  estimated_value?: string | number | null;
+  expected_close_date?: string | null;
+  description?: string | null;
+  notes?: string | null;
+  tenant_id: string;
+  franchise_id?: string | null;
+  service_id?: string | null;
+  attachments?: Array<{ name?: string }>;
+  custom_fields?: Record<string, unknown> | null;
+}
+
+export interface NormalizedLeadMutationInput {
+  first_name: string;
+  last_name: string;
+  company: string | null;
+  title: string | null;
+  email: string | null;
+  phone: string | null;
+  status: LeadStatus;
+  source: string;
+  estimated_value: number | null;
+  expected_close_date: string | null;
+  description: string | null;
+  notes: string | null;
+  tenant_id: string;
+  franchise_id: string | null;
+  custom_fields: Record<string, unknown> | null;
+}
 
 export interface LeadPipelineQuery {
   page?: number;
@@ -44,7 +87,215 @@ const mapErrorCode = (error: unknown): PipelineTransitionErrorCode => {
   return 'unknown';
 };
 
+const normalizeText = (value: string | null | undefined): string | null => {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+};
+
+const normalizeEmail = (value: string | null | undefined): string | null => {
+  const normalized = normalizeText(value);
+  return normalized ? normalized.toLowerCase() : null;
+};
+
+const normalizePhone = (value: string | null | undefined): string | null => {
+  const normalized = normalizeText(value);
+  if (!normalized) return null;
+  const compact = normalized.replace(/[^\d+]/g, '');
+  return compact.length > 0 ? compact : null;
+};
+
+export const normalizeLeadMutationInput = (
+  input: LeadMutationInput
+): NormalizedLeadMutationInput => {
+  const attachmentNames = Array.isArray(input.attachments)
+    ? input.attachments
+        .map((file) => (typeof file?.name === 'string' ? file.name : null))
+        .filter((name): name is string => Boolean(name))
+    : [];
+
+  const serviceId = normalizeText(input.service_id);
+  const customFields = {
+    ...(input.custom_fields || {}),
+    ...(serviceId ? { service_id: serviceId } : {}),
+    ...(attachmentNames.length > 0 ? { attachments_names: attachmentNames } : {}),
+  };
+
+  const estimatedValue =
+    typeof input.estimated_value === 'number'
+      ? input.estimated_value
+      : typeof input.estimated_value === 'string' && input.estimated_value.trim() !== ''
+        ? Number(input.estimated_value)
+        : null;
+
+  return {
+    first_name: normalizeText(input.first_name) || '',
+    last_name: normalizeText(input.last_name) || '',
+    company: normalizeText(input.company),
+    title: normalizeText(input.title),
+    email: normalizeEmail(input.email),
+    phone: normalizePhone(input.phone),
+    status: input.status,
+    source: input.source,
+    estimated_value: Number.isFinite(estimatedValue) ? estimatedValue : null,
+    expected_close_date: normalizeText(input.expected_close_date),
+    description: normalizeText(input.description),
+    notes: normalizeText(input.notes),
+    tenant_id: input.tenant_id,
+    franchise_id: normalizeText(input.franchise_id),
+    custom_fields: Object.keys(customFields).length > 0 ? customFields : null,
+  };
+};
+
+export const validateLeadMutationInput = (
+  input: NormalizedLeadMutationInput
+): { valid: true } | { valid: false; message: string } => {
+  if (!input.first_name || !input.last_name) {
+    return { valid: false, message: 'First name and last name are required.' };
+  }
+  if (!input.email && !input.phone) {
+    return { valid: false, message: 'Provide at least one contact method: email or phone.' };
+  }
+  if (input.estimated_value !== null && input.estimated_value < 0) {
+    return { valid: false, message: 'Estimated value cannot be negative.' };
+  }
+  return { valid: true };
+};
+
 export const PipelineService = {
+  async findDuplicateLead(
+    scopedDb: ScopedDataAccess,
+    params: {
+      email?: string | null;
+      phone?: string | null;
+      excludeLeadId?: string;
+    }
+  ): Promise<Pick<Lead, 'id' | 'first_name' | 'last_name' | 'email' | 'phone' | 'updated_at'> | null> {
+    const email = normalizeEmail(params.email);
+    const phone = normalizePhone(params.phone);
+    if (!email && !phone) return null;
+
+    const conditions: string[] = [];
+    if (email) conditions.push(`email.eq.${email}`);
+    if (phone) conditions.push(`phone.eq.${phone}`);
+
+    let query = scopedDb
+      .from('leads')
+      .select('id,first_name,last_name,email,phone,updated_at')
+      .or(conditions.join(','))
+      .limit(1);
+
+    if (params.excludeLeadId) {
+      query = query.neq('id', params.excludeLeadId);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+    const duplicate = Array.isArray(data) ? data[0] : null;
+    return duplicate
+      ? {
+          id: duplicate.id as string,
+          first_name: duplicate.first_name as string,
+          last_name: duplicate.last_name as string,
+          email: (duplicate.email as string | null) || null,
+          phone: (duplicate.phone as string | null) || null,
+          updated_at: duplicate.updated_at as string,
+        }
+      : null;
+  },
+
+  async createLead(
+    scopedDb: ScopedDataAccess,
+    input: LeadMutationInput
+  ): Promise<LeadMutationResult<Lead>> {
+    const normalized = normalizeLeadMutationInput(input);
+    const validation = validateLeadMutationInput(normalized);
+    if (validation.valid === false) {
+      return { ok: false, code: 'validation', message: validation.message };
+    }
+
+    try {
+      const duplicate = await this.findDuplicateLead(scopedDb, {
+        email: normalized.email,
+        phone: normalized.phone,
+      });
+      if (duplicate) {
+        return {
+          ok: false,
+          code: 'duplicate',
+          message: `Potential duplicate found: ${duplicate.first_name} ${duplicate.last_name}`,
+          current: duplicate as Lead,
+        };
+      }
+
+      const { data, error } = await scopedDb.from('leads').insert(normalized).select('*').single();
+      if (error) {
+        return { ok: false, code: mapErrorCode(error), message: error.message };
+      }
+      return { ok: true, data: data as Lead };
+    } catch (error) {
+      return { ok: false, code: 'unknown', message: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  },
+
+  async updateLead(
+    scopedDb: ScopedDataAccess,
+    params: {
+      id: string;
+      input: LeadMutationInput;
+      expectedUpdatedAt?: string | null;
+    }
+  ): Promise<LeadMutationResult<Lead>> {
+    const normalized = normalizeLeadMutationInput(params.input);
+    const validation = validateLeadMutationInput(normalized);
+    if (validation.valid === false) {
+      return { ok: false, code: 'validation', message: validation.message };
+    }
+
+    try {
+      const duplicate = await this.findDuplicateLead(scopedDb, {
+        email: normalized.email,
+        phone: normalized.phone,
+        excludeLeadId: params.id,
+      });
+      if (duplicate) {
+        return {
+          ok: false,
+          code: 'duplicate',
+          message: `Potential duplicate found: ${duplicate.first_name} ${duplicate.last_name}`,
+          current: duplicate as Lead,
+        };
+      }
+
+      let query = (scopedDb.from('leads') as any)
+        .update(normalized)
+        .eq('id', params.id);
+
+      if (params.expectedUpdatedAt) {
+        query = query.eq('updated_at', params.expectedUpdatedAt);
+      }
+
+      const { data, error } = await query.select('*');
+      if (error) {
+        return { ok: false, code: mapErrorCode(error), message: error.message };
+      }
+
+      if (!data || data.length === 0) {
+        const { data: current } = await scopedDb.from('leads').select('*').eq('id', params.id).maybeSingle();
+        return {
+          ok: false,
+          code: 'conflict',
+          message: 'Lead was updated by another user.',
+          current: (current as Lead | null) || null,
+        };
+      }
+
+      return { ok: true, data: data[0] as Lead };
+    } catch (error) {
+      return { ok: false, code: 'unknown', message: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  },
+
   async listLeads(
     scopedDb: ScopedDataAccess,
     options: LeadPipelineQuery = {}

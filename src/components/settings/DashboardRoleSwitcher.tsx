@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Button } from '@/components/ui/button';
 import { LayoutDashboard, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { UserRole } from '@/types/dashboardTemplates';
@@ -93,6 +92,11 @@ export function DashboardRoleSwitcher() {
                 <SelectValue placeholder="Select a dashboard role" />
               </SelectTrigger>
               <SelectContent>
+                <SelectGroup>
+                  <SelectLabel className="font-semibold text-primary">Enterprise Presets</SelectLabel>
+                  <SelectItem value="enterprise_operations">Operations Command Center</SelectItem>
+                  <SelectItem value="enterprise_executive">Executive Performance</SelectItem>
+                </SelectGroup>
                 <SelectGroup>
                   <SelectLabel className="font-semibold text-primary">CRM Module</SelectLabel>
                   <SelectItem value="crm_sales_rep">Sales Representative</SelectItem>

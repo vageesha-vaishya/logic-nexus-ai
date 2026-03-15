@@ -24,6 +24,9 @@ import Unauthorized from "./pages/Unauthorized";
 import NotFound from "./pages/NotFound";
 
 // Lazy: all dashboard pages (loaded on navigation)
+const DashboardRouter = lazy(() =>
+  import("./components/dashboard/DashboardRouter").then((module) => ({ default: module.DashboardRouter }))
+);
 const Dashboards = lazy(() => import("./pages/dashboard/Dashboards"));
 const Accounts = lazy(() => import("./pages/dashboard/Accounts"));
 const AccountsImportExport = lazy(() => import("./pages/dashboard/AccountsImportExport"));
@@ -41,6 +44,7 @@ const LeadDetail = lazy(() => import("./pages/dashboard/LeadDetail"));
 const LeadsImportExport = lazy(() => import("./pages/dashboard/LeadsImportExport"));
 const LeadsPipeline = lazy(() => import("./pages/dashboard/LeadsPipeline"));
 const Activities = lazy(() => import("./pages/dashboard/Activities"));
+const ActivitiesImportExport = lazy(() => import("./pages/dashboard/ActivitiesImportExport"));
 const ActivityNew = lazy(() => import("./pages/dashboard/ActivityNew"));
 const ActivityDetail = lazy(() => import("./pages/dashboard/ActivityDetail"));
 const Settings = lazy(() => import("./pages/dashboard/Settings"));
@@ -55,6 +59,7 @@ const Users = lazy(() => import("./pages/dashboard/Users"));
 const UserNew = lazy(() => import("./pages/dashboard/UserNew"));
 const UserDetail = lazy(() => import("./pages/dashboard/UserDetail"));
 const Opportunities = lazy(() => import("./pages/dashboard/Opportunities"));
+const OpportunitiesImportExport = lazy(() => import("./pages/dashboard/OpportunitiesImportExport"));
 const OpportunityNew = lazy(() => import("./pages/dashboard/OpportunityNew"));
 const OpportunityDetail = lazy(() => import("./pages/dashboard/OpportunityDetail"));
 const OpportunitiesPipeline = lazy(() => import("./pages/dashboard/OpportunitiesPipeline"));
@@ -201,8 +206,8 @@ const App = () => (
             <Route 
               path="/dashboard" 
               element={
-                <ProtectedRoute>
-                  <Dashboards />
+                <ProtectedRoute requiredPermissions={["dashboards.view"]}>
+                  <DashboardRouter />
                 </ProtectedRoute>
               } 
             />
@@ -339,6 +344,14 @@ const App = () => (
               element={
                 <ProtectedRoute requiredPermissions={["activities.create"]}>
                   <ActivityNew />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/dashboard/activities/import-export" 
+              element={
+                <ProtectedRoute requiredPermissions={["activities.create"]}>
+                  <ActivitiesImportExport />
                 </ProtectedRoute>
               } 
             />
@@ -483,6 +496,14 @@ const App = () => (
               element={
                 <ProtectedRoute requiredPermissions={["opportunities.create"]}>
                   <OpportunityNew />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/dashboard/opportunities/import-export" 
+              element={
+                <ProtectedRoute requiredPermissions={["opportunities.create"]}>
+                  <OpportunitiesImportExport />
                 </ProtectedRoute>
               } 
             />

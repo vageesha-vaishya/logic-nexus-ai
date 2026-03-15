@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react';
+import type { Meta, StoryObj } from '@storybook/react-vite';
 import { FormGrid, FormItem, FormSection } from './FormLayout';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';

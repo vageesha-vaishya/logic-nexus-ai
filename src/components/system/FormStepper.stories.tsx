@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/react-vite";
 import { FormStepper } from "./FormStepper";
 
 const meta: Meta<typeof FormStepper> = {

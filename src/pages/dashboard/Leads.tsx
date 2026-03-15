@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Search, UserPlus, DollarSign, Filter, TrendingUp, Users as UsersIcon, Trash2, Palette, ArrowLeft, Download } from 'lucide-react';
+import { Search, UserPlus, DollarSign, Filter, TrendingUp, Users as UsersIcon, Trash2, ArrowLeft } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
@@ -8,25 +8,22 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ViewToggle, ViewMode } from '@/components/ui/view-toggle';
+import { ViewMode } from '@/components/ui/view-toggle';
 import { useCRM } from '@/hooks/useCRM';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { matchText, TextOp } from '@/lib/utils';
 import { FirstScreenTemplate } from '@/components/system/FirstScreenTemplate';
 import { EmptyState } from '@/components/system/EmptyState';
 import { TableSkeleton } from '@/components/system/TableSkeleton';
 import { LeadCard } from '@/components/crm/LeadCard';
+import { CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
 import { DataTable, ColumnDef } from '@/components/system/DataTable';
-import { THEME_PRESETS } from '@/theme/themes';
 import { themeStyleFromPreset } from '@/lib/theme-utils';
 import { Lead, LeadStatus, stages, statusConfig } from './leads-data';
 import { usePerformanceMonitor } from '@/hooks/usePerformanceMonitor';
 import { useLeadsViewState } from '@/hooks/useLeadsViewState';
 import { useDebounce } from '@/hooks/useDebounce';
-import { logger } from '@/lib/logger';
-import * as Sentry from '@sentry/react';
 import { useUndo } from '@/hooks/useUndo';
 
 export default function Leads() {
@@ -35,8 +32,6 @@ export default function Leads() {
   const navigate = useNavigate();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isSavingDefault, setIsSavingDefault] = useState(false);
-  const [didSetDefault, setDidSetDefault] = useState(false);
   const { supabase, context, scopedDb } = useCRM();
   const {
     state: viewState,
@@ -231,40 +226,6 @@ export default function Leads() {
     }
   };
 
-  const handleSetDefaultView = async () => {
-    try {
-      setIsSavingDefault(true);
-      try {
-        localStorage.setItem('leadsViewMode', viewState.view);
-        localStorage.setItem('leadsTheme', viewState.theme);
-      } catch {
-        void 0;
-      }
-      if (context?.userId) {
-        const userViewKey = `user:${context.userId}:leads.default_view`;
-        const userThemeKey = `user:${context.userId}:leads.default_theme`;
-        const [{ error: vErr }, { error: tErr }] = await Promise.all([
-          scopedDb.setSystemSetting(userViewKey, viewState.view),
-          scopedDb.setSystemSetting(userThemeKey, viewState.theme),
-        ]);
-        if (vErr || tErr) throw (vErr || tErr);
-      }
-      setDidSetDefault(true);
-      toast.success(t('leads.messages.defaultSet', 'Default saved'));
-    } catch (error) {
-      logger.error('Failed to set leads default view', {
-        view: viewState.view,
-        theme: viewState.theme,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      Sentry.captureException(error);
-      toast.error(t('leads.messages.defaultSetFailed', 'Failed to save default'));
-    } finally {
-      setIsSavingDefault(false);
-      setTimeout(() => setDidSetDefault(false), 1500);
-    }
-  };
-
   const handleThemeChange = (val: string) => {
     setTheme(val);
     try {
@@ -429,56 +390,28 @@ export default function Leads() {
           title={t('leads.title', 'Leads Workspace')}
           description={t('leads.subtitle', 'Focus on pipeline and active contacts')}
           actionsRight={
-            <div className="flex items-center gap-2">
-              <Select value={currentTheme} onValueChange={handleThemeChange}>
-                <SelectTrigger className="w-[140px] h-8 text-xs">
-                  <Palette className="mr-2 h-3 w-3" />
-                  <SelectValue placeholder="Theme" />
-                </SelectTrigger>
-                <SelectContent>
-                  {THEME_PRESETS.map(theme => (
-                    <SelectItem key={theme.name} value={theme.name}>
-                      {theme.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  const params = new URLSearchParams();
-                  params.set('from', 'workspace');
-                  params.set('view', viewMode);
-                  if (searchQuery) params.set('q', searchQuery);
-                  if (statusFilter && statusFilter !== 'all') params.set('status', statusFilter);
-                  if (scoreMin) params.set('scoreMin', scoreMin);
-                  if (scoreMax) params.set('scoreMax', scoreMax);
-                  if (createdStart) params.set('createdFrom', createdStart);
-                  if (createdEnd) params.set('createdTo', createdEnd);
-                  navigate(`/dashboard/leads/import-export?${params.toString()}`);
-                }}
-              >
-                <Download className="h-4 w-4 mr-2" />
-                {t('leads.actions.importExport', 'Import/Export')}
-              </Button>
-              <ViewToggle 
-                value={viewMode} 
-                modes={['pipeline', 'card', 'grid', 'list']}
-                onChange={handleViewChange} 
-              />
-              {context?.isPlatformAdmin && (
-                <Button variant="outline" size="sm" onClick={handleSetDefaultView}>
-                  {t('leads.actions.setDefault', 'Set as Default')}
-                </Button>
-              )}
-              <Button asChild size="sm">
-                <Link to="/dashboard/leads/new">
-                  <Plus className="mr-2 h-4 w-4" />
-                  {t('leads.actions.newLead', 'New Lead')}
-                </Link>
-              </Button>
-            </div>
+            <CRMModuleHeaderNavigation
+              moduleLabel="Leads"
+              viewMode={viewState.view}
+              theme={currentTheme}
+              onViewModeChange={(mode) => handleViewChange(mode as ViewMode)}
+              onThemeChange={handleThemeChange}
+              onCreate={() => navigate('/dashboard/leads/new')}
+              createLabel="New Lead"
+              onRefresh={fetchLeads}
+              onImportExport={() => {
+                const params = new URLSearchParams();
+                params.set('from', 'workspace');
+                params.set('view', viewMode);
+                if (searchQuery) params.set('q', searchQuery);
+                if (statusFilter && statusFilter !== 'all') params.set('status', statusFilter);
+                if (scoreMin) params.set('scoreMin', scoreMin);
+                if (scoreMax) params.set('scoreMax', scoreMax);
+                if (createdStart) params.set('createdFrom', createdStart);
+                if (createdEnd) params.set('createdTo', createdEnd);
+                navigate(`/dashboard/leads/import-export?${params.toString()}`);
+              }}
+            />
           }
         >
           {/* KPI Cards */}

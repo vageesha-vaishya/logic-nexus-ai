@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react';
+import type { Meta, StoryObj } from '@storybook/react-vite';
 import { TaskScheduler, Task } from '../../components/crm/TaskScheduler';
 import { mockUsers } from './mock-data';
 import { addDays, subDays } from 'date-fns';

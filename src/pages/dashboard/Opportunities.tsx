@@ -1,28 +1,36 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import TitleStrip from '@/components/ui/title-strip';
 import { Table, TableBody, TableCell, TableHeader, TableRow, SortableHead } from '@/components/ui/table';
 import { useSort } from '@/hooks/useSort';
 import { Badge } from '@/components/ui/badge';
-import { Plus, TrendingUp } from 'lucide-react';
+import { TrendingUp } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
-import { ViewToggle, ViewMode } from '@/components/ui/view-toggle';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { matchText, TextOp, formatCurrency } from '@/lib/utils';
 import { Opportunity, OpportunityStage, stageColors, stageLabels } from './opportunities-data';
+import { useTheme } from '@/hooks/useTheme';
+import { useCRMModuleNavigationState } from '@/hooks/useCRMModuleNavigationState';
+import { CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
 
 export default function Opportunities() {
   const navigate = useNavigate();
   const { supabase, context, scopedDb } = useCRM();
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<ViewMode>('list');
+  const { setActive } = useTheme();
+  const {
+    viewMode,
+    theme,
+    hydrated,
+    setViewMode,
+    setTheme,
+  } = useCRMModuleNavigationState('opportunities', { viewMode: 'pipeline', theme: 'Azure Sky' });
 
   // Advanced per-column filters
   const [nameQuery, setNameQuery] = useState('');
@@ -63,6 +71,11 @@ export default function Opportunities() {
   useEffect(() => {
     fetchOpportunities();
   }, [fetchOpportunities]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    setActive(theme);
+  }, [hydrated, setActive, theme]);
 
   const formatDate = (date: string | null) => {
     if (!date) return '-';
@@ -114,18 +127,23 @@ export default function Opportunities() {
             <h1 className="text-3xl font-bold">Opportunities</h1>
             <p className="text-muted-foreground">Manage your sales pipeline</p>
           </div>
-          <div className="flex gap-2 items-center">
-            <ViewToggle
-              value={viewMode}
-              modes={['pipeline','card','grid','list']}
-              onChange={(v) => v === 'pipeline' ? navigate('/dashboard/opportunities/pipeline') : setViewMode(v)}
-            />
-            {/* Removed standalone Pipeline View button; use ViewToggle with Pipeline first */}
-            <Button onClick={() => navigate('/dashboard/opportunities/new')}>
-              <Plus className="mr-2 h-4 w-4" />
-              New Opportunity
-            </Button>
-          </div>
+          <CRMModuleHeaderNavigation
+            moduleLabel="Opportunities"
+            viewMode={viewMode}
+            theme={theme}
+            onViewModeChange={(mode) => {
+              if (mode === 'pipeline') {
+                navigate('/dashboard/opportunities/pipeline');
+                return;
+              }
+              setViewMode(mode);
+            }}
+            onThemeChange={setTheme}
+            onCreate={() => navigate('/dashboard/opportunities/new')}
+            createLabel="New Opportunity"
+            onRefresh={fetchOpportunities}
+            onImportExport={() => navigate('/dashboard/opportunities/import-export')}
+          />
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">

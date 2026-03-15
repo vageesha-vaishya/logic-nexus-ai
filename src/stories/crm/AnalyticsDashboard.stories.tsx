@@ -1,5 +1,5 @@
 import React from 'react';
-import type { Meta, StoryObj } from '@storybook/react';
+import type { Meta, StoryObj } from '@storybook/react-vite';
 import { PipelineAnalytics } from '@/components/analytics/PipelineAnalytics';
 import { mockLeads } from './mock-data';
 import { Lead } from '@/pages/dashboard/leads-data';

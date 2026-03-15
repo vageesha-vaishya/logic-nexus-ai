@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/react-vite";
 import { FirstScreenTemplate } from "./FirstScreenTemplate";
 import { EntityCard } from "./EntityCard";
 import { Button } from "@/components/ui/button";

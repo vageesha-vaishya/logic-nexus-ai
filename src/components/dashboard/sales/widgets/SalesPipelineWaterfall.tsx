@@ -1,5 +1,5 @@
 import React from 'react';
-import { Funnel, ArrowDown } from 'lucide-react';
+import { Filter, ArrowDown } from 'lucide-react';
 
 export function SalesPipelineWaterfall() {
   const waterfallData = {
@@ -24,7 +24,7 @@ export function SalesPipelineWaterfall() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Funnel className="h-5 w-5 text-purple-600" />
+          <Filter className="h-5 w-5 text-purple-600" />
           <h4 className="font-semibold text-gray-900">Pipeline Waterfall</h4>
         </div>
       </div>

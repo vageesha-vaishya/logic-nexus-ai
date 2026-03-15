@@ -9,7 +9,7 @@ import { DataTable } from '@/components/system/DataTable';
 import { ColumnDef } from '@/components/system/DataTable';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Copy, Trash2, FileText, Download, AlertCircle, RefreshCcw, ExternalLink, List, LayoutGrid } from 'lucide-react';
+import { Copy, Trash2, FileText, Download, AlertCircle, RefreshCcw, ExternalLink } from 'lucide-react';
 import { format } from 'date-fns';
 import { statusConfig } from '@/config/statusConfig';
 import { QuoteMetrics } from '@/components/sales/QuoteMetrics';
@@ -23,6 +23,9 @@ import Papa from 'papaparse';
 import { AdvancedSearchFilter, FilterCriterion } from '@/components/sales/AdvancedSearchFilter';
 import { FEATURE_FLAGS, useAppFeatureFlag } from '@/lib/feature-flags';
 import { QuotationDeleteService } from '@/services/quotation/QuotationDeleteService';
+import { useTheme } from '@/hooks/useTheme';
+import { useCRMModuleNavigationState } from '@/hooks/useCRMModuleNavigationState';
+import { CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
 
 interface QuoteWithRelations extends Quote {
   accounts?: { id: string; name: string };
@@ -78,7 +81,15 @@ export default function Quotes() {
   const [quotes, setQuotes] = useState<QuoteWithRelations[]>([]);
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
-  const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
+  const { setActive } = useTheme();
+  const {
+    viewMode,
+    theme,
+    hydrated,
+    setViewMode,
+    setTheme,
+  } = useCRMModuleNavigationState('quotes', { viewMode: 'pipeline', theme: 'Azure Sky' });
+  const quoteViewMode = viewMode === 'grid' || viewMode === 'card' ? 'grid' : 'table';
   const [error, setError] = useState<Error | null>(null);
   const [selectedQuoteIds, setSelectedQuoteIds] = useState<string[]>([]);
   const [deleteInProgress, setDeleteInProgress] = useState(false);
@@ -102,6 +113,11 @@ export default function Quotes() {
       return [];
     }
   }, [filters.sorts]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    setActive(theme);
+  }, [hydrated, setActive, theme]);
 
   const fetchQuotes = useCallback(async () => {
     if (quotes.length === 0) setLoading(true);
@@ -665,7 +681,25 @@ export default function Quotes() {
         title="Quotes"
         description="Manage sales quotes and opportunities. Shortcuts: ⌘/Ctrl+B (New), ⌘/Ctrl+R (Refresh)"
         breadcrumbs={[{ label: 'Dashboard', to: '/dashboard' }, { label: 'Quotes' }]}
-        onCreate={() => navigate('/dashboard/quotes/new')}
+        actionsRight={
+          <CRMModuleHeaderNavigation
+            moduleLabel="Quotes"
+            viewMode={viewMode}
+            theme={theme}
+            onViewModeChange={(mode) => {
+              if (mode === 'pipeline') {
+                navigate('/dashboard/quotes/pipeline');
+                return;
+              }
+              setViewMode(mode);
+            }}
+            onThemeChange={setTheme}
+            onCreate={() => navigate('/dashboard/quotes/new')}
+            createLabel="New Quote"
+            onRefresh={fetchQuotes}
+            onImportExport={() => navigate('/dashboard/quotes/import-export')}
+          />
+        }
       >
         <div className="space-y-6 mb-8">
           <QuoteMetrics quotes={quotes} loading={loading} />
@@ -806,27 +840,9 @@ export default function Quotes() {
                   >
                     <Download className="h-4 w-4" />
                   </Button>
-                  <Button
-                    variant={viewMode === 'table' ? 'secondary' : 'ghost'}
-                    size="icon"
-                    className="h-7 w-7"
-                    onClick={() => setViewMode('table')}
-                    title="List View"
-                  >
-                    <List className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
-                    size="icon"
-                    className="h-7 w-7"
-                    onClick={() => setViewMode('grid')}
-                    title="Grid View"
-                  >
-                    <LayoutGrid className="h-4 w-4" />
-                  </Button>
                 </div>
               }
-              viewMode={viewMode}
+              viewMode={quoteViewMode}
               mobileTitleKey="quote_number"
               mobileSubtitleKey="account_id"
             />

@@ -1,18 +1,2328 @@
-<testsuites id="" name="" tests="4" failures="0" skipped="0" errors="0" time="8.985479999999999">
-<testsuite name="test/integration/diagonal-strip.playwright.spec.ts" timestamp="2026-03-14T04:25:27.767Z" hostname="chromium" tests="1" failures="0" skipped="0" time="5.677" errors="0">
-<testcase name="diagonal strip visual parity › renders consistent diagonal geometry and no focus artifacts" classname="test/integration/diagonal-strip.playwright.spec.ts" time="5.677">
+<testsuites id="" name="" tests="49" failures="40" skipped="9" errors="0" time="69.39939899999999">
+<testsuite name="tests/e2e/crm-navigation-order.spec.ts" timestamp="2026-03-15T04:23:05.357Z" hostname="chromium" tests="7" failures="6" skipped="1" time="52.554" errors="0">
+<testcase name="crm navigation header order › keeps unified control sequence on /dashboard/leads" classname="tests/e2e/crm-navigation-order.spec.ts" time="9.224">
+<failure message="crm-navigation-order.spec.ts:5:5 keeps unified control sequence on /dashboard/leads" type="FAILURE">
+<![CDATA[  [chromium] › tests/e2e/crm-navigation-order.spec.ts:5:5 › crm navigation header order › keeps unified control sequence on /dashboard/leads 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+
+
+      21 |
+      22 |       const nav = page.getByRole('navigation').filter({ hasText: 'Pipeline' }).first();
+    > 23 |       await expect(nav).toBeVisible();
+         |                         ^
+      24 |
+      25 |       const text = (await nav.textContent()) ?? '';
+      26 |       const createLabel = modulePath.startsWith('/dashboard/leads') ? 'New Lead' : 'New';
+        at /Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/crm-navigation-order.spec.ts:23:25
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-32480-sequence-on-dashboard-leads-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-32480-sequence-on-dashboard-leads-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/playwright/tests-e2e-crm-navigation-o-32480-sequence-on-dashboard-leads-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-32480-sequence-on-dashboard-leads-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/playwright/tests-e2e-crm-navigation-o-32480-sequence-on-dashboard-leads-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-32480-sequence-on-dashboard-leads-chromium/test-failed-1.png]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-32480-sequence-on-dashboard-leads-chromium/video.webm]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-32480-sequence-on-dashboard-leads-chromium/error-context.md]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-32480-sequence-on-dashboard-leads-chromium/trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="crm navigation header order › keeps unified control sequence on /dashboard/leads/pipeline" classname="tests/e2e/crm-navigation-order.spec.ts" time="3.941">
+<properties>
+<property name="skip" value="">
+</property>
+</properties>
+<skipped>
+</skipped>
+</testcase>
+<testcase name="crm navigation header order › keeps unified control sequence on /dashboard/opportunities" classname="tests/e2e/crm-navigation-order.spec.ts" time="9.089">
+<failure message="crm-navigation-order.spec.ts:5:5 keeps unified control sequence on /dashboard/opportunities" type="FAILURE">
+<![CDATA[  [chromium] › tests/e2e/crm-navigation-order.spec.ts:5:5 › crm navigation header order › keeps unified control sequence on /dashboard/opportunities 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+
+
+      21 |
+      22 |       const nav = page.getByRole('navigation').filter({ hasText: 'Pipeline' }).first();
+    > 23 |       await expect(nav).toBeVisible();
+         |                         ^
+      24 |
+      25 |       const text = (await nav.textContent()) ?? '';
+      26 |       const createLabel = modulePath.startsWith('/dashboard/leads') ? 'New Lead' : 'New';
+        at /Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/crm-navigation-order.spec.ts:23:25
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-58b77--on-dashboard-opportunities-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-58b77--on-dashboard-opportunities-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/playwright/tests-e2e-crm-navigation-o-58b77--on-dashboard-opportunities-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-58b77--on-dashboard-opportunities-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/playwright/tests-e2e-crm-navigation-o-58b77--on-dashboard-opportunities-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-58b77--on-dashboard-opportunities-chromium/test-failed-1.png]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-58b77--on-dashboard-opportunities-chromium/video.webm]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-58b77--on-dashboard-opportunities-chromium/error-context.md]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-58b77--on-dashboard-opportunities-chromium/trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="crm navigation header order › keeps unified control sequence on /dashboard/accounts" classname="tests/e2e/crm-navigation-order.spec.ts" time="9.206">
+<failure message="crm-navigation-order.spec.ts:5:5 keeps unified control sequence on /dashboard/accounts" type="FAILURE">
+<![CDATA[  [chromium] › tests/e2e/crm-navigation-order.spec.ts:5:5 › crm navigation header order › keeps unified control sequence on /dashboard/accounts 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+
+
+      21 |
+      22 |       const nav = page.getByRole('navigation').filter({ hasText: 'Pipeline' }).first();
+    > 23 |       await expect(nav).toBeVisible();
+         |                         ^
+      24 |
+      25 |       const text = (await nav.textContent()) ?? '';
+      26 |       const createLabel = modulePath.startsWith('/dashboard/leads') ? 'New Lead' : 'New';
+        at /Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/crm-navigation-order.spec.ts:23:25
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-0a6ad-uence-on-dashboard-accounts-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-0a6ad-uence-on-dashboard-accounts-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/playwright/tests-e2e-crm-navigation-o-0a6ad-uence-on-dashboard-accounts-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-0a6ad-uence-on-dashboard-accounts-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/playwright/tests-e2e-crm-navigation-o-0a6ad-uence-on-dashboard-accounts-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-0a6ad-uence-on-dashboard-accounts-chromium/test-failed-1.png]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-0a6ad-uence-on-dashboard-accounts-chromium/video.webm]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-0a6ad-uence-on-dashboard-accounts-chromium/error-context.md]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-0a6ad-uence-on-dashboard-accounts-chromium/trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="crm navigation header order › keeps unified control sequence on /dashboard/contacts" classname="tests/e2e/crm-navigation-order.spec.ts" time="9.075">
+<failure message="crm-navigation-order.spec.ts:5:5 keeps unified control sequence on /dashboard/contacts" type="FAILURE">
+<![CDATA[  [chromium] › tests/e2e/crm-navigation-order.spec.ts:5:5 › crm navigation header order › keeps unified control sequence on /dashboard/contacts 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+
+
+      21 |
+      22 |       const nav = page.getByRole('navigation').filter({ hasText: 'Pipeline' }).first();
+    > 23 |       await expect(nav).toBeVisible();
+         |                         ^
+      24 |
+      25 |       const text = (await nav.textContent()) ?? '';
+      26 |       const createLabel = modulePath.startsWith('/dashboard/leads') ? 'New Lead' : 'New';
+        at /Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/crm-navigation-order.spec.ts:23:25
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-233bd-uence-on-dashboard-contacts-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-233bd-uence-on-dashboard-contacts-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/playwright/tests-e2e-crm-navigation-o-233bd-uence-on-dashboard-contacts-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-233bd-uence-on-dashboard-contacts-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/playwright/tests-e2e-crm-navigation-o-233bd-uence-on-dashboard-contacts-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-233bd-uence-on-dashboard-contacts-chromium/test-failed-1.png]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-233bd-uence-on-dashboard-contacts-chromium/video.webm]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-233bd-uence-on-dashboard-contacts-chromium/error-context.md]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-233bd-uence-on-dashboard-contacts-chromium/trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="crm navigation header order › keeps unified control sequence on /dashboard/activities" classname="tests/e2e/crm-navigation-order.spec.ts" time="5.779">
+<failure message="crm-navigation-order.spec.ts:5:5 keeps unified control sequence on /dashboard/activities" type="FAILURE">
+<![CDATA[  [chromium] › tests/e2e/crm-navigation-order.spec.ts:5:5 › crm navigation header order › keeps unified control sequence on /dashboard/activities 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+
+
+      21 |
+      22 |       const nav = page.getByRole('navigation').filter({ hasText: 'Pipeline' }).first();
+    > 23 |       await expect(nav).toBeVisible();
+         |                         ^
+      24 |
+      25 |       const text = (await nav.textContent()) ?? '';
+      26 |       const createLabel = modulePath.startsWith('/dashboard/leads') ? 'New Lead' : 'New';
+        at /Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/crm-navigation-order.spec.ts:23:25
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-17dda-nce-on-dashboard-activities-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-17dda-nce-on-dashboard-activities-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/playwright/tests-e2e-crm-navigation-o-17dda-nce-on-dashboard-activities-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-17dda-nce-on-dashboard-activities-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/playwright/tests-e2e-crm-navigation-o-17dda-nce-on-dashboard-activities-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-17dda-nce-on-dashboard-activities-chromium/test-failed-1.png]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-17dda-nce-on-dashboard-activities-chromium/video.webm]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-17dda-nce-on-dashboard-activities-chromium/error-context.md]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-17dda-nce-on-dashboard-activities-chromium/trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="crm navigation header order › keeps unified control sequence on /dashboard/quotes" classname="tests/e2e/crm-navigation-order.spec.ts" time="6.24">
+<failure message="crm-navigation-order.spec.ts:5:5 keeps unified control sequence on /dashboard/quotes" type="FAILURE">
+<![CDATA[  [chromium] › tests/e2e/crm-navigation-order.spec.ts:5:5 › crm navigation header order › keeps unified control sequence on /dashboard/quotes 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+
+
+      21 |
+      22 |       const nav = page.getByRole('navigation').filter({ hasText: 'Pipeline' }).first();
+    > 23 |       await expect(nav).toBeVisible();
+         |                         ^
+      24 |
+      25 |       const text = (await nav.textContent()) ?? '';
+      26 |       const createLabel = modulePath.startsWith('/dashboard/leads') ? 'New Lead' : 'New';
+        at /Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/crm-navigation-order.spec.ts:23:25
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-42f58-equence-on-dashboard-quotes-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-42f58-equence-on-dashboard-quotes-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/playwright/tests-e2e-crm-navigation-o-42f58-equence-on-dashboard-quotes-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-42f58-equence-on-dashboard-quotes-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/playwright/tests-e2e-crm-navigation-o-42f58-equence-on-dashboard-quotes-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-42f58-equence-on-dashboard-quotes-chromium/test-failed-1.png]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-42f58-equence-on-dashboard-quotes-chromium/video.webm]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-42f58-equence-on-dashboard-quotes-chromium/error-context.md]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-42f58-equence-on-dashboard-quotes-chromium/trace.zip]]
+]]>
+</system-out>
 </testcase>
 </testsuite>
-<testsuite name="test/integration/diagonal-strip.playwright.spec.ts" timestamp="2026-03-14T04:25:27.767Z" hostname="msedge-latest" tests="1" failures="0" skipped="0" time="5.023" errors="0">
-<testcase name="diagonal strip visual parity › renders consistent diagonal geometry and no focus artifacts" classname="test/integration/diagonal-strip.playwright.spec.ts" time="5.023">
+<testsuite name="tests/e2e/crm-navigation-order.spec.ts" timestamp="2026-03-15T04:23:05.357Z" hostname="chrome-latest" tests="7" failures="2" skipped="5" time="18.808" errors="0">
+<testcase name="crm navigation header order › keeps unified control sequence on /dashboard/leads" classname="tests/e2e/crm-navigation-order.spec.ts" time="1.471">
+<properties>
+<property name="skip" value="">
+</property>
+</properties>
+<skipped>
+</skipped>
+</testcase>
+<testcase name="crm navigation header order › keeps unified control sequence on /dashboard/leads/pipeline" classname="tests/e2e/crm-navigation-order.spec.ts" time="1.867">
+<properties>
+<property name="skip" value="">
+</property>
+</properties>
+<skipped>
+</skipped>
+</testcase>
+<testcase name="crm navigation header order › keeps unified control sequence on /dashboard/opportunities" classname="tests/e2e/crm-navigation-order.spec.ts" time="1.792">
+<properties>
+<property name="skip" value="">
+</property>
+</properties>
+<skipped>
+</skipped>
+</testcase>
+<testcase name="crm navigation header order › keeps unified control sequence on /dashboard/accounts" classname="tests/e2e/crm-navigation-order.spec.ts" time="0.806">
+<properties>
+<property name="skip" value="">
+</property>
+</properties>
+<skipped>
+</skipped>
+</testcase>
+<testcase name="crm navigation header order › keeps unified control sequence on /dashboard/contacts" classname="tests/e2e/crm-navigation-order.spec.ts" time="5.863">
+<failure message="crm-navigation-order.spec.ts:5:5 keeps unified control sequence on /dashboard/contacts" type="FAILURE">
+<![CDATA[  [chrome-latest] › tests/e2e/crm-navigation-order.spec.ts:5:5 › crm navigation header order › keeps unified control sequence on /dashboard/contacts 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+
+
+      21 |
+      22 |       const nav = page.getByRole('navigation').filter({ hasText: 'Pipeline' }).first();
+    > 23 |       await expect(nav).toBeVisible();
+         |                         ^
+      24 |
+      25 |       const text = (await nav.textContent()) ?? '';
+      26 |       const createLabel = modulePath.startsWith('/dashboard/leads') ? 'New Lead' : 'New';
+        at /Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/crm-navigation-order.spec.ts:23:25
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-233bd-uence-on-dashboard-contacts-chrome-latest/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-233bd-uence-on-dashboard-contacts-chrome-latest/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/playwright/tests-e2e-crm-navigation-o-233bd-uence-on-dashboard-contacts-chrome-latest/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-233bd-uence-on-dashboard-contacts-chrome-latest/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/playwright/tests-e2e-crm-navigation-o-233bd-uence-on-dashboard-contacts-chrome-latest/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-233bd-uence-on-dashboard-contacts-chrome-latest/test-failed-1.png]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-233bd-uence-on-dashboard-contacts-chrome-latest/video.webm]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-233bd-uence-on-dashboard-contacts-chrome-latest/error-context.md]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-233bd-uence-on-dashboard-contacts-chrome-latest/trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="crm navigation header order › keeps unified control sequence on /dashboard/activities" classname="tests/e2e/crm-navigation-order.spec.ts" time="5.982">
+<failure message="crm-navigation-order.spec.ts:5:5 keeps unified control sequence on /dashboard/activities" type="FAILURE">
+<![CDATA[  [chrome-latest] › tests/e2e/crm-navigation-order.spec.ts:5:5 › crm navigation header order › keeps unified control sequence on /dashboard/activities 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+
+
+      21 |
+      22 |       const nav = page.getByRole('navigation').filter({ hasText: 'Pipeline' }).first();
+    > 23 |       await expect(nav).toBeVisible();
+         |                         ^
+      24 |
+      25 |       const text = (await nav.textContent()) ?? '';
+      26 |       const createLabel = modulePath.startsWith('/dashboard/leads') ? 'New Lead' : 'New';
+        at /Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/crm-navigation-order.spec.ts:23:25
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-17dda-nce-on-dashboard-activities-chrome-latest/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-17dda-nce-on-dashboard-activities-chrome-latest/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/playwright/tests-e2e-crm-navigation-o-17dda-nce-on-dashboard-activities-chrome-latest/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-17dda-nce-on-dashboard-activities-chrome-latest/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/playwright/tests-e2e-crm-navigation-o-17dda-nce-on-dashboard-activities-chrome-latest/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-17dda-nce-on-dashboard-activities-chrome-latest/test-failed-1.png]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-17dda-nce-on-dashboard-activities-chrome-latest/video.webm]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-17dda-nce-on-dashboard-activities-chrome-latest/error-context.md]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-17dda-nce-on-dashboard-activities-chrome-latest/trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="crm navigation header order › keeps unified control sequence on /dashboard/quotes" classname="tests/e2e/crm-navigation-order.spec.ts" time="1.027">
+<properties>
+<property name="skip" value="">
+</property>
+</properties>
+<skipped>
+</skipped>
 </testcase>
 </testsuite>
-<testsuite name="test/integration/diagonal-strip.playwright.spec.ts" timestamp="2026-03-14T04:25:27.767Z" hostname="firefox" tests="1" failures="0" skipped="0" time="3.906" errors="0">
-<testcase name="diagonal strip visual parity › renders consistent diagonal geometry and no focus artifacts" classname="test/integration/diagonal-strip.playwright.spec.ts" time="3.906">
+<testsuite name="tests/e2e/crm-navigation-order.spec.ts" timestamp="2026-03-15T04:23:05.357Z" hostname="msedge-latest" tests="7" failures="7" skipped="0" time="40.242" errors="0">
+<testcase name="crm navigation header order › keeps unified control sequence on /dashboard/leads" classname="tests/e2e/crm-navigation-order.spec.ts" time="5.682">
+<failure message="crm-navigation-order.spec.ts:5:5 keeps unified control sequence on /dashboard/leads" type="FAILURE">
+<![CDATA[  [msedge-latest] › tests/e2e/crm-navigation-order.spec.ts:5:5 › crm navigation header order › keeps unified control sequence on /dashboard/leads 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+
+
+      21 |
+      22 |       const nav = page.getByRole('navigation').filter({ hasText: 'Pipeline' }).first();
+    > 23 |       await expect(nav).toBeVisible();
+         |                         ^
+      24 |
+      25 |       const text = (await nav.textContent()) ?? '';
+      26 |       const createLabel = modulePath.startsWith('/dashboard/leads') ? 'New Lead' : 'New';
+        at /Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/crm-navigation-order.spec.ts:23:25
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-32480-sequence-on-dashboard-leads-msedge-latest/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-32480-sequence-on-dashboard-leads-msedge-latest/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/playwright/tests-e2e-crm-navigation-o-32480-sequence-on-dashboard-leads-msedge-latest/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-32480-sequence-on-dashboard-leads-msedge-latest/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/playwright/tests-e2e-crm-navigation-o-32480-sequence-on-dashboard-leads-msedge-latest/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-32480-sequence-on-dashboard-leads-msedge-latest/test-failed-1.png]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-32480-sequence-on-dashboard-leads-msedge-latest/video.webm]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-32480-sequence-on-dashboard-leads-msedge-latest/error-context.md]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-32480-sequence-on-dashboard-leads-msedge-latest/trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="crm navigation header order › keeps unified control sequence on /dashboard/leads/pipeline" classname="tests/e2e/crm-navigation-order.spec.ts" time="5.692">
+<failure message="crm-navigation-order.spec.ts:5:5 keeps unified control sequence on /dashboard/leads/pipeline" type="FAILURE">
+<![CDATA[  [msedge-latest] › tests/e2e/crm-navigation-order.spec.ts:5:5 › crm navigation header order › keeps unified control sequence on /dashboard/leads/pipeline 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+
+
+      21 |
+      22 |       const nav = page.getByRole('navigation').filter({ hasText: 'Pipeline' }).first();
+    > 23 |       await expect(nav).toBeVisible();
+         |                         ^
+      24 |
+      25 |       const text = (await nav.textContent()) ?? '';
+      26 |       const createLabel = modulePath.startsWith('/dashboard/leads') ? 'New Lead' : 'New';
+        at /Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/crm-navigation-order.spec.ts:23:25
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-18b46-on-dashboard-leads-pipeline-msedge-latest/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-18b46-on-dashboard-leads-pipeline-msedge-latest/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/playwright/tests-e2e-crm-navigation-o-18b46-on-dashboard-leads-pipeline-msedge-latest/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-18b46-on-dashboard-leads-pipeline-msedge-latest/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/playwright/tests-e2e-crm-navigation-o-18b46-on-dashboard-leads-pipeline-msedge-latest/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-18b46-on-dashboard-leads-pipeline-msedge-latest/test-failed-1.png]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-18b46-on-dashboard-leads-pipeline-msedge-latest/video.webm]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-18b46-on-dashboard-leads-pipeline-msedge-latest/error-context.md]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-18b46-on-dashboard-leads-pipeline-msedge-latest/trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="crm navigation header order › keeps unified control sequence on /dashboard/opportunities" classname="tests/e2e/crm-navigation-order.spec.ts" time="5.669">
+<failure message="crm-navigation-order.spec.ts:5:5 keeps unified control sequence on /dashboard/opportunities" type="FAILURE">
+<![CDATA[  [msedge-latest] › tests/e2e/crm-navigation-order.spec.ts:5:5 › crm navigation header order › keeps unified control sequence on /dashboard/opportunities 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+
+
+      21 |
+      22 |       const nav = page.getByRole('navigation').filter({ hasText: 'Pipeline' }).first();
+    > 23 |       await expect(nav).toBeVisible();
+         |                         ^
+      24 |
+      25 |       const text = (await nav.textContent()) ?? '';
+      26 |       const createLabel = modulePath.startsWith('/dashboard/leads') ? 'New Lead' : 'New';
+        at /Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/crm-navigation-order.spec.ts:23:25
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-58b77--on-dashboard-opportunities-msedge-latest/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-58b77--on-dashboard-opportunities-msedge-latest/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/playwright/tests-e2e-crm-navigation-o-58b77--on-dashboard-opportunities-msedge-latest/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-58b77--on-dashboard-opportunities-msedge-latest/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/playwright/tests-e2e-crm-navigation-o-58b77--on-dashboard-opportunities-msedge-latest/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-58b77--on-dashboard-opportunities-msedge-latest/test-failed-1.png]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-58b77--on-dashboard-opportunities-msedge-latest/video.webm]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-58b77--on-dashboard-opportunities-msedge-latest/error-context.md]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-58b77--on-dashboard-opportunities-msedge-latest/trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="crm navigation header order › keeps unified control sequence on /dashboard/accounts" classname="tests/e2e/crm-navigation-order.spec.ts" time="5.577">
+<failure message="crm-navigation-order.spec.ts:5:5 keeps unified control sequence on /dashboard/accounts" type="FAILURE">
+<![CDATA[  [msedge-latest] › tests/e2e/crm-navigation-order.spec.ts:5:5 › crm navigation header order › keeps unified control sequence on /dashboard/accounts 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+
+
+      21 |
+      22 |       const nav = page.getByRole('navigation').filter({ hasText: 'Pipeline' }).first();
+    > 23 |       await expect(nav).toBeVisible();
+         |                         ^
+      24 |
+      25 |       const text = (await nav.textContent()) ?? '';
+      26 |       const createLabel = modulePath.startsWith('/dashboard/leads') ? 'New Lead' : 'New';
+        at /Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/crm-navigation-order.spec.ts:23:25
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-0a6ad-uence-on-dashboard-accounts-msedge-latest/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-0a6ad-uence-on-dashboard-accounts-msedge-latest/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/playwright/tests-e2e-crm-navigation-o-0a6ad-uence-on-dashboard-accounts-msedge-latest/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-0a6ad-uence-on-dashboard-accounts-msedge-latest/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/playwright/tests-e2e-crm-navigation-o-0a6ad-uence-on-dashboard-accounts-msedge-latest/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-0a6ad-uence-on-dashboard-accounts-msedge-latest/test-failed-1.png]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-0a6ad-uence-on-dashboard-accounts-msedge-latest/video.webm]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-0a6ad-uence-on-dashboard-accounts-msedge-latest/error-context.md]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-0a6ad-uence-on-dashboard-accounts-msedge-latest/trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="crm navigation header order › keeps unified control sequence on /dashboard/contacts" classname="tests/e2e/crm-navigation-order.spec.ts" time="5.674">
+<failure message="crm-navigation-order.spec.ts:5:5 keeps unified control sequence on /dashboard/contacts" type="FAILURE">
+<![CDATA[  [msedge-latest] › tests/e2e/crm-navigation-order.spec.ts:5:5 › crm navigation header order › keeps unified control sequence on /dashboard/contacts 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+
+
+      21 |
+      22 |       const nav = page.getByRole('navigation').filter({ hasText: 'Pipeline' }).first();
+    > 23 |       await expect(nav).toBeVisible();
+         |                         ^
+      24 |
+      25 |       const text = (await nav.textContent()) ?? '';
+      26 |       const createLabel = modulePath.startsWith('/dashboard/leads') ? 'New Lead' : 'New';
+        at /Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/crm-navigation-order.spec.ts:23:25
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-233bd-uence-on-dashboard-contacts-msedge-latest/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-233bd-uence-on-dashboard-contacts-msedge-latest/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/playwright/tests-e2e-crm-navigation-o-233bd-uence-on-dashboard-contacts-msedge-latest/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-233bd-uence-on-dashboard-contacts-msedge-latest/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/playwright/tests-e2e-crm-navigation-o-233bd-uence-on-dashboard-contacts-msedge-latest/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-233bd-uence-on-dashboard-contacts-msedge-latest/test-failed-1.png]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-233bd-uence-on-dashboard-contacts-msedge-latest/video.webm]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-233bd-uence-on-dashboard-contacts-msedge-latest/error-context.md]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-233bd-uence-on-dashboard-contacts-msedge-latest/trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="crm navigation header order › keeps unified control sequence on /dashboard/activities" classname="tests/e2e/crm-navigation-order.spec.ts" time="5.977">
+<failure message="crm-navigation-order.spec.ts:5:5 keeps unified control sequence on /dashboard/activities" type="FAILURE">
+<![CDATA[  [msedge-latest] › tests/e2e/crm-navigation-order.spec.ts:5:5 › crm navigation header order › keeps unified control sequence on /dashboard/activities 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+
+
+      21 |
+      22 |       const nav = page.getByRole('navigation').filter({ hasText: 'Pipeline' }).first();
+    > 23 |       await expect(nav).toBeVisible();
+         |                         ^
+      24 |
+      25 |       const text = (await nav.textContent()) ?? '';
+      26 |       const createLabel = modulePath.startsWith('/dashboard/leads') ? 'New Lead' : 'New';
+        at /Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/crm-navigation-order.spec.ts:23:25
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-17dda-nce-on-dashboard-activities-msedge-latest/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-17dda-nce-on-dashboard-activities-msedge-latest/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/playwright/tests-e2e-crm-navigation-o-17dda-nce-on-dashboard-activities-msedge-latest/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-17dda-nce-on-dashboard-activities-msedge-latest/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/playwright/tests-e2e-crm-navigation-o-17dda-nce-on-dashboard-activities-msedge-latest/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-17dda-nce-on-dashboard-activities-msedge-latest/test-failed-1.png]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-17dda-nce-on-dashboard-activities-msedge-latest/video.webm]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-17dda-nce-on-dashboard-activities-msedge-latest/error-context.md]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-17dda-nce-on-dashboard-activities-msedge-latest/trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="crm navigation header order › keeps unified control sequence on /dashboard/quotes" classname="tests/e2e/crm-navigation-order.spec.ts" time="5.971">
+<failure message="crm-navigation-order.spec.ts:5:5 keeps unified control sequence on /dashboard/quotes" type="FAILURE">
+<![CDATA[  [msedge-latest] › tests/e2e/crm-navigation-order.spec.ts:5:5 › crm navigation header order › keeps unified control sequence on /dashboard/quotes 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+
+
+      21 |
+      22 |       const nav = page.getByRole('navigation').filter({ hasText: 'Pipeline' }).first();
+    > 23 |       await expect(nav).toBeVisible();
+         |                         ^
+      24 |
+      25 |       const text = (await nav.textContent()) ?? '';
+      26 |       const createLabel = modulePath.startsWith('/dashboard/leads') ? 'New Lead' : 'New';
+        at /Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/crm-navigation-order.spec.ts:23:25
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-42f58-equence-on-dashboard-quotes-msedge-latest/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-42f58-equence-on-dashboard-quotes-msedge-latest/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/playwright/tests-e2e-crm-navigation-o-42f58-equence-on-dashboard-quotes-msedge-latest/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-42f58-equence-on-dashboard-quotes-msedge-latest/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/playwright/tests-e2e-crm-navigation-o-42f58-equence-on-dashboard-quotes-msedge-latest/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-42f58-equence-on-dashboard-quotes-msedge-latest/test-failed-1.png]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-42f58-equence-on-dashboard-quotes-msedge-latest/video.webm]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-42f58-equence-on-dashboard-quotes-msedge-latest/error-context.md]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-42f58-equence-on-dashboard-quotes-msedge-latest/trace.zip]]
+]]>
+</system-out>
 </testcase>
 </testsuite>
-<testsuite name="test/integration/diagonal-strip.playwright.spec.ts" timestamp="2026-03-14T04:25:27.767Z" hostname="webkit" tests="1" failures="0" skipped="0" time="5.468" errors="0">
-<testcase name="diagonal strip visual parity › renders consistent diagonal geometry and no focus artifacts" classname="test/integration/diagonal-strip.playwright.spec.ts" time="5.468">
+<testsuite name="tests/e2e/crm-navigation-order.spec.ts" timestamp="2026-03-15T04:23:05.357Z" hostname="firefox" tests="7" failures="5" skipped="2" time="41.242" errors="0">
+<testcase name="crm navigation header order › keeps unified control sequence on /dashboard/leads" classname="tests/e2e/crm-navigation-order.spec.ts" time="2.038">
+<properties>
+<property name="skip" value="">
+</property>
+</properties>
+<skipped>
+</skipped>
+</testcase>
+<testcase name="crm navigation header order › keeps unified control sequence on /dashboard/leads/pipeline" classname="tests/e2e/crm-navigation-order.spec.ts" time="8.051">
+<failure message="crm-navigation-order.spec.ts:5:5 keeps unified control sequence on /dashboard/leads/pipeline" type="FAILURE">
+<![CDATA[  [firefox] › tests/e2e/crm-navigation-order.spec.ts:5:5 › crm navigation header order › keeps unified control sequence on /dashboard/leads/pipeline 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+
+
+      21 |
+      22 |       const nav = page.getByRole('navigation').filter({ hasText: 'Pipeline' }).first();
+    > 23 |       await expect(nav).toBeVisible();
+         |                         ^
+      24 |
+      25 |       const text = (await nav.textContent()) ?? '';
+      26 |       const createLabel = modulePath.startsWith('/dashboard/leads') ? 'New Lead' : 'New';
+        at /Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/crm-navigation-order.spec.ts:23:25
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-18b46-on-dashboard-leads-pipeline-firefox/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-18b46-on-dashboard-leads-pipeline-firefox/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/playwright/tests-e2e-crm-navigation-o-18b46-on-dashboard-leads-pipeline-firefox/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-18b46-on-dashboard-leads-pipeline-firefox/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/playwright/tests-e2e-crm-navigation-o-18b46-on-dashboard-leads-pipeline-firefox/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-18b46-on-dashboard-leads-pipeline-firefox/test-failed-1.png]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-18b46-on-dashboard-leads-pipeline-firefox/video.webm]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-18b46-on-dashboard-leads-pipeline-firefox/error-context.md]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-18b46-on-dashboard-leads-pipeline-firefox/trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="crm navigation header order › keeps unified control sequence on /dashboard/opportunities" classname="tests/e2e/crm-navigation-order.spec.ts" time="8.058">
+<failure message="crm-navigation-order.spec.ts:5:5 keeps unified control sequence on /dashboard/opportunities" type="FAILURE">
+<![CDATA[  [firefox] › tests/e2e/crm-navigation-order.spec.ts:5:5 › crm navigation header order › keeps unified control sequence on /dashboard/opportunities 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+
+
+      21 |
+      22 |       const nav = page.getByRole('navigation').filter({ hasText: 'Pipeline' }).first();
+    > 23 |       await expect(nav).toBeVisible();
+         |                         ^
+      24 |
+      25 |       const text = (await nav.textContent()) ?? '';
+      26 |       const createLabel = modulePath.startsWith('/dashboard/leads') ? 'New Lead' : 'New';
+        at /Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/crm-navigation-order.spec.ts:23:25
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-58b77--on-dashboard-opportunities-firefox/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-58b77--on-dashboard-opportunities-firefox/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/playwright/tests-e2e-crm-navigation-o-58b77--on-dashboard-opportunities-firefox/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-58b77--on-dashboard-opportunities-firefox/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/playwright/tests-e2e-crm-navigation-o-58b77--on-dashboard-opportunities-firefox/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-58b77--on-dashboard-opportunities-firefox/test-failed-1.png]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-58b77--on-dashboard-opportunities-firefox/video.webm]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-58b77--on-dashboard-opportunities-firefox/error-context.md]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-58b77--on-dashboard-opportunities-firefox/trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="crm navigation header order › keeps unified control sequence on /dashboard/accounts" classname="tests/e2e/crm-navigation-order.spec.ts" time="6.818">
+<failure message="crm-navigation-order.spec.ts:5:5 keeps unified control sequence on /dashboard/accounts" type="FAILURE">
+<![CDATA[  [firefox] › tests/e2e/crm-navigation-order.spec.ts:5:5 › crm navigation header order › keeps unified control sequence on /dashboard/accounts 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+
+
+      21 |
+      22 |       const nav = page.getByRole('navigation').filter({ hasText: 'Pipeline' }).first();
+    > 23 |       await expect(nav).toBeVisible();
+         |                         ^
+      24 |
+      25 |       const text = (await nav.textContent()) ?? '';
+      26 |       const createLabel = modulePath.startsWith('/dashboard/leads') ? 'New Lead' : 'New';
+        at /Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/crm-navigation-order.spec.ts:23:25
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-0a6ad-uence-on-dashboard-accounts-firefox/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-0a6ad-uence-on-dashboard-accounts-firefox/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/playwright/tests-e2e-crm-navigation-o-0a6ad-uence-on-dashboard-accounts-firefox/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-0a6ad-uence-on-dashboard-accounts-firefox/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/playwright/tests-e2e-crm-navigation-o-0a6ad-uence-on-dashboard-accounts-firefox/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-0a6ad-uence-on-dashboard-accounts-firefox/test-failed-1.png]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-0a6ad-uence-on-dashboard-accounts-firefox/video.webm]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-0a6ad-uence-on-dashboard-accounts-firefox/error-context.md]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-0a6ad-uence-on-dashboard-accounts-firefox/trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="crm navigation header order › keeps unified control sequence on /dashboard/contacts" classname="tests/e2e/crm-navigation-order.spec.ts" time="2.198">
+<properties>
+<property name="skip" value="">
+</property>
+</properties>
+<skipped>
+</skipped>
+</testcase>
+<testcase name="crm navigation header order › keeps unified control sequence on /dashboard/activities" classname="tests/e2e/crm-navigation-order.spec.ts" time="7.752">
+<failure message="crm-navigation-order.spec.ts:5:5 keeps unified control sequence on /dashboard/activities" type="FAILURE">
+<![CDATA[  [firefox] › tests/e2e/crm-navigation-order.spec.ts:5:5 › crm navigation header order › keeps unified control sequence on /dashboard/activities 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+
+
+      21 |
+      22 |       const nav = page.getByRole('navigation').filter({ hasText: 'Pipeline' }).first();
+    > 23 |       await expect(nav).toBeVisible();
+         |                         ^
+      24 |
+      25 |       const text = (await nav.textContent()) ?? '';
+      26 |       const createLabel = modulePath.startsWith('/dashboard/leads') ? 'New Lead' : 'New';
+        at /Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/crm-navigation-order.spec.ts:23:25
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-17dda-nce-on-dashboard-activities-firefox/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-17dda-nce-on-dashboard-activities-firefox/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/playwright/tests-e2e-crm-navigation-o-17dda-nce-on-dashboard-activities-firefox/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-17dda-nce-on-dashboard-activities-firefox/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/playwright/tests-e2e-crm-navigation-o-17dda-nce-on-dashboard-activities-firefox/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-17dda-nce-on-dashboard-activities-firefox/test-failed-1.png]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-17dda-nce-on-dashboard-activities-firefox/video.webm]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-17dda-nce-on-dashboard-activities-firefox/error-context.md]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-17dda-nce-on-dashboard-activities-firefox/trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="crm navigation header order › keeps unified control sequence on /dashboard/quotes" classname="tests/e2e/crm-navigation-order.spec.ts" time="6.327">
+<failure message="crm-navigation-order.spec.ts:5:5 keeps unified control sequence on /dashboard/quotes" type="FAILURE">
+<![CDATA[  [firefox] › tests/e2e/crm-navigation-order.spec.ts:5:5 › crm navigation header order › keeps unified control sequence on /dashboard/quotes 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+
+
+      21 |
+      22 |       const nav = page.getByRole('navigation').filter({ hasText: 'Pipeline' }).first();
+    > 23 |       await expect(nav).toBeVisible();
+         |                         ^
+      24 |
+      25 |       const text = (await nav.textContent()) ?? '';
+      26 |       const createLabel = modulePath.startsWith('/dashboard/leads') ? 'New Lead' : 'New';
+        at /Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/crm-navigation-order.spec.ts:23:25
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-42f58-equence-on-dashboard-quotes-firefox/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-42f58-equence-on-dashboard-quotes-firefox/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/playwright/tests-e2e-crm-navigation-o-42f58-equence-on-dashboard-quotes-firefox/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-42f58-equence-on-dashboard-quotes-firefox/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/playwright/tests-e2e-crm-navigation-o-42f58-equence-on-dashboard-quotes-firefox/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-42f58-equence-on-dashboard-quotes-firefox/test-failed-1.png]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-42f58-equence-on-dashboard-quotes-firefox/video.webm]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-42f58-equence-on-dashboard-quotes-firefox/error-context.md]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-42f58-equence-on-dashboard-quotes-firefox/trace.zip]]
+]]>
+</system-out>
+</testcase>
+</testsuite>
+<testsuite name="tests/e2e/crm-navigation-order.spec.ts" timestamp="2026-03-15T04:23:05.357Z" hostname="webkit" tests="7" failures="6" skipped="1" time="37.826" errors="0">
+<testcase name="crm navigation header order › keeps unified control sequence on /dashboard/leads" classname="tests/e2e/crm-navigation-order.spec.ts" time="6.261">
+<failure message="crm-navigation-order.spec.ts:5:5 keeps unified control sequence on /dashboard/leads" type="FAILURE">
+<![CDATA[  [webkit] › tests/e2e/crm-navigation-order.spec.ts:5:5 › crm navigation header order › keeps unified control sequence on /dashboard/leads 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+
+
+      21 |
+      22 |       const nav = page.getByRole('navigation').filter({ hasText: 'Pipeline' }).first();
+    > 23 |       await expect(nav).toBeVisible();
+         |                         ^
+      24 |
+      25 |       const text = (await nav.textContent()) ?? '';
+      26 |       const createLabel = modulePath.startsWith('/dashboard/leads') ? 'New Lead' : 'New';
+        at /Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/crm-navigation-order.spec.ts:23:25
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-32480-sequence-on-dashboard-leads-webkit/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-32480-sequence-on-dashboard-leads-webkit/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/playwright/tests-e2e-crm-navigation-o-32480-sequence-on-dashboard-leads-webkit/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-32480-sequence-on-dashboard-leads-webkit/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/playwright/tests-e2e-crm-navigation-o-32480-sequence-on-dashboard-leads-webkit/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-32480-sequence-on-dashboard-leads-webkit/test-failed-1.png]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-32480-sequence-on-dashboard-leads-webkit/video.webm]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-32480-sequence-on-dashboard-leads-webkit/error-context.md]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-32480-sequence-on-dashboard-leads-webkit/trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="crm navigation header order › keeps unified control sequence on /dashboard/leads/pipeline" classname="tests/e2e/crm-navigation-order.spec.ts" time="5.996">
+<failure message="crm-navigation-order.spec.ts:5:5 keeps unified control sequence on /dashboard/leads/pipeline" type="FAILURE">
+<![CDATA[  [webkit] › tests/e2e/crm-navigation-order.spec.ts:5:5 › crm navigation header order › keeps unified control sequence on /dashboard/leads/pipeline 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+
+
+      21 |
+      22 |       const nav = page.getByRole('navigation').filter({ hasText: 'Pipeline' }).first();
+    > 23 |       await expect(nav).toBeVisible();
+         |                         ^
+      24 |
+      25 |       const text = (await nav.textContent()) ?? '';
+      26 |       const createLabel = modulePath.startsWith('/dashboard/leads') ? 'New Lead' : 'New';
+        at /Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/crm-navigation-order.spec.ts:23:25
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-18b46-on-dashboard-leads-pipeline-webkit/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-18b46-on-dashboard-leads-pipeline-webkit/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/playwright/tests-e2e-crm-navigation-o-18b46-on-dashboard-leads-pipeline-webkit/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-18b46-on-dashboard-leads-pipeline-webkit/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/playwright/tests-e2e-crm-navigation-o-18b46-on-dashboard-leads-pipeline-webkit/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-18b46-on-dashboard-leads-pipeline-webkit/test-failed-1.png]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-18b46-on-dashboard-leads-pipeline-webkit/video.webm]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-18b46-on-dashboard-leads-pipeline-webkit/error-context.md]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-18b46-on-dashboard-leads-pipeline-webkit/trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="crm navigation header order › keeps unified control sequence on /dashboard/opportunities" classname="tests/e2e/crm-navigation-order.spec.ts" time="6.039">
+<failure message="crm-navigation-order.spec.ts:5:5 keeps unified control sequence on /dashboard/opportunities" type="FAILURE">
+<![CDATA[  [webkit] › tests/e2e/crm-navigation-order.spec.ts:5:5 › crm navigation header order › keeps unified control sequence on /dashboard/opportunities 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+
+
+      21 |
+      22 |       const nav = page.getByRole('navigation').filter({ hasText: 'Pipeline' }).first();
+    > 23 |       await expect(nav).toBeVisible();
+         |                         ^
+      24 |
+      25 |       const text = (await nav.textContent()) ?? '';
+      26 |       const createLabel = modulePath.startsWith('/dashboard/leads') ? 'New Lead' : 'New';
+        at /Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/crm-navigation-order.spec.ts:23:25
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-58b77--on-dashboard-opportunities-webkit/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-58b77--on-dashboard-opportunities-webkit/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/playwright/tests-e2e-crm-navigation-o-58b77--on-dashboard-opportunities-webkit/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-58b77--on-dashboard-opportunities-webkit/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/playwright/tests-e2e-crm-navigation-o-58b77--on-dashboard-opportunities-webkit/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-58b77--on-dashboard-opportunities-webkit/test-failed-1.png]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-58b77--on-dashboard-opportunities-webkit/video.webm]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-58b77--on-dashboard-opportunities-webkit/error-context.md]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-58b77--on-dashboard-opportunities-webkit/trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="crm navigation header order › keeps unified control sequence on /dashboard/accounts" classname="tests/e2e/crm-navigation-order.spec.ts" time="5.89">
+<failure message="crm-navigation-order.spec.ts:5:5 keeps unified control sequence on /dashboard/accounts" type="FAILURE">
+<![CDATA[  [webkit] › tests/e2e/crm-navigation-order.spec.ts:5:5 › crm navigation header order › keeps unified control sequence on /dashboard/accounts 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+
+
+      21 |
+      22 |       const nav = page.getByRole('navigation').filter({ hasText: 'Pipeline' }).first();
+    > 23 |       await expect(nav).toBeVisible();
+         |                         ^
+      24 |
+      25 |       const text = (await nav.textContent()) ?? '';
+      26 |       const createLabel = modulePath.startsWith('/dashboard/leads') ? 'New Lead' : 'New';
+        at /Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/crm-navigation-order.spec.ts:23:25
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-0a6ad-uence-on-dashboard-accounts-webkit/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-0a6ad-uence-on-dashboard-accounts-webkit/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/playwright/tests-e2e-crm-navigation-o-0a6ad-uence-on-dashboard-accounts-webkit/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-0a6ad-uence-on-dashboard-accounts-webkit/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/playwright/tests-e2e-crm-navigation-o-0a6ad-uence-on-dashboard-accounts-webkit/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-0a6ad-uence-on-dashboard-accounts-webkit/test-failed-1.png]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-0a6ad-uence-on-dashboard-accounts-webkit/video.webm]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-0a6ad-uence-on-dashboard-accounts-webkit/error-context.md]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-0a6ad-uence-on-dashboard-accounts-webkit/trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="crm navigation header order › keeps unified control sequence on /dashboard/contacts" classname="tests/e2e/crm-navigation-order.spec.ts" time="5.922">
+<failure message="crm-navigation-order.spec.ts:5:5 keeps unified control sequence on /dashboard/contacts" type="FAILURE">
+<![CDATA[  [webkit] › tests/e2e/crm-navigation-order.spec.ts:5:5 › crm navigation header order › keeps unified control sequence on /dashboard/contacts 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+
+
+      21 |
+      22 |       const nav = page.getByRole('navigation').filter({ hasText: 'Pipeline' }).first();
+    > 23 |       await expect(nav).toBeVisible();
+         |                         ^
+      24 |
+      25 |       const text = (await nav.textContent()) ?? '';
+      26 |       const createLabel = modulePath.startsWith('/dashboard/leads') ? 'New Lead' : 'New';
+        at /Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/crm-navigation-order.spec.ts:23:25
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-233bd-uence-on-dashboard-contacts-webkit/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-233bd-uence-on-dashboard-contacts-webkit/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/playwright/tests-e2e-crm-navigation-o-233bd-uence-on-dashboard-contacts-webkit/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-233bd-uence-on-dashboard-contacts-webkit/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/playwright/tests-e2e-crm-navigation-o-233bd-uence-on-dashboard-contacts-webkit/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-233bd-uence-on-dashboard-contacts-webkit/test-failed-1.png]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-233bd-uence-on-dashboard-contacts-webkit/video.webm]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-233bd-uence-on-dashboard-contacts-webkit/error-context.md]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-233bd-uence-on-dashboard-contacts-webkit/trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="crm navigation header order › keeps unified control sequence on /dashboard/activities" classname="tests/e2e/crm-navigation-order.spec.ts" time="1.171">
+<properties>
+<property name="skip" value="">
+</property>
+</properties>
+<skipped>
+</skipped>
+</testcase>
+<testcase name="crm navigation header order › keeps unified control sequence on /dashboard/quotes" classname="tests/e2e/crm-navigation-order.spec.ts" time="6.547">
+<failure message="crm-navigation-order.spec.ts:5:5 keeps unified control sequence on /dashboard/quotes" type="FAILURE">
+<![CDATA[  [webkit] › tests/e2e/crm-navigation-order.spec.ts:5:5 › crm navigation header order › keeps unified control sequence on /dashboard/quotes 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+
+
+      21 |
+      22 |       const nav = page.getByRole('navigation').filter({ hasText: 'Pipeline' }).first();
+    > 23 |       await expect(nav).toBeVisible();
+         |                         ^
+      24 |
+      25 |       const text = (await nav.textContent()) ?? '';
+      26 |       const createLabel = modulePath.startsWith('/dashboard/leads') ? 'New Lead' : 'New';
+        at /Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/crm-navigation-order.spec.ts:23:25
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-42f58-equence-on-dashboard-quotes-webkit/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-42f58-equence-on-dashboard-quotes-webkit/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/playwright/tests-e2e-crm-navigation-o-42f58-equence-on-dashboard-quotes-webkit/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-42f58-equence-on-dashboard-quotes-webkit/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/playwright/tests-e2e-crm-navigation-o-42f58-equence-on-dashboard-quotes-webkit/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-42f58-equence-on-dashboard-quotes-webkit/test-failed-1.png]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-42f58-equence-on-dashboard-quotes-webkit/video.webm]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-42f58-equence-on-dashboard-quotes-webkit/error-context.md]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-42f58-equence-on-dashboard-quotes-webkit/trace.zip]]
+]]>
+</system-out>
+</testcase>
+</testsuite>
+<testsuite name="tests/e2e/crm-navigation-order.spec.ts" timestamp="2026-03-15T04:23:05.357Z" hostname="ios-mobile" tests="7" failures="7" skipped="0" time="44.409" errors="0">
+<testcase name="crm navigation header order › keeps unified control sequence on /dashboard/leads" classname="tests/e2e/crm-navigation-order.spec.ts" time="6.234">
+<failure message="crm-navigation-order.spec.ts:5:5 keeps unified control sequence on /dashboard/leads" type="FAILURE">
+<![CDATA[  [ios-mobile] › tests/e2e/crm-navigation-order.spec.ts:5:5 › crm navigation header order › keeps unified control sequence on /dashboard/leads 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+
+
+      21 |
+      22 |       const nav = page.getByRole('navigation').filter({ hasText: 'Pipeline' }).first();
+    > 23 |       await expect(nav).toBeVisible();
+         |                         ^
+      24 |
+      25 |       const text = (await nav.textContent()) ?? '';
+      26 |       const createLabel = modulePath.startsWith('/dashboard/leads') ? 'New Lead' : 'New';
+        at /Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/crm-navigation-order.spec.ts:23:25
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-32480-sequence-on-dashboard-leads-ios-mobile/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-32480-sequence-on-dashboard-leads-ios-mobile/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/playwright/tests-e2e-crm-navigation-o-32480-sequence-on-dashboard-leads-ios-mobile/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-32480-sequence-on-dashboard-leads-ios-mobile/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/playwright/tests-e2e-crm-navigation-o-32480-sequence-on-dashboard-leads-ios-mobile/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-32480-sequence-on-dashboard-leads-ios-mobile/test-failed-1.png]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-32480-sequence-on-dashboard-leads-ios-mobile/video.webm]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-32480-sequence-on-dashboard-leads-ios-mobile/error-context.md]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-32480-sequence-on-dashboard-leads-ios-mobile/trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="crm navigation header order › keeps unified control sequence on /dashboard/leads/pipeline" classname="tests/e2e/crm-navigation-order.spec.ts" time="6.277">
+<failure message="crm-navigation-order.spec.ts:5:5 keeps unified control sequence on /dashboard/leads/pipeline" type="FAILURE">
+<![CDATA[  [ios-mobile] › tests/e2e/crm-navigation-order.spec.ts:5:5 › crm navigation header order › keeps unified control sequence on /dashboard/leads/pipeline 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+
+
+      21 |
+      22 |       const nav = page.getByRole('navigation').filter({ hasText: 'Pipeline' }).first();
+    > 23 |       await expect(nav).toBeVisible();
+         |                         ^
+      24 |
+      25 |       const text = (await nav.textContent()) ?? '';
+      26 |       const createLabel = modulePath.startsWith('/dashboard/leads') ? 'New Lead' : 'New';
+        at /Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/crm-navigation-order.spec.ts:23:25
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-18b46-on-dashboard-leads-pipeline-ios-mobile/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-18b46-on-dashboard-leads-pipeline-ios-mobile/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/playwright/tests-e2e-crm-navigation-o-18b46-on-dashboard-leads-pipeline-ios-mobile/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-18b46-on-dashboard-leads-pipeline-ios-mobile/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/playwright/tests-e2e-crm-navigation-o-18b46-on-dashboard-leads-pipeline-ios-mobile/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-18b46-on-dashboard-leads-pipeline-ios-mobile/test-failed-1.png]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-18b46-on-dashboard-leads-pipeline-ios-mobile/video.webm]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-18b46-on-dashboard-leads-pipeline-ios-mobile/error-context.md]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-18b46-on-dashboard-leads-pipeline-ios-mobile/trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="crm navigation header order › keeps unified control sequence on /dashboard/opportunities" classname="tests/e2e/crm-navigation-order.spec.ts" time="6.843">
+<failure message="crm-navigation-order.spec.ts:5:5 keeps unified control sequence on /dashboard/opportunities" type="FAILURE">
+<![CDATA[  [ios-mobile] › tests/e2e/crm-navigation-order.spec.ts:5:5 › crm navigation header order › keeps unified control sequence on /dashboard/opportunities 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+
+
+      21 |
+      22 |       const nav = page.getByRole('navigation').filter({ hasText: 'Pipeline' }).first();
+    > 23 |       await expect(nav).toBeVisible();
+         |                         ^
+      24 |
+      25 |       const text = (await nav.textContent()) ?? '';
+      26 |       const createLabel = modulePath.startsWith('/dashboard/leads') ? 'New Lead' : 'New';
+        at /Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/crm-navigation-order.spec.ts:23:25
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-58b77--on-dashboard-opportunities-ios-mobile/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-58b77--on-dashboard-opportunities-ios-mobile/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/playwright/tests-e2e-crm-navigation-o-58b77--on-dashboard-opportunities-ios-mobile/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-58b77--on-dashboard-opportunities-ios-mobile/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/playwright/tests-e2e-crm-navigation-o-58b77--on-dashboard-opportunities-ios-mobile/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-58b77--on-dashboard-opportunities-ios-mobile/test-failed-1.png]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-58b77--on-dashboard-opportunities-ios-mobile/video.webm]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-58b77--on-dashboard-opportunities-ios-mobile/error-context.md]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-58b77--on-dashboard-opportunities-ios-mobile/trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="crm navigation header order › keeps unified control sequence on /dashboard/accounts" classname="tests/e2e/crm-navigation-order.spec.ts" time="7.29">
+<failure message="crm-navigation-order.spec.ts:5:5 keeps unified control sequence on /dashboard/accounts" type="FAILURE">
+<![CDATA[  [ios-mobile] › tests/e2e/crm-navigation-order.spec.ts:5:5 › crm navigation header order › keeps unified control sequence on /dashboard/accounts 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+
+
+      21 |
+      22 |       const nav = page.getByRole('navigation').filter({ hasText: 'Pipeline' }).first();
+    > 23 |       await expect(nav).toBeVisible();
+         |                         ^
+      24 |
+      25 |       const text = (await nav.textContent()) ?? '';
+      26 |       const createLabel = modulePath.startsWith('/dashboard/leads') ? 'New Lead' : 'New';
+        at /Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/crm-navigation-order.spec.ts:23:25
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-0a6ad-uence-on-dashboard-accounts-ios-mobile/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-0a6ad-uence-on-dashboard-accounts-ios-mobile/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/playwright/tests-e2e-crm-navigation-o-0a6ad-uence-on-dashboard-accounts-ios-mobile/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-0a6ad-uence-on-dashboard-accounts-ios-mobile/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/playwright/tests-e2e-crm-navigation-o-0a6ad-uence-on-dashboard-accounts-ios-mobile/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-0a6ad-uence-on-dashboard-accounts-ios-mobile/test-failed-1.png]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-0a6ad-uence-on-dashboard-accounts-ios-mobile/video.webm]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-0a6ad-uence-on-dashboard-accounts-ios-mobile/error-context.md]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-0a6ad-uence-on-dashboard-accounts-ios-mobile/trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="crm navigation header order › keeps unified control sequence on /dashboard/contacts" classname="tests/e2e/crm-navigation-order.spec.ts" time="5.909">
+<failure message="crm-navigation-order.spec.ts:5:5 keeps unified control sequence on /dashboard/contacts" type="FAILURE">
+<![CDATA[  [ios-mobile] › tests/e2e/crm-navigation-order.spec.ts:5:5 › crm navigation header order › keeps unified control sequence on /dashboard/contacts 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+
+
+      21 |
+      22 |       const nav = page.getByRole('navigation').filter({ hasText: 'Pipeline' }).first();
+    > 23 |       await expect(nav).toBeVisible();
+         |                         ^
+      24 |
+      25 |       const text = (await nav.textContent()) ?? '';
+      26 |       const createLabel = modulePath.startsWith('/dashboard/leads') ? 'New Lead' : 'New';
+        at /Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/crm-navigation-order.spec.ts:23:25
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-233bd-uence-on-dashboard-contacts-ios-mobile/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-233bd-uence-on-dashboard-contacts-ios-mobile/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/playwright/tests-e2e-crm-navigation-o-233bd-uence-on-dashboard-contacts-ios-mobile/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-233bd-uence-on-dashboard-contacts-ios-mobile/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/playwright/tests-e2e-crm-navigation-o-233bd-uence-on-dashboard-contacts-ios-mobile/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-233bd-uence-on-dashboard-contacts-ios-mobile/test-failed-1.png]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-233bd-uence-on-dashboard-contacts-ios-mobile/video.webm]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-233bd-uence-on-dashboard-contacts-ios-mobile/error-context.md]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-233bd-uence-on-dashboard-contacts-ios-mobile/trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="crm navigation header order › keeps unified control sequence on /dashboard/activities" classname="tests/e2e/crm-navigation-order.spec.ts" time="5.909">
+<failure message="crm-navigation-order.spec.ts:5:5 keeps unified control sequence on /dashboard/activities" type="FAILURE">
+<![CDATA[  [ios-mobile] › tests/e2e/crm-navigation-order.spec.ts:5:5 › crm navigation header order › keeps unified control sequence on /dashboard/activities 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+
+
+      21 |
+      22 |       const nav = page.getByRole('navigation').filter({ hasText: 'Pipeline' }).first();
+    > 23 |       await expect(nav).toBeVisible();
+         |                         ^
+      24 |
+      25 |       const text = (await nav.textContent()) ?? '';
+      26 |       const createLabel = modulePath.startsWith('/dashboard/leads') ? 'New Lead' : 'New';
+        at /Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/crm-navigation-order.spec.ts:23:25
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-17dda-nce-on-dashboard-activities-ios-mobile/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-17dda-nce-on-dashboard-activities-ios-mobile/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/playwright/tests-e2e-crm-navigation-o-17dda-nce-on-dashboard-activities-ios-mobile/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-17dda-nce-on-dashboard-activities-ios-mobile/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/playwright/tests-e2e-crm-navigation-o-17dda-nce-on-dashboard-activities-ios-mobile/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-17dda-nce-on-dashboard-activities-ios-mobile/test-failed-1.png]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-17dda-nce-on-dashboard-activities-ios-mobile/video.webm]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-17dda-nce-on-dashboard-activities-ios-mobile/error-context.md]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-17dda-nce-on-dashboard-activities-ios-mobile/trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="crm navigation header order › keeps unified control sequence on /dashboard/quotes" classname="tests/e2e/crm-navigation-order.spec.ts" time="5.947">
+<failure message="crm-navigation-order.spec.ts:5:5 keeps unified control sequence on /dashboard/quotes" type="FAILURE">
+<![CDATA[  [ios-mobile] › tests/e2e/crm-navigation-order.spec.ts:5:5 › crm navigation header order › keeps unified control sequence on /dashboard/quotes 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+
+
+      21 |
+      22 |       const nav = page.getByRole('navigation').filter({ hasText: 'Pipeline' }).first();
+    > 23 |       await expect(nav).toBeVisible();
+         |                         ^
+      24 |
+      25 |       const text = (await nav.textContent()) ?? '';
+      26 |       const createLabel = modulePath.startsWith('/dashboard/leads') ? 'New Lead' : 'New';
+        at /Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/crm-navigation-order.spec.ts:23:25
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-42f58-equence-on-dashboard-quotes-ios-mobile/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-42f58-equence-on-dashboard-quotes-ios-mobile/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/playwright/tests-e2e-crm-navigation-o-42f58-equence-on-dashboard-quotes-ios-mobile/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-42f58-equence-on-dashboard-quotes-ios-mobile/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/playwright/tests-e2e-crm-navigation-o-42f58-equence-on-dashboard-quotes-ios-mobile/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-42f58-equence-on-dashboard-quotes-ios-mobile/test-failed-1.png]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-42f58-equence-on-dashboard-quotes-ios-mobile/video.webm]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-42f58-equence-on-dashboard-quotes-ios-mobile/error-context.md]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-42f58-equence-on-dashboard-quotes-ios-mobile/trace.zip]]
+]]>
+</system-out>
+</testcase>
+</testsuite>
+<testsuite name="tests/e2e/crm-navigation-order.spec.ts" timestamp="2026-03-15T04:23:05.357Z" hostname="android-mobile" tests="7" failures="7" skipped="0" time="40.483" errors="0">
+<testcase name="crm navigation header order › keeps unified control sequence on /dashboard/leads" classname="tests/e2e/crm-navigation-order.spec.ts" time="5.929">
+<failure message="crm-navigation-order.spec.ts:5:5 keeps unified control sequence on /dashboard/leads" type="FAILURE">
+<![CDATA[  [android-mobile] › tests/e2e/crm-navigation-order.spec.ts:5:5 › crm navigation header order › keeps unified control sequence on /dashboard/leads 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+
+
+      21 |
+      22 |       const nav = page.getByRole('navigation').filter({ hasText: 'Pipeline' }).first();
+    > 23 |       await expect(nav).toBeVisible();
+         |                         ^
+      24 |
+      25 |       const text = (await nav.textContent()) ?? '';
+      26 |       const createLabel = modulePath.startsWith('/dashboard/leads') ? 'New Lead' : 'New';
+        at /Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/crm-navigation-order.spec.ts:23:25
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-32480-sequence-on-dashboard-leads-android-mobile/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-32480-sequence-on-dashboard-leads-android-mobile/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/playwright/tests-e2e-crm-navigation-o-32480-sequence-on-dashboard-leads-android-mobile/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-32480-sequence-on-dashboard-leads-android-mobile/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/playwright/tests-e2e-crm-navigation-o-32480-sequence-on-dashboard-leads-android-mobile/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-32480-sequence-on-dashboard-leads-android-mobile/test-failed-1.png]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-32480-sequence-on-dashboard-leads-android-mobile/video.webm]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-32480-sequence-on-dashboard-leads-android-mobile/error-context.md]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-32480-sequence-on-dashboard-leads-android-mobile/trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="crm navigation header order › keeps unified control sequence on /dashboard/leads/pipeline" classname="tests/e2e/crm-navigation-order.spec.ts" time="5.682">
+<failure message="crm-navigation-order.spec.ts:5:5 keeps unified control sequence on /dashboard/leads/pipeline" type="FAILURE">
+<![CDATA[  [android-mobile] › tests/e2e/crm-navigation-order.spec.ts:5:5 › crm navigation header order › keeps unified control sequence on /dashboard/leads/pipeline 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+
+
+      21 |
+      22 |       const nav = page.getByRole('navigation').filter({ hasText: 'Pipeline' }).first();
+    > 23 |       await expect(nav).toBeVisible();
+         |                         ^
+      24 |
+      25 |       const text = (await nav.textContent()) ?? '';
+      26 |       const createLabel = modulePath.startsWith('/dashboard/leads') ? 'New Lead' : 'New';
+        at /Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/crm-navigation-order.spec.ts:23:25
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-18b46-on-dashboard-leads-pipeline-android-mobile/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-18b46-on-dashboard-leads-pipeline-android-mobile/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/playwright/tests-e2e-crm-navigation-o-18b46-on-dashboard-leads-pipeline-android-mobile/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-18b46-on-dashboard-leads-pipeline-android-mobile/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/playwright/tests-e2e-crm-navigation-o-18b46-on-dashboard-leads-pipeline-android-mobile/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-18b46-on-dashboard-leads-pipeline-android-mobile/test-failed-1.png]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-18b46-on-dashboard-leads-pipeline-android-mobile/video.webm]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-18b46-on-dashboard-leads-pipeline-android-mobile/error-context.md]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-18b46-on-dashboard-leads-pipeline-android-mobile/trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="crm navigation header order › keeps unified control sequence on /dashboard/opportunities" classname="tests/e2e/crm-navigation-order.spec.ts" time="5.638">
+<failure message="crm-navigation-order.spec.ts:5:5 keeps unified control sequence on /dashboard/opportunities" type="FAILURE">
+<![CDATA[  [android-mobile] › tests/e2e/crm-navigation-order.spec.ts:5:5 › crm navigation header order › keeps unified control sequence on /dashboard/opportunities 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+
+
+      21 |
+      22 |       const nav = page.getByRole('navigation').filter({ hasText: 'Pipeline' }).first();
+    > 23 |       await expect(nav).toBeVisible();
+         |                         ^
+      24 |
+      25 |       const text = (await nav.textContent()) ?? '';
+      26 |       const createLabel = modulePath.startsWith('/dashboard/leads') ? 'New Lead' : 'New';
+        at /Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/crm-navigation-order.spec.ts:23:25
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-58b77--on-dashboard-opportunities-android-mobile/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-58b77--on-dashboard-opportunities-android-mobile/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/playwright/tests-e2e-crm-navigation-o-58b77--on-dashboard-opportunities-android-mobile/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-58b77--on-dashboard-opportunities-android-mobile/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/playwright/tests-e2e-crm-navigation-o-58b77--on-dashboard-opportunities-android-mobile/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-58b77--on-dashboard-opportunities-android-mobile/test-failed-1.png]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-58b77--on-dashboard-opportunities-android-mobile/video.webm]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-58b77--on-dashboard-opportunities-android-mobile/error-context.md]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-58b77--on-dashboard-opportunities-android-mobile/trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="crm navigation header order › keeps unified control sequence on /dashboard/accounts" classname="tests/e2e/crm-navigation-order.spec.ts" time="5.782">
+<failure message="crm-navigation-order.spec.ts:5:5 keeps unified control sequence on /dashboard/accounts" type="FAILURE">
+<![CDATA[  [android-mobile] › tests/e2e/crm-navigation-order.spec.ts:5:5 › crm navigation header order › keeps unified control sequence on /dashboard/accounts 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+
+
+      21 |
+      22 |       const nav = page.getByRole('navigation').filter({ hasText: 'Pipeline' }).first();
+    > 23 |       await expect(nav).toBeVisible();
+         |                         ^
+      24 |
+      25 |       const text = (await nav.textContent()) ?? '';
+      26 |       const createLabel = modulePath.startsWith('/dashboard/leads') ? 'New Lead' : 'New';
+        at /Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/crm-navigation-order.spec.ts:23:25
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-0a6ad-uence-on-dashboard-accounts-android-mobile/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-0a6ad-uence-on-dashboard-accounts-android-mobile/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/playwright/tests-e2e-crm-navigation-o-0a6ad-uence-on-dashboard-accounts-android-mobile/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-0a6ad-uence-on-dashboard-accounts-android-mobile/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/playwright/tests-e2e-crm-navigation-o-0a6ad-uence-on-dashboard-accounts-android-mobile/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-0a6ad-uence-on-dashboard-accounts-android-mobile/test-failed-1.png]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-0a6ad-uence-on-dashboard-accounts-android-mobile/video.webm]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-0a6ad-uence-on-dashboard-accounts-android-mobile/error-context.md]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-0a6ad-uence-on-dashboard-accounts-android-mobile/trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="crm navigation header order › keeps unified control sequence on /dashboard/contacts" classname="tests/e2e/crm-navigation-order.spec.ts" time="5.882">
+<failure message="crm-navigation-order.spec.ts:5:5 keeps unified control sequence on /dashboard/contacts" type="FAILURE">
+<![CDATA[  [android-mobile] › tests/e2e/crm-navigation-order.spec.ts:5:5 › crm navigation header order › keeps unified control sequence on /dashboard/contacts 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+
+
+      21 |
+      22 |       const nav = page.getByRole('navigation').filter({ hasText: 'Pipeline' }).first();
+    > 23 |       await expect(nav).toBeVisible();
+         |                         ^
+      24 |
+      25 |       const text = (await nav.textContent()) ?? '';
+      26 |       const createLabel = modulePath.startsWith('/dashboard/leads') ? 'New Lead' : 'New';
+        at /Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/crm-navigation-order.spec.ts:23:25
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-233bd-uence-on-dashboard-contacts-android-mobile/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-233bd-uence-on-dashboard-contacts-android-mobile/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/playwright/tests-e2e-crm-navigation-o-233bd-uence-on-dashboard-contacts-android-mobile/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-233bd-uence-on-dashboard-contacts-android-mobile/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/playwright/tests-e2e-crm-navigation-o-233bd-uence-on-dashboard-contacts-android-mobile/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-233bd-uence-on-dashboard-contacts-android-mobile/test-failed-1.png]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-233bd-uence-on-dashboard-contacts-android-mobile/video.webm]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-233bd-uence-on-dashboard-contacts-android-mobile/error-context.md]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-233bd-uence-on-dashboard-contacts-android-mobile/trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="crm navigation header order › keeps unified control sequence on /dashboard/activities" classname="tests/e2e/crm-navigation-order.spec.ts" time="5.862">
+<failure message="crm-navigation-order.spec.ts:5:5 keeps unified control sequence on /dashboard/activities" type="FAILURE">
+<![CDATA[  [android-mobile] › tests/e2e/crm-navigation-order.spec.ts:5:5 › crm navigation header order › keeps unified control sequence on /dashboard/activities 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+
+
+      21 |
+      22 |       const nav = page.getByRole('navigation').filter({ hasText: 'Pipeline' }).first();
+    > 23 |       await expect(nav).toBeVisible();
+         |                         ^
+      24 |
+      25 |       const text = (await nav.textContent()) ?? '';
+      26 |       const createLabel = modulePath.startsWith('/dashboard/leads') ? 'New Lead' : 'New';
+        at /Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/crm-navigation-order.spec.ts:23:25
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-17dda-nce-on-dashboard-activities-android-mobile/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-17dda-nce-on-dashboard-activities-android-mobile/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/playwright/tests-e2e-crm-navigation-o-17dda-nce-on-dashboard-activities-android-mobile/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-17dda-nce-on-dashboard-activities-android-mobile/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/playwright/tests-e2e-crm-navigation-o-17dda-nce-on-dashboard-activities-android-mobile/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-17dda-nce-on-dashboard-activities-android-mobile/test-failed-1.png]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-17dda-nce-on-dashboard-activities-android-mobile/video.webm]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-17dda-nce-on-dashboard-activities-android-mobile/error-context.md]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-17dda-nce-on-dashboard-activities-android-mobile/trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="crm navigation header order › keeps unified control sequence on /dashboard/quotes" classname="tests/e2e/crm-navigation-order.spec.ts" time="5.708">
+<failure message="crm-navigation-order.spec.ts:5:5 keeps unified control sequence on /dashboard/quotes" type="FAILURE">
+<![CDATA[  [android-mobile] › tests/e2e/crm-navigation-order.spec.ts:5:5 › crm navigation header order › keeps unified control sequence on /dashboard/quotes 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for getByRole('navigation').filter({ hasText: 'Pipeline' }).first()
+
+
+      21 |
+      22 |       const nav = page.getByRole('navigation').filter({ hasText: 'Pipeline' }).first();
+    > 23 |       await expect(nav).toBeVisible();
+         |                         ^
+      24 |
+      25 |       const text = (await nav.textContent()) ?? '';
+      26 |       const createLabel = modulePath.startsWith('/dashboard/leads') ? 'New Lead' : 'New';
+        at /Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/crm-navigation-order.spec.ts:23:25
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-42f58-equence-on-dashboard-quotes-android-mobile/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-42f58-equence-on-dashboard-quotes-android-mobile/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/playwright/tests-e2e-crm-navigation-o-42f58-equence-on-dashboard-quotes-android-mobile/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-crm-navigation-o-42f58-equence-on-dashboard-quotes-android-mobile/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/playwright/tests-e2e-crm-navigation-o-42f58-equence-on-dashboard-quotes-android-mobile/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-42f58-equence-on-dashboard-quotes-android-mobile/test-failed-1.png]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-42f58-equence-on-dashboard-quotes-android-mobile/video.webm]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-42f58-equence-on-dashboard-quotes-android-mobile/error-context.md]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-crm-navigation-o-42f58-equence-on-dashboard-quotes-android-mobile/trace.zip]]
+]]>
+</system-out>
 </testcase>
 </testsuite>
 </testsuites>
