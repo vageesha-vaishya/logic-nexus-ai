@@ -80,6 +80,7 @@ export default function SelfServiceOnboarding() {
   const [domainOptions, setDomainOptions] = useState<DomainOption[]>([])
   const [fieldErrors, setFieldErrors] = useState<{
     organization_name?: string
+    country?: string
     domain?: string
     organization_domain_combination?: string
   }>({})
@@ -121,6 +122,9 @@ export default function SelfServiceOnboarding() {
     }
     if (key === 'domain') {
       setFieldErrors((prev) => ({ ...prev, domain: undefined, organization_domain_combination: undefined }))
+    }
+    if (key === 'country') {
+      setFieldErrors((prev) => ({ ...prev, country: undefined }))
     }
     setForm((prev) => ({ ...prev, [key]: value }))
   }
@@ -174,6 +178,7 @@ export default function SelfServiceOnboarding() {
     if (stepIds[stepIndex] === 'organization') {
       const nextErrors: {
         organization_name?: string
+        country?: string
         domain?: string
         organization_domain_combination?: string
       } = {}
@@ -183,7 +188,7 @@ export default function SelfServiceOnboarding() {
           nextErrors.organization_name = 'Organization Name is required'
         }
         if (!form.country.trim()) {
-          toast.error('Country is required')
+          nextErrors.country = 'Country is required'
         }
       }
       if (!form.domain.trim()) {
@@ -192,9 +197,9 @@ export default function SelfServiceOnboarding() {
         nextErrors.domain = 'Select a preferred domain from available options'
       }
 
-      if (nextErrors.organization_name || nextErrors.domain) {
+      if (nextErrors.organization_name || nextErrors.country || nextErrors.domain) {
         setFieldErrors(nextErrors)
-        toast.error(nextErrors.organization_name || nextErrors.domain || 'Please complete required fields')
+        toast.error(nextErrors.organization_name || nextErrors.country || nextErrors.domain || 'Please complete required fields')
         return false
       }
 
@@ -239,6 +244,7 @@ export default function SelfServiceOnboarding() {
       setFieldErrors((prev) => ({
         ...prev,
         organization_name: undefined,
+        country: undefined,
         domain: undefined,
         organization_domain_combination: undefined
       }))
@@ -521,8 +527,14 @@ export default function SelfServiceOnboarding() {
                     {fieldErrors.organization_name && <p className="text-xs text-destructive">{fieldErrors.organization_name}</p>}
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="country">Country</Label>
-                    <Input id="country" value={form.country} onChange={(e) => updateField('country', e.target.value)} />
+                    <Label htmlFor="country">Country <span className="text-destructive">*</span></Label>
+                    <Input
+                      id="country"
+                      value={form.country}
+                      onChange={(e) => updateField('country', e.target.value)}
+                      className={fieldErrors.country ? 'border-destructive focus-visible:ring-destructive/30' : ''}
+                    />
+                    {fieldErrors.country && <p className="text-xs text-destructive">{fieldErrors.country}</p>}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="website">Website</Label>

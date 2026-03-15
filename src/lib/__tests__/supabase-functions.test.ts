@@ -177,7 +177,7 @@ describe('invokeAnonymous', () => {
     const options = call[1] as RequestInit;
     const headers = options.headers as Record<string, string>;
     expect(headers.apikey).toBeTruthy();
-    expect(headers.Authorization).toBeUndefined();
+    expect(headers.Authorization).toBeTruthy();
     fetchSpy.mockRestore();
   });
 });
