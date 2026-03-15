@@ -5,7 +5,7 @@ import { StickyActionsProvider } from "@/components/layout/StickyActionsContext"
 import { logger } from "@/lib/logger";
 import { initializePlugins } from "./plugins/init";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, type ComponentType } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./hooks/useAuth";
 import { CRMProvider } from "./hooks/useCRM";
@@ -24,6 +24,15 @@ import Unauthorized from "./pages/Unauthorized";
 import NotFound from "./pages/NotFound";
 
 // Lazy: all dashboard pages (loaded on navigation)
+const lazyWithRetry = <T extends { default: ComponentType<unknown> }>(
+  importer: () => Promise<T>
+) =>
+  lazy(() =>
+    importer().catch(() =>
+      new Promise((resolve) => setTimeout(resolve, 800)).then(importer)
+    )
+  );
+
 const DashboardRouter = lazy(() =>
   import("./components/dashboard/DashboardRouter").then((module) => ({ default: module.DashboardRouter }))
 );
@@ -39,7 +48,7 @@ const ContactNew = lazy(() => import("./pages/dashboard/ContactNew"));
 const ContactDetail = lazy(() => import("./pages/dashboard/ContactDetail"));
 const ContactsPipeline = lazy(() => import("./pages/dashboard/ContactsPipeline"));
 const Leads = lazy(() => import("./pages/dashboard/Leads"));
-const LeadNew = lazy(() => import("./pages/dashboard/LeadNew"));
+const LeadNew = lazyWithRetry(() => import("./pages/dashboard/LeadNew"));
 const LeadDetail = lazy(() => import("./pages/dashboard/LeadDetail"));
 const LeadsImportExport = lazy(() => import("./pages/dashboard/LeadsImportExport"));
 const LeadsPipeline = lazy(() => import("./pages/dashboard/LeadsPipeline"));
