@@ -104,6 +104,7 @@ export default function LeadsImportExport() {
       validationSchema={leadSchema}
       defaultExportTemplate={defaultTemplate}
       listPath="/dashboard/leads"
+      showBackToListButton={false}
       containerStyle={themeStyleFromPreset(currentTheme)}
       headerActions={
         <CRMModuleHeaderNavigation

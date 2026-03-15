@@ -1,9 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { LeadForm } from '@/components/crm/LeadForm';
-import { ArrowLeft } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 import { logger } from '@/lib/logger';
@@ -103,14 +101,9 @@ export default function LeadNew() {
     <DashboardLayout>
       <div style={themeStyleFromPreset(currentTheme)} className="space-y-6 transition-colors duration-300">
         <div className="flex items-start justify-between gap-4 sm:items-center">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard/leads')}>
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-            <div>
-              <h1 className="text-3xl font-bold">New Lead</h1>
-              <p className="text-muted-foreground">Create a new sales lead</p>
-            </div>
+          <div>
+            <h1 className="text-3xl font-bold">New Lead</h1>
+            <p className="text-muted-foreground">Create a new sales lead</p>
           </div>
           <CRMModuleHeaderNavigation
             moduleLabel="Leads"

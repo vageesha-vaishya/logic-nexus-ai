@@ -18,7 +18,7 @@ import { LeadScoringCard } from '@/components/crm/LeadScoringCard';
 import { ManualAssignment } from '@/components/assignment/ManualAssignment';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { ArrowLeft, Download, Edit, Trash2, UserPlus, DollarSign, Calendar, Mail, Phone, Building2, GitBranch, Users as UsersIcon, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { Download, Edit, Trash2, UserPlus, DollarSign, Calendar, Mail, Phone, Building2, GitBranch, Users as UsersIcon, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -408,9 +408,6 @@ export default function LeadDetail() {
       <DashboardLayout>
         <div className="text-center py-12">
           <p className="text-muted-foreground">Lead not found</p>
-          <Button onClick={() => navigate('/dashboard/leads')} className="mt-4">
-            Back to Leads
-          </Button>
         </div>
       </DashboardLayout>
     );

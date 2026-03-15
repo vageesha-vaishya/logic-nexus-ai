@@ -65,4 +65,18 @@ describe('CRM module navigation workflow consistency', () => {
     expect(dataTable).toContain('<Table className="table-fixed">');
     expect(dataTable).toContain("className={cn('max-w-0 break-words', col.className)}");
   });
+
+  it('removes redundant Back to List controls from lead forms and fallback states', () => {
+    const leadNew = read('src/pages/dashboard/LeadNew.tsx');
+    const leadDetail = read('src/pages/dashboard/LeadDetail.tsx');
+    expect(leadNew).not.toContain('ArrowLeft');
+    expect(leadDetail).not.toContain('Back to Leads');
+  });
+
+  it('hides duplicate Back to List action in leads import export header', () => {
+    const dataImportExport = read('src/components/system/DataImportExport.tsx');
+    const leadsImportExport = read('src/pages/dashboard/LeadsImportExport.tsx');
+    expect(dataImportExport).toContain('showBackToListButton = true');
+    expect(leadsImportExport).toContain('showBackToListButton={false}');
+  });
 });

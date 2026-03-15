@@ -89,6 +89,7 @@ interface DataImportExportProps {
   }) => Promise<boolean> | boolean;
   // Navigation
   listPath: string; // e.g., "/dashboard/leads"
+  showBackToListButton?: boolean;
   enableAutoCorrection?: boolean;
   headerActions?: React.ReactNode;
   containerStyle?: React.CSSProperties;
@@ -198,6 +199,7 @@ export default function DataImportExport({
   additionalExportTemplates = [],
   onTransformRecord,
   listPath,
+  showBackToListButton = true,
   enableAutoCorrection = true,
   onExportFilterApply,
   onPrepareExportData,
@@ -1176,9 +1178,11 @@ export default function DataImportExport({
           </div>
           <div className="flex items-center gap-2">
             {headerActions}
-            <Button variant="outline" onClick={() => navigate(listPath)}>
-              Back to List
-            </Button>
+            {showBackToListButton && (
+              <Button variant="outline" onClick={() => navigate(listPath)}>
+                Back to List
+              </Button>
+            )}
           </div>
         </div>
 
