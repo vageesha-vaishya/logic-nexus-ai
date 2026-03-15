@@ -67,6 +67,24 @@ const schema = z.object({
 })
 
 type FormState = z.infer<typeof schema>
+type FieldErrorKey =
+  | 'plan_tier'
+  | 'organization_name'
+  | 'country'
+  | 'domain'
+  | 'organization_domain_combination'
+  | 'admin_first_name'
+  | 'admin_last_name'
+  | 'admin_email'
+  | 'admin_password'
+  | 'billing_period'
+  | 'data_residency'
+  | 'requested_user_count'
+  | 'requested_franchise_count'
+  | 'currency'
+  | 'timezone'
+  | 'captcha_token'
+type FieldErrors = Partial<Record<FieldErrorKey, string>>
 
 const stepIds = ['package', 'organization', 'admin', 'compliance', 'verify'] as const
 
@@ -78,12 +96,7 @@ export default function SelfServiceOnboarding() {
   const [domainsLoading, setDomainsLoading] = useState(true)
   const [domainsError, setDomainsError] = useState<string | null>(null)
   const [domainOptions, setDomainOptions] = useState<DomainOption[]>([])
-  const [fieldErrors, setFieldErrors] = useState<{
-    organization_name?: string
-    country?: string
-    domain?: string
-    organization_domain_combination?: string
-  }>({})
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const [requestId, setRequestId] = useState<string | null>(null)
   const [verificationCode, setVerificationCode] = useState('')
   const [status, setStatus] = useState<'form' | 'verification' | 'completed'>('form')
@@ -117,15 +130,26 @@ export default function SelfServiceOnboarding() {
   const progress = ((stepIndex + 1) / stepIds.length) * 100
 
   const updateField = <K extends keyof FormState>(key: K, value: FormState[K]) => {
-    if (key === 'organization_name') {
-      setFieldErrors((prev) => ({ ...prev, organization_name: undefined, organization_domain_combination: undefined }))
-    }
-    if (key === 'domain') {
-      setFieldErrors((prev) => ({ ...prev, domain: undefined, organization_domain_combination: undefined }))
-    }
-    if (key === 'country') {
-      setFieldErrors((prev) => ({ ...prev, country: undefined }))
-    }
+    setFieldErrors((prev) => ({
+      ...prev,
+      plan_tier: key === 'plan_tier' ? undefined : prev.plan_tier,
+      organization_name: key === 'organization_name' ? undefined : prev.organization_name,
+      country: key === 'country' ? undefined : prev.country,
+      domain: key === 'domain' ? undefined : prev.domain,
+      organization_domain_combination:
+        key === 'organization_name' || key === 'domain' ? undefined : prev.organization_domain_combination,
+      admin_first_name: key === 'admin_first_name' ? undefined : prev.admin_first_name,
+      admin_last_name: key === 'admin_last_name' ? undefined : prev.admin_last_name,
+      admin_email: key === 'admin_email' ? undefined : prev.admin_email,
+      admin_password: key === 'admin_password' ? undefined : prev.admin_password,
+      billing_period: key === 'billing_period' ? undefined : prev.billing_period,
+      data_residency: key === 'data_residency' ? undefined : prev.data_residency,
+      requested_user_count: key === 'requested_user_count' ? undefined : prev.requested_user_count,
+      requested_franchise_count: key === 'requested_franchise_count' ? undefined : prev.requested_franchise_count,
+      currency: key === 'currency' ? undefined : prev.currency,
+      timezone: key === 'timezone' ? undefined : prev.timezone,
+      captcha_token: key === 'captcha_token' ? undefined : prev.captcha_token
+    }))
     setForm((prev) => ({ ...prev, [key]: value }))
   }
 
@@ -170,9 +194,11 @@ export default function SelfServiceOnboarding() {
   const validateCurrentStep = async (): Promise<boolean> => {
     if (stepIds[stepIndex] === 'package') {
       if (!form.plan_tier) {
+        setFieldErrors((prev) => ({ ...prev, plan_tier: 'Package selection is required' }))
         toast.error('Select a package to continue')
         return false
       }
+      setFieldErrors((prev) => ({ ...prev, plan_tier: undefined }))
       return true
     }
     if (stepIds[stepIndex] === 'organization') {
@@ -251,21 +277,86 @@ export default function SelfServiceOnboarding() {
       return true
     }
     if (stepIds[stepIndex] === 'admin') {
-      if (!form.admin_first_name.trim() || !form.admin_last_name.trim() || !form.admin_email.trim() || !form.admin_password.trim()) {
-        toast.error('Complete admin details to continue')
+      const nextErrors: FieldErrors = {}
+
+      if (!form.admin_first_name.trim()) nextErrors.admin_first_name = 'First Name is required'
+      if (!form.admin_last_name.trim()) nextErrors.admin_last_name = 'Last Name is required'
+      if (!form.admin_email.trim()) {
+        nextErrors.admin_email = 'Admin Email is required'
+      } else if (!z.string().email().safeParse(form.admin_email.trim()).success) {
+        nextErrors.admin_email = 'Enter a valid email address'
+      }
+      if (!form.admin_password.trim()) {
+        nextErrors.admin_password = 'Admin Password is required'
+      } else if (form.admin_password.length < 12) {
+        nextErrors.admin_password = 'Password must be at least 12 characters'
+      }
+
+      if (nextErrors.admin_first_name || nextErrors.admin_last_name || nextErrors.admin_email || nextErrors.admin_password) {
+        setFieldErrors((prev) => ({ ...prev, ...nextErrors }))
+        toast.error(nextErrors.admin_first_name || nextErrors.admin_last_name || nextErrors.admin_email || nextErrors.admin_password || 'Complete admin details to continue')
         return false
       }
-      if (form.admin_password.length < 12) {
-        toast.error('Password must be at least 12 characters')
-        return false
-      }
+
+      setFieldErrors((prev) => ({
+        ...prev,
+        admin_first_name: undefined,
+        admin_last_name: undefined,
+        admin_email: undefined,
+        admin_password: undefined
+      }))
       return true
     }
     if (stepIds[stepIndex] === 'compliance') {
-      if (!form.data_residency.trim()) {
-        toast.error('Data residency is required')
+      const nextErrors: FieldErrors = {}
+
+      if (!form.billing_period.trim()) nextErrors.billing_period = 'Billing Period is required'
+      if (!form.data_residency.trim()) nextErrors.data_residency = 'Data Residency is required'
+      if (!Number.isInteger(form.requested_user_count) || form.requested_user_count < 1) {
+        nextErrors.requested_user_count = 'Requested Users must be at least 1'
+      }
+      if (!Number.isInteger(form.requested_franchise_count) || form.requested_franchise_count < 0) {
+        nextErrors.requested_franchise_count = 'Requested Franchises cannot be negative'
+      }
+      if (!/^[A-Z]{3}$/.test(form.currency.trim())) {
+        nextErrors.currency = 'Currency must be a 3-letter code'
+      }
+      if (!form.timezone.trim()) {
+        nextErrors.timezone = 'Timezone is required'
+      } else if (form.timezone.trim().length < 2) {
+        nextErrors.timezone = 'Timezone is invalid'
+      }
+
+      if (
+        nextErrors.billing_period ||
+        nextErrors.data_residency ||
+        nextErrors.requested_user_count ||
+        nextErrors.requested_franchise_count ||
+        nextErrors.currency ||
+        nextErrors.timezone
+      ) {
+        setFieldErrors((prev) => ({ ...prev, ...nextErrors }))
+        toast.error(
+          nextErrors.billing_period ||
+          nextErrors.data_residency ||
+          nextErrors.requested_user_count ||
+          nextErrors.requested_franchise_count ||
+          nextErrors.currency ||
+          nextErrors.timezone ||
+          'Please complete required fields'
+        )
         return false
       }
+
+      setFieldErrors((prev) => ({
+        ...prev,
+        billing_period: undefined,
+        data_residency: undefined,
+        requested_user_count: undefined,
+        requested_franchise_count: undefined,
+        currency: undefined,
+        timezone: undefined
+      }))
       return true
     }
     return true
@@ -281,6 +372,13 @@ export default function SelfServiceOnboarding() {
   }
 
   const startRegistration = async () => {
+    if (!form.captcha_token.trim() || form.captcha_token.trim().length < 5) {
+      setFieldErrors((prev) => ({ ...prev, captcha_token: 'Captcha Token is required' }))
+      toast.error('Captcha token is required')
+      return
+    }
+    setFieldErrors((prev) => ({ ...prev, captcha_token: undefined }))
+
     const parsed = schema.safeParse(form)
     if (!parsed.success) {
       toast.error(parsed.error.issues[0]?.message || 'Please complete all required fields')
@@ -497,20 +595,24 @@ export default function SelfServiceOnboarding() {
             </CardHeader>
             <CardContent className="space-y-5">
               {stepIds[stepIndex] === 'package' && (
-                <div className="grid md:grid-cols-3 gap-4">
-                  {plans.map((plan) => (
-                    <button
-                      key={plan.tier}
-                      type="button"
-                      className={`text-left border rounded-lg p-4 transition-all ${form.plan_tier === plan.tier ? 'border-primary ring-2 ring-primary/30' : 'border-border hover:border-primary/50'}`}
-                      onClick={() => updateField('plan_tier', plan.tier)}
-                    >
-                      <div className="font-semibold">{plan.title}</div>
-                      <div className="text-sm text-muted-foreground mt-1">{plan.subtitle}</div>
-                      <div className="mt-3 text-xs text-muted-foreground">{plan.users}</div>
-                      <div className="text-xs text-muted-foreground">{plan.franchises}</div>
-                    </button>
-                  ))}
+                <div className="space-y-2">
+                  <Label>Package <span className="text-destructive">*</span></Label>
+                  <div className={`grid md:grid-cols-3 gap-4 ${fieldErrors.plan_tier ? 'border border-destructive rounded-lg p-3' : ''}`}>
+                    {plans.map((plan) => (
+                      <button
+                        key={plan.tier}
+                        type="button"
+                        className={`text-left border rounded-lg p-4 transition-all ${form.plan_tier === plan.tier ? 'border-primary ring-2 ring-primary/30' : 'border-border hover:border-primary/50'}`}
+                        onClick={() => updateField('plan_tier', plan.tier)}
+                      >
+                        <div className="font-semibold">{plan.title}</div>
+                        <div className="text-sm text-muted-foreground mt-1">{plan.subtitle}</div>
+                        <div className="mt-3 text-xs text-muted-foreground">{plan.users}</div>
+                        <div className="text-xs text-muted-foreground">{plan.franchises}</div>
+                      </button>
+                    ))}
+                  </div>
+                  {fieldErrors.plan_tier && <p className="text-xs text-destructive">{fieldErrors.plan_tier}</p>}
                 </div>
               )}
 
@@ -578,20 +680,46 @@ export default function SelfServiceOnboarding() {
               {stepIds[stepIndex] === 'admin' && (
                 <div className="grid md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="admin_first_name">First Name</Label>
-                    <Input id="admin_first_name" value={form.admin_first_name} onChange={(e) => updateField('admin_first_name', e.target.value)} />
+                    <Label htmlFor="admin_first_name">First Name <span className="text-destructive">*</span></Label>
+                    <Input
+                      id="admin_first_name"
+                      value={form.admin_first_name}
+                      onChange={(e) => updateField('admin_first_name', e.target.value)}
+                      className={fieldErrors.admin_first_name ? 'border-destructive focus-visible:ring-destructive/30' : ''}
+                    />
+                    {fieldErrors.admin_first_name && <p className="text-xs text-destructive">{fieldErrors.admin_first_name}</p>}
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="admin_last_name">Last Name</Label>
-                    <Input id="admin_last_name" value={form.admin_last_name} onChange={(e) => updateField('admin_last_name', e.target.value)} />
+                    <Label htmlFor="admin_last_name">Last Name <span className="text-destructive">*</span></Label>
+                    <Input
+                      id="admin_last_name"
+                      value={form.admin_last_name}
+                      onChange={(e) => updateField('admin_last_name', e.target.value)}
+                      className={fieldErrors.admin_last_name ? 'border-destructive focus-visible:ring-destructive/30' : ''}
+                    />
+                    {fieldErrors.admin_last_name && <p className="text-xs text-destructive">{fieldErrors.admin_last_name}</p>}
                   </div>
                   <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="admin_email">Admin Email</Label>
-                    <Input id="admin_email" type="email" value={form.admin_email} onChange={(e) => updateField('admin_email', e.target.value)} />
+                    <Label htmlFor="admin_email">Admin Email <span className="text-destructive">*</span></Label>
+                    <Input
+                      id="admin_email"
+                      type="email"
+                      value={form.admin_email}
+                      onChange={(e) => updateField('admin_email', e.target.value)}
+                      className={fieldErrors.admin_email ? 'border-destructive focus-visible:ring-destructive/30' : ''}
+                    />
+                    {fieldErrors.admin_email && <p className="text-xs text-destructive">{fieldErrors.admin_email}</p>}
                   </div>
                   <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="admin_password">Admin Password</Label>
-                    <Input id="admin_password" type="password" value={form.admin_password} onChange={(e) => updateField('admin_password', e.target.value)} />
+                    <Label htmlFor="admin_password">Admin Password <span className="text-destructive">*</span></Label>
+                    <Input
+                      id="admin_password"
+                      type="password"
+                      value={form.admin_password}
+                      onChange={(e) => updateField('admin_password', e.target.value)}
+                      className={fieldErrors.admin_password ? 'border-destructive focus-visible:ring-destructive/30' : ''}
+                    />
+                    {fieldErrors.admin_password && <p className="text-xs text-destructive">{fieldErrors.admin_password}</p>}
                   </div>
                 </div>
               )}
@@ -599,19 +727,20 @@ export default function SelfServiceOnboarding() {
               {stepIds[stepIndex] === 'compliance' && (
                 <div className="grid md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Billing Period</Label>
+                    <Label>Billing Period <span className="text-destructive">*</span></Label>
                     <Select value={form.billing_period} onValueChange={(v: BillingPeriod) => updateField('billing_period', v)}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectTrigger className={fieldErrors.billing_period ? 'border-destructive focus:ring-destructive/30' : ''}><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="monthly">Monthly</SelectItem>
                         <SelectItem value="annual">Annual</SelectItem>
                       </SelectContent>
                     </Select>
+                    {fieldErrors.billing_period && <p className="text-xs text-destructive">{fieldErrors.billing_period}</p>}
                   </div>
                   <div className="space-y-2">
-                    <Label>Data Residency</Label>
+                    <Label>Data Residency <span className="text-destructive">*</span></Label>
                     <Select value={form.data_residency} onValueChange={(v) => updateField('data_residency', v)}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectTrigger className={fieldErrors.data_residency ? 'border-destructive focus:ring-destructive/30' : ''}><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="India">India</SelectItem>
                         <SelectItem value="EU">EU</SelectItem>
@@ -619,32 +748,49 @@ export default function SelfServiceOnboarding() {
                         <SelectItem value="Singapore">Singapore</SelectItem>
                       </SelectContent>
                     </Select>
+                    {fieldErrors.data_residency && <p className="text-xs text-destructive">{fieldErrors.data_residency}</p>}
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="requested_user_count">Requested Users</Label>
+                    <Label htmlFor="requested_user_count">Requested Users <span className="text-destructive">*</span></Label>
                     <Input
                       id="requested_user_count"
                       type="number"
                       value={String(form.requested_user_count)}
                       onChange={(e) => updateField('requested_user_count', Number(e.target.value || 1))}
+                      className={fieldErrors.requested_user_count ? 'border-destructive focus-visible:ring-destructive/30' : ''}
                     />
+                    {fieldErrors.requested_user_count && <p className="text-xs text-destructive">{fieldErrors.requested_user_count}</p>}
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="requested_franchise_count">Requested Franchises</Label>
+                    <Label htmlFor="requested_franchise_count">Requested Franchises <span className="text-destructive">*</span></Label>
                     <Input
                       id="requested_franchise_count"
                       type="number"
                       value={String(form.requested_franchise_count)}
                       onChange={(e) => updateField('requested_franchise_count', Number(e.target.value || 0))}
+                      className={fieldErrors.requested_franchise_count ? 'border-destructive focus-visible:ring-destructive/30' : ''}
                     />
+                    {fieldErrors.requested_franchise_count && <p className="text-xs text-destructive">{fieldErrors.requested_franchise_count}</p>}
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="currency">Currency</Label>
-                    <Input id="currency" value={form.currency} onChange={(e) => updateField('currency', e.target.value.toUpperCase())} />
+                    <Label htmlFor="currency">Currency <span className="text-destructive">*</span></Label>
+                    <Input
+                      id="currency"
+                      value={form.currency}
+                      onChange={(e) => updateField('currency', e.target.value.toUpperCase())}
+                      className={fieldErrors.currency ? 'border-destructive focus-visible:ring-destructive/30' : ''}
+                    />
+                    {fieldErrors.currency && <p className="text-xs text-destructive">{fieldErrors.currency}</p>}
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="timezone">Timezone</Label>
-                    <Input id="timezone" value={form.timezone} onChange={(e) => updateField('timezone', e.target.value)} />
+                    <Label htmlFor="timezone">Timezone <span className="text-destructive">*</span></Label>
+                    <Input
+                      id="timezone"
+                      value={form.timezone}
+                      onChange={(e) => updateField('timezone', e.target.value)}
+                      className={fieldErrors.timezone ? 'border-destructive focus-visible:ring-destructive/30' : ''}
+                    />
+                    {fieldErrors.timezone && <p className="text-xs text-destructive">{fieldErrors.timezone}</p>}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="legal_name">Legal Name</Label>
@@ -675,13 +821,15 @@ export default function SelfServiceOnboarding() {
                     </CardContent>
                   </Card>
                   <div className="space-y-2">
-                    <Label htmlFor="captcha_token">Captcha Token</Label>
+                    <Label htmlFor="captcha_token">Captcha Token <span className="text-destructive">*</span></Label>
                     <Input
                       id="captcha_token"
                       value={form.captcha_token}
                       onChange={(e) => updateField('captcha_token', e.target.value)}
                       placeholder={import.meta.env.DEV ? 'dev-captcha-pass' : 'Enter CAPTCHA token'}
+                      className={fieldErrors.captcha_token ? 'border-destructive focus-visible:ring-destructive/30' : ''}
                     />
+                    {fieldErrors.captcha_token && <p className="text-xs text-destructive">{fieldErrors.captcha_token}</p>}
                   </div>
                 </div>
               )}
