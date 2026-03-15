@@ -61,11 +61,11 @@ export function CRMModuleHeaderNavigation({
 
   return (
     <nav
-      className={cn('w-full', className)}
+      className={cn('ml-auto w-full', className)}
       aria-label={`${moduleLabel} header navigation`}
     >
-      <div className="overflow-x-auto pb-1">
-        <div className="inline-flex min-w-max items-center gap-2 md:justify-end">
+      <div className="flex w-full justify-end overflow-x-auto pb-1">
+        <div className="inline-flex min-w-max items-center gap-2">
         {VIEW_MODE_SEQUENCE.map((mode, index) => (
           <Button
             key={mode}

@@ -31,6 +31,7 @@ describe('CRMModuleHeaderNavigation', () => {
     setup();
 
     const nav = screen.getByRole('navigation', { name: /leads header navigation/i });
+    const rightAlignedRow = nav.querySelector('div.flex.w-full.justify-end.overflow-x-auto.pb-1');
     const labels = ['Pipeline', 'Card', 'Grid', 'List', 'New Lead', 'Refresh', 'Import/Export', 'Azure Sky'];
     const controlText = nav.textContent ?? '';
     let cursor = -1;
@@ -43,6 +44,7 @@ describe('CRMModuleHeaderNavigation', () => {
 
     expect(screen.queryByText('Set as Default')).not.toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: /leads theme/i })).toBeInTheDocument();
+    expect(rightAlignedRow).not.toBeNull();
   });
 
   it('changes view by keyboard navigation', () => {
