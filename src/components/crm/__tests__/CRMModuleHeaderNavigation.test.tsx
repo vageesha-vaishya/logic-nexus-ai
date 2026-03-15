@@ -31,7 +31,7 @@ describe('CRMModuleHeaderNavigation', () => {
     setup();
 
     const nav = screen.getByRole('navigation', { name: /leads header navigation/i });
-    const rightAlignedRow = nav.querySelector('div.flex.w-full.justify-end.overflow-x-auto.pb-1');
+    const rightAlignedRow = nav.querySelector('div.flex.flex-wrap.items-center.justify-end.gap-2.pb-1.w-full.max-w-full');
     const labels = ['Pipeline', 'Card', 'Grid', 'List', 'New Lead', 'Refresh', 'Import/Export', 'Azure Sky'];
     const controlText = nav.textContent ?? '';
     let cursor = -1;

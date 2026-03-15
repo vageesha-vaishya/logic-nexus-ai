@@ -207,14 +207,8 @@ export default function Leads() {
       }
       scopedDb.logViewPreference('leads', 'pipeline');
       setView('pipeline');
-      const nextPipelineQ = searchQuery;
-      const nextPipelineStatus = statusFilter !== 'all' ? [statusFilter] : [];
-      setPipeline({ q: nextPipelineQ, status: nextPipelineStatus });
-      const params = new URLSearchParams();
-      if (nextPipelineQ) params.set('q', nextPipelineQ);
-      if (nextPipelineStatus.length > 0) params.set('status', nextPipelineStatus.join(','));
-      const qs = params.toString();
-      navigate(qs ? `/dashboard/leads/pipeline?${qs}` : '/dashboard/leads/pipeline');
+      setPipeline({ q: '', status: [] });
+      navigate('/dashboard/leads/pipeline');
     } else {
       try {
         localStorage.setItem('leadsViewMode', mode);
@@ -388,16 +382,30 @@ export default function Leads() {
       <div style={themeStyleFromPreset(currentTheme)} className="min-h-full transition-colors duration-300">
         <FirstScreenTemplate
           title={t('leads.title', 'Leads Workspace')}
-          description={t('leads.subtitle', 'Focus on pipeline and active contacts')}
           actionsRight={
             <CRMModuleHeaderNavigation
               moduleLabel="Leads"
               viewMode={viewState.view}
               theme={currentTheme}
               onViewModeChange={(mode) => handleViewChange(mode as ViewMode)}
+              analyticsLabel={t('leads.tabs.analytics', 'Analytics')}
+              onAnalyticsClick={() => {
+                try {
+                  localStorage.setItem('leadsViewMode', 'pipeline');
+                } catch {
+                  void 0;
+                }
+                scopedDb.logViewPreference('leads', 'pipeline');
+                setView('pipeline');
+                setPipeline({ q: '', status: [] });
+                navigate('/dashboard/leads/pipeline?view=analytics');
+              }}
+              controlSequence={['pipeline', 'list', 'create', 'card', 'grid', 'refresh', 'analytics', 'importExport', 'theme']}
               onThemeChange={handleThemeChange}
               onCreate={() => navigate('/dashboard/leads/new')}
               createLabel="New Lead"
+              iconOnly
+              layout="compact"
               onRefresh={fetchLeads}
               onImportExport={() => {
                 const params = new URLSearchParams();
@@ -465,7 +473,7 @@ export default function Leads() {
         {/* Filters */}
         <div className="flex flex-col gap-4 mb-6">
           <div className="flex flex-wrap gap-4 items-center">
-            <div className="relative flex-1 min-w-[300px]">
+            <div className="relative w-full min-w-0 sm:flex-1 sm:min-w-[260px]">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder={t('leads.filters.search')}
@@ -476,7 +484,7 @@ export default function Leads() {
             </div>
             
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[160px] bg-background">
+              <SelectTrigger className="w-full sm:w-[160px] bg-background">
                 <Filter className="mr-2 h-4 w-4 text-muted-foreground" />
                 <SelectValue placeholder={t('leads.filters.status')} />
               </SelectTrigger>
@@ -493,7 +501,7 @@ export default function Leads() {
             </Select>
 
             <Select value={ownerFilter} onValueChange={(v) => setOwnerFilter(v as 'any' | 'unassigned' | 'me')}>
-              <SelectTrigger className="w-[160px] bg-background">
+              <SelectTrigger className="w-full sm:w-[160px] bg-background">
                 <UsersIcon className="mr-2 h-4 w-4 text-muted-foreground" />
                 <SelectValue placeholder={t('leads.filters.owner')} />
               </SelectTrigger>
@@ -506,9 +514,9 @@ export default function Leads() {
           </div>
 
           <div className="flex flex-wrap gap-4 items-center">
-             <div className="flex items-center gap-2">
+             <div className="flex flex-wrap items-center gap-2">
                 <Select value={scoreFilter} onValueChange={setScoreFilter}>
-                  <SelectTrigger className="w-[160px] bg-background">
+                  <SelectTrigger className="w-full sm:w-[160px] bg-background">
                     <TrendingUp className="mr-2 h-4 w-4 text-muted-foreground" />
                     <SelectValue placeholder={t('leads.filters.score')} />
                   </SelectTrigger>
@@ -521,13 +529,13 @@ export default function Leads() {
                 </Select>
              </div>
              
-             <div className="flex items-center gap-2">
+             <div className="flex flex-wrap items-center gap-2">
                 <Input
                   type="number"
                   placeholder={t('leads.filters.valueMin')}
                   value={valueMin}
                   onChange={(e) => setValueMin(e.target.value)}
-                  className="w-[120px] bg-background"
+                  className="w-full sm:w-[120px] bg-background"
                 />
                 <span className="text-muted-foreground">-</span>
                 <Input
@@ -535,14 +543,14 @@ export default function Leads() {
                   placeholder={t('leads.filters.valueMax')}
                   value={valueMax}
                   onChange={(e) => setValueMax(e.target.value)}
-                  className="w-[120px] bg-background"
+                  className="w-full sm:w-[120px] bg-background"
                 />
              </div>
              
              {/* Name Filter */}
-             <div className="flex items-center gap-2">
+             <div className="flex flex-wrap items-center gap-2">
                 <Select value={nameOp} onValueChange={(v) => setNameOp(v as TextOp)}>
-                  <SelectTrigger className="w-[130px] bg-background">
+                  <SelectTrigger className="w-full sm:w-[130px] bg-background">
                     <SelectValue placeholder="Name Op" />
                   </SelectTrigger>
                   <SelectContent>
@@ -554,7 +562,7 @@ export default function Leads() {
                   placeholder={t('leads.filters.name')}
                   value={nameQuery}
                   onChange={(e) => setNameQuery(e.target.value)}
-                  className="w-[150px] bg-background"
+                  className="w-full sm:w-[150px] bg-background"
                 />
              </div>
           </div>

@@ -56,6 +56,8 @@ export interface LeadPipelineQuery {
   pageSize?: number;
   statuses?: LeadStatus[];
   search?: string;
+  sources?: string[];
+  customFieldFilters?: Array<{ key: string; value: string }>;
   franchiseId?: string;
   fromDate?: string;
   toDate?: string;
@@ -305,6 +307,8 @@ export const PipelineService = {
       pageSize = 500,
       statuses = [],
       search = '',
+      sources = [],
+      customFieldFilters = [],
       franchiseId,
       fromDate,
       toDate,
@@ -327,16 +331,34 @@ export const PipelineService = {
       );
     }
 
+    if (sources.length > 0) {
+      query = query.in('source', sources);
+    }
+
+    if (customFieldFilters.length > 0) {
+      for (const filter of customFieldFilters) {
+        query = query.contains('custom_fields', { [filter.key]: filter.value });
+      }
+    }
+
     if (franchiseId && franchiseId !== 'all') {
       query = query.eq('franchise_id', franchiseId);
     }
 
     if (fromDate) {
-      query = query.gte('created_at', new Date(fromDate).toISOString());
+      const start = new Date(fromDate);
+      if (!Number.isNaN(start.getTime())) {
+        start.setHours(0, 0, 0, 0);
+        query = query.gte('created_at', start.toISOString());
+      }
     }
 
     if (toDate) {
-      query = query.lte('created_at', new Date(toDate).toISOString());
+      const end = new Date(toDate);
+      if (!Number.isNaN(end.getTime())) {
+        end.setHours(23, 59, 59, 999);
+        query = query.lte('created_at', end.toISOString());
+      }
     }
 
     const { data, error, count } = await query

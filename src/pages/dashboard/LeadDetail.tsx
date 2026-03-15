@@ -26,12 +26,17 @@ import { Lead, statusConfig } from './leads-data';
 import { exportCsv, exportExcel } from '@/lib/import-export';
 import { getScoreGrade } from '@/utils/leadScoring';
 import { DetailScreenTemplate } from '@/components/system/DetailScreenTemplate';
+import { CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
+import { themeStyleFromPreset } from '@/lib/theme-utils';
+import { useLeadsViewState, LeadsPrimaryView } from '@/hooks/useLeadsViewState';
 
 export default function LeadDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
   const { supabase, scopedDb } = useCRM();
+  const { state: viewState, setTheme, setView, setPipeline } = useLeadsViewState();
+  const currentTheme = viewState.theme;
   const [lead, setLead] = useState<Lead | null>(null);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
@@ -45,6 +50,39 @@ export default function LeadDetail() {
   const [tabValue, setTabValue] = useState<'activity' | 'email'>(() => {
     return location.hash === '#email' ? 'email' : 'activity';
   });
+
+  const handleThemeChange = useCallback((val: string) => {
+    setTheme(val);
+    try {
+      localStorage.setItem('leadsTheme', val);
+    } catch {
+      return;
+    }
+  }, [setTheme]);
+
+  const handleHeaderViewModeChange = useCallback((mode: LeadsPrimaryView) => {
+    if (mode === 'pipeline') {
+      try {
+        localStorage.setItem('leadsViewMode', 'pipeline');
+      } catch {
+        void 0;
+      }
+      scopedDb.logViewPreference('leads', 'pipeline');
+      setView('pipeline');
+      setPipeline({ q: '', status: [], tab: 'board' });
+      navigate('/dashboard/leads/pipeline');
+      return;
+    }
+
+    try {
+      localStorage.setItem('leadsViewMode', mode);
+    } catch {
+      void 0;
+    }
+    scopedDb.logViewPreference('leads', mode);
+    setView(mode);
+    navigate('/dashboard/leads');
+  }, [navigate, scopedDb, setPipeline, setView]);
 
   useEffect(() => {
     if (location.state && (location.state as any).openComposer) {
@@ -393,147 +431,176 @@ export default function LeadDetail() {
 
   return (
     <DashboardLayout>
-      <DetailScreenTemplate
-        title={`${lead.first_name} ${lead.last_name}`}
-        breadcrumbs={[
-          { label: 'Dashboard', to: '/dashboard' },
-          { label: 'Leads', to: '/dashboard/leads' },
-          { label: `${lead.first_name} ${lead.last_name}` },
-        ]}
-        subtitle={
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2">
-              <Badge className={stage.color}>{stage.label}</Badge>
-              <Badge className={`${priority.bg} ${priority.color}`}>{priority.label}</Badge>
-              {lead.converted_at && (
-                <Badge className="bg-green-500/10 text-green-700 dark:text-green-300">
-                  Converted {format(new Date(lead.converted_at), 'PPP')}
-                </Badge>
-              )}
-            </div>
-            <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-              {lead.company && (
-                <span className="inline-flex items-center gap-1">
-                  <Building2 className="h-4 w-4" />
-                  {lead.company}
-                </span>
-              )}
-              {lead.title && <span>{lead.title}</span>}
-              {lead.email && (
-                <a href={`mailto:${lead.email}`} className="inline-flex items-center gap-1 text-primary hover:underline">
-                  <Mail className="h-4 w-4" />
-                  {lead.email}
-                </a>
-              )}
-              {lead.phone && (
-                <a href={`tel:${lead.phone}`} className="inline-flex items-center gap-1 text-primary hover:underline">
-                  <Phone className="h-4 w-4" />
-                  {lead.phone}
-                </a>
-              )}
-            </div>
-          </div>
-        }
-        actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              aria-label={isLeftPanelOpen ? "Collapse sidebar" : "Expand sidebar"} 
-              onClick={() => setIsLeftPanelOpen(!isLeftPanelOpen)}
-            >
-              {isLeftPanelOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
-            </Button>
-            
-            {!isEditing ? (
-              <>
-                <Button
-                  variant="outline"
-                  onClick={() => navigate(`/dashboard/activities/new?leadId=${lead.id}&type=call`)}
-                  disabled={!lead.phone}
-                >
-                  <Phone className="mr-2 h-4 w-4" />
-                  Call
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => navigate(`/dashboard/activities/new?leadId=${lead.id}&type=email`)}
-                  disabled={!lead.email}
-                >
-                  <Mail className="mr-2 h-4 w-4" />
-                  Email
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => navigate(`/dashboard/activities/new?leadId=${lead.id}&type=meeting`)}
-                >
-                  <Calendar className="mr-2 h-4 w-4" />
-                  Meeting
-                </Button>
-
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline">
-                      <Download className="mr-2 h-4 w-4" />
-                      Export
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuLabel>Lead</DropdownMenuLabel>
-                    <DropdownMenuItem onSelect={() => exportLead('csv')}>Export Lead (CSV)</DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => exportLead('xlsx')}>Export Lead (Excel)</DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuLabel>Activities</DropdownMenuLabel>
-                    <DropdownMenuItem onSelect={() => exportActivities('csv')}>Export Activities (CSV)</DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => exportActivities('xlsx')}>Export Activities (Excel)</DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-
-                <Dialog open={showAssignmentDialog} onOpenChange={setShowAssignmentDialog}>
-                  <DialogTrigger asChild>
-                    <Button variant="outline">
-                      <UsersIcon className="mr-2 h-4 w-4" />
-                      Assign Lead
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Assign Lead</DialogTitle>
-                      <DialogDescription>
-                        Manually assign this lead to a user
-                      </DialogDescription>
-                    </DialogHeader>
-                    <ManualAssignment
-                      leadId={lead.id}
-                      currentOwnerId={lead.owner_id}
-                      onAssigned={() => {
-                        setShowAssignmentDialog(false);
-                        fetchLead();
-                      }}
-                    />
-                  </DialogContent>
-                </Dialog>
-
-                {!lead.converted_at && (
-                  <Button onClick={() => setShowConversionDialog(true)}>
-                    <GitBranch className="mr-2 h-4 w-4" />
-                    Convert Lead
-                  </Button>
+      <div style={themeStyleFromPreset(currentTheme)} className="transition-colors duration-300">
+        <DetailScreenTemplate
+          title={`${lead.first_name} ${lead.last_name}`}
+          breadcrumbs={[
+            { label: 'Dashboard', to: '/dashboard' },
+            { label: 'Leads', to: '/dashboard/leads' },
+            { label: `${lead.first_name} ${lead.last_name}` },
+          ]}
+          subtitle={
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2">
+                <Badge className={stage.color}>{stage.label}</Badge>
+                <Badge className={`${priority.bg} ${priority.color}`}>{priority.label}</Badge>
+                {lead.converted_at && (
+                  <Badge className="bg-green-500/10 text-green-700 dark:text-green-300">
+                    Converted {format(new Date(lead.converted_at), 'PPP')}
+                  </Badge>
                 )}
+              </div>
+              <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+                {lead.company && (
+                  <span className="inline-flex items-center gap-1">
+                    <Building2 className="h-4 w-4" />
+                    {lead.company}
+                  </span>
+                )}
+                {lead.title && <span>{lead.title}</span>}
+                {lead.email && (
+                  <a href={`mailto:${lead.email}`} className="inline-flex items-center gap-1 text-primary hover:underline">
+                    <Mail className="h-4 w-4" />
+                    {lead.email}
+                  </a>
+                )}
+                {lead.phone && (
+                  <a href={`tel:${lead.phone}`} className="inline-flex items-center gap-1 text-primary hover:underline">
+                    <Phone className="h-4 w-4" />
+                    {lead.phone}
+                  </a>
+                )}
+              </div>
+            </div>
+          }
+          actions={
+            <div className="flex flex-col items-end gap-2">
+              <CRMModuleHeaderNavigation
+                moduleLabel="Leads"
+                viewMode="list"
+                theme={currentTheme}
+                onViewModeChange={(mode) => handleHeaderViewModeChange(mode as LeadsPrimaryView)}
+                onThemeChange={handleThemeChange}
+                onCreate={() => navigate('/dashboard/leads/new')}
+                createLabel="New Lead"
+                onRefresh={fetchLead}
+                analyticsActive={false}
+                onAnalyticsClick={() => {
+                  try {
+                    localStorage.setItem('leadsViewMode', 'pipeline');
+                  } catch {
+                    void 0;
+                  }
+                  scopedDb.logViewPreference('leads', 'pipeline');
+                  setView('pipeline');
+                  setPipeline({ q: '', status: [], tab: 'analytics' });
+                  navigate('/dashboard/leads/pipeline?view=analytics');
+                }}
+                onImportExport={() => navigate('/dashboard/leads/import-export')}
+                controlSequence={['pipeline', 'list', 'create', 'card', 'grid', 'refresh', 'analytics', 'importExport', 'theme']}
+                iconOnly
+                layout="compact"
+              />
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label={isLeftPanelOpen ? "Collapse sidebar" : "Expand sidebar"}
+                  onClick={() => setIsLeftPanelOpen(!isLeftPanelOpen)}
+                >
+                  {isLeftPanelOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
+                </Button>
+                
+                {!isEditing ? (
+                  <>
+                    <Button
+                      variant="outline"
+                      onClick={() => navigate(`/dashboard/activities/new?leadId=${lead.id}&type=call`)}
+                      disabled={!lead.phone}
+                    >
+                      <Phone className="mr-2 h-4 w-4" />
+                      Call
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => navigate(`/dashboard/activities/new?leadId=${lead.id}&type=email`)}
+                      disabled={!lead.email}
+                    >
+                      <Mail className="mr-2 h-4 w-4" />
+                      Email
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => navigate(`/dashboard/activities/new?leadId=${lead.id}&type=meeting`)}
+                    >
+                      <Calendar className="mr-2 h-4 w-4" />
+                      Meeting
+                    </Button>
 
-                <Button variant="outline" onClick={() => setIsEditing(true)}>
-                  <Edit className="mr-2 h-4 w-4" />
-                  Edit
-                </Button>
-                <Button variant="destructive" onClick={() => setShowDeleteDialog(true)}>
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Delete
-                </Button>
-              </>
-            ) : null}
-          </div>
-        }
-      >
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline">
+                          <Download className="mr-2 h-4 w-4" />
+                          Export
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuLabel>Lead</DropdownMenuLabel>
+                        <DropdownMenuItem onSelect={() => exportLead('csv')}>Export Lead (CSV)</DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => exportLead('xlsx')}>Export Lead (Excel)</DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuLabel>Activities</DropdownMenuLabel>
+                        <DropdownMenuItem onSelect={() => exportActivities('csv')}>Export Activities (CSV)</DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => exportActivities('xlsx')}>Export Activities (Excel)</DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+
+                    <Dialog open={showAssignmentDialog} onOpenChange={setShowAssignmentDialog}>
+                      <DialogTrigger asChild>
+                        <Button variant="outline">
+                          <UsersIcon className="mr-2 h-4 w-4" />
+                          Assign Lead
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Assign Lead</DialogTitle>
+                          <DialogDescription>
+                            Manually assign this lead to a user
+                          </DialogDescription>
+                        </DialogHeader>
+                        <ManualAssignment
+                          leadId={lead.id}
+                          currentOwnerId={lead.owner_id}
+                          onAssigned={() => {
+                            setShowAssignmentDialog(false);
+                            fetchLead();
+                          }}
+                        />
+                      </DialogContent>
+                    </Dialog>
+
+                    {!lead.converted_at && (
+                      <Button onClick={() => setShowConversionDialog(true)}>
+                        <GitBranch className="mr-2 h-4 w-4" />
+                        Convert Lead
+                      </Button>
+                    )}
+
+                    <Button variant="outline" onClick={() => setIsEditing(true)}>
+                      <Edit className="mr-2 h-4 w-4" />
+                      Edit
+                    </Button>
+                    <Button variant="destructive" onClick={() => setShowDeleteDialog(true)}>
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete
+                    </Button>
+                  </>
+                ) : null}
+              </div>
+            </div>
+          }
+        >
         {isEditing ? (
           <Card>
             <CardHeader>
@@ -836,7 +903,8 @@ export default function LeadDetail() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-      </DetailScreenTemplate>
+        </DetailScreenTemplate>
+      </div>
     </DashboardLayout>
   );
 }

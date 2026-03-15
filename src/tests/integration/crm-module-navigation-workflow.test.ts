@@ -44,27 +44,25 @@ describe('CRM module navigation workflow consistency', () => {
   });
 
   it('enforces unified header control ordering contract', () => {
-    const headerComponent = read('src/components/crm/CRMModuleHeaderNavigation.tsx');
-    const orderedSegments = [
-      'VIEW_MODE_SEQUENCE.map',
-      '{toLabel(mode)}',
-      '{createLabel}',
-      'Refresh',
-      'Import/Export',
-      '<Select value={theme} onValueChange={onThemeChange}>',
-    ];
-    let cursor = -1;
-    orderedSegments.forEach((segment) => {
-      const next = headerComponent.indexOf(segment, cursor + 1);
-      expect(next).toBeGreaterThan(cursor);
-      cursor = next;
-    });
-    expect(headerComponent).not.toContain('Set as Default');
+    const leadsWorkspace = read('src/pages/dashboard/Leads.tsx');
+    const leadsPipeline = read('src/pages/dashboard/LeadsPipeline.tsx');
+    const dashboardLayout = read('src/components/layout/DashboardLayout.tsx');
+    const controlOrder = "['pipeline', 'list', 'create', 'card', 'grid', 'refresh', 'analytics', 'importExport', 'theme']";
+    expect(leadsWorkspace).toContain(`controlSequence={${controlOrder}}`);
+    expect(leadsPipeline).toContain(`controlSequence={${controlOrder}}`);
+    expect(dashboardLayout).toContain('overflow-x-hidden');
   });
 
   it('registers activities and opportunities import export routes', () => {
     const appContent = read('src/App.tsx');
     expect(appContent).toContain('/dashboard/activities/import-export');
     expect(appContent).toContain('/dashboard/opportunities/import-export');
+  });
+
+  it('keeps DataTable list rendering contained without horizontal overflow', () => {
+    const dataTable = read('src/components/system/DataTable.tsx');
+    expect(dataTable).toContain('rounded-md border overflow-hidden [&>div]:overflow-x-hidden');
+    expect(dataTable).toContain('<Table className="table-fixed">');
+    expect(dataTable).toContain("className={cn('max-w-0 break-words', col.className)}");
   });
 });

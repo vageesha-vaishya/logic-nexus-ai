@@ -144,7 +144,7 @@ function LeadsPipelineStory(props: LeadsPipelineStoryProps) {
         ))}
       </div>
       <div
-        className={`overflow-hidden rounded-lg border bg-muted/20 p-2 ${props.freezeInteractions ? 'pointer-events-none' : ''}`}
+        className={`overflow-hidden rounded-lg border border-[#e5eaf2] bg-white p-2 ${props.freezeInteractions ? 'pointer-events-none' : ''}`}
         style={{ height: `${props.boardHeight}px` }}
       >
         <KanbanBoard
@@ -153,6 +153,7 @@ function LeadsPipelineStory(props: LeadsPipelineStoryProps) {
           onDragEnd={handleDragEnd}
           onItemUpdate={handleItemUpdate}
           onItemClick={handleItemClick}
+          themeVariant="reference"
         />
       </div>
     </div>

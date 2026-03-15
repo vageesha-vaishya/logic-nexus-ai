@@ -1,7 +1,7 @@
 
 import { render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import LeadsPipeline from '../LeadsPipeline';
+import LeadsPipeline, { getVisiblePipelineStages, parseSelectedPipelineStages } from '../LeadsPipeline';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
@@ -109,5 +109,26 @@ describe('LeadsPipeline', () => {
     await waitFor(() => {
       expect(screen.getByText(/Leads Pipeline|leads\.title/i)).toBeInTheDocument();
     });
+  });
+
+  it('parses only valid status values from query params', () => {
+    expect(parseSelectedPipelineStages('won,qualified,invalid,new')).toEqual(['won', 'qualified', 'new']);
+    expect(parseSelectedPipelineStages('')).toEqual([]);
+    expect(parseSelectedPipelineStages(null)).toEqual([]);
+  });
+
+  it('returns all stages when no status filter is selected', () => {
+    const visible = getVisiblePipelineStages([]);
+    expect(visible).toEqual(['new', 'contacted', 'qualified', 'proposal', 'negotiation', 'won', 'lost', 'converted']);
+  });
+
+  it('returns only selected status sections preserving pipeline order', () => {
+    const visible = getVisiblePipelineStages(['won', 'qualified', 'new']);
+    expect(visible).toEqual(['new', 'qualified', 'won']);
+  });
+
+  it('handles empty filter output safely when selected statuses are unavailable', () => {
+    const visible = getVisiblePipelineStages(['won']).filter((stage) => stage === 'new');
+    expect(visible).toEqual([]);
   });
 });

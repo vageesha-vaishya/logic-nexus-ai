@@ -29,8 +29,10 @@ interface KanbanFiltersProps {
   onSearchChange: (value: string) => void;
   filters: Record<string, string[]>; // key -> selected values
   onFilterChange: (key: string, values: string[]) => void;
+  onReset?: () => void;
   availableFilters: FilterOption[];
   className?: string;
+  leadingContent?: React.ReactNode;
 }
 
 export function KanbanFilters({
@@ -38,8 +40,10 @@ export function KanbanFilters({
   onSearchChange,
   filters,
   onFilterChange,
+  onReset,
   availableFilters,
   className,
+  leadingContent,
 }: KanbanFiltersProps) {
   const activeFilterCount = Object.values(filters).reduce(
     (acc, curr) => acc + curr.length,
@@ -47,6 +51,10 @@ export function KanbanFilters({
   );
 
   const clearFilters = () => {
+    if (onReset) {
+      onReset();
+      return;
+    }
     availableFilters.forEach((f) => onFilterChange(f.id, []));
     onSearchChange("");
   };
@@ -60,9 +68,10 @@ export function KanbanFilters({
   };
 
   return (
-    <div className={cn("flex items-center gap-2 p-1", className)}>
+    <div className={cn("flex items-center gap-2 p-1 overflow-x-auto no-scrollbar whitespace-nowrap", className)}>
+      {leadingContent}
       {/* Search Bar */}
-      <div className="relative flex-1 max-w-sm">
+      <div className="relative min-w-[240px] w-[240px]">
         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
         <Input
           type="search"
@@ -131,6 +140,25 @@ export function KanbanFilters({
               </PopoverTrigger>
               <PopoverContent className="w-[200px] p-0" align="start">
                 <div className="p-1">
+                  <div className="flex items-center gap-1 px-1 pb-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 flex-1 text-[11px]"
+                      onClick={() => onFilterChange(filter.id, filter.options.map((option) => option.value))}
+                    >
+                      Select All
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 flex-1 text-[11px]"
+                      onClick={() => onFilterChange(filter.id, [])}
+                    >
+                      Select None
+                    </Button>
+                  </div>
+                  <Separator className="mb-1" />
                   {filter.options.map((option) => {
                     const isSelected = selected.includes(option.value);
                     return (

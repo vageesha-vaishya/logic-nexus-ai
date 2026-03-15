@@ -96,8 +96,8 @@ export function FirstScreenTemplate({
 }: FirstScreenTemplateProps) {
   return (
     <div className={cn("space-y-6", className)}>
-      <div className="flex items-start justify-between gap-4">
-        <div className="space-y-2">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="space-y-2 min-w-0">
           {breadcrumbs && breadcrumbs.length > 0 && (
             <Breadcrumb>
               <BreadcrumbList>
@@ -121,7 +121,7 @@ export function FirstScreenTemplate({
             {description && <p className="text-muted-foreground">{description}</p>}
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-start gap-2 min-w-0 lg:flex-1 lg:justify-end">
           {onViewModeChange && (
             <ViewToggle value={viewMode} onChange={onViewModeChange} modes={availableModes} />
           )}

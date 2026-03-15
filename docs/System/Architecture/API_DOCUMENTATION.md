@@ -54,6 +54,21 @@
 - Response Header: `Content-Language: en` is included in all Edge Function responses.
 - Clients should expect English error messages and data content, regardless of the `Accept-Language` request header or input language.
 
+## Leads Pipeline Query Contract
+- Route: `/dashboard/leads/pipeline`
+- Query parameters:
+  - `view`: `board | analytics`
+  - `q`: free-text search query
+  - `status`: comma-separated lead status keys (`new,contacted,qualified,proposal,negotiation,won,lost,converted`)
+  - `source`: comma-separated source values (URL encoded)
+  - `custom`: comma-separated custom field tokens (URL encoded)
+  - `from`: `YYYY-MM-DD` created date lower bound
+  - `to`: `YYYY-MM-DD` created date upper bound
+- Behavior:
+  - When `status` is present, only the matching pipeline status columns are rendered.
+  - When `status` is absent, all pipeline status columns are rendered.
+  - Invalid `status` tokens are ignored.
+
 ## Rate Limits
 - Per-tenant limits: 600 rpm; burst 1200 rpm; 429 on exceed
 

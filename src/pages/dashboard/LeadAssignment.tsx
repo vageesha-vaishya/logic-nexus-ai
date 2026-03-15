@@ -18,13 +18,18 @@ import { UserCapacity } from '@/components/assignment/UserCapacity';
 import { AssignmentQueue } from '@/components/assignment/AssignmentQueue';
 import { AssignmentHistory } from '@/components/assignment/AssignmentHistory';
 import { AssignmentAnalytics } from '@/components/assignment/AssignmentAnalytics';
+import { CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
+import { themeStyleFromPreset } from '@/lib/theme-utils';
+import { LeadsPrimaryView, useLeadsViewState } from '@/hooks/useLeadsViewState';
 
 export default function LeadAssignment() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const currentTab = searchParams.get('tab') || 'rules';
 
-  const { supabase, context } = useCRM();
+  const { supabase, context, scopedDb } = useCRM();
+  const { state: viewState, setTheme, setView, setPipeline } = useLeadsViewState();
+  const currentTheme = viewState.theme;
   const [stats, setStats] = useState({
     pendingQueue: 0,
     assignedToday: 0,
@@ -36,6 +41,38 @@ export default function LeadAssignment() {
     setSearchParams({ tab: value });
   };
   const [loading, setLoading] = useState(true);
+  const handleThemeChange = (val: string) => {
+    setTheme(val);
+    try {
+      localStorage.setItem('leadsTheme', val);
+    } catch {
+      return;
+    }
+  };
+
+  const handleHeaderViewModeChange = (mode: LeadsPrimaryView) => {
+    if (mode === 'pipeline') {
+      try {
+        localStorage.setItem('leadsViewMode', 'pipeline');
+      } catch {
+        void 0;
+      }
+      scopedDb.logViewPreference('leads', 'pipeline');
+      setView('pipeline');
+      setPipeline({ q: '', status: [], tab: 'board' });
+      navigate('/dashboard/leads/pipeline');
+      return;
+    }
+
+    try {
+      localStorage.setItem('leadsViewMode', mode);
+    } catch {
+      void 0;
+    }
+    scopedDb.logViewPreference('leads', mode);
+    setView(mode);
+    navigate('/dashboard/leads');
+  };
 
   useEffect(() => {
     fetchStats();
@@ -78,25 +115,25 @@ export default function LeadAssignment() {
       today.setHours(0, 0, 0, 0);
 
       // Fetch queue count
-      const { count: queueCount } = await supabase
+      const { count: queueCount } = await scopedDb
         .from('lead_assignment_queue')
         .select('*', { count: 'exact', head: true })
         .eq('status', 'pending');
 
       // Fetch assignments today
-      const { count: assignedCount } = await supabase
+      const { count: assignedCount } = await scopedDb
         .from('lead_assignment_history')
         .select('*', { count: 'exact', head: true })
         .gte('assigned_at', today.toISOString());
 
       // Fetch active rules
-      const { count: rulesCount } = await supabase
+      const { count: rulesCount } = await scopedDb
         .from('lead_assignment_rules')
         .select('*', { count: 'exact', head: true })
         .eq('is_active', true);
 
       // Fetch territories
-      const { count: territoriesCount } = await supabase
+      const { count: territoriesCount } = await scopedDb
         .from('territories')
         .select('*', { count: 'exact', head: true })
         .eq('is_active', true);
@@ -132,18 +169,46 @@ export default function LeadAssignment() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
+      <div style={themeStyleFromPreset(currentTheme)} className="space-y-6 transition-colors duration-300">
+        <div className="flex items-start justify-between gap-4 sm:items-center">
           <div>
             <h1 className="text-3xl font-bold">Lead Assignment</h1>
             <p className="text-muted-foreground">
               Manage automated lead distribution and assignment workflows
             </p>
           </div>
-          <Button onClick={handleProcessQueue}>
-            <Play className="mr-2 h-4 w-4" />
-            Process Queue
-          </Button>
+          <div className="flex flex-col items-end gap-2">
+            <CRMModuleHeaderNavigation
+              moduleLabel="Leads"
+              viewMode="list"
+              theme={currentTheme}
+              onViewModeChange={(mode) => handleHeaderViewModeChange(mode as LeadsPrimaryView)}
+              onThemeChange={handleThemeChange}
+              onCreate={() => navigate('/dashboard/leads/new')}
+              createLabel="New Lead"
+              onRefresh={fetchStats}
+              analyticsActive={false}
+              onAnalyticsClick={() => {
+                try {
+                  localStorage.setItem('leadsViewMode', 'pipeline');
+                } catch {
+                  void 0;
+                }
+                scopedDb.logViewPreference('leads', 'pipeline');
+                setView('pipeline');
+                setPipeline({ q: '', status: [], tab: 'analytics' });
+                navigate('/dashboard/leads/pipeline?view=analytics');
+              }}
+              onImportExport={() => navigate('/dashboard/leads/import-export')}
+              controlSequence={['pipeline', 'list', 'create', 'card', 'grid', 'refresh', 'analytics', 'importExport', 'theme']}
+              iconOnly
+              layout="compact"
+            />
+            <Button onClick={handleProcessQueue}>
+              <Play className="mr-2 h-4 w-4" />
+              Process Queue
+            </Button>
+          </div>
         </div>
 
         {/* Stats Cards */}

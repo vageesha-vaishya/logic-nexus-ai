@@ -1,25 +1,28 @@
 import React from 'react';
 import logoImage from '@/assets/sos-logistics-logo-3d.png';
+import { cn } from '@/lib/utils';
 
 type LogoProps = {
   showWordmark?: boolean;
   size?: number;
   className?: string;
   wordmarkClassName?: string;
+  imageClassName?: string;
 };
 
 export const Logo: React.FC<LogoProps> = ({ 
   showWordmark = false, 
   size = 40, 
   className, 
-  wordmarkClassName 
+  wordmarkClassName,
+  imageClassName,
 }) => {
   return (
-    <div className={`flex items-center gap-3 ${className || ''}`}>
+    <div className={cn('flex items-center gap-3', className)}>
       <img 
         src={logoImage}
         alt="SOS Logistic Pro Logo"
-        className="object-contain"
+        className={cn('aspect-square object-contain transition-[width,height] duration-300 ease-out', imageClassName)}
         style={{ width: size, height: size }}
       />
 

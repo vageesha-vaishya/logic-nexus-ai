@@ -8,10 +8,48 @@ import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 import { logger } from '@/lib/logger';
 import * as Sentry from '@sentry/react';
+import { CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
+import { themeStyleFromPreset } from '@/lib/theme-utils';
+import { useLeadsViewState, LeadsPrimaryView } from '@/hooks/useLeadsViewState';
 
 export default function LeadNew() {
   const navigate = useNavigate();
   const { context, scopedDb } = useCRM();
+  const { state: viewState, setTheme, setView, setPipeline } = useLeadsViewState();
+  const currentTheme = viewState.theme;
+
+  const handleThemeChange = (val: string) => {
+    setTheme(val);
+    try {
+      localStorage.setItem('leadsTheme', val);
+    } catch {
+      return;
+    }
+  };
+
+  const handleViewModeChange = (mode: LeadsPrimaryView) => {
+    if (mode === 'pipeline') {
+      try {
+        localStorage.setItem('leadsViewMode', 'pipeline');
+      } catch {
+        void 0;
+      }
+      scopedDb.logViewPreference('leads', 'pipeline');
+      setView('pipeline');
+      setPipeline({ q: '', status: [], tab: 'board' });
+      navigate('/dashboard/leads/pipeline');
+      return;
+    }
+
+    try {
+      localStorage.setItem('leadsViewMode', mode);
+    } catch {
+      void 0;
+    }
+    scopedDb.logViewPreference('leads', mode);
+    setView(mode);
+    navigate('/dashboard/leads');
+  };
 
   const handleCreate = async (formData: any) => {
     try {
@@ -63,15 +101,43 @@ export default function LeadNew() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard/leads')}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold">New Lead</h1>
-            <p className="text-muted-foreground">Create a new sales lead</p>
+      <div style={themeStyleFromPreset(currentTheme)} className="space-y-6 transition-colors duration-300">
+        <div className="flex items-start justify-between gap-4 sm:items-center">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard/leads')}>
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <div>
+              <h1 className="text-3xl font-bold">New Lead</h1>
+              <p className="text-muted-foreground">Create a new sales lead</p>
+            </div>
           </div>
+          <CRMModuleHeaderNavigation
+            moduleLabel="Leads"
+            viewMode="list"
+            theme={currentTheme}
+            onViewModeChange={(mode) => handleViewModeChange(mode as LeadsPrimaryView)}
+            onThemeChange={handleThemeChange}
+            onCreate={() => navigate('/dashboard/leads/new')}
+            createLabel="New Lead"
+            onRefresh={() => navigate(0)}
+            onAnalyticsClick={() => {
+              try {
+                localStorage.setItem('leadsViewMode', 'pipeline');
+              } catch {
+                void 0;
+              }
+              scopedDb.logViewPreference('leads', 'pipeline');
+              setView('pipeline');
+              setPipeline({ q: '', status: [], tab: 'analytics' });
+              navigate('/dashboard/leads/pipeline?view=analytics');
+            }}
+            analyticsActive={false}
+            onImportExport={() => navigate('/dashboard/leads/import-export')}
+            controlSequence={['pipeline', 'list', 'create', 'card', 'grid', 'refresh', 'analytics', 'importExport', 'theme']}
+            iconOnly
+            layout="compact"
+          />
         </div>
 
         <Card>

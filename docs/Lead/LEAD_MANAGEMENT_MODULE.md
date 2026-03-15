@@ -256,3 +256,22 @@ When a lead is marked `converted`:
 *   **Lead**: Unqualified prospect.
 *   **Activity**: Interaction event.
 *   **Queue**: Container for unassigned leads.
+
+---
+
+## Pipeline Status Filter Behavior (2026-03)
+
+### User-Facing Changes
+*   Status filtering in Pipeline now controls both lead cards and visible status columns.
+*   Selecting statuses shows only matching columns in canonical order:
+    `new -> contacted -> qualified -> proposal -> negotiation -> won -> lost -> converted`.
+*   Clearing status selection restores all status columns.
+*   The filter toolbar now includes explicit **Select All** and **Select None** actions.
+*   A visible status indicator row shows exactly which columns are currently displayed.
+*   Empty results are now explicit:
+    *   If no columns are selected: "No status columns selected".
+    *   If columns exist but no leads match: "No leads match the current filters".
+
+### Session Persistence
+*   Pipeline filter state (`q`, `status`, `view`) persists in browser storage and is restored on reload when URL params are absent.
+*   URL query parameters remain the source of truth when present.

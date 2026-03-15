@@ -1,4 +1,3 @@
-import { SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from './AppSidebar';
 import { ObjectMenu } from './ObjectMenu';
 import { Button } from '@/components/ui/button';
@@ -220,7 +219,6 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             </div>
           )}
           <div className="relative z-[3] flex items-center gap-3 w-full">
-            <SidebarTrigger />
             <Button
               variant="ghost"
               size="icon"
@@ -267,7 +265,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             <ObjectMenu />
           </div>
         </header>
-        <main id="main-content" className="flex-1 p-4 bg-muted/30 pb-24 outline-none" style={{ backgroundImage: 'var(--app-background, none)' }} tabIndex={-1}>
+        <main id="main-content" className="flex-1 p-4 bg-muted/30 pb-24 outline-none overflow-x-hidden" style={{ backgroundImage: 'var(--app-background, none)' }} tabIndex={-1}>
           <FeatureErrorBoundary featureName="Dashboard Content">
             {children}
           </FeatureErrorBoundary>
