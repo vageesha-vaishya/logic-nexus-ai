@@ -31,6 +31,7 @@ type LeadsWorkspaceFilters = {
   pageSize: number;
   sortField: string;
   sortDirection: 'asc' | 'desc';
+  listVisibleFields: string[];
 };
 
 type LeadsPipelineState = {
@@ -91,6 +92,7 @@ const defaultWorkspace: LeadsWorkspaceFilters = {
   pageSize: 10,
   sortField: 'created_at',
   sortDirection: 'desc',
+  listVisibleFields: ['company', 'status', 'score', 'estimated_value', 'actions', 'email_under_name'],
 };
 
 const defaultState: LeadsViewState = {

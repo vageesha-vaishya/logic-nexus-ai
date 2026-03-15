@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Search, UserPlus, DollarSign, Filter, TrendingUp, Users as UsersIcon, Trash2, ArrowLeft } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { Search, UserPlus, Filter, TrendingUp, Users as UsersIcon, Trash2, ArrowLeft, MoreHorizontal, ArrowUpDown, SlidersHorizontal } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,16 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu';
 import { ViewMode } from '@/components/ui/view-toggle';
 import { useCRM } from '@/hooks/useCRM';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
@@ -18,13 +28,61 @@ import { EmptyState } from '@/components/system/EmptyState';
 import { TableSkeleton } from '@/components/system/TableSkeleton';
 import { LeadCard } from '@/components/crm/LeadCard';
 import { CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
-import { DataTable, ColumnDef } from '@/components/system/DataTable';
 import { themeStyleFromPreset } from '@/lib/theme-utils';
-import { Lead, LeadStatus, stages, statusConfig } from './leads-data';
+import { Lead } from './leads-data';
 import { usePerformanceMonitor } from '@/hooks/usePerformanceMonitor';
 import { useLeadsViewState } from '@/hooks/useLeadsViewState';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useUndo } from '@/hooks/useUndo';
+
+const LIST_FIELD_OPTIONS = [
+  { key: 'email_under_name', label: 'Email under Name', tableColumn: false },
+  { key: 'title', label: 'Title', tableColumn: true },
+  { key: 'company', label: 'Company', tableColumn: true },
+  { key: 'email', label: 'Email', tableColumn: true },
+  { key: 'phone', label: 'Phone', tableColumn: true },
+  { key: 'status', label: 'Status', tableColumn: true },
+  { key: 'source', label: 'Source', tableColumn: true },
+  { key: 'qualification_status', label: 'Qualification', tableColumn: true },
+  { key: 'score', label: 'Score', tableColumn: true },
+  { key: 'estimated_value', label: 'Value', tableColumn: true },
+  { key: 'expected_close_date', label: 'Expected Close', tableColumn: true },
+  { key: 'last_activity_date', label: 'Last Activity', tableColumn: true },
+  { key: 'created_at', label: 'Created At', tableColumn: true },
+  { key: 'updated_at', label: 'Updated At', tableColumn: true },
+  { key: 'converted_at', label: 'Converted At', tableColumn: true },
+  { key: 'owner_id', label: 'Owner', tableColumn: true },
+  { key: 'description', label: 'Description', tableColumn: true },
+  { key: 'notes', label: 'Notes', tableColumn: true },
+  { key: 'custom_fields', label: 'Custom Fields', tableColumn: true },
+  { key: 'franchise_id', label: 'Franchise', tableColumn: true },
+  { key: 'tenant_id', label: 'Tenant', tableColumn: true },
+  { key: 'actions', label: 'Actions', tableColumn: true },
+] as const;
+
+type ListFieldKey = (typeof LIST_FIELD_OPTIONS)[number]['key'];
+const DEFAULT_LIST_FIELDS: ListFieldKey[] = ['company', 'status', 'score', 'estimated_value', 'actions', 'email_under_name'];
+const SORT_FIELD_MAP: Partial<Record<ListFieldKey, string>> = {
+  title: 'title',
+  company: 'company',
+  email: 'email',
+  phone: 'phone',
+  status: 'status',
+  source: 'source',
+  qualification_status: 'qualification_status',
+  score: 'lead_score',
+  estimated_value: 'estimated_value',
+  expected_close_date: 'expected_close_date',
+  last_activity_date: 'last_activity_date',
+  created_at: 'created_at',
+  updated_at: 'updated_at',
+  converted_at: 'converted_at',
+  owner_id: 'owner_id',
+  description: 'description',
+  notes: 'notes',
+  franchise_id: 'franchise_id',
+  tenant_id: 'tenant_id',
+};
 
 export default function Leads() {
   usePerformanceMonitor('Leads Module');
@@ -70,6 +128,7 @@ export default function Leads() {
     pageSize,
     sortField,
     sortDirection,
+    listVisibleFields,
   } = viewState.workspace;
 
   const [totalCount, setTotalCount] = useState(0);
@@ -280,62 +339,154 @@ export default function Leads() {
     fetchLeads();
   }, [fetchLeads, viewState.hydrated]);
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'new': return 'bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-800';
-      case 'contacted': return 'bg-violet-500/10 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-800';
-      case 'qualified': return 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800';
-      case 'won': return 'bg-green-500/10 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800';
-      case 'lost': return 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800';
-      default: return 'bg-slate-500/10 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800';
+  const allVisibleSelected = leads.length > 0 && leads.every((lead) => selectedIds.has(lead.id));
+  const partiallyVisibleSelected = leads.some((lead) => selectedIds.has(lead.id)) && !allVisibleSelected;
+  const visibleFieldSet = useMemo(() => {
+    const allowed = new Set<ListFieldKey>(LIST_FIELD_OPTIONS.map((field) => field.key));
+    const fromState = Array.isArray(listVisibleFields)
+      ? listVisibleFields.filter((f): f is ListFieldKey => allowed.has(f as ListFieldKey))
+      : [];
+    const keys = fromState.length > 0 ? fromState : DEFAULT_LIST_FIELDS;
+    return new Set<ListFieldKey>(keys);
+  }, [listVisibleFields]);
+
+  const visibleFieldList = useMemo(
+    () => LIST_FIELD_OPTIONS.map((item) => item.key).filter((key) => visibleFieldSet.has(key)),
+    [visibleFieldSet]
+  );
+
+  const visibleColumnFields = useMemo(
+    () => LIST_FIELD_OPTIONS.filter((field) => field.tableColumn && visibleFieldSet.has(field.key)),
+    [visibleFieldSet]
+  );
+
+  const handleFieldVisibilityChange = (field: ListFieldKey, checked: boolean | 'indeterminate') => {
+    const next = new Set(visibleFieldList);
+    if (checked === true) {
+      next.add(field);
+    } else {
+      next.delete(field);
+    }
+    setWorkspace({
+      listVisibleFields: LIST_FIELD_OPTIONS.map((item) => item.key).filter((key) => next.has(key)),
+    });
+  };
+
+  const formatDate = (value: string | null) => {
+    if (!value) return '-';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '-';
+    return date.toLocaleDateString();
+  };
+
+  const formatDateTime = (value: string | null) => {
+    if (!value) return '-';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '-';
+    return date.toLocaleString();
+  };
+
+  const formatCurrency = (value: number | null) => {
+    if (value === null) return '-';
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
+  };
+
+  const renderCustomFields = (value: Lead['custom_fields']) => {
+    if (!value) return '-';
+    const text = JSON.stringify(value);
+    return text.length > 120 ? `${text.slice(0, 120)}...` : text;
+  };
+
+  const getFieldCellClass = (field: ListFieldKey) => {
+    if (field === 'estimated_value') return 'text-right';
+    if (field === 'description' || field === 'notes') return 'max-w-[240px] truncate';
+    if (field === 'custom_fields') return 'max-w-[260px] truncate';
+    return undefined;
+  };
+
+  const renderFieldCell = (lead: Lead, field: ListFieldKey) => {
+    switch (field) {
+      case 'title':
+        return lead.title || '-';
+      case 'company':
+        return lead.company || '-';
+      case 'email':
+        return lead.email || '-';
+      case 'phone':
+        return lead.phone || '-';
+      case 'status':
+        return <Badge variant="secondary" className="capitalize">{lead.status}</Badge>;
+      case 'source':
+        return lead.source || '-';
+      case 'qualification_status':
+        return lead.qualification_status || '-';
+      case 'score':
+        return (
+          <div className="flex items-center gap-2">
+            <div className="h-2 w-16 bg-slate-100 rounded-full overflow-hidden">
+              <div
+                className={`h-full ${
+                  (lead.lead_score || 0) > 80 ? 'bg-green-500' :
+                  (lead.lead_score || 0) > 50 ? 'bg-yellow-500' : 'bg-red-500'
+                }`}
+                style={{ width: `${lead.lead_score || 0}%` }}
+              />
+            </div>
+            <span className="text-xs font-medium">{lead.lead_score ?? '-'}</span>
+          </div>
+        );
+      case 'estimated_value':
+        return formatCurrency(lead.estimated_value);
+      case 'expected_close_date':
+        return formatDate(lead.expected_close_date);
+      case 'last_activity_date':
+        return formatDate(lead.last_activity_date);
+      case 'created_at':
+        return formatDateTime(lead.created_at);
+      case 'updated_at':
+        return formatDateTime(lead.updated_at);
+      case 'converted_at':
+        return formatDate(lead.converted_at);
+      case 'owner_id':
+        return lead.owner_id || '-';
+      case 'description':
+        return lead.description || '-';
+      case 'notes':
+        return lead.notes || '-';
+      case 'custom_fields':
+        return renderCustomFields(lead.custom_fields);
+      case 'franchise_id':
+        return lead.franchise_id || '-';
+      case 'tenant_id':
+        return lead.tenant_id || '-';
+      case 'actions':
+        return (
+          <Button variant="ghost" size="icon" className="h-8 w-8">
+            <MoreHorizontal className="h-4 w-4" />
+          </Button>
+        );
+      default:
+        return null;
     }
   };
 
-  const columns: ColumnDef<Lead>[] = [
-    {
-      key: 'name',
-      header: t('leads.columns.name'),
-      render: (l: Lead) => `${l.first_name} ${l.last_name}`,
-      sortable: true
-    },
-    { key: 'company', header: t('leads.columns.company'), sortable: true },
-    { key: 'email', header: t('leads.columns.email'), sortable: true },
-    { key: 'phone', header: t('leads.columns.phone'), sortable: true },
-    {
-      key: 'status',
-      header: t('leads.columns.status'),
-      render: (l: Lead) => <Badge className={getStatusColor(l.status)}>{l.status}</Badge>,
-      sortable: true
-    },
-    {
-      key: 'source',
-      header: t('leads.columns.source'),
-      render: (l: Lead) => <Badge variant="outline">{l.source}</Badge>,
-      sortable: true
-    },
-    {
-      key: 'lead_score',
-      header: t('leads.columns.score'),
-      render: (l: Lead) => l.lead_score !== null ? (
-        <div className="flex items-center gap-1">
-          <TrendingUp className="h-4 w-4 text-primary" />
-          {l.lead_score}
-        </div>
-      ) : '-',
-      sortable: true
-    },
-    {
-      key: 'estimated_value',
-      header: t('leads.columns.value'),
-      render: (l: Lead) => l.estimated_value ? (
-        <div className="flex items-center gap-1 text-green-600">
-          <DollarSign className="h-4 w-4" />
-          ${l.estimated_value.toLocaleString()}
-        </div>
-      ) : '-',
-      sortable: true
-    },
-  ];
+  const getHeaderClass = (field: ListFieldKey) => {
+    if (field === 'actions') return 'w-[50px]';
+    if (field === 'estimated_value') return 'text-right';
+    return undefined;
+  };
+
+  const toggleSelectAllVisible = (checked: boolean | 'indeterminate') => {
+    if (checked === true) {
+      const next = new Set(selectedIds);
+      leads.forEach((lead) => next.add(lead.id));
+      setSelectedIds(Array.from(next));
+      return;
+    }
+    const next = new Set(selectedIds);
+    leads.forEach((lead) => next.delete(lead.id));
+    setSelectedIds(Array.from(next));
+  };
 
   const toggleSelection = (id: string) => {
     const next = new Set(selectedIds);
@@ -511,6 +662,28 @@ export default function Leads() {
                 <SelectItem value="unassigned">{t('leads.filters.ownerOptions.unassigned')}</SelectItem>
               </SelectContent>
             </Select>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="w-full sm:w-auto">
+                  <SlidersHorizontal className="mr-2 h-4 w-4" />
+                  Fields
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-72 max-h-96 overflow-y-auto">
+                <DropdownMenuLabel>Visible Fields</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {LIST_FIELD_OPTIONS.map((field) => (
+                  <DropdownMenuCheckboxItem
+                    key={field.key}
+                    checked={visibleFieldSet.has(field.key)}
+                    onCheckedChange={(checked) => handleFieldVisibilityChange(field.key, checked)}
+                  >
+                    {field.label}
+                  </DropdownMenuCheckboxItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
           <div className="flex flex-wrap gap-4 items-center">
@@ -578,7 +751,7 @@ export default function Leads() {
                   </Card>
                 ))}
              </div>
-             <TableSkeleton columns={6} rows={8} />
+             <TableSkeleton columns={Math.max(6, visibleColumnFields.length + 2)} rows={8} />
           </div>
         ) : leads.length === 0 ? (
           <EmptyState
@@ -589,38 +762,104 @@ export default function Leads() {
             onAction={!searchQuery ? () => navigate('/dashboard/leads/new') : undefined}
           />
         ) : viewMode === 'list' ? (
-          <Card>
-            <CardContent className="pt-6">
-              <DataTable
-                data={leads}
-                columns={columns as any}
-                isLoading={loading}
-                onRowClick={(lead) => navigate(`/dashboard/leads/${lead.id}`)}
-                selection={{
-                  selectedIds: viewState.selection.selectedIds,
-                  onSelectionChange: setSelectedIds,
-                  rowId: (l) => l.id
-                }}
-                pagination={{
-                  pageIndex: page,
-                  pageSize: pageSize,
-                  totalCount: totalCount,
-                  onPageChange: setPage,
-                  onPageSizeChange: setPageSize
-                }}
-                sorting={{
-                  field: sortField,
-                  direction: sortDirection,
-                  onSort: (field) => {
-                    const dir = sortField === field && sortDirection === 'asc' ? 'desc' : 'asc';
-                    setSorting(field, dir);
-                  }
-                }}
-                mobileTitleKey="first_name"
-                mobileSubtitleKey="company"
-              />
-            </CardContent>
-          </Card>
+          <>
+            <div className="rounded-md border bg-white overflow-x-auto">
+              <Table className="text-sm">
+                <TableHeader>
+                  <TableRow className="h-8">
+                    <TableHead className="w-[50px] py-1">
+                      <Checkbox
+                        checked={allVisibleSelected ? true : partiallyVisibleSelected ? 'indeterminate' : false}
+                        onCheckedChange={toggleSelectAllVisible}
+                      />
+                    </TableHead>
+                    <TableHead className="w-[200px] py-1">
+                      <Button
+                        variant="ghost"
+                        className="p-0 hover:bg-transparent font-medium"
+                        onClick={() => {
+                          const dir = sortField === 'first_name' && sortDirection === 'asc' ? 'desc' : 'asc';
+                          setSorting('first_name', dir);
+                        }}
+                      >
+                        Name <ArrowUpDown className="ml-2 h-4 w-4" />
+                      </Button>
+                    </TableHead>
+                    {visibleColumnFields.map((field) => {
+                      const sortableBy = SORT_FIELD_MAP[field.key];
+                      const isSorted = sortableBy && sortField === sortableBy;
+                      if (!sortableBy) {
+                        return (
+                          <TableHead key={field.key} className={`${getHeaderClass(field.key) || ''} py-1`}>
+                            {field.label}
+                          </TableHead>
+                        );
+                      }
+                      return (
+                        <TableHead key={field.key} className={`${getHeaderClass(field.key) || ''} py-1`}>
+                          <Button
+                            variant="ghost"
+                            className={`p-0 hover:bg-transparent font-medium ${field.key === 'estimated_value' ? 'justify-end w-full' : ''}`}
+                            onClick={() => {
+                              const dir = isSorted && sortDirection === 'asc' ? 'desc' : 'asc';
+                              setSorting(sortableBy, dir);
+                            }}
+                          >
+                            {field.label}
+                            <ArrowUpDown className="ml-2 h-4 w-4" />
+                          </Button>
+                        </TableHead>
+                      );
+                    })}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {leads.map((lead) => (
+                    <TableRow key={lead.id} className="h-8 hover:bg-slate-50/50">
+                      <TableCell className="py-1">
+                        <Checkbox
+                          checked={selectedIds.has(lead.id)}
+                          onCheckedChange={() => toggleSelection(lead.id)}
+                        />
+                      </TableCell>
+                      <TableCell className="py-1 font-medium">
+                        <div className="flex flex-col leading-tight">
+                          <span className="text-sm leading-tight">{lead.first_name} {lead.last_name}</span>
+                          {visibleFieldSet.has('email_under_name') && (
+                            <span className="text-xs text-muted-foreground leading-tight">{lead.email || '-'}</span>
+                          )}
+                        </div>
+                      </TableCell>
+                      {visibleColumnFields.map((field) => (
+                        <TableCell key={`${lead.id}-${field.key}`} className={`py-1 ${getFieldCellClass(field.key) || ''}`}>
+                          {renderFieldCell(lead, field.key)}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+
+            <div className="flex items-center justify-end space-x-2 py-4">
+              <div className="flex-1 text-sm text-muted-foreground">
+                {selectedIds.size} of {totalCount} row(s) selected.
+              </div>
+              <div className="space-x-2">
+                <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
+                  Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page * pageSize >= totalCount}
+                  onClick={() => setPage(page + 1)}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          </>
         ) : viewMode === 'grid' ? (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             {leads.map((lead) => (
