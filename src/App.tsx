@@ -22,6 +22,7 @@ import OAuthCallback from "./pages/OAuthCallback";
 import SetupAdmin from "./pages/SetupAdmin";
 import Unauthorized from "./pages/Unauthorized";
 import NotFound from "./pages/NotFound";
+import SelfServiceOnboarding from "./pages/SelfServiceOnboarding";
 
 // Lazy: all dashboard pages (loaded on navigation)
 const Dashboards = lazy(() => import("./pages/dashboard/Dashboards"));
@@ -196,6 +197,7 @@ const App = () => (
                       <Routes>
             <Route path="/" element={<Landing />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/register-organization" element={<SelfServiceOnboarding />} />
             <Route path="/oauth/callback" element={<OAuthCallback />} />
             <Route path="/setup-admin" element={<SetupAdmin />} />
             <Route path="/unauthorized" element={<Unauthorized />} />

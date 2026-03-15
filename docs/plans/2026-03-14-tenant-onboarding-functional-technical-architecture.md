@@ -166,12 +166,19 @@ Backend:
   - Update `tenant_subscriptions` and onboarding state.
   - Write `audit_logs`.
 
+- New edge function: `self-service-onboarding`
+  - Public tenant registration start (`start_registration`) with CAPTCHA verification.
+  - Email OTP verification and tenant bootstrap (`verify_email`).
+  - Tenant admin creation, role assignment, subscription bootstrap, onboarding session linking.
+
 ## 5.4 Security and Multi-Tenant Isolation
 
 - Continue enforcing RLS by tenant/franchise context.
 - Replace raw client writes in tenant onboarding with scoped access where possible.
 - Platform-only operations guarded by `is_platform_admin`.
 - Ensure all onboarding writes include actor identity for audit traceability.
+- Public self-service onboarding endpoint uses strict input validation, payload sanitization, CAPTCHA verification, and per-IP/per-email rate limiting before any provisioning.
+- Verification codes are hashed at rest and expiration is enforced before provisioning.
 
 ## 5.5 Payment Compliance Model
 
@@ -226,7 +233,61 @@ Execution:
 - First-login guided tour flag in user preferences.
 - Auto-dismiss after completion, with replay option in help menu.
 
+## 5.8 Self-Service Registration API Contract
+
+Public route:
+
+- `/register-organization` hosts the package-first onboarding UI.
+
+Edge API:
+
+- `self-service-onboarding` action `start_registration`
+  - Required: organization, admin profile, plan tier, compliance basics, CAPTCHA token.
+  - Output: `request_id`, verification status, expiry metadata.
+- `self-service-onboarding` action `verify_email`
+  - Required: `request_id`, OTP code, admin password.
+  - Output: tenant and onboarding session identifiers.
+  - Free tier: tenant and onboarding are completed in-line.
+  - Paid tier: tenant is provisioned with `payment_pending` onboarding continuation.
+
+Schema additions:
+
+- `self_service_onboarding_requests`
+  - Request lifecycle, sanitized payload snapshot, OTP hash and expiry, provisioning links (`tenant_id`, `admin_user_id`, `onboarding_session_id`).
+- `self_service_onboarding_rate_limits`
+  - Rolling-window counters by `ip` and `email`, temporary blocking windows.
+
+Error handling:
+
+- Validation errors return `422` with issue details.
+- Rate-limit violations return `429` with `retry_after_seconds`.
+- CAPTCHA failures return `400`.
+- Provisioning failures return `500` and persist failure reason in request state.
+
 ## 6. End-to-End Sequence
+
+### 6.1 Public Self-Service Registration
+
+```mermaid
+sequenceDiagram
+  participant V as Website Visitor
+  participant UI as Register Organization UI
+  participant SSO as self-service-onboarding
+  participant DB as Supabase DB
+  participant MAIL as send-email
+
+  V->>UI: Select package and enter organization/admin details
+  UI->>SSO: start_registration + captcha token
+  SSO->>DB: Rate-limit checks + request insert (pending_verification)
+  SSO->>MAIL: Send OTP to admin email
+  MAIL-->>V: Verification code
+  V->>UI: Submit request_id + code
+  UI->>SSO: verify_email
+  SSO->>DB: Validate OTP + provision tenant/admin/subscription/session
+  SSO-->>UI: tenant_id + onboarding_session_id + next status
+```
+
+### 6.2 Product-to-Onboarding and Activation Flow
 
 ```mermaid
 sequenceDiagram
@@ -296,9 +357,9 @@ Phase 4: Support Automation and Analytics
 
 - React pages/components remain in existing dashboard architecture.
 - Public commercial pages can be added as non-auth routes and pass onboarding context into existing onboarding flow.
-- Supabase edge function pattern follows existing `serveWithLogger` + `requireAuth`.
+- Supabase edge function pattern follows existing `serveWithLogger`; public self-service endpoint is intentionally non-auth and guarded by CAPTCHA + rate limits.
 - RLS model remains tenant/franchise scoped.
-- Existing tables (`tenants`, `tenant_profile`, `tenant_subscriptions`, `subscription_plans`, `ui_themes`) are reused.
+- Existing tables (`tenants`, `tenant_profile`, `tenant_subscriptions`, `subscription_plans`, `ui_themes`) are reused with additive self-service onboarding tables.
 - Existing domain verification and subscription workflows are integrated, not replaced.
 
 ## 10. Acceptance Criteria
@@ -306,6 +367,8 @@ Phase 4: Support Automation and Analytics
 - Tenant onboarding can complete end-to-end for free and paid plans.
 - Public product page shows Logic Nexus-AI with short description, key features, customer proof, and package matrix.
 - Clicking a package starts onboarding with package pre-selected.
+- Public self-service registration enforces CAPTCHA and rate limits for abuse protection.
+- Email verification is mandatory before tenant/admin provisioning.
 - Legal/tax/data residency data is captured and persisted per tenant.
 - Paid onboarding confirms payment via webhook before activation.
 - Domain verification status is visible and retryable.

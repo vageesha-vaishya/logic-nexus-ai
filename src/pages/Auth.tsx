@@ -171,6 +171,9 @@ export default function Auth() {
             <div className="pt-2 text-center text-sm text-muted-foreground">
               First time setup? <a href="/setup-admin" className="text-primary underline">Create Platform Admin</a>
             </div>
+            <div className="text-center text-sm text-muted-foreground">
+              New customer? <a href="/register-organization" className="text-primary underline">Register organization</a>
+            </div>
           </form>
         </CardContent>
       </Card>

@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Sparkles, Shield } from "lucide-react";
+import { ArrowRight, Building2, Sparkles, Shield } from "lucide-react";
 import { Link } from "react-router-dom";
 import heroImage from "@/assets/hero-logistics.jpg";
 import Logo from "@/components/branding/Logo";
@@ -43,9 +43,20 @@ export const HeroSection = () => {
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+            <Button
+              size="lg"
+              className="bg-gradient-primary hover:shadow-primary transition-all duration-300 group"
+              asChild
+            >
+              <Link to="/register-organization">
+                <Building2 className="mr-2 w-5 h-5" />
+                Register Organization
+              </Link>
+            </Button>
             <Button 
               size="lg" 
-              className="bg-gradient-primary hover:shadow-primary transition-all duration-300 group"
+              variant="outline"
+              className="border-primary/30 hover:bg-primary/10 transition-all"
               asChild
             >
               <Link to="/auth">
