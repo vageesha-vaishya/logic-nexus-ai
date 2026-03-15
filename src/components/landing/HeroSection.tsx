@@ -45,7 +45,7 @@ export const HeroSection = () => {
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
             <Button
               size="lg"
-              className="bg-gradient-primary hover:shadow-primary transition-all duration-300 group"
+              className="bg-white text-primary hover:bg-white/90 hover:text-primary shadow-sm transition-all duration-300 group"
               asChild
             >
               <Link to="/register-organization">
