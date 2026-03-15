@@ -1,9 +1,10 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { z } from 'zod'
 import { toast } from 'sonner'
 import { CheckCircle2, ShieldCheck, Sparkles } from 'lucide-react'
 import { invokeAnonymous } from '@/lib/supabase-functions'
+import { supabase } from '@/integrations/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -13,6 +14,11 @@ import { Badge } from '@/components/ui/badge'
 
 type PlanTier = 'free' | 'professional' | 'enterprise'
 type BillingPeriod = 'monthly' | 'annual'
+type DomainOption = {
+  value: string
+  label: string
+  description?: string | null
+}
 
 const plans: Array<{
   tier: PlanTier
@@ -68,6 +74,9 @@ export default function SelfServiceOnboarding() {
   const [stepIndex, setStepIndex] = useState(0)
   const [submitting, setSubmitting] = useState(false)
   const [verifying, setVerifying] = useState(false)
+  const [domainsLoading, setDomainsLoading] = useState(true)
+  const [domainsError, setDomainsError] = useState<string | null>(null)
+  const [domainOptions, setDomainOptions] = useState<DomainOption[]>([])
   const [requestId, setRequestId] = useState<string | null>(null)
   const [verificationCode, setVerificationCode] = useState('')
   const [status, setStatus] = useState<'form' | 'verification' | 'completed'>('form')
@@ -104,6 +113,44 @@ export default function SelfServiceOnboarding() {
     setForm((prev) => ({ ...prev, [key]: value }))
   }
 
+  useEffect(() => {
+    const loadDomainOptions = async () => {
+      setDomainsLoading(true)
+      setDomainsError(null)
+      try {
+        const { data, error } = await supabase
+          .from('platform_domains')
+          .select('id, key, code, name, description')
+          .eq('is_active', true)
+          .order('name', { ascending: true })
+
+        if (error) {
+          throw new Error(error.message || 'Failed to load domains')
+        }
+
+        const domains = (data || []).reduce<DomainOption[]>((acc, domain) => {
+            const domainValue = domain.key || domain.code || domain.name || ''
+            const value = domainValue.trim().toLowerCase()
+            if (!value) return acc
+            const label = domain.name || domain.code || value
+            const description = domain.description || null
+            acc.push({ value, label, description })
+            return acc
+          }, [])
+
+        setDomainOptions(domains)
+      } catch (error: any) {
+        setDomainOptions([])
+        setDomainsError(error?.message || 'Unable to load available domains')
+        toast.error(error?.message || 'Unable to load available domains')
+      } finally {
+        setDomainsLoading(false)
+      }
+    }
+
+    void loadDomainOptions()
+  }, [])
+
   const validateCurrentStep = (): boolean => {
     if (stepIds[stepIndex] === 'package') {
       if (!form.plan_tier) {
@@ -115,6 +162,10 @@ export default function SelfServiceOnboarding() {
     if (stepIds[stepIndex] === 'organization') {
       if (!form.organization_name.trim() || !form.country.trim()) {
         toast.error('Organization name and country are required')
+        return false
+      }
+      if (form.domain && !domainOptions.some((domain) => domain.value === form.domain)) {
+        toast.error('Select a preferred domain from available options')
         return false
       }
       return true
@@ -399,7 +450,27 @@ export default function SelfServiceOnboarding() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="domain">Preferred Domain</Label>
-                    <Input id="domain" value={form.domain || ''} onChange={(e) => updateField('domain', e.target.value)} placeholder="tenant.example.com" />
+                    <Select
+                      value={form.domain || '__none__'}
+                      onValueChange={(value) => updateField('domain', value === '__none__' ? '' : value)}
+                      disabled={domainsLoading || domainOptions.length === 0}
+                    >
+                      <SelectTrigger id="domain">
+                        <SelectValue placeholder={domainsLoading ? 'Loading domains...' : 'Select a preferred domain'} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">No preference</SelectItem>
+                        {domainOptions.map((domain) => (
+                          <SelectItem key={domain.value} value={domain.value}>
+                            {domain.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {domainsError && <p className="text-xs text-destructive">{domainsError}</p>}
+                    {!domainsError && !domainsLoading && domainOptions.length === 0 && (
+                      <p className="text-xs text-muted-foreground">No domains are currently available.</p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="industry">Industry</Label>

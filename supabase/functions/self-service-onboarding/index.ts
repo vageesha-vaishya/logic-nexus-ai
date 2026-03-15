@@ -46,6 +46,10 @@ const verifyEmailSchema = z.object({
   admin_password: z.string().min(12).max(128)
 })
 
+const listDomainsSchema = z.object({
+  action: z.union([z.literal('list_domains'), z.literal('get_platform_domains')])
+})
+
 const removeControlCharacters = (value: string): string =>
   value
     .split('')
@@ -292,6 +296,42 @@ serveWithLogger(async (req, logger, supabase) => {
   const ipAddress = getClientIp(req)
   const userAgent = sanitizeText(req.headers.get('user-agent') || 'unknown', 240)
 
+  if (action === 'list_domains' || action === 'get_platform_domains') {
+    const parsed = listDomainsSchema.safeParse(payload)
+    if (!parsed.success) {
+      return json(422, { success: false, error: 'Validation failed', issues: parsed.error.issues })
+    }
+
+    const { data: platformDomains, error: domainsError } = await supabase
+      .from('platform_domains')
+      .select('id, key, code, name, description, is_active, status')
+      .eq('is_active', true)
+      .order('name', { ascending: true })
+
+    if (domainsError) {
+      await logger.error('Failed to load platform domains', { error: domainsError.message })
+      return json(500, { success: false, error: 'Unable to load available domains' })
+    }
+
+    const domains = (platformDomains || [])
+      .map((domain) => {
+        const value = sanitizeDomain(domain.key || domain.code || domain.name || '')
+        if (!value) return null
+        const label = sanitizeText(domain.name || domain.code || domain.key || value, 120)
+        return {
+          value,
+          label,
+          description: domain.description ? sanitizeText(domain.description, 300) : null
+        }
+      })
+      .filter((domain): domain is { value: string; label: string; description: string | null } => Boolean(domain))
+
+    return json(200, {
+      success: true,
+      domains
+    })
+  }
+
   if (action === 'start_registration') {
     const parsed = startRegistrationSchema.safeParse(payload)
     if (!parsed.success) {
@@ -348,6 +388,29 @@ serveWithLogger(async (req, logger, supabase) => {
     const verificationCodeHash = await sha256Hex(verificationCode)
     const organizationSlug = await buildUniqueSlug(supabase, sanitizedOrganization)
     const verificationExpiresAt = addMinutes(new Date(), 15)
+    const preferredDomainValue = input.initial_config?.domain ? sanitizeDomain(input.initial_config.domain) : null
+
+    if (preferredDomainValue) {
+      const { data: availableDomains, error: availableDomainsError } = await supabase
+        .from('platform_domains')
+        .select('key, code, name, is_active')
+        .eq('is_active', true)
+
+      if (availableDomainsError) {
+        await logger.error('Failed validating selected preferred domain', { error: availableDomainsError.message })
+        return json(500, { success: false, error: 'Unable to validate selected domain' })
+      }
+
+      const validDomainSet = new Set(
+        (availableDomains || [])
+          .map((domain) => sanitizeDomain(domain.key || domain.code || domain.name || ''))
+          .filter((value) => value.length > 0)
+      )
+
+      if (!validDomainSet.has(preferredDomainValue)) {
+        return json(422, { success: false, error: 'Selected preferred domain is not available' })
+      }
+    }
 
     const requestPayload = {
       legal_name: input.legal_name ? sanitizeText(input.legal_name, 160) : null,
@@ -358,7 +421,7 @@ serveWithLogger(async (req, logger, supabase) => {
         currency: sanitizeText(input.initial_config?.currency || 'USD', 3).toUpperCase(),
         timezone: sanitizeText(input.initial_config?.timezone || 'UTC', 80),
         preferred_language: sanitizeText(input.initial_config?.preferred_language || 'en', 10),
-        domain: input.initial_config?.domain ? sanitizeDomain(input.initial_config.domain) : null,
+        domain: preferredDomainValue,
         industry: input.initial_config?.industry ? sanitizeText(input.initial_config.industry, 80) : null,
         website: input.initial_config?.website ? sanitizeText(input.initial_config.website, 180) : null
       }

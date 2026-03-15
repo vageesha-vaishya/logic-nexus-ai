@@ -243,6 +243,7 @@ Edge API:
 
 - `self-service-onboarding` action `start_registration`
   - Required: organization, admin profile, plan tier, compliance basics, CAPTCHA token.
+  - Preferred domain value is validated against active `platform_domains` values before request persistence.
   - Output: `request_id`, verification status, expiry metadata.
 - `self-service-onboarding` action `verify_email`
   - Required: `request_id`, OTP code, admin password.
@@ -262,6 +263,7 @@ Error handling:
 - Validation errors return `422` with issue details.
 - Rate-limit violations return `429` with `retry_after_seconds`.
 - CAPTCHA failures return `400`.
+- Domain-catalog connectivity failures surface in the registration UI when reading `platform_domains` for the dropdown.
 - Provisioning failures return `500` and persist failure reason in request state.
 
 ## 6. End-to-End Sequence
@@ -277,6 +279,8 @@ sequenceDiagram
   participant MAIL as send-email
 
   V->>UI: Select package and enter organization/admin details
+  UI->>DB: Read available platform_domains
+  DB-->>UI: Domain dropdown options
   UI->>SSO: start_registration + captcha token
   SSO->>DB: Rate-limit checks + request insert (pending_verification)
   SSO->>MAIL: Send OTP to admin email
