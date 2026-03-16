@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { z } from 'zod'
 import { toast } from 'sonner'
-import { CheckCircle2, ShieldCheck, Sparkles } from 'lucide-react'
+import { CheckCircle2, Eye, EyeOff, ShieldCheck, Sparkles } from 'lucide-react'
 import { invokeAnonymous } from '@/lib/supabase-functions'
 import { supabase } from '@/integrations/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -146,6 +146,8 @@ export default function SelfServiceOnboarding() {
   const [tenantId, setTenantId] = useState<string | null>(null)
   const [captchaScriptReady, setCaptchaScriptReady] = useState(false)
   const [captchaWidgetError, setCaptchaWidgetError] = useState<string | null>(null)
+  const [showAdminPassword, setShowAdminPassword] = useState(false)
+  const [showAdminPasswordConfirm, setShowAdminPasswordConfirm] = useState(false)
   const [form, setForm] = useState<FormState>({
     organization_name: '',
     country: '',
@@ -926,13 +928,29 @@ export default function SelfServiceOnboarding() {
                   </div>
                   <div className="space-y-2 md:col-span-2">
                     <Label htmlFor="admin_password">Admin Password <span className="text-destructive">*</span></Label>
-                    <Input
-                      id="admin_password"
-                      type="password"
-                      value={form.admin_password}
-                      onChange={(e) => updateField('admin_password', e.target.value)}
-                      className={fieldErrors.admin_password ? 'border-destructive focus-visible:ring-destructive/30' : ''}
-                    />
+                    <div className="relative">
+                      <Input
+                        id="admin_password"
+                        type={showAdminPassword ? 'text' : 'password'}
+                        value={form.admin_password}
+                        onChange={(e) => updateField('admin_password', e.target.value)}
+                        className={[
+                          'pr-10',
+                          fieldErrors.admin_password ? 'border-destructive focus-visible:ring-destructive/30' : ''
+                        ].join(' ')}
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-2 top-1/2 h-8 w-8 -translate-y-1/2"
+                        onClick={() => setShowAdminPassword((prev) => !prev)}
+                        aria-label={showAdminPassword ? 'Hide password' : 'Show password'}
+                        title={showAdminPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showAdminPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </Button>
+                    </div>
                     {fieldErrors.admin_password && <p className="text-xs text-destructive">{fieldErrors.admin_password}</p>}
                     {!fieldErrors.admin_password && (
                       <p className="text-xs text-muted-foreground">Use 12-128 characters with uppercase, lowercase, number, and special character.</p>
@@ -940,13 +958,29 @@ export default function SelfServiceOnboarding() {
                   </div>
                   <div className="space-y-2 md:col-span-2">
                     <Label htmlFor="admin_password_confirm">Confirm Password <span className="text-destructive">*</span></Label>
-                    <Input
-                      id="admin_password_confirm"
-                      type="password"
-                      value={form.admin_password_confirm}
-                      onChange={(e) => updateField('admin_password_confirm', e.target.value)}
-                      className={fieldErrors.admin_password_confirm ? 'border-destructive focus-visible:ring-destructive/30' : ''}
-                    />
+                    <div className="relative">
+                      <Input
+                        id="admin_password_confirm"
+                        type={showAdminPasswordConfirm ? 'text' : 'password'}
+                        value={form.admin_password_confirm}
+                        onChange={(e) => updateField('admin_password_confirm', e.target.value)}
+                        className={[
+                          'pr-10',
+                          fieldErrors.admin_password_confirm ? 'border-destructive focus-visible:ring-destructive/30' : ''
+                        ].join(' ')}
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-2 top-1/2 h-8 w-8 -translate-y-1/2"
+                        onClick={() => setShowAdminPasswordConfirm((prev) => !prev)}
+                        aria-label={showAdminPasswordConfirm ? 'Hide password' : 'Show password'}
+                        title={showAdminPasswordConfirm ? 'Hide password' : 'Show password'}
+                      >
+                        {showAdminPasswordConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </Button>
+                    </div>
                     {fieldErrors.admin_password_confirm && <p className="text-xs text-destructive">{fieldErrors.admin_password_confirm}</p>}
                   </div>
                 </div>
