@@ -1,7 +1,6 @@
 -- Seed all USA states (including District of Columbia) into public.states
 
 BEGIN;
-
 DO $$
 DECLARE
   v_us uuid := (SELECT id FROM public.countries WHERE code_iso2 = 'US');
@@ -30,5 +29,4 @@ BEGIN
     ON s.country_id = v_us AND s.code_iso = v.code_iso
   WHERE s.id IS NULL;
 END$$;
-
 COMMIT;

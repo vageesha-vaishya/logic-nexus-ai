@@ -1,11 +1,8 @@
-
 -- 1. Add queue column to emails table
 ALTER TABLE public.emails ADD COLUMN IF NOT EXISTS queue TEXT;
-
 -- 2. Create index for queue lookups
 CREATE INDEX IF NOT EXISTS idx_emails_queue ON public.emails(queue);
 CREATE INDEX IF NOT EXISTS idx_emails_queue_tenant ON public.emails(queue, tenant_id);
-
 -- 3. Create get_queue_counts function
 CREATE OR REPLACE FUNCTION public.get_queue_counts()
 RETURNS JSON
@@ -37,10 +34,8 @@ BEGIN
     RETURN COALESCE(v_result, '{}'::json);
 END;
 $$;
-
 -- 4. Add RLS policy for queue emails
 DROP POLICY IF EXISTS "Users can view emails in their queues" ON public.emails;
-
 CREATE POLICY "Users can view emails in their queues"
 ON public.emails
 FOR SELECT

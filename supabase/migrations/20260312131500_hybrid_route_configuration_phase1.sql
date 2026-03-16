@@ -1,5 +1,4 @@
 BEGIN;
-
 CREATE TABLE IF NOT EXISTS public.quote_route_configurations (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id uuid NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
@@ -16,12 +15,10 @@ CREATE TABLE IF NOT EXISTS public.quote_route_configurations (
   updated_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (quotation_version_option_id)
 );
-
 CREATE INDEX IF NOT EXISTS idx_quote_route_configurations_quote
   ON public.quote_route_configurations (quote_id, quotation_version_id);
 CREATE INDEX IF NOT EXISTS idx_quote_route_configurations_tenant_created
   ON public.quote_route_configurations (tenant_id, created_at DESC);
-
 CREATE TABLE IF NOT EXISTS public.quote_generation_metrics (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id uuid NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
@@ -39,48 +36,40 @@ CREATE TABLE IF NOT EXISTS public.quote_generation_metrics (
   timeline jsonb NOT NULL DEFAULT '[]'::jsonb,
   created_at timestamptz NOT NULL DEFAULT now()
 );
-
 CREATE INDEX IF NOT EXISTS idx_quote_generation_metrics_tenant_created
   ON public.quote_generation_metrics (tenant_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_quote_generation_metrics_request
   ON public.quote_generation_metrics (request_id);
-
 ALTER TABLE public.quote_route_configurations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.quote_generation_metrics ENABLE ROW LEVEL SECURITY;
-
 DO $$ BEGIN
   CREATE POLICY quote_route_configurations_read ON public.quote_route_configurations
     FOR SELECT USING (tenant_id = get_user_tenant_id(auth.uid()));
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
-
 DO $$ BEGIN
   CREATE POLICY quote_route_configurations_write ON public.quote_route_configurations
     FOR ALL USING (tenant_id = get_user_tenant_id(auth.uid()))
     WITH CHECK (tenant_id = get_user_tenant_id(auth.uid()));
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
-
 DO $$ BEGIN
   CREATE POLICY quote_generation_metrics_read ON public.quote_generation_metrics
     FOR SELECT USING (tenant_id = get_user_tenant_id(auth.uid()));
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
-
 DO $$ BEGIN
   CREATE POLICY quote_generation_metrics_write ON public.quote_generation_metrics
     FOR ALL USING (tenant_id = get_user_tenant_id(auth.uid()))
     WITH CHECK (tenant_id = get_user_tenant_id(auth.uid()));
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
-
 INSERT INTO public.app_feature_flags (flag_key, is_enabled, description)
 VALUES
   ('hybrid_route_configuration_v1', false, 'Enable hybrid route recompute for Smart Quote and manual overrides'),
   ('hybrid_route_metrics_dashboard_v1', false, 'Enable quote generation performance dashboard and telemetry')
 ON CONFLICT (flag_key) DO UPDATE
 SET description = EXCLUDED.description;
-
 CREATE OR REPLACE FUNCTION public.migrate_legacy_quotes_to_hybrid_route_config(p_tenant_id uuid DEFAULT NULL)
 RETURNS integer
 LANGUAGE plpgsql
@@ -149,7 +138,5 @@ BEGIN
   RETURN inserted_rows;
 END;
 $$;
-
 SELECT public.migrate_legacy_quotes_to_hybrid_route_config(NULL);
-
 COMMIT;

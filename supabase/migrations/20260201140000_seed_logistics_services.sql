@@ -4,22 +4,19 @@
 -- Adheres to the platform's Service Architecture patterns (Domains > Categories > Types > Services).
 
 BEGIN;
-
 -----------------------------------------------------------------------------
 -- 0. Schema Validation & Enhancements
 -----------------------------------------------------------------------------
 
 -- Ensure platform_domains table exists
-CREATE TABLE IF NOT EXISTS public.platform_domains (
+CREATE TABLE IF NOT EXISTS platform_domains (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    code TEXT NOT NULL UNIQUE,
+    key TEXT NOT NULL UNIQUE,
     name TEXT NOT NULL,
-    description TEXT,
-    is_active BOOLEAN DEFAULT true,
+    status TEXT DEFAULT 'active',
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now()
 );
-
 -- Ensure service_categories has domain_id
 DO $$
 BEGIN
@@ -27,21 +24,16 @@ BEGIN
         ALTER TABLE service_categories ADD COLUMN domain_id UUID REFERENCES platform_domains(id);
     END IF;
 END $$;
-
 -----------------------------------------------------------------------------
 -- 1. Seed Platform Domains
 -----------------------------------------------------------------------------
-INSERT INTO public.platform_domains (code, name, description, is_active) VALUES
-('logistics', 'Logistics & Supply Chain', 'Logistics & Supply Chain', true),
-('banking', 'Banking & Finance', 'Banking & Finance', true),
-('ecommerce', 'E-commerce & Retail', 'E-commerce & Retail', true),
-('telecom', 'Telecommunications', 'Telecommunications', true),
-('healthcare', 'Healthcare & Life Sciences', 'Healthcare & Life Sciences', true)
-ON CONFLICT (code) DO UPDATE SET
-    name = EXCLUDED.name,
-    description = EXCLUDED.description,
-    is_active = EXCLUDED.is_active;
-
+INSERT INTO platform_domains (key, name, status) VALUES
+('logistics', 'Logistics & Supply Chain', 'active'),
+('banking', 'Banking & Finance', 'active'),
+('ecommerce', 'E-commerce & Retail', 'active'),
+('telecom', 'Telecommunications', 'active'),
+('healthcare', 'Healthcare & Life Sciences', 'active')
+ON CONFLICT (key) DO UPDATE SET name = EXCLUDED.name;
 -----------------------------------------------------------------------------
 -- 2. Seed Service Categories (Logistics)
 -----------------------------------------------------------------------------
@@ -51,9 +43,9 @@ DECLARE
     v_domain_banking UUID;
     v_domain_ecommerce UUID;
 BEGIN
-    SELECT id INTO v_domain_logistics FROM public.platform_domains WHERE code = 'logistics';
-    SELECT id INTO v_domain_banking FROM public.platform_domains WHERE code = 'banking';
-    SELECT id INTO v_domain_ecommerce FROM public.platform_domains WHERE code = 'ecommerce';
+    SELECT id INTO v_domain_logistics FROM platform_domains WHERE key = 'logistics';
+    SELECT id INTO v_domain_banking FROM platform_domains WHERE key = 'banking';
+    SELECT id INTO v_domain_ecommerce FROM platform_domains WHERE key = 'ecommerce';
 
     -- Logistics Categories
     INSERT INTO service_categories (code, name, description, icon_name, display_order, domain_id) VALUES
@@ -75,7 +67,6 @@ BEGIN
     ('ecom_fulfillment', 'Order Fulfillment', 'Pick, pack, and ship', 'Box', 10, v_domain_ecommerce)
     ON CONFLICT (code) DO UPDATE SET domain_id = v_domain_ecommerce;
 END $$;
-
 -----------------------------------------------------------------------------
 -- 3. Seed Service Types (Logistics)
 -----------------------------------------------------------------------------
@@ -144,7 +135,6 @@ BEGIN
     ON CONFLICT (code) DO UPDATE SET category_id = EXCLUDED.category_id, mode_id = EXCLUDED.mode_id;
 
 END $$;
-
 -----------------------------------------------------------------------------
 -- 4. Seed Services (Linked to Demo Tenant)
 -----------------------------------------------------------------------------
@@ -207,5 +197,4 @@ BEGIN
         
     END IF;
 END $$;
-
 COMMIT;

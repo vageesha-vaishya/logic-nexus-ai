@@ -32,6 +32,7 @@ type LeadsWorkspaceFilters = {
   sortField: string;
   sortDirection: 'asc' | 'desc';
   listVisibleFields: string[];
+  groupBy: 'none' | 'status' | 'source' | 'assigned_to' | 'industry' | 'created_date';
 };
 
 type LeadsPipelineState = {
@@ -93,6 +94,7 @@ const defaultWorkspace: LeadsWorkspaceFilters = {
   sortField: 'created_at',
   sortDirection: 'desc',
   listVisibleFields: ['company', 'status', 'score', 'estimated_value', 'actions', 'email_under_name'],
+  groupBy: 'none',
 };
 
 const defaultState: LeadsViewState = {

@@ -1,6 +1,5 @@
 -- Add shipment_type to services and seed sample services per tenant
 BEGIN;
-
 DO $$
 DECLARE lbl text;
 BEGIN
@@ -20,11 +19,9 @@ BEGIN
     END LOOP;
   END IF;
 END $$;
-
 -- Add column to services (safe if already exists)
 ALTER TABLE public.services
   ADD COLUMN IF NOT EXISTS shipment_type public.shipment_type;
-
 -- Populate shipment_type from existing columns if present
 DO $$
 DECLARE
@@ -66,7 +63,6 @@ BEGIN
     WHERE shipment_type IS NULL;
   END IF;
 END $$;
-
 -- Seed sample services per tenant referencing shipment_type
 DO $$
 DECLARE
@@ -234,5 +230,4 @@ BEGIN
   ALTER TABLE public.services
     ALTER COLUMN shipment_type SET NOT NULL;
 END $$;
-
 COMMIT;

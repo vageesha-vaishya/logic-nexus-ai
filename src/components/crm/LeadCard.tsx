@@ -17,6 +17,7 @@ interface LeadCardProps {
   selected?: boolean;
   onSelect?: () => void;
   onClick?: () => void;
+  onDoubleClick?: () => void;
   onEdit?: (e: React.MouseEvent) => void;
   onDelete?: (e: React.MouseEvent) => void;
   className?: string;
@@ -27,6 +28,7 @@ export function LeadCard({
   selected, 
   onSelect, 
   onClick, 
+  onDoubleClick,
   onEdit, 
   onDelete,
   className 
@@ -52,6 +54,7 @@ export function LeadCard({
         className
       )}
       onClick={onClick}
+      onDoubleClick={onDoubleClick}
     >
       {/* Selection Overlay/Checkbox */}
       <div className="absolute top-3 left-3 z-10">

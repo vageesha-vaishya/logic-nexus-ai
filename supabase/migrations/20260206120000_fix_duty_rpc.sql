@@ -1,10 +1,8 @@
-
 -- Fix Duty Calculation RPC (Final Clean Version)
 -- Date: 2026-02-06
 -- Description: RPC function for calculating estimated duties.
 
 BEGIN;
-
 CREATE OR REPLACE FUNCTION public.calculate_duty(
   p_origin_country TEXT,
   p_destination_country TEXT,
@@ -92,5 +90,4 @@ BEGIN
   );
 END;
 $$;
-
 COMMIT;

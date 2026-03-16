@@ -1,10 +1,8 @@
-
 -- Update get_hts_hierarchy to return ID for leaf nodes
 -- This is required for the Visual HTS Browser to allow selection of codes
 -- Date: 2026-02-08
 
 DROP FUNCTION IF EXISTS get_hts_hierarchy(text, text);
-
 CREATE OR REPLACE FUNCTION get_hts_hierarchy(
   level_type text, -- 'chapter', 'heading', 'subheading', 'code'
   parent_code text DEFAULT NULL
@@ -72,5 +70,4 @@ BEGIN
   END IF;
 END;
 $$;
-
 GRANT EXECUTE ON FUNCTION get_hts_hierarchy(text, text) TO authenticated;

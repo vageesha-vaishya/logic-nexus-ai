@@ -28,5 +28,4 @@ BEGIN
   END IF;
 END;
 $$;
-
 GRANT EXECUTE ON FUNCTION public.create_channel_account(uuid, text, jsonb, boolean) TO authenticated;

@@ -8,7 +8,6 @@ CREATE TABLE IF NOT EXISTS public.charge_categories (
   is_active boolean DEFAULT true,
   created_at timestamptz DEFAULT now()
 );
-
 CREATE TABLE IF NOT EXISTS public.charge_bases (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id uuid,
@@ -18,7 +17,6 @@ CREATE TABLE IF NOT EXISTS public.charge_bases (
   is_active boolean DEFAULT true,
   created_at timestamptz DEFAULT now()
 );
-
 CREATE TABLE IF NOT EXISTS public.charge_sides (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id uuid,
@@ -27,7 +25,6 @@ CREATE TABLE IF NOT EXISTS public.charge_sides (
   is_active boolean DEFAULT true,
   created_at timestamptz DEFAULT now()
 );
-
 CREATE TABLE IF NOT EXISTS public.currencies (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id uuid,
@@ -37,7 +34,6 @@ CREATE TABLE IF NOT EXISTS public.currencies (
   is_active boolean DEFAULT true,
   created_at timestamptz DEFAULT now()
 );
-
 CREATE TABLE IF NOT EXISTS public.container_types (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id uuid,
@@ -46,7 +42,6 @@ CREATE TABLE IF NOT EXISTS public.container_types (
   is_active boolean DEFAULT true,
   created_at timestamptz DEFAULT now()
 );
-
 CREATE TABLE IF NOT EXISTS public.container_sizes (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id uuid,
@@ -56,7 +51,6 @@ CREATE TABLE IF NOT EXISTS public.container_sizes (
   is_active boolean DEFAULT true,
   created_at timestamptz DEFAULT now()
 );
-
 -- Quote Options (per version)
 CREATE TABLE IF NOT EXISTS public.quote_options (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -81,7 +75,6 @@ CREATE TABLE IF NOT EXISTS public.quote_options (
   total_amount numeric NOT NULL DEFAULT 0,
   created_at timestamptz NOT NULL DEFAULT now()
 );
-
 -- Quote Charges (normalized lines)
 CREATE TABLE IF NOT EXISTS public.quote_charges (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -101,7 +94,6 @@ CREATE TABLE IF NOT EXISTS public.quote_charges (
   sort_order integer NOT NULL DEFAULT 1000,
   created_at timestamptz NOT NULL DEFAULT now()
 );
-
 -- Customer selection
 CREATE TABLE IF NOT EXISTS public.quote_selection (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -114,11 +106,9 @@ CREATE TABLE IF NOT EXISTS public.quote_selection (
   selected_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (quote_id)
 );
-
 -- Indexes
 CREATE INDEX IF NOT EXISTS quote_options_version_idx ON public.quote_options (quote_version_id);
 CREATE INDEX IF NOT EXISTS quote_charges_option_idx ON public.quote_charges (quote_option_id);
-
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -163,7 +153,6 @@ BEGIN
     ALTER TABLE public.container_sizes ADD COLUMN tenant_id uuid;
   END IF;
 END $$;
-
 -- Enable RLS
 ALTER TABLE public.charge_categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.charge_bases ENABLE ROW LEVEL SECURITY;
@@ -174,7 +163,6 @@ ALTER TABLE public.container_sizes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.quote_options ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.quote_charges ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.quote_selection ENABLE ROW LEVEL SECURITY;
-
 DROP POLICY IF EXISTS charge_categories_read ON public.charge_categories;
 DROP POLICY IF EXISTS charge_categories_manage ON public.charge_categories;
 DROP POLICY IF EXISTS charge_bases_read ON public.charge_bases;
@@ -193,7 +181,6 @@ DROP POLICY IF EXISTS quote_charges_read ON public.quote_charges;
 DROP POLICY IF EXISTS quote_charges_manage ON public.quote_charges;
 DROP POLICY IF EXISTS quote_selection_read ON public.quote_selection;
 DROP POLICY IF EXISTS quote_selection_manage ON public.quote_selection;
-
 CREATE POLICY charge_categories_read ON public.charge_categories FOR SELECT USING (tenant_id IS NULL OR tenant_id = get_user_tenant_id(auth.uid()));
 CREATE POLICY charge_categories_manage ON public.charge_categories FOR ALL USING (tenant_id = get_user_tenant_id(auth.uid())) WITH CHECK (tenant_id = get_user_tenant_id(auth.uid()));
 CREATE POLICY charge_bases_read ON public.charge_bases FOR SELECT USING (tenant_id IS NULL OR tenant_id = get_user_tenant_id(auth.uid()));
@@ -206,7 +193,6 @@ CREATE POLICY container_types_read ON public.container_types FOR SELECT USING (t
 CREATE POLICY container_types_manage ON public.container_types FOR ALL USING (tenant_id = get_user_tenant_id(auth.uid())) WITH CHECK (tenant_id = get_user_tenant_id(auth.uid()));
 CREATE POLICY container_sizes_read ON public.container_sizes FOR SELECT USING (tenant_id IS NULL OR tenant_id = get_user_tenant_id(auth.uid()));
 CREATE POLICY container_sizes_manage ON public.container_sizes FOR ALL USING (tenant_id = get_user_tenant_id(auth.uid())) WITH CHECK (tenant_id = get_user_tenant_id(auth.uid()));
-
 CREATE POLICY quote_options_read ON public.quote_options FOR SELECT USING (tenant_id = get_user_tenant_id(auth.uid()));
 CREATE POLICY quote_options_manage ON public.quote_options FOR ALL USING (tenant_id = get_user_tenant_id(auth.uid())) WITH CHECK (tenant_id = get_user_tenant_id(auth.uid()));
 CREATE POLICY quote_charges_read ON public.quote_charges FOR SELECT USING (tenant_id = get_user_tenant_id(auth.uid()));

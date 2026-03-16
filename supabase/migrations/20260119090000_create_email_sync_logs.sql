@@ -1,4 +1,3 @@
-
 -- Create email_sync_logs table
 CREATE TABLE IF NOT EXISTS public.email_sync_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -10,10 +9,8 @@ CREATE TABLE IF NOT EXISTS public.email_sync_logs (
     completed_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT now()
 );
-
 -- Enable RLS
 ALTER TABLE public.email_sync_logs ENABLE ROW LEVEL SECURITY;
-
 -- Policies
 DO $$
 BEGIN
@@ -53,4 +50,3 @@ BEGIN
     END IF;
 END
 $$;
-

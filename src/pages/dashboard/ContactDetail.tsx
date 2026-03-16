@@ -17,6 +17,7 @@ import { EnterpriseNotebook, EnterpriseTab } from '@/components/ui/enterprise/En
 import { EnterpriseActivityFeed } from '@/components/ui/enterprise/EnterpriseActivityFeed';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { StickyActionsBar } from '@/components/ui/StickyActionsBar';
 
 export default function ContactDetail() {
   const { id } = useParams();
@@ -98,6 +99,24 @@ export default function ContactDetail() {
       </div>
     );
   }
+
+  const stickyActions = isEditing
+    ? [
+        <Button key="cancel-edit" variant="outline" onClick={() => setIsEditing(false)}>
+          Cancel
+        </Button>,
+      ]
+    : [
+        <Button key="new-contact" variant="outline" onClick={() => navigate('/dashboard/contacts/new')}>
+          New Contact
+        </Button>,
+        <Button key="edit-contact" variant="outline" onClick={() => setIsEditing(true)}>
+          Edit
+        </Button>,
+        <Button key="delete-contact" variant="destructive" onClick={() => setShowDeleteDialog(true)}>
+          Delete
+        </Button>,
+      ];
 
   return (
     <div className="h-screen w-full bg-[#f9fafb] overflow-hidden">
@@ -255,6 +274,7 @@ export default function ContactDetail() {
 
             <EnterpriseActivityFeed className="hidden xl:flex shrink-0 w-[400px]" />
         </EnterpriseFormLayout>
+        <StickyActionsBar right={stickyActions} />
 
         <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
             <AlertDialogContent>

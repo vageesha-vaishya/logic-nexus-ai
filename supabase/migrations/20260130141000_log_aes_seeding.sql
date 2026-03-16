@@ -2,7 +2,6 @@
 -- Description: Log the completion of AES-AESTIR Appendix D seeding to audit_logs
 
 BEGIN;
-
 DO $$
 DECLARE
     v_count integer;
@@ -26,5 +25,4 @@ BEGIN
     END IF;
 
 END $$;
-
 COMMIT;

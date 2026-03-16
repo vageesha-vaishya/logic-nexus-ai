@@ -1,4 +1,3 @@
-
 -- Create tenant_branding table
 CREATE TABLE IF NOT EXISTS public.tenant_branding (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -12,10 +11,8 @@ CREATE TABLE IF NOT EXISTS public.tenant_branding (
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now()
 );
-
 -- Ensure RLS is enabled on tenant_branding
 ALTER TABLE public.tenant_branding ENABLE ROW LEVEL SECURITY;
-
 -- Create quote_templates table if not exists (referenced in code but not found in migrations)
 CREATE TABLE IF NOT EXISTS public.quote_templates (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -26,18 +23,13 @@ CREATE TABLE IF NOT EXISTS public.quote_templates (
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now()
 );
-
 -- Ensure columns exist (if table already existed with different schema)
-ALTER TABLE public.quote_templates ALTER COLUMN tenant_id DROP NOT NULL;
 ALTER TABLE public.quote_templates ADD COLUMN IF NOT EXISTS is_default BOOLEAN DEFAULT false;
 ALTER TABLE public.quote_templates ADD COLUMN IF NOT EXISTS version TEXT DEFAULT '1.0.0';
-
 -- Force version to be TEXT if it was INTEGER
 ALTER TABLE public.quote_templates ALTER COLUMN version TYPE TEXT USING version::TEXT;
-
 -- Ensure RLS is enabled on quote_templates
 ALTER TABLE public.quote_templates ENABLE ROW LEVEL SECURITY;
-
 -- Add template_snapshot column to quotation_versions for versioning/snapshotting
 DO $$
 BEGIN
@@ -50,19 +42,17 @@ BEGIN
         ALTER TABLE public.quotation_versions ADD COLUMN template_snapshot JSONB;
     END IF;
 END $$;
-
 -- Seed default branding (MGL) if not exists
 INSERT INTO public.tenant_branding (company_name, primary_color, secondary_color, accent_color, font_family)
 SELECT 'Miami Global Lines', '#0087b5', '#dceef2', '#000000', 'Helvetica'
 WHERE NOT EXISTS (SELECT 1 FROM public.tenant_branding WHERE company_name = 'Miami Global Lines');
-
 -- Seed default template if not exists
 INSERT INTO public.quote_templates (name, description, content, is_default, version)
 SELECT 
     'MGL Standard Granular', 
     'Standard granular quote template for MGL',
     '{
-        "layout": "granular",
+        "layout": "mgl_granular",
         "header": { "show_logo": true, "company_info": true, "title": "QUOTATION" },
         "sections": [
             { "type": "customer_matrix_header", "title": "Customer Information" },
@@ -75,7 +65,6 @@ SELECT
     true,
     '1.0.0'
 WHERE NOT EXISTS (SELECT 1 FROM public.quote_templates WHERE name = 'MGL Standard Granular');
-
 -- Function to snapshot template on version creation
 CREATE OR REPLACE FUNCTION public.snapshot_quote_template()
 RETURNS TRIGGER AS $$
@@ -101,11 +90,9 @@ BEGIN
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
-
 -- Trigger to auto-snapshot template
 DROP TRIGGER IF EXISTS trigger_snapshot_quote_template ON public.quotation_versions;
 CREATE TRIGGER trigger_snapshot_quote_template
 BEFORE INSERT ON public.quotation_versions
 FOR EACH ROW
 EXECUTE FUNCTION public.snapshot_quote_template();
-

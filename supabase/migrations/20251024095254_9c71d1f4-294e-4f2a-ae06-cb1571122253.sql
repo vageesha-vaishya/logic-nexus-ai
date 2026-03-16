@@ -1,6 +1,5 @@
 -- Drop and recreate get_database_tables function with correct signature
 DROP FUNCTION IF EXISTS public.get_database_tables();
-
 CREATE FUNCTION public.get_database_tables()
 RETURNS TABLE (
   table_name text,

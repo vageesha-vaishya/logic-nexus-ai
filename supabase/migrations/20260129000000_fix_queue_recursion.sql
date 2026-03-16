@@ -16,7 +16,6 @@ BEGIN
   );
 END;
 $$;
-
 -- 2. Helper function to get queue tenant (Bypasses RLS)
 CREATE OR REPLACE FUNCTION public.get_queue_tenant_id_secure(p_queue_id UUID)
 RETURNS UUID
@@ -33,11 +32,9 @@ BEGIN
   RETURN v_tenant_id;
 END;
 $$;
-
 -- 3. Fix policies on public.queues
 -- Drop potential conflicting policies
 DROP POLICY IF EXISTS "Users can view queues they are members of" ON public.queues;
-
 -- Recreate with secure function to avoid recursion
 CREATE POLICY "Users can view queues they are members of"
 ON public.queues FOR SELECT
@@ -46,12 +43,10 @@ USING (
   public.is_queue_member_secure(id, auth.uid())
   OR public.has_role(auth.uid(), 'tenant_admin'::public.app_role)
 );
-
 -- 4. Fix policies on public.queue_members
 -- Cleanup old potentially duplicate policies
 DROP POLICY IF EXISTS "Tenant admins can manage queue members" ON public.queue_members;
 DROP POLICY IF EXISTS "Tenant admins can manage queue memberships" ON public.queue_members;
-
 -- Recreate consistent policy using secure function to avoid recursion
 CREATE POLICY "Tenant admins can manage queue memberships"
 ON public.queue_members

@@ -18,7 +18,6 @@ BEGIN
       );
   END IF;
 END$$;
-
 -- Usage records: permit SELECT for users scoped to their tenant
 DO $$
 BEGIN
@@ -36,7 +35,6 @@ BEGIN
       );
   END IF;
 END$$;
-
 -- Subscription invoices: optional read for tenant members
 DO $$
 BEGIN

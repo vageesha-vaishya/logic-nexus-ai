@@ -1,10 +1,8 @@
-
 -- Migration: Cleanup Duplicate Container Types
 -- Description: Merges duplicate container types (case-insensitive name match) before applying unique constraints.
 -- Strategy: Identify duplicates, pick survivor (min ID), reassign references, delete duplicates.
 
 BEGIN;
-
 DO $$
 DECLARE
     r RECORD;
@@ -56,5 +54,4 @@ BEGIN
         END IF;
     END LOOP;
 END $$;
-
 COMMIT;

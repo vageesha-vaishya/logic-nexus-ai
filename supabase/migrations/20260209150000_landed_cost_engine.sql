@@ -24,7 +24,6 @@ CREATE TABLE IF NOT EXISTS public.duty_rates (
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
-
 -- Index for fast lookup by code and jurisdiction
 -- CREATE INDEX idx_duty_rates_lookup ON public.duty_rates (jurisdiction, hs_code);
 -- CREATE INDEX idx_duty_rates_effective ON public.duty_rates (effective_date, end_date);
@@ -32,7 +31,7 @@ CREATE TABLE IF NOT EXISTS public.duty_rates (
 -- 2. Tax & Fee Definitions (MPF, HMF, VAT)
 CREATE TABLE IF NOT EXISTS public.tax_definitions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    code TEXT NOT NULL UNIQUE, -- e.g., 'US_MPF', 'US_HMF', 'DE_VAT'
+    code TEXT NOT NULL, -- e.g., 'US_MPF', 'US_HMF', 'DE_VAT'
     name TEXT NOT NULL,
     jurisdiction TEXT NOT NULL,
     
@@ -49,20 +48,16 @@ CREATE TABLE IF NOT EXISTS public.tax_definitions (
     effective_date DATE NOT NULL DEFAULT CURRENT_DATE,
     end_date DATE
 );
-
 -- 3. RLS Policies
 ALTER TABLE public.duty_rates ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tax_definitions ENABLE ROW LEVEL SECURITY;
-
 -- Read-only for authenticated users
 DROP POLICY IF EXISTS "Allow read access to authenticated users" ON public.duty_rates;
 CREATE POLICY "Allow read access to authenticated users" ON public.duty_rates
     FOR SELECT TO authenticated USING (true);
-
 DROP POLICY IF EXISTS "Allow read access to authenticated users" ON public.tax_definitions;
 CREATE POLICY "Allow read access to authenticated users" ON public.tax_definitions
     FOR SELECT TO authenticated USING (true);
-
 -- Write access for admins only
 DROP POLICY IF EXISTS "Allow write access to admins" ON public.duty_rates;
 CREATE POLICY "Allow write access to admins" ON public.duty_rates
@@ -74,7 +69,6 @@ CREATE POLICY "Allow write access to admins" ON public.duty_rates
             AND ur.role IN ('platform_admin', 'tenant_admin')
         )
     );
-
 DROP POLICY IF EXISTS "Allow write access to admins" ON public.tax_definitions;
 CREATE POLICY "Allow write access to admins" ON public.tax_definitions
     FOR ALL TO authenticated
@@ -85,18 +79,14 @@ CREATE POLICY "Allow write access to admins" ON public.tax_definitions
             AND ur.role IN ('platform_admin', 'tenant_admin')
         )
     );
-
 -- 4. Audit Triggers (Reusing existing audit mechanism if available, else simple update trigger)
 DROP TRIGGER IF EXISTS update_duty_rates_modtime ON public.duty_rates;
 CREATE TRIGGER update_duty_rates_modtime
     BEFORE UPDATE ON public.duty_rates
     FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
-
 -- 5. Seeding Basic US Fees (MPF/HMF) as per analysis
 INSERT INTO public.tax_definitions (code, name, jurisdiction, calculation_method, percentage_rate, min_amount, max_amount, currency)
 VALUES 
 ('US_MPF', 'Merchandise Processing Fee', 'US', 'complex_min_max', 0.003464, 31.67, 614.35, 'USD'),
-('US_HMF', 'Harbor Maintenance Fee', 'US', 'percentage', 0.00125, NULL, NULL, 'USD'),
-('UK_VAT', 'Value Added Tax', 'UK', 'percentage', 0.20, NULL, NULL, 'GBP'),
-('DE_VAT', 'Value Added Tax', 'DE', 'percentage', 0.19, NULL, NULL, 'EUR')
-ON CONFLICT (code) DO NOTHING;
+('US_HMF', 'Harbor Maintenance Fee', 'US', 'percentage', 0.00125, NULL, NULL, 'USD')
+ON CONFLICT DO NOTHING;

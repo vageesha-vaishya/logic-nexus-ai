@@ -34,7 +34,6 @@ AS $$
     AND c.relname NOT IN ('schema_migrations', 'spatial_ref_sys') -- Exclude technical tables
   ORDER BY n.nspname, c.relname;
 $$;
-
 -- 2. Secure Auth User Export
 -- Exports users with non-sensitive data. 
 -- Note: Password hashes are exported but caution is advised.
@@ -89,7 +88,6 @@ AS $$
     deleted_at
   FROM auth.users;
 $$;
-
 -- 3. Storage Objects Export
 CREATE OR REPLACE FUNCTION public.get_storage_objects_export()
 RETURNS TABLE (
@@ -118,7 +116,6 @@ AS $$
     metadata
   FROM storage.objects;
 $$;
-
 -- 4. Generic Table Data Export (Dynamic)
 -- Allows exporting data from any schema (e.g., extensions)
 -- WARNING: This is a powerful function. Ensure RLS protects access to this function 

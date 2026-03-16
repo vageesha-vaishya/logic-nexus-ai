@@ -3,14 +3,12 @@
 -- Adds VAT tax definitions.
 
 BEGIN;
-
 -- 0. Ensure Unique Constraint exists for ON CONFLICT support
 -- 0a. Cleanup duplicates first
 DELETE FROM public.tax_definitions a USING public.tax_definitions b
 WHERE a.id < b.id
 AND a.code = b.code
 AND a.jurisdiction = b.jurisdiction;
-
 -- 0b. Add constraint
 DO $$
 BEGIN
@@ -22,7 +20,6 @@ BEGIN
         ADD CONSTRAINT tax_definitions_code_jurisdiction_key UNIQUE (code, jurisdiction);
     END IF;
 END $$;
-
 -- 1. Ensure Tax Definitions (VAT) exist
 INSERT INTO public.tax_definitions (code, name, jurisdiction, calculation_method, percentage_rate, min_amount, max_amount, currency)
 VALUES 
@@ -32,7 +29,6 @@ VALUES
 ('DE_VAT', 'Value Added Tax', 'DE', 'percentage', 0.19, NULL, NULL, 'EUR')
 ON CONFLICT (code, jurisdiction) DO UPDATE 
 SET percentage_rate = EXCLUDED.percentage_rate;
-
 -- 2. Update calculate_landed_cost RPC
 CREATE OR REPLACE FUNCTION public.calculate_landed_cost(
     items JSONB, -- Array of { hs_code, value, quantity, weight, origin_country }
@@ -196,5 +192,4 @@ BEGIN
     );
 END;
 $$;
-
 COMMIT;

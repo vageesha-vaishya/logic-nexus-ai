@@ -1,4 +1,3 @@
-
 -- Table for storing contact screening results per quote
 -- Enables persistence of screening status (Pending, Cleared, Hit) and audit trail
 CREATE TABLE IF NOT EXISTS public.quote_contacts_screening (
@@ -17,13 +16,10 @@ CREATE TABLE IF NOT EXISTS public.quote_contacts_screening (
     -- Let's just index it well.
     UNIQUE(quote_id, direction) -- Enforce one status per direction per quote for simplicity in MVP
 );
-
 -- Index for fast lookup during quote load
 CREATE INDEX IF NOT EXISTS idx_quote_screening_quote_id ON public.quote_contacts_screening(quote_id);
-
 -- RLS
 ALTER TABLE public.quote_contacts_screening ENABLE ROW LEVEL SECURITY;
-
 DROP POLICY IF EXISTS "Users can view screenings for their tenant's quotes" ON public.quote_contacts_screening;
 CREATE POLICY "Users can view screenings for their tenant's quotes" ON public.quote_contacts_screening
     FOR SELECT TO authenticated USING (
@@ -33,7 +29,6 @@ CREATE POLICY "Users can view screenings for their tenant's quotes" ON public.qu
             AND (q.tenant_id = (SELECT tenant_id FROM public.profiles WHERE id = auth.uid()) OR q.tenant_id IS NULL)
         )
     );
-
 DROP POLICY IF EXISTS "Users can create/update screenings for their tenant's quotes" ON public.quote_contacts_screening;
 CREATE POLICY "Users can create/update screenings for their tenant's quotes" ON public.quote_contacts_screening
     FOR ALL TO authenticated USING (
@@ -43,7 +38,6 @@ CREATE POLICY "Users can create/update screenings for their tenant's quotes" ON 
             AND (q.tenant_id = (SELECT tenant_id FROM public.profiles WHERE id = auth.uid()) OR q.tenant_id IS NULL)
         )
     );
-
 -- Add 'quote.screen' permission (insert into permissions table if exists, or handled via app config)
 -- We'll assume the permission system uses the 'permissions' table or config/permissions.ts.
--- Based on previous context, there is a permissions config.
+-- Based on previous context, there is a permissions config.;

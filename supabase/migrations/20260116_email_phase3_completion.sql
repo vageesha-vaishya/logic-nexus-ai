@@ -4,7 +4,6 @@
 ALTER TABLE public.emails 
 ADD COLUMN IF NOT EXISTS ai_summary TEXT,
 ADD COLUMN IF NOT EXISTS ai_processed_at TIMESTAMPTZ;
-
 -- 2. Email Account Delegations (Shared Inbox Support)
 CREATE TABLE IF NOT EXISTS public.email_account_delegations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -16,14 +15,11 @@ CREATE TABLE IF NOT EXISTS public.email_account_delegations (
   
   UNIQUE(account_id, delegate_user_id)
 );
-
 -- Enable RLS
 ALTER TABLE public.email_account_delegations ENABLE ROW LEVEL SECURITY;
-
 -- 3. RLS for Delegations
 
 -- Account owners can manage delegations
-DROP POLICY IF EXISTS "Owners can manage delegations" ON public.email_account_delegations;
 CREATE POLICY "Owners can manage delegations"
 ON public.email_account_delegations
 FOR ALL
@@ -33,16 +29,12 @@ USING (
     WHERE id = account_id AND user_id = auth.uid()
   )
 );
-
 -- Delegates can view their delegations
-DROP POLICY IF EXISTS "Delegates can view their delegations" ON public.email_account_delegations;
 CREATE POLICY "Delegates can view their delegations"
 ON public.email_account_delegations
 FOR SELECT
 USING (delegate_user_id = auth.uid());
-
 -- Tenant/Franchise admins can view delegations in their scope
-DROP POLICY IF EXISTS "Admins can view delegations" ON public.email_account_delegations;
 CREATE POLICY "Admins can view delegations"
 ON public.email_account_delegations
 FOR SELECT
@@ -57,7 +49,6 @@ USING (
     WHERE ea.id = account_id AND ea.franchise_id = public.get_user_franchise_id(auth.uid())
   ))
 );
-
 -- 4. Helper Function: Get Franchise User IDs (for UI lists)
 CREATE OR REPLACE FUNCTION public.get_franchise_user_ids(_franchise_id UUID)
 RETURNS TABLE (user_id UUID)
@@ -69,11 +60,9 @@ AS $$
   SELECT user_id FROM public.user_roles 
   WHERE franchise_id = _franchise_id;
 $$;
-
 -- 5. Update Emails RLS to include Delegated Access
 -- We need to DROP the existing policy and recreate it to include delegations
 DROP POLICY IF EXISTS "Hierarchical email visibility" ON public.emails;
-
 CREATE POLICY "Hierarchical email visibility"
 ON public.emails FOR SELECT
 TO authenticated
@@ -101,7 +90,6 @@ USING (
     WHERE delegate_user_id = auth.uid()
   ))
 );
-
 -- 6. Update Email Accounts RLS for Delegation Visibility
 -- Ensure delegates can see the accounts they have access to
 DROP POLICY IF EXISTS "Users can view own email accounts" ON public.email_accounts;
@@ -110,7 +98,6 @@ DROP POLICY IF EXISTS "Users can view own email accounts" ON public.email_accoun
 -- Let's check existing policies. If we can't check, we'll create a new policy "Users can view delegated accounts"
 -- avoiding conflict with "Users can view own email accounts".
 
-DROP POLICY IF EXISTS "Users can view delegated email accounts" ON public.email_accounts;
 CREATE POLICY "Users can view delegated email accounts"
 ON public.email_accounts FOR SELECT
 TO authenticated

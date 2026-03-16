@@ -2,7 +2,6 @@
 -- Description: Adds Invoices, Invoice Line Items, and Payments tables linked to Shipments and Accounts.
 
 BEGIN;
-
 -----------------------------------------------------------------------------
 -- 1. Enums
 -----------------------------------------------------------------------------
@@ -14,7 +13,6 @@ DO $$ BEGIN
 EXCEPTION
     WHEN duplicate_object THEN null;
 END $$;
-
 DO $$ BEGIN
     CREATE TYPE public.invoice_type AS ENUM (
         'standard', 'proforma', 'credit_note', 'debit_note'
@@ -22,7 +20,6 @@ DO $$ BEGIN
 EXCEPTION
     WHEN duplicate_object THEN null;
 END $$;
-
 DO $$ BEGIN
     CREATE TYPE public.payment_status AS ENUM (
         'pending', 'completed', 'failed', 'refunded'
@@ -30,7 +27,6 @@ DO $$ BEGIN
 EXCEPTION
     WHEN duplicate_object THEN null;
 END $$;
-
 DO $$ BEGIN
     CREATE TYPE public.payment_method AS ENUM (
         'bank_transfer', 'credit_card', 'check', 'cash', 'other'
@@ -38,7 +34,6 @@ DO $$ BEGIN
 EXCEPTION
     WHEN duplicate_object THEN null;
 END $$;
-
 -----------------------------------------------------------------------------
 -- 2. Invoices Table
 -----------------------------------------------------------------------------
@@ -78,14 +73,12 @@ CREATE TABLE IF NOT EXISTS public.invoices (
     
     CONSTRAINT unique_invoice_number_per_tenant UNIQUE (tenant_id, invoice_number)
 );
-
 -- Indexing
 CREATE INDEX IF NOT EXISTS idx_invoices_tenant ON public.invoices(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_invoices_customer ON public.invoices(customer_id);
 CREATE INDEX IF NOT EXISTS idx_invoices_shipment ON public.invoices(shipment_id);
 CREATE INDEX IF NOT EXISTS idx_invoices_status ON public.invoices(status);
 CREATE INDEX IF NOT EXISTS idx_invoices_date ON public.invoices(issue_date);
-
 -----------------------------------------------------------------------------
 -- 3. Invoice Line Items Table
 -----------------------------------------------------------------------------
@@ -110,10 +103,8 @@ CREATE TABLE IF NOT EXISTS public.invoice_line_items (
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now()
 );
-
 CREATE INDEX IF NOT EXISTS idx_invoice_items_invoice ON public.invoice_line_items(invoice_id);
 CREATE INDEX IF NOT EXISTS idx_invoice_items_charge ON public.invoice_line_items(charge_id);
-
 -----------------------------------------------------------------------------
 -- 4. Payments Table
 -----------------------------------------------------------------------------
@@ -138,39 +129,31 @@ CREATE TABLE IF NOT EXISTS public.payments (
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now()
 );
-
 CREATE INDEX IF NOT EXISTS idx_payments_tenant ON public.payments(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_payments_invoice ON public.payments(invoice_id);
-
 -----------------------------------------------------------------------------
 -- 5. RLS Policies
 -----------------------------------------------------------------------------
 
 -- Invoices
 ALTER TABLE public.invoices ENABLE ROW LEVEL SECURITY;
-
 CREATE POLICY "Platform admins manage invoices" ON public.invoices
     FOR ALL
     USING (public.is_platform_admin(auth.uid()));
-
 CREATE POLICY "Tenant admins manage invoices" ON public.invoices
     FOR ALL
     USING (
         public.has_role(auth.uid(), 'tenant_admin'::public.app_role) 
         AND tenant_id = public.get_user_tenant_id(auth.uid())
     );
-
 CREATE POLICY "Users view invoices" ON public.invoices
     FOR SELECT
     USING (tenant_id = public.get_user_tenant_id(auth.uid()));
-
 -- Line Items
 ALTER TABLE public.invoice_line_items ENABLE ROW LEVEL SECURITY;
-
 CREATE POLICY "Platform admins manage invoice items" ON public.invoice_line_items
     FOR ALL
     USING (public.is_platform_admin(auth.uid()));
-
 CREATE POLICY "Tenant admins manage invoice items" ON public.invoice_line_items
     FOR ALL
     USING (
@@ -181,7 +164,6 @@ CREATE POLICY "Tenant admins manage invoice items" ON public.invoice_line_items
         )
         AND public.has_role(auth.uid(), 'tenant_admin'::public.app_role)
     );
-
 CREATE POLICY "Users view invoice items" ON public.invoice_line_items
     FOR SELECT
     USING (
@@ -191,25 +173,20 @@ CREATE POLICY "Users view invoice items" ON public.invoice_line_items
             AND tenant_id = public.get_user_tenant_id(auth.uid())
         )
     );
-
 -- Payments
 ALTER TABLE public.payments ENABLE ROW LEVEL SECURITY;
-
 CREATE POLICY "Platform admins manage payments" ON public.payments
     FOR ALL
     USING (public.is_platform_admin(auth.uid()));
-
 CREATE POLICY "Tenant admins manage payments" ON public.payments
     FOR ALL
     USING (
         public.has_role(auth.uid(), 'tenant_admin'::public.app_role) 
         AND tenant_id = public.get_user_tenant_id(auth.uid())
     );
-
 CREATE POLICY "Users view payments" ON public.payments
     FOR SELECT
     USING (tenant_id = public.get_user_tenant_id(auth.uid()));
-
 -----------------------------------------------------------------------------
 -- 6. Triggers for Balance Calculation
 -----------------------------------------------------------------------------
@@ -246,14 +223,12 @@ BEGIN
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
-
 -- Trigger on Payment Insert/Update
 DROP TRIGGER IF EXISTS trg_update_invoice_balance ON public.payments;
 CREATE TRIGGER trg_update_invoice_balance
     AFTER INSERT OR UPDATE ON public.payments
     FOR EACH ROW
     EXECUTE FUNCTION public.update_invoice_balance();
-
 -----------------------------------------------------------------------------
 -- 7. Auto-Number Generation (Sequence per Tenant)
 -----------------------------------------------------------------------------
@@ -267,7 +242,6 @@ CREATE TABLE IF NOT EXISTS public.document_sequences (
     updated_at TIMESTAMPTZ DEFAULT now(),
     PRIMARY KEY (tenant_id, document_type)
 );
-
 CREATE OR REPLACE FUNCTION public.get_next_document_number(
     p_tenant_id UUID,
     p_type TEXT
@@ -292,5 +266,4 @@ BEGIN
     RETURN v_prefix || LPAD(v_next_val::TEXT, 6, '0');
 END;
 $$ LANGUAGE plpgsql;
-
 COMMIT;

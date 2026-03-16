@@ -3,26 +3,21 @@
 -- Optionally links legs (`quotation_version_option_legs`) and services to service_type_id where applicable
 
 BEGIN;
-
 -- Ensure service_types has `code` and uniqueness (idempotent)
 ALTER TABLE public.service_types ADD COLUMN IF NOT EXISTS code text;
 CREATE UNIQUE INDEX IF NOT EXISTS service_types_code_unique ON public.service_types(code);
 UPDATE public.service_types SET code = LOWER(REPLACE(name, ' ', '_')) WHERE code IS NULL;
 ALTER TABLE public.service_types ALTER COLUMN code SET NOT NULL;
-
 -- Upsert ocean sub-service types by code
 INSERT INTO public.service_types (name, code, description, is_active)
 VALUES ('Break Bulk', 'ocean_breakbulk', 'Ocean break bulk (non-containerized)', true)
 ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name, is_active = true;
-
 INSERT INTO public.service_types (name, code, description, is_active)
 VALUES ('LCL', 'ocean_lcl', 'Less than container load ocean freight', true)
 ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name, is_active = true;
-
 INSERT INTO public.service_types (name, code, description, is_active)
 VALUES ('RORO', 'ocean_roro', 'Roll-on/roll-off vehicle cargo', true)
 ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name, is_active = true;
-
 -- Add service_type_id to the current legs table (quotation_version_option_legs) if missing
 DO $$ BEGIN
   IF NOT EXISTS (
@@ -37,7 +32,6 @@ DO $$ BEGIN
       ON public.quotation_version_option_legs(service_type_id);
   END IF;
 END $$;
-
 -- Optionally link services to these new service types where names indicate LCL/RORO/Break Bulk
 DO $$
 DECLARE
@@ -109,5 +103,4 @@ BEGIN
     END IF;
   END IF;
 END $$;
-
 COMMIT;

@@ -59,14 +59,12 @@ BEGIN
     RETURN NEW;
 END;
 $$;
-
 -- 2. Trigger for entity_transfers
 DROP TRIGGER IF EXISTS trg_log_transfer_audit ON entity_transfers;
 CREATE TRIGGER trg_log_transfer_audit
     AFTER INSERT OR UPDATE ON entity_transfers
     FOR EACH ROW
     EXECUTE FUNCTION log_transfer_audit();
-
 -- 3. Function to log relationship changes (tenant/franchise updates) on entities
 CREATE OR REPLACE FUNCTION log_relationship_change()
 RETURNS TRIGGER
@@ -107,7 +105,6 @@ BEGIN
     RETURN NEW;
 END;
 $$;
-
 -- 4. Apply relationship change trigger to relevant tables
 -- Leads
 DROP TRIGGER IF EXISTS trg_log_lead_rel_change ON leads;
@@ -115,42 +112,36 @@ CREATE TRIGGER trg_log_lead_rel_change
     AFTER UPDATE ON leads
     FOR EACH ROW
     EXECUTE FUNCTION log_relationship_change();
-
 -- Opportunities
 DROP TRIGGER IF EXISTS trg_log_opp_rel_change ON opportunities;
 CREATE TRIGGER trg_log_opp_rel_change
     AFTER UPDATE ON opportunities
     FOR EACH ROW
     EXECUTE FUNCTION log_relationship_change();
-
 -- Quotes
 DROP TRIGGER IF EXISTS trg_log_quote_rel_change ON quotes;
 CREATE TRIGGER trg_log_quote_rel_change
     AFTER UPDATE ON quotes
     FOR EACH ROW
     EXECUTE FUNCTION log_relationship_change();
-
 -- Shipments
 DROP TRIGGER IF EXISTS trg_log_shipment_rel_change ON shipments;
 CREATE TRIGGER trg_log_shipment_rel_change
     AFTER UPDATE ON shipments
     FOR EACH ROW
     EXECUTE FUNCTION log_relationship_change();
-
 -- Accounts
 DROP TRIGGER IF EXISTS trg_log_account_rel_change ON accounts;
 CREATE TRIGGER trg_log_account_rel_change
     AFTER UPDATE ON accounts
     FOR EACH ROW
     EXECUTE FUNCTION log_relationship_change();
-
 -- Contacts
 DROP TRIGGER IF EXISTS trg_log_contact_rel_change ON contacts;
 CREATE TRIGGER trg_log_contact_rel_change
     AFTER UPDATE ON contacts
     FOR EACH ROW
     EXECUTE FUNCTION log_relationship_change();
-
 -- Activities
 DROP TRIGGER IF EXISTS trg_log_activity_rel_change ON activities;
 CREATE TRIGGER trg_log_activity_rel_change

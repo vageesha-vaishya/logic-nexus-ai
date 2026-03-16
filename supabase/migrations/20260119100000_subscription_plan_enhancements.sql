@@ -61,4 +61,3 @@ BEGIN
       ADD COLUMN metadata JSONB DEFAULT '{}'::jsonb;
   END IF;
 END$$;
-

@@ -2,26 +2,21 @@
 -- Aligns Quotation System with new Service Architecture & adds Enterprise Workflows
 
 BEGIN;
-
 -----------------------------------------------------------------------------
 -- 1. Enhance Quote Options with Service Architecture
 -----------------------------------------------------------------------------
 -- Ensure quote_options links to the specific Service (not just generic type)
 ALTER TABLE public.quote_options 
 ADD COLUMN IF NOT EXISTS service_id UUID REFERENCES public.services(id);
-
 -- Snapshot configurations to freeze business rules at time of quote
 ALTER TABLE public.quote_options 
 ADD COLUMN IF NOT EXISTS billing_config_snapshot JSONB DEFAULT '{}'::jsonb,
 ADD COLUMN IF NOT EXISTS pricing_config_snapshot JSONB DEFAULT '{}'::jsonb,
 ADD COLUMN IF NOT EXISTS fulfillment_config_snapshot JSONB DEFAULT '{}'::jsonb;
-
 -- Add IncoTerms and other trade specifics if missing
 ALTER TABLE public.quote_options 
 ADD COLUMN IF NOT EXISTS incoterms TEXT,
 ADD COLUMN IF NOT EXISTS incoterms_location TEXT;
-
-
 -----------------------------------------------------------------------------
 -- 2. Enterprise Approval Workflows
 -----------------------------------------------------------------------------
@@ -36,7 +31,6 @@ CREATE TABLE IF NOT EXISTS public.quote_approval_rules (
     is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMPTZ DEFAULT now()
 );
-
 -- Approval Requests (Runtime)
 CREATE TABLE IF NOT EXISTS public.quote_approvals (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -51,28 +45,17 @@ CREATE TABLE IF NOT EXISTS public.quote_approvals (
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now()
 );
-
 -- Indexes for Workflows
 CREATE INDEX IF NOT EXISTS idx_quote_approvals_quote ON public.quote_approvals(quote_id);
 CREATE INDEX IF NOT EXISTS idx_quote_approvals_status ON public.quote_approvals(status);
-
-
 -----------------------------------------------------------------------------
 -- 3. Advanced Pricing & Rate Management Integration
 -----------------------------------------------------------------------------
 -- Link Quote Charges to Vendor Contracts (if applicable)
-DO $$
-BEGIN
-    IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'vendors') THEN
-        ALTER TABLE public.quote_charges 
-        ADD COLUMN IF NOT EXISTS vendor_id UUID REFERENCES public.vendors(id);
-    END IF;
-END $$;
-
-ALTER TABLE public.quote_charges
+ALTER TABLE public.quote_charges 
+ADD COLUMN IF NOT EXISTS vendor_id UUID REFERENCES public.vendors(id),
 ADD COLUMN IF NOT EXISTS contract_reference TEXT,
 ADD COLUMN IF NOT EXISTS is_system_calculated BOOLEAN DEFAULT false;
-
 -- Audit Trail for Pricing Logic (Why was this price chosen?)
 CREATE TABLE IF NOT EXISTS public.quote_pricing_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -85,8 +68,6 @@ CREATE TABLE IF NOT EXISTS public.quote_pricing_logs (
     applied_rule JSONB, -- Snapshot of the tier/contract rule used
     created_at TIMESTAMPTZ DEFAULT now()
 );
-
-
 -----------------------------------------------------------------------------
 -- 4. RPC: Smart Price Calculator
 -----------------------------------------------------------------------------
@@ -142,8 +123,6 @@ BEGIN
     RETURN NEXT;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
-
-
 -----------------------------------------------------------------------------
 -- 5. Seed Default Approval Rules
 -----------------------------------------------------------------------------
@@ -156,7 +135,6 @@ SELECT
     'manager'
 FROM public.tenants
 ON CONFLICT DO NOTHING;
-
 INSERT INTO public.quote_approval_rules (tenant_id, name, description, trigger_criteria, required_role)
 SELECT 
     id as tenant_id,
@@ -166,5 +144,4 @@ SELECT
     'director'
 FROM public.tenants
 ON CONFLICT DO NOTHING;
-
 COMMIT;

@@ -7,7 +7,6 @@ SET
   subheading = substring(regexp_replace(hts_code, '[^0-9]', '', 'g'), 1, 6),
   tariff_item = substring(regexp_replace(hts_code, '[^0-9]', '', 'g'), 1, 8)
 WHERE chapter IS NULL;
-
 -- Create RPC to fetch HTS hierarchy levels
 -- This function supports browsing: Chapters -> Headings -> Subheadings -> Codes
 CREATE OR REPLACE FUNCTION get_hts_hierarchy(
@@ -73,6 +72,5 @@ BEGIN
   END IF;
 END;
 $$;
-
 -- Grant execute permission to authenticated users
 GRANT EXECUTE ON FUNCTION get_hts_hierarchy(text, text) TO authenticated;

@@ -1,6 +1,5 @@
 -- Bidirectional syncing: reflect opportunity_items changes back to primary quote_items
 BEGIN;
-
 CREATE OR REPLACE FUNCTION public.sync_quote_items_from_opportunity_trigger()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -74,24 +73,20 @@ BEGIN
   END IF;
 END;
 $$ LANGUAGE plpgsql;
-
 -- Triggers on opportunity_items to sync to primary quote
 DROP TRIGGER IF EXISTS trg_opp_items_sync_ins ON public.opportunity_items;
 CREATE TRIGGER trg_opp_items_sync_ins
   AFTER INSERT ON public.opportunity_items
   FOR EACH ROW
   EXECUTE FUNCTION public.sync_quote_items_from_opportunity_trigger();
-
 DROP TRIGGER IF EXISTS trg_opp_items_sync_upd ON public.opportunity_items;
 CREATE TRIGGER trg_opp_items_sync_upd
   AFTER UPDATE ON public.opportunity_items
   FOR EACH ROW
   EXECUTE FUNCTION public.sync_quote_items_from_opportunity_trigger();
-
 DROP TRIGGER IF EXISTS trg_opp_items_sync_del ON public.opportunity_items;
 CREATE TRIGGER trg_opp_items_sync_del
   AFTER DELETE ON public.opportunity_items
   FOR EACH ROW
   EXECUTE FUNCTION public.sync_quote_items_from_opportunity_trigger();
-
 COMMIT;

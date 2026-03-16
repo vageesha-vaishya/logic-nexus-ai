@@ -2,32 +2,26 @@
 -- Description: Adds tenant_id column to support RLS and scoped access, updates View and Trigger.
 
 BEGIN;
-
 -- 1. Add tenant_id to public.quote_items_core
 ALTER TABLE public.quote_items_core
 ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES public.tenants(id);
-
 -- 2. Add tenant_id to logistics.quote_items_extension
 ALTER TABLE logistics.quote_items_extension
 ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES public.tenants(id);
-
 -- 3. Backfill tenant_id from parent quotes
 UPDATE public.quote_items_core c
 SET tenant_id = q.tenant_id
 FROM public.quotes q
 WHERE c.quote_id = q.id
 AND c.tenant_id IS NULL;
-
 -- Backfill extension from core
 UPDATE logistics.quote_items_extension e
 SET tenant_id = c.tenant_id
 FROM public.quote_items_core c
 WHERE e.quote_item_id = c.id
 AND e.tenant_id IS NULL;
-
 -- 4. Drop existing View (CASCADE to drop trigger)
 DROP VIEW IF EXISTS public.quote_items CASCADE;
-
 -- 5. Recreate View with tenant_id
 CREATE OR REPLACE VIEW public.quote_items AS
 SELECT
@@ -65,7 +59,6 @@ SELECT
     e.attributes
 FROM public.quote_items_core c
 LEFT JOIN logistics.quote_items_extension e ON c.id = e.quote_item_id;
-
 -- 6. Update Trigger Function
 CREATE OR REPLACE FUNCTION public.fn_quote_items_view_handler()
 RETURNS TRIGGER AS $$
@@ -179,19 +172,16 @@ BEGIN
     RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
-
 -- 7. Re-attach Trigger
 CREATE TRIGGER tr_quote_items_view_handler
     INSTEAD OF INSERT OR UPDATE OR DELETE ON public.quote_items
     FOR EACH ROW EXECUTE FUNCTION public.fn_quote_items_view_handler();
-
 -- 8. Optimize RLS Policies (Optional but recommended)
 -- Update policies to use direct tenant_id check instead of JOIN
 DROP POLICY IF EXISTS "Users can view quote items for accessible quotes" ON public.quote_items_core;
 DROP POLICY IF EXISTS "Users can manage quote items for accessible quotes" ON public.quote_items_core;
 DROP POLICY IF EXISTS "Users can view quote item extensions" ON logistics.quote_items_extension;
 DROP POLICY IF EXISTS "Users can manage quote item extensions" ON logistics.quote_items_extension;
-
 CREATE POLICY "Users can view quote items for accessible quotes"
 ON public.quote_items_core FOR SELECT
 USING (
@@ -202,7 +192,6 @@ USING (
     AND (q.franchise_id = get_user_franchise_id(auth.uid()) OR q.owner_id = auth.uid())
   )
 );
-
 CREATE POLICY "Users can manage quote items for accessible quotes"
 ON public.quote_items_core FOR ALL
 USING (
@@ -213,7 +202,6 @@ USING (
     AND (q.franchise_id = get_user_franchise_id(auth.uid()) OR q.owner_id = auth.uid())
   )
 );
-
 CREATE POLICY "Users can view quote item extensions"
 ON logistics.quote_items_extension FOR SELECT
 USING (
@@ -225,7 +213,6 @@ USING (
     AND (q.franchise_id = get_user_franchise_id(auth.uid()) OR q.owner_id = auth.uid())
   )
 );
-
 CREATE POLICY "Users can manage quote item extensions"
 ON logistics.quote_items_extension FOR ALL
 USING (
@@ -237,5 +224,4 @@ USING (
     AND (q.franchise_id = get_user_franchise_id(auth.uid()) OR q.owner_id = auth.uid())
   )
 );
-
 COMMIT;

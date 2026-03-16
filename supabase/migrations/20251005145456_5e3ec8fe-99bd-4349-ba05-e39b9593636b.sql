@@ -18,7 +18,6 @@ BEGIN
     END LOOP;
   END IF;
 END $$;
-
 DO $$
 DECLARE lbl text;
 BEGIN
@@ -38,7 +37,6 @@ BEGIN
     END LOOP;
   END IF;
 END $$;
-
 DO $$
 DECLARE lbl text;
 BEGIN
@@ -58,7 +56,6 @@ BEGIN
     END LOOP;
   END IF;
 END $$;
-
 DO $$
 DECLARE lbl text;
 BEGIN
@@ -78,7 +75,6 @@ BEGIN
     END LOOP;
   END IF;
 END $$;
-
 DO $$
 DECLARE lbl text;
 BEGIN
@@ -98,7 +94,6 @@ BEGIN
     END LOOP;
   END IF;
 END $$;
-
 -- Warehouses table
 CREATE TABLE public.warehouses (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -120,7 +115,6 @@ CREATE TABLE public.warehouses (
   updated_at TIMESTAMPTZ DEFAULT now(),
   UNIQUE(tenant_id, code)
 );
-
 -- Vehicles table
 CREATE TABLE public.vehicles (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -145,7 +139,6 @@ CREATE TABLE public.vehicles (
   updated_at TIMESTAMPTZ DEFAULT now(),
   UNIQUE(tenant_id, vehicle_number)
 );
-
 -- Shipments table
 CREATE TABLE public.shipments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -214,7 +207,6 @@ CREATE TABLE public.shipments (
   
   UNIQUE(tenant_id, shipment_number)
 );
-
 -- Shipment items table
 CREATE TABLE public.shipment_items (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -235,7 +227,6 @@ CREATE TABLE public.shipment_items (
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
-
 -- Tracking events table
 CREATE TABLE public.tracking_events (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -250,7 +241,6 @@ CREATE TABLE public.tracking_events (
   created_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ DEFAULT now()
 );
-
 -- Routes table
 CREATE TABLE public.routes (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -268,7 +258,6 @@ CREATE TABLE public.routes (
   updated_at TIMESTAMPTZ DEFAULT now(),
   UNIQUE(tenant_id, route_code)
 );
-
 -- Shipping rates table
 CREATE TABLE public.shipping_rates (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -290,7 +279,6 @@ CREATE TABLE public.shipping_rates (
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
-
 -- Customs documents table
 CREATE TABLE public.customs_documents (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -307,7 +295,6 @@ CREATE TABLE public.customs_documents (
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
-
 -- Warehouse inventory table
 CREATE TABLE public.warehouse_inventory (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -324,7 +311,6 @@ CREATE TABLE public.warehouse_inventory (
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
-
 -- Create indexes for better performance
 CREATE INDEX idx_shipments_tenant ON public.shipments(tenant_id);
 CREATE INDEX idx_shipments_franchise ON public.shipments(franchise_id);
@@ -335,7 +321,6 @@ CREATE INDEX idx_tracking_events_shipment ON public.tracking_events(shipment_id)
 CREATE INDEX idx_tracking_events_date ON public.tracking_events(event_date);
 CREATE INDEX idx_vehicles_tenant ON public.vehicles(tenant_id);
 CREATE INDEX idx_warehouses_tenant ON public.warehouses(tenant_id);
-
 -- Enable RLS
 ALTER TABLE public.warehouses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.vehicles ENABLE ROW LEVEL SECURITY;
@@ -346,59 +331,46 @@ ALTER TABLE public.routes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.shipping_rates ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.customs_documents ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.warehouse_inventory ENABLE ROW LEVEL SECURITY;
-
 -- RLS Policies for warehouses
 CREATE POLICY "Platform admins can manage all warehouses"
   ON public.warehouses FOR ALL
   USING (is_platform_admin(auth.uid()));
-
 CREATE POLICY "Tenant admins can manage tenant warehouses"
   ON public.warehouses FOR ALL
   USING (has_role(auth.uid(), 'tenant_admin'::app_role) AND tenant_id = get_user_tenant_id(auth.uid()));
-
 CREATE POLICY "Franchise users can view franchise warehouses"
   ON public.warehouses FOR SELECT
   USING (franchise_id = get_user_franchise_id(auth.uid()));
-
 -- RLS Policies for vehicles
 CREATE POLICY "Platform admins can manage all vehicles"
   ON public.vehicles FOR ALL
   USING (is_platform_admin(auth.uid()));
-
 CREATE POLICY "Tenant admins can manage tenant vehicles"
   ON public.vehicles FOR ALL
   USING (has_role(auth.uid(), 'tenant_admin'::app_role) AND tenant_id = get_user_tenant_id(auth.uid()));
-
 CREATE POLICY "Franchise users can view franchise vehicles"
   ON public.vehicles FOR SELECT
   USING (franchise_id = get_user_franchise_id(auth.uid()));
-
 -- RLS Policies for shipments
 CREATE POLICY "Platform admins can manage all shipments"
   ON public.shipments FOR ALL
   USING (is_platform_admin(auth.uid()));
-
 CREATE POLICY "Tenant admins can manage tenant shipments"
   ON public.shipments FOR ALL
   USING (has_role(auth.uid(), 'tenant_admin'::app_role) AND tenant_id = get_user_tenant_id(auth.uid()));
-
 CREATE POLICY "Franchise admins can manage franchise shipments"
   ON public.shipments FOR ALL
   USING (has_role(auth.uid(), 'franchise_admin'::app_role) AND franchise_id = get_user_franchise_id(auth.uid()));
-
 CREATE POLICY "Users can view assigned shipments"
   ON public.shipments FOR SELECT
   USING (assigned_to = auth.uid() OR franchise_id = get_user_franchise_id(auth.uid()));
-
 CREATE POLICY "Users can create franchise shipments"
   ON public.shipments FOR INSERT
   WITH CHECK (franchise_id = get_user_franchise_id(auth.uid()));
-
 -- RLS Policies for shipment items
 CREATE POLICY "Platform admins can manage all shipment items"
   ON public.shipment_items FOR ALL
   USING (is_platform_admin(auth.uid()));
-
 CREATE POLICY "Users can manage items for accessible shipments"
   ON public.shipment_items FOR ALL
   USING (shipment_id IN (
@@ -406,12 +378,10 @@ CREATE POLICY "Users can manage items for accessible shipments"
     WHERE franchise_id = get_user_franchise_id(auth.uid()) 
     OR assigned_to = auth.uid()
   ));
-
 -- RLS Policies for tracking events
 CREATE POLICY "Platform admins can manage all tracking events"
   ON public.tracking_events FOR ALL
   USING (is_platform_admin(auth.uid()));
-
 CREATE POLICY "Users can view tracking for accessible shipments"
   ON public.tracking_events FOR SELECT
   USING (shipment_id IN (
@@ -419,7 +389,6 @@ CREATE POLICY "Users can view tracking for accessible shipments"
     WHERE franchise_id = get_user_franchise_id(auth.uid()) 
     OR assigned_to = auth.uid()
   ));
-
 CREATE POLICY "Users can create tracking events for accessible shipments"
   ON public.tracking_events FOR INSERT
   WITH CHECK (shipment_id IN (
@@ -427,38 +396,30 @@ CREATE POLICY "Users can create tracking events for accessible shipments"
     WHERE franchise_id = get_user_franchise_id(auth.uid()) 
     OR assigned_to = auth.uid()
   ));
-
 -- RLS Policies for routes
 CREATE POLICY "Platform admins can manage all routes"
   ON public.routes FOR ALL
   USING (is_platform_admin(auth.uid()));
-
 CREATE POLICY "Tenant admins can manage tenant routes"
   ON public.routes FOR ALL
   USING (has_role(auth.uid(), 'tenant_admin'::app_role) AND tenant_id = get_user_tenant_id(auth.uid()));
-
 CREATE POLICY "Users can view tenant routes"
   ON public.routes FOR SELECT
   USING (tenant_id = get_user_tenant_id(auth.uid()));
-
 -- RLS Policies for shipping rates
 CREATE POLICY "Platform admins can manage all shipping rates"
   ON public.shipping_rates FOR ALL
   USING (is_platform_admin(auth.uid()));
-
 CREATE POLICY "Tenant admins can manage tenant shipping rates"
   ON public.shipping_rates FOR ALL
   USING (has_role(auth.uid(), 'tenant_admin'::app_role) AND tenant_id = get_user_tenant_id(auth.uid()));
-
 CREATE POLICY "Users can view tenant shipping rates"
   ON public.shipping_rates FOR SELECT
   USING (tenant_id = get_user_tenant_id(auth.uid()));
-
 -- RLS Policies for customs documents
 CREATE POLICY "Platform admins can manage all customs documents"
   ON public.customs_documents FOR ALL
   USING (is_platform_admin(auth.uid()));
-
 CREATE POLICY "Users can manage customs documents for accessible shipments"
   ON public.customs_documents FOR ALL
   USING (shipment_id IN (
@@ -466,42 +427,31 @@ CREATE POLICY "Users can manage customs documents for accessible shipments"
     WHERE franchise_id = get_user_franchise_id(auth.uid()) 
     OR assigned_to = auth.uid()
   ));
-
 -- RLS Policies for warehouse inventory
 CREATE POLICY "Platform admins can manage all warehouse inventory"
   ON public.warehouse_inventory FOR ALL
   USING (is_platform_admin(auth.uid()));
-
 CREATE POLICY "Tenant admins can manage tenant warehouse inventory"
   ON public.warehouse_inventory FOR ALL
   USING (has_role(auth.uid(), 'tenant_admin'::app_role) AND 
     warehouse_id IN (SELECT id FROM public.warehouses WHERE tenant_id = get_user_tenant_id(auth.uid())));
-
 CREATE POLICY "Users can view franchise warehouse inventory"
   ON public.warehouse_inventory FOR SELECT
   USING (warehouse_id IN (SELECT id FROM public.warehouses WHERE franchise_id = get_user_franchise_id(auth.uid())));
-
 -- Triggers for updated_at
 CREATE TRIGGER update_warehouses_updated_at BEFORE UPDATE ON public.warehouses
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
-
 CREATE TRIGGER update_vehicles_updated_at BEFORE UPDATE ON public.vehicles
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
-
 CREATE TRIGGER update_shipments_updated_at BEFORE UPDATE ON public.shipments
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
-
 CREATE TRIGGER update_shipment_items_updated_at BEFORE UPDATE ON public.shipment_items
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
-
 CREATE TRIGGER update_routes_updated_at BEFORE UPDATE ON public.routes
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
-
 CREATE TRIGGER update_shipping_rates_updated_at BEFORE UPDATE ON public.shipping_rates
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
-
 CREATE TRIGGER update_customs_documents_updated_at BEFORE UPDATE ON public.customs_documents
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
-
 CREATE TRIGGER update_warehouse_inventory_updated_at BEFORE UPDATE ON public.warehouse_inventory
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();

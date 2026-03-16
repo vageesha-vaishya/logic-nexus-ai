@@ -11,7 +11,7 @@
     "grepInvert": null,
     "maxFailures": 0,
     "metadata": {
-      "actualWorkers": 5
+      "actualWorkers": 1
     },
     "preserveOutput": "always",
     "reporter": [
@@ -46,7 +46,7 @@
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
-          "actualWorkers": 5
+          "actualWorkers": 1
         },
         "id": "chromium",
         "name": "chromium",
@@ -64,7 +64,7 @@
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
-          "actualWorkers": 5
+          "actualWorkers": 1
         },
         "id": "chrome-latest",
         "name": "chrome-latest",
@@ -82,7 +82,7 @@
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
-          "actualWorkers": 5
+          "actualWorkers": 1
         },
         "id": "msedge-latest",
         "name": "msedge-latest",
@@ -100,7 +100,7 @@
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
-          "actualWorkers": 5
+          "actualWorkers": 1
         },
         "id": "firefox",
         "name": "firefox",
@@ -118,7 +118,7 @@
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
-          "actualWorkers": 5
+          "actualWorkers": 1
         },
         "id": "webkit",
         "name": "webkit",
@@ -136,7 +136,7 @@
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
-          "actualWorkers": 5
+          "actualWorkers": 1
         },
         "id": "ios-mobile",
         "name": "ios-mobile",
@@ -154,7 +154,7 @@
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
-          "actualWorkers": 5
+          "actualWorkers": 1
         },
         "id": "android-mobile",
         "name": "android-mobile",
@@ -173,7 +173,7 @@
     "updateSnapshots": "missing",
     "updateSourceMethod": "patch",
     "version": "1.57.0",
-    "workers": 5,
+    "workers": 1,
     "webServer": {
       "command": "npm run dev -- --host 0.0.0.0 --port 4173",
       "url": "http://localhost:4173",
@@ -182,20 +182,20 @@
   },
   "suites": [
     {
-      "title": "tests/e2e/leads-pipeline-rail.spec.ts",
-      "file": "tests/e2e/leads-pipeline-rail.spec.ts",
+      "title": "tests/e2e/lead-workspace-regression.spec.ts",
+      "file": "tests/e2e/lead-workspace-regression.spec.ts",
       "column": 0,
       "line": 0,
       "specs": [],
       "suites": [
         {
-          "title": "leads pipeline single-line rail",
-          "file": "tests/e2e/leads-pipeline-rail.spec.ts",
-          "line": 38,
+          "title": "lead workspace regressions",
+          "file": "tests/e2e/lead-workspace-regression.spec.ts",
+          "line": 52,
           "column": 6,
           "specs": [
             {
-              "title": "renders one-line stage rail with connectors and tooltip across breakpoints",
+              "title": "keeps breadcrumbs visible on lead main, create, view, and edit flows",
               "ok": true,
               "tags": [],
               "tests": [
@@ -204,11 +204,11 @@
                   "annotations": [
                     {
                       "type": "skip",
-                      "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
+                      "description": "No lead record is available for view/edit breadcrumb assertions",
                       "location": {
-                        "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                        "line": 25,
-                        "column": 8
+                        "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/lead-workspace-regression.spec.ts",
+                        "line": 70,
+                        "column": 10
                       }
                     }
                   ],
@@ -220,278 +220,20 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "skipped",
-                      "duration": 537,
+                      "duration": 7634,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-03-15T10:22:02.584Z",
+                      "startTime": "2026-03-16T16:01:31.561Z",
                       "annotations": [
                         {
                           "type": "skip",
-                          "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
+                          "description": "No lead record is available for view/edit breadcrumb assertions",
                           "location": {
-                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                            "line": 25,
-                            "column": 8
-                          }
-                        }
-                      ],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
-                },
-                {
-                  "timeout": 30000,
-                  "annotations": [
-                    {
-                      "type": "skip",
-                      "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                      "location": {
-                        "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                        "line": 25,
-                        "column": 8
-                      }
-                    }
-                  ],
-                  "expectedStatus": "skipped",
-                  "projectId": "chrome-latest",
-                  "projectName": "chrome-latest",
-                  "results": [
-                    {
-                      "workerIndex": 7,
-                      "parallelIndex": 3,
-                      "status": "skipped",
-                      "duration": 391,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-03-15T10:22:05.042Z",
-                      "annotations": [
-                        {
-                          "type": "skip",
-                          "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                          "location": {
-                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                            "line": 25,
-                            "column": 8
-                          }
-                        }
-                      ],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
-                },
-                {
-                  "timeout": 30000,
-                  "annotations": [
-                    {
-                      "type": "skip",
-                      "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                      "location": {
-                        "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                        "line": 25,
-                        "column": 8
-                      }
-                    }
-                  ],
-                  "expectedStatus": "skipped",
-                  "projectId": "msedge-latest",
-                  "projectName": "msedge-latest",
-                  "results": [
-                    {
-                      "workerIndex": 11,
-                      "parallelIndex": 0,
-                      "status": "skipped",
-                      "duration": 251,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-03-15T10:22:06.424Z",
-                      "annotations": [
-                        {
-                          "type": "skip",
-                          "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                          "location": {
-                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                            "line": 25,
-                            "column": 8
-                          }
-                        }
-                      ],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
-                },
-                {
-                  "timeout": 30000,
-                  "annotations": [
-                    {
-                      "type": "skip",
-                      "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                      "location": {
-                        "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                        "line": 25,
-                        "column": 8
-                      }
-                    }
-                  ],
-                  "expectedStatus": "skipped",
-                  "projectId": "firefox",
-                  "projectName": "firefox",
-                  "results": [
-                    {
-                      "workerIndex": 15,
-                      "parallelIndex": 0,
-                      "status": "skipped",
-                      "duration": 1900,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-03-15T10:22:07.697Z",
-                      "annotations": [
-                        {
-                          "type": "skip",
-                          "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                          "location": {
-                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                            "line": 25,
-                            "column": 8
-                          }
-                        }
-                      ],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
-                },
-                {
-                  "timeout": 30000,
-                  "annotations": [
-                    {
-                      "type": "skip",
-                      "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                      "location": {
-                        "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                        "line": 25,
-                        "column": 8
-                      }
-                    }
-                  ],
-                  "expectedStatus": "skipped",
-                  "projectId": "webkit",
-                  "projectName": "webkit",
-                  "results": [
-                    {
-                      "workerIndex": 20,
-                      "parallelIndex": 1,
-                      "status": "skipped",
-                      "duration": 2333,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-03-15T10:22:12.121Z",
-                      "annotations": [
-                        {
-                          "type": "skip",
-                          "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                          "location": {
-                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                            "line": 25,
-                            "column": 8
-                          }
-                        }
-                      ],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
-                },
-                {
-                  "timeout": 30000,
-                  "annotations": [
-                    {
-                      "type": "skip",
-                      "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                      "location": {
-                        "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                        "line": 25,
-                        "column": 8
-                      }
-                    }
-                  ],
-                  "expectedStatus": "skipped",
-                  "projectId": "ios-mobile",
-                  "projectName": "ios-mobile",
-                  "results": [
-                    {
-                      "workerIndex": 25,
-                      "parallelIndex": 3,
-                      "status": "skipped",
-                      "duration": 746,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-03-15T10:22:16.048Z",
-                      "annotations": [
-                        {
-                          "type": "skip",
-                          "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                          "location": {
-                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                            "line": 25,
-                            "column": 8
-                          }
-                        }
-                      ],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
-                },
-                {
-                  "timeout": 30000,
-                  "annotations": [
-                    {
-                      "type": "skip",
-                      "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                      "location": {
-                        "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                        "line": 25,
-                        "column": 8
-                      }
-                    }
-                  ],
-                  "expectedStatus": "skipped",
-                  "projectId": "android-mobile",
-                  "projectName": "android-mobile",
-                  "results": [
-                    {
-                      "workerIndex": 30,
-                      "parallelIndex": 3,
-                      "status": "skipped",
-                      "duration": 531,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-03-15T10:22:17.928Z",
-                      "annotations": [
-                        {
-                          "type": "skip",
-                          "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                          "location": {
-                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                            "line": 25,
-                            "column": 8
+                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/lead-workspace-regression.spec.ts",
+                            "line": 70,
+                            "column": 10
                           }
                         }
                       ],
@@ -501,13 +243,13 @@
                   "status": "skipped"
                 }
               ],
-              "id": "18be7531b820ce9c2fae-b46322f858c31feff7b3",
-              "file": "tests/e2e/leads-pipeline-rail.spec.ts",
-              "line": 39,
+              "id": "58bdd089077e4b89d852-07abc1fecbb085647500",
+              "file": "tests/e2e/lead-workspace-regression.spec.ts",
+              "line": 53,
               "column": 3
             },
             {
-              "title": "renders only selected status columns when status filter is active",
+              "title": "keeps main and bottom sections visible with independent split-scroll behavior",
               "ok": true,
               "tags": [],
               "tests": [
@@ -516,11 +258,11 @@
                   "annotations": [
                     {
                       "type": "skip",
-                      "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
+                      "description": "Three-section lead workspace is not enabled in this environment",
                       "location": {
-                        "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                        "line": 25,
-                        "column": 8
+                        "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/lead-workspace-regression.spec.ts",
+                        "line": 91,
+                        "column": 10
                       }
                     }
                   ],
@@ -529,281 +271,23 @@
                   "projectName": "chromium",
                   "results": [
                     {
-                      "workerIndex": 1,
-                      "parallelIndex": 1,
-                      "status": "skipped",
-                      "duration": 480,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-03-15T10:22:02.634Z",
-                      "annotations": [
-                        {
-                          "type": "skip",
-                          "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                          "location": {
-                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                            "line": 25,
-                            "column": 8
-                          }
-                        }
-                      ],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
-                },
-                {
-                  "timeout": 30000,
-                  "annotations": [
-                    {
-                      "type": "skip",
-                      "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                      "location": {
-                        "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                        "line": 25,
-                        "column": 8
-                      }
-                    }
-                  ],
-                  "expectedStatus": "skipped",
-                  "projectId": "chrome-latest",
-                  "projectName": "chrome-latest",
-                  "results": [
-                    {
-                      "workerIndex": 5,
-                      "parallelIndex": 1,
-                      "status": "skipped",
-                      "duration": 440,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-03-15T10:22:05.008Z",
-                      "annotations": [
-                        {
-                          "type": "skip",
-                          "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                          "location": {
-                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                            "line": 25,
-                            "column": 8
-                          }
-                        }
-                      ],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
-                },
-                {
-                  "timeout": 30000,
-                  "annotations": [
-                    {
-                      "type": "skip",
-                      "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                      "location": {
-                        "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                        "line": 25,
-                        "column": 8
-                      }
-                    }
-                  ],
-                  "expectedStatus": "skipped",
-                  "projectId": "msedge-latest",
-                  "projectName": "msedge-latest",
-                  "results": [
-                    {
-                      "workerIndex": 10,
-                      "parallelIndex": 3,
-                      "status": "skipped",
-                      "duration": 342,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-03-15T10:22:06.448Z",
-                      "annotations": [
-                        {
-                          "type": "skip",
-                          "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                          "location": {
-                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                            "line": 25,
-                            "column": 8
-                          }
-                        }
-                      ],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
-                },
-                {
-                  "timeout": 30000,
-                  "annotations": [
-                    {
-                      "type": "skip",
-                      "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                      "location": {
-                        "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                        "line": 25,
-                        "column": 8
-                      }
-                    }
-                  ],
-                  "expectedStatus": "skipped",
-                  "projectId": "firefox",
-                  "projectName": "firefox",
-                  "results": [
-                    {
-                      "workerIndex": 16,
-                      "parallelIndex": 3,
-                      "status": "skipped",
-                      "duration": 1387,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-03-15T10:22:07.847Z",
-                      "annotations": [
-                        {
-                          "type": "skip",
-                          "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                          "location": {
-                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                            "line": 25,
-                            "column": 8
-                          }
-                        }
-                      ],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
-                },
-                {
-                  "timeout": 30000,
-                  "annotations": [
-                    {
-                      "type": "skip",
-                      "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                      "location": {
-                        "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                        "line": 25,
-                        "column": 8
-                      }
-                    }
-                  ],
-                  "expectedStatus": "skipped",
-                  "projectId": "webkit",
-                  "projectName": "webkit",
-                  "results": [
-                    {
-                      "workerIndex": 21,
-                      "parallelIndex": 3,
-                      "status": "skipped",
-                      "duration": 1716,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-03-15T10:22:13.210Z",
-                      "annotations": [
-                        {
-                          "type": "skip",
-                          "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                          "location": {
-                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                            "line": 25,
-                            "column": 8
-                          }
-                        }
-                      ],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
-                },
-                {
-                  "timeout": 30000,
-                  "annotations": [
-                    {
-                      "type": "skip",
-                      "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                      "location": {
-                        "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                        "line": 25,
-                        "column": 8
-                      }
-                    }
-                  ],
-                  "expectedStatus": "skipped",
-                  "projectId": "ios-mobile",
-                  "projectName": "ios-mobile",
-                  "results": [
-                    {
-                      "workerIndex": 26,
+                      "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "skipped",
-                      "duration": 644,
+                      "duration": 6250,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-03-15T10:22:16.129Z",
+                      "startTime": "2026-03-16T16:01:39.492Z",
                       "annotations": [
                         {
                           "type": "skip",
-                          "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
+                          "description": "Three-section lead workspace is not enabled in this environment",
                           "location": {
-                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                            "line": 25,
-                            "column": 8
-                          }
-                        }
-                      ],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
-                },
-                {
-                  "timeout": 30000,
-                  "annotations": [
-                    {
-                      "type": "skip",
-                      "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                      "location": {
-                        "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                        "line": 25,
-                        "column": 8
-                      }
-                    }
-                  ],
-                  "expectedStatus": "skipped",
-                  "projectId": "android-mobile",
-                  "projectName": "android-mobile",
-                  "results": [
-                    {
-                      "workerIndex": 31,
-                      "parallelIndex": 0,
-                      "status": "skipped",
-                      "duration": 542,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-03-15T10:22:17.990Z",
-                      "annotations": [
-                        {
-                          "type": "skip",
-                          "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                          "location": {
-                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                            "line": 25,
-                            "column": 8
+                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/lead-workspace-regression.spec.ts",
+                            "line": 91,
+                            "column": 10
                           }
                         }
                       ],
@@ -813,945 +297,9 @@
                   "status": "skipped"
                 }
               ],
-              "id": "18be7531b820ce9c2fae-f4e2eb2e8546869e1652",
-              "file": "tests/e2e/leads-pipeline-rail.spec.ts",
-              "line": 75,
-              "column": 3
-            },
-            {
-              "title": "resets search and status filters from the board reset action",
-              "ok": true,
-              "tags": [],
-              "tests": [
-                {
-                  "timeout": 30000,
-                  "annotations": [
-                    {
-                      "type": "skip",
-                      "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                      "location": {
-                        "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                        "line": 25,
-                        "column": 8
-                      }
-                    }
-                  ],
-                  "expectedStatus": "skipped",
-                  "projectId": "chromium",
-                  "projectName": "chromium",
-                  "results": [
-                    {
-                      "workerIndex": 2,
-                      "parallelIndex": 2,
-                      "status": "skipped",
-                      "duration": 520,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-03-15T10:22:02.615Z",
-                      "annotations": [
-                        {
-                          "type": "skip",
-                          "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                          "location": {
-                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                            "line": 25,
-                            "column": 8
-                          }
-                        }
-                      ],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
-                },
-                {
-                  "timeout": 30000,
-                  "annotations": [
-                    {
-                      "type": "skip",
-                      "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                      "location": {
-                        "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                        "line": 25,
-                        "column": 8
-                      }
-                    }
-                  ],
-                  "expectedStatus": "skipped",
-                  "projectId": "chrome-latest",
-                  "projectName": "chrome-latest",
-                  "results": [
-                    {
-                      "workerIndex": 6,
-                      "parallelIndex": 0,
-                      "status": "skipped",
-                      "duration": 403,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-03-15T10:22:05.001Z",
-                      "annotations": [
-                        {
-                          "type": "skip",
-                          "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                          "location": {
-                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                            "line": 25,
-                            "column": 8
-                          }
-                        }
-                      ],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
-                },
-                {
-                  "timeout": 30000,
-                  "annotations": [
-                    {
-                      "type": "skip",
-                      "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                      "location": {
-                        "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                        "line": 25,
-                        "column": 8
-                      }
-                    }
-                  ],
-                  "expectedStatus": "skipped",
-                  "projectId": "msedge-latest",
-                  "projectName": "msedge-latest",
-                  "results": [
-                    {
-                      "workerIndex": 12,
-                      "parallelIndex": 2,
-                      "status": "skipped",
-                      "duration": 231,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-03-15T10:22:06.518Z",
-                      "annotations": [
-                        {
-                          "type": "skip",
-                          "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                          "location": {
-                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                            "line": 25,
-                            "column": 8
-                          }
-                        }
-                      ],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
-                },
-                {
-                  "timeout": 30000,
-                  "annotations": [
-                    {
-                      "type": "skip",
-                      "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                      "location": {
-                        "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                        "line": 25,
-                        "column": 8
-                      }
-                    }
-                  ],
-                  "expectedStatus": "skipped",
-                  "projectId": "firefox",
-                  "projectName": "firefox",
-                  "results": [
-                    {
-                      "workerIndex": 17,
-                      "parallelIndex": 2,
-                      "status": "skipped",
-                      "duration": 2313,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-03-15T10:22:07.826Z",
-                      "annotations": [
-                        {
-                          "type": "skip",
-                          "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                          "location": {
-                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                            "line": 25,
-                            "column": 8
-                          }
-                        }
-                      ],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
-                },
-                {
-                  "timeout": 30000,
-                  "annotations": [
-                    {
-                      "type": "skip",
-                      "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                      "location": {
-                        "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                        "line": 25,
-                        "column": 8
-                      }
-                    }
-                  ],
-                  "expectedStatus": "skipped",
-                  "projectId": "webkit",
-                  "projectName": "webkit",
-                  "results": [
-                    {
-                      "workerIndex": 22,
-                      "parallelIndex": 0,
-                      "status": "skipped",
-                      "duration": 908,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-03-15T10:22:14.207Z",
-                      "annotations": [
-                        {
-                          "type": "skip",
-                          "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                          "location": {
-                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                            "line": 25,
-                            "column": 8
-                          }
-                        }
-                      ],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
-                },
-                {
-                  "timeout": 30000,
-                  "annotations": [
-                    {
-                      "type": "skip",
-                      "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                      "location": {
-                        "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                        "line": 25,
-                        "column": 8
-                      }
-                    }
-                  ],
-                  "expectedStatus": "skipped",
-                  "projectId": "ios-mobile",
-                  "projectName": "ios-mobile",
-                  "results": [
-                    {
-                      "workerIndex": 27,
-                      "parallelIndex": 1,
-                      "status": "skipped",
-                      "duration": 649,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-03-15T10:22:16.132Z",
-                      "annotations": [
-                        {
-                          "type": "skip",
-                          "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                          "location": {
-                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                            "line": 25,
-                            "column": 8
-                          }
-                        }
-                      ],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
-                },
-                {
-                  "timeout": 30000,
-                  "annotations": [
-                    {
-                      "type": "skip",
-                      "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                      "location": {
-                        "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                        "line": 25,
-                        "column": 8
-                      }
-                    }
-                  ],
-                  "expectedStatus": "skipped",
-                  "projectId": "android-mobile",
-                  "projectName": "android-mobile",
-                  "results": [
-                    {
-                      "workerIndex": 32,
-                      "parallelIndex": 1,
-                      "status": "skipped",
-                      "duration": 531,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-03-15T10:22:17.971Z",
-                      "annotations": [
-                        {
-                          "type": "skip",
-                          "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                          "location": {
-                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                            "line": 25,
-                            "column": 8
-                          }
-                        }
-                      ],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
-                }
-              ],
-              "id": "18be7531b820ce9c2fae-7b311e4b1575005ee415",
-              "file": "tests/e2e/leads-pipeline-rail.spec.ts",
-              "line": 89,
-              "column": 3
-            },
-            {
-              "title": "resets multi-criteria filters including source, date range, and custom fields",
-              "ok": true,
-              "tags": [],
-              "tests": [
-                {
-                  "timeout": 30000,
-                  "annotations": [
-                    {
-                      "type": "skip",
-                      "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                      "location": {
-                        "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                        "line": 25,
-                        "column": 8
-                      }
-                    }
-                  ],
-                  "expectedStatus": "skipped",
-                  "projectId": "chromium",
-                  "projectName": "chromium",
-                  "results": [
-                    {
-                      "workerIndex": 3,
-                      "parallelIndex": 3,
-                      "status": "skipped",
-                      "duration": 536,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-03-15T10:22:02.642Z",
-                      "annotations": [
-                        {
-                          "type": "skip",
-                          "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                          "location": {
-                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                            "line": 25,
-                            "column": 8
-                          }
-                        }
-                      ],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
-                },
-                {
-                  "timeout": 30000,
-                  "annotations": [
-                    {
-                      "type": "skip",
-                      "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                      "location": {
-                        "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                        "line": 25,
-                        "column": 8
-                      }
-                    }
-                  ],
-                  "expectedStatus": "skipped",
-                  "projectId": "chrome-latest",
-                  "projectName": "chrome-latest",
-                  "results": [
-                    {
-                      "workerIndex": 8,
-                      "parallelIndex": 2,
-                      "status": "skipped",
-                      "duration": 341,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-03-15T10:22:05.105Z",
-                      "annotations": [
-                        {
-                          "type": "skip",
-                          "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                          "location": {
-                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                            "line": 25,
-                            "column": 8
-                          }
-                        }
-                      ],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
-                },
-                {
-                  "timeout": 30000,
-                  "annotations": [
-                    {
-                      "type": "skip",
-                      "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                      "location": {
-                        "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                        "line": 25,
-                        "column": 8
-                      }
-                    }
-                  ],
-                  "expectedStatus": "skipped",
-                  "projectId": "msedge-latest",
-                  "projectName": "msedge-latest",
-                  "results": [
-                    {
-                      "workerIndex": 13,
-                      "parallelIndex": 1,
-                      "status": "skipped",
-                      "duration": 274,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-03-15T10:22:06.695Z",
-                      "annotations": [
-                        {
-                          "type": "skip",
-                          "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                          "location": {
-                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                            "line": 25,
-                            "column": 8
-                          }
-                        }
-                      ],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
-                },
-                {
-                  "timeout": 30000,
-                  "annotations": [
-                    {
-                      "type": "skip",
-                      "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                      "location": {
-                        "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                        "line": 25,
-                        "column": 8
-                      }
-                    }
-                  ],
-                  "expectedStatus": "skipped",
-                  "projectId": "firefox",
-                  "projectName": "firefox",
-                  "results": [
-                    {
-                      "workerIndex": 18,
-                      "parallelIndex": 1,
-                      "status": "skipped",
-                      "duration": 1217,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-03-15T10:22:07.919Z",
-                      "annotations": [
-                        {
-                          "type": "skip",
-                          "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                          "location": {
-                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                            "line": 25,
-                            "column": 8
-                          }
-                        }
-                      ],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
-                },
-                {
-                  "timeout": 30000,
-                  "annotations": [
-                    {
-                      "type": "skip",
-                      "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                      "location": {
-                        "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                        "line": 25,
-                        "column": 8
-                      }
-                    }
-                  ],
-                  "expectedStatus": "skipped",
-                  "projectId": "webkit",
-                  "projectName": "webkit",
-                  "results": [
-                    {
-                      "workerIndex": 23,
-                      "parallelIndex": 4,
-                      "status": "skipped",
-                      "duration": 552,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-03-15T10:22:14.802Z",
-                      "annotations": [
-                        {
-                          "type": "skip",
-                          "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                          "location": {
-                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                            "line": 25,
-                            "column": 8
-                          }
-                        }
-                      ],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
-                },
-                {
-                  "timeout": 30000,
-                  "annotations": [
-                    {
-                      "type": "skip",
-                      "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                      "location": {
-                        "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                        "line": 25,
-                        "column": 8
-                      }
-                    }
-                  ],
-                  "expectedStatus": "skipped",
-                  "projectId": "ios-mobile",
-                  "projectName": "ios-mobile",
-                  "results": [
-                    {
-                      "workerIndex": 28,
-                      "parallelIndex": 4,
-                      "status": "skipped",
-                      "duration": 400,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-03-15T10:22:16.342Z",
-                      "annotations": [
-                        {
-                          "type": "skip",
-                          "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                          "location": {
-                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                            "line": 25,
-                            "column": 8
-                          }
-                        }
-                      ],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
-                },
-                {
-                  "timeout": 30000,
-                  "annotations": [
-                    {
-                      "type": "skip",
-                      "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                      "location": {
-                        "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                        "line": 25,
-                        "column": 8
-                      }
-                    }
-                  ],
-                  "expectedStatus": "skipped",
-                  "projectId": "android-mobile",
-                  "projectName": "android-mobile",
-                  "results": [
-                    {
-                      "workerIndex": 33,
-                      "parallelIndex": 4,
-                      "status": "skipped",
-                      "duration": 198,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-03-15T10:22:18.598Z",
-                      "annotations": [
-                        {
-                          "type": "skip",
-                          "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                          "location": {
-                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                            "line": 25,
-                            "column": 8
-                          }
-                        }
-                      ],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
-                }
-              ],
-              "id": "18be7531b820ce9c2fae-34c56463f7c57ba0e5bd",
-              "file": "tests/e2e/leads-pipeline-rail.spec.ts",
-              "line": 104,
-              "column": 3
-            },
-            {
-              "title": "preserves board horizontal scroll position across view switches",
-              "ok": true,
-              "tags": [],
-              "tests": [
-                {
-                  "timeout": 30000,
-                  "annotations": [
-                    {
-                      "type": "skip",
-                      "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                      "location": {
-                        "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                        "line": 25,
-                        "column": 8
-                      }
-                    }
-                  ],
-                  "expectedStatus": "skipped",
-                  "projectId": "chromium",
-                  "projectName": "chromium",
-                  "results": [
-                    {
-                      "workerIndex": 4,
-                      "parallelIndex": 4,
-                      "status": "skipped",
-                      "duration": 496,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-03-15T10:22:02.607Z",
-                      "annotations": [
-                        {
-                          "type": "skip",
-                          "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                          "location": {
-                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                            "line": 25,
-                            "column": 8
-                          }
-                        }
-                      ],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
-                },
-                {
-                  "timeout": 30000,
-                  "annotations": [
-                    {
-                      "type": "skip",
-                      "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                      "location": {
-                        "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                        "line": 25,
-                        "column": 8
-                      }
-                    }
-                  ],
-                  "expectedStatus": "skipped",
-                  "projectId": "chrome-latest",
-                  "projectName": "chrome-latest",
-                  "results": [
-                    {
-                      "workerIndex": 9,
-                      "parallelIndex": 4,
-                      "status": "skipped",
-                      "duration": 219,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-03-15T10:22:05.240Z",
-                      "annotations": [
-                        {
-                          "type": "skip",
-                          "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                          "location": {
-                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                            "line": 25,
-                            "column": 8
-                          }
-                        }
-                      ],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
-                },
-                {
-                  "timeout": 30000,
-                  "annotations": [
-                    {
-                      "type": "skip",
-                      "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                      "location": {
-                        "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                        "line": 25,
-                        "column": 8
-                      }
-                    }
-                  ],
-                  "expectedStatus": "skipped",
-                  "projectId": "msedge-latest",
-                  "projectName": "msedge-latest",
-                  "results": [
-                    {
-                      "workerIndex": 14,
-                      "parallelIndex": 4,
-                      "status": "skipped",
-                      "duration": 220,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-03-15T10:22:06.893Z",
-                      "annotations": [
-                        {
-                          "type": "skip",
-                          "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                          "location": {
-                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                            "line": 25,
-                            "column": 8
-                          }
-                        }
-                      ],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
-                },
-                {
-                  "timeout": 30000,
-                  "annotations": [
-                    {
-                      "type": "skip",
-                      "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                      "location": {
-                        "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                        "line": 25,
-                        "column": 8
-                      }
-                    }
-                  ],
-                  "expectedStatus": "skipped",
-                  "projectId": "firefox",
-                  "projectName": "firefox",
-                  "results": [
-                    {
-                      "workerIndex": 19,
-                      "parallelIndex": 4,
-                      "status": "skipped",
-                      "duration": 1912,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-03-15T10:22:08.270Z",
-                      "annotations": [
-                        {
-                          "type": "skip",
-                          "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                          "location": {
-                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                            "line": 25,
-                            "column": 8
-                          }
-                        }
-                      ],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
-                },
-                {
-                  "timeout": 30000,
-                  "annotations": [
-                    {
-                      "type": "skip",
-                      "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                      "location": {
-                        "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                        "line": 25,
-                        "column": 8
-                      }
-                    }
-                  ],
-                  "expectedStatus": "skipped",
-                  "projectId": "webkit",
-                  "projectName": "webkit",
-                  "results": [
-                    {
-                      "workerIndex": 24,
-                      "parallelIndex": 2,
-                      "status": "skipped",
-                      "duration": 798,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-03-15T10:22:15.969Z",
-                      "annotations": [
-                        {
-                          "type": "skip",
-                          "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                          "location": {
-                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                            "line": 25,
-                            "column": 8
-                          }
-                        }
-                      ],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
-                },
-                {
-                  "timeout": 30000,
-                  "annotations": [
-                    {
-                      "type": "skip",
-                      "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                      "location": {
-                        "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                        "line": 25,
-                        "column": 8
-                      }
-                    }
-                  ],
-                  "expectedStatus": "skipped",
-                  "projectId": "ios-mobile",
-                  "projectName": "ios-mobile",
-                  "results": [
-                    {
-                      "workerIndex": 29,
-                      "parallelIndex": 2,
-                      "status": "skipped",
-                      "duration": 576,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-03-15T10:22:17.953Z",
-                      "annotations": [
-                        {
-                          "type": "skip",
-                          "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                          "location": {
-                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                            "line": 25,
-                            "column": 8
-                          }
-                        }
-                      ],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
-                },
-                {
-                  "timeout": 30000,
-                  "annotations": [
-                    {
-                      "type": "skip",
-                      "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                      "location": {
-                        "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                        "line": 25,
-                        "column": 8
-                      }
-                    }
-                  ],
-                  "expectedStatus": "skipped",
-                  "projectId": "android-mobile",
-                  "projectName": "android-mobile",
-                  "results": [
-                    {
-                      "workerIndex": 34,
-                      "parallelIndex": 2,
-                      "status": "skipped",
-                      "duration": 158,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-03-15T10:22:19.406Z",
-                      "annotations": [
-                        {
-                          "type": "skip",
-                          "description": "E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD are required",
-                          "location": {
-                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/leads-pipeline-rail.spec.ts",
-                            "line": 25,
-                            "column": 8
-                          }
-                        }
-                      ],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
-                }
-              ],
-              "id": "18be7531b820ce9c2fae-901a7421bb5472047e43",
-              "file": "tests/e2e/leads-pipeline-rail.spec.ts",
-              "line": 123,
+              "id": "58bdd089077e4b89d852-fb786a5e909ec11f45a3",
+              "file": "tests/e2e/lead-workspace-regression.spec.ts",
+              "line": 81,
               "column": 3
             }
           ]
@@ -1761,10 +309,10 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-03-15T10:21:59.909Z",
-    "duration": 19817.08,
+    "startTime": "2026-03-16T16:01:30.580Z",
+    "duration": 15204.180999999999,
     "expected": 0,
-    "skipped": 35,
+    "skipped": 2,
     "unexpected": 0,
     "flaky": 0
   }

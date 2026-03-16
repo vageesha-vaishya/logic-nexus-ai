@@ -8,7 +8,6 @@ DROP POLICY IF EXISTS "Allow write access to franchise ports" ON public.ports_lo
 DROP POLICY IF EXISTS "Read access for ports_locations" ON public.ports_locations;
 DROP POLICY IF EXISTS "Write access for ports_locations" ON public.ports_locations;
 DROP POLICY IF EXISTS "Users can view global ports" ON public.ports_locations;
-
 -- Remove franchise_id if it exists (it might not, based on user report, but good to be safe)
 DO $$ 
 BEGIN
@@ -16,7 +15,6 @@ BEGIN
         ALTER TABLE public.ports_locations DROP COLUMN franchise_id;
     END IF;
 END $$;
-
 -- Create new global policies
 
 -- 1. Read Access: All authenticated users can read all ports
@@ -25,7 +23,6 @@ ON public.ports_locations
 FOR SELECT
 TO authenticated
 USING (true);
-
 -- 2. Write Access: Only Platform Admins can modify ports
 -- (Assuming we want to restrict global data management to platform admins)
 CREATE POLICY "Platform Admin write access for ports_locations"

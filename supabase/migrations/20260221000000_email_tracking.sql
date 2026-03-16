@@ -9,10 +9,8 @@ CREATE TABLE IF NOT EXISTS public.email_tracking_events (
     location JSONB, -- GeoIP data
     created_at TIMESTAMPTZ DEFAULT now()
 );
-
 -- Enable RLS
 ALTER TABLE public.email_tracking_events ENABLE ROW LEVEL SECURITY;
-
 -- RLS Policies
 -- Service role can insert events (Edge Functions)
 CREATE POLICY "Service role can manage tracking events"
@@ -20,7 +18,6 @@ CREATE POLICY "Service role can manage tracking events"
     FOR ALL
     USING (true)
     WITH CHECK (true);
-
 -- Users can view tracking events for emails they have access to
 CREATE POLICY "Users can view tracking events"
     ON public.email_tracking_events
@@ -37,14 +34,12 @@ CREATE POLICY "Users can view tracking events"
             )
         )
     );
-
 -- 2. Add aggregate columns to emails table for fast lookup
 ALTER TABLE public.emails 
 ADD COLUMN IF NOT EXISTS open_count INTEGER DEFAULT 0,
 ADD COLUMN IF NOT EXISTS click_count INTEGER DEFAULT 0,
 ADD COLUMN IF NOT EXISTS last_opened_at TIMESTAMPTZ,
 ADD COLUMN IF NOT EXISTS last_clicked_at TIMESTAMPTZ;
-
 -- 3. Create function to update aggregates on new event
 CREATE OR REPLACE FUNCTION public.update_email_tracking_aggregates()
 RETURNS TRIGGER
@@ -68,7 +63,6 @@ BEGIN
     RETURN NEW;
 END;
 $$;
-
 -- 4. Create trigger
 DROP TRIGGER IF EXISTS trg_update_email_tracking ON public.email_tracking_events;
 CREATE TRIGGER trg_update_email_tracking

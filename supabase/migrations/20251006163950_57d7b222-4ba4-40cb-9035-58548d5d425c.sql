@@ -40,7 +40,6 @@ AS $$
     AND c.table_name NOT IN ('spatial_ref_sys')
   ORDER BY c.table_name, c.ordinal_position;
 $$ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public;
-
 -- Create function to get database tables overview
 DROP FUNCTION IF EXISTS public.get_database_tables();
 CREATE FUNCTION public.get_database_tables()
@@ -76,7 +75,6 @@ AS $$
   GROUP BY t.tablename, c.relrowsecurity, c.reltuples
   ORDER BY t.tablename;
 $$;
-
 -- Create function to get table constraints
 CREATE OR REPLACE FUNCTION public.get_table_constraints()
 RETURNS TABLE (
@@ -110,7 +108,6 @@ AS $$
   GROUP BY tc.table_name, tc.constraint_name, tc.constraint_type, cc.check_clause
   ORDER BY tc.table_name, tc.constraint_name;
 $$;
-
 -- Create function to get table indexes
 CREATE OR REPLACE FUNCTION public.get_table_indexes()
 RETURNS TABLE (

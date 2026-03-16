@@ -13,7 +13,6 @@ BEGIN
     CREATE TYPE public.quote_reset_policy AS ENUM ('none', 'daily', 'monthly', 'yearly');
   END IF;
 END $$;
-
 -- Tenant-level quote numbering configuration
 CREATE TABLE IF NOT EXISTS public.quote_number_config_tenant (
   tenant_id UUID PRIMARY KEY REFERENCES public.tenants(id) ON DELETE CASCADE,
@@ -22,7 +21,6 @@ CREATE TABLE IF NOT EXISTS public.quote_number_config_tenant (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
-
 -- Franchise-level quote numbering configuration (overrides tenant config)
 CREATE TABLE IF NOT EXISTS public.quote_number_config_franchise (
   tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
@@ -33,7 +31,6 @@ CREATE TABLE IF NOT EXISTS public.quote_number_config_franchise (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
   PRIMARY KEY (tenant_id, franchise_id)
 );
-
 -- Table to track quote number sequences
 CREATE TABLE IF NOT EXISTS public.quote_number_sequences (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -45,69 +42,58 @@ CREATE TABLE IF NOT EXISTS public.quote_number_sequences (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
   UNIQUE (tenant_id, franchise_id, period_key)
 );
-
 -- Enable RLS
 ALTER TABLE public.quote_number_config_tenant ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.quote_number_config_franchise ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.quote_number_sequences ENABLE ROW LEVEL SECURITY;
-
 -- RLS Policies for quote_number_config_tenant
 DROP POLICY IF EXISTS "Platform admins can manage all tenant configs" ON public.quote_number_config_tenant;
 CREATE POLICY "Platform admins can manage all tenant configs"
   ON public.quote_number_config_tenant
   FOR ALL
   USING (is_platform_admin(auth.uid()));
-
 DROP POLICY IF EXISTS "Tenant admins can manage own config" ON public.quote_number_config_tenant;
 CREATE POLICY "Tenant admins can manage own config"
   ON public.quote_number_config_tenant
   FOR ALL
   USING (has_role(auth.uid(), 'tenant_admin'::app_role) AND tenant_id = get_user_tenant_id(auth.uid()));
-
 DROP POLICY IF EXISTS "Users can view tenant config" ON public.quote_number_config_tenant;
 CREATE POLICY "Users can view tenant config"
   ON public.quote_number_config_tenant
   FOR SELECT
   USING (tenant_id = get_user_tenant_id(auth.uid()));
-
 -- RLS Policies for quote_number_config_franchise
 DROP POLICY IF EXISTS "Platform admins can manage all franchise configs" ON public.quote_number_config_franchise;
 CREATE POLICY "Platform admins can manage all franchise configs"
   ON public.quote_number_config_franchise
   FOR ALL
   USING (is_platform_admin(auth.uid()));
-
 DROP POLICY IF EXISTS "Tenant admins can manage franchise configs" ON public.quote_number_config_franchise;
 CREATE POLICY "Tenant admins can manage franchise configs"
   ON public.quote_number_config_franchise
   FOR ALL
   USING (has_role(auth.uid(), 'tenant_admin'::app_role) AND tenant_id = get_user_tenant_id(auth.uid()));
-
 DROP POLICY IF EXISTS "Franchise admins can manage own config" ON public.quote_number_config_franchise;
 CREATE POLICY "Franchise admins can manage own config"
   ON public.quote_number_config_franchise
   FOR ALL
   USING (has_role(auth.uid(), 'franchise_admin'::app_role) AND franchise_id = get_user_franchise_id(auth.uid()));
-
 DROP POLICY IF EXISTS "Users can view franchise config" ON public.quote_number_config_franchise;
 CREATE POLICY "Users can view franchise config"
   ON public.quote_number_config_franchise
   FOR SELECT
   USING (tenant_id = get_user_tenant_id(auth.uid()));
-
 -- RLS Policies for quote_number_sequences
 DROP POLICY IF EXISTS "Platform admins can manage all sequences" ON public.quote_number_sequences;
 CREATE POLICY "Platform admins can manage all sequences"
   ON public.quote_number_sequences
   FOR ALL
   USING (is_platform_admin(auth.uid()));
-
 DROP POLICY IF EXISTS "Tenant admins can view sequences" ON public.quote_number_sequences;
 CREATE POLICY "Tenant admins can view sequences"
   ON public.quote_number_sequences
   FOR SELECT
   USING (has_role(auth.uid(), 'tenant_admin'::app_role) AND tenant_id = get_user_tenant_id(auth.uid()));
-
 -- Function to preview next quote number
 CREATE OR REPLACE FUNCTION public.preview_next_quote_number(
   p_tenant_id UUID,
@@ -168,20 +154,17 @@ BEGIN
   END;
 END;
 $$;
-
 -- Trigger to update updated_at timestamp
 DROP TRIGGER IF EXISTS update_quote_number_config_tenant_updated_at ON public.quote_number_config_tenant;
 CREATE TRIGGER update_quote_number_config_tenant_updated_at
   BEFORE UPDATE ON public.quote_number_config_tenant
   FOR EACH ROW
   EXECUTE FUNCTION public.update_updated_at_column();
-
 DROP TRIGGER IF EXISTS update_quote_number_config_franchise_updated_at ON public.quote_number_config_franchise;
 CREATE TRIGGER update_quote_number_config_franchise_updated_at
   BEFORE UPDATE ON public.quote_number_config_franchise
   FOR EACH ROW
   EXECUTE FUNCTION public.update_updated_at_column();
-
 DROP TRIGGER IF EXISTS update_quote_number_sequences_updated_at ON public.quote_number_sequences;
 CREATE TRIGGER update_quote_number_sequences_updated_at
   BEFORE UPDATE ON public.quote_number_sequences

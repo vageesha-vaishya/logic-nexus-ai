@@ -1,4 +1,3 @@
-
 CREATE OR REPLACE FUNCTION save_quote_atomic(p_payload jsonb)
 RETURNS uuid
 LANGUAGE plpgsql
@@ -410,4 +409,4 @@ BEGIN
 
   RETURN v_quote_id;
 END;
-$$;
+$$;;

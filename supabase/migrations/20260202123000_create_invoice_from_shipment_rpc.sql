@@ -1,5 +1,4 @@
 BEGIN;
-
 CREATE OR REPLACE FUNCTION public.create_invoice_from_shipment(
   p_shipment_id uuid,
   p_tenant_id uuid
@@ -137,9 +136,6 @@ BEGIN
   RETURN v_invoice_id;
 END;
 $$;
-
 REVOKE ALL ON FUNCTION public.create_invoice_from_shipment(uuid, uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.create_invoice_from_shipment(uuid, uuid) TO authenticated;
-
 COMMIT;
-

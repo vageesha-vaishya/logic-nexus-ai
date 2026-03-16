@@ -4,7 +4,6 @@
 
 -- Enable pgcrypto extension for encryption primitives
 create extension if not exists pgcrypto;
-
 -- 1. Create tenant_domains table
 create table if not exists public.tenant_domains (
     id uuid primary key default gen_random_uuid(),
@@ -28,10 +27,8 @@ create table if not exists public.tenant_domains (
     
     unique(tenant_id, domain_name)
 );
-
 -- Enable RLS
 alter table public.tenant_domains enable row level security;
-
 -- RLS Policies for tenant_domains
 
 -- Ensure idempotency: drop existing policies if they already exist
@@ -40,14 +37,12 @@ drop policy if exists "Tenant admins can view own domains" on public.tenant_doma
 drop policy if exists "Tenant admins can manage own domains" on public.tenant_domains;
 drop policy if exists "Tenant admins can update own domains" on public.tenant_domains;
 drop policy if exists "Tenant admins can delete own domains" on public.tenant_domains;
-
 -- Policy: Platform admins can do everything
 create policy "Platform admins can manage all domains"
     on public.tenant_domains for all
     to authenticated
     using (public.is_platform_admin(auth.uid()))
     with check (public.is_platform_admin(auth.uid()));
-
 -- Policy: Tenant admins can view their own domains
 create policy "Tenant admins can view own domains"
     on public.tenant_domains for select
@@ -56,7 +51,6 @@ create policy "Tenant admins can view own domains"
         public.is_tenant_admin(auth.uid()) 
         and tenant_id = public.get_user_tenant_id(auth.uid())
     );
-
 -- Policy: Tenant admins can insert/update their own domains
 create policy "Tenant admins can manage own domains"
     on public.tenant_domains for insert
@@ -65,7 +59,6 @@ create policy "Tenant admins can manage own domains"
         public.is_tenant_admin(auth.uid()) 
         and tenant_id = public.get_user_tenant_id(auth.uid())
     );
-
 create policy "Tenant admins can update own domains"
     on public.tenant_domains for update
     to authenticated
@@ -77,7 +70,6 @@ create policy "Tenant admins can update own domains"
         public.is_tenant_admin(auth.uid()) 
         and tenant_id = public.get_user_tenant_id(auth.uid())
     );
-
 create policy "Tenant admins can delete own domains"
     on public.tenant_domains for delete
     to authenticated
@@ -85,16 +77,13 @@ create policy "Tenant admins can delete own domains"
         public.is_tenant_admin(auth.uid()) 
         and tenant_id = public.get_user_tenant_id(auth.uid())
     );
-
 -- 2. Update email_account_delegations
 alter table public.email_account_delegations 
 add column if not exists requires_mfa boolean default false;
-
 -- 3. Update emails table
 alter table public.emails
 add column if not exists body_encrypted bytea,
 add column if not exists encryption_key_id uuid;
-
 -- 4. Create RPC for secure body retrieval
 -- Note: This function assumes the encryption key is available via a secure configuration or vault.
 -- For Phase 1, we establish the signature. Actual decryption logic will be enabled when Key Management is live.

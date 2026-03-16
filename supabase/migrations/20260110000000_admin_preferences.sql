@@ -7,23 +7,18 @@ CREATE TABLE IF NOT EXISTS public.user_preferences (
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
-
 -- Enable RLS
 ALTER TABLE public.user_preferences ENABLE ROW LEVEL SECURITY;
-
 -- Policies (Drop first to avoid conflicts)
 DROP POLICY IF EXISTS "Users can view own preferences" ON public.user_preferences;
 CREATE POLICY "Users can view own preferences" ON public.user_preferences
     FOR SELECT USING (auth.uid() = user_id);
-
 DROP POLICY IF EXISTS "Users can update own preferences" ON public.user_preferences;
 CREATE POLICY "Users can update own preferences" ON public.user_preferences
     FOR UPDATE USING (auth.uid() = user_id);
-
 DROP POLICY IF EXISTS "Users can insert own preferences" ON public.user_preferences;
 CREATE POLICY "Users can insert own preferences" ON public.user_preferences
     FOR INSERT WITH CHECK (auth.uid() = user_id);
-
 -- RPC: set_user_scope_preference
 DROP FUNCTION IF EXISTS public.set_user_scope_preference(UUID, UUID, BOOLEAN);
 CREATE OR REPLACE FUNCTION public.set_user_scope_preference(
@@ -46,7 +41,6 @@ BEGIN
         updated_at = NOW();
 END;
 $$;
-
 -- RPC: set_admin_override (Updated)
 DROP FUNCTION IF EXISTS public.set_admin_override(BOOLEAN, UUID, UUID);
 CREATE OR REPLACE FUNCTION public.set_admin_override(

@@ -5,7 +5,6 @@
 -- Drop existing policies to be clean
 DROP POLICY IF EXISTS "Allow read access to global and franchise ports" ON public.ports_locations;
 DROP POLICY IF EXISTS "Allow write access to franchise ports" ON public.ports_locations;
-
 -- Create comprehensive Read policy
 CREATE POLICY "Read access for ports_locations"
 ON public.ports_locations
@@ -20,7 +19,6 @@ USING (
   -- Franchise users see their franchise ports
   (franchise_id = public.get_user_franchise_id(auth.uid()))
 );
-
 -- Create comprehensive Write policy
 CREATE POLICY "Write access for ports_locations"
 ON public.ports_locations

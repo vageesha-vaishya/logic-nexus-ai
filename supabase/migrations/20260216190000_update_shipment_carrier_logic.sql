@@ -1,9 +1,7 @@
 BEGIN;
-
 -- 1. Add carrier_id to shipments table if not exists
 ALTER TABLE public.shipments 
 ADD COLUMN IF NOT EXISTS carrier_id UUID REFERENCES public.carriers(id);
-
 -- 2. Update create_shipment_from_quote to populate carrier_id
 CREATE OR REPLACE FUNCTION public.create_shipment_from_quote(
   p_quote_id UUID,
@@ -148,5 +146,4 @@ BEGIN
   RETURN v_shipment_id;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
-
 COMMIT;

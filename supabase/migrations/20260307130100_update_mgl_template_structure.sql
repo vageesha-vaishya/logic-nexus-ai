@@ -15,7 +15,7 @@ BEGIN
     -- Update the template
     UPDATE quote_templates
     SET content = '{
-        "layout": "matrix",
+        "layout": "mgl_matrix",
         "header": {
             "show_logo": true,
             "company_info": true,

@@ -1,5 +1,4 @@
 BEGIN;
-
 -- Allow viewing global carriers (tenant_id IS NULL)
 DO $$ BEGIN
   IF NOT EXISTS (
@@ -12,7 +11,6 @@ DO $$ BEGIN
     USING (tenant_id IS NULL);
   END IF;
 END $$;
-
 -- Allow viewing global carrier/service type mappings (tenant_id IS NULL)
 DO $$ BEGIN
   IF NOT EXISTS (
@@ -25,5 +23,4 @@ DO $$ BEGIN
     USING (tenant_id IS NULL);
   END IF;
 END $$;
-
 COMMIT;

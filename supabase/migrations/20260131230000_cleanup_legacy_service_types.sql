@@ -4,7 +4,6 @@
 INSERT INTO service_modes (code, name, description)
 VALUES ('multimodal', 'Multimodal Transport', 'Transportation involving multiple modes')
 ON CONFLICT (code) DO NOTHING;
-
 -- 2. Consolidate and standardize Service Types
 DO $$
 DECLARE

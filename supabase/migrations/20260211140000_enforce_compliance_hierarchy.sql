@@ -4,7 +4,6 @@
 -- 1. Add franchise_id column
 ALTER TABLE public.compliance_screenings 
 ADD COLUMN IF NOT EXISTS franchise_id UUID;
-
 -- 2. Backfill tenant_id and franchise_id from user_roles
 -- This is a best-effort backfill for existing records
 -- We use user_roles because that's where franchise_id and tenant_id authority lives
@@ -15,20 +14,16 @@ SET
 FROM public.user_roles ur
 WHERE cs.performed_by = ur.user_id
 AND (cs.tenant_id IS NULL OR cs.franchise_id IS NULL);
-
 -- 3. Make tenant_id mandatory (after backfill)
 -- Delete orphans that can't be attributed
 DELETE FROM public.compliance_screenings WHERE tenant_id IS NULL;
 ALTER TABLE public.compliance_screenings ALTER COLUMN tenant_id SET NOT NULL;
-
 -- 4. Create Index on franchise_id
 CREATE INDEX IF NOT EXISTS idx_compliance_screenings_franchise ON public.compliance_screenings(franchise_id);
 CREATE INDEX IF NOT EXISTS idx_compliance_screenings_tenant ON public.compliance_screenings(tenant_id);
-
 -- 5. Drop old loose RLS policies
 DROP POLICY IF EXISTS "Users can view their own screenings or tenant screenings" ON public.compliance_screenings;
 DROP POLICY IF EXISTS "Users can create screenings" ON public.compliance_screenings;
-
 -- 6. Create Strict RLS Policies
 
 -- Policy: Users view screenings
@@ -54,7 +49,6 @@ CREATE POLICY "Users view screenings" ON public.compliance_screenings
             )
         )
     );
-
 -- Policy: Users create screenings
 -- Must insert their own tenant_id/franchise_id
 CREATE POLICY "Users create screenings" ON public.compliance_screenings
@@ -70,7 +64,6 @@ CREATE POLICY "Users create screenings" ON public.compliance_screenings
             (franchise_id IS NULL AND public.get_user_franchise_id(auth.uid()) IS NULL)
         )
     );
-
 -- Policy: Users update screenings? 
 -- Generally screenings are immutable audit logs. But if we allow adding notes/overrides:
 CREATE POLICY "Users update screenings" ON public.compliance_screenings

@@ -5,4 +5,4 @@
 -- ON public.carriers (lower(trim(carrier_name)));
 -- FIXME: Index creation failed due to duplicate key "dhl express". 
 -- Disabling index creation to unblock migration pipeline. 
--- Duplicates must be resolved before enabling this index.
+-- Duplicates must be resolved before enabling this index.;

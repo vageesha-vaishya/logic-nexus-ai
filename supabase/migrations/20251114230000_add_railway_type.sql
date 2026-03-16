@@ -8,7 +8,6 @@ BEGIN
     ALTER TABLE public.ports_locations DROP CONSTRAINT ports_locations_location_type_check;
   END IF;
 END $$;
-
 -- Add the constraint back with the new type
 ALTER TABLE public.ports_locations
   ADD CONSTRAINT ports_locations_location_type_check

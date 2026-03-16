@@ -2,7 +2,6 @@
 -- Depends on 20260131000000_service_architecture_overhaul.sql
 
 BEGIN;
-
 -----------------------------------------------------------------------------
 -- 1. Ensure Categories Exist
 -----------------------------------------------------------------------------
@@ -11,7 +10,6 @@ INSERT INTO service_categories (code, name, description, icon_name, display_orde
 ('insurance', 'Insurance Services', 'Cargo and business liability insurance', 'ShieldCheck', 40), -- Ensure exists
 ('customs', 'Customs & Compliance', 'Regulatory compliance and clearance', 'Stamp', 30)     -- Ensure exists
 ON CONFLICT (code) DO NOTHING;
-
 -----------------------------------------------------------------------------
 -- 2. Seed Service Types
 -----------------------------------------------------------------------------
@@ -28,7 +26,6 @@ DECLARE
   v_type_customs UUID;
   v_tenant_id UUID := '9e2686ba-ef3c-42df-aea6-dcc880436b9f'; -- Default Tenant
 BEGIN
-  BEGIN
 
   -- Get Category IDs
   SELECT id INTO v_cat_trading FROM service_categories WHERE code = 'trading';
@@ -36,12 +33,6 @@ BEGIN
   SELECT id INTO v_cat_customs FROM service_categories WHERE code = 'customs';
 
   -- Get Mode ID (Digital)
-  IF v_mode_digital IS NULL THEN
-    INSERT INTO service_modes (code, name, description, icon_name, display_order, is_active)
-    VALUES ('digital', 'Digital Services', 'Non-physical services', 'FileDigit', 90, true)
-    ON CONFLICT (code) DO NOTHING;
-    SELECT id INTO v_mode_digital FROM service_modes WHERE code = 'digital';
-  END IF;
   SELECT id INTO v_mode_digital FROM service_modes WHERE code = 'digital';
 
   -- A. Trading Types
@@ -172,9 +163,5 @@ BEGIN
 
   END IF;
 
-  EXCEPTION WHEN OTHERS THEN
-    RAISE NOTICE 'Seed non-logistics domains skipped: %', SQLERRM;
-  END;
 END $$;
-
 COMMIT;

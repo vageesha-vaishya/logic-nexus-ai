@@ -3,18 +3,15 @@
 -- Seeded Count: 440
 
 BEGIN;
-
 -- Ensure port_type column exists
 ALTER TABLE public.ports_locations 
 ADD COLUMN IF NOT EXISTS port_type text[];
-
 -- Create a temp table for the new data
 CREATE TEMP TABLE temp_aes_ports_full (
     code text,
     name text,
     modes text[]
 );
-
 INSERT INTO temp_aes_ports_full (code, name, modes) VALUES
 ('0101', 'PORTLAND, ME', '{"Vessel","Air","Passenger"}'),
 ('0102', 'BANGOR, ME', '{"Vessel","Air","Passenger"}'),
@@ -456,8 +453,6 @@ INSERT INTO temp_aes_ports_full (code, name, modes) VALUES
 ('5584', 'ADDISON AIRPORT', '{"Air","Passenger"}'),
 ('5588', 'DALLAS LOVE FIELD (DAL)', '{"Air","Passenger"}'),
 ('8000', 'US MAIL EEI PORT CODE', '{"Mail"}');
-
-
 -- 1. Update existing ports with Schedule D code and name normalization
 UPDATE public.ports_locations pl
 SET 
@@ -467,7 +462,6 @@ SET
     updated_at = NOW()
 FROM temp_aes_ports_full t
 WHERE pl.location_code = t.code OR pl.schedule_d_code = t.code;
-
 -- 2. Insert NEW ports that don't exist
 INSERT INTO public.ports_locations (
     location_code,
@@ -493,7 +487,6 @@ WHERE NOT EXISTS (
     SELECT 1 FROM public.ports_locations pl 
     WHERE pl.location_code = t.code OR pl.schedule_d_code = t.code
 );
-
 -- 3. Log the operation
 INSERT INTO public.audit_logs (action, resource_type, details)
 VALUES (
@@ -505,7 +498,5 @@ VALUES (
         'source', 'AESTIR_Export_Reference_Data.xlsx'
     )
 );
-
 DROP TABLE temp_aes_ports_full;
-
 COMMIT;

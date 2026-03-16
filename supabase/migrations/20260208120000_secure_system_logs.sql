@@ -1,17 +1,13 @@
-
 -- Migration: Secure System Logs and Update Analytics RPC
 -- Description: Enables RLS on system_logs, adds policies, and updates get_system_log_stats to be RLS-compliant (SECURITY INVOKER)
 
 BEGIN;
-
 -- 1. Enable RLS on system_logs
 ALTER TABLE public.system_logs ENABLE ROW LEVEL SECURITY;
-
 -- 2. Drop existing policies to ensure clean slate
 DROP POLICY IF EXISTS "Users can view own tenant system logs" ON public.system_logs;
 DROP POLICY IF EXISTS "Platform admins can view all system logs" ON public.system_logs;
 DROP POLICY IF EXISTS "Service role has full access" ON public.system_logs;
-
 -- 3. Create RLS Policies
 
 -- Policy for Standard Users (View own tenant logs)
@@ -24,7 +20,6 @@ USING (
     SELECT tenant_id FROM public.user_roles WHERE user_id = auth.uid()
   )
 );
-
 -- Policy for Platform Admins (View all logs)
 CREATE POLICY "Platform admins can view all system logs"
 ON public.system_logs
@@ -33,7 +28,6 @@ TO authenticated
 USING (
   public.is_platform_admin(auth.uid())
 );
-
 -- Policy for Service Role (Full access)
 -- Implicitly bypassed usually, but good to be explicit if needed, 
 -- though RLS is usually bypassed by service_role key. 
@@ -88,5 +82,4 @@ BEGIN
   RETURN result;
 END;
 $$;
-
 COMMIT;

@@ -7,7 +7,7 @@
 CREATE TABLE IF NOT EXISTS public.queue_rules (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
-    -- queue_id might be missing if table existed from old schema
+    queue_id UUID NOT NULL REFERENCES public.queues(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     description TEXT,
     criteria JSONB NOT NULL DEFAULT '{}',
@@ -18,38 +18,12 @@ CREATE TABLE IF NOT EXISTS public.queue_rules (
     created_by UUID REFERENCES auth.users(id),
     UNIQUE(tenant_id, name)
 );
-
--- Ensure queue_id column exists (schema migration)
-DO $$
-BEGIN
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'queue_rules' AND column_name = 'queue_id') THEN
-        -- Add as nullable first
-        ALTER TABLE public.queue_rules ADD COLUMN queue_id UUID REFERENCES public.queues(id) ON DELETE CASCADE;
-        
-        -- Migrate data if target_queue_name exists
-        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'queue_rules' AND column_name = 'target_queue_name') THEN
-             UPDATE public.queue_rules qr
-             SET queue_id = q.id
-             FROM public.queues q
-             WHERE qr.target_queue_name = q.name AND qr.tenant_id = q.tenant_id;
-        END IF;
-
-        -- Remove invalid rows (safety for NOT NULL constraint)
-        DELETE FROM public.queue_rules WHERE queue_id IS NULL;
-        
-        -- Set NOT NULL
-        ALTER TABLE public.queue_rules ALTER COLUMN queue_id SET NOT NULL;
-    END IF;
-END $$;
-
 -- 2. Create index for efficient rule evaluation
 CREATE INDEX IF NOT EXISTS idx_queue_rules_tenant_priority 
     ON public.queue_rules(tenant_id, priority DESC) 
     WHERE is_active = true;
-
 CREATE INDEX IF NOT EXISTS idx_queue_rules_queue_id 
     ON public.queue_rules(queue_id);
-
 -- 3. Add tenant_id to queue_members if not present
 DO $$
 BEGIN
@@ -63,10 +37,8 @@ BEGIN
         ADD COLUMN tenant_id UUID REFERENCES public.tenants(id);
     END IF;
 END $$;
-
 -- 4. Enable RLS on queue_rules
 ALTER TABLE public.queue_rules ENABLE ROW LEVEL SECURITY;
-
 -- 5. RLS policies for queue_rules (tenant admin only)
 DROP POLICY IF EXISTS "Tenant admins can manage queue rules" ON public.queue_rules;
 CREATE POLICY "Tenant admins can manage queue rules"
@@ -95,10 +67,8 @@ WITH CHECK (
         AND ur.role = 'tenant_admin'
     )
 );
-
 -- 6. RLS policies for queue_members
 ALTER TABLE public.queue_members ENABLE ROW LEVEL SECURITY;
-
 DROP POLICY IF EXISTS "Users can view their queue memberships" ON public.queue_members;
 CREATE POLICY "Users can view their queue memberships"
 ON public.queue_members
@@ -112,7 +82,6 @@ USING (
         AND ur.role = 'tenant_admin'
     )
 );
-
 DROP POLICY IF EXISTS "Tenant admins can manage queue memberships" ON public.queue_members;
 CREATE POLICY "Tenant admins can manage queue memberships"
 ON public.queue_members
@@ -132,10 +101,8 @@ WITH CHECK (
         AND ur.role = 'tenant_admin'
     )
 );
-
 -- 7. RLS policies for queues table
 ALTER TABLE public.queues ENABLE ROW LEVEL SECURITY;
-
 DROP POLICY IF EXISTS "Users can view queues in their tenant" ON public.queues;
 CREATE POLICY "Users can view queues in their tenant"
 ON public.queues
@@ -147,7 +114,6 @@ USING (
         WHERE ur.user_id = auth.uid()
     )
 );
-
 DROP POLICY IF EXISTS "Tenant admins can manage queues" ON public.queues;
 CREATE POLICY "Tenant admins can manage queues"
 ON public.queues
@@ -175,7 +141,6 @@ WITH CHECK (
         AND ur.role = 'tenant_admin'
     )
 );
-
 -- 8. Create function to evaluate queue rules and assign queue
 CREATE OR REPLACE FUNCTION public.process_email_queue_assignment()
 RETURNS TRIGGER
@@ -279,14 +244,12 @@ BEGIN
     RETURN NEW;
 END;
 $$;
-
 -- 9. Create trigger for auto-assignment
 DROP TRIGGER IF EXISTS trg_assign_email_queue ON public.emails;
 CREATE TRIGGER trg_assign_email_queue
     BEFORE INSERT ON public.emails
     FOR EACH ROW
     EXECUTE FUNCTION public.process_email_queue_assignment();
-
 -- 10. Create function to manually assign email to queue
 CREATE OR REPLACE FUNCTION public.assign_email_to_queue(
     p_email_id UUID,
@@ -357,7 +320,6 @@ BEGIN
     RETURN true;
 END;
 $$;
-
 -- 11. Create function to get user's accessible queues
 CREATE OR REPLACE FUNCTION public.get_user_queues()
 RETURNS TABLE (
@@ -415,7 +377,6 @@ BEGIN
     GROUP BY q.id, q.name, q.type, q.description;
 END;
 $$;
-
 -- 12. Update updated_at trigger for queue_rules
 CREATE OR REPLACE FUNCTION public.update_queue_rules_updated_at()
 RETURNS TRIGGER AS $$
@@ -424,13 +385,11 @@ BEGIN
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SET search_path = public;
-
 DROP TRIGGER IF EXISTS update_queue_rules_updated_at ON public.queue_rules;
 CREATE TRIGGER update_queue_rules_updated_at
     BEFORE UPDATE ON public.queue_rules
     FOR EACH ROW
     EXECUTE FUNCTION public.update_queue_rules_updated_at();
-
 -- 13. Grant execute permissions
 GRANT EXECUTE ON FUNCTION public.assign_email_to_queue(UUID, TEXT) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.get_user_queues() TO authenticated;

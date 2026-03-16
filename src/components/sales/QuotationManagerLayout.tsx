@@ -285,7 +285,7 @@ export function QuotationManagerLayout({
           </nav>
         </div>
 
-        {/* Right Section */}
+        {/* Communication */}
         <div className="flex items-center gap-3">
           <Button 
             variant="ghost" 
@@ -487,7 +487,7 @@ export function QuotationManagerLayout({
 
           <div className="flex bg-gray-100 p-1 rounded-lg gap-0.5">
             <Button 
-              variant={viewMode === 'list' ? 'white' : 'ghost'} 
+              variant={viewMode === 'list' ? 'secondary' : 'ghost'} 
               size="icon" 
               className={`h-8 w-8 ${viewMode === 'list' ? 'shadow-sm text-[#714B67]' : 'text-gray-500 hover:text-gray-700'}`}
               onClick={() => onViewModeChange('list')}
@@ -496,7 +496,7 @@ export function QuotationManagerLayout({
               <List className="h-4 w-4" />
             </Button>
             <Button 
-              variant={viewMode === 'board' ? 'white' : 'ghost'} 
+              variant={viewMode === 'board' ? 'secondary' : 'ghost'} 
               size="icon" 
               className={`h-8 w-8 ${viewMode === 'board' ? 'shadow-sm text-[#714B67]' : 'text-gray-500 hover:text-gray-700'}`}
               onClick={() => onViewModeChange('board')}

@@ -14,21 +14,17 @@ CREATE TABLE IF NOT EXISTS public.quotation_packages (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
-
 -- Enable RLS
 ALTER TABLE public.quotation_packages ENABLE ROW LEVEL SECURITY;
-
 -- Create indexes
 CREATE INDEX idx_quotation_packages_quote_id ON public.quotation_packages(quote_id);
 CREATE INDEX idx_quotation_packages_tenant_id ON public.quotation_packages(tenant_id);
-
 -- RLS Policies
 CREATE POLICY "Platform admins can manage all quotation packages"
   ON public.quotation_packages
   FOR ALL
   TO authenticated
   USING (is_platform_admin(auth.uid()));
-
 CREATE POLICY "Tenant admins can manage tenant quotation packages"
   ON public.quotation_packages
   FOR ALL
@@ -37,7 +33,6 @@ CREATE POLICY "Tenant admins can manage tenant quotation packages"
     has_role(auth.uid(), 'tenant_admin'::app_role) 
     AND tenant_id = get_user_tenant_id(auth.uid())
   );
-
 CREATE POLICY "Users can view franchise quotation packages"
   ON public.quotation_packages
   FOR SELECT
@@ -48,7 +43,6 @@ CREATE POLICY "Users can view franchise quotation packages"
       WHERE franchise_id = get_user_franchise_id(auth.uid())
     )
   );
-
 CREATE POLICY "Users can create quotation packages"
   ON public.quotation_packages
   FOR INSERT
@@ -59,7 +53,6 @@ CREATE POLICY "Users can create quotation packages"
       WHERE franchise_id = get_user_franchise_id(auth.uid())
     )
   );
-
 CREATE POLICY "Users can update quotation packages"
   ON public.quotation_packages
   FOR UPDATE
@@ -70,13 +63,11 @@ CREATE POLICY "Users can update quotation packages"
       WHERE franchise_id = get_user_franchise_id(auth.uid())
     )
   );
-
 -- Trigger for updated_at
 CREATE TRIGGER update_quotation_packages_updated_at
   BEFORE UPDATE ON public.quotation_packages
   FOR EACH ROW
   EXECUTE FUNCTION public.update_updated_at_column();
-
 -- Grant permissions
 GRANT ALL ON public.quotation_packages TO authenticated;
 GRANT ALL ON public.quotation_packages TO service_role;

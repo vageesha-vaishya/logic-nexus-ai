@@ -17,7 +17,6 @@ BEGIN
     END LOOP;
   END IF;
 END $$;
-
 -- Create tenants table
 CREATE TABLE public.tenants (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -31,7 +30,6 @@ CREATE TABLE public.tenants (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
-
 -- Create franchises table
 CREATE TABLE public.franchises (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -44,7 +42,6 @@ CREATE TABLE public.franchises (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
-
 -- Create profiles table
 CREATE TABLE public.profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -58,7 +55,6 @@ CREATE TABLE public.profiles (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
-
 -- Create user_roles table (idempotent for fresh/local environments)
 CREATE TABLE IF NOT EXISTS public.user_roles (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -70,7 +66,6 @@ CREATE TABLE IF NOT EXISTS public.user_roles (
   assigned_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
   UNIQUE(user_id, role, tenant_id, franchise_id)
 );
-
 -- Create invitations table
 CREATE TABLE public.invitations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -84,7 +79,6 @@ CREATE TABLE public.invitations (
   accepted_at TIMESTAMP WITH TIME ZONE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
-
 -- Create audit_logs table
 CREATE TABLE public.audit_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -96,7 +90,6 @@ CREATE TABLE public.audit_logs (
   ip_address TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
-
 -- Enable RLS on all tables
 ALTER TABLE public.tenants ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.franchises ENABLE ROW LEVEL SECURITY;
@@ -104,7 +97,6 @@ ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.invitations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
-
 -- Create helper functions (SECURITY DEFINER)
 CREATE OR REPLACE FUNCTION public.has_role(check_user_id UUID, check_role public.app_role)
 RETURNS BOOLEAN
@@ -119,7 +111,6 @@ AS $$
       AND role = check_role
   );
 $$;
-
 CREATE OR REPLACE FUNCTION public.is_platform_admin(check_user_id UUID)
 RETURNS BOOLEAN
 LANGUAGE sql
@@ -129,7 +120,6 @@ SET search_path = public
 AS $$
   SELECT public.has_role(check_user_id, 'platform_admin'::public.app_role);
 $$;
-
 CREATE OR REPLACE FUNCTION public.get_user_tenant_id(check_user_id UUID)
 RETURNS UUID
 LANGUAGE sql
@@ -142,7 +132,6 @@ AS $$
     AND role IN ('tenant_admin', 'franchise_admin', 'user')
   LIMIT 1;
 $$;
-
 CREATE OR REPLACE FUNCTION public.get_user_franchise_id(check_user_id UUID)
 RETURNS UUID
 LANGUAGE sql
@@ -155,123 +144,99 @@ AS $$
     AND role IN ('franchise_admin', 'user')
   LIMIT 1;
 $$;
-
 -- RLS Policies for profiles
 CREATE POLICY "Users can view own profile"
   ON public.profiles FOR SELECT
   USING (auth.uid() = id);
-
 CREATE POLICY "Platform admins can view all profiles"
   ON public.profiles FOR SELECT
   USING (public.is_platform_admin(auth.uid()));
-
 CREATE POLICY "Tenant admins can view tenant profiles"
   ON public.profiles FOR SELECT
   USING (
     public.has_role(auth.uid(), 'tenant_admin') AND
     public.get_user_tenant_id(id) = public.get_user_tenant_id(auth.uid())
   );
-
 CREATE POLICY "Franchise admins can view franchise profiles"
   ON public.profiles FOR SELECT
   USING (
     public.has_role(auth.uid(), 'franchise_admin') AND
     public.get_user_franchise_id(id) = public.get_user_franchise_id(auth.uid())
   );
-
 CREATE POLICY "Users can update own profile"
   ON public.profiles FOR UPDATE
   USING (auth.uid() = id);
-
 CREATE POLICY "Platform admins can update all profiles"
   ON public.profiles FOR UPDATE
   USING (public.is_platform_admin(auth.uid()));
-
 CREATE POLICY "Platform admins can insert profiles"
   ON public.profiles FOR INSERT
   WITH CHECK (public.is_platform_admin(auth.uid()));
-
 -- RLS Policies for tenants
 CREATE POLICY "Platform admins full access to tenants"
   ON public.tenants FOR ALL
   USING (public.is_platform_admin(auth.uid()));
-
 CREATE POLICY "Tenant admins can view own tenant"
   ON public.tenants FOR SELECT
   USING (id = public.get_user_tenant_id(auth.uid()));
-
 CREATE POLICY "Tenant admins can update own tenant"
   ON public.tenants FOR UPDATE
   USING (id = public.get_user_tenant_id(auth.uid()));
-
 -- RLS Policies for franchises
 CREATE POLICY "Platform admins full access to franchises"
   ON public.franchises FOR ALL
   USING (public.is_platform_admin(auth.uid()));
-
 CREATE POLICY "Tenant admins can manage tenant franchises"
   ON public.franchises FOR ALL
   USING (tenant_id = public.get_user_tenant_id(auth.uid()));
-
 CREATE POLICY "Franchise admins can view own franchise"
   ON public.franchises FOR SELECT
   USING (id = public.get_user_franchise_id(auth.uid()));
-
 CREATE POLICY "Franchise admins can update own franchise"
   ON public.franchises FOR UPDATE
   USING (id = public.get_user_franchise_id(auth.uid()));
-
 CREATE POLICY "Users can view own franchise"
   ON public.franchises FOR SELECT
   USING (id = public.get_user_franchise_id(auth.uid()));
-
 -- RLS Policies for user_roles
 CREATE POLICY "Users can view own roles"
   ON public.user_roles FOR SELECT
   USING (user_id = auth.uid());
-
 CREATE POLICY "Platform admins full access to roles"
   ON public.user_roles FOR ALL
   USING (public.is_platform_admin(auth.uid()));
-
 CREATE POLICY "Tenant admins can manage tenant roles"
   ON public.user_roles FOR ALL
   USING (
     public.has_role(auth.uid(), 'tenant_admin') AND
     tenant_id = public.get_user_tenant_id(auth.uid())
   );
-
 CREATE POLICY "Franchise admins can view franchise roles"
   ON public.user_roles FOR SELECT
   USING (
     public.has_role(auth.uid(), 'franchise_admin') AND
     franchise_id = public.get_user_franchise_id(auth.uid())
   );
-
 -- RLS Policies for invitations
 CREATE POLICY "Platform admins full access to invitations"
   ON public.invitations FOR ALL
   USING (public.is_platform_admin(auth.uid()));
-
 CREATE POLICY "Tenant admins can manage tenant invitations"
   ON public.invitations FOR ALL
   USING (
     public.has_role(auth.uid(), 'tenant_admin') AND
     tenant_id = public.get_user_tenant_id(auth.uid())
   );
-
 CREATE POLICY "Franchise admins can manage franchise invitations"
   ON public.invitations FOR ALL
   USING (
     public.has_role(auth.uid(), 'franchise_admin') AND
     franchise_id = public.get_user_franchise_id(auth.uid())
   );
-
 -- RLS Policies for audit_logs
 CREATE POLICY "Platform admins can view all audit logs"
   ON public.audit_logs FOR SELECT
   USING (public.is_platform_admin(auth.uid()));
-
 CREATE POLICY "Tenant admins can view tenant audit logs"
   ON public.audit_logs FOR SELECT
   USING (
@@ -281,7 +246,6 @@ CREATE POLICY "Tenant admins can view tenant audit logs"
       WHERE ur.tenant_id = public.get_user_tenant_id(auth.uid())
     )
   );
-
 -- Trigger to auto-create profile on user signup
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER
@@ -300,11 +264,9 @@ BEGIN
   RETURN NEW;
 END;
 $$;
-
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
-
 -- Trigger for updating updated_at timestamp
 CREATE OR REPLACE FUNCTION public.update_updated_at_column()
 RETURNS TRIGGER
@@ -315,16 +277,12 @@ BEGIN
   RETURN NEW;
 END;
 $$;
-
 CREATE TRIGGER update_tenants_updated_at BEFORE UPDATE ON public.tenants
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
-
 CREATE TRIGGER update_franchises_updated_at BEFORE UPDATE ON public.franchises
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
-
 CREATE TRIGGER update_profiles_updated_at BEFORE UPDATE ON public.profiles
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
-
 -- Create indexes for performance
 CREATE INDEX idx_user_roles_user_id ON public.user_roles(user_id);
 CREATE INDEX idx_user_roles_tenant_id ON public.user_roles(tenant_id);

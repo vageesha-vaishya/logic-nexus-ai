@@ -2,7 +2,6 @@
 -- The issue is that NEW.id isn't available in quotation_versions when the trigger fires
 
 DROP FUNCTION IF EXISTS log_version_changes() CASCADE;
-
 CREATE OR REPLACE FUNCTION public.log_version_changes()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -57,7 +56,6 @@ BEGIN
   RETURN COALESCE(NEW, OLD);
 END;
 $function$;
-
 -- Recreate the trigger
 CREATE TRIGGER log_version_changes_trigger
 AFTER INSERT OR UPDATE OR DELETE ON quotation_versions

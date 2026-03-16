@@ -2,7 +2,6 @@
 -- Description: Implements the execute_booking RPC that allows Autonomous Agents to select options and book shipments.
 
 BEGIN;
-
 -- Function: execute_booking
 -- Description: 
 -- 1. Validates Agent and Quote.
@@ -145,5 +144,4 @@ EXCEPTION WHEN OTHERS THEN
     RAISE; 
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
-
 COMMIT;

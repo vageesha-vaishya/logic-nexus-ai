@@ -6,7 +6,6 @@
 -- Safe to re-run: checks existence before creating
 
 BEGIN;
-
 -- Helper: create unique index on LOWER(code) if table exists
 DO $$
 BEGIN
@@ -20,7 +19,6 @@ BEGIN
       ON public.transport_modes (LOWER(code));
   END IF;
 END $$;
-
 DO $$
 BEGIN
   IF EXISTS (
@@ -33,7 +31,6 @@ BEGIN
       ON public.service_modes (LOWER(code));
   END IF;
 END $$;
-
 -- Helper: add icon_name check constraint to restrict to known set (or NULL)
 -- Known set (must match UI options): Ship, Plane, Truck, Train, Package, Waves, Container, Navigation, Anchor, Bus, Network
 DO $$
@@ -59,7 +56,6 @@ BEGIN
     END IF;
   END IF;
 END $$;
-
 DO $$
 BEGIN
   IF EXISTS (
@@ -83,5 +79,4 @@ BEGIN
     END IF;
   END IF;
 END $$;
-
 COMMIT;

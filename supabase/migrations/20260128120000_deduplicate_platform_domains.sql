@@ -21,7 +21,6 @@ BEGIN
         RAISE NOTICE 'Cleaned up duplicates for code: %', r.code;
     END LOOP;
 END $$;
-
 -- Add unique constraint if it doesn't exist
 DO $$
 BEGIN

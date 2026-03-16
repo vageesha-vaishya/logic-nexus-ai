@@ -1,11 +1,9 @@
 BEGIN;
-
 -- 1. Ensure invoice_line_items.type allows 'fees'
 -- Dropping existing constraint and adding a comprehensive one
 ALTER TABLE public.invoice_line_items DROP CONSTRAINT IF EXISTS invoice_line_items_type_check;
 ALTER TABLE public.invoice_line_items ADD CONSTRAINT invoice_line_items_type_check 
   CHECK (type IN ('service', 'product', 'tax', 'fees', 'adjustment'));
-
 -- 2. Update create_invoice_from_shipment to be robust and metadata-rich
 CREATE OR REPLACE FUNCTION public.create_invoice_from_shipment(
   p_shipment_id UUID,
@@ -179,5 +177,4 @@ BEGIN
   RETURN v_invoice_id;
 END;
 $$ LANGUAGE plpgsql;
-
 COMMIT;

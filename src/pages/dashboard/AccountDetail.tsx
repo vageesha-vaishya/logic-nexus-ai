@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -18,10 +18,12 @@ import { EnterpriseNotebook, EnterpriseTab } from '@/components/ui/enterprise/En
 import { EnterpriseActivityFeed } from '@/components/ui/enterprise/EnterpriseActivityFeed';
 import { EnterpriseTable, type Column, EnterpriseCard } from '@/components/ui/enterprise';
 import { Badge } from '@/components/ui/badge';
+import { StickyActionsBar } from '@/components/ui/StickyActionsBar';
 
 export default function AccountDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { context, scopedDb } = useCRM();
   const [account, setAccount] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -30,10 +32,19 @@ export default function AccountDetail() {
   const [relatedContacts, setRelatedContacts] = useState<any[]>([]);
   const [relatedOpps, setRelatedOpps] = useState<any[]>([]);
   const [isEnriching, setIsEnriching] = useState(false);
+  const shouldOpenInEditMode = Boolean((location.state as { openEdit?: boolean } | null)?.openEdit);
+  const returnTo = (location.state as { returnTo?: string } | null)?.returnTo;
+  const autoSave = Boolean((location.state as { autoSave?: boolean } | null)?.autoSave);
 
   useEffect(() => {
     if (id) fetchAccount();
   }, [id]);
+
+  useEffect(() => {
+    if (shouldOpenInEditMode) {
+      setIsEditing(true);
+    }
+  }, [shouldOpenInEditMode]);
 
   const fetchAccount = async () => {
     try {
@@ -100,6 +111,10 @@ export default function AccountDetail() {
         const { error } = await scopedDb.from('accounts').update(updateData).eq('id', id);
         if (error) throw error;
         toast.success('Account updated');
+        if (returnTo) {
+          navigate(returnTo, { replace: true, state: { accountUpdated: true } });
+          return;
+        }
         setIsEditing(false);
         fetchAccount();
     } catch (e) {
@@ -153,6 +168,23 @@ export default function AccountDetail() {
     { key: 'stage', label: 'Stage', width: '120px', render: (value) => <Badge>{value}</Badge> },
     { key: 'amount', label: 'Amount', width: '150px', render: (value) => `$${value?.toLocaleString() || '0.00'}` },
   ];
+  const stickyActions = isEditing
+    ? [
+        <Button key="cancel-edit" variant="outline" onClick={() => setIsEditing(false)}>
+          Cancel
+        </Button>,
+      ]
+    : [
+        <Button key="new-account" variant="outline" onClick={() => navigate('/dashboard/accounts/new')}>
+          New Account
+        </Button>,
+        <Button key="edit-account" variant="outline" onClick={() => setIsEditing(true)}>
+          Edit
+        </Button>,
+        <Button key="delete-account" variant="destructive" onClick={() => setShowDeleteDialog(true)}>
+          Delete
+        </Button>,
+      ];
 
   return (
     <div className="h-screen w-full bg-[#f9fafb] overflow-hidden">
@@ -294,7 +326,8 @@ export default function AccountDetail() {
                             entityType="account"
                             mode="edit"
                             onSubmit={handleUpdate} 
-                            onCancel={() => setIsEditing(false)} 
+                            onCancel={() => setIsEditing(false)}
+                            autoSave={autoSave}
                         />
                     ) : (
                         <EnterpriseNotebook>
@@ -346,6 +379,7 @@ export default function AccountDetail() {
                 {/* Chatter Sidebar */}
                 <EnterpriseActivityFeed className="hidden xl:flex shrink-0 w-[400px]" />
             </EnterpriseFormLayout>
+        <StickyActionsBar right={stickyActions} />
         
         <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
             <AlertDialogContent>

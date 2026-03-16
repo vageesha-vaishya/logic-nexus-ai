@@ -12,7 +12,6 @@ ADD COLUMN IF NOT EXISTS website TEXT,
 ADD COLUMN IF NOT EXISTS tax_id TEXT,
 ADD COLUMN IF NOT EXISTS payment_terms TEXT, -- e.g., 'Net 30'
 ADD COLUMN IF NOT EXISTS currency TEXT DEFAULT 'USD';
-
 -----------------------------------------------------------------------------
 -- 2. Vendor Documents (Compliance & Legal)
 -----------------------------------------------------------------------------
@@ -29,9 +28,7 @@ CREATE TABLE IF NOT EXISTS public.vendor_documents (
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now()
 );
-
 CREATE INDEX IF NOT EXISTS idx_vendor_docs_vendor ON public.vendor_documents(vendor_id);
-
 -----------------------------------------------------------------------------
 -- 3. Vendor Contracts (Lifecycle Management)
 -----------------------------------------------------------------------------
@@ -52,9 +49,7 @@ CREATE TABLE IF NOT EXISTS public.vendor_contracts (
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now()
 );
-
 CREATE INDEX IF NOT EXISTS idx_vendor_contracts_vendor ON public.vendor_contracts(vendor_id);
-
 -----------------------------------------------------------------------------
 -- 4. Vendor Performance Reviews (KPIs & Scoring)
 -----------------------------------------------------------------------------
@@ -72,9 +67,7 @@ CREATE TABLE IF NOT EXISTS public.vendor_performance_reviews (
     comments TEXT,
     created_at TIMESTAMPTZ DEFAULT now()
 );
-
 CREATE INDEX IF NOT EXISTS idx_vendor_reviews_vendor ON public.vendor_performance_reviews(vendor_id);
-
 -----------------------------------------------------------------------------
 -- 5. Vendor Risk Assessments
 -----------------------------------------------------------------------------
@@ -90,9 +83,7 @@ CREATE TABLE IF NOT EXISTS public.vendor_risk_assessments (
     assessed_by UUID REFERENCES public.profiles(id),
     created_at TIMESTAMPTZ DEFAULT now()
 );
-
 CREATE INDEX IF NOT EXISTS idx_vendor_risk_vendor ON public.vendor_risk_assessments(vendor_id);
-
 -----------------------------------------------------------------------------
 -- 6. Enable RLS
 -----------------------------------------------------------------------------
@@ -100,7 +91,6 @@ ALTER TABLE public.vendor_documents ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.vendor_contracts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.vendor_performance_reviews ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.vendor_risk_assessments ENABLE ROW LEVEL SECURITY;
-
 -- Policies (Standard Tenant Isolation)
 -- Assuming vendors are tenant-scoped or global (tenant_id IS NULL)
 -- For simplicity, we'll allow access if user belongs to the vendor's tenant (or if vendor is global)
@@ -115,7 +105,6 @@ CREATE POLICY "Tenant Access" ON public.vendor_documents
             AND (v.tenant_id = (SELECT tenant_id FROM public.profiles WHERE id = auth.uid()) OR v.tenant_id IS NULL)
         )
     );
-
 DROP POLICY IF EXISTS "Tenant Access" ON public.vendor_contracts;
 CREATE POLICY "Tenant Access" ON public.vendor_contracts
     USING (
@@ -125,7 +114,6 @@ CREATE POLICY "Tenant Access" ON public.vendor_contracts
             AND (v.tenant_id = (SELECT tenant_id FROM public.profiles WHERE id = auth.uid()) OR v.tenant_id IS NULL)
         )
     );
-
 DROP POLICY IF EXISTS "Tenant Access" ON public.vendor_performance_reviews;
 CREATE POLICY "Tenant Access" ON public.vendor_performance_reviews
     USING (
@@ -135,7 +123,6 @@ CREATE POLICY "Tenant Access" ON public.vendor_performance_reviews
             AND (v.tenant_id = (SELECT tenant_id FROM public.profiles WHERE id = auth.uid()) OR v.tenant_id IS NULL)
         )
     );
-
 DROP POLICY IF EXISTS "Tenant Access" ON public.vendor_risk_assessments;
 CREATE POLICY "Tenant Access" ON public.vendor_risk_assessments
     USING (
@@ -145,4 +132,3 @@ CREATE POLICY "Tenant Access" ON public.vendor_risk_assessments
             AND (v.tenant_id = (SELECT tenant_id FROM public.profiles WHERE id = auth.uid()) OR v.tenant_id IS NULL)
         )
     );
-

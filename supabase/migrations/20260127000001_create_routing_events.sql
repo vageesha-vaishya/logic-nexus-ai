@@ -18,7 +18,6 @@ BEGIN
         ALTER TABLE public.emails ADD COLUMN queue TEXT;
     END IF;
 END $$;
-
 -- Create routing_events table
 CREATE TABLE IF NOT EXISTS public.routing_events (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -28,10 +27,8 @@ CREATE TABLE IF NOT EXISTS public.routing_events (
     routed_at TIMESTAMPTZ DEFAULT NOW(),
     metadata JSONB DEFAULT '{}'::jsonb
 );
-
 -- Enable RLS
 ALTER TABLE public.routing_events ENABLE ROW LEVEL SECURITY;
-
 -- RLS Policies
 DROP POLICY IF EXISTS "Tenant admins can view routing events" ON public.routing_events;
 CREATE POLICY "Tenant admins can view routing events"
@@ -45,7 +42,6 @@ CREATE POLICY "Tenant admins can view routing events"
       AND has_role(auth.uid(), 'tenant_admin')
     )
   );
-
 DROP POLICY IF EXISTS "Users can view routing events for accessible emails" ON public.routing_events;
 CREATE POLICY "Users can view routing events for accessible emails"
   ON public.routing_events
@@ -61,14 +57,12 @@ CREATE POLICY "Users can view routing events for accessible emails"
       )
     )
   );
-
 DROP POLICY IF EXISTS "Service role can manage all" ON public.routing_events;
 CREATE POLICY "Service role can manage all"
   ON public.routing_events
   FOR ALL
   USING (true)
   WITH CHECK (true);
-
 -- Function to get queue counts
 -- Now we can just count from emails table directly which is faster and simpler
 CREATE OR REPLACE FUNCTION get_queue_counts()
@@ -84,7 +78,6 @@ AS $$
     GROUP BY queue
   ) t;
 $$;
-
 -- BACKFILL LOGIC FOR EXISTING EMAILS
 DO $$
 DECLARE

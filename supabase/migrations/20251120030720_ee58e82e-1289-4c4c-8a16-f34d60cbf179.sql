@@ -18,33 +18,27 @@ CREATE TABLE charge_weight_breaks (
   updated_at TIMESTAMPTZ DEFAULT now(),
   CONSTRAINT valid_effective_dates CHECK (effective_until IS NULL OR effective_until >= effective_from)
 );
-
 -- Add indexes for performance
 CREATE INDEX idx_charge_weight_breaks_tenant ON charge_weight_breaks(tenant_id);
 CREATE INDEX idx_charge_weight_breaks_carrier ON charge_weight_breaks(carrier_id);
 CREATE INDEX idx_charge_weight_breaks_service_type ON charge_weight_breaks(service_type_id);
 CREATE INDEX idx_charge_weight_breaks_weight ON charge_weight_breaks(min_weight_kg, max_weight_kg);
 CREATE INDEX idx_charge_weight_breaks_dates ON charge_weight_breaks(effective_from, effective_until);
-
 -- Phase 4.2: Dimensional Weight Support
 -- Add dimensional weight flag to service_types
 ALTER TABLE service_types 
 ADD COLUMN use_dimensional_weight BOOLEAN DEFAULT false,
 ADD COLUMN dim_divisor NUMERIC DEFAULT 6000 CHECK (dim_divisor > 0);
-
 COMMENT ON COLUMN service_types.use_dimensional_weight IS 'Whether to calculate chargeable weight using dimensional (volumetric) weight';
-COMMENT ON COLUMN service_types.dim_divisor IS 'Divisor for dimensional weight calculation (L×W×H)/divisor. Default 6000 for air freight';
-
+COMMENT ON COLUMN service_types.dim_divisor IS 'Divisor for dimensional weight calculation (L├ùW├ùH)/divisor. Default 6000 for air freight';
 -- Add dimensional weight calculation to cargo_details (already has dimensions_cm)
 ALTER TABLE cargo_details
 ADD COLUMN actual_weight_kg NUMERIC CHECK (actual_weight_kg IS NULL OR actual_weight_kg >= 0),
 ADD COLUMN volumetric_weight_kg NUMERIC CHECK (volumetric_weight_kg IS NULL OR volumetric_weight_kg >= 0),
 ADD COLUMN chargeable_weight_kg NUMERIC CHECK (chargeable_weight_kg IS NULL OR chargeable_weight_kg >= 0);
-
 COMMENT ON COLUMN cargo_details.actual_weight_kg IS 'Physical weight of the cargo';
 COMMENT ON COLUMN cargo_details.volumetric_weight_kg IS 'Calculated volumetric/dimensional weight';
 COMMENT ON COLUMN cargo_details.chargeable_weight_kg IS 'Weight used for pricing (greater of actual or volumetric)';
-
 -- Create function to calculate dimensional weight
 CREATE OR REPLACE FUNCTION calculate_dimensional_weight(
   p_length_cm NUMERIC,
@@ -63,7 +57,6 @@ AS $$
     ELSE (p_length_cm * p_width_cm * p_height_cm) / p_divisor
   END;
 $$;
-
 -- Create function to get chargeable weight
 CREATE OR REPLACE FUNCTION get_chargeable_weight(
   p_actual_weight_kg NUMERIC,
@@ -79,78 +72,47 @@ AS $$
     COALESCE(p_volumetric_weight_kg, 0)
   );
 $$;
-
 -- Phase 4.3: Container Type Variations
 -- Add container ownership and special types to container_types
 ALTER TABLE container_types
 ADD COLUMN ownership_type TEXT CHECK (ownership_type IN ('COC', 'SOC', 'BOTH', NULL)),
 ADD COLUMN is_special BOOLEAN DEFAULT false,
 ADD COLUMN special_type TEXT;
-
 COMMENT ON COLUMN container_types.ownership_type IS 'COC (Carrier Owned), SOC (Shipper Owned), or BOTH';
 COMMENT ON COLUMN container_types.is_special IS 'Whether this is a special container type (Open Top, Flat Rack, etc.)';
 COMMENT ON COLUMN container_types.special_type IS 'Type of special container: open_top, flat_rack, tank, refrigerated, etc.';
-
 -- Add special container attributes to container_sizes
 ALTER TABLE container_sizes
 ADD COLUMN has_ventilation BOOLEAN DEFAULT false,
 ADD COLUMN has_temperature_control BOOLEAN DEFAULT false,
 ADD COLUMN is_open_top BOOLEAN DEFAULT false,
 ADD COLUMN is_flat_rack BOOLEAN DEFAULT false;
-
 -- Insert common container ownership variants
-DO $$
-BEGIN
-  IF EXISTS (
-    SELECT 1
-    FROM information_schema.columns
-    WHERE table_schema = 'public'
-      AND table_name = 'container_types'
-      AND column_name = 'category'
-  ) THEN
-    INSERT INTO container_types (name, code, ownership_type, is_active, is_special, special_type, category) VALUES
-    ('Dry COC', 'DRY_COC', 'COC', true, false, NULL, 'Standard'),
-    ('Dry SOC', 'DRY_SOC', 'SOC', true, false, NULL, 'Standard'),
-    ('Reefer COC', 'REEFER_COC', 'COC', true, true, 'refrigerated', 'Reefer'),
-    ('Reefer SOC', 'REEFER_SOC', 'SOC', true, true, 'refrigerated', 'Reefer'),
-    ('Open Top', 'OPEN_TOP', 'BOTH', true, true, 'open_top', 'Open Top'),
-    ('Flat Rack', 'FLAT_RACK', 'BOTH', true, true, 'flat_rack', 'Flat Rack'),
-    ('Tank Container', 'TANK', 'BOTH', true, true, 'tank', 'Tank')
-    ON CONFLICT (code) DO NOTHING;
-  ELSE
-    INSERT INTO container_types (name, code, ownership_type, is_active, is_special, special_type) VALUES
-    ('Dry COC', 'DRY_COC', 'COC', true, false, NULL),
-    ('Dry SOC', 'DRY_SOC', 'SOC', true, false, NULL),
-    ('Reefer COC', 'REEFER_COC', 'COC', true, true, 'refrigerated'),
-    ('Reefer SOC', 'REEFER_SOC', 'SOC', true, true, 'refrigerated'),
-    ('Open Top', 'OPEN_TOP', 'BOTH', true, true, 'open_top'),
-    ('Flat Rack', 'FLAT_RACK', 'BOTH', true, true, 'flat_rack'),
-    ('Tank Container', 'TANK', 'BOTH', true, true, 'tank')
-    ON CONFLICT (code) DO NOTHING;
-  END IF;
-END $$;
-
+INSERT INTO container_types (name, code, ownership_type, is_active, is_special, special_type) VALUES
+('Dry COC', 'DRY_COC', 'COC', true, false, NULL),
+('Dry SOC', 'DRY_SOC', 'SOC', true, false, NULL),
+('Reefer COC', 'REEFER_COC', 'COC', true, true, 'refrigerated'),
+('Reefer SOC', 'REEFER_SOC', 'SOC', true, true, 'refrigerated'),
+('Open Top', 'OPEN_TOP', 'BOTH', true, true, 'open_top'),
+('Flat Rack', 'FLAT_RACK', 'BOTH', true, true, 'flat_rack'),
+('Tank Container', 'TANK', 'BOTH', true, true, 'tank')
+ON CONFLICT (code) DO NOTHING;
 -- Add RLS policies for charge_weight_breaks
 ALTER TABLE charge_weight_breaks ENABLE ROW LEVEL SECURITY;
-
 CREATE POLICY "Platform admins can manage all weight breaks"
   ON charge_weight_breaks FOR ALL
   USING (is_platform_admin(auth.uid()));
-
 CREATE POLICY "Tenant admins can manage weight breaks"
   ON charge_weight_breaks FOR ALL
   USING (has_role(auth.uid(), 'tenant_admin') AND tenant_id = get_user_tenant_id(auth.uid()));
-
 CREATE POLICY "Users can view tenant weight breaks"
   ON charge_weight_breaks FOR SELECT
   USING (tenant_id = get_user_tenant_id(auth.uid()));
-
 -- Add trigger for updated_at
 CREATE TRIGGER update_charge_weight_breaks_updated_at
   BEFORE UPDATE ON charge_weight_breaks
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();
-
 -- Add helper function to find applicable weight break rate
 CREATE OR REPLACE FUNCTION get_weight_break_rate(
   p_tenant_id UUID,
@@ -191,9 +153,8 @@ AS $$
     min_weight_kg DESC
   LIMIT 1;
 $$;
-
 -- Add comments
 COMMENT ON TABLE charge_weight_breaks IS 'Weight-based tiered pricing for carriers (e.g., air freight 0-45kg, 45-100kg, 100+)';
-COMMENT ON FUNCTION calculate_dimensional_weight IS 'Calculates volumetric weight: (L×W×H)/divisor';
+COMMENT ON FUNCTION calculate_dimensional_weight IS 'Calculates volumetric weight: (L├ùW├ùH)/divisor';
 COMMENT ON FUNCTION get_chargeable_weight IS 'Returns the greater of actual weight or volumetric weight';
 COMMENT ON FUNCTION get_weight_break_rate IS 'Finds the applicable weight break rate for given parameters';

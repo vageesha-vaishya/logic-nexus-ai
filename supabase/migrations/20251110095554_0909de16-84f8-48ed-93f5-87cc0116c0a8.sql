@@ -49,10 +49,8 @@ BEGIN
     REFERENCES public.quotation_version_options(id)
     ON DELETE CASCADE;
 END $$;
-
 -- Optional: simple tenant RLS alignment (keeps existing if already set)
 ALTER TABLE public.quote_charges ENABLE ROW LEVEL SECURITY;
-
 DO $$
 BEGIN
   IF NOT EXISTS (

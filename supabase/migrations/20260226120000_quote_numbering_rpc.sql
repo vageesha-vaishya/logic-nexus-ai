@@ -9,10 +9,8 @@ CREATE TABLE IF NOT EXISTS quote_audits (
   changed_at timestamptz DEFAULT now(),
   notes text
 );
-
 -- Enable RLS
 ALTER TABLE quote_audits ENABLE ROW LEVEL SECURITY;
-
 -- Policies for quote_audits
 CREATE POLICY "Users can view audits for their tenant" ON quote_audits
   FOR SELECT
@@ -23,7 +21,6 @@ CREATE POLICY "Users can view audits for their tenant" ON quote_audits
       AND q.tenant_id = (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid() LIMIT 1)
     )
   );
-
 -- Function to generate quote number
 CREATE OR REPLACE FUNCTION generate_quote_number(p_prefix text, p_date date)
 RETURNS text
@@ -69,7 +66,6 @@ BEGIN
   RETURN v_new_number;
 END;
 $$;
-
 -- Function to check availability
 CREATE OR REPLACE FUNCTION check_quote_number_availability(p_quote_number text)
 RETURNS boolean
@@ -82,7 +78,6 @@ BEGIN
   );
 END;
 $$;
-
 -- Trigger function for audit
 CREATE OR REPLACE FUNCTION audit_quote_changes()
 RETURNS TRIGGER
@@ -106,7 +101,6 @@ BEGIN
   RETURN NULL;
 END;
 $$;
-
 -- Create Trigger
 DROP TRIGGER IF EXISTS trigger_audit_quotes ON quotes;
 CREATE TRIGGER trigger_audit_quotes

@@ -1,12 +1,10 @@
 BEGIN;
-
 -- Ensure 'Customs' charge category exists
 INSERT INTO public.charge_categories (name, code, description, is_active)
 SELECT 'Customs', 'customs', 'Customs clearance and duty fees', true
 WHERE NOT EXISTS (
     SELECT 1 FROM public.charge_categories WHERE code = 'customs'
 );
-
 CREATE OR REPLACE FUNCTION public.create_invoice_from_shipment(
   p_shipment_id uuid,
   p_tenant_id uuid
@@ -225,5 +223,4 @@ BEGIN
   RETURN v_invoice_id;
 END;
 $$;
-
 COMMIT;

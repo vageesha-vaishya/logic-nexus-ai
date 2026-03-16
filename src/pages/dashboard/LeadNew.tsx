@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { LeadForm } from '@/components/crm/LeadForm';
+import { LeadWorkspaceSections } from '@/components/crm/LeadWorkspaceSections';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 import { logger } from '@/lib/logger';
@@ -9,12 +10,14 @@ import * as Sentry from '@sentry/react';
 import { CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
 import { themeStyleFromPreset } from '@/lib/theme-utils';
 import { useLeadsViewState, LeadsPrimaryView } from '@/hooks/useLeadsViewState';
+import { FEATURE_FLAGS, useAppFeatureFlag } from '@/lib/feature-flags';
 
 export default function LeadNew() {
   const navigate = useNavigate();
   const { context, scopedDb } = useCRM();
   const { state: viewState, setTheme, setView, setPipeline } = useLeadsViewState();
   const currentTheme = viewState.theme;
+  const threeSectionLeadWorkspace = useAppFeatureFlag(FEATURE_FLAGS.LEAD_THREE_SECTION_LAYOUT);
 
   const handleThemeChange = (val: string) => {
     setTheme(val);
@@ -49,7 +52,7 @@ export default function LeadNew() {
     navigate('/dashboard/leads');
   };
 
-  const handleCreate = async (formData: any) => {
+  const createLead = async (formData: any) => {
     try {
       const tenantId = context.isPlatformAdmin 
         ? formData.tenant_id 
@@ -57,17 +60,22 @@ export default function LeadNew() {
 
       if (!tenantId) {
         toast.error('Please select a tenant');
-        return;
+        return null;
       }
 
       // Extract non-column extras and persist them into custom_fields
-      const { service_id, attachments, ...rest } = formData || {};
+      const { service_id, attachments, lead_type, referral_name, decision_timeline, stakeholders_count, lost_reason, ...rest } = formData || {};
       const attachmentNames = Array.isArray(attachments)
         ? attachments.map((f: File) => f.name)
         : [];
       const customFields: Record<string, any> = {
         ...(rest?.custom_fields || {}),
         ...(service_id ? { service_id } : {}),
+        ...(lead_type ? { lead_type } : {}),
+        ...(referral_name ? { referral_name } : {}),
+        ...(decision_timeline ? { decision_timeline } : {}),
+        ...(stakeholders_count ? { stakeholders_count } : {}),
+        ...(lost_reason ? { lost_reason } : {}),
         ...(attachmentNames.length ? { attachments_names: attachmentNames } : {}),
       };
 
@@ -85,16 +93,29 @@ export default function LeadNew() {
         .single();
 
       if (error) throw error;
-
-      toast.success('Lead created successfully');
-      navigate(`/dashboard/leads/${data.id}`);
+      return data;
     } catch (error: any) {
       toast.error('Failed to create lead');
       logger.error('Failed to create lead', {
         error: error instanceof Error ? error.message : String(error),
       });
       Sentry.captureException(error);
+      return null;
     }
+  };
+
+  const handleCreate = async (formData: any) => {
+    const created = await createLead(formData);
+    if (!created) return;
+    toast.success('Lead created successfully');
+    navigate(`/dashboard/leads/${created.id}`);
+  };
+
+  const handleCreateAndNew = async (formData: any) => {
+    const created = await createLead(formData);
+    if (!created) return;
+    toast.success('Lead created. Ready for next lead');
+    navigate('/dashboard/leads/new');
   };
 
   return (
@@ -133,17 +154,27 @@ export default function LeadNew() {
           />
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Lead Information</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <LeadForm
-              onSubmit={handleCreate}
-              onCancel={() => navigate('/dashboard/leads')}
-            />
-          </CardContent>
-        </Card>
+        {threeSectionLeadWorkspace ? (
+          <LeadWorkspaceSections
+            mode="create"
+            onSubmit={handleCreate}
+            onSaveAndNew={handleCreateAndNew}
+            onCancel={() => navigate('/dashboard/leads')}
+          />
+        ) : (
+          <Card>
+            <CardHeader>
+              <CardTitle>Lead Information</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <LeadForm
+                onSubmit={handleCreate}
+                onSaveAndNew={handleCreateAndNew}
+                onCancel={() => navigate('/dashboard/leads')}
+              />
+            </CardContent>
+          </Card>
+        )}
       </div>
     </DashboardLayout>
   );

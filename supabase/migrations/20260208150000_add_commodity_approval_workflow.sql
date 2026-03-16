@@ -4,10 +4,8 @@ ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'draft' CHECK (status IN (
 ADD COLUMN IF NOT EXISTS approved_by uuid REFERENCES auth.users(id),
 ADD COLUMN IF NOT EXISTS approved_at timestamptz,
 ADD COLUMN IF NOT EXISTS rejection_reason text;
-
 -- Add index for status filtering
 CREATE INDEX IF NOT EXISTS idx_master_commodities_status ON public.master_commodities(status);
-
 -- Update RLS policies to ensure proper access
 -- (Assuming existing policies cover basic CRUD, we might want to restrict approval to admins later, 
 -- but for now we rely on UI logic and potentially a trigger if strict enforcement is needed)

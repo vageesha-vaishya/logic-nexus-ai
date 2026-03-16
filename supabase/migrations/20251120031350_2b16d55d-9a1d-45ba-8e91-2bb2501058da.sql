@@ -36,7 +36,6 @@ CREATE TABLE IF NOT EXISTS provider_rate_templates (
   
   CONSTRAINT provider_rate_templates_unique UNIQUE(carrier_id, service_type_id, template_name)
 );
-
 -- ================================================
 -- 2. Provider Charge Mappings
 -- ================================================
@@ -71,7 +70,6 @@ CREATE TABLE IF NOT EXISTS provider_charge_mappings (
   
   CONSTRAINT provider_charge_mappings_unique UNIQUE(carrier_id, provider_charge_code)
 );
-
 -- ================================================
 -- 3. Provider API Configurations
 -- ================================================
@@ -120,7 +118,6 @@ CREATE TABLE IF NOT EXISTS provider_api_configs (
   
   CONSTRAINT provider_api_configs_unique UNIQUE(tenant_id, carrier_id)
 );
-
 -- ================================================
 -- 4. Provider Rate Rules
 -- ================================================
@@ -151,7 +148,6 @@ CREATE TABLE IF NOT EXISTS provider_rate_rules (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
-
 -- ================================================
 -- 5. Provider Surcharge Definitions
 -- ================================================
@@ -191,43 +187,35 @@ CREATE TABLE IF NOT EXISTS provider_surcharges (
   
   CONSTRAINT provider_surcharges_unique UNIQUE(carrier_id, surcharge_code)
 );
-
 -- ================================================
 -- Indexes
 -- ================================================
 CREATE INDEX IF NOT EXISTS idx_provider_rate_templates_carrier ON provider_rate_templates(carrier_id);
 CREATE INDEX IF NOT EXISTS idx_provider_rate_templates_service_type ON provider_rate_templates(service_type_id);
 CREATE INDEX IF NOT EXISTS idx_provider_rate_templates_active ON provider_rate_templates(is_active);
-
 CREATE INDEX IF NOT EXISTS idx_provider_charge_mappings_carrier ON provider_charge_mappings(carrier_id);
 CREATE INDEX IF NOT EXISTS idx_provider_charge_mappings_category ON provider_charge_mappings(charge_category_id);
 CREATE INDEX IF NOT EXISTS idx_provider_charge_mappings_active ON provider_charge_mappings(is_active);
-
 CREATE INDEX IF NOT EXISTS idx_provider_api_configs_carrier ON provider_api_configs(carrier_id);
 CREATE INDEX IF NOT EXISTS idx_provider_api_configs_active ON provider_api_configs(is_active);
-
 CREATE INDEX IF NOT EXISTS idx_provider_rate_rules_carrier ON provider_rate_rules(carrier_id);
 CREATE INDEX IF NOT EXISTS idx_provider_rate_rules_service_type ON provider_rate_rules(service_type_id);
 CREATE INDEX IF NOT EXISTS idx_provider_rate_rules_priority ON provider_rate_rules(priority);
 CREATE INDEX IF NOT EXISTS idx_provider_rate_rules_active ON provider_rate_rules(is_active);
-
 CREATE INDEX IF NOT EXISTS idx_provider_surcharges_carrier ON provider_surcharges(carrier_id);
 CREATE INDEX IF NOT EXISTS idx_provider_surcharges_active ON provider_surcharges(is_active);
-
 -- ================================================
 -- Row Level Security (RLS)
 -- ================================================
 
 -- Provider Rate Templates
 ALTER TABLE provider_rate_templates ENABLE ROW LEVEL SECURITY;
-
 CREATE POLICY "Platform admins full access to provider rate templates"
   ON provider_rate_templates
   FOR ALL
   TO authenticated
   USING (is_platform_admin(auth.uid()))
   WITH CHECK (is_platform_admin(auth.uid()));
-
 CREATE POLICY "Tenant admins manage provider rate templates"
   ON provider_rate_templates
   FOR ALL
@@ -236,23 +224,19 @@ CREATE POLICY "Tenant admins manage provider rate templates"
     has_role(auth.uid(), 'tenant_admin') 
     AND tenant_id = get_user_tenant_id(auth.uid())
   );
-
 CREATE POLICY "Users view tenant provider rate templates"
   ON provider_rate_templates
   FOR SELECT
   TO authenticated
   USING (tenant_id = get_user_tenant_id(auth.uid()));
-
 -- Provider Charge Mappings
 ALTER TABLE provider_charge_mappings ENABLE ROW LEVEL SECURITY;
-
 CREATE POLICY "Platform admins full access to provider charge mappings"
   ON provider_charge_mappings
   FOR ALL
   TO authenticated
   USING (is_platform_admin(auth.uid()))
   WITH CHECK (is_platform_admin(auth.uid()));
-
 CREATE POLICY "Tenant admins manage provider charge mappings"
   ON provider_charge_mappings
   FOR ALL
@@ -261,23 +245,19 @@ CREATE POLICY "Tenant admins manage provider charge mappings"
     has_role(auth.uid(), 'tenant_admin') 
     AND tenant_id = get_user_tenant_id(auth.uid())
   );
-
 CREATE POLICY "Users view tenant provider charge mappings"
   ON provider_charge_mappings
   FOR SELECT
   TO authenticated
   USING (tenant_id = get_user_tenant_id(auth.uid()));
-
 -- Provider API Configurations
 ALTER TABLE provider_api_configs ENABLE ROW LEVEL SECURITY;
-
 CREATE POLICY "Platform admins full access to provider api configs"
   ON provider_api_configs
   FOR ALL
   TO authenticated
   USING (is_platform_admin(auth.uid()))
   WITH CHECK (is_platform_admin(auth.uid()));
-
 CREATE POLICY "Tenant admins manage provider api configs"
   ON provider_api_configs
   FOR ALL
@@ -286,17 +266,14 @@ CREATE POLICY "Tenant admins manage provider api configs"
     has_role(auth.uid(), 'tenant_admin') 
     AND tenant_id = get_user_tenant_id(auth.uid())
   );
-
 -- Provider Rate Rules
 ALTER TABLE provider_rate_rules ENABLE ROW LEVEL SECURITY;
-
 CREATE POLICY "Platform admins full access to provider rate rules"
   ON provider_rate_rules
   FOR ALL
   TO authenticated
   USING (is_platform_admin(auth.uid()))
   WITH CHECK (is_platform_admin(auth.uid()));
-
 CREATE POLICY "Tenant admins manage provider rate rules"
   ON provider_rate_rules
   FOR ALL
@@ -305,23 +282,19 @@ CREATE POLICY "Tenant admins manage provider rate rules"
     has_role(auth.uid(), 'tenant_admin') 
     AND tenant_id = get_user_tenant_id(auth.uid())
   );
-
 CREATE POLICY "Users view tenant provider rate rules"
   ON provider_rate_rules
   FOR SELECT
   TO authenticated
   USING (tenant_id = get_user_tenant_id(auth.uid()));
-
 -- Provider Surcharges
 ALTER TABLE provider_surcharges ENABLE ROW LEVEL SECURITY;
-
 CREATE POLICY "Platform admins full access to provider surcharges"
   ON provider_surcharges
   FOR ALL
   TO authenticated
   USING (is_platform_admin(auth.uid()))
   WITH CHECK (is_platform_admin(auth.uid()));
-
 CREATE POLICY "Tenant admins manage provider surcharges"
   ON provider_surcharges
   FOR ALL
@@ -330,13 +303,11 @@ CREATE POLICY "Tenant admins manage provider surcharges"
     has_role(auth.uid(), 'tenant_admin') 
     AND tenant_id = get_user_tenant_id(auth.uid())
   );
-
 CREATE POLICY "Users view tenant provider surcharges"
   ON provider_surcharges
   FOR SELECT
   TO authenticated
   USING (tenant_id = get_user_tenant_id(auth.uid()));
-
 -- ================================================
 -- Triggers for updated_at
 -- ================================================
@@ -344,27 +315,22 @@ CREATE TRIGGER update_provider_rate_templates_updated_at
   BEFORE UPDATE ON provider_rate_templates
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();
-
 CREATE TRIGGER update_provider_charge_mappings_updated_at
   BEFORE UPDATE ON provider_charge_mappings
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();
-
 CREATE TRIGGER update_provider_api_configs_updated_at
   BEFORE UPDATE ON provider_api_configs
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();
-
 CREATE TRIGGER update_provider_rate_rules_updated_at
   BEFORE UPDATE ON provider_rate_rules
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();
-
 CREATE TRIGGER update_provider_surcharges_updated_at
   BEFORE UPDATE ON provider_surcharges
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();
-
 -- ================================================
 -- Helper Functions
 -- ================================================
@@ -429,7 +395,6 @@ BEGIN
   ORDER BY ps.surcharge_code;
 END;
 $$;
-
 -- Function to evaluate provider rate rules
 CREATE OR REPLACE FUNCTION evaluate_provider_rate_rules(
   p_carrier_id UUID,

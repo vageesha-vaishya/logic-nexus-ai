@@ -1,7 +1,6 @@
 -- Grant execute permission to authenticated users and service_role
 GRANT EXECUTE ON FUNCTION delete_quotes_cascade(UUID[]) TO authenticated;
 GRANT EXECUTE ON FUNCTION delete_quotes_cascade(UUID[]) TO service_role;
-
 -- Optional: verify function exists by replacing it (idempotent)
 CREATE OR REPLACE FUNCTION delete_quotes_cascade(quote_ids UUID[])
 RETURNS VOID

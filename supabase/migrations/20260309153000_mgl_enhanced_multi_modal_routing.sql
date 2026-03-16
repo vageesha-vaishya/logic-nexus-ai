@@ -11,7 +11,6 @@ ADD COLUMN IF NOT EXISTS service_level TEXT DEFAULT 'standard' CHECK (service_le
 ADD COLUMN IF NOT EXISTS capacity_available BOOLEAN DEFAULT true,
 ADD COLUMN IF NOT EXISTS cut_off_time TIMESTAMPTZ,
 ADD COLUMN IF NOT EXISTS real_time_availability BOOLEAN DEFAULT false;
-
 DO $$
 BEGIN
   IF EXISTS (
@@ -26,13 +25,11 @@ BEGIN
     WHERE "mode" IS NULL;
   END IF;
 END $$;
-
 COMMENT ON COLUMN public.rate_option_legs.carrier_alliance_code IS 'Carrier alliance/interline partnership code';
 COMMENT ON COLUMN public.rate_option_legs.equipment_restrictions IS 'JSON array of allowed equipment types for this leg';
 COMMENT ON COLUMN public.rate_option_legs.transit_time_buffer_hours IS 'Additional buffer time for port/airport congestion';
 COMMENT ON COLUMN public.rate_option_legs.service_level IS 'Service level (express, standard, economy)';
 COMMENT ON COLUMN public.rate_option_legs.capacity_available IS 'Real-time capacity availability flag';
-
 -- 2. Create carrier alliance reference table
 CREATE TABLE IF NOT EXISTS public.carrier_alliances (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -45,7 +42,6 @@ CREATE TABLE IF NOT EXISTS public.carrier_alliances (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
-
 -- 3. Create port/airport capability matrix
 CREATE TABLE IF NOT EXISTS public.facility_capabilities (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -64,7 +60,6 @@ CREATE TABLE IF NOT EXISTS public.facility_capabilities (
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(tenant_id, facility_code)
 );
-
 -- 4. Create origin-destination routing matrix
 CREATE TABLE IF NOT EXISTS public.route_matrices (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -85,7 +80,6 @@ CREATE TABLE IF NOT EXISTS public.route_matrices (
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(tenant_id, origin_code, destination_code, transport_mode, valid_from)
 );
-
 -- 5. Enhanced commodity validation rules
 ALTER TABLE public.rate_options 
 ADD COLUMN IF NOT EXISTS ventilation_requirements TEXT,
@@ -93,10 +87,8 @@ ADD COLUMN IF NOT EXISTS stacking_restrictions TEXT,
 ADD COLUMN IF NOT EXISTS special_handling_flags JSONB DEFAULT '[]'::jsonb,
 ADD COLUMN IF NOT EXISTS documentation_requirements JSONB DEFAULT '[]'::jsonb,
 ADD COLUMN IF NOT EXISTS security_level TEXT DEFAULT 'standard' CHECK (security_level IN ('standard', 'enhanced', 'high'));
-
 ALTER TABLE public.rate_charge_rows
 ADD COLUMN IF NOT EXISTS charge_type TEXT;
-
 DO $$
 BEGIN
   IF EXISTS (
@@ -111,10 +103,8 @@ BEGIN
     WHERE charge_type IS NULL;
   END IF;
 END $$;
-
 ALTER TABLE public.rate_charge_cells
 ADD COLUMN IF NOT EXISTS equipment_key TEXT;
-
 DO $$
 BEGIN
   IF EXISTS (
@@ -129,7 +119,6 @@ BEGIN
     WHERE equipment_key IS NULL;
   END IF;
 END $$;
-
 -- 6. Create inter-modal transfer rules table
 CREATE TABLE IF NOT EXISTS public.intermodal_transfer_rules (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -146,7 +135,6 @@ CREATE TABLE IF NOT EXISTS public.intermodal_transfer_rules (
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(tenant_id, from_mode, to_mode)
 );
-
 -- 7. Create real-time surcharge calculation table
 CREATE TABLE IF NOT EXISTS public.dynamic_surcharges (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -161,14 +149,12 @@ CREATE TABLE IF NOT EXISTS public.dynamic_surcharges (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
-
 -- 8. Enable RLS on new tables
 ALTER TABLE public.carrier_alliances ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.facility_capabilities ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.route_matrices ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.intermodal_transfer_rules ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.dynamic_surcharges ENABLE ROW LEVEL SECURITY;
-
 -- 9. Create RLS policies for new tables
 DO $$
 BEGIN
@@ -192,14 +178,12 @@ BEGIN
   EXECUTE 'DROP POLICY IF EXISTS "tenant_isolation_dynamic_surcharges" ON public.dynamic_surcharges';
   EXECUTE 'CREATE POLICY "tenant_isolation_dynamic_surcharges" ON public.dynamic_surcharges FOR ALL USING (tenant_id = current_setting(''app.current_tenant_id'', true)::uuid)';
 END $$;
-
 -- 10. Create indexes for performance
 CREATE INDEX IF NOT EXISTS idx_route_matrices_origin_dest ON public.route_matrices(origin_code, destination_code, transport_mode);
 CREATE INDEX IF NOT EXISTS idx_facility_capabilities_code ON public.facility_capabilities(facility_code);
 CREATE INDEX IF NOT EXISTS idx_carrier_alliances_code ON public.carrier_alliances(alliance_code);
 CREATE INDEX IF NOT EXISTS idx_intermodal_rules_modes ON public.intermodal_transfer_rules(from_mode, to_mode);
 CREATE INDEX IF NOT EXISTS idx_dynamic_surcharges_type ON public.dynamic_surcharges(surcharge_type, validity_period);
-
 -- 11. Insert initial data for NYC→Dehra Dun routing
 INSERT INTO public.route_matrices (
   origin_code, destination_code, transport_mode, carrier_coverage, 
@@ -208,7 +192,6 @@ INSERT INTO public.route_matrices (
 ('JFK', 'DED', 'air', '["FedEx", "DHL", "UPS", "Emirates"]', 2, 7, 0.95, '00000000-0000-0000-0000-000000000000', '2024-01-01', '2024-12-31'),
 ('EWR', 'DED', 'air', '["FedEx", "DHL", "UPS"]', 2, 5, 0.90, '00000000-0000-0000-0000-000000000000', '2024-01-01', '2024-12-31'),
 ('NYC', 'DED', 'multimodal', '["Maersk", "MSC", "COSCO", "FedEx"]', 18, 3, 0.85, '00000000-0000-0000-0000-000000000000', '2024-01-01', '2024-12-31');
-
 -- 12. Insert inter-modal transfer rules
 INSERT INTO public.intermodal_transfer_rules (
   from_mode, to_mode, min_transfer_time_hours, equipment_compatibility_rules, tenant_id
@@ -216,16 +199,13 @@ INSERT INTO public.intermodal_transfer_rules (
 ('ocean', 'air', 48, '{"requires": ["customs_clearance"], "equipment_changes": true}', '00000000-0000-0000-0000-000000000000'),
 ('air', 'road', 6, '{"requires": ["security_screening"], "equipment_changes": false}', '00000000-0000-0000-0000-000000000000'),
 ('road', 'rail', 12, '{"requires": [], "equipment_changes": true}', '00000000-0000-0000-0000-000000000000');
-
 COMMENT ON TABLE public.carrier_alliances IS 'Carrier alliance and interline agreement definitions';
 COMMENT ON TABLE public.facility_capabilities IS 'Port/airport/terminal capability matrices';
 COMMENT ON TABLE public.route_matrices IS 'Origin-destination routing intelligence and carrier coverage';
 COMMENT ON TABLE public.intermodal_transfer_rules IS 'Business rules for inter-modal transfers';
 COMMENT ON TABLE public.dynamic_surcharges IS 'Real-time surcharge calculation parameters';
-
 -- 13. Update the rate_matrix_view to include enhanced fields
 DROP VIEW IF EXISTS public.rate_matrix_view;
-
 CREATE VIEW public.rate_matrix_view AS
 SELECT
   o.id AS rate_option_id,

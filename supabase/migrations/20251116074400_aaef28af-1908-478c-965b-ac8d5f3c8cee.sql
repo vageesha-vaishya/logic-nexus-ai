@@ -17,10 +17,8 @@ CREATE TABLE IF NOT EXISTS public.themes (
   updated_at TIMESTAMPTZ DEFAULT now(),
   created_by UUID REFERENCES auth.users(id) ON DELETE SET NULL
 );
-
 -- Enable RLS on themes
 ALTER TABLE public.themes ENABLE ROW LEVEL SECURITY;
-
 -- Create RLS policies for themes
 DROP POLICY IF EXISTS "Users can view themes in their tenant" ON public.themes;
 CREATE POLICY "Users can view themes in their tenant" 
@@ -32,7 +30,6 @@ CREATE POLICY "Users can view themes in their tenant"
     )
     OR public.is_platform_admin(auth.uid())
   );
-
 DROP POLICY IF EXISTS "Tenant admins can manage themes" ON public.themes;
 CREATE POLICY "Tenant admins can manage themes" 
   ON public.themes FOR ALL 
@@ -44,19 +41,16 @@ CREATE POLICY "Tenant admins can manage themes"
     )
     OR public.is_platform_admin(auth.uid())
   );
-
 -- Create indexes
 CREATE INDEX IF NOT EXISTS idx_themes_tenant_id ON public.themes(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_themes_is_default ON public.themes(is_default);
 CREATE INDEX IF NOT EXISTS idx_themes_is_active ON public.themes(is_active);
-
 -- Create trigger for updated_at
 DROP TRIGGER IF EXISTS update_themes_updated_at ON public.themes;
 CREATE TRIGGER update_themes_updated_at 
   BEFORE UPDATE ON public.themes 
   FOR EACH ROW 
   EXECUTE FUNCTION public.update_updated_at_column();
-
 -- Insert default simple theme for existing tenants
 INSERT INTO public.themes (tenant_id, name, is_default, is_active, colors, typography, spacing, borders, shadows)
 SELECT 
@@ -112,7 +106,6 @@ WHERE NOT EXISTS (
   WHERE tenant_id = t.id AND is_default = true
 )
 ON CONFLICT DO NOTHING;
-
 COMMENT ON TABLE public.themes IS 'Stores theme configurations for tenants';
 COMMENT ON COLUMN public.themes.is_default IS 'Whether this is the default theme for the tenant';
 COMMENT ON COLUMN public.themes.colors IS 'Color palette configuration';

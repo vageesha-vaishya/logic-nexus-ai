@@ -2,7 +2,6 @@
 -- Core schema: carrier rates, charges, attachments, quotation versions, options, selections
 
 BEGIN;
-
 -- ===============
 -- Charge Type Master
 -- ===============
@@ -13,7 +12,6 @@ CREATE TABLE IF NOT EXISTS public.charge_types (
   is_active boolean DEFAULT true,
   created_at timestamptz DEFAULT now()
 );
-
 -- Seed standard charge types
 INSERT INTO public.charge_types (code, name, description)
 VALUES
@@ -27,7 +25,6 @@ VALUES
   ('ISF', 'Importer Security Filing', 'ISF filing'),
   ('ISPS', 'International Ship & Port Security', 'ISPS surcharge')
 ON CONFLICT (code) DO NOTHING;
-
 -- ===============
 -- Carrier Rates
 -- ===============
@@ -57,11 +54,9 @@ ALTER TABLE public.carrier_rates
   ADD COLUMN IF NOT EXISTS status text DEFAULT 'active' CHECK (status IN ('active','expiring','expired','removed','selected')),
   ADD COLUMN IF NOT EXISTS removed_reason text,
   ADD COLUMN IF NOT EXISTS created_by uuid;
-
 -- Indexes for new columns
 CREATE INDEX IF NOT EXISTS idx_carrier_rates_route ON public.carrier_rates(origin_port_id, destination_port_id);
 CREATE INDEX IF NOT EXISTS idx_carrier_rates_carrier ON public.carrier_rates(carrier_id);
-
 -- RLS
 ALTER TABLE public.carrier_rates ENABLE ROW LEVEL SECURITY;
 DO $$
@@ -90,7 +85,6 @@ BEGIN
       USING (tenant_id = public.get_user_tenant_id(auth.uid()));
   END IF;
 END $$;
-
 -- Charges
 CREATE TABLE IF NOT EXISTS public.carrier_rate_charges (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -105,7 +99,6 @@ CREATE TABLE IF NOT EXISTS public.carrier_rate_charges (
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now()
 );
-
 CREATE INDEX IF NOT EXISTS idx_carrier_rate_charges_rate ON public.carrier_rate_charges(carrier_rate_id);
 ALTER TABLE public.carrier_rate_charges ENABLE ROW LEVEL SECURITY;
 DO $$
@@ -126,7 +119,6 @@ BEGIN
       USING (tenant_id = public.get_user_tenant_id(auth.uid()));
   END IF;
 END $$;
-
 -- Attachments
 CREATE TABLE IF NOT EXISTS public.carrier_rate_attachments (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -155,7 +147,6 @@ BEGIN
       USING (tenant_id = public.get_user_tenant_id(auth.uid()));
   END IF;
 END $$;
-
 -- Totals recalculation trigger for charges
 CREATE OR REPLACE FUNCTION public.recalc_carrier_rate_total_trigger()
 RETURNS trigger
@@ -179,22 +170,18 @@ BEGIN
   RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
-
 DROP TRIGGER IF EXISTS trg_recalc_total_on_charge_ins ON public.carrier_rate_charges;
 CREATE TRIGGER trg_recalc_total_on_charge_ins
   AFTER INSERT ON public.carrier_rate_charges
   FOR EACH ROW EXECUTE FUNCTION public.recalc_carrier_rate_total_trigger();
-
 DROP TRIGGER IF EXISTS trg_recalc_total_on_charge_upd ON public.carrier_rate_charges;
 CREATE TRIGGER trg_recalc_total_on_charge_upd
   AFTER UPDATE ON public.carrier_rate_charges
   FOR EACH ROW EXECUTE FUNCTION public.recalc_carrier_rate_total_trigger();
-
 DROP TRIGGER IF EXISTS trg_recalc_total_on_charge_del ON public.carrier_rate_charges;
 CREATE TRIGGER trg_recalc_total_on_charge_del
   AFTER DELETE ON public.carrier_rate_charges
   FOR EACH ROW EXECUTE FUNCTION public.recalc_carrier_rate_total_trigger();
-
 -- Recalc totals when base or markup changes
 CREATE OR REPLACE FUNCTION public.recalc_carrier_rate_on_rate_update()
 RETURNS trigger
@@ -212,12 +199,10 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
-
 DROP TRIGGER IF EXISTS trg_recalc_total_on_rate_upd ON public.carrier_rates;
 CREATE TRIGGER trg_recalc_total_on_rate_upd
   BEFORE UPDATE ON public.carrier_rates
   FOR EACH ROW EXECUTE FUNCTION public.recalc_carrier_rate_on_rate_update();
-
 -- ===============
 -- Quotation Versioning & Selection
 -- ===============
@@ -253,7 +238,6 @@ BEGIN
       USING (tenant_id = public.get_user_tenant_id(auth.uid()));
   END IF;
 END $$;
-
 CREATE TABLE IF NOT EXISTS public.quotation_version_options (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id uuid NOT NULL,
@@ -286,7 +270,6 @@ BEGIN
       USING (tenant_id = public.get_user_tenant_id(auth.uid()));
   END IF;
 END $$;
-
 -- Populate option summary fields from carrier_rate
 CREATE OR REPLACE FUNCTION public.populate_option_from_rate()
 RETURNS trigger
@@ -302,12 +285,10 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
-
 DROP TRIGGER IF EXISTS trg_qvo_populate ON public.quotation_version_options;
 CREATE TRIGGER trg_qvo_populate
   BEFORE INSERT ON public.quotation_version_options
   FOR EACH ROW EXECUTE FUNCTION public.populate_option_from_rate();
-
 -- Selection events
 CREATE TABLE IF NOT EXISTS public.quotation_selection_events (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -338,7 +319,6 @@ BEGIN
       USING (tenant_id = public.get_user_tenant_id(auth.uid()));
   END IF;
 END $$;
-
 -- Helper: record customer selection and update statuses
 CREATE OR REPLACE FUNCTION public.record_customer_selection(
   p_tenant_id uuid,
@@ -367,5 +347,4 @@ BEGIN
   UPDATE public.quotation_versions SET status = 'selected' WHERE id = p_version_id;
 END;
 $$ LANGUAGE plpgsql;
-
 COMMIT;

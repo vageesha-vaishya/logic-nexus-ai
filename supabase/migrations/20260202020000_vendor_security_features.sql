@@ -1,33 +1,27 @@
-
 -- Migration for Vendor Security Features
 -- Adds virus scanning status and expiration alert tracking
 
 BEGIN;
-
 -- 1. Create virus_scan_status enum
 DO $$ BEGIN
     CREATE TYPE public.virus_scan_status AS ENUM ('pending', 'clean', 'infected', 'skipped');
 EXCEPTION
     WHEN duplicate_object THEN null;
 END $$;
-
 -- 2. Update vendor_documents
 ALTER TABLE public.vendor_documents
 ADD COLUMN IF NOT EXISTS virus_scan_status public.virus_scan_status DEFAULT 'pending',
 ADD COLUMN IF NOT EXISTS virus_scan_date TIMESTAMPTZ,
 ADD COLUMN IF NOT EXISTS is_encrypted BOOLEAN DEFAULT false,
 ADD COLUMN IF NOT EXISTS expiration_alert_sent BOOLEAN DEFAULT false;
-
 -- 3. Update vendor_contract_versions
 ALTER TABLE public.vendor_contract_versions
 ADD COLUMN IF NOT EXISTS virus_scan_status public.virus_scan_status DEFAULT 'pending',
 ADD COLUMN IF NOT EXISTS virus_scan_date TIMESTAMPTZ,
 ADD COLUMN IF NOT EXISTS is_encrypted BOOLEAN DEFAULT false;
-
 -- 4. Update vendor_contracts (for expiration)
 ALTER TABLE public.vendor_contracts
 ADD COLUMN IF NOT EXISTS expiration_alert_sent BOOLEAN DEFAULT false;
-
 -- 5. Create a function to auto-approve scan (Mock for now, can be replaced by Edge Function webhook later)
 CREATE OR REPLACE FUNCTION public.mock_virus_scan()
 RETURNS TRIGGER AS $$
@@ -46,16 +40,13 @@ BEGIN
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
-
 -- 6. Attach trigger
 DROP TRIGGER IF EXISTS trigger_mock_virus_scan_docs ON public.vendor_documents;
 CREATE TRIGGER trigger_mock_virus_scan_docs
 BEFORE INSERT ON public.vendor_documents
 FOR EACH ROW EXECUTE FUNCTION public.mock_virus_scan();
-
 DROP TRIGGER IF EXISTS trigger_mock_virus_scan_versions ON public.vendor_contract_versions;
 CREATE TRIGGER trigger_mock_virus_scan_versions
 BEFORE INSERT ON public.vendor_contract_versions
 FOR EACH ROW EXECUTE FUNCTION public.mock_virus_scan();
-
 COMMIT;

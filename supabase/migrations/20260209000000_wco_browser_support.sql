@@ -3,14 +3,12 @@
 -- Description: optimizes global_hs_roots for browsing and adds hierarchy descriptions
 
 BEGIN;
-
 --------------------------------------------------------------------------------
 -- 1. Add Description Columns for Hierarchy Levels
 --------------------------------------------------------------------------------
 ALTER TABLE public.global_hs_roots
 ADD COLUMN IF NOT EXISTS chapter_description TEXT,
 ADD COLUMN IF NOT EXISTS heading_description TEXT;
-
 -- 2. Populate Descriptions from existing AES HTS Data (Best Effort)
 -- We take the most frequent or first available category/sub_category for each chapter/heading
 UPDATE public.global_hs_roots g
@@ -30,13 +28,11 @@ SET
         LIMIT 1
     )
 WHERE chapter_description IS NULL OR heading_description IS NULL;
-
 -- Fallback for missing descriptions
 UPDATE public.global_hs_roots
 SET 
     chapter_description = COALESCE(chapter_description, 'Chapter ' || chapter),
     heading_description = COALESCE(heading_description, 'Heading ' || heading);
-
 --------------------------------------------------------------------------------
 -- 3. Add Performance Indices
 --------------------------------------------------------------------------------
@@ -44,7 +40,6 @@ CREATE INDEX IF NOT EXISTS idx_global_hs_roots_chapter ON public.global_hs_roots
 CREATE INDEX IF NOT EXISTS idx_global_hs_roots_heading ON public.global_hs_roots(heading);
 -- Composite index for hierarchy browsing
 CREATE INDEX IF NOT EXISTS idx_global_hs_roots_browsing ON public.global_hs_roots(chapter, heading);
-
 --------------------------------------------------------------------------------
 -- 4. Create Global HS Hierarchy RPC
 --------------------------------------------------------------------------------
@@ -117,8 +112,6 @@ BEGIN
   END IF;
 END;
 $$;
-
 -- Grant access
 GRANT EXECUTE ON FUNCTION get_global_hs_hierarchy(text, text) TO authenticated;
-
 COMMIT;

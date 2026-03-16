@@ -1,10 +1,8 @@
 begin;
-
 drop policy if exists ui_themes_read_authenticated on public.ui_themes;
 drop policy if exists ui_themes_user_write on public.ui_themes;
 drop policy if exists ui_themes_read_scoped on public.ui_themes;
 drop policy if exists ui_themes_write_scoped on public.ui_themes;
-
 create policy ui_themes_read_scoped
 on public.ui_themes
 for select
@@ -18,7 +16,6 @@ using (
     or (scope = 'user' and user_id = auth.uid())
   )
 );
-
 create policy ui_themes_write_scoped
 on public.ui_themes
 for all
@@ -35,7 +32,6 @@ with check (
   or (scope = 'franchise' and public.is_franchise_admin(auth.uid()) and franchise_id = public.get_user_franchise_id(auth.uid()))
   or (scope = 'user' and user_id = auth.uid())
 );
-
 update public.ui_themes
 set tokens = jsonb_set(
   jsonb_set(
@@ -51,5 +47,4 @@ set tokens = jsonb_set(
   '{headerBannerHeight}', to_jsonb(coalesce(tokens->>'headerBannerHeight', '48px')), true
 )
 where lower(name) = lower('Default Simple');
-
 commit;

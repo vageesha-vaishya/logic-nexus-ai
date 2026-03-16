@@ -21,7 +21,6 @@ AS $$
   GROUP BY t.typname
   ORDER BY t.typname;
 $$;
-
 -- Function to get RLS status for all tables
 CREATE OR REPLACE FUNCTION public.get_rls_status()
 RETURNS TABLE (
@@ -45,7 +44,6 @@ AS $$
   GROUP BY c.relname, c.relrowsecurity
   ORDER BY c.relname;
 $$;
-
 -- Function to get all RLS policies
 CREATE OR REPLACE FUNCTION public.get_rls_policies()
 RETURNS TABLE (

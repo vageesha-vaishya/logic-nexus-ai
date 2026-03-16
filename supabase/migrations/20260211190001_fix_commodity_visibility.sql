@@ -2,15 +2,12 @@
 -- Ensures dual visibility of Description and HTS Code
 
 BEGIN;
-
 -- 1. Add columns to public.quote_items_core
 ALTER TABLE public.quote_items_core
 ADD COLUMN IF NOT EXISTS commodity_id UUID REFERENCES public.master_commodities(id) ON DELETE SET NULL,
 ADD COLUMN IF NOT EXISTS aes_hts_id UUID REFERENCES public.aes_hts_codes(id) ON DELETE SET NULL;
-
 -- 2. Drop existing View (CASCADE to drop trigger)
 DROP VIEW IF EXISTS public.quote_items CASCADE;
-
 -- 3. Recreate View with New Columns
 CREATE OR REPLACE VIEW public.quote_items AS
 SELECT
@@ -45,7 +42,6 @@ SELECT
     e.attributes
 FROM public.quote_items_core c
 LEFT JOIN logistics.quote_items_extension e ON c.id = e.quote_item_id;
-
 -- 4. Update Trigger Function
 CREATE OR REPLACE FUNCTION public.fn_quote_items_view_handler()
 RETURNS TRIGGER AS $$
@@ -173,10 +169,8 @@ BEGIN
     RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
-
 -- 5. Re-attach Trigger
 CREATE TRIGGER tr_quote_items_view_handler
     INSTEAD OF INSERT OR UPDATE OR DELETE ON public.quote_items
     FOR EACH ROW EXECUTE FUNCTION public.fn_quote_items_view_handler();
-
 COMMIT;

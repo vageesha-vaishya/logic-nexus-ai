@@ -2,7 +2,6 @@
 -- Also updates preview function to reflect the same format
 
 BEGIN;
-
 -- Generator: PREFIX-YYMMDD-##### with tenant/franchise scope and daily reset
 CREATE OR REPLACE FUNCTION public.generate_quote_number(
   p_tenant_id uuid,
@@ -63,7 +62,6 @@ BEGIN
   RETURN v_quote_number;
 END;
 $$;
-
 -- Preview next without incrementing the sequence
 CREATE OR REPLACE FUNCTION public.preview_next_quote_number(
   p_tenant_id uuid,
@@ -111,5 +109,4 @@ BEGIN
   RETURN v_quote_number;
 END;
 $$;
-
 COMMIT;

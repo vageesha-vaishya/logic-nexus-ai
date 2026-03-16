@@ -2,18 +2,15 @@
 -- Description: Fixes weak RLS, secures storage bucket, and adds retention logic
 
 BEGIN;
-
 -- 1. Fix RLS on Vendor Documents
 DROP POLICY IF EXISTS "Enable read access for authenticated users" ON public.vendor_documents;
 DROP POLICY IF EXISTS "Enable insert access for authenticated users" ON public.vendor_documents;
 DROP POLICY IF EXISTS "Enable update access for authenticated users" ON public.vendor_documents;
 DROP POLICY IF EXISTS "Enable delete access for authenticated users" ON public.vendor_documents;
-
 DROP POLICY IF EXISTS "Platform Admin Full Access Documents" ON public.vendor_documents;
 CREATE POLICY "Platform Admin Full Access Documents" ON public.vendor_documents
     FOR ALL
     USING (public.is_platform_admin(auth.uid()));
-
 DROP POLICY IF EXISTS "Tenant Access Documents" ON public.vendor_documents;
 CREATE POLICY "Tenant Access Documents" ON public.vendor_documents
     FOR ALL
@@ -27,18 +24,15 @@ CREATE POLICY "Tenant Access Documents" ON public.vendor_documents
             )
         )
     );
-
 -- 2. Fix RLS on Vendor Contracts
 DROP POLICY IF EXISTS "Enable read access for authenticated users" ON public.vendor_contracts;
 DROP POLICY IF EXISTS "Enable insert access for authenticated users" ON public.vendor_contracts;
 DROP POLICY IF EXISTS "Enable update access for authenticated users" ON public.vendor_contracts;
 DROP POLICY IF EXISTS "Enable delete access for authenticated users" ON public.vendor_contracts;
-
 DROP POLICY IF EXISTS "Platform Admin Full Access Contracts" ON public.vendor_contracts;
 CREATE POLICY "Platform Admin Full Access Contracts" ON public.vendor_contracts
     FOR ALL
     USING (public.is_platform_admin(auth.uid()));
-
 DROP POLICY IF EXISTS "Tenant Access Contracts" ON public.vendor_contracts;
 CREATE POLICY "Tenant Access Contracts" ON public.vendor_contracts
     FOR ALL
@@ -52,16 +46,13 @@ CREATE POLICY "Tenant Access Contracts" ON public.vendor_contracts
             )
         )
     );
-
 -- 3. Secure Storage Bucket (vendor-documents)
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('vendor-documents', 'vendor-documents', false)
 ON CONFLICT (id) DO NOTHING;
-
 -- Drop existing weak storage policies if any
 DROP POLICY IF EXISTS "Vendor Docs Access" ON storage.objects;
 DROP POLICY IF EXISTS "Users can upload vendor docs" ON storage.objects;
-
 -- Create Tenant-Aware Storage Policies
 DROP POLICY IF EXISTS "Vendor Docs Tenant Access" ON storage.objects;
 CREATE POLICY "Vendor Docs Tenant Access" ON storage.objects
@@ -90,7 +81,6 @@ WITH CHECK (
         )
     )
 );
-
 -- 4. Data Retention Function
 -- Function to identify expired documents
 CREATE OR REPLACE FUNCTION public.get_expired_vendor_documents(p_days_grace integer DEFAULT 30)
@@ -112,5 +102,4 @@ BEGIN
     AND vd.status != 'archived';
 END;
 $$;
-
 COMMIT;

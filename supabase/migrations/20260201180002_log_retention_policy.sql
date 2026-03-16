@@ -11,7 +11,6 @@ BEGIN
   WHERE created_at < NOW() - INTERVAL '30 days';
 END;
 $$ LANGUAGE plpgsql;
-
 -- Schedule the cleanup job to run daily at 3 AM
 -- Note: pg_cron usage requires specific permissions. If this fails, the user needs to enable it in Supabase Dashboard.
 -- We wrap it in a DO block to avoid breaking if pg_cron is not available.
@@ -22,7 +21,6 @@ BEGIN
   END IF;
 END
 $$;
-
 -- Alternatively, we can use pg_net to call an edge function, but a simple SQL cleanup is better for data retention.
 -- If pg_cron is not available, we can't schedule it from SQL alone without an external trigger.
 

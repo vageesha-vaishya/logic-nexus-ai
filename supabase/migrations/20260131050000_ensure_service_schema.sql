@@ -2,7 +2,6 @@
 -- This handles cases where 20260131000000 failed halfway
 
 BEGIN;
-
 -----------------------------------------------------------------------------
 -- 1. Service Categories
 -----------------------------------------------------------------------------
@@ -17,7 +16,6 @@ CREATE TABLE IF NOT EXISTS service_categories (
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
-
 -- Seed standard categories (idempotent)
 INSERT INTO service_categories (code, name, description, display_order) VALUES
 ('transport', 'Transportation', 'Movement of goods', 10),
@@ -26,7 +24,6 @@ INSERT INTO service_categories (code, name, description, display_order) VALUES
 ('insurance', 'Insurance', 'Cargo insurance', 40),
 ('handling', 'Handling & Labor', 'Packing, loading, labor', 50)
 ON CONFLICT (code) DO NOTHING;
-
 -----------------------------------------------------------------------------
 -- 2. Service Types (Enhancement)
 -----------------------------------------------------------------------------
@@ -37,7 +34,6 @@ BEGIN
     ALTER TABLE service_types ADD COLUMN category_id UUID REFERENCES service_categories(id);
   END IF;
 END $$;
-
 -----------------------------------------------------------------------------
 -- 3. Service Attribute Definitions
 -----------------------------------------------------------------------------
@@ -56,7 +52,6 @@ CREATE TABLE IF NOT EXISTS service_attribute_definitions (
   updated_at TIMESTAMPTZ DEFAULT now(),
   UNIQUE(service_type_id, attribute_key)
 );
-
 -----------------------------------------------------------------------------
 -- 4. Service Details
 -----------------------------------------------------------------------------
@@ -68,7 +63,6 @@ CREATE TABLE IF NOT EXISTS service_details (
   updated_at TIMESTAMPTZ DEFAULT now(),
   UNIQUE(service_id)
 );
-
 -- Trigger function (replace to ensure latest logic)
 CREATE OR REPLACE FUNCTION validate_service_details()
 RETURNS TRIGGER AS $$
@@ -114,10 +108,8 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
-
 DROP TRIGGER IF EXISTS check_service_details_trigger ON service_details;
 CREATE TRIGGER check_service_details_trigger
   BEFORE INSERT OR UPDATE ON service_details
   FOR EACH ROW EXECUTE FUNCTION validate_service_details();
-
 COMMIT;

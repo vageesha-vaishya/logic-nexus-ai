@@ -1,7 +1,6 @@
 -- Phase 3: Vendor Performance Scorecard Schema
 
 BEGIN;
-
 -----------------------------------------------------------------------------
 -- 0. Update Shipments Table (Prerequisite)
 -- Add vendor_id to link shipments to vendors
@@ -18,7 +17,6 @@ BEGIN
         CREATE INDEX IF NOT EXISTS idx_shipments_vendor_id ON public.shipments(vendor_id);
     END IF;
 END $$;
-
 -----------------------------------------------------------------------------
 -- 1. Quality Claims (New Table)
 -- Tracks operational failures for Quality Compliance Score (30%)
@@ -39,17 +37,13 @@ CREATE TABLE IF NOT EXISTS public.quality_claims (
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now()
 );
-
 CREATE INDEX IF NOT EXISTS idx_quality_claims_vendor ON public.quality_claims(vendor_id);
 CREATE INDEX IF NOT EXISTS idx_quality_claims_date ON public.quality_claims(claim_date);
-
 -- RLS
 ALTER TABLE public.quality_claims ENABLE ROW LEVEL SECURITY;
-
 DROP POLICY IF EXISTS "Platform Admin Full Access" ON public.quality_claims;
 CREATE POLICY "Platform Admin Full Access" ON public.quality_claims
     FOR ALL USING (public.is_platform_admin(auth.uid()));
-
 DROP POLICY IF EXISTS "Tenant Access" ON public.quality_claims;
 CREATE POLICY "Tenant Access" ON public.quality_claims
     FOR ALL USING (
@@ -62,7 +56,6 @@ CREATE POLICY "Tenant Access" ON public.quality_claims
             )
         )
     );
-
 -----------------------------------------------------------------------------
 -- 2. Vendor Performance Metrics (Daily Snapshots)
 -- Stores calculated scores for historical trend analysis
@@ -89,17 +82,13 @@ CREATE TABLE IF NOT EXISTS public.vendor_performance_metrics (
     created_at TIMESTAMPTZ DEFAULT now(),
     UNIQUE(vendor_id, snapshot_date) -- One snapshot per vendor per day
 );
-
 CREATE INDEX IF NOT EXISTS idx_vendor_metrics_vendor ON public.vendor_performance_metrics(vendor_id);
 CREATE INDEX IF NOT EXISTS idx_vendor_metrics_date ON public.vendor_performance_metrics(snapshot_date);
-
 -- RLS
 ALTER TABLE public.vendor_performance_metrics ENABLE ROW LEVEL SECURITY;
-
 DROP POLICY IF EXISTS "Platform Admin Full Access" ON public.vendor_performance_metrics;
 CREATE POLICY "Platform Admin Full Access" ON public.vendor_performance_metrics
     FOR ALL USING (public.is_platform_admin(auth.uid()));
-
 DROP POLICY IF EXISTS "Tenant Read Access" ON public.vendor_performance_metrics;
 CREATE POLICY "Tenant Read Access" ON public.vendor_performance_metrics
     FOR SELECT USING (
@@ -112,7 +101,6 @@ CREATE POLICY "Tenant Read Access" ON public.vendor_performance_metrics
             )
         )
     );
-
 -----------------------------------------------------------------------------
 -- 3. Update Vendors Table
 -- Denormalized current score for easy sorting/filtering
@@ -120,7 +108,6 @@ CREATE POLICY "Tenant Read Access" ON public.vendor_performance_metrics
 ALTER TABLE public.vendors 
 ADD COLUMN IF NOT EXISTS current_performance_score NUMERIC CHECK (current_performance_score BETWEEN 0 AND 100),
 ADD COLUMN IF NOT EXISTS last_performance_update TIMESTAMPTZ;
-
 -----------------------------------------------------------------------------
 -- 4. Vendor Portal Activity
 -- For Responsiveness Score (10%)
@@ -133,16 +120,12 @@ CREATE TABLE IF NOT EXISTS public.vendor_portal_activity (
     metadata JSONB DEFAULT '{}'::jsonb,
     created_at TIMESTAMPTZ DEFAULT now()
 );
-
 CREATE INDEX IF NOT EXISTS idx_portal_activity_vendor ON public.vendor_portal_activity(vendor_id);
 CREATE INDEX IF NOT EXISTS idx_portal_activity_created ON public.vendor_portal_activity(created_at);
-
 ALTER TABLE public.vendor_portal_activity ENABLE ROW LEVEL SECURITY;
-
 DROP POLICY IF EXISTS "Platform Admin Full Access" ON public.vendor_portal_activity;
 CREATE POLICY "Platform Admin Full Access" ON public.vendor_portal_activity
     FOR ALL USING (public.is_platform_admin(auth.uid()));
-
 -----------------------------------------------------------------------------
 -- 5. RPC: Calculate Vendor Score
 -- Logic to compute scores on demand
@@ -230,5 +213,4 @@ BEGIN
     );
 END;
 $$;
-
 COMMIT;

@@ -11,7 +11,6 @@ BEGIN
 EXCEPTION
     WHEN OTHERS THEN NULL; -- Ignore if it fails (e.g. if constraint name is different)
 END $$;
-
 -- Function to archive expired documents
 CREATE OR REPLACE FUNCTION archive_expired_vendor_documents(p_retention_days INT DEFAULT 3650)
 RETURNS TABLE (
@@ -81,7 +80,6 @@ BEGIN
     RETURN QUERY SELECT v_archived_count, v_archived_ids;
 END;
 $$;
-
 -- Grant execute permission
 GRANT EXECUTE ON FUNCTION archive_expired_vendor_documents(INT) TO authenticated;
 GRANT EXECUTE ON FUNCTION archive_expired_vendor_documents(INT) TO service_role;

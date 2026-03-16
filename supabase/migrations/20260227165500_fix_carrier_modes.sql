@@ -3,7 +3,6 @@
 -- or have it set to 'sea' or NULL.
 
 BEGIN;
-
 -- Update well-known Ocean carriers to ensure they have mode = 'ocean'
 UPDATE public.carriers
 SET mode = 'ocean'
@@ -22,7 +21,6 @@ WHERE
     carrier_name ILIKE '%Mediterranean%'
   )
   AND (mode IS NULL OR mode != 'ocean');
-
 -- Update Air carriers
 UPDATE public.carriers
 SET mode = 'air'
@@ -38,5 +36,4 @@ WHERE
     carrier_name ILIKE '%Cathay%'
   )
   AND (mode IS NULL OR mode != 'air');
-
 COMMIT;

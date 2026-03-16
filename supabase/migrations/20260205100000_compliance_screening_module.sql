@@ -1,6 +1,5 @@
 -- Enable pg_trgm for fuzzy matching if not already enabled
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
-
 -- 1. Restricted Party Lists (The Source Data)
 DROP TABLE IF EXISTS public.restricted_party_lists CASCADE;
 CREATE TABLE public.restricted_party_lists (
@@ -20,12 +19,10 @@ CREATE TABLE public.restricted_party_lists (
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now()
 );
-
 -- Indexes for search performance
 CREATE INDEX IF NOT EXISTS idx_restricted_party_name_trgm ON public.restricted_party_lists USING gin (entity_name gin_trgm_ops);
 CREATE INDEX IF NOT EXISTS idx_restricted_party_source ON public.restricted_party_lists(source_list);
 CREATE INDEX IF NOT EXISTS idx_restricted_party_country ON public.restricted_party_lists(country_code);
-
 -- 2. Compliance Screenings (The Audit Log)
 -- Records every screening attempt and its result
 DROP TABLE IF EXISTS public.compliance_screenings CASCADE;
@@ -51,35 +48,28 @@ CREATE TABLE public.compliance_screenings (
     
     notes TEXT
 );
-
 CREATE INDEX IF NOT EXISTS idx_compliance_screenings_performed_at ON public.compliance_screenings(performed_at);
 CREATE INDEX IF NOT EXISTS idx_compliance_screenings_entity ON public.compliance_screenings(linked_entity_type, linked_entity_id);
-
 -- RLS
 ALTER TABLE public.restricted_party_lists ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.compliance_screenings ENABLE ROW LEVEL SECURITY;
-
 -- Policies for Restricted Party Lists (Public Read, Admin Write)
 -- Drop existing policies first to avoid conflict if table wasn't dropped (but we dropped it)
 -- Since we dropped the table, policies are gone.
 CREATE POLICY "Authenticated users can read restricted lists" ON public.restricted_party_lists
     FOR SELECT TO authenticated USING (true);
-
 -- Policies for Screenings
 CREATE POLICY "Users can view their own screenings or tenant screenings" ON public.compliance_screenings
     FOR SELECT TO authenticated USING (
         performed_by = auth.uid() OR 
         (tenant_id IS NOT NULL AND tenant_id = (SELECT tenant_id FROM public.profiles WHERE id = auth.uid()))
     );
-
 CREATE POLICY "Users can create screenings" ON public.compliance_screenings
     FOR INSERT TO authenticated WITH CHECK (
         performed_by = auth.uid()
     );
-
 -- 3. RPC Function for Screening
 DROP FUNCTION IF EXISTS public.screen_restricted_party(TEXT, TEXT, NUMERIC);
-
 CREATE OR REPLACE FUNCTION public.screen_restricted_party(
     p_name TEXT,
     p_country TEXT DEFAULT NULL,

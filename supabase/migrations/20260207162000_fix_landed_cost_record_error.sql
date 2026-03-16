@@ -1,4 +1,3 @@
-
 CREATE OR REPLACE FUNCTION public.calculate_duty(
   p_origin_country TEXT,
   p_destination_country TEXT,

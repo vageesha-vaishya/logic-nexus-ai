@@ -47,7 +47,6 @@ BEGIN
   END IF;
 END;
 $function$;
-
 CREATE OR REPLACE FUNCTION public.sync_opportunity_items_from_quote(p_quote_id uuid)
  RETURNS void
  LANGUAGE plpgsql

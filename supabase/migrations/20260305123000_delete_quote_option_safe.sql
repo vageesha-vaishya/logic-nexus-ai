@@ -133,6 +133,5 @@ BEGIN
   );
 END;
 $$;
-
 REVOKE ALL ON FUNCTION public.delete_quote_option_safe(uuid, text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.delete_quote_option_safe(uuid, text) TO authenticated;

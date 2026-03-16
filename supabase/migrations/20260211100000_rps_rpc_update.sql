@@ -1,11 +1,9 @@
-
 -- Enhanced RPC for Restricted Party Screening
 -- Includes fuzzy matching on name and exact/partial matching on country
 -- Logs the screening attempt automatically (optional, but good for atomicity) OR we can log from service.
 -- For now, we'll keep it as a search function and let the service handle logging to separate concerns (Search vs Audit).
 
 DROP FUNCTION IF EXISTS public.screen_restricted_party(text, text, numeric);
-
 CREATE OR REPLACE FUNCTION public.screen_restricted_party(
     p_name TEXT,
     p_country TEXT DEFAULT NULL,

@@ -15,12 +15,10 @@ CREATE TABLE IF NOT EXISTS public.container_transactions (
     created_at TIMESTAMPTZ DEFAULT NOW(),
     created_by UUID REFERENCES public.profiles(id)
 );
-
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_container_transactions_tenant_date ON public.container_transactions(tenant_id, transaction_date);
 CREATE INDEX IF NOT EXISTS idx_container_transactions_size ON public.container_transactions(size_id);
 CREATE INDEX IF NOT EXISTS idx_container_transactions_location ON public.container_transactions(location_name);
-
 -- 2. Vessel Hierarchy Enhancements
 -- Vessel Class Capacities (Specific limits per container size if needed, beyond just TEU)
 CREATE TABLE IF NOT EXISTS public.vessel_class_capacities (
@@ -32,22 +30,17 @@ CREATE TABLE IF NOT EXISTS public.vessel_class_capacities (
     tenant_id UUID REFERENCES public.tenants(id),
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
-
 -- 3. RLS Policies
 ALTER TABLE public.container_transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.vessel_class_capacities ENABLE ROW LEVEL SECURITY;
-
 -- Transactions Policy
 CREATE POLICY "Tenant Access Transactions" ON public.container_transactions
     USING (tenant_id = (SELECT (auth.jwt() ->> 'tenant_id')::UUID));
-
 CREATE POLICY "Tenant Insert Transactions" ON public.container_transactions
     WITH CHECK (tenant_id = (SELECT (auth.jwt() ->> 'tenant_id')::UUID));
-
 -- Vessel Capacities Policy
 CREATE POLICY "Tenant Access Vessel Capacities" ON public.vessel_class_capacities
     USING (tenant_id = (SELECT (auth.jwt() ->> 'tenant_id')::UUID));
-
 -- 4. Constraint for Summary Table Upsert
 -- We need to ensure container_tracking allows unique identification for upserts
 DO $$ 
@@ -60,7 +53,6 @@ BEGIN
         ADD CONSTRAINT container_tracking_unique_key UNIQUE (tenant_id, size_id, location_name, status);
     END IF;
 END $$;
-
 -- 5. Trigger to Maintain Summary (Container Tracking)
 CREATE OR REPLACE FUNCTION public.update_container_inventory_summary()
 RETURNS TRIGGER AS $$
@@ -97,13 +89,11 @@ BEGIN
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
-
 DROP TRIGGER IF EXISTS trigger_update_inventory ON public.container_transactions;
 CREATE TRIGGER trigger_update_inventory
 AFTER INSERT ON public.container_transactions
 FOR EACH ROW
 EXECUTE FUNCTION public.update_container_inventory_summary();
-
 -- 6. Helper Function for TEU Calculation
 CREATE OR REPLACE FUNCTION public.calculate_teu(
     p_size_id UUID,
@@ -120,45 +110,23 @@ BEGIN
     RETURN COALESCE(v_teu_factor, 0) * p_quantity;
 END;
 $$ LANGUAGE plpgsql;
-
 -- 7. View for Analytics
 DROP VIEW IF EXISTS public.view_container_inventory_summary CASCADE;
-DO $$
-BEGIN
-  IF EXISTS (
-    SELECT 1
-    FROM information_schema.columns
-    WHERE table_schema = 'public'
-      AND table_name = 'container_sizes'
-      AND column_name = 'name'
-  ) AND EXISTS (
-    SELECT 1
-    FROM information_schema.columns
-    WHERE table_schema = 'public'
-      AND table_name = 'container_sizes'
-      AND column_name = 'type_id'
-  ) THEN
-    EXECUTE $sql$
-      CREATE OR REPLACE VIEW public.view_container_inventory_summary AS
-      SELECT
-          ct.id,
-          ct.tenant_id,
-          ct.size_id,
-          ct.location_name,
-          t.name as category,
-          s.name as size,
-          s.iso_code,
-          ct.status,
-          ct.quantity as total_quantity,
-          (ct.quantity * COALESCE(s.teu_factor, 0)) as total_teu
-      FROM public.container_tracking ct
-      JOIN public.container_sizes s ON ct.size_id = s.id
-      LEFT JOIN public.container_types t ON s.type_id = t.id;
-    $sql$;
-
-    EXECUTE 'GRANT SELECT ON public.view_container_inventory_summary TO authenticated';
-    EXECUTE 'GRANT SELECT ON public.view_container_inventory_summary TO service_role';
-  ELSE
-    RAISE NOTICE 'Skipping view_container_inventory_summary: legacy container_sizes schema.';
-  END IF;
-END $$;
+CREATE OR REPLACE VIEW public.view_container_inventory_summary AS
+SELECT 
+    ct.id,
+    ct.tenant_id,
+    ct.size_id,
+    ct.location_name,
+    t.name as category,
+    s.name as size,
+    s.iso_code,
+    ct.status,
+    ct.quantity as total_quantity,
+    (ct.quantity * COALESCE(s.teu_factor, 0)) as total_teu
+FROM public.container_tracking ct
+JOIN public.container_sizes s ON ct.size_id = s.id
+LEFT JOIN public.container_types t ON s.type_id = t.id;
+-- Grant access to view
+GRANT SELECT ON public.view_container_inventory_summary TO authenticated;
+GRANT SELECT ON public.view_container_inventory_summary TO service_role;

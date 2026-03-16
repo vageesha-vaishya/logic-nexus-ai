@@ -47,6 +47,5 @@ BEGIN
     RAISE NOTICE 'Grant failed for record_customer_selection: %', SQLERRM;
   END;
 END $$;
-
 -- Hint PostgREST to reload schema cache (no-op if not supported); safe to call manually if needed:
 -- SELECT pg_notify('postgrest', 'reload schema');

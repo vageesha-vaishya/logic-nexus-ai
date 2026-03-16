@@ -8,19 +8,15 @@ CREATE TABLE IF NOT EXISTS public.ai_quote_requests (
     status TEXT NOT NULL DEFAULT 'generated', -- generated, converted
     quote_id UUID REFERENCES public.quotes(id) -- Linked if converted
 );
-
 -- Add RLS
 ALTER TABLE public.ai_quote_requests ENABLE ROW LEVEL SECURITY;
-
 CREATE POLICY "Users can view their own AI requests"
     ON public.ai_quote_requests
     FOR SELECT
     USING (auth.uid() = user_id);
-
 CREATE POLICY "Users can insert their own AI requests"
     ON public.ai_quote_requests
     FOR INSERT
     WITH CHECK (auth.uid() = user_id);
-
 -- Grant permissions
 GRANT SELECT, INSERT, UPDATE ON public.ai_quote_requests TO authenticated;

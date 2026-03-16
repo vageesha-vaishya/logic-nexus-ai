@@ -6,7 +6,6 @@
 CREATE INDEX IF NOT EXISTS idx_aes_hts_codes_description_trgm 
 ON public.aes_hts_codes 
 USING GIN (description gin_trgm_ops);
-
 -- 2. Smart Search RPC
 -- Combines: Exact Code, Prefix Code, Full Text Search, and Trigram Similarity
 CREATE OR REPLACE FUNCTION public.search_hts_codes_smart(
@@ -65,6 +64,5 @@ BEGIN
     LIMIT p_limit;
 END;
 $$;
-
 -- Grant access
 GRANT EXECUTE ON FUNCTION search_hts_codes_smart(TEXT, INT) TO authenticated;

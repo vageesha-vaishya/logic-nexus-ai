@@ -1,7 +1,6 @@
 -- Add carrier_id column to quotation_version_options
 ALTER TABLE public.quotation_version_options
 ADD COLUMN IF NOT EXISTS carrier_id UUID REFERENCES public.carriers(id) ON DELETE SET NULL;
-
 -- Update create_shipment_from_quote to copy carrier_id
 CREATE OR REPLACE FUNCTION public.create_shipment_from_quote(
   p_quote_id UUID,

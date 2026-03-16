@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { describe, it, vi, expect, beforeEach } from 'vitest';
 import LeadDetail from './LeadDetail';
 import { BrowserRouter } from 'react-router-dom';
@@ -18,6 +18,10 @@ vi.mock('@/components/crm/LeadActivitiesTimeline', () => ({
   LeadActivitiesTimeline: () => <div data-testid="lead-activities-timeline" />,
 }));
 
+vi.mock('@/components/crm/LeadForm', () => ({
+  LeadForm: () => <div data-testid="lead-form" />,
+}));
+
 vi.mock('@/components/email/EmailHistoryPanel', () => ({
   EmailHistoryPanel: () => <div data-testid="email-history-panel" />,
 }));
@@ -26,11 +30,30 @@ vi.mock('@/components/crm/LeadConversionDialog', () => ({
   LeadConversionDialog: () => null,
 }));
 
+vi.mock('@/components/layout/StickyActionsContext', () => ({
+  useStickyActions: () => ({
+    actions: { left: [], right: [] },
+    setActions: vi.fn(),
+    clearActions: vi.fn(),
+  }),
+}));
+
 vi.mock('@/components/assignment/ManualAssignment', () => ({
   ManualAssignment: () => <div data-testid="manual-assignment" />,
 }));
 
+vi.mock('@/hooks/useLeadsViewState', () => ({
+  useLeadsViewState: () => ({
+    state: { theme: 'Azure Sky' },
+    setTheme: vi.fn(),
+    setView: vi.fn(),
+    setPipeline: vi.fn(),
+  }),
+}));
+
 const navigateMock = vi.fn();
+let locationState: any = {};
+const fetchMock = vi.fn();
 
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
@@ -38,6 +61,7 @@ vi.mock('react-router-dom', async () => {
     ...actual,
     useParams: () => ({ id: 'lead-1' }),
     useNavigate: () => navigateMock,
+    useLocation: () => ({ hash: '', state: locationState }),
   };
 });
 
@@ -48,14 +72,20 @@ vi.mock('@/hooks/useCRM', () => {
   };
 
   const supabase = {
+    auth: {
+      getSession: vi.fn().mockResolvedValue({ data: { session: null } }),
+    },
     channel: vi.fn().mockReturnValue(channel),
     removeChannel: vi.fn(),
     from: vi.fn((table: string) => {
       if (table === 'activities') {
+        const query = {
+          eq: vi.fn().mockReturnThis(),
+          order: vi.fn().mockReturnThis(),
+          limit: vi.fn().mockResolvedValue({ data: [], error: null }),
+        };
         return {
-          select: vi.fn(() => ({
-            eq: vi.fn().mockResolvedValue({ data: [], error: null }),
-          })),
+          select: vi.fn(() => query),
         };
       }
       if (table === ('lead_activities' as any)) {
@@ -107,27 +137,98 @@ vi.mock('@/hooks/useCRM', () => {
   };
 
   const scopedDb = {
-    from: vi.fn(() => ({
-      select: vi.fn(() => ({
-        eq: vi.fn(() => ({
-          single: vi.fn().mockResolvedValue({ data: lead, error: null }),
+    from: vi.fn((table: string) => {
+      if (table === 'leads') {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              single: vi.fn().mockResolvedValue({ data: lead, error: null }),
+            })),
+          })),
+          delete: vi.fn(() => ({
+            eq: vi.fn().mockResolvedValue({ error: null }),
+          })),
+        };
+      }
+      if (table === 'accounts') {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+            })),
+          })),
+        };
+      }
+      if (table === 'activities') {
+        const query = {
+          eq: vi.fn().mockReturnThis(),
+          order: vi.fn().mockReturnThis(),
+          limit: vi.fn().mockResolvedValue({ data: [], error: null }),
+        };
+        return {
+          select: vi.fn(() => query),
+        };
+      }
+      return {
+        select: vi.fn(() => ({
+          eq: vi.fn().mockResolvedValue({ data: [], error: null }),
         })),
-      })),
-      delete: vi.fn(() => ({
-        eq: vi.fn().mockResolvedValue({ error: null }),
-      })),
-    })),
+      };
+    }),
   };
 
   return {
     useCRM: () => ({
       supabase,
       scopedDb,
+      context: {
+        tenantId: 'tenant-1',
+        userId: 'user-1',
+      },
     }),
   };
 });
 
 describe('LeadDetail', () => {
+  beforeEach(() => {
+    locationState = {};
+    fetchMock.mockReset();
+    fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes('/description-notes')) {
+        return {
+          ok: true,
+          json: async () => ({
+            data: {
+              leadId: 'lead-1',
+              description: '<p>Lead description</p>',
+              notes: '<p>Lead notes</p>',
+              updatedAt: new Date().toISOString(),
+            },
+          }),
+        } as Response;
+      }
+      if (init?.method === 'PUT') {
+        return {
+          ok: true,
+          json: async () => ({
+            data: {
+              leadId: 'lead-1',
+              description: '<p>Lead description</p>',
+              notes: '<p>Lead notes</p>',
+              updatedAt: new Date().toISOString(),
+            },
+          }),
+        } as Response;
+      }
+      return {
+        ok: false,
+        json: async () => ({ error: 'Not found' }),
+      } as Response;
+    });
+    vi.stubGlobal('fetch', fetchMock);
+  });
+
   it('renders lead header badges and quick actions', async () => {
     render(
       <BrowserRouter>
@@ -145,6 +246,18 @@ describe('LeadDetail', () => {
     expect(screen.getByRole('button', { name: 'Email' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Meeting' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Export' })).toBeEnabled();
+    expect(await screen.findByText('Additional Information')).toBeInTheDocument();
+  });
+
+  it('opens in edit mode when navigation state requests it', async () => {
+    locationState = { openEdit: true, returnTo: '/dashboard/leads' };
+
+    render(
+      <BrowserRouter>
+        <LeadDetail />
+      </BrowserRouter>,
+    );
+
+    expect(await screen.findByTestId('lead-form')).toBeInTheDocument();
   });
 });
-

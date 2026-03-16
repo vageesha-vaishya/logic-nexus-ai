@@ -1,5 +1,4 @@
 ALTER TABLE public.channel_accounts ENABLE ROW LEVEL SECURITY;
-
 DROP POLICY IF EXISTS "Platform admins can manage channel accounts" ON public.channel_accounts;
 CREATE POLICY "Platform admins can manage channel accounts"
 ON public.channel_accounts

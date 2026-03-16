@@ -8,7 +8,6 @@ BEGIN
         CREATE TYPE public.log_level AS ENUM ('DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL');
     END IF;
 END $$;
-
 -- 1. Rename existing table to back it up (if it exists and is not partitioned)
 DO $$
 BEGIN
@@ -19,7 +18,6 @@ BEGIN
         END IF;
     END IF;
 END $$;
-
 -- 2. Create Partitioned Table
 CREATE TABLE IF NOT EXISTS public.system_logs (
     id UUID DEFAULT gen_random_uuid(),
@@ -34,20 +32,16 @@ CREATE TABLE IF NOT EXISTS public.system_logs (
     created_at TIMESTAMPTZ DEFAULT NOW(),
     PRIMARY KEY (created_at, id) -- Partition key must be part of PK
 ) PARTITION BY RANGE (created_at);
-
 -- 3. Create Partitions (Current + Next 2 Months)
 -- January 2026
 CREATE TABLE IF NOT EXISTS public.system_logs_y2026m01 PARTITION OF public.system_logs
     FOR VALUES FROM ('2026-01-01') TO ('2026-02-01');
-
 -- February 2026
 CREATE TABLE IF NOT EXISTS public.system_logs_y2026m02 PARTITION OF public.system_logs
     FOR VALUES FROM ('2026-02-01') TO ('2026-03-01');
-
 -- March 2026
 CREATE TABLE IF NOT EXISTS public.system_logs_y2026m03 PARTITION OF public.system_logs
     FOR VALUES FROM ('2026-03-01') TO ('2026-04-01');
-
 -- 4. Restore Data (if legacy exists)
 DO $$
 BEGIN
@@ -60,7 +54,6 @@ BEGIN
         DROP TABLE public.system_logs_legacy;
     END IF;
 END $$;
-
 -- 5. Re-apply Indexes (must be done on the partitioned table, Postgres propagates them)
 CREATE INDEX IF NOT EXISTS idx_system_logs_level ON public.system_logs(level);
 CREATE INDEX IF NOT EXISTS idx_system_logs_component ON public.system_logs(component);
@@ -69,10 +62,8 @@ CREATE INDEX IF NOT EXISTS idx_system_logs_metadata_gin ON public.system_logs US
 CREATE INDEX IF NOT EXISTS idx_system_logs_text_search ON public.system_logs USING GIN (to_tsvector('english', message));
 -- created_at index is usually implicit in partition key, but good to have for range queries
 CREATE INDEX IF NOT EXISTS idx_system_logs_created_at ON public.system_logs(created_at DESC);
-
 -- 6. Re-apply RLS
 ALTER TABLE public.system_logs ENABLE ROW LEVEL SECURITY;
-
 -- Policies (need to be re-created on the new table)
 DO $$
 BEGIN
@@ -80,7 +71,6 @@ BEGIN
     DROP POLICY IF EXISTS "Service role can insert system logs" ON public.system_logs;
     DROP POLICY IF EXISTS "Authenticated users can insert system logs" ON public.system_logs;
 END $$;
-
 CREATE POLICY "Platform admins view all system logs" ON public.system_logs
     FOR SELECT
     USING (
@@ -89,15 +79,12 @@ CREATE POLICY "Platform admins view all system logs" ON public.system_logs
             WHERE ur.user_id = auth.uid() AND ur.role = 'platform_admin'
         )
     );
-
 CREATE POLICY "Service role can insert system logs" ON public.system_logs
     FOR INSERT
     WITH CHECK (true);
-
 CREATE POLICY "Authenticated users can insert system logs" ON public.system_logs
     FOR INSERT
     WITH CHECK (auth.uid() = user_id);
-
 -- 7. Update Cleanup Function to Drop Partitions
 CREATE OR REPLACE FUNCTION public.cleanup_old_log_partitions()
 RETURNS void

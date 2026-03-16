@@ -13,7 +13,6 @@ CREATE TABLE charge_tier_config (
   updated_at TIMESTAMPTZ DEFAULT now(),
   CONSTRAINT unique_tier_config_name UNIQUE (tenant_id, name)
 );
-
 -- Create charge_tier_ranges table for individual tier levels
 CREATE TABLE charge_tier_ranges (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -26,7 +25,6 @@ CREATE TABLE charge_tier_ranges (
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
-
 -- Add indexes for performance
 CREATE INDEX idx_charge_tier_config_tenant ON charge_tier_config(tenant_id);
 CREATE INDEX idx_charge_tier_config_basis ON charge_tier_config(basis_id);
@@ -35,29 +33,22 @@ CREATE INDEX idx_charge_tier_config_service_type ON charge_tier_config(service_t
 CREATE INDEX idx_charge_tier_config_carrier ON charge_tier_config(carrier_id);
 CREATE INDEX idx_charge_tier_ranges_config ON charge_tier_ranges(tier_config_id);
 CREATE INDEX idx_charge_tier_ranges_values ON charge_tier_ranges(min_value, max_value);
-
 -- Add RLS policies for charge_tier_config
 ALTER TABLE charge_tier_config ENABLE ROW LEVEL SECURITY;
-
 CREATE POLICY "Platform admins can manage all tier configs"
   ON charge_tier_config FOR ALL
   USING (is_platform_admin(auth.uid()));
-
 CREATE POLICY "Tenant admins can manage tier configs"
   ON charge_tier_config FOR ALL
   USING (has_role(auth.uid(), 'tenant_admin') AND tenant_id = get_user_tenant_id(auth.uid()));
-
 CREATE POLICY "Users can view tenant tier configs"
   ON charge_tier_config FOR SELECT
   USING (tenant_id = get_user_tenant_id(auth.uid()));
-
 -- Add RLS policies for charge_tier_ranges
 ALTER TABLE charge_tier_ranges ENABLE ROW LEVEL SECURITY;
-
 CREATE POLICY "Platform admins can manage all tier ranges"
   ON charge_tier_ranges FOR ALL
   USING (is_platform_admin(auth.uid()));
-
 CREATE POLICY "Tenant admins can manage tier ranges"
   ON charge_tier_ranges FOR ALL
   USING (
@@ -66,7 +57,6 @@ CREATE POLICY "Tenant admins can manage tier ranges"
       WHERE tenant_id = get_user_tenant_id(auth.uid())
     )
   );
-
 CREATE POLICY "Users can view tenant tier ranges"
   ON charge_tier_ranges FOR SELECT
   USING (
@@ -75,18 +65,15 @@ CREATE POLICY "Users can view tenant tier ranges"
       WHERE tenant_id = get_user_tenant_id(auth.uid())
     )
   );
-
 -- Add trigger for updated_at
 CREATE TRIGGER update_charge_tier_config_updated_at
   BEFORE UPDATE ON charge_tier_config
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();
-
 CREATE TRIGGER update_charge_tier_ranges_updated_at
   BEFORE UPDATE ON charge_tier_ranges
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();
-
 -- Add helper function to get applicable rate for a given value
 CREATE OR REPLACE FUNCTION get_tier_rate(
   p_tier_config_id UUID,
@@ -114,7 +101,6 @@ AS $$
   ORDER BY sort_order, min_value
   LIMIT 1;
 $$;
-
 -- Add comments for documentation
 COMMENT ON TABLE charge_tier_config IS 'Defines tiered pricing configurations for weight, volume, or other measurable units';
 COMMENT ON TABLE charge_tier_ranges IS 'Individual tier ranges with rates for each configuration';

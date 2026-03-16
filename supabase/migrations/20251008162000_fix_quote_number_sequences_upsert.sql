@@ -3,18 +3,15 @@
 -- - Replaces generate_quote_number to use valid ON CONFLICT targets
 
 BEGIN;
-
 -- Ensure partial unique indexes exist to enforce one row per period
 -- Tenant-level (franchise_id IS NULL)
 CREATE UNIQUE INDEX IF NOT EXISTS uq_quote_number_sequences_tenant_period
   ON public.quote_number_sequences (tenant_id, period_key)
   WHERE franchise_id IS NULL;
-
 -- Franchise-level (franchise_id IS NOT NULL)
 CREATE UNIQUE INDEX IF NOT EXISTS uq_quote_number_sequences_franchise_period
   ON public.quote_number_sequences (tenant_id, franchise_id, period_key)
   WHERE franchise_id IS NOT NULL;
-
 -- Replace generator function to upsert using the above indexes
 CREATE OR REPLACE FUNCTION public.generate_quote_number(
   p_tenant_id uuid,
@@ -86,5 +83,4 @@ BEGIN
   RETURN v_quote_number;
 END;
 $$;
-
 COMMIT;

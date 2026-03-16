@@ -112,7 +112,6 @@ BEGIN
     );
 END;
 $$;
-
 -- 2. Create Audit Function for Transfers
 CREATE OR REPLACE FUNCTION audit_transfer_change()
 RETURNS TRIGGER
@@ -173,18 +172,15 @@ BEGIN
   END IF;
 END;
 $$;
-
 -- 3. Add Triggers
 DROP TRIGGER IF EXISTS audit_entity_transfers ON entity_transfers;
 CREATE TRIGGER audit_entity_transfers
 AFTER INSERT OR UPDATE OR DELETE ON entity_transfers
 FOR EACH ROW EXECUTE FUNCTION audit_transfer_change();
-
 DROP TRIGGER IF EXISTS audit_entity_transfer_items ON entity_transfer_items;
 CREATE TRIGGER audit_entity_transfer_items
 AFTER INSERT OR UPDATE OR DELETE ON entity_transfer_items
 FOR EACH ROW EXECUTE FUNCTION audit_transfer_change();
-
 -- 4. Add Foreign Keys to Profiles for Querying
 -- This allows referencing profiles!requested_by(email) in PostgREST
 DO $$

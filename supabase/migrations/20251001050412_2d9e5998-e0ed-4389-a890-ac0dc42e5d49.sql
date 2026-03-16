@@ -9,7 +9,6 @@ CREATE TYPE opportunity_stage AS ENUM (
   'closed_won',
   'closed_lost'
 );
-
 -- Create opportunities table
 CREATE TABLE public.opportunities (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -49,16 +48,13 @@ CREATE TABLE public.opportunities (
   
   CONSTRAINT valid_close_date CHECK (close_date >= CURRENT_DATE OR stage IN ('closed_won', 'closed_lost'))
 );
-
 -- Enable RLS
 ALTER TABLE public.opportunities ENABLE ROW LEVEL SECURITY;
-
 -- Create RLS policies
 CREATE POLICY "Platform admins can manage all opportunities"
   ON public.opportunities
   FOR ALL
   USING (is_platform_admin(auth.uid()));
-
 CREATE POLICY "Tenant admins can manage tenant opportunities"
   ON public.opportunities
   FOR ALL
@@ -66,7 +62,6 @@ CREATE POLICY "Tenant admins can manage tenant opportunities"
     has_role(auth.uid(), 'tenant_admin') 
     AND tenant_id = get_user_tenant_id(auth.uid())
   );
-
 CREATE POLICY "Franchise admins can manage franchise opportunities"
   ON public.opportunities
   FOR ALL
@@ -74,22 +69,18 @@ CREATE POLICY "Franchise admins can manage franchise opportunities"
     has_role(auth.uid(), 'franchise_admin') 
     AND franchise_id = get_user_franchise_id(auth.uid())
   );
-
 CREATE POLICY "Users can view franchise opportunities"
   ON public.opportunities
   FOR SELECT
   USING (franchise_id = get_user_franchise_id(auth.uid()));
-
 CREATE POLICY "Users can create franchise opportunities"
   ON public.opportunities
   FOR INSERT
   WITH CHECK (franchise_id = get_user_franchise_id(auth.uid()));
-
 CREATE POLICY "Users can update assigned opportunities"
   ON public.opportunities
   FOR UPDATE
   USING (owner_id = auth.uid());
-
 -- Create indexes for performance
 CREATE INDEX idx_opportunities_tenant ON public.opportunities(tenant_id);
 CREATE INDEX idx_opportunities_franchise ON public.opportunities(franchise_id);
@@ -98,7 +89,6 @@ CREATE INDEX idx_opportunities_contact ON public.opportunities(contact_id);
 CREATE INDEX idx_opportunities_owner ON public.opportunities(owner_id);
 CREATE INDEX idx_opportunities_stage ON public.opportunities(stage);
 CREATE INDEX idx_opportunities_close_date ON public.opportunities(close_date);
-
 -- Create trigger for updated_at
 CREATE TRIGGER update_opportunities_updated_at
   BEFORE UPDATE ON public.opportunities

@@ -3,7 +3,6 @@
 -- Date: 2026-01-31
 
 BEGIN;
-
 --------------------------------------------------------------------------------
 -- 1. Package Types Master Data
 --------------------------------------------------------------------------------
@@ -22,7 +21,6 @@ CREATE TABLE IF NOT EXISTS public.package_types (
   updated_at TIMESTAMPTZ DEFAULT now(),
   UNIQUE(tenant_id, code)
 );
-
 -- Seed Standard Package Types (Global - tenant_id NULL)
 INSERT INTO public.package_types (code, name, description, default_length_cm, default_width_cm, default_height_cm)
 VALUES
@@ -34,7 +32,6 @@ VALUES
   ('CRATE', 'Wooden Crate', 'Secure wooden crate', NULL, NULL, NULL),
   ('DRUM', 'Drum', '55-gallon drum', 60, 60, 90)
 ON CONFLICT (tenant_id, code) DO NOTHING;
-
 -- RLS for Package Types
 ALTER TABLE public.package_types ENABLE ROW LEVEL SECURITY;
 DO $$
@@ -44,8 +41,6 @@ BEGIN
 END $$;
 CREATE POLICY "Read package types" ON public.package_types FOR SELECT USING (tenant_id IS NULL OR tenant_id = get_user_tenant_id(auth.uid()));
 CREATE POLICY "Manage package types" ON public.package_types FOR ALL USING (tenant_id = get_user_tenant_id(auth.uid()));
-
-
 --------------------------------------------------------------------------------
 -- 2. Service Type Mappings
 --------------------------------------------------------------------------------
@@ -62,7 +57,6 @@ CREATE TABLE IF NOT EXISTS public.service_type_mappings (
   updated_at TIMESTAMPTZ DEFAULT now(),
   UNIQUE(tenant_id, carrier_id, mapping_context, external_code)
 );
-
 -- RLS for Service Type Mappings
 ALTER TABLE public.service_type_mappings ENABLE ROW LEVEL SECURITY;
 DO $$
@@ -72,8 +66,6 @@ BEGIN
 END $$;
 CREATE POLICY "Read service mappings" ON public.service_type_mappings FOR SELECT USING (tenant_id IS NULL OR tenant_id = get_user_tenant_id(auth.uid()));
 CREATE POLICY "Manage service mappings" ON public.service_type_mappings FOR ALL USING (tenant_id = get_user_tenant_id(auth.uid()));
-
-
 --------------------------------------------------------------------------------
 -- 3. Enhance Services Table (Link to Service Types)
 --------------------------------------------------------------------------------
@@ -84,15 +76,12 @@ BEGIN
         ALTER TABLE public.services ADD COLUMN service_type_id UUID REFERENCES public.service_types(id);
     END IF;
 END $$;
-
 -- Migrate existing text service_types to FKs
 UPDATE public.services s
 SET service_type_id = st.id
 FROM public.service_types st
 WHERE s.service_type_id IS NULL 
   AND lower(s.service_type) = lower(st.name);
-
-
 --------------------------------------------------------------------------------
 -- 4. Refactor Cargo Details (Normalization)
 --------------------------------------------------------------------------------
@@ -103,11 +92,9 @@ ALTER TABLE public.cargo_details
   ADD COLUMN IF NOT EXISTS package_type_id UUID REFERENCES public.package_types(id),
   ALTER COLUMN service_id DROP NOT NULL,
   ALTER COLUMN service_type DROP NOT NULL;
-
 -- Create Indexes for new columns
 CREATE INDEX IF NOT EXISTS idx_cargo_details_quotation_version ON public.cargo_details(quotation_version_id);
 CREATE INDEX IF NOT EXISTS idx_cargo_details_aes_hts ON public.cargo_details(aes_hts_id);
-
 -- Trigger to validate AES HTS if provided
 CREATE OR REPLACE FUNCTION validate_cargo_aes_hts()
 RETURNS TRIGGER AS $$
@@ -118,11 +105,9 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
-
 DROP TRIGGER IF EXISTS trg_validate_cargo_aes_hts ON public.cargo_details;
 CREATE TRIGGER trg_validate_cargo_aes_hts
   BEFORE INSERT OR UPDATE ON public.cargo_details
   FOR EACH ROW
   EXECUTE FUNCTION validate_cargo_aes_hts();
-
 COMMIT;

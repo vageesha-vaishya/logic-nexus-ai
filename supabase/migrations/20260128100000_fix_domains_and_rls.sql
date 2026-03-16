@@ -8,17 +8,14 @@ CREATE TABLE IF NOT EXISTS public.platform_domains (
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now()
 );
-
 -- Enable RLS on platform_domains
 ALTER TABLE public.platform_domains ENABLE ROW LEVEL SECURITY;
-
 -- Add RLS policies for platform_domains (Allow read access to authenticated users)
 DROP POLICY IF EXISTS "Authenticated users can view platform domains" ON public.platform_domains;
 CREATE POLICY "Authenticated users can view platform domains"
   ON public.platform_domains FOR SELECT
   TO authenticated
   USING (true);
-
 -- Add domain_id to tenants if not exists
 DO $$
 BEGIN
@@ -26,7 +23,6 @@ BEGIN
         ALTER TABLE public.tenants ADD COLUMN domain_id uuid REFERENCES public.platform_domains(id);
     END IF;
 END $$;
-
 -- Ensure user_preferences table exists (dependency for get_user_tenant_id)
 CREATE TABLE IF NOT EXISTS public.user_preferences (
   user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -39,23 +35,18 @@ CREATE TABLE IF NOT EXISTS public.user_preferences (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
-
 -- Enable RLS on user_preferences
 ALTER TABLE public.user_preferences ENABLE ROW LEVEL SECURITY;
-
 -- Ensure policies on user_preferences
 DROP POLICY IF EXISTS "Users can view own preferences" ON public.user_preferences;
 CREATE POLICY "Users can view own preferences" ON public.user_preferences
     FOR SELECT USING (auth.uid() = user_id);
-
 DROP POLICY IF EXISTS "Users can update own preferences" ON public.user_preferences;
 CREATE POLICY "Users can update own preferences" ON public.user_preferences
     FOR UPDATE USING (auth.uid() = user_id);
-
 DROP POLICY IF EXISTS "Users can insert own preferences" ON public.user_preferences;
 CREATE POLICY "Users can insert own preferences" ON public.user_preferences
     FOR INSERT WITH CHECK (auth.uid() = user_id);
-
 -- Fix is_platform_admin to be strictly safe and avoid recursion
 CREATE OR REPLACE FUNCTION public.is_platform_admin(check_user_id UUID)
 RETURNS BOOLEAN
@@ -69,7 +60,6 @@ AS $$
     WHERE user_id = check_user_id AND role = 'platform_admin'
   );
 $$;
-
 -- Fix get_user_tenant_id to be strictly safe and handle missing preferences
 CREATE OR REPLACE FUNCTION public.get_user_tenant_id(check_user_id UUID)
 RETURNS UUID
@@ -121,27 +111,22 @@ BEGIN
   RETURN v_role_tenant_id;
 END;
 $$;
-
 -- Ensure tenants RLS is correct and uses the safe functions
 DROP POLICY IF EXISTS "Platform admins can view all tenants" ON public.tenants;
 CREATE POLICY "Platform admins can view all tenants"
   ON public.tenants FOR SELECT
   USING (public.is_platform_admin(auth.uid()));
-
 DROP POLICY IF EXISTS "Tenant admins can view own tenant" ON public.tenants;
 CREATE POLICY "Tenant admins can view own tenant"
   ON public.tenants FOR SELECT
   USING (id = public.get_user_tenant_id(auth.uid()));
-
 -- Insert default domains if they don't exist
 INSERT INTO public.platform_domains (code, name, description)
 SELECT 'LOGISTICS', 'Logistics', 'Logistics and Supply Chain Management'
 WHERE NOT EXISTS (SELECT 1 FROM public.platform_domains WHERE code = 'LOGISTICS');
-
 INSERT INTO public.platform_domains (code, name, description)
 SELECT 'REAL_ESTATE', 'Real Estate', 'Real Estate Management'
 WHERE NOT EXISTS (SELECT 1 FROM public.platform_domains WHERE code = 'REAL_ESTATE');
-
 INSERT INTO public.platform_domains (code, name, description)
 SELECT 'ECOMMERCE', 'E-Commerce', 'E-Commerce and Retail'
 WHERE NOT EXISTS (SELECT 1 FROM public.platform_domains WHERE code = 'ECOMMERCE');

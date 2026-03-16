@@ -14,7 +14,6 @@ BEGIN
         CREATE TYPE public.domain_type AS ENUM ('logistics', 'banking', 'telecom');
     END IF;
 END $$;
-
 -- 2. Add domain_type column to tenants table
 DO $$
 BEGIN
@@ -29,6 +28,5 @@ BEGIN
         ADD COLUMN domain_type public.domain_type DEFAULT 'logistics'::public.domain_type NOT NULL;
     END IF;
 END $$;
-
 -- 3. Comment for documentation
 COMMENT ON COLUMN public.tenants.domain_type IS 'Vertical domain of the tenant (logistics, banking, telecom). Controls available modules and business logic.';

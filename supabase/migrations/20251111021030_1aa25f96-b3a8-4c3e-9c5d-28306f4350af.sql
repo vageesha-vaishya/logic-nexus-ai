@@ -3,10 +3,8 @@
 -- 1) Add service_type_id column for future FK-based lookups
 ALTER TABLE public.service_type_mappings 
 ADD COLUMN IF NOT EXISTS service_type_id uuid REFERENCES public.service_types(id);
-
 CREATE INDEX IF NOT EXISTS service_type_mappings_service_type_id_idx 
 ON public.service_type_mappings(service_type_id);
-
 DO $$
 BEGIN
   IF EXISTS (

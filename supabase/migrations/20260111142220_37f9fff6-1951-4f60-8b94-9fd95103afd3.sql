@@ -12,10 +12,8 @@ BEGIN
   RETURN NEW;
 END;
 $$;
-
 -- 2. Replace overly permissive audit log INSERT policy with proper check
 DROP POLICY IF EXISTS "Service can insert audit logs" ON public.email_audit_log;
-
 CREATE POLICY "Authenticated users can insert audit logs for their actions"
 ON public.email_audit_log FOR INSERT
 TO authenticated

@@ -3,7 +3,6 @@
 -- Description: Implements advanced commodity management, duty rates, compliance tracking, and HTS search optimization.
 
 BEGIN;
-
 --------------------------------------------------------------------------------
 -- 1. Enhanced HTS Codes Structure
 --------------------------------------------------------------------------------
@@ -14,7 +13,6 @@ ADD COLUMN IF NOT EXISTS heading VARCHAR(4),
 ADD COLUMN IF NOT EXISTS subheading VARCHAR(6),
 ADD COLUMN IF NOT EXISTS tariff_item VARCHAR(8),
 ADD COLUMN IF NOT EXISTS search_vector tsvector;
-
 -- Create function to auto-populate hierarchy from hts_code
 CREATE OR REPLACE FUNCTION public.parse_hts_hierarchy()
 RETURNS TRIGGER AS $$
@@ -39,14 +37,12 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
-
 -- Trigger for HTS hierarchy and search vector
 DROP TRIGGER IF EXISTS trg_aes_hts_hierarchy ON public.aes_hts_codes;
 CREATE TRIGGER trg_aes_hts_hierarchy
 BEFORE INSERT OR UPDATE ON public.aes_hts_codes
 FOR EACH ROW
 EXECUTE FUNCTION public.parse_hts_hierarchy();
-
 -- Update existing records
 -- UPDATE public.aes_hts_codes SET id = id; -- Commented out to save time during dev, run manually if needed
 
@@ -55,7 +51,6 @@ CREATE INDEX IF NOT EXISTS idx_aes_hts_search_vector ON public.aes_hts_codes USI
 -- Indexes for hierarchy
 CREATE INDEX IF NOT EXISTS idx_aes_hts_chapter ON public.aes_hts_codes(chapter);
 CREATE INDEX IF NOT EXISTS idx_aes_hts_heading ON public.aes_hts_codes(heading);
-
 --------------------------------------------------------------------------------
 -- 2. Master Commodities (Tenant Product Catalog)
 --------------------------------------------------------------------------------
@@ -77,10 +72,8 @@ CREATE TABLE IF NOT EXISTS public.master_commodities (
   updated_at TIMESTAMPTZ DEFAULT now(),
   UNIQUE(tenant_id, sku)
 );
-
 -- Enable RLS
 ALTER TABLE public.master_commodities ENABLE ROW LEVEL SECURITY;
-
 DO $$ 
 BEGIN
   IF NOT EXISTS (
@@ -97,11 +90,9 @@ BEGIN
       FOR ALL USING (tenant_id = get_user_tenant_id(auth.uid()));
   END IF;
 END $$;
-
 -- Index
 CREATE INDEX IF NOT EXISTS idx_master_commodities_tenant_sku ON public.master_commodities(tenant_id, sku);
 CREATE INDEX IF NOT EXISTS idx_master_commodities_name ON public.master_commodities USING GIN (to_tsvector('english', name));
-
 --------------------------------------------------------------------------------
 -- 3. Duty Rates
 --------------------------------------------------------------------------------
@@ -119,13 +110,10 @@ CREATE TABLE IF NOT EXISTS public.duty_rates (
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
-
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_duty_rates_hts_country ON public.duty_rates(aes_hts_id, country_code);
-
 -- RLS (Public read, Admin write)
 ALTER TABLE public.duty_rates ENABLE ROW LEVEL SECURITY;
-
 DO $$ 
 BEGIN
   IF NOT EXISTS (
@@ -140,7 +128,6 @@ BEGIN
     CREATE POLICY "Admin manage duty rates" ON public.duty_rates FOR ALL USING (is_platform_admin(auth.uid()));
   END IF;
 END $$;
-
 --------------------------------------------------------------------------------
 -- 4. Compliance Screenings
 --------------------------------------------------------------------------------
@@ -156,13 +143,10 @@ CREATE TABLE IF NOT EXISTS public.compliance_screenings (
   screened_by UUID REFERENCES auth.users(id),
   created_at TIMESTAMPTZ DEFAULT now()
 );
-
 -- Index
 CREATE INDEX IF NOT EXISTS idx_compliance_screenings_entity ON public.compliance_screenings(entity_type, entity_id);
-
 -- RLS
 ALTER TABLE public.compliance_screenings ENABLE ROW LEVEL SECURITY;
-
 DO $$ 
 BEGIN
   IF NOT EXISTS (
@@ -171,12 +155,10 @@ BEGIN
     CREATE POLICY "Tenant read screenings" ON public.compliance_screenings FOR SELECT USING (tenant_id = get_user_tenant_id(auth.uid()));
   END IF;
 END $$;
-
 --------------------------------------------------------------------------------
 -- 5. Advanced Search Function
 --------------------------------------------------------------------------------
 DROP FUNCTION IF EXISTS public.search_hts_codes(text, integer);
-
 CREATE OR REPLACE FUNCTION public.search_hts_codes(
   search_term TEXT,
   limit_count INTEGER DEFAULT 20
@@ -202,5 +184,4 @@ BEGIN
   LIMIT limit_count;
 END;
 $$ LANGUAGE plpgsql;
-
 COMMIT;

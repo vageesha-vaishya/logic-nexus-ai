@@ -1,4 +1,3 @@
-
 -- Add source_attribution column to quotation_version_options
 DO $$ 
 BEGIN 
@@ -6,5 +5,4 @@ BEGIN
         ALTER TABLE quotation_version_options ADD COLUMN source_attribution text;
     END IF;
 END $$;
-
 COMMENT ON COLUMN quotation_version_options.source_attribution IS 'Indicates the specific attribution of the source (e.g., "manual", "AI Smart Engine").';

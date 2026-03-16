@@ -8,10 +8,8 @@ CREATE TABLE IF NOT EXISTS public.system_settings (
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE(tenant_id, setting_key)
 );
-
 -- Enable RLS
 ALTER TABLE public.system_settings ENABLE ROW LEVEL SECURITY;
-
 -- Policies
 -- Platform Admins can do everything
 CREATE POLICY "Platform Admins can do everything on system_settings" ON public.system_settings
@@ -22,7 +20,6 @@ CREATE POLICY "Platform Admins can do everything on system_settings" ON public.s
             WHERE ur.user_id = auth.uid() AND ur.role = 'platform_admin'
         )
     );
-
 -- Tenant Admins can view/edit their own tenant settings
 CREATE POLICY "Tenant Admins can view own settings" ON public.system_settings
     FOR SELECT
@@ -32,7 +29,6 @@ CREATE POLICY "Tenant Admins can view own settings" ON public.system_settings
             WHERE ur.user_id = auth.uid() AND ur.role = 'tenant_admin'
         )
     );
-
 CREATE POLICY "Tenant Admins can update own settings" ON public.system_settings
     FOR INSERT
     WITH CHECK (
@@ -41,7 +37,6 @@ CREATE POLICY "Tenant Admins can update own settings" ON public.system_settings
             WHERE ur.user_id = auth.uid() AND ur.role = 'tenant_admin'
         )
     );
-
 CREATE POLICY "Tenant Admins can update own settings update" ON public.system_settings
     FOR UPDATE
     USING (
@@ -50,7 +45,6 @@ CREATE POLICY "Tenant Admins can update own settings update" ON public.system_se
             WHERE ur.user_id = auth.uid() AND ur.role = 'tenant_admin'
         )
     );
-
 -- Regular users can view settings for their tenant
 CREATE POLICY "Users can view own tenant settings" ON public.system_settings
     FOR SELECT

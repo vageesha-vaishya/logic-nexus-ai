@@ -1,7 +1,5 @@
 -- Function to restore table data to any schema with dynamic conflict target
 -- WARNING: This bypasses RLS if used with SECURITY DEFINER. Ensure proper access control.
-DROP FUNCTION IF EXISTS public.restore_table_data(text, text, jsonb, text, text[]);
-
 CREATE OR REPLACE FUNCTION public.restore_table_data(
     target_schema text,
     target_table text,

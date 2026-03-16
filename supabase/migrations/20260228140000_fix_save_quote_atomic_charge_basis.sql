@@ -538,4 +538,4 @@ BEGIN
 
   RETURN v_quote_id;
 END;
-$function$
+$function$;

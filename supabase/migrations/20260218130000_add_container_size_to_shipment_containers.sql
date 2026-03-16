@@ -3,7 +3,6 @@
 
 ALTER TABLE public.shipment_containers
 ADD COLUMN IF NOT EXISTS container_size TEXT;
-
 -- Backfill container_size based on container_size_id if available
 UPDATE public.shipment_containers sc
 SET container_size = cs.name

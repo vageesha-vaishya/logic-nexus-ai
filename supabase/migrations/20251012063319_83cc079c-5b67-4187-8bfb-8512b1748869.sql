@@ -11,7 +11,6 @@ CREATE TABLE IF NOT EXISTS public.quotation_versions (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
-
 -- Create quotation_version_options table for carrier rate options per version
 CREATE TABLE IF NOT EXISTS public.quotation_version_options (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -23,7 +22,6 @@ CREATE TABLE IF NOT EXISTS public.quotation_version_options (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
-
 -- Create customer_selections table for tracking which option customer chose
 CREATE TABLE IF NOT EXISTS public.customer_selections (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -35,12 +33,10 @@ CREATE TABLE IF NOT EXISTS public.customer_selections (
   selected_by UUID,
   selected_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
-
 -- Enable RLS
 ALTER TABLE public.quotation_versions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.quotation_version_options ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.customer_selections ENABLE ROW LEVEL SECURITY;
-
 -- RLS Policies for quotation_versions
 CREATE POLICY "Users can view franchise quote versions"
   ON public.quotation_versions FOR SELECT
@@ -50,7 +46,6 @@ CREATE POLICY "Users can view franchise quote versions"
       WHERE franchise_id = get_user_franchise_id(auth.uid())
     )
   );
-
 CREATE POLICY "Users can create quote versions"
   ON public.quotation_versions FOR INSERT
   WITH CHECK (
@@ -59,11 +54,9 @@ CREATE POLICY "Users can create quote versions"
       WHERE franchise_id = get_user_franchise_id(auth.uid())
     )
   );
-
 CREATE POLICY "Platform admins full access to quote versions"
   ON public.quotation_versions FOR ALL
   USING (is_platform_admin(auth.uid()));
-
 -- RLS Policies for quotation_version_options
 CREATE POLICY "Users can view franchise version options"
   ON public.quotation_version_options FOR SELECT
@@ -74,7 +67,6 @@ CREATE POLICY "Users can view franchise version options"
       WHERE q.franchise_id = get_user_franchise_id(auth.uid())
     )
   );
-
 CREATE POLICY "Users can create version options"
   ON public.quotation_version_options FOR INSERT
   WITH CHECK (
@@ -84,11 +76,9 @@ CREATE POLICY "Users can create version options"
       WHERE q.franchise_id = get_user_franchise_id(auth.uid())
     )
   );
-
 CREATE POLICY "Platform admins full access to version options"
   ON public.quotation_version_options FOR ALL
   USING (is_platform_admin(auth.uid()));
-
 -- RLS Policies for customer_selections
 CREATE POLICY "Users can view franchise customer selections"
   ON public.customer_selections FOR SELECT
@@ -98,7 +88,6 @@ CREATE POLICY "Users can view franchise customer selections"
       WHERE franchise_id = get_user_franchise_id(auth.uid())
     )
   );
-
 CREATE POLICY "Users can create customer selections"
   ON public.customer_selections FOR INSERT
   WITH CHECK (
@@ -107,11 +96,9 @@ CREATE POLICY "Users can create customer selections"
       WHERE franchise_id = get_user_franchise_id(auth.uid())
     )
   );
-
 CREATE POLICY "Platform admins full access to customer selections"
   ON public.customer_selections FOR ALL
   USING (is_platform_admin(auth.uid()));
-
 -- Create function for recording customer selection
 CREATE OR REPLACE FUNCTION public.record_customer_selection(
   p_tenant_id UUID,
@@ -143,7 +130,6 @@ BEGIN
   );
 END;
 $$;
-
 -- Create indexes for better query performance
 CREATE INDEX IF NOT EXISTS idx_quotation_versions_quote_id ON public.quotation_versions(quote_id);
 CREATE INDEX IF NOT EXISTS idx_quotation_version_options_version_id ON public.quotation_version_options(quotation_version_id);

@@ -3,7 +3,6 @@
 -- Date: 2026-03-06
 
 BEGIN;
-
 --------------------------------------------------------------------------------
 -- Update Storage Policies (RLS) for Organization Assets
 --------------------------------------------------------------------------------
@@ -24,7 +23,6 @@ WITH CHECK (
         (storage.foldername(name))[1] = (select public.get_user_tenant_id(auth.uid()))::text
     )
 );
-
 -- Policy: Authenticated Update Access (Tenant Isolation + Admin Access)
 DROP POLICY IF EXISTS "Authenticated Update Access for Organization Assets" ON storage.objects;
 CREATE POLICY "Authenticated Update Access for Organization Assets"
@@ -38,7 +36,6 @@ USING (
         (storage.foldername(name))[1] = (select public.get_user_tenant_id(auth.uid()))::text
     )
 );
-
 -- Policy: Authenticated Delete Access (Tenant Isolation + Admin Access)
 DROP POLICY IF EXISTS "Authenticated Delete Access for Organization Assets" ON storage.objects;
 CREATE POLICY "Authenticated Delete Access for Organization Assets"
@@ -52,5 +49,4 @@ USING (
         (storage.foldername(name))[1] = (select public.get_user_tenant_id(auth.uid()))::text
     )
 );
-
 COMMIT;

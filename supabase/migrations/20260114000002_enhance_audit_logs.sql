@@ -19,7 +19,6 @@ BEGIN
         CREATE INDEX idx_audit_logs_franchise_id ON public.audit_logs(franchise_id);
     END IF;
 END $$;
-
 -- 2. Update RLS Policies
 
 -- Drop existing policies to recreate them
@@ -28,7 +27,6 @@ DROP POLICY IF EXISTS "Users view own logs" ON public.audit_logs;
 DROP POLICY IF EXISTS "Users can insert logs" ON public.audit_logs;
 DROP POLICY IF EXISTS "Tenant admins view tenant logs" ON public.audit_logs;
 DROP POLICY IF EXISTS "Franchise admins view franchise logs" ON public.audit_logs;
-
 -- Platform Admins can view all logs
 CREATE POLICY "Platform admins view all logs" ON public.audit_logs
     FOR SELECT
@@ -38,7 +36,6 @@ CREATE POLICY "Platform admins view all logs" ON public.audit_logs
             WHERE ur.user_id = auth.uid() AND ur.role = 'platform_admin'
         )
     );
-
 -- Tenant Admins can view logs for their tenant
 CREATE POLICY "Tenant admins view tenant logs" ON public.audit_logs
     FOR SELECT
@@ -50,7 +47,6 @@ CREATE POLICY "Tenant admins view tenant logs" ON public.audit_logs
             AND ur.tenant_id = audit_logs.tenant_id
         )
     );
-
 -- Franchise Admins can view logs for their franchise
 CREATE POLICY "Franchise admins view franchise logs" ON public.audit_logs
     FOR SELECT
@@ -62,17 +58,14 @@ CREATE POLICY "Franchise admins view franchise logs" ON public.audit_logs
             AND ur.franchise_id = audit_logs.franchise_id
         )
     );
-
 -- Users can view their own logs
 CREATE POLICY "Users view own logs" ON public.audit_logs
     FOR SELECT
     USING (auth.uid() = user_id);
-
 -- Users can insert logs (must be authenticated)
 CREATE POLICY "Users can insert logs" ON public.audit_logs
     FOR INSERT
     WITH CHECK (auth.uid() = user_id);
-
 -- 3. Add function to automatically set tenant_id/franchise_id on insert if not provided
 -- This is useful if the insertion comes from a trigger that doesn't explicitly set them,
 -- although ScopedDataAccess should handle this.
@@ -91,7 +84,6 @@ BEGIN
     RETURN NEW;
 END;
 $$;
-
 DROP TRIGGER IF EXISTS trg_set_audit_log_context ON public.audit_logs;
 CREATE TRIGGER trg_set_audit_log_context
     BEFORE INSERT ON public.audit_logs

@@ -10,7 +10,6 @@ ADD COLUMN IF NOT EXISTS reliability_score numeric(3,2) DEFAULT 0.95,
 ADD COLUMN IF NOT EXISTS carrier_alliance_members jsonb DEFAULT '[]'::jsonb,
 ADD COLUMN IF NOT EXISTS service_level text DEFAULT 'standard' CHECK (service_level IN ('express', 'standard', 'economy')),
 ADD COLUMN IF NOT EXISTS real_time_pricing boolean DEFAULT false;
-
 -- Transfer Points Table for Inter-Modal Connections
 CREATE TABLE IF NOT EXISTS public.transfer_points (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -31,7 +30,6 @@ CREATE TABLE IF NOT EXISTS public.transfer_points (
   updated_at timestamptz DEFAULT NOW(),
   CONSTRAINT transfer_points_unique_code UNIQUE (tenant_id, code)
 );
-
 -- Leg Connections with Transfer Metadata
 CREATE TABLE IF NOT EXISTS public.leg_connections (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -52,7 +50,6 @@ CREATE TABLE IF NOT EXISTS public.leg_connections (
   updated_at timestamptz DEFAULT NOW(),
   CONSTRAINT leg_connections_unique_transfer UNIQUE (rate_option_id, from_leg_id, to_leg_id)
 );
-
 -- NYC→DED Routing Matrix (Pre-calculated optimal routes)
 CREATE TABLE IF NOT EXISTS public.nyc_ded_routing_matrix (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -73,7 +70,6 @@ CREATE TABLE IF NOT EXISTS public.nyc_ded_routing_matrix (
   created_at timestamptz DEFAULT NOW(),
   CONSTRAINT nyc_ded_matrix_unique_route UNIQUE (tenant_id, origin_code, transport_mode_sequence)
 );
-
 -- Enhanced Commodity Classification System
 CREATE TABLE IF NOT EXISTS public.commodity_classifications (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -94,7 +90,6 @@ CREATE TABLE IF NOT EXISTS public.commodity_classifications (
   updated_at timestamptz DEFAULT NOW(),
   CONSTRAINT commodity_classifications_unique_hs UNIQUE (tenant_id, hs_code)
 );
-
 -- Enhanced Container Specifications
 CREATE TABLE IF NOT EXISTS public.container_specifications (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -117,7 +112,6 @@ CREATE TABLE IF NOT EXISTS public.container_specifications (
   updated_at timestamptz DEFAULT NOW(),
   CONSTRAINT container_specs_unique_iso UNIQUE (tenant_id, iso_code)
 );
-
 -- Dynamic Surcharge Configuration
 CREATE TABLE IF NOT EXISTS public.dynamic_surcharges (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -135,7 +129,6 @@ CREATE TABLE IF NOT EXISTS public.dynamic_surcharges (
   last_updated timestamptz DEFAULT NOW(),
   created_at timestamptz DEFAULT NOW()
 );
-
 -- RLS Policies for Enhanced Tables
 ALTER TABLE public.transfer_points ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.leg_connections ENABLE ROW LEVEL SECURITY;
@@ -143,7 +136,6 @@ ALTER TABLE public.nyc_ded_routing_matrix ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.commodity_classifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.container_specifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.dynamic_surcharges ENABLE ROW LEVEL SECURITY;
-
 DO $$
 BEGIN
   EXECUTE 'DROP POLICY IF EXISTS "Users can view transfer_points for their tenant" ON public.transfer_points';
@@ -164,14 +156,12 @@ BEGIN
   EXECUTE 'DROP POLICY IF EXISTS "Tenants can only access their dynamic surcharges" ON public.dynamic_surcharges';
   EXECUTE 'CREATE POLICY "Tenants can only access their dynamic surcharges" ON public.dynamic_surcharges FOR ALL USING (tenant_id = auth.uid()::text::uuid)';
 END $$;
-
 -- Indexes for Performance Optimization
 CREATE INDEX IF NOT EXISTS idx_transfer_points_geo ON public.transfer_points USING gist (point(longitude, latitude));
 CREATE INDEX IF NOT EXISTS idx_nyc_ded_matrix_origin ON public.nyc_ded_routing_matrix (origin_code, tenant_id);
 CREATE INDEX IF NOT EXISTS idx_commodity_hs_type ON public.commodity_classifications (hs_code, commodity_type, tenant_id);
 CREATE INDEX IF NOT EXISTS idx_container_type_size ON public.container_specifications (container_type, container_size, tenant_id);
 CREATE INDEX IF NOT EXISTS idx_surcharges_validity ON public.dynamic_surcharges (validity_period, tenant_id);
-
 -- Insert NYC Transfer Points
 INSERT INTO public.transfer_points (tenant_id, code, name, location_type, country_code, latitude, longitude, facility_capabilities) VALUES
 ('00000000-0000-0000-0000-000000000000', 'JFK', 'John F. Kennedy International Airport', 'airport', 'US', 40.6413, -73.7781, '["air_cargo", "cold_storage", "hazardous_materials", "oversized_cargo"]'),
@@ -181,7 +171,6 @@ INSERT INTO public.transfer_points (tenant_id, code, name, location_type, countr
 ('00000000-0000-0000-0000-000000000000', 'NYCTRUCK', 'New York City Truck Terminal', 'truck_terminal', 'US', 40.7505, -73.9934, '["cross_docking", "lcl_consolidation", "distribution"]'),
 ('00000000-0000-0000-0000-000000000000', 'DED', 'Dehra Dun Airport', 'airport', 'IN', 30.3165, 78.0322, '["air_cargo", "general_cargo", "customs_clearance"]')
 ON CONFLICT ON CONSTRAINT transfer_points_unique_code DO NOTHING;
-
 -- Insert Sample NYC→DED Routing Matrix
 INSERT INTO public.nyc_ded_routing_matrix (tenant_id, origin_code, destination_code, transport_mode_sequence, total_transit_days, total_cost, viability_score, carrier_alliances, transfer_points) VALUES
 ('00000000-0000-0000-0000-000000000000', 'JFK', 'DED', '{"air"}', 2, 8500.00, 0.95, '{"Star Alliance", "SkyTeam Cargo"}', '{}'),

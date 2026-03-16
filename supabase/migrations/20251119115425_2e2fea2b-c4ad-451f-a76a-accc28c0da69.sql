@@ -1,10 +1,8 @@
 -- Add option_name column to quotation_version_options
 ALTER TABLE public.quotation_version_options 
 ADD COLUMN option_name TEXT;
-
 -- Add a comment explaining the column
 COMMENT ON COLUMN public.quotation_version_options.option_name IS 'Human-readable name for the option (e.g., Option A, Option B)';
-
 -- Create function to generate next option name for a version
 CREATE OR REPLACE FUNCTION generate_next_option_name(p_version_id UUID)
 RETURNS TEXT

@@ -1,4 +1,3 @@
-
 -- Migration: Email Infrastructure Phase 2 (AI Threat Detection)
 -- Date: 2026-02-19
 -- Description: Adds threat detection columns to emails and creates security_incidents table.
@@ -9,13 +8,11 @@ DO $$ BEGIN
 EXCEPTION
     WHEN duplicate_object THEN null;
 END $$;
-
 -- 2. Add threat columns to emails table
 ALTER TABLE public.emails
 ADD COLUMN IF NOT EXISTS threat_level public.email_threat_level DEFAULT 'safe',
 ADD COLUMN IF NOT EXISTS threat_score NUMERIC(3, 2) DEFAULT 0.00, -- 0.00 to 1.00
 ADD COLUMN IF NOT EXISTS threat_details JSONB DEFAULT '{}'::jsonb;
-
 -- 3. Create security_incidents table
 CREATE TABLE IF NOT EXISTS public.security_incidents (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -33,10 +30,8 @@ CREATE TABLE IF NOT EXISTS public.security_incidents (
     resolved_at TIMESTAMPTZ,
     resolved_by UUID REFERENCES auth.users(id)
 );
-
 -- Enable RLS
 ALTER TABLE public.security_incidents ENABLE ROW LEVEL SECURITY;
-
 -- RLS Policies for security_incidents
 
 -- Policy: Platform admins can manage all incidents
@@ -46,7 +41,6 @@ CREATE POLICY "Platform admins can manage all incidents"
     TO authenticated
     USING (public.is_platform_admin(auth.uid()))
     WITH CHECK (public.is_platform_admin(auth.uid()));
-
 -- Policy: Tenant admins can view incidents for their tenant
 DROP POLICY IF EXISTS "Tenant admins can view own incidents" ON public.security_incidents;
 CREATE POLICY "Tenant admins can view own incidents"
@@ -56,7 +50,6 @@ CREATE POLICY "Tenant admins can view own incidents"
         public.is_tenant_admin(auth.uid()) 
         AND tenant_id = public.get_user_tenant_id(auth.uid())
     );
-
 -- Policy: Tenant admins can update incidents (e.g. resolve them)
 DROP POLICY IF EXISTS "Tenant admins can update own incidents" ON public.security_incidents;
 CREATE POLICY "Tenant admins can update own incidents"
@@ -70,7 +63,6 @@ CREATE POLICY "Tenant admins can update own incidents"
         public.is_tenant_admin(auth.uid()) 
         AND tenant_id = public.get_user_tenant_id(auth.uid())
     );
-
 -- Indexing
 CREATE INDEX IF NOT EXISTS idx_emails_threat_level ON public.emails(threat_level);
 CREATE INDEX IF NOT EXISTS idx_security_incidents_tenant_id ON public.security_incidents(tenant_id);

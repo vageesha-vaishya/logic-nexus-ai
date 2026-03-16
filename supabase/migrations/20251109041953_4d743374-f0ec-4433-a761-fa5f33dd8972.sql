@@ -8,7 +8,6 @@ CREATE TABLE IF NOT EXISTS public.container_types (
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
-
 -- Create container_sizes table
 CREATE TABLE IF NOT EXISTS public.container_sizes (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -24,7 +23,6 @@ CREATE TABLE IF NOT EXISTS public.container_sizes (
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
-
 -- Create quote_charges table for quotation composer
 CREATE TABLE IF NOT EXISTS public.quote_charges (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -44,46 +42,36 @@ CREATE TABLE IF NOT EXISTS public.quote_charges (
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
-
 -- Enable RLS on container_types
 ALTER TABLE public.container_types ENABLE ROW LEVEL SECURITY;
-
 CREATE POLICY "Tenant users can view container types"
   ON public.container_types FOR SELECT
   USING (tenant_id = get_user_tenant_id(auth.uid()));
-
 CREATE POLICY "Tenant admins can manage container types"
   ON public.container_types FOR ALL
   USING (
     has_role(auth.uid(), 'tenant_admin'::app_role) 
     AND tenant_id = get_user_tenant_id(auth.uid())
   );
-
 CREATE POLICY "Platform admins can manage all container types"
   ON public.container_types FOR ALL
   USING (is_platform_admin(auth.uid()));
-
 -- Enable RLS on container_sizes
 ALTER TABLE public.container_sizes ENABLE ROW LEVEL SECURITY;
-
 CREATE POLICY "Tenant users can view container sizes"
   ON public.container_sizes FOR SELECT
   USING (tenant_id = get_user_tenant_id(auth.uid()));
-
 CREATE POLICY "Tenant admins can manage container sizes"
   ON public.container_sizes FOR ALL
   USING (
     has_role(auth.uid(), 'tenant_admin'::app_role) 
     AND tenant_id = get_user_tenant_id(auth.uid())
   );
-
 CREATE POLICY "Platform admins can manage all container sizes"
   ON public.container_sizes FOR ALL
   USING (is_platform_admin(auth.uid()));
-
 -- Enable RLS on quote_charges
 ALTER TABLE public.quote_charges ENABLE ROW LEVEL SECURITY;
-
 CREATE POLICY "Users can view franchise quote charges"
   ON public.quote_charges FOR SELECT
   USING (
@@ -94,7 +82,6 @@ CREATE POLICY "Users can view franchise quote charges"
       WHERE q.franchise_id = get_user_franchise_id(auth.uid())
     )
   );
-
 CREATE POLICY "Users can create franchise quote charges"
   ON public.quote_charges FOR INSERT
   WITH CHECK (
@@ -105,14 +92,12 @@ CREATE POLICY "Users can create franchise quote charges"
       WHERE q.franchise_id = get_user_franchise_id(auth.uid())
     )
   );
-
 CREATE POLICY "Tenant admins can manage tenant quote charges"
   ON public.quote_charges FOR ALL
   USING (
     has_role(auth.uid(), 'tenant_admin'::app_role) 
     AND tenant_id = get_user_tenant_id(auth.uid())
   );
-
 CREATE POLICY "Platform admins can manage all quote charges"
   ON public.quote_charges FOR ALL
   USING (is_platform_admin(auth.uid()));

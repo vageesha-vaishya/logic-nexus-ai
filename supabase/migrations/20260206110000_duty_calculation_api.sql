@@ -3,7 +3,6 @@
 -- Description: RPC function for calculating estimated duties based on HTS codes and origin/destination.
 
 BEGIN;
-
 CREATE OR REPLACE FUNCTION public.calculate_duty(
   p_origin_country TEXT,
   p_destination_country TEXT,
@@ -95,5 +94,4 @@ BEGIN
   );
 END;
 $$;
-
 COMMIT;

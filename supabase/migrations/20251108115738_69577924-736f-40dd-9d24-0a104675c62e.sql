@@ -18,7 +18,6 @@ BEGIN
     END LOOP;
   END IF;
 END $$;
-
 -- Create charge_sides table (Buy/Sell)
 CREATE TABLE IF NOT EXISTS public.charge_sides (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -29,7 +28,6 @@ CREATE TABLE IF NOT EXISTS public.charge_sides (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
-
 -- Create charge_categories table
 CREATE TABLE IF NOT EXISTS public.charge_categories (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -40,7 +38,6 @@ CREATE TABLE IF NOT EXISTS public.charge_categories (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
-
 -- Create charge_bases table
 CREATE TABLE IF NOT EXISTS public.charge_bases (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -51,7 +48,6 @@ CREATE TABLE IF NOT EXISTS public.charge_bases (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
-
 -- Create currencies table
 CREATE TABLE IF NOT EXISTS public.currencies (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -62,7 +58,6 @@ CREATE TABLE IF NOT EXISTS public.currencies (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
-
 -- Create quote_number_config_tenant table
 CREATE TABLE IF NOT EXISTS public.quote_number_config_tenant (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -73,7 +68,6 @@ CREATE TABLE IF NOT EXISTS public.quote_number_config_tenant (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
   UNIQUE(tenant_id)
 );
-
 -- Create quote_number_config_franchise table
 CREATE TABLE IF NOT EXISTS public.quote_number_config_franchise (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -85,7 +79,6 @@ CREATE TABLE IF NOT EXISTS public.quote_number_config_franchise (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
   UNIQUE(tenant_id, franchise_id)
 );
-
 -- Create quote_number_sequences table
 CREATE TABLE IF NOT EXISTS public.quote_number_sequences (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -96,16 +89,13 @@ CREATE TABLE IF NOT EXISTS public.quote_number_sequences (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
-
 -- Create partial unique indexes for quote_number_sequences
 CREATE UNIQUE INDEX IF NOT EXISTS quote_number_sequences_franchise_unique
   ON public.quote_number_sequences(tenant_id, franchise_id, period_key)
   WHERE franchise_id IS NOT NULL;
-
 CREATE UNIQUE INDEX IF NOT EXISTS quote_number_sequences_tenant_unique
   ON public.quote_number_sequences(tenant_id, period_key)
   WHERE franchise_id IS NULL;
-
 -- Create quotation_versions table
 CREATE TABLE IF NOT EXISTS public.quotation_versions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -120,7 +110,6 @@ CREATE TABLE IF NOT EXISTS public.quotation_versions (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
   UNIQUE(quote_id, version_number)
 );
-
 -- Create quotation_version_options table (carrier rates for each version)
 CREATE TABLE IF NOT EXISTS public.quotation_version_options (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -131,7 +120,6 @@ CREATE TABLE IF NOT EXISTS public.quotation_version_options (
   sort_order INTEGER DEFAULT 0,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
-
 -- Enable RLS on all new tables
 ALTER TABLE public.charge_sides ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.charge_categories ENABLE ROW LEVEL SECURITY;
@@ -142,7 +130,6 @@ ALTER TABLE public.quote_number_config_franchise ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.quote_number_sequences ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.quotation_versions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.quotation_version_options ENABLE ROW LEVEL SECURITY;
-
 -- RLS Policies for charge_sides
 DO $$ BEGIN
   CREATE POLICY "Platform admins can manage all charge sides"
@@ -151,7 +138,6 @@ DO $$ BEGIN
 EXCEPTION
   WHEN duplicate_object THEN null;
 END $$;
-
 DO $$ BEGIN
   CREATE POLICY "Users can view charge sides"
     ON public.charge_sides FOR SELECT
@@ -159,7 +145,6 @@ DO $$ BEGIN
 EXCEPTION
   WHEN duplicate_object THEN null;
 END $$;
-
 -- RLS Policies for charge_categories
 DO $$ BEGIN
   CREATE POLICY "Platform admins can manage all charge categories"
@@ -168,7 +153,6 @@ DO $$ BEGIN
 EXCEPTION
   WHEN duplicate_object THEN null;
 END $$;
-
 DO $$ BEGIN
   CREATE POLICY "Users can view charge categories"
     ON public.charge_categories FOR SELECT
@@ -176,7 +160,6 @@ DO $$ BEGIN
 EXCEPTION
   WHEN duplicate_object THEN null;
 END $$;
-
 -- RLS Policies for charge_bases
 DO $$ BEGIN
   CREATE POLICY "Platform admins can manage all charge bases"
@@ -185,7 +168,6 @@ DO $$ BEGIN
 EXCEPTION
   WHEN duplicate_object THEN null;
 END $$;
-
 DO $$ BEGIN
   CREATE POLICY "Users can view charge bases"
     ON public.charge_bases FOR SELECT
@@ -193,7 +175,6 @@ DO $$ BEGIN
 EXCEPTION
   WHEN duplicate_object THEN null;
 END $$;
-
 -- RLS Policies for currencies
 DO $$ BEGIN
   CREATE POLICY "Platform admins can manage all currencies"
@@ -202,7 +183,6 @@ DO $$ BEGIN
 EXCEPTION
   WHEN duplicate_object THEN null;
 END $$;
-
 DO $$ BEGIN
   CREATE POLICY "Users can view currencies"
     ON public.currencies FOR SELECT
@@ -210,7 +190,6 @@ DO $$ BEGIN
 EXCEPTION
   WHEN duplicate_object THEN null;
 END $$;
-
 -- RLS Policies for quote_number_config_tenant
 DO $$ BEGIN
   CREATE POLICY "Platform admins can manage all tenant quote configs"
@@ -219,7 +198,6 @@ DO $$ BEGIN
 EXCEPTION
   WHEN duplicate_object THEN null;
 END $$;
-
 DO $$ BEGIN
   CREATE POLICY "Tenant admins can manage tenant quote config"
     ON public.quote_number_config_tenant FOR ALL
@@ -227,7 +205,6 @@ DO $$ BEGIN
 EXCEPTION
   WHEN duplicate_object THEN null;
 END $$;
-
 DO $$ BEGIN
   CREATE POLICY "Users can view tenant quote config"
     ON public.quote_number_config_tenant FOR SELECT
@@ -235,7 +212,6 @@ DO $$ BEGIN
 EXCEPTION
   WHEN duplicate_object THEN null;
 END $$;
-
 -- RLS Policies for quote_number_config_franchise
 DO $$ BEGIN
   CREATE POLICY "Platform admins can manage all franchise quote configs"
@@ -244,7 +220,6 @@ DO $$ BEGIN
 EXCEPTION
   WHEN duplicate_object THEN null;
 END $$;
-
 DO $$ BEGIN
   CREATE POLICY "Tenant admins can manage franchise quote configs"
     ON public.quote_number_config_franchise FOR ALL
@@ -252,7 +227,6 @@ DO $$ BEGIN
 EXCEPTION
   WHEN duplicate_object THEN null;
 END $$;
-
 DO $$ BEGIN
   CREATE POLICY "Franchise admins can manage franchise quote config"
     ON public.quote_number_config_franchise FOR ALL
@@ -260,7 +234,6 @@ DO $$ BEGIN
 EXCEPTION
   WHEN duplicate_object THEN null;
 END $$;
-
 DO $$ BEGIN
   CREATE POLICY "Users can view franchise quote config"
     ON public.quote_number_config_franchise FOR SELECT
@@ -268,7 +241,6 @@ DO $$ BEGIN
 EXCEPTION
   WHEN duplicate_object THEN null;
 END $$;
-
 -- RLS Policies for quote_number_sequences
 DO $$ BEGIN
   CREATE POLICY "Platform admins can manage all quote sequences"
@@ -277,7 +249,6 @@ DO $$ BEGIN
 EXCEPTION
   WHEN duplicate_object THEN null;
 END $$;
-
 DO $$ BEGIN
   CREATE POLICY "System can manage quote sequences"
     ON public.quote_number_sequences FOR ALL
@@ -285,7 +256,6 @@ DO $$ BEGIN
 EXCEPTION
   WHEN duplicate_object THEN null;
 END $$;
-
 -- RLS Policies for quotation_versions
 DO $$ BEGIN
   CREATE POLICY "Platform admins can manage all quotation versions"
@@ -294,7 +264,6 @@ DO $$ BEGIN
 EXCEPTION
   WHEN duplicate_object THEN null;
 END $$;
-
 DO $$ BEGIN
   CREATE POLICY "Users can manage versions for accessible quotes"
     ON public.quotation_versions FOR ALL
@@ -307,7 +276,6 @@ DO $$ BEGIN
 EXCEPTION
   WHEN duplicate_object THEN null;
 END $$;
-
 -- RLS Policies for quotation_version_options
 DO $$ BEGIN
   CREATE POLICY "Platform admins can manage all quotation version options"
@@ -316,7 +284,6 @@ DO $$ BEGIN
 EXCEPTION
   WHEN duplicate_object THEN null;
 END $$;
-
 DO $$ BEGIN
   CREATE POLICY "Users can manage options for accessible versions"
     ON public.quotation_version_options FOR ALL
@@ -330,13 +297,11 @@ DO $$ BEGIN
 EXCEPTION
   WHEN duplicate_object THEN null;
 END $$;
-
 -- Insert default charge sides
 INSERT INTO public.charge_sides (name, code, description) VALUES
   ('Buy', 'buy', 'Costs incurred from carriers/suppliers'),
   ('Sell', 'sell', 'Charges to customers')
 ON CONFLICT (code) DO NOTHING;
-
 -- Insert default charge categories
 INSERT INTO public.charge_categories (name, code, description) VALUES
   ('Freight', 'freight', 'Main transportation charge'),
@@ -349,7 +314,6 @@ INSERT INTO public.charge_categories (name, code, description) VALUES
   ('Storage', 'storage', 'Warehousing and storage'),
   ('Other', 'other', 'Miscellaneous charges')
 ON CONFLICT (code) DO NOTHING;
-
 -- Insert default charge bases
 INSERT INTO public.charge_bases (name, code, description) VALUES
   ('Per Shipment', 'shipment', 'Flat rate per shipment'),
@@ -361,20 +325,18 @@ INSERT INTO public.charge_bases (name, code, description) VALUES
   ('Per Mile', 'mile', 'Rate per mile'),
   ('Per Hour', 'hour', 'Hourly rate')
 ON CONFLICT (code) DO NOTHING;
-
 -- Insert default currencies
 INSERT INTO public.currencies (code, name, symbol) VALUES
   ('USD', 'US Dollar', '$'),
-  ('EUR', 'Euro', '€'),
-  ('GBP', 'British Pound', '£'),
-  ('JPY', 'Japanese Yen', '¥'),
+  ('EUR', 'Euro', 'Ôé¼'),
+  ('GBP', 'British Pound', '┬ú'),
+  ('JPY', 'Japanese Yen', '┬Ñ'),
   ('CAD', 'Canadian Dollar', 'C$'),
   ('AUD', 'Australian Dollar', 'A$'),
   ('CHF', 'Swiss Franc', 'CHF'),
-  ('CNY', 'Chinese Yuan', '¥'),
-  ('INR', 'Indian Rupee', '₹')
+  ('CNY', 'Chinese Yuan', '┬Ñ'),
+  ('INR', 'Indian Rupee', 'Ôé╣')
 ON CONFLICT (code) DO NOTHING;
-
 -- Create triggers for updated_at
 DO $$ BEGIN
   CREATE TRIGGER update_charge_sides_updated_at BEFORE UPDATE ON public.charge_sides
@@ -382,42 +344,36 @@ DO $$ BEGIN
 EXCEPTION
   WHEN duplicate_object THEN null;
 END $$;
-
 DO $$ BEGIN
   CREATE TRIGGER update_charge_categories_updated_at BEFORE UPDATE ON public.charge_categories
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 EXCEPTION
   WHEN duplicate_object THEN null;
 END $$;
-
 DO $$ BEGIN
   CREATE TRIGGER update_charge_bases_updated_at BEFORE UPDATE ON public.charge_bases
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 EXCEPTION
   WHEN duplicate_object THEN null;
 END $$;
-
 DO $$ BEGIN
   CREATE TRIGGER update_currencies_updated_at BEFORE UPDATE ON public.currencies
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 EXCEPTION
   WHEN duplicate_object THEN null;
 END $$;
-
 DO $$ BEGIN
   CREATE TRIGGER update_quote_number_config_tenant_updated_at BEFORE UPDATE ON public.quote_number_config_tenant
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 EXCEPTION
   WHEN duplicate_object THEN null;
 END $$;
-
 DO $$ BEGIN
   CREATE TRIGGER update_quote_number_config_franchise_updated_at BEFORE UPDATE ON public.quote_number_config_franchise
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 EXCEPTION
   WHEN duplicate_object THEN null;
 END $$;
-
 DO $$ BEGIN
   CREATE TRIGGER update_quote_number_sequences_updated_at BEFORE UPDATE ON public.quote_number_sequences
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

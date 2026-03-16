@@ -1,6 +1,4 @@
-
 BEGIN;
-
 -- 1. Add new columns
 ALTER TABLE public.duty_rates ADD COLUMN IF NOT EXISTS jurisdiction TEXT;
 ALTER TABLE public.duty_rates ADD COLUMN IF NOT EXISTS hs_code TEXT;
@@ -10,28 +8,23 @@ ALTER TABLE public.duty_rates ADD COLUMN IF NOT EXISTS specific_currency TEXT DE
 ALTER TABLE public.duty_rates ADD COLUMN IF NOT EXISTS specific_unit TEXT;
 ALTER TABLE public.duty_rates ADD COLUMN IF NOT EXISTS effective_date DATE DEFAULT CURRENT_DATE;
 ALTER TABLE public.duty_rates ADD COLUMN IF NOT EXISTS end_date DATE;
-
 -- 2. Migrate existing data
 -- Map country_code to jurisdiction
 UPDATE public.duty_rates
 SET jurisdiction = country_code
 WHERE jurisdiction IS NULL AND country_code IS NOT NULL;
-
 -- Map rate_value to ad_valorem_rate
 UPDATE public.duty_rates
 SET ad_valorem_rate = rate_value
 WHERE ad_valorem_rate IS NULL AND rate_value IS NOT NULL;
-
 -- Map MFN to ad_valorem
 UPDATE public.duty_rates
 SET rate_type = 'ad_valorem'
 WHERE rate_type = 'MFN';
-
 -- Cleanup invalid jurisdictions before adding constraint
 DELETE FROM public.duty_rates
 WHERE jurisdiction NOT IN ('US', 'EU', 'CN', 'UK')
    OR jurisdiction IS NULL;
-
 -- Populate hs_code from aes_hts_codes relation
 DO $$
 BEGIN
@@ -43,7 +36,6 @@ BEGIN
         AND dr.hs_code IS NULL;
     END IF;
 END $$;
-
 -- 3. Constraints
 -- Drop old constraints if they conflict (e.g. rate_type check)
 DO $$
@@ -62,5 +54,4 @@ BEGIN
     -- Assuming standard naming or just adding a new one.
     -- Let's just ensure our code handles 'ad_valorem'.
 END $$;
-
 COMMIT;

@@ -14,15 +14,12 @@ CREATE TABLE IF NOT EXISTS public.quotation_configuration (
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     CONSTRAINT uq_quotation_config_tenant UNIQUE (tenant_id)
 );
-
 -- 2. Add RLS Policies
 ALTER TABLE public.quotation_configuration ENABLE ROW LEVEL SECURITY;
-
 DROP POLICY IF EXISTS "Users can view their tenant quotation config" ON public.quotation_configuration;
 CREATE POLICY "Users can view their tenant quotation config"
 ON public.quotation_configuration FOR SELECT
 USING (tenant_id = get_user_tenant_id(auth.uid()));
-
 DROP POLICY IF EXISTS "Admins can manage quotation config" ON public.quotation_configuration;
 CREATE POLICY "Admins can manage quotation config"
 ON public.quotation_configuration FOR ALL
@@ -36,17 +33,14 @@ USING (
         AND (has_role(auth.uid(), 'tenant_admin') OR has_role(auth.uid(), 'sales_manager'))
     )
 );
-
 -- 3. Add Smart Mode preferences to User Profiles (for persistence)
 ALTER TABLE public.profiles 
 ADD COLUMN IF NOT EXISTS quotation_preferences JSONB DEFAULT '{"smart_mode_active": false}'::jsonb;
-
 -- 4. Seed Default Configuration for existing tenants
 INSERT INTO public.quotation_configuration (tenant_id, default_module, smart_mode_enabled)
 SELECT id, 'composer', false
 FROM public.tenants
 ON CONFLICT (tenant_id) DO NOTHING;
-
 -- 5. Prepare Quotation Options for Multi-Option Logic
 -- Enhance quotation_version_options to support ranking and recommendation data
 ALTER TABLE public.quotation_version_options
@@ -54,7 +48,6 @@ ADD COLUMN IF NOT EXISTS rank_score NUMERIC,
 ADD COLUMN IF NOT EXISTS rank_details JSONB,
 ADD COLUMN IF NOT EXISTS is_recommended BOOLEAN DEFAULT FALSE,
 ADD COLUMN IF NOT EXISTS recommendation_reason TEXT;
-
 -- 6. Create Comparison Snapshot Table (for dashboard caching)
 CREATE TABLE IF NOT EXISTS public.quotation_comparison_snapshots (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -62,9 +55,7 @@ CREATE TABLE IF NOT EXISTS public.quotation_comparison_snapshots (
     comparison_data JSONB NOT NULL, -- Stores side-by-side metrics
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
-
 ALTER TABLE public.quotation_comparison_snapshots ENABLE ROW LEVEL SECURITY;
-
 DROP POLICY IF EXISTS "Users can view comparison snapshots" ON public.quotation_comparison_snapshots;
 CREATE POLICY "Users can view comparison snapshots"
 ON public.quotation_comparison_snapshots FOR SELECT

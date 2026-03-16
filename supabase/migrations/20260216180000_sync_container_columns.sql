@@ -3,7 +3,6 @@
 -- Prioritizes ID if provided, falls back to text lookup
 
 BEGIN;
-
 -- 1. Function to sync container type/size columns
 CREATE OR REPLACE FUNCTION public.sync_shipment_container_columns()
 RETURNS TRIGGER AS $$
@@ -59,17 +58,14 @@ BEGIN
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
-
 -- 2. Apply Triggers to shipment_cargo_configurations
 DROP TRIGGER IF EXISTS trg_sync_container_cols_cargo_config ON public.shipment_cargo_configurations;
 CREATE TRIGGER trg_sync_container_cols_cargo_config
 BEFORE INSERT OR UPDATE ON public.shipment_cargo_configurations
 FOR EACH ROW EXECUTE FUNCTION public.sync_shipment_container_columns();
-
 -- 3. Apply Triggers to shipment_containers
 DROP TRIGGER IF EXISTS trg_sync_container_cols_containers ON public.shipment_containers;
 CREATE TRIGGER trg_sync_container_cols_containers
 BEFORE INSERT OR UPDATE ON public.shipment_containers
 FOR EACH ROW EXECUTE FUNCTION public.sync_shipment_container_columns();
-
 COMMIT;

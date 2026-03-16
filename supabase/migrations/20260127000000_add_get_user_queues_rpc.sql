@@ -60,6 +60,5 @@ BEGIN
     ORDER BY q.name;
 END;
 $$;
-
 -- Grant execute permission to authenticated users
 GRANT EXECUTE ON FUNCTION public.get_user_queues() TO authenticated;

@@ -2,7 +2,6 @@
 -- Upgrades existing table or creates new one to match requirements
 
 BEGIN;
-
 -- 1. Upgrade Platform Domains
 CREATE TABLE IF NOT EXISTS platform_domains (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -13,7 +12,6 @@ CREATE TABLE IF NOT EXISTS platform_domains (
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now()
 );
-
 -- Add new columns
 ALTER TABLE platform_domains ADD COLUMN IF NOT EXISTS key TEXT;
 ALTER TABLE platform_domains ADD COLUMN IF NOT EXISTS owner TEXT;
@@ -21,10 +19,8 @@ ALTER TABLE platform_domains ADD COLUMN IF NOT EXISTS status TEXT CHECK (status 
 ALTER TABLE platform_domains ADD COLUMN IF NOT EXISTS deployment_target TEXT;
 ALTER TABLE platform_domains ADD COLUMN IF NOT EXISTS repository_url TEXT;
 ALTER TABLE platform_domains ADD COLUMN IF NOT EXISTS swagger_endpoint TEXT;
-
 -- Migrate code -> key if key is empty
 UPDATE platform_domains SET key = code WHERE key IS NULL AND code IS NOT NULL;
-
 -- Ensure key is unique and not null (if possible, otherwise handle duplicates)
 -- We'll just add the unique constraint if it doesn't exist
 DO $$
@@ -33,8 +29,6 @@ BEGIN
     ALTER TABLE platform_domains ADD CONSTRAINT platform_domains_key_key UNIQUE (key);
   END IF;
 END $$;
-
-
 -- 2. Domain Relationships (Dependencies)
 CREATE TABLE IF NOT EXISTS domain_relationships (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -45,7 +39,6 @@ CREATE TABLE IF NOT EXISTS domain_relationships (
     created_at TIMESTAMPTZ DEFAULT now(),
     UNIQUE(source_domain_id, target_domain_id)
 );
-
 -- 3. Domain Metadata (Extended Technical Metadata)
 CREATE TABLE IF NOT EXISTS domain_metadata (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -56,7 +49,6 @@ CREATE TABLE IF NOT EXISTS domain_metadata (
     updated_at TIMESTAMPTZ DEFAULT now(),
     UNIQUE(domain_id, key)
 );
-
 -- 4. Domain Config (Environment-Specific Configs)
 CREATE TABLE IF NOT EXISTS domain_config (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -67,26 +59,20 @@ CREATE TABLE IF NOT EXISTS domain_config (
     updated_at TIMESTAMPTZ DEFAULT now(),
     UNIQUE(domain_id, environment)
 );
-
 -- Enable RLS
 ALTER TABLE platform_domains ENABLE ROW LEVEL SECURITY;
 ALTER TABLE domain_relationships ENABLE ROW LEVEL SECURITY;
 ALTER TABLE domain_metadata ENABLE ROW LEVEL SECURITY;
 ALTER TABLE domain_config ENABLE ROW LEVEL SECURITY;
-
 -- Policies (Open Read, Admin Write)
 DROP POLICY IF EXISTS "Everyone can view domains" ON platform_domains;
 CREATE POLICY "Everyone can view domains" ON platform_domains FOR SELECT USING (true);
-
 DROP POLICY IF EXISTS "Everyone can view relationships" ON domain_relationships;
 CREATE POLICY "Everyone can view relationships" ON domain_relationships FOR SELECT USING (true);
-
 DROP POLICY IF EXISTS "Everyone can view metadata" ON domain_metadata;
 CREATE POLICY "Everyone can view metadata" ON domain_metadata FOR SELECT USING (true);
-
 DROP POLICY IF EXISTS "Everyone can view config" ON domain_config;
 CREATE POLICY "Everyone can view config" ON domain_config FOR SELECT USING (true);
-
 -- Seed Initial Data (Upsert)
 -- Logistics
 INSERT INTO platform_domains (key, code, name, description, owner, status, repository_url, swagger_endpoint)
@@ -103,7 +89,6 @@ VALUES (
     description = EXCLUDED.description,
     owner = EXCLUDED.owner,
     status = EXCLUDED.status;
-
 -- Trading
 INSERT INTO platform_domains (key, code, name, description, owner, status, repository_url, swagger_endpoint)
 VALUES (
@@ -119,7 +104,6 @@ VALUES (
     description = EXCLUDED.description,
     owner = EXCLUDED.owner,
     status = EXCLUDED.status;
-
 -- Insurance
 INSERT INTO platform_domains (key, code, name, description, owner, status, repository_url, swagger_endpoint)
 VALUES (
@@ -135,7 +119,6 @@ VALUES (
     description = EXCLUDED.description,
     owner = EXCLUDED.owner,
     status = EXCLUDED.status;
-
 -- Customs
 INSERT INTO platform_domains (key, code, name, description, owner, status, repository_url, swagger_endpoint)
 VALUES (
@@ -151,7 +134,6 @@ VALUES (
     description = EXCLUDED.description,
     owner = EXCLUDED.owner,
     status = EXCLUDED.status;
-
 -- Relationships (Bootstrap)
 DO $$
 DECLARE
@@ -186,5 +168,4 @@ BEGIN
         ON CONFLICT DO NOTHING;
     END IF;
 END $$;
-
 COMMIT;

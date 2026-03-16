@@ -1,6 +1,5 @@
 -- Seed carriers with SCAC/IATA codes and map to service types per tenant
 BEGIN;
-
 -- Common tenants CTE
 WITH tenants AS (
   SELECT id AS tenant_id FROM public.tenants
@@ -21,7 +20,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.carriers x
   WHERE x.tenant_id = t.tenant_id AND x.name = c.name AND x.mode = 'ocean'::public.transport_mode
 );
-
 -- Air carriers (IATA)
 WITH tenants AS (
   SELECT id AS tenant_id FROM public.tenants
@@ -41,7 +39,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.carriers x
   WHERE x.tenant_id = t.tenant_id AND x.name = c.name AND x.mode = 'air'::public.transport_mode
 );
-
 -- Courier carriers (SCAC where applicable)
 WITH tenants AS (
   SELECT id AS tenant_id FROM public.tenants
@@ -59,7 +56,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.carriers x
   WHERE x.tenant_id = t.tenant_id AND x.name = c.name AND x.mode = 'courier'::public.transport_mode
 );
-
 -- Inland trucking carriers (MC/DOT as available)
 WITH tenants AS (
   SELECT id AS tenant_id FROM public.tenants
@@ -79,7 +75,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.carriers x
   WHERE x.tenant_id = t.tenant_id AND x.name = c.name AND x.mode = 'inland_trucking'::public.transport_mode
 );
-
 -- Movers/Packers (moving)
 WITH tenants AS (
   SELECT id AS tenant_id FROM public.tenants
@@ -97,41 +92,35 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.carriers x
   WHERE x.tenant_id = t.tenant_id AND x.name = c.name AND x.mode = 'movers_packers'::public.transport_mode
 );
-
 -- Map carriers to service_types with code metadata
--- Ocean → ocean (SCAC)
+-- Ocean ÔåÆ ocean (SCAC)
 INSERT INTO public.carrier_service_types (tenant_id, carrier_id, service_type, code_type, code_value, is_primary, is_active)
 SELECT c.tenant_id, c.id, 'ocean', 'SCAC', c.scac, true, true
 FROM public.carriers c
 WHERE c.mode = 'ocean'::public.transport_mode AND c.scac IS NOT NULL
 ON CONFLICT (tenant_id, carrier_id, service_type) DO NOTHING;
-
--- Air → air (IATA)
+-- Air ÔåÆ air (IATA)
 INSERT INTO public.carrier_service_types (tenant_id, carrier_id, service_type, code_type, code_value, is_primary, is_active)
 SELECT c.tenant_id, c.id, 'air', 'IATA', c.iata, true, true
 FROM public.carriers c
 WHERE c.mode = 'air'::public.transport_mode AND c.iata IS NOT NULL
 ON CONFLICT (tenant_id, carrier_id, service_type) DO NOTHING;
-
--- Courier → courier (SCAC)
+-- Courier ÔåÆ courier (SCAC)
 INSERT INTO public.carrier_service_types (tenant_id, carrier_id, service_type, code_type, code_value, is_primary, is_active)
 SELECT c.tenant_id, c.id, 'courier', 'SCAC', c.scac, true, true
 FROM public.carriers c
 WHERE c.mode = 'courier'::public.transport_mode AND c.scac IS NOT NULL
 ON CONFLICT (tenant_id, carrier_id, service_type) DO NOTHING;
-
--- Inland trucking → trucking (MC_DOT)
+-- Inland trucking ÔåÆ trucking (MC_DOT)
 INSERT INTO public.carrier_service_types (tenant_id, carrier_id, service_type, code_type, code_value, is_primary, is_active)
 SELECT c.tenant_id, c.id, 'trucking', 'MC_DOT', c.mc_dot, true, true
 FROM public.carriers c
 WHERE c.mode = 'inland_trucking'::public.transport_mode AND c.mc_dot IS NOT NULL
 ON CONFLICT (tenant_id, carrier_id, service_type) DO NOTHING;
-
--- Movers/Packers → moving (no code)
+-- Movers/Packers ÔåÆ moving (no code)
 INSERT INTO public.carrier_service_types (tenant_id, carrier_id, service_type, is_primary, is_active)
 SELECT c.tenant_id, c.id, 'moving', true, true
 FROM public.carriers c
 WHERE c.mode = 'movers_packers'::public.transport_mode
 ON CONFLICT (tenant_id, carrier_id, service_type) DO NOTHING;
-
 COMMIT;

@@ -9,11 +9,9 @@ CREATE TABLE IF NOT EXISTS public.lead_activities (
     created_at TIMESTAMPTZ DEFAULT NOW(),
     tenant_id UUID REFERENCES public.tenants(id) -- Optional, for multi-tenancy if leads are tenant-scoped
 );
-
 -- Index for faster querying of activities by lead
 CREATE INDEX IF NOT EXISTS idx_lead_activities_lead_id ON public.lead_activities(lead_id);
 CREATE INDEX IF NOT EXISTS idx_lead_activities_created_at ON public.lead_activities(created_at);
-
 -- 2. Lead Score Configuration Table
 CREATE TABLE IF NOT EXISTS public.lead_score_config (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -42,13 +40,11 @@ CREATE TABLE IF NOT EXISTS public.lead_score_config (
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE(tenant_id)
 );
-
 -- 3. RLS Policies
 
 -- Enable RLS
 ALTER TABLE public.lead_activities ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.lead_score_config ENABLE ROW LEVEL SECURITY;
-
 -- Policies for lead_activities
 -- Assuming users can view activities for leads they have access to
 CREATE POLICY "Users can view activities for their leads" ON public.lead_activities
@@ -60,10 +56,10 @@ CREATE POLICY "Users can view activities for their leads" ON public.lead_activit
             -- Add additional checks here if leads are scoped by user/tenant
         )
     );
-
 CREATE POLICY "Users can insert activities" ON public.lead_activities
     FOR INSERT
-    WITH CHECK (true); -- Or restrict to authenticated users
+    WITH CHECK (true);
+-- Or restrict to authenticated users
 
 -- Policies for lead_score_config
 CREATE POLICY "Users can view their tenant score config" ON public.lead_score_config
@@ -71,14 +67,12 @@ CREATE POLICY "Users can view their tenant score config" ON public.lead_score_co
     USING (
         tenant_id = public.get_user_tenant_id(auth.uid())
     );
-
 CREATE POLICY "Admins can update their tenant score config" ON public.lead_score_config
     FOR UPDATE
     USING (
         tenant_id = public.get_user_tenant_id(auth.uid())
         AND public.has_role(auth.uid(), 'tenant_admin')
     );
-
 -- 4. Lead Score Logs (Optional, for audit/history)
 CREATE TABLE IF NOT EXISTS public.lead_score_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -88,11 +82,8 @@ CREATE TABLE IF NOT EXISTS public.lead_score_logs (
     change_reason TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
-
 CREATE INDEX IF NOT EXISTS idx_lead_score_logs_lead_id ON public.lead_score_logs(lead_id);
-
 ALTER TABLE public.lead_score_logs ENABLE ROW LEVEL SECURITY;
-
 CREATE POLICY "Users can view score logs for their leads" ON public.lead_score_logs
     FOR SELECT
     USING (

@@ -2,32 +2,26 @@
 -- Description: Adds franchise_id column to support RLS and scoped access, updates View and Trigger.
 
 BEGIN;
-
 -- 1. Add franchise_id to public.quote_items_core
 ALTER TABLE public.quote_items_core
 ADD COLUMN IF NOT EXISTS franchise_id UUID REFERENCES public.franchises(id);
-
 -- 2. Add franchise_id to logistics.quote_items_extension
 ALTER TABLE logistics.quote_items_extension
 ADD COLUMN IF NOT EXISTS franchise_id UUID REFERENCES public.franchises(id);
-
 -- 3. Backfill franchise_id from parent quotes
 UPDATE public.quote_items_core c
 SET franchise_id = q.franchise_id
 FROM public.quotes q
 WHERE c.quote_id = q.id
 AND c.franchise_id IS NULL;
-
 -- Backfill extension from core
 UPDATE logistics.quote_items_extension e
 SET franchise_id = c.franchise_id
 FROM public.quote_items_core c
 WHERE e.quote_item_id = c.id
 AND e.franchise_id IS NULL;
-
 -- 4. Drop existing View (CASCADE to drop trigger)
 DROP VIEW IF EXISTS public.quote_items CASCADE;
-
 -- 5. Recreate View with franchise_id
 CREATE OR REPLACE VIEW public.quote_items AS
 SELECT
@@ -66,7 +60,6 @@ SELECT
     e.attributes
 FROM public.quote_items_core c
 LEFT JOIN logistics.quote_items_extension e ON c.id = e.quote_item_id;
-
 -- 6. Update Trigger Function
 CREATE OR REPLACE FUNCTION public.fn_quote_items_view_handler()
 RETURNS TRIGGER AS $$
@@ -182,10 +175,8 @@ BEGIN
     RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
-
 -- 7. Re-attach Trigger
 CREATE TRIGGER tr_quote_items_view_handler
     INSTEAD OF INSERT OR UPDATE OR DELETE ON public.quote_items
     FOR EACH ROW EXECUTE FUNCTION public.fn_quote_items_view_handler();
-
 COMMIT;

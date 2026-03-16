@@ -2,7 +2,6 @@
 -- Adds Clause Library, Redlining/Comments, and Signature Status
 
 BEGIN;
-
 -----------------------------------------------------------------------------
 -- 1. Clause Library
 -----------------------------------------------------------------------------
@@ -17,15 +16,12 @@ CREATE TABLE IF NOT EXISTS public.contract_clauses (
     updated_at TIMESTAMPTZ DEFAULT now(),
     created_by UUID REFERENCES auth.users(id)
 );
-
 -- RLS for Clause Library
 ALTER TABLE public.contract_clauses ENABLE ROW LEVEL SECURITY;
-
 DROP POLICY IF EXISTS "Tenant Access Clauses" ON public.contract_clauses;
 CREATE POLICY "Tenant Access Clauses" ON public.contract_clauses
     FOR ALL
     USING (tenant_id = (SELECT tenant_id FROM public.profiles WHERE id = auth.uid()));
-
 -----------------------------------------------------------------------------
 -- 2. Contract Comments (Redlining / Negotiation)
 -----------------------------------------------------------------------------
@@ -39,12 +35,9 @@ CREATE TABLE IF NOT EXISTS public.vendor_contract_comments (
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now()
 );
-
 CREATE INDEX IF NOT EXISTS idx_vendor_contract_comments_contract ON public.vendor_contract_comments(contract_id);
-
 -- RLS for Comments
 ALTER TABLE public.vendor_contract_comments ENABLE ROW LEVEL SECURITY;
-
 DROP POLICY IF EXISTS "Tenant Access Contract Comments" ON public.vendor_contract_comments;
 CREATE POLICY "Tenant Access Contract Comments" ON public.vendor_contract_comments
     FOR ALL
@@ -59,7 +52,6 @@ CREATE POLICY "Tenant Access Contract Comments" ON public.vendor_contract_commen
             )
         )
     );
-
 -----------------------------------------------------------------------------
 -- 3. Enhanced Contract Status (Signature Tracking)
 -----------------------------------------------------------------------------
@@ -72,7 +64,6 @@ BEGIN
         ADD COLUMN signed_by TEXT; -- Name or Email of signer (internal or external)
     END IF;
 END $$;
-
 -----------------------------------------------------------------------------
 -- 4. Audit Logging for CLM
 -----------------------------------------------------------------------------
@@ -81,10 +72,8 @@ DROP TRIGGER IF EXISTS audit_contract_clauses ON public.contract_clauses;
 CREATE TRIGGER audit_contract_clauses
 AFTER INSERT OR UPDATE OR DELETE ON public.contract_clauses
 FOR EACH ROW EXECUTE FUNCTION public.audit_row_change();
-
 DROP TRIGGER IF EXISTS audit_vendor_contract_comments ON public.vendor_contract_comments;
 CREATE TRIGGER audit_vendor_contract_comments
 AFTER INSERT OR UPDATE OR DELETE ON public.vendor_contract_comments
 FOR EACH ROW EXECUTE FUNCTION public.audit_row_change();
-
 COMMIT;

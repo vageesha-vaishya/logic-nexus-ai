@@ -32,7 +32,6 @@ BEGIN
         RAISE NOTICE 'Cleaned up duplicates for name: %', r.name;
     END LOOP;
 END $$;
-
 -- Add unique constraint on name if it doesn't exist
 DO $$
 BEGIN

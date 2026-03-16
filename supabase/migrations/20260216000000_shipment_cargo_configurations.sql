@@ -2,7 +2,6 @@
 -- Mirrors quote_cargo_configurations for Shipments
 
 BEGIN;
-
 -- 1. Create Table
 CREATE TABLE IF NOT EXISTS public.shipment_cargo_configurations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -45,14 +44,11 @@ CREATE TABLE IF NOT EXISTS public.shipment_cargo_configurations (
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now()
 );
-
 -- 2. Indexes
 CREATE INDEX IF NOT EXISTS idx_shipment_cargo_shipment_id ON public.shipment_cargo_configurations(shipment_id);
 CREATE INDEX IF NOT EXISTS idx_shipment_cargo_tenant_id ON public.shipment_cargo_configurations(tenant_id);
-
 -- 3. RLS
 ALTER TABLE public.shipment_cargo_configurations ENABLE ROW LEVEL SECURITY;
-
 DO $$ 
 BEGIN
     IF NOT EXISTS (
@@ -71,13 +67,11 @@ BEGIN
             FOR ALL USING (tenant_id = get_user_tenant_id(auth.uid()));
     END IF;
 END $$;
-
 -- 4. Triggers
 DROP TRIGGER IF EXISTS update_shipment_cargo_modtime ON public.shipment_cargo_configurations;
 CREATE TRIGGER update_shipment_cargo_modtime
     BEFORE UPDATE ON public.shipment_cargo_configurations
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
 -- 5. Update Conversion RPC
 CREATE OR REPLACE FUNCTION public.create_shipment_from_quote(
   p_quote_id UUID,
@@ -253,5 +247,4 @@ BEGIN
   RETURN v_shipment_id;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
-
 COMMIT;

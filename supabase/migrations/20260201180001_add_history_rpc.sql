@@ -1,4 +1,3 @@
-
 -- RPC to fetch service history
 CREATE OR REPLACE FUNCTION get_service_history(
   p_service_id UUID,
@@ -39,7 +38,6 @@ BEGIN
   OFFSET p_offset;
 END;
 $$;
-
 -- RPC to fetch pricing tier history
 CREATE OR REPLACE FUNCTION get_tier_history(
   p_tier_id UUID,

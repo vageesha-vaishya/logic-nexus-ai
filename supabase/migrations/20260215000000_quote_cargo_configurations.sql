@@ -1,4 +1,3 @@
-
 -- Migration to add quote_cargo_configurations table
 -- Supports multi-modal cargo units (Containers, ULDs, etc.)
 
@@ -43,21 +42,16 @@ CREATE TABLE IF NOT EXISTS public.quote_cargo_configurations (
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now()
 );
-
 -- Add index for performance
 CREATE INDEX IF NOT EXISTS idx_quote_cargo_quote_id ON public.quote_cargo_configurations(quote_id);
 CREATE INDEX IF NOT EXISTS idx_quote_cargo_tenant_id ON public.quote_cargo_configurations(tenant_id);
-
 -- Enable RLS
 ALTER TABLE public.quote_cargo_configurations ENABLE ROW LEVEL SECURITY;
-
 -- Policies
 CREATE POLICY "Tenant read cargo configs" ON public.quote_cargo_configurations
     FOR SELECT USING (tenant_id = get_user_tenant_id(auth.uid()));
-
 CREATE POLICY "Tenant write cargo configs" ON public.quote_cargo_configurations
     FOR ALL USING (tenant_id = get_user_tenant_id(auth.uid()));
-
 -- Add triggers for updated_at
 CREATE TRIGGER update_quote_cargo_modtime
     BEFORE UPDATE ON public.quote_cargo_configurations

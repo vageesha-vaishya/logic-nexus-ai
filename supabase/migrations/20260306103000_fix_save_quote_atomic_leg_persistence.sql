@@ -35,16 +35,9 @@ DECLARE
   v_amount numeric;
   v_charge_sort integer;
   v_option_total_amount numeric;
-  v_recompute_total boolean;
   v_payload_leg_ids uuid[];
   v_charge_side_id uuid;
   v_charge_side text;
-  v_quote_tax_percent numeric;
-  v_quote_shipping_amount numeric;
-  v_quote_currency_id uuid;
-  v_tax_category_id uuid;
-  v_shipping_category_id uuid;
-  v_per_shipment_basis_id uuid;
 BEGIN
   v_quote_data := p_payload -> 'quote';
   v_items := p_payload -> 'items';
@@ -54,9 +47,6 @@ BEGIN
   v_quote_id := (v_quote_data ->> 'id')::uuid;
   v_tenant_id := (v_quote_data ->> 'tenant_id')::uuid;
   v_franchise_id := (v_quote_data ->> 'franchise_id')::uuid;
-  v_quote_tax_percent := COALESCE((v_quote_data ->> 'tax_percent')::numeric, 0);
-  v_quote_shipping_amount := COALESCE((v_quote_data ->> 'shipping_amount')::numeric, 0);
-  v_quote_currency_id := (v_quote_data ->> 'currency_id')::uuid;
 
   -- Upsert Quote
   INSERT INTO quotes (
@@ -273,33 +263,6 @@ BEGIN
   SELECT id INTO v_buy_side_id FROM charge_sides WHERE lower(code) IN ('buy', 'cost') LIMIT 1;
   IF v_buy_side_id IS NULL THEN RAISE EXCEPTION 'save_quote_atomic: no buy-side entry found'; END IF;
 
-  SELECT id INTO v_per_shipment_basis_id
-  FROM charge_bases
-  WHERE upper(COALESCE(code, '')) IN ('PER_SHIPMENT', 'SHIPMENT', 'LUMPSUM')
-  LIMIT 1;
-  IF v_per_shipment_basis_id IS NULL THEN
-    SELECT id INTO v_per_shipment_basis_id FROM charge_bases ORDER BY created_at LIMIT 1;
-  END IF;
-
-  SELECT id INTO v_tax_category_id
-  FROM charge_categories
-  WHERE upper(COALESCE(code, '')) IN ('TAX', 'DUTY', 'VAT')
-     OR lower(COALESCE(name, '')) LIKE '%tax%'
-  LIMIT 1;
-  IF v_tax_category_id IS NULL THEN
-    SELECT id INTO v_tax_category_id FROM charge_categories ORDER BY created_at LIMIT 1;
-  END IF;
-
-  SELECT id INTO v_shipping_category_id
-  FROM charge_categories
-  WHERE upper(COALESCE(code, '')) IN ('FREIGHT', 'SHIPPING', 'LOGISTICS')
-     OR lower(COALESCE(name, '')) LIKE '%shipping%'
-     OR lower(COALESCE(name, '')) LIKE '%freight%'
-  LIMIT 1;
-  IF v_shipping_category_id IS NULL THEN
-    SELECT id INTO v_shipping_category_id FROM charge_categories ORDER BY created_at LIMIT 1;
-  END IF;
-
   -- Options & Legs Updates / Inserts
   IF v_options IS NOT NULL AND jsonb_array_length(v_options) > 0 THEN
     FOR v_opt IN SELECT * FROM jsonb_array_elements(v_options)
@@ -310,16 +273,12 @@ BEGIN
       END IF;
 
       v_option_total_amount := COALESCE((v_opt ->> 'total_amount')::numeric, 0);
-      v_recompute_total := v_option_total_amount <= 0;
-      IF v_recompute_total THEN
-        v_option_total_amount := 0;
-      END IF;
 
       IF v_option_id IS NOT NULL THEN
         -- Upsert (Insert or Update) using ON CONFLICT
         INSERT INTO quotation_version_options (
           id, quotation_version_id, tenant_id, franchise_id,
-          option_name, carrier_name, carrier_rate_id, is_selected, total_amount, currency,
+          option_name, is_selected, total_amount, currency,
           total_transit_days, created_by,
           source, source_attribution, is_recommended, recommendation_reason,
           rank_score, rank_details, margin_percentage,
@@ -327,8 +286,6 @@ BEGIN
         ) VALUES (
           v_option_id, v_version_id, v_tenant_id, v_franchise_id,
           COALESCE(v_opt ->> 'option_name', 'Option'),
-          NULLIF(v_opt ->> 'carrier_name', ''),
-          NULLIF(v_opt ->> 'carrier_rate_id', '')::uuid,
           COALESCE((v_opt ->> 'is_selected')::boolean, false),
           v_option_total_amount,
           COALESCE(v_opt ->> 'currency', 'USD'),
@@ -344,9 +301,6 @@ BEGIN
           now(), now()
         )
         ON CONFLICT (id) DO UPDATE SET
-          option_name = EXCLUDED.option_name,
-          carrier_name = COALESCE(EXCLUDED.carrier_name, quotation_version_options.carrier_name),
-          carrier_rate_id = COALESCE(EXCLUDED.carrier_rate_id, quotation_version_options.carrier_rate_id),
           is_selected = EXCLUDED.is_selected,
           total_amount = EXCLUDED.total_amount,
           currency = EXCLUDED.currency,
@@ -358,7 +312,7 @@ BEGIN
         v_option_id := gen_random_uuid();
         INSERT INTO quotation_version_options (
           id, quotation_version_id, tenant_id, franchise_id,
-          option_name, carrier_name, carrier_rate_id, is_selected, total_amount, currency,
+          option_name, is_selected, total_amount, currency,
           total_transit_days, created_by,
           source, source_attribution, is_recommended, recommendation_reason,
           rank_score, rank_details, margin_percentage,
@@ -366,8 +320,6 @@ BEGIN
         ) VALUES (
           v_option_id, v_version_id, v_tenant_id, v_franchise_id,
           COALESCE(v_opt ->> 'option_name', 'Option'),
-          NULLIF(v_opt ->> 'carrier_name', ''),
-          NULLIF(v_opt ->> 'carrier_rate_id', '')::uuid,
           COALESCE((v_opt ->> 'is_selected')::boolean, false),
           v_option_total_amount,
           COALESCE(v_opt ->> 'currency', 'USD'),
@@ -554,10 +506,6 @@ BEGIN
                  v_charge_side_id,
                  now(), now()
                );
-
-               IF v_recompute_total AND lower(v_charge_side) = 'sell' THEN
-                 v_option_total_amount := COALESCE(v_option_total_amount, 0) + COALESCE(v_amount, 0);
-               END IF;
              END LOOP;
           END IF;
         END LOOP;
@@ -622,51 +570,12 @@ BEGIN
              v_charge_side_id,
              now(), now()
            );
-
-           IF v_recompute_total AND lower(v_charge_side) = 'sell' THEN
-             v_option_total_amount := COALESCE(v_option_total_amount, 0) + COALESCE(v_amount, 0);
-           END IF;
          END LOOP;
       END IF;
-
-      IF v_recompute_total AND v_quote_tax_percent > 0 AND v_tax_category_id IS NOT NULL THEN
-        v_amount := COALESCE(v_option_total_amount, 0) * (v_quote_tax_percent / 100);
-        IF v_amount > 0 THEN
-          INSERT INTO quote_charges (
-            quote_option_id, tenant_id, category_id, note,
-            basis_id, currency_id, quantity, rate, amount,
-            charge_side_id, created_at, updated_at
-          ) VALUES (
-            v_option_id, v_tenant_id, v_tax_category_id,
-            'Tax materialized from quote tax_percent',
-            v_per_shipment_basis_id, v_quote_currency_id, 1, v_amount, v_amount,
-            v_sell_side_id, now(), now()
-          );
-          v_option_total_amount := COALESCE(v_option_total_amount, 0) + COALESCE(v_amount, 0);
-        END IF;
-      END IF;
-
-      IF v_recompute_total AND v_quote_shipping_amount > 0 AND v_shipping_category_id IS NOT NULL THEN
-        INSERT INTO quote_charges (
-          quote_option_id, tenant_id, category_id, note,
-          basis_id, currency_id, quantity, rate, amount,
-          charge_side_id, created_at, updated_at
-        ) VALUES (
-          v_option_id, v_tenant_id, v_shipping_category_id,
-          'Shipping materialized from quote shipping_amount',
-          v_per_shipment_basis_id, v_quote_currency_id, 1, v_quote_shipping_amount, v_quote_shipping_amount,
-          v_sell_side_id, now(), now()
-        );
-        v_option_total_amount := COALESCE(v_option_total_amount, 0) + COALESCE(v_quote_shipping_amount, 0);
-      END IF;
-
-      UPDATE quotation_version_options
-      SET total_amount = COALESCE(v_option_total_amount, 0)
-      WHERE id = v_option_id;
 
     END LOOP;
   END IF;
 
   RETURN v_quote_id;
 END;
-$function$
+$function$;

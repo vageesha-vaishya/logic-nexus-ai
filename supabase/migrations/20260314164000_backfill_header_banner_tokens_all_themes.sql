@@ -1,5 +1,4 @@
 begin;
-
 update public.ui_themes
 set tokens = jsonb_set(
   jsonb_set(
@@ -55,5 +54,4 @@ set tokens = jsonb_set(
   true
 )
 where tokens is not null;
-
 commit;

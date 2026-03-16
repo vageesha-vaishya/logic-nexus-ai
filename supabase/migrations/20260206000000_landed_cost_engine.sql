@@ -3,7 +3,6 @@
 -- Description: Implements calculate_duty RPC and seeds sample duty rates.
 
 BEGIN;
-
 --------------------------------------------------------------------------------
 -- 1. Calculate Duty RPC
 --------------------------------------------------------------------------------
@@ -54,11 +53,9 @@ BEGIN
   -- but for now we just return what we have.
 END;
 $$ LANGUAGE plpgsql;
-
 -- Grant access
 GRANT EXECUTE ON FUNCTION public.calculate_duty(TEXT, TEXT, NUMERIC) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.calculate_duty(TEXT, TEXT, NUMERIC) TO service_role;
-
 --------------------------------------------------------------------------------
 -- 2. Seed Sample Duty Rates (Idempotent)
 --------------------------------------------------------------------------------
@@ -114,5 +111,4 @@ BEGIN
   WHERE NOT EXISTS (SELECT 1 FROM public.duty_rates WHERE aes_hts_id = v_hts_id_2 AND country_code = 'US' AND rate_type = 'FTA');
 
 END $$;
-
 COMMIT;

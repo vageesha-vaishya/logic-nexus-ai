@@ -13,10 +13,8 @@ BEGIN
   RETURN NEW;
 END;
 $$;
-
 -- Drop trigger if it exists
 DROP TRIGGER IF EXISTS trigger_auto_generate_quote_number ON public.quotes;
-
 -- Create trigger on quotes table
 CREATE TRIGGER trigger_auto_generate_quote_number
   BEFORE INSERT ON public.quotes

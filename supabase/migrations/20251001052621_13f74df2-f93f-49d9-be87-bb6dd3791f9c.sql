@@ -4,7 +4,6 @@ ADD COLUMN IF NOT EXISTS lead_score INTEGER DEFAULT 0,
 ADD COLUMN IF NOT EXISTS qualification_status TEXT DEFAULT 'unqualified',
 ADD COLUMN IF NOT EXISTS last_activity_date TIMESTAMP WITH TIME ZONE,
 ADD COLUMN IF NOT EXISTS conversion_probability INTEGER;
-
 -- Create lead scoring criteria table
 CREATE TABLE IF NOT EXISTS public.lead_scoring_rules (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -16,15 +15,12 @@ CREATE TABLE IF NOT EXISTS public.lead_scoring_rules (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
-
 ALTER TABLE public.lead_scoring_rules ENABLE ROW LEVEL SECURITY;
-
 -- RLS policies for lead_scoring_rules
 CREATE POLICY "Platform admins can manage all scoring rules"
 ON public.lead_scoring_rules
 FOR ALL
 USING (is_platform_admin(auth.uid()));
-
 CREATE POLICY "Tenant admins can manage tenant scoring rules"
 ON public.lead_scoring_rules
 FOR ALL
@@ -32,7 +28,6 @@ USING (
   has_role(auth.uid(), 'tenant_admin') 
   AND tenant_id = get_user_tenant_id(auth.uid())
 );
-
 -- Create lead assignment rules table
 CREATE TABLE IF NOT EXISTS public.lead_assignment_rules (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -45,15 +40,12 @@ CREATE TABLE IF NOT EXISTS public.lead_assignment_rules (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
-
 ALTER TABLE public.lead_assignment_rules ENABLE ROW LEVEL SECURITY;
-
 -- RLS policies for lead_assignment_rules
 CREATE POLICY "Platform admins can manage all assignment rules"
 ON public.lead_assignment_rules
 FOR ALL
 USING (is_platform_admin(auth.uid()));
-
 CREATE POLICY "Tenant admins can manage tenant assignment rules"
 ON public.lead_assignment_rules
 FOR ALL
@@ -61,7 +53,6 @@ USING (
   has_role(auth.uid(), 'tenant_admin') 
   AND tenant_id = get_user_tenant_id(auth.uid())
 );
-
 -- Create function to calculate lead score
 CREATE OR REPLACE FUNCTION public.calculate_lead_score(lead_id UUID)
 RETURNS INTEGER
@@ -118,7 +109,6 @@ BEGIN
   RETURN total_score;
 END;
 $$;
-
 -- Create trigger to update lead score
 CREATE OR REPLACE FUNCTION public.update_lead_score()
 RETURNS TRIGGER
@@ -129,7 +119,6 @@ BEGIN
   RETURN NEW;
 END;
 $$;
-
 CREATE TRIGGER trigger_update_lead_score
 BEFORE INSERT OR UPDATE ON public.leads
 FOR EACH ROW

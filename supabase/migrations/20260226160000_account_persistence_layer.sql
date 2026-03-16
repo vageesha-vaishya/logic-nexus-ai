@@ -23,10 +23,8 @@ BEGIN
     CREATE INDEX IF NOT EXISTS idx_accounts_tax_id ON public.accounts(tax_id);
     CREATE INDEX IF NOT EXISTS idx_accounts_name_trgm ON public.accounts USING gin (name gin_trgm_ops); -- Requires pg_trgm extension, ensure it's enabled
 END $$;
-
 -- Ensure pg_trgm extension
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
-
 -- 2. Create Account References Table
 CREATE TABLE IF NOT EXISTS public.account_references (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -40,22 +38,18 @@ CREATE TABLE IF NOT EXISTS public.account_references (
     
     CONSTRAINT unique_account_ref_type_val UNIQUE (account_id, reference_type, reference_value)
 );
-
 -- RLS for References
 ALTER TABLE public.account_references ENABLE ROW LEVEL SECURITY;
-
 DROP POLICY IF EXISTS "Users can view account references" ON public.account_references;
 CREATE POLICY "Users can view account references" ON public.account_references
     FOR SELECT USING (
         tenant_id IN (SELECT tenant_id FROM public.user_roles WHERE user_id = auth.uid())
     );
-
 DROP POLICY IF EXISTS "Users can manage account references" ON public.account_references;
 CREATE POLICY "Users can manage account references" ON public.account_references
     FOR ALL USING (
         tenant_id IN (SELECT tenant_id FROM public.user_roles WHERE user_id = auth.uid())
     );
-
 -- 3. Create Account Notes Table
 CREATE TABLE IF NOT EXISTS public.account_notes (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -68,22 +62,18 @@ CREATE TABLE IF NOT EXISTS public.account_notes (
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     created_by UUID REFERENCES auth.users(id)
 );
-
 -- RLS for Notes
 ALTER TABLE public.account_notes ENABLE ROW LEVEL SECURITY;
-
 DROP POLICY IF EXISTS "Users can view account notes" ON public.account_notes;
 CREATE POLICY "Users can view account notes" ON public.account_notes
     FOR SELECT USING (
         tenant_id IN (SELECT tenant_id FROM public.user_roles WHERE user_id = auth.uid())
     );
-
 DROP POLICY IF EXISTS "Users can manage account notes" ON public.account_notes;
 CREATE POLICY "Users can manage account notes" ON public.account_notes
     FOR ALL USING (
         tenant_id IN (SELECT tenant_id FROM public.user_roles WHERE user_id = auth.uid())
     );
-
 -- 4. Audit Trail Function (Generic)
 CREATE OR REPLACE FUNCTION public.log_audit_event()
 RETURNS TRIGGER AS $$
@@ -122,19 +112,15 @@ BEGIN
     RETURN NULL;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
-
 -- Attach Audit Trigger to new tables
 DROP TRIGGER IF EXISTS trg_audit_account_refs ON public.account_references;
 CREATE TRIGGER trg_audit_account_refs
     AFTER INSERT OR UPDATE OR DELETE ON public.account_references
     FOR EACH ROW EXECUTE FUNCTION public.log_audit_event();
-
 DROP TRIGGER IF EXISTS trg_audit_account_notes ON public.account_notes;
 CREATE TRIGGER trg_audit_account_notes
     AFTER INSERT OR UPDATE OR DELETE ON public.account_notes
     FOR EACH ROW EXECUTE FUNCTION public.log_audit_event();
-
-
 -- 5. RPC: Manage Account with Validation & Duplicate Check
 CREATE OR REPLACE FUNCTION public.manage_account(
     p_account_id UUID,

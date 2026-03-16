@@ -9,26 +9,17 @@ CREATE TABLE IF NOT EXISTS user_preferences (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
   UNIQUE(user_id, role)
 );
-
--- Ensure role column exists if table already existed without it
-ALTER TABLE user_preferences ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'standard';
-
 -- Create index on user_id for faster lookups
 CREATE INDEX idx_user_preferences_user_id ON user_preferences(user_id);
 CREATE INDEX idx_user_preferences_role ON user_preferences(role);
-
 -- Enable RLS
 ALTER TABLE user_preferences ENABLE ROW LEVEL SECURITY;
-
 -- Create RLS policy: users can only see their own preferences
 CREATE POLICY user_preferences_self_read ON user_preferences
   FOR SELECT USING (auth.uid() = user_id);
-
 CREATE POLICY user_preferences_self_write ON user_preferences
   FOR UPDATE USING (auth.uid() = user_id);
-
 CREATE POLICY user_preferences_self_insert ON user_preferences
   FOR INSERT WITH CHECK (auth.uid() = user_id);
-
 CREATE POLICY user_preferences_self_delete ON user_preferences
   FOR DELETE USING (auth.uid() = user_id);

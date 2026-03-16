@@ -33,7 +33,6 @@ AS $$
     WHERE n.nspname IN ('public', 'auth', 'storage', 'extensions')
     ORDER BY n.nspname, rel.relname, con.contype;
 $$;
-
 -- 2. Get Table Indexes (Schema-aware)
 DROP FUNCTION IF EXISTS public.get_table_indexes();
 CREATE OR REPLACE FUNCTION public.get_table_indexes()
@@ -62,7 +61,6 @@ AS $$
       AND NOT x.indisunique
     ORDER BY n.nspname, t.relname, i.relname;
 $$;
-
 -- 3. Get RLS Policies (Schema-aware)
 DROP FUNCTION IF EXISTS public.get_all_rls_policies();
 CREATE OR REPLACE FUNCTION public.get_all_rls_policies()
