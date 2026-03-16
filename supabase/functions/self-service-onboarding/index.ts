@@ -139,6 +139,20 @@ const buildUniqueSlug = async (supabase: SupabaseClient, organizationName: strin
   return `${base}-${crypto.randomUUID().replace(/-/g, '').slice(0, 8)}`.slice(0, 60)
 }
 
+const isValidIpAddress = (value: string): boolean => {
+  const trimmed = (value || '').trim()
+  if (!trimmed) return false
+
+  const ipv4Match = /^(\d{1,3}\.){3}\d{1,3}$/.test(trimmed)
+  if (ipv4Match) {
+    const parts = trimmed.split('.').map((part) => Number(part))
+    return parts.length === 4 && parts.every((part) => Number.isInteger(part) && part >= 0 && part <= 255)
+  }
+
+  const ipv6Match = trimmed.length <= 45 && /^[0-9a-fA-F:]+$/.test(trimmed) && trimmed.includes(':')
+  return ipv6Match
+}
+
 const verifyCaptcha = async (token: string, ipAddress: string): Promise<CaptchaVerificationResult> => {
   const turnstileSecret = Deno.env.get('TURNSTILE_SECRET_KEY') || Deno.env.get('CAPTCHA_TURNSTILE_SECRET_KEY')
   const recaptchaSecret = Deno.env.get('RECAPTCHA_SECRET_KEY') || Deno.env.get('CAPTCHA_RECAPTCHA_SECRET_KEY')
@@ -146,6 +160,7 @@ const verifyCaptcha = async (token: string, ipAddress: string): Promise<CaptchaV
   const allowBypass = rawAllowBypass === 'true' || rawAllowBypass === '1' || rawAllowBypass === 'yes'
   const bypassToken = (Deno.env.get('DEV_CAPTCHA_BYPASS_TOKEN') || 'dev-captcha-pass').trim()
   const trimmedToken = sanitizeText(token || '', 4096)
+  const sanitizedIpAddress = isValidIpAddress(ipAddress) ? ipAddress : ''
 
   if (!trimmedToken) {
     return { success: false, provider: 'none', reason: 'token_missing' }
@@ -155,9 +170,9 @@ const verifyCaptcha = async (token: string, ipAddress: string): Promise<CaptchaV
     try {
       const body = new URLSearchParams({
         secret: turnstileSecret,
-        response: trimmedToken,
-        remoteip: ipAddress
+        response: trimmedToken
       })
+      if (sanitizedIpAddress) body.set('remoteip', sanitizedIpAddress)
       const response = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -193,9 +208,9 @@ const verifyCaptcha = async (token: string, ipAddress: string): Promise<CaptchaV
     try {
       const body = new URLSearchParams({
         secret: recaptchaSecret,
-        response: trimmedToken,
-        remoteip: ipAddress
+        response: trimmedToken
       })
+      if (sanitizedIpAddress) body.set('remoteip', sanitizedIpAddress)
       const response = await fetch('https://www.google.com/recaptcha/api/siteverify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -331,7 +346,9 @@ const sendVerificationEmail = async (
       to: [to],
       subject: 'Verify your Logic Nexus-AI onboarding request',
       body: html,
-      provider: 'resend'
+      provider: 'resend',
+      priority: 'high',
+      isVip: true
     }
   })
 
@@ -663,12 +680,49 @@ serveWithLogger(async (req, logger, supabase) => {
     try {
       await sendVerificationEmail(supabase, sanitizedEmail, verificationCode, sanitizedOrganization)
     } catch (error: any) {
+      const errorMessage = String(error?.message || 'Email dispatch failed')
       await supabase
         .from('self_service_onboarding_requests')
-        .update({ status: 'failed', failure_reason: error?.message || 'Email dispatch failed' })
+        .update({ status: 'failed', failure_reason: errorMessage })
         .eq('id', createdRequest.id)
-      await logger.error('Failed sending verification email', { requestId: createdRequest.id, error: error?.message })
-      return json(500, { success: false, error: 'Unable to send verification code' })
+      await logger.error('Failed sending verification email', { requestId: createdRequest.id, error: errorMessage })
+
+      const normalizedEmailError = errorMessage.toLowerCase()
+      if (
+        normalizedEmailError.includes('missing resend_api_key') ||
+        normalizedEmailError.includes('smtp settings incomplete') ||
+        normalizedEmailError.includes('email account not found') ||
+        normalizedEmailError.includes('invalid request: provide accountid') ||
+        normalizedEmailError.includes('domain is not verified')
+      ) {
+        return json(503, {
+          success: false,
+          error: 'Email service is not configured',
+          error_code: 'email_config_missing'
+        })
+      }
+
+      if (
+        normalizedEmailError.includes('retryable') ||
+        normalizedEmailError.includes('429') ||
+        normalizedEmailError.includes('500') ||
+        normalizedEmailError.includes('502') ||
+        normalizedEmailError.includes('503') ||
+        normalizedEmailError.includes('fetch failed') ||
+        normalizedEmailError.includes('network')
+      ) {
+        return json(502, {
+          success: false,
+          error: 'Email service unavailable',
+          error_code: 'email_provider_unavailable'
+        })
+      }
+
+      return json(500, {
+        success: false,
+        error: 'Unable to send verification code',
+        error_code: 'email_send_failed'
+      })
     }
 
     return json(200, {
