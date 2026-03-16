@@ -7,6 +7,8 @@ type CaptchaVerificationResult = {
   success: boolean
   provider: 'turnstile' | 'recaptcha' | 'dev_bypass' | 'none'
   score?: number
+  reason?: 'config_missing' | 'token_missing' | 'provider_request_failed' | 'provider_rejected' | 'invalid_bypass'
+  error_codes?: string[]
 }
 
 const startRegistrationSchema = z.object({
@@ -138,51 +140,110 @@ const buildUniqueSlug = async (supabase: SupabaseClient, organizationName: strin
 }
 
 const verifyCaptcha = async (token: string, ipAddress: string): Promise<CaptchaVerificationResult> => {
-  const turnstileSecret = Deno.env.get('TURNSTILE_SECRET_KEY')
-  const recaptchaSecret = Deno.env.get('RECAPTCHA_SECRET_KEY')
+  const turnstileSecret = Deno.env.get('TURNSTILE_SECRET_KEY') || Deno.env.get('CAPTCHA_TURNSTILE_SECRET_KEY')
+  const recaptchaSecret = Deno.env.get('RECAPTCHA_SECRET_KEY') || Deno.env.get('CAPTCHA_RECAPTCHA_SECRET_KEY')
+  const rawAllowBypass = (Deno.env.get('ALLOW_DEV_CAPTCHA_BYPASS') || Deno.env.get('CAPTCHA_ALLOW_DEV_BYPASS') || '').trim().toLowerCase()
+  const allowBypass = rawAllowBypass === 'true' || rawAllowBypass === '1' || rawAllowBypass === 'yes'
+  const bypassToken = (Deno.env.get('DEV_CAPTCHA_BYPASS_TOKEN') || 'dev-captcha-pass').trim()
+  const trimmedToken = sanitizeText(token || '', 4096)
+
+  if (!trimmedToken) {
+    return { success: false, provider: 'none', reason: 'token_missing' }
+  }
 
   if (turnstileSecret) {
-    const body = new URLSearchParams({
-      secret: turnstileSecret,
-      response: token,
-      remoteip: ipAddress
-    })
-    const response = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
-      method: 'POST',
-      body
-    })
-    const data = await response.json()
-    return {
-      success: !!data?.success,
-      provider: 'turnstile',
-      score: typeof data?.score === 'number' ? data.score : undefined
+    try {
+      const body = new URLSearchParams({
+        secret: turnstileSecret,
+        response: trimmedToken,
+        remoteip: ipAddress
+      })
+      const response = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body
+      })
+
+      if (!response.ok) {
+        return { success: false, provider: 'turnstile', reason: 'provider_request_failed' }
+      }
+
+      const data = await response.json()
+      const errorCodes = Array.isArray(data?.['error-codes']) ? data['error-codes'].map((code: unknown) => String(code)) : []
+      if (!data?.success) {
+        return {
+          success: false,
+          provider: 'turnstile',
+          reason: 'provider_rejected',
+          error_codes: errorCodes
+        }
+      }
+
+      return {
+        success: true,
+        provider: 'turnstile',
+        score: typeof data?.score === 'number' ? data.score : undefined
+      }
+    } catch {
+      return { success: false, provider: 'turnstile', reason: 'provider_request_failed' }
     }
   }
 
   if (recaptchaSecret) {
-    const body = new URLSearchParams({
-      secret: recaptchaSecret,
-      response: token,
-      remoteip: ipAddress
-    })
-    const response = await fetch('https://www.google.com/recaptcha/api/siteverify', {
-      method: 'POST',
-      body
-    })
-    const data = await response.json()
-    return {
-      success: !!data?.success,
-      provider: 'recaptcha',
-      score: typeof data?.score === 'number' ? data.score : undefined
+    try {
+      const body = new URLSearchParams({
+        secret: recaptchaSecret,
+        response: trimmedToken,
+        remoteip: ipAddress
+      })
+      const response = await fetch('https://www.google.com/recaptcha/api/siteverify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body
+      })
+
+      if (!response.ok) {
+        return { success: false, provider: 'recaptcha', reason: 'provider_request_failed' }
+      }
+
+      const data = await response.json()
+      const errorCodes = Array.isArray(data?.['error-codes']) ? data['error-codes'].map((code: unknown) => String(code)) : []
+      const minScoreRaw = sanitizeText(Deno.env.get('RECAPTCHA_MIN_SCORE') || '0', 16)
+      const minScore = Number.isFinite(Number(minScoreRaw)) ? Number(minScoreRaw) : 0
+      const score = typeof data?.score === 'number' ? data.score : undefined
+      const scorePass = score === undefined ? true : score >= minScore
+      if (!data?.success || !scorePass) {
+        return {
+          success: false,
+          provider: 'recaptcha',
+          reason: 'provider_rejected',
+          error_codes: scorePass ? errorCodes : [...errorCodes, 'low-score']
+        }
+      }
+
+      return {
+        success: true,
+        provider: 'recaptcha',
+        score
+      }
+    } catch {
+      return { success: false, provider: 'recaptcha', reason: 'provider_request_failed' }
     }
   }
 
-  const allowBypass = Deno.env.get('ALLOW_DEV_CAPTCHA_BYPASS') === 'true'
-  if (allowBypass && token === 'dev-captcha-pass') {
-    return { success: true, provider: 'dev_bypass', score: 1 }
+  if (allowBypass && trimmedToken === bypassToken) {
+    return {
+      success: true,
+      provider: 'dev_bypass',
+      score: 1
+    }
   }
 
-  return { success: false, provider: 'none' }
+  if (allowBypass) {
+    return { success: false, provider: 'dev_bypass', reason: 'invalid_bypass' }
+  }
+
+  return { success: false, provider: 'none', reason: 'config_missing' }
 }
 
 const applyRateLimit = async (
@@ -404,8 +465,35 @@ serveWithLogger(async (req, logger, supabase) => {
 
     const captchaResult = await verifyCaptcha(input.captcha_token, ipAddress)
     if (!captchaResult.success) {
-      await logger.warn('Captcha verification failed', { ipAddress, email: sanitizedEmail, provider: captchaResult.provider })
-      return json(400, { success: false, error: 'Captcha verification failed' })
+      await logger.warn('Captcha verification failed', {
+        ipAddress,
+        email: sanitizedEmail,
+        provider: captchaResult.provider,
+        reason: captchaResult.reason,
+        errorCodes: captchaResult.error_codes
+      })
+
+      if (captchaResult.reason === 'config_missing') {
+        return json(503, {
+          success: false,
+          error: 'Captcha service is not configured',
+          error_code: 'captcha_config_missing'
+        })
+      }
+
+      if (captchaResult.reason === 'provider_request_failed') {
+        return json(502, {
+          success: false,
+          error: 'Captcha verification service unavailable',
+          error_code: 'captcha_provider_unavailable'
+        })
+      }
+
+      return json(400, {
+        success: false,
+        error: 'Captcha verification failed',
+        error_code: 'captcha_validation_failed'
+      })
     }
 
     const existingPending = await supabase

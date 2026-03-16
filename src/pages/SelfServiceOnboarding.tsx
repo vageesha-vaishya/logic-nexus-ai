@@ -28,6 +28,26 @@ type CurrencyOption = {
   label: string
 }
 
+type TurnstileApi = {
+  render: (
+    element: string | HTMLElement,
+    options: {
+      sitekey: string
+      callback: (token: string) => void
+      'expired-callback'?: () => void
+      'error-callback'?: () => void
+      theme?: 'light' | 'dark' | 'auto'
+    }
+  ) => string
+  remove: (widgetId: string) => void
+}
+
+declare global {
+  interface Window {
+    turnstile?: TurnstileApi
+  }
+}
+
 const plans: Array<{
   tier: PlanTier
   title: string
@@ -49,6 +69,9 @@ const features = [
 
 const customerProof = ['Global Freight Group', 'Orbit Supply Chain', 'Aster Manufacturing', 'Helix Healthcare Logistics']
 const passwordPolicy = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{12,128}$/
+const turnstileSiteKey = String(import.meta.env.VITE_TURNSTILE_SITE_KEY || '').trim()
+const allowDevCaptchaBypass = import.meta.env.DEV && String(import.meta.env.VITE_ALLOW_DEV_CAPTCHA_BYPASS || '').trim().toLowerCase() === 'true'
+const captchaContainerId = 'self-service-onboarding-captcha'
 
 const schema = z.object({
   organization_name: z.string().min(2, 'Organization name is required'),
@@ -121,6 +144,8 @@ export default function SelfServiceOnboarding() {
   const [verificationCode, setVerificationCode] = useState('')
   const [status, setStatus] = useState<'form' | 'verification' | 'completed'>('form')
   const [tenantId, setTenantId] = useState<string | null>(null)
+  const [captchaScriptReady, setCaptchaScriptReady] = useState(false)
+  const [captchaWidgetError, setCaptchaWidgetError] = useState<string | null>(null)
   const [form, setForm] = useState<FormState>({
     organization_name: '',
     country: '',
@@ -174,6 +199,67 @@ export default function SelfServiceOnboarding() {
     }))
     setForm((prev) => ({ ...prev, [key]: value }))
   }
+
+  useEffect(() => {
+    if (!turnstileSiteKey) return
+    if (window.turnstile) {
+      setCaptchaScriptReady(true)
+      return
+    }
+
+    const existingScript = document.getElementById('turnstile-api-script') as HTMLScriptElement | null
+    if (existingScript) {
+      const handleLoad = () => setCaptchaScriptReady(true)
+      const handleError = () => setCaptchaWidgetError('Unable to load CAPTCHA widget')
+      existingScript.addEventListener('load', handleLoad)
+      existingScript.addEventListener('error', handleError)
+      return () => {
+        existingScript.removeEventListener('load', handleLoad)
+        existingScript.removeEventListener('error', handleError)
+      }
+    }
+
+    const script = document.createElement('script')
+    script.id = 'turnstile-api-script'
+    script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'
+    script.async = true
+    script.defer = true
+    script.onload = () => setCaptchaScriptReady(true)
+    script.onerror = () => setCaptchaWidgetError('Unable to load CAPTCHA widget')
+    document.head.appendChild(script)
+  }, [])
+
+  useEffect(() => {
+    if (!turnstileSiteKey) return
+    if (stepIds[stepIndex] !== 'verify') return
+    if (!captchaScriptReady || !window.turnstile) return
+    const container = document.getElementById(captchaContainerId)
+    if (!container) return
+
+    container.innerHTML = ''
+    const widgetId = window.turnstile.render(`#${captchaContainerId}`, {
+      sitekey: turnstileSiteKey,
+      callback: (token: string) => {
+        setCaptchaWidgetError(null)
+        updateField('captcha_token', token)
+      },
+      'expired-callback': () => {
+        updateField('captcha_token', '')
+        setFieldErrors((prev) => ({ ...prev, captcha_token: 'Captcha expired. Please verify again.' }))
+      },
+      'error-callback': () => {
+        updateField('captcha_token', '')
+        setCaptchaWidgetError('Captcha verification encountered an error. Please retry.')
+      },
+      theme: 'light'
+    })
+
+    return () => {
+      if (widgetId && window.turnstile) {
+        window.turnstile.remove(widgetId)
+      }
+    }
+  }, [captchaScriptReady, stepIndex])
 
   useEffect(() => {
     const loadDomainOptions = async () => {
@@ -480,8 +566,9 @@ export default function SelfServiceOnboarding() {
 
   const startRegistration = async () => {
     if (!form.captcha_token.trim() || form.captcha_token.trim().length < 5) {
-      setFieldErrors((prev) => ({ ...prev, captcha_token: 'Captcha Token is required' }))
-      toast.error('Captcha token is required')
+      const captchaErrorMessage = turnstileSiteKey ? 'Complete CAPTCHA verification to continue' : 'Captcha token is required'
+      setFieldErrors((prev) => ({ ...prev, captcha_token: captchaErrorMessage }))
+      toast.error(captchaErrorMessage)
       return
     }
     setFieldErrors((prev) => ({ ...prev, captcha_token: undefined }))
@@ -536,7 +623,12 @@ export default function SelfServiceOnboarding() {
       setStatus('verification')
       toast.success('Verification code sent to admin email')
     } catch (error: any) {
-      toast.error(error?.message || 'Failed to start onboarding')
+      const message = error?.message || 'Unable to start onboarding'
+      if (String(message).toLowerCase().includes('captcha service is not configured')) {
+        toast.error('Captcha service is not configured. Please set Turnstile or reCAPTCHA secrets on the backend.')
+      } else {
+        toast.error(message)
+      }
     } finally {
       setSubmitting(false)
     }
@@ -973,14 +1065,27 @@ export default function SelfServiceOnboarding() {
                   </Card>
                   <div className="space-y-2">
                     <Label htmlFor="captcha_token">Captcha Token <span className="text-destructive">*</span></Label>
-                    <Input
-                      id="captcha_token"
-                      value={form.captcha_token}
-                      onChange={(e) => updateField('captcha_token', e.target.value)}
-                      placeholder={import.meta.env.DEV ? 'dev-captcha-pass' : 'Enter CAPTCHA token'}
-                      className={fieldErrors.captcha_token ? 'border-destructive focus-visible:ring-destructive/30' : ''}
-                    />
+                    {turnstileSiteKey ? (
+                      <div className="space-y-2">
+                        <div id={captchaContainerId} className={fieldErrors.captcha_token ? 'rounded-md border border-destructive p-2' : ''} />
+                        {captchaWidgetError && <p className="text-xs text-destructive">{captchaWidgetError}</p>}
+                        {!captchaWidgetError && !form.captcha_token && <p className="text-xs text-muted-foreground">Complete CAPTCHA challenge to continue.</p>}
+                      </div>
+                    ) : (
+                      <Input
+                        id="captcha_token"
+                        value={form.captcha_token}
+                        onChange={(e) => updateField('captcha_token', e.target.value)}
+                        placeholder={allowDevCaptchaBypass ? 'dev-captcha-pass' : 'Set VITE_TURNSTILE_SITE_KEY to enable CAPTCHA'}
+                        className={fieldErrors.captcha_token ? 'border-destructive focus-visible:ring-destructive/30' : ''}
+                      />
+                    )}
                     {fieldErrors.captcha_token && <p className="text-xs text-destructive">{fieldErrors.captcha_token}</p>}
+                    {!turnstileSiteKey && (
+                      <p className="text-xs text-muted-foreground">
+                        CAPTCHA site key is not configured in frontend. Set VITE_TURNSTILE_SITE_KEY.
+                      </p>
+                    )}
                   </div>
                 </div>
               )}
