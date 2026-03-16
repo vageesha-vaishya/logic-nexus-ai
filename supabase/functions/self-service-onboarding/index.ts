@@ -27,7 +27,13 @@ const startRegistrationSchema = z.object({
     email: z.string().email(),
     first_name: z.string().min(1).max(80),
     last_name: z.string().min(1).max(80),
-    password: z.string().min(12).max(128)
+    password: z.string()
+      .min(12)
+      .max(128)
+      .regex(/[a-z]/, 'Password must include at least one lowercase letter')
+      .regex(/[A-Z]/, 'Password must include at least one uppercase letter')
+      .regex(/\d/, 'Password must include at least one number')
+      .regex(/[^A-Za-z0-9]/, 'Password must include at least one special character')
   }),
   initial_config: z.object({
     currency: z.string().min(3).max(3).optional(),
@@ -43,7 +49,13 @@ const verifyEmailSchema = z.object({
   action: z.literal('verify_email'),
   request_id: z.string().uuid(),
   verification_code: z.string().regex(/^\d{6}$/),
-  admin_password: z.string().min(12).max(128)
+  admin_password: z.string()
+    .min(12)
+    .max(128)
+    .regex(/[a-z]/, 'Password must include at least one lowercase letter')
+    .regex(/[A-Z]/, 'Password must include at least one uppercase letter')
+    .regex(/\d/, 'Password must include at least one number')
+    .regex(/[^A-Za-z0-9]/, 'Password must include at least one special character')
 })
 
 const listDomainsSchema = z.object({
@@ -427,6 +439,62 @@ serveWithLogger(async (req, logger, supabase) => {
     const organizationSlug = await buildUniqueSlug(supabase, sanitizedOrganization)
     const verificationExpiresAt = addMinutes(new Date(), 15)
     const preferredDomainValue = input.initial_config?.domain ? sanitizeDomain(input.initial_config.domain) : null
+    const sanitizedCountryInput = sanitizeText(input.country, 80)
+    const normalizedCountryCode = sanitizedCountryInput.toUpperCase()
+    const normalizedCurrencyCode = sanitizeText(input.initial_config?.currency || 'USD', 3).toUpperCase()
+
+    const [{ data: countryByCode, error: countryByCodeError }, { data: matchedCurrency, error: currencyLookupError }] = await Promise.all([
+      supabase
+        .from('countries')
+        .select('id, name, code_iso2')
+        .eq('is_active', true)
+        .eq('code_iso2', normalizedCountryCode)
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from('currencies')
+        .select('id, code, name')
+        .eq('is_active', true)
+        .eq('code', normalizedCurrencyCode)
+        .limit(1)
+        .maybeSingle()
+    ])
+
+    if (countryByCodeError) {
+      await logger.error('Failed resolving country reference for onboarding request', { error: countryByCodeError.message })
+      return json(500, { success: false, error: 'Unable to validate country selection' })
+    }
+
+    if (currencyLookupError) {
+      await logger.error('Failed resolving currency reference for onboarding request', { error: currencyLookupError.message })
+      return json(500, { success: false, error: 'Unable to validate currency selection' })
+    }
+
+    let matchedCountry = countryByCode
+    if (!matchedCountry?.id) {
+      const { data: countryByName, error: countryByNameError } = await supabase
+        .from('countries')
+        .select('id, name, code_iso2')
+        .eq('is_active', true)
+        .eq('name', sanitizedCountryInput)
+        .limit(1)
+        .maybeSingle()
+
+      if (countryByNameError) {
+        await logger.error('Failed resolving country reference by name for onboarding request', { error: countryByNameError.message })
+        return json(500, { success: false, error: 'Unable to validate country selection' })
+      }
+
+      matchedCountry = countryByName
+    }
+
+    if (!matchedCountry?.id) {
+      return json(422, { success: false, error: 'Selected country is not available' })
+    }
+
+    if (!matchedCurrency?.id) {
+      return json(422, { success: false, error: 'Selected currency is not available' })
+    }
 
     if (preferredDomainValue) {
       const { data: availableDomains, error: availableDomainsError } = await supabase
@@ -455,8 +523,10 @@ serveWithLogger(async (req, logger, supabase) => {
       tax_id: input.tax_id ? sanitizeText(input.tax_id, 80) : null,
       tax_jurisdiction: input.tax_jurisdiction ? sanitizeText(input.tax_jurisdiction, 80) : null,
       registered_address: input.registered_address ? sanitizeText(input.registered_address, 400) : null,
+      country_id: matchedCountry.id,
+      currency_id: matchedCurrency.id,
       initial_config: {
-        currency: sanitizeText(input.initial_config?.currency || 'USD', 3).toUpperCase(),
+        currency: matchedCurrency.code || normalizedCurrencyCode,
         timezone: sanitizeText(input.initial_config?.timezone || 'UTC', 80),
         preferred_language: sanitizeText(input.initial_config?.preferred_language || 'en', 10),
         domain: preferredDomainValue,
@@ -472,10 +542,12 @@ serveWithLogger(async (req, logger, supabase) => {
       admin_email: sanitizedEmail,
       admin_first_name: sanitizeText(input.admin.first_name, 80),
       admin_last_name: sanitizeText(input.admin.last_name, 80),
-      country: sanitizeText(input.country, 80),
+      country: matchedCountry.code_iso2 || normalizedCountryCode || matchedCountry.name,
+      country_id: matchedCountry.id,
       plan_tier: input.plan_tier,
       billing_period: input.billing_period,
-      currency: requestPayload.initial_config.currency,
+      currency: matchedCurrency.code || requestPayload.initial_config.currency,
+      currency_id: matchedCurrency.id,
       requested_user_count: input.requested_user_count,
       requested_franchise_count: input.requested_franchise_count,
       data_residency: sanitizeText(input.data_residency, 80),
@@ -580,6 +652,58 @@ serveWithLogger(async (req, logger, supabase) => {
     const requestPayload = requestRow.request_payload || {}
     const initialConfig = requestPayload.initial_config || {}
     const isPaidPlan = requestRow.plan_tier !== 'free'
+    let resolvedCountryCode = sanitizeText(requestRow.country || '', 80).toUpperCase()
+    let resolvedCountryName = sanitizeText(requestRow.country || '', 120)
+    let resolvedCurrencyCode = sanitizeText(requestRow.currency || initialConfig.currency || 'USD', 3).toUpperCase()
+
+    if (requestRow.country_id) {
+      const { data: countryRef, error: countryRefError } = await supabase
+        .from('countries')
+        .select('id, name, code_iso2')
+        .eq('id', requestRow.country_id)
+        .limit(1)
+        .maybeSingle()
+
+      if (countryRefError) {
+        await logger.error('Failed loading country reference from onboarding request', {
+          requestId: requestRow.id,
+          countryId: requestRow.country_id,
+          error: countryRefError.message
+        })
+        return json(500, { success: false, error: 'Unable to resolve country reference' })
+      }
+
+      if (!countryRef?.id) {
+        return json(422, { success: false, error: 'Country reference is invalid for this onboarding request' })
+      }
+
+      resolvedCountryCode = sanitizeText(countryRef.code_iso2 || resolvedCountryCode, 80).toUpperCase()
+      resolvedCountryName = sanitizeText(countryRef.name || resolvedCountryName, 120)
+    }
+
+    if (requestRow.currency_id) {
+      const { data: currencyRef, error: currencyRefError } = await supabase
+        .from('currencies')
+        .select('id, code, name')
+        .eq('id', requestRow.currency_id)
+        .limit(1)
+        .maybeSingle()
+
+      if (currencyRefError) {
+        await logger.error('Failed loading currency reference from onboarding request', {
+          requestId: requestRow.id,
+          currencyId: requestRow.currency_id,
+          error: currencyRefError.message
+        })
+        return json(500, { success: false, error: 'Unable to resolve currency reference' })
+      }
+
+      if (!currencyRef?.id) {
+        return json(422, { success: false, error: 'Currency reference is invalid for this onboarding request' })
+      }
+
+      resolvedCurrencyCode = sanitizeText(currencyRef.code || resolvedCurrencyCode, 3).toUpperCase()
+    }
 
     await supabase
       .from('self_service_onboarding_requests')
@@ -600,7 +724,7 @@ serveWithLogger(async (req, logger, supabase) => {
         subscription_tier: requestRow.plan_tier,
         max_users: requestRow.requested_user_count,
         max_franchises: requestRow.requested_franchise_count,
-        country: requestRow.country,
+        country: resolvedCountryCode || resolvedCountryName,
         status: isPaidPlan ? 'pending' : 'active',
         settings: {
           onboarding_source: 'self_service',
@@ -609,7 +733,7 @@ serveWithLogger(async (req, logger, supabase) => {
             region: requestRow.data_residency
           },
           locale: {
-            currency: requestRow.currency || 'USD',
+            currency: resolvedCurrencyCode || 'USD',
             timezone: initialConfig.timezone || 'UTC',
             preferred_language: initialConfig.preferred_language || 'en'
           }
@@ -682,7 +806,7 @@ serveWithLogger(async (req, logger, supabase) => {
         registered_address: requestPayload.registered_address || null,
         tax_id: requestPayload.tax_id || null,
         tax_jurisdiction: requestPayload.tax_jurisdiction || null,
-        country_of_operation: requestRow.country,
+        country_of_operation: resolvedCountryName || resolvedCountryCode || requestRow.country,
         data_residency_region: requestRow.data_residency
       }, { onConflict: 'tenant_id' })
 

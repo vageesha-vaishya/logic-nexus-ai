@@ -19,6 +19,14 @@ type DomainOption = {
   label: string
   description?: string | null
 }
+type CountryOption = {
+  value: string
+  label: string
+}
+type CurrencyOption = {
+  value: string
+  label: string
+}
 
 const plans: Array<{
   tier: PlanTier
@@ -40,6 +48,7 @@ const features = [
 ]
 
 const customerProof = ['Global Freight Group', 'Orbit Supply Chain', 'Aster Manufacturing', 'Helix Healthcare Logistics']
+const passwordPolicy = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{12,128}$/
 
 const schema = z.object({
   organization_name: z.string().min(2, 'Organization name is required'),
@@ -47,7 +56,11 @@ const schema = z.object({
   admin_first_name: z.string().min(1, 'First name is required'),
   admin_last_name: z.string().min(1, 'Last name is required'),
   admin_email: z.string().email('Valid email is required'),
-  admin_password: z.string().min(12, 'Password must be at least 12 characters'),
+  admin_password: z.string()
+    .min(12, 'Password must be at least 12 characters')
+    .max(128, 'Password must be at most 128 characters')
+    .regex(passwordPolicy, 'Password must include uppercase, lowercase, number, and special character'),
+  admin_password_confirm: z.string().min(1, 'Confirm Password is required'),
   plan_tier: z.enum(['free', 'professional', 'enterprise']),
   billing_period: z.enum(['monthly', 'annual']),
   requested_user_count: z.number().int().min(1).max(10000),
@@ -77,6 +90,7 @@ type FieldErrorKey =
   | 'admin_last_name'
   | 'admin_email'
   | 'admin_password'
+  | 'admin_password_confirm'
   | 'billing_period'
   | 'data_residency'
   | 'requested_user_count'
@@ -96,6 +110,12 @@ export default function SelfServiceOnboarding() {
   const [domainsLoading, setDomainsLoading] = useState(true)
   const [domainsError, setDomainsError] = useState<string | null>(null)
   const [domainOptions, setDomainOptions] = useState<DomainOption[]>([])
+  const [countriesLoading, setCountriesLoading] = useState(true)
+  const [countriesError, setCountriesError] = useState<string | null>(null)
+  const [countryOptions, setCountryOptions] = useState<CountryOption[]>([])
+  const [currenciesLoading, setCurrenciesLoading] = useState(true)
+  const [currenciesError, setCurrenciesError] = useState<string | null>(null)
+  const [currencyOptions, setCurrencyOptions] = useState<CurrencyOption[]>([])
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const [requestId, setRequestId] = useState<string | null>(null)
   const [verificationCode, setVerificationCode] = useState('')
@@ -108,6 +128,7 @@ export default function SelfServiceOnboarding() {
     admin_last_name: '',
     admin_email: '',
     admin_password: '',
+    admin_password_confirm: '',
     plan_tier: 'free',
     billing_period: 'monthly',
     requested_user_count: 2,
@@ -142,6 +163,7 @@ export default function SelfServiceOnboarding() {
       admin_last_name: key === 'admin_last_name' ? undefined : prev.admin_last_name,
       admin_email: key === 'admin_email' ? undefined : prev.admin_email,
       admin_password: key === 'admin_password' ? undefined : prev.admin_password,
+      admin_password_confirm: key === 'admin_password' || key === 'admin_password_confirm' ? undefined : prev.admin_password_confirm,
       billing_period: key === 'billing_period' ? undefined : prev.billing_period,
       data_residency: key === 'data_residency' ? undefined : prev.data_residency,
       requested_user_count: key === 'requested_user_count' ? undefined : prev.requested_user_count,
@@ -191,6 +213,81 @@ export default function SelfServiceOnboarding() {
     void loadDomainOptions()
   }, [])
 
+  useEffect(() => {
+    const loadCountryOptions = async () => {
+      setCountriesLoading(true)
+      setCountriesError(null)
+      try {
+        const { data, error } = await supabase
+          .from('countries')
+          .select('name, code_iso2')
+          .order('name', { ascending: true })
+
+        if (error) {
+          throw new Error(error.message || 'Failed to load countries')
+        }
+
+        const countries = (data || []).reduce<CountryOption[]>((acc, country) => {
+          const name = (country.name || '').trim()
+          const code = (country.code_iso2 || '').trim().toUpperCase()
+          if (!name && !code) return acc
+          const value = code || name
+          const label = code && name ? `${name} (${code})` : name || code
+          acc.push({ value, label })
+          return acc
+        }, [])
+
+        setCountryOptions(countries)
+      } catch (error: any) {
+        setCountryOptions([])
+        setCountriesError(error?.message || 'Unable to load countries')
+        toast.error(error?.message || 'Unable to load countries')
+      } finally {
+        setCountriesLoading(false)
+      }
+    }
+
+    void loadCountryOptions()
+  }, [])
+
+  useEffect(() => {
+    const loadCurrencyOptions = async () => {
+      setCurrenciesLoading(true)
+      setCurrenciesError(null)
+      try {
+        const { data, error } = await supabase
+          .from('currencies')
+          .select('code, name, symbol')
+          .eq('is_active', true)
+          .order('code', { ascending: true })
+
+        if (error) {
+          throw new Error(error.message || 'Failed to load currencies')
+        }
+
+        const currencies = (data || []).reduce<CurrencyOption[]>((acc, currency) => {
+          const code = (currency.code || '').trim().toUpperCase()
+          const name = (currency.name || '').trim()
+          const symbol = (currency.symbol || '').trim()
+          if (!code) return acc
+          const label = [code, name, symbol ? `(${symbol})` : ''].filter(Boolean).join(' - ').replace(' - (', ' (')
+          acc.push({ value: code, label })
+          return acc
+        }, [])
+
+        setCurrencyOptions(currencies)
+      } catch (error: any) {
+        setCurrencyOptions([])
+        setCurrenciesError(error?.message || 'Unable to load currencies')
+        toast.error(error?.message || 'Unable to load currencies')
+      } finally {
+        setCurrenciesLoading(false)
+      }
+    }
+
+    void loadCurrencyOptions()
+  }, [])
+
   const validateCurrentStep = async (): Promise<boolean> => {
     if (stepIds[stepIndex] === 'package') {
       if (!form.plan_tier) {
@@ -216,6 +313,8 @@ export default function SelfServiceOnboarding() {
         if (!form.country.trim()) {
           nextErrors.country = 'Country is required'
         }
+      } else if (!countryOptions.some((country) => country.value === form.country)) {
+        nextErrors.country = 'Select a country from available options'
       }
       if (!form.domain.trim()) {
         nextErrors.domain = 'Preferred Domain is required'
@@ -288,13 +387,18 @@ export default function SelfServiceOnboarding() {
       }
       if (!form.admin_password.trim()) {
         nextErrors.admin_password = 'Admin Password is required'
-      } else if (form.admin_password.length < 12) {
-        nextErrors.admin_password = 'Password must be at least 12 characters'
+      } else if (!passwordPolicy.test(form.admin_password)) {
+        nextErrors.admin_password = 'Use 12-128 chars with uppercase, lowercase, number, and special character'
+      }
+      if (!form.admin_password_confirm.trim()) {
+        nextErrors.admin_password_confirm = 'Confirm Password is required'
+      } else if (form.admin_password !== form.admin_password_confirm) {
+        nextErrors.admin_password_confirm = 'Passwords do not match'
       }
 
-      if (nextErrors.admin_first_name || nextErrors.admin_last_name || nextErrors.admin_email || nextErrors.admin_password) {
+      if (nextErrors.admin_first_name || nextErrors.admin_last_name || nextErrors.admin_email || nextErrors.admin_password || nextErrors.admin_password_confirm) {
         setFieldErrors((prev) => ({ ...prev, ...nextErrors }))
-        toast.error(nextErrors.admin_first_name || nextErrors.admin_last_name || nextErrors.admin_email || nextErrors.admin_password || 'Complete admin details to continue')
+        toast.error(nextErrors.admin_first_name || nextErrors.admin_last_name || nextErrors.admin_email || nextErrors.admin_password || nextErrors.admin_password_confirm || 'Complete admin details to continue')
         return false
       }
 
@@ -303,7 +407,8 @@ export default function SelfServiceOnboarding() {
         admin_first_name: undefined,
         admin_last_name: undefined,
         admin_email: undefined,
-        admin_password: undefined
+        admin_password: undefined,
+        admin_password_confirm: undefined
       }))
       return true
     }
@@ -318,8 +423,10 @@ export default function SelfServiceOnboarding() {
       if (!Number.isInteger(form.requested_franchise_count) || form.requested_franchise_count < 0) {
         nextErrors.requested_franchise_count = 'Requested Franchises cannot be negative'
       }
-      if (!/^[A-Z]{3}$/.test(form.currency.trim())) {
-        nextErrors.currency = 'Currency must be a 3-letter code'
+      if (!form.currency.trim()) {
+        nextErrors.currency = 'Currency is required'
+      } else if (!currencyOptions.some((currency) => currency.value === form.currency.trim().toUpperCase())) {
+        nextErrors.currency = 'Select a currency from available options'
       }
       if (!form.timezone.trim()) {
         nextErrors.timezone = 'Timezone is required'
@@ -630,13 +737,28 @@ export default function SelfServiceOnboarding() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="country">Country <span className="text-destructive">*</span></Label>
-                    <Input
-                      id="country"
-                      value={form.country}
-                      onChange={(e) => updateField('country', e.target.value)}
-                      className={fieldErrors.country ? 'border-destructive focus-visible:ring-destructive/30' : ''}
-                    />
+                    <Select
+                      value={form.country || '__none__'}
+                      onValueChange={(value) => updateField('country', value === '__none__' ? '' : value)}
+                      disabled={countriesLoading || countryOptions.length === 0}
+                    >
+                      <SelectTrigger id="country" className={fieldErrors.country ? 'border-destructive focus:ring-destructive/30' : ''}>
+                        <SelectValue placeholder={countriesLoading ? 'Loading countries...' : 'Select country code'} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">Select country</SelectItem>
+                        {countryOptions.map((country) => (
+                          <SelectItem key={country.value} value={country.value}>
+                            {country.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {countriesError && <p className="text-xs text-destructive">{countriesError}</p>}
                     {fieldErrors.country && <p className="text-xs text-destructive">{fieldErrors.country}</p>}
+                    {!countriesError && !countriesLoading && countryOptions.length === 0 && (
+                      <p className="text-xs text-muted-foreground">No countries are currently available.</p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="website">Website</Label>
@@ -720,6 +842,20 @@ export default function SelfServiceOnboarding() {
                       className={fieldErrors.admin_password ? 'border-destructive focus-visible:ring-destructive/30' : ''}
                     />
                     {fieldErrors.admin_password && <p className="text-xs text-destructive">{fieldErrors.admin_password}</p>}
+                    {!fieldErrors.admin_password && (
+                      <p className="text-xs text-muted-foreground">Use 12-128 characters with uppercase, lowercase, number, and special character.</p>
+                    )}
+                  </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="admin_password_confirm">Confirm Password <span className="text-destructive">*</span></Label>
+                    <Input
+                      id="admin_password_confirm"
+                      type="password"
+                      value={form.admin_password_confirm}
+                      onChange={(e) => updateField('admin_password_confirm', e.target.value)}
+                      className={fieldErrors.admin_password_confirm ? 'border-destructive focus-visible:ring-destructive/30' : ''}
+                    />
+                    {fieldErrors.admin_password_confirm && <p className="text-xs text-destructive">{fieldErrors.admin_password_confirm}</p>}
                   </div>
                 </div>
               )}
@@ -774,13 +910,28 @@ export default function SelfServiceOnboarding() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="currency">Currency <span className="text-destructive">*</span></Label>
-                    <Input
-                      id="currency"
-                      value={form.currency}
-                      onChange={(e) => updateField('currency', e.target.value.toUpperCase())}
-                      className={fieldErrors.currency ? 'border-destructive focus-visible:ring-destructive/30' : ''}
-                    />
+                    <Select
+                      value={form.currency || '__none__'}
+                      onValueChange={(value) => updateField('currency', value === '__none__' ? '' : value)}
+                      disabled={currenciesLoading || currencyOptions.length === 0}
+                    >
+                      <SelectTrigger id="currency" className={fieldErrors.currency ? 'border-destructive focus:ring-destructive/30' : ''}>
+                        <SelectValue placeholder={currenciesLoading ? 'Loading currencies...' : 'Select currency'} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">Select currency</SelectItem>
+                        {currencyOptions.map((currency) => (
+                          <SelectItem key={currency.value} value={currency.value}>
+                            {currency.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {currenciesError && <p className="text-xs text-destructive">{currenciesError}</p>}
                     {fieldErrors.currency && <p className="text-xs text-destructive">{fieldErrors.currency}</p>}
+                    {!currenciesError && !currenciesLoading && currencyOptions.length === 0 && (
+                      <p className="text-xs text-muted-foreground">No currencies are currently available.</p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="timezone">Timezone <span className="text-destructive">*</span></Label>
