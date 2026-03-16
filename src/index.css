@@ -162,7 +162,7 @@ All colors MUST be HSL.
 
 @layer components {
   .lead-workspace-tight-lines {
-    --lead-workspace-line-height: 1.3;
+    --lead-workspace-line-height: 1.2;
   }
 
   .lead-workspace-tight-lines :is(
