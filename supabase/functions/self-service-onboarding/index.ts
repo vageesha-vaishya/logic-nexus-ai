@@ -19,10 +19,10 @@ const startRegistrationSchema = z.object({
   requested_franchise_count: z.number().int().min(0).max(10000).default(1),
   data_residency: z.string().min(2).max(80),
   captcha_token: z.string().min(5),
-  legal_name: z.string().max(160).optional(),
-  tax_id: z.string().max(80).optional(),
-  tax_jurisdiction: z.string().max(80).optional(),
-  registered_address: z.string().max(400).optional(),
+  legal_name: z.string().max(160).nullish(),
+  tax_id: z.string().max(80).nullish(),
+  tax_jurisdiction: z.string().max(80).nullish(),
+  registered_address: z.string().max(400).nullish(),
   admin: z.object({
     email: z.string().email(),
     first_name: z.string().min(1).max(80),
@@ -36,12 +36,12 @@ const startRegistrationSchema = z.object({
       .regex(/[^A-Za-z0-9]/, 'Password must include at least one special character')
   }),
   initial_config: z.object({
-    currency: z.string().min(3).max(3).optional(),
-    timezone: z.string().min(2).max(80).optional(),
-    preferred_language: z.string().min(2).max(10).optional(),
-    domain: z.string().max(120).optional(),
-    industry: z.string().max(80).optional(),
-    website: z.string().max(180).optional()
+    currency: z.string().min(3).max(3).nullish(),
+    timezone: z.string().min(2).max(80).nullish(),
+    preferred_language: z.string().min(2).max(10).nullish(),
+    domain: z.string().max(120).nullish(),
+    industry: z.string().max(80).nullish(),
+    website: z.string().max(180).nullish()
   }).optional()
 })
 
