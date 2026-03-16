@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Filter } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { KanbanBoard, ColumnType } from '@/components/kanban/KanbanBoard';
 import { KanbanItem } from '@/components/kanban/KanbanCard';
@@ -935,10 +935,6 @@ export default function LeadsPipeline() {
                             }
                           ]}
                         />
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground px-2 pb-1">
-                          <Filter className="h-3 w-3" />
-                          <span>{filteredLeads.length} {t('leads.pipeline.leadsFound', 'leads found')}</span>
-                        </div>
                         {selectedStages.length > 0 && (
                           <div className="flex flex-wrap items-center gap-2 px-2 pb-1">
                             <span className="text-xs text-muted-foreground">

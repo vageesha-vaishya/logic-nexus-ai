@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Search, UserPlus, Filter, TrendingUp, Users as UsersIcon, Trash2, ArrowLeft, MoreHorizontal, ArrowUpDown, SlidersHorizontal } from 'lucide-react';
+import { Search, UserPlus, Filter, TrendingUp, Users as UsersIcon, Trash2, MoreHorizontal, ArrowUpDown, SlidersHorizontal, X } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
@@ -22,7 +22,7 @@ import { ViewMode } from '@/components/ui/view-toggle';
 import { useCRM } from '@/hooks/useCRM';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { toast } from 'sonner';
-import { matchText, TextOp } from '@/lib/utils';
+import { TextOp } from '@/lib/utils';
 import { FirstScreenTemplate } from '@/components/system/FirstScreenTemplate';
 import { EmptyState } from '@/components/system/EmptyState';
 import { TableSkeleton } from '@/components/system/TableSkeleton';
@@ -200,8 +200,34 @@ export default function Leads() {
   const setValueMin = (val: string) => setWorkspace({ valueMin: val, page: 1 });
   const setValueMax = (val: string) => setWorkspace({ valueMax: val, page: 1 });
   const setPage = (val: number) => setWorkspace({ page: val });
-  const setPageSize = (val: number) => setWorkspace({ pageSize: val, page: 1 });
   const setSorting = (field: string, direction: 'asc' | 'desc') => setWorkspace({ sortField: field, sortDirection: direction });
+  const clearAllFilters = () => {
+    setWorkspace({
+      searchQuery: '',
+      statusFilter: 'all',
+      scoreFilter: 'all',
+      ownerFilter: 'any',
+      nameQuery: '',
+      nameOp: 'contains',
+      valueMin: '',
+      valueMax: '',
+      scoreMin: '',
+      scoreMax: '',
+      createdStart: '',
+      createdEnd: '',
+      companyQuery: '',
+      companyOp: 'contains',
+      emailQuery: '',
+      emailOp: 'contains',
+      phoneQuery: '',
+      phoneOp: 'contains',
+      sourceQuery: '',
+      sourceOp: 'contains',
+      qualificationQuery: '',
+      qualificationOp: 'contains',
+      page: 1,
+    });
+  };
 
   // KPI Stats
   const stats = {
@@ -315,6 +341,35 @@ export default function Leads() {
         query = query.or(`first_name.ilike.%${searchQuery}%,last_name.ilike.%${searchQuery}%,company.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%`);
       }
 
+      if (nameQuery.trim()) {
+        if (nameOp === 'equals') {
+          query = query.or(`first_name.eq.${nameQuery.trim()},last_name.eq.${nameQuery.trim()}`);
+        } else {
+          query = query.or(`first_name.ilike.%${nameQuery.trim()}%,last_name.ilike.%${nameQuery.trim()}%`);
+        }
+      }
+
+      if (scoreFilter === 'high') {
+        query = query.gte('lead_score', 70);
+      } else if (scoreFilter === 'medium') {
+        query = query.gte('lead_score', 40).lte('lead_score', 69);
+      } else if (scoreFilter === 'low') {
+        query = query.lte('lead_score', 39);
+      }
+
+      if (scoreMin) {
+        query = query.gte('lead_score', Number(scoreMin));
+      }
+      if (scoreMax) {
+        query = query.lte('lead_score', Number(scoreMax));
+      }
+      if (valueMin) {
+        query = query.gte('estimated_value', Number(valueMin));
+      }
+      if (valueMax) {
+        query = query.lte('estimated_value', Number(valueMax));
+      }
+
       // Apply sorting
       query = query.order(sortField, { ascending: sortDirection === 'asc' });
 
@@ -332,15 +387,43 @@ export default function Leads() {
     } finally {
       setLoading(false);
     }
-  }, [scopedDb, page, pageSize, sortField, sortDirection, statusFilter, ownerFilter, searchQuery, context?.userId, t]);
+  }, [
+    scopedDb,
+    page,
+    pageSize,
+    sortField,
+    sortDirection,
+    statusFilter,
+    ownerFilter,
+    searchQuery,
+    nameQuery,
+    nameOp,
+    scoreFilter,
+    scoreMin,
+    scoreMax,
+    valueMin,
+    valueMax,
+    context?.userId,
+    t,
+  ]);
 
   useEffect(() => {
     if (!viewState.hydrated) return;
     fetchLeads();
   }, [fetchLeads, viewState.hydrated]);
 
+  useEffect(() => {
+    const maxPage = Math.max(1, Math.ceil(totalCount / pageSize));
+    if (page > maxPage) {
+      setPage(maxPage);
+    }
+  }, [page, pageSize, totalCount]);
+
   const allVisibleSelected = leads.length > 0 && leads.every((lead) => selectedIds.has(lead.id));
   const partiallyVisibleSelected = leads.some((lead) => selectedIds.has(lead.id)) && !allVisibleSelected;
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const canGoPrevious = page > 1;
+  const canGoNext = page < totalPages;
   const visibleFieldSet = useMemo(() => {
     const allowed = new Set<ListFieldKey>(LIST_FIELD_OPTIONS.map((field) => field.key));
     const fromState = Array.isArray(listVisibleFields)
@@ -359,6 +442,84 @@ export default function Leads() {
     () => LIST_FIELD_OPTIONS.filter((field) => field.tableColumn && visibleFieldSet.has(field.key)),
     [visibleFieldSet]
   );
+  const statusLabels = useMemo(
+    () => ({
+      new: t('leads.filters.statusOptions.new', 'New'),
+      contacted: t('leads.filters.statusOptions.contacted', 'Contacted'),
+      qualified: t('leads.filters.statusOptions.qualified', 'Qualified'),
+      proposal: t('leads.filters.statusOptions.proposal', 'Proposal'),
+      negotiation: t('leads.filters.statusOptions.negotiation', 'Negotiation'),
+      won: t('leads.filters.statusOptions.won', 'Won'),
+      lost: t('leads.filters.statusOptions.lost', 'Lost'),
+    }),
+    [t]
+  );
+  const ownerLabels = useMemo(
+    () => ({
+      any: t('leads.filters.anyOwner', 'Any Owner'),
+      me: t('leads.filters.ownerOptions.me', 'Assigned to Me'),
+      unassigned: t('leads.filters.ownerOptions.unassigned', 'Unassigned'),
+    }),
+    [t]
+  );
+  const scoreLabels = useMemo(
+    () => ({
+      all: t('leads.filters.allScores', 'All Scores'),
+      high: t('leads.filters.scoreOptions.high', 'High'),
+      medium: t('leads.filters.scoreOptions.medium', 'Medium'),
+      low: t('leads.filters.scoreOptions.low', 'Low'),
+    }),
+    [t]
+  );
+  const activeFilterTags = useMemo(() => {
+    const tags: Array<{ key: string; label: string; onClear: () => void }> = [];
+    if (searchQuery) {
+      tags.push({
+        key: 'search',
+        label: `${t('leads.filters.search', 'Search')}: ${searchQuery}`,
+        onClear: () => setSearchQuery(''),
+      });
+    }
+    if (statusFilter !== 'all') {
+      tags.push({
+        key: 'status',
+        label: `${t('leads.filters.status', 'Status')}: ${statusLabels[statusFilter as keyof typeof statusLabels] || statusFilter}`,
+        onClear: () => setStatusFilter('all'),
+      });
+    }
+    if (ownerFilter !== 'any') {
+      tags.push({
+        key: 'owner',
+        label: `${t('leads.filters.owner', 'Owner')}: ${ownerLabels[ownerFilter] || ownerFilter}`,
+        onClear: () => setOwnerFilter('any'),
+      });
+    }
+    if (scoreFilter !== 'all') {
+      tags.push({
+        key: 'score-bucket',
+        label: `${t('leads.filters.score', 'Score')}: ${scoreLabels[scoreFilter as keyof typeof scoreLabels] || scoreFilter}`,
+        onClear: () => setScoreFilter('all'),
+      });
+    }
+    if (nameQuery) {
+      tags.push({
+        key: 'name',
+        label: `${t('leads.filters.name', 'Name')} (${nameOp === 'equals' ? t('leads.filters.ops.equals', 'equals') : t('leads.filters.ops.contains', 'contains')}): ${nameQuery}`,
+        onClear: () => setNameQuery(''),
+      });
+    }
+    if (valueMin || valueMax) {
+      tags.push({
+        key: 'value-range',
+        label: `${t('leads.filters.valueRange', 'Deal Value')}: ${valueMin || t('leads.filters.range.from', 'Any')} - ${valueMax || t('leads.filters.range.to', 'Any')}`,
+        onClear: () => {
+          setValueMin('');
+          setValueMax('');
+        },
+      });
+    }
+    return tags;
+  }, [searchQuery, statusFilter, ownerFilter, scoreFilter, nameQuery, nameOp, valueMin, valueMax, t, statusLabels, ownerLabels, scoreLabels]);
 
   const handleFieldVisibilityChange = (field: ListFieldKey, checked: boolean | 'indeterminate') => {
     const next = new Set(visibleFieldList);
@@ -573,105 +734,107 @@ export default function Leads() {
             />
           }
         >
-          {/* KPI Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-          <Card className="transition-colors shadow-sm">
-            <CardHeader className="pb-2">
-              <CardDescription className="text-xs">{t('leads.kpi.totalLeads', 'Total Leads')}</CardDescription>
-              <CardTitle className="text-2xl">{stats.total}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Badge variant="outline" className="bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-800">
-                {t('leads.kpi.totalLeads', 'Total Leads')}
-              </Badge>
-            </CardContent>
-          </Card>
-          <Card className="transition-colors shadow-sm">
-            <CardHeader className="pb-2">
-              <CardDescription className="text-xs">{t('leads.kpi.wonDeals', 'Won Deals')}</CardDescription>
-              <CardTitle className="text-2xl">{stats.won}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Badge variant="outline" className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800">
-                {t('leads.kpi.wonDeals', 'Won Deals')}
-              </Badge>
-            </CardContent>
-          </Card>
-          <Card className="transition-colors shadow-sm">
-            <CardHeader className="pb-2">
-              <CardDescription className="text-xs">{t('leads.kpi.contacted', 'Contacted')}</CardDescription>
-              <CardTitle className="text-2xl">{stats.contacted}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Badge variant="outline" className="bg-violet-500/10 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-800">
-                {t('leads.kpi.contacted', 'Contacted')}
-              </Badge>
-            </CardContent>
-          </Card>
-          <Card className="transition-colors shadow-sm">
-            <CardHeader className="pb-2">
-              <CardDescription className="text-xs">{t('leads.kpi.highScore', 'High Score')}</CardDescription>
-              <CardTitle className="text-2xl">{stats.highScore}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Badge variant="outline" className="bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800">
-                {t('leads.kpi.highScore', 'High Score')}
-              </Badge>
-            </CardContent>
-          </Card>
-        </div>
-
         {/* Filters */}
-        <div className="flex flex-col gap-4 mb-6">
-          <div className="flex flex-wrap gap-4 items-center">
-            <div className="relative w-full min-w-0 sm:flex-1 sm:min-w-[260px]">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <div className="flex flex-col gap-0.5 mb-1.5">
+          <div className="w-full overflow-x-auto">
+            <div className="flex flex-nowrap items-center gap-0.5 min-w-max">
+              <div className="relative w-[280px] shrink-0">
+              <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder={t('leads.filters.search')}
+                placeholder={t('leads.filters.searchPlaceholder', 'Search by name, company, or email')}
                 value={localSearch}
                 onChange={(e) => setLocalSearch(e.target.value)}
-                className="pl-10 bg-background"
+                className="h-7 pl-8.5 bg-background"
               />
-            </div>
-            
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full sm:w-[160px] bg-background">
-                <Filter className="mr-2 h-4 w-4 text-muted-foreground" />
-                <SelectValue placeholder={t('leads.filters.status')} />
+              </div>
+
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="h-7 w-[160px] shrink-0 bg-background px-1">
+                <Filter className="mr-0.5 h-4 w-4 text-muted-foreground" />
+                <SelectValue placeholder={t('leads.filters.status', 'Status')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">{t('leads.filters.allStatuses')}</SelectItem>
-                <SelectItem value="new">{t('leads.filters.statusOptions.new')}</SelectItem>
-                <SelectItem value="contacted">{t('leads.filters.statusOptions.contacted')}</SelectItem>
-                <SelectItem value="qualified">{t('leads.filters.statusOptions.qualified')}</SelectItem>
-                <SelectItem value="proposal">{t('leads.filters.statusOptions.proposal')}</SelectItem>
-                <SelectItem value="negotiation">{t('leads.filters.statusOptions.negotiation')}</SelectItem>
-                <SelectItem value="won">{t('leads.filters.statusOptions.won')}</SelectItem>
-                <SelectItem value="lost">{t('leads.filters.statusOptions.lost')}</SelectItem>
+                <SelectItem value="all">{t('leads.filters.allStatuses', 'All Statuses')}</SelectItem>
+                <SelectItem value="new">{t('leads.filters.statusOptions.new', 'New')}</SelectItem>
+                <SelectItem value="contacted">{t('leads.filters.statusOptions.contacted', 'Contacted')}</SelectItem>
+                <SelectItem value="qualified">{t('leads.filters.statusOptions.qualified', 'Qualified')}</SelectItem>
+                <SelectItem value="proposal">{t('leads.filters.statusOptions.proposal', 'Proposal')}</SelectItem>
+                <SelectItem value="negotiation">{t('leads.filters.statusOptions.negotiation', 'Negotiation')}</SelectItem>
+                <SelectItem value="won">{t('leads.filters.statusOptions.won', 'Won')}</SelectItem>
+                <SelectItem value="lost">{t('leads.filters.statusOptions.lost', 'Lost')}</SelectItem>
               </SelectContent>
-            </Select>
+              </Select>
 
-            <Select value={ownerFilter} onValueChange={(v) => setOwnerFilter(v as 'any' | 'unassigned' | 'me')}>
-              <SelectTrigger className="w-full sm:w-[160px] bg-background">
-                <UsersIcon className="mr-2 h-4 w-4 text-muted-foreground" />
-                <SelectValue placeholder={t('leads.filters.owner')} />
+              <Select value={ownerFilter} onValueChange={(v) => setOwnerFilter(v as 'any' | 'unassigned' | 'me')}>
+              <SelectTrigger className="h-7 w-[160px] shrink-0 bg-background px-1">
+                <UsersIcon className="mr-0.5 h-4 w-4 text-muted-foreground" />
+                <SelectValue placeholder={t('leads.filters.owner', 'Owner')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="any">{t('leads.filters.anyOwner')}</SelectItem>
-                <SelectItem value="me">{t('leads.filters.ownerOptions.me')}</SelectItem>
-                <SelectItem value="unassigned">{t('leads.filters.ownerOptions.unassigned')}</SelectItem>
+                <SelectItem value="any">{t('leads.filters.anyOwner', 'Any Owner')}</SelectItem>
+                <SelectItem value="me">{t('leads.filters.ownerOptions.me', 'Assigned to Me')}</SelectItem>
+                <SelectItem value="unassigned">{t('leads.filters.ownerOptions.unassigned', 'Unassigned')}</SelectItem>
               </SelectContent>
-            </Select>
+              </Select>
 
-            <DropdownMenu>
+              <Select value={scoreFilter} onValueChange={setScoreFilter}>
+                <SelectTrigger className="h-7 w-[160px] shrink-0 bg-background px-1">
+                  <TrendingUp className="mr-0.5 h-4 w-4 text-muted-foreground" />
+                  <SelectValue placeholder={t('leads.filters.score', 'Score')} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t('leads.filters.allScores', 'All Scores')}</SelectItem>
+                  <SelectItem value="high">{t('leads.filters.scoreOptions.high', 'High')}</SelectItem>
+                  <SelectItem value="medium">{t('leads.filters.scoreOptions.medium', 'Medium')}</SelectItem>
+                  <SelectItem value="low">{t('leads.filters.scoreOptions.low', 'Low')}</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <div className="flex flex-nowrap items-center gap-0.5 shrink-0">
+                <Input
+                  type="number"
+                  placeholder={t('leads.filters.valueMin', 'Min Value')}
+                  value={valueMin}
+                  onChange={(e) => setValueMin(e.target.value)}
+                  className="h-7 w-[120px] bg-background"
+                />
+                <span className="text-muted-foreground">-</span>
+                <Input
+                  type="number"
+                  placeholder={t('leads.filters.valueMax', 'Max Value')}
+                  value={valueMax}
+                  onChange={(e) => setValueMax(e.target.value)}
+                  className="h-7 w-[120px] bg-background"
+                />
+              </div>
+
+              <div className="flex flex-nowrap items-center gap-0.5 shrink-0">
+                <Select value={nameOp} onValueChange={(v) => setNameOp(v as TextOp)}>
+                  <SelectTrigger className="h-7 w-[130px] bg-background px-1">
+                    <SelectValue placeholder={t('leads.filters.nameMatch', 'Name Match')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="contains">{t('leads.filters.ops.contains', 'Contains')}</SelectItem>
+                    <SelectItem value="equals">{t('leads.filters.ops.equals', 'Equals')}</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Input
+                  placeholder={t('leads.filters.name', 'Lead Name')}
+                  value={nameQuery}
+                  onChange={(e) => setNameQuery(e.target.value)}
+                  className="h-7 w-[150px] bg-background"
+                />
+              </div>
+
+              <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="w-full sm:w-auto">
+                <Button variant="outline" className="h-7 shrink-0 px-1.5">
                   <SlidersHorizontal className="mr-2 h-4 w-4" />
-                  Fields
+                  {t('leads.filters.fields', 'Fields')}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-72 max-h-96 overflow-y-auto">
-                <DropdownMenuLabel>Visible Fields</DropdownMenuLabel>
+                <DropdownMenuLabel>{t('leads.filters.visibleFields', 'Visible Fields')}</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 {LIST_FIELD_OPTIONS.map((field) => (
                   <DropdownMenuCheckboxItem
@@ -683,62 +846,34 @@ export default function Leads() {
                   </DropdownMenuCheckboxItem>
                 ))}
               </DropdownMenuContent>
-            </DropdownMenu>
+              </DropdownMenu>
+              <Button
+                variant="ghost"
+                className="h-7 shrink-0 px-1.5"
+                disabled={activeFilterTags.length === 0}
+                onClick={clearAllFilters}
+              >
+                {t('leads.filters.clearFilters', 'Clear Filters')}
+              </Button>
+            </div>
           </div>
-
-          <div className="flex flex-wrap gap-4 items-center">
-             <div className="flex flex-wrap items-center gap-2">
-                <Select value={scoreFilter} onValueChange={setScoreFilter}>
-                  <SelectTrigger className="w-full sm:w-[160px] bg-background">
-                    <TrendingUp className="mr-2 h-4 w-4 text-muted-foreground" />
-                    <SelectValue placeholder={t('leads.filters.score')} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">{t('leads.filters.allScores')}</SelectItem>
-                    <SelectItem value="high">{t('leads.filters.scoreOptions.high')}</SelectItem>
-                    <SelectItem value="medium">{t('leads.filters.scoreOptions.medium')}</SelectItem>
-                    <SelectItem value="low">{t('leads.filters.scoreOptions.low')}</SelectItem>
-                  </SelectContent>
-                </Select>
-             </div>
-             
-             <div className="flex flex-wrap items-center gap-2">
-                <Input
-                  type="number"
-                  placeholder={t('leads.filters.valueMin')}
-                  value={valueMin}
-                  onChange={(e) => setValueMin(e.target.value)}
-                  className="w-full sm:w-[120px] bg-background"
-                />
-                <span className="text-muted-foreground">-</span>
-                <Input
-                  type="number"
-                  placeholder={t('leads.filters.valueMax')}
-                  value={valueMax}
-                  onChange={(e) => setValueMax(e.target.value)}
-                  className="w-full sm:w-[120px] bg-background"
-                />
-             </div>
-             
-             {/* Name Filter */}
-             <div className="flex flex-wrap items-center gap-2">
-                <Select value={nameOp} onValueChange={(v) => setNameOp(v as TextOp)}>
-                  <SelectTrigger className="w-full sm:w-[130px] bg-background">
-                    <SelectValue placeholder="Name Op" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="contains">{t('leads.filters.ops.contains')}</SelectItem>
-                    <SelectItem value="equals">{t('leads.filters.ops.equals')}</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Input
-                  placeholder={t('leads.filters.name')}
-                  value={nameQuery}
-                  onChange={(e) => setNameQuery(e.target.value)}
-                  className="w-full sm:w-[150px] bg-background"
-                />
-             </div>
-          </div>
+          {activeFilterTags.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {activeFilterTags.map((tag) => (
+                <Badge key={tag.key} variant="secondary" className="flex items-center gap-1 pr-1">
+                  <span>{tag.label}</span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-4 w-4 p-0"
+                    onClick={tag.onClear}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </Badge>
+              ))}
+            </div>
+          )}
         </div>
 
         {loading ? (
@@ -843,18 +978,13 @@ export default function Leads() {
 
             <div className="flex items-center justify-end space-x-2 py-4">
               <div className="flex-1 text-sm text-muted-foreground">
-                {selectedIds.size} of {totalCount} row(s) selected.
+                {selectedIds.size} of {leads.length} row(s) selected.
               </div>
               <div className="space-x-2">
-                <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
+                <Button variant="outline" size="sm" disabled={!canGoPrevious} onClick={() => setPage(page - 1)}>
                   Previous
                 </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={page * pageSize >= totalCount}
-                  onClick={() => setPage(page + 1)}
-                >
+                <Button variant="outline" size="sm" disabled={!canGoNext} onClick={() => setPage(page + 1)}>
                   Next
                 </Button>
               </div>
@@ -889,6 +1019,52 @@ export default function Leads() {
             ))}
           </div>
         )}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mt-6">
+          <Card className="transition-colors shadow-sm">
+            <CardHeader className="pb-2">
+              <CardDescription className="text-xs">{t('leads.kpi.totalLeads', 'Total Leads')}</CardDescription>
+              <CardTitle className="text-2xl">{stats.total}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Badge variant="outline" className="bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-800">
+                {t('leads.kpi.totalLeads', 'Total Leads')}
+              </Badge>
+            </CardContent>
+          </Card>
+          <Card className="transition-colors shadow-sm">
+            <CardHeader className="pb-2">
+              <CardDescription className="text-xs">{t('leads.kpi.wonDeals', 'Won Deals')}</CardDescription>
+              <CardTitle className="text-2xl">{stats.won}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Badge variant="outline" className="bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800">
+                {t('leads.kpi.wonDeals', 'Won Deals')}
+              </Badge>
+            </CardContent>
+          </Card>
+          <Card className="transition-colors shadow-sm">
+            <CardHeader className="pb-2">
+              <CardDescription className="text-xs">{t('leads.kpi.contacted', 'Contacted')}</CardDescription>
+              <CardTitle className="text-2xl">{stats.contacted}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Badge variant="outline" className="bg-violet-500/10 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-800">
+                {t('leads.kpi.contacted', 'Contacted')}
+              </Badge>
+            </CardContent>
+          </Card>
+          <Card className="transition-colors shadow-sm">
+            <CardHeader className="pb-2">
+              <CardDescription className="text-xs">{t('leads.kpi.highScore', 'High Score')}</CardDescription>
+              <CardTitle className="text-2xl">{stats.highScore}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Badge variant="outline" className="bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800">
+                {t('leads.kpi.highScore', 'High Score')}
+              </Badge>
+            </CardContent>
+          </Card>
+        </div>
         {/* Bulk Action Bar */}
         {selectedIds.size > 0 && (
           <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-popover text-popover-foreground shadow-lg border rounded-full px-6 py-3 flex items-center gap-4 z-50 animate-in fade-in slide-in-from-bottom-4">
