@@ -220,12 +220,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "skipped",
-                      "duration": 7634,
+                      "duration": 8015,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-03-16T16:01:31.561Z",
+                      "startTime": "2026-03-16T16:27:43.536Z",
                       "annotations": [
                         {
                           "type": "skip",
@@ -274,12 +274,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "skipped",
-                      "duration": 6250,
+                      "duration": 6287,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-03-16T16:01:39.492Z",
+                      "startTime": "2026-03-16T16:27:51.914Z",
                       "annotations": [
                         {
                           "type": "skip",
@@ -301,6 +301,60 @@
               "file": "tests/e2e/lead-workspace-regression.spec.ts",
               "line": 81,
               "column": 3
+            },
+            {
+              "title": "keeps communication options top-left aligned with accessible hit targets",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "description": "Communication section is not available in this environment",
+                      "location": {
+                        "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/lead-workspace-regression.spec.ts",
+                        "line": 133,
+                        "column": 10
+                      }
+                    }
+                  ],
+                  "expectedStatus": "skipped",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "skipped",
+                      "duration": 6262,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-16T16:27:58.207Z",
+                      "annotations": [
+                        {
+                          "type": "skip",
+                          "description": "Communication section is not available in this environment",
+                          "location": {
+                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/lead-workspace-regression.spec.ts",
+                            "line": 133,
+                            "column": 10
+                          }
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "58bdd089077e4b89d852-1c3631da7ffc2fc4ea63",
+              "file": "tests/e2e/lead-workspace-regression.spec.ts",
+              "line": 118,
+              "column": 3
             }
           ]
         }
@@ -309,10 +363,10 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-03-16T16:01:30.580Z",
-    "duration": 15204.180999999999,
+    "startTime": "2026-03-16T16:27:42.207Z",
+    "duration": 22310.971999999998,
     "expected": 0,
-    "skipped": 2,
+    "skipped": 3,
     "unexpected": 0,
     "flaky": 0
   }

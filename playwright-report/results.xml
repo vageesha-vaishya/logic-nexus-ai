@@ -1,6 +1,6 @@
-<testsuites id="" name="" tests="2" failures="0" skipped="2" errors="0" time="15.204180999999998">
-<testsuite name="tests/e2e/lead-workspace-regression.spec.ts" timestamp="2026-03-16T16:01:31.149Z" hostname="chromium" tests="2" failures="0" skipped="2" time="13.884" errors="0">
-<testcase name="lead workspace regressions › keeps breadcrumbs visible on lead main, create, view, and edit flows" classname="tests/e2e/lead-workspace-regression.spec.ts" time="7.634">
+<testsuites id="" name="" tests="3" failures="0" skipped="3" errors="0" time="22.310972">
+<testsuite name="tests/e2e/lead-workspace-regression.spec.ts" timestamp="2026-03-16T16:27:43.104Z" hostname="chromium" tests="3" failures="0" skipped="3" time="20.564" errors="0">
+<testcase name="lead workspace regressions › keeps breadcrumbs visible on lead main, create, view, and edit flows" classname="tests/e2e/lead-workspace-regression.spec.ts" time="8.015">
 <properties>
 <property name="skip" value="No lead record is available for view/edit breadcrumb assertions">
 </property>
@@ -8,9 +8,17 @@
 <skipped>
 </skipped>
 </testcase>
-<testcase name="lead workspace regressions › keeps main and bottom sections visible with independent split-scroll behavior" classname="tests/e2e/lead-workspace-regression.spec.ts" time="6.25">
+<testcase name="lead workspace regressions › keeps main and bottom sections visible with independent split-scroll behavior" classname="tests/e2e/lead-workspace-regression.spec.ts" time="6.287">
 <properties>
 <property name="skip" value="Three-section lead workspace is not enabled in this environment">
+</property>
+</properties>
+<skipped>
+</skipped>
+</testcase>
+<testcase name="lead workspace regressions › keeps communication options top-left aligned with accessible hit targets" classname="tests/e2e/lead-workspace-regression.spec.ts" time="6.262">
+<properties>
+<property name="skip" value="Communication section is not available in this environment">
 </property>
 </properties>
 <skipped>
