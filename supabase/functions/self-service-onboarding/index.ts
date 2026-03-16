@@ -340,19 +340,50 @@ const sendVerificationEmail = async (
   organizationName: string
 ) => {
   const html = `<p>Your Logic Nexus-AI verification code for <strong>${organizationName}</strong> is:</p><h2>${code}</h2><p>This code expires in 15 minutes.</p>`
+  const payload = {
+    to: [to],
+    subject: 'Verify your Logic Nexus-AI onboarding request',
+    body: html,
+    provider: 'resend',
+    priority: 'high',
+    isVip: true
+  }
 
   const { data, error } = await supabase.functions.invoke('send-email', {
-    body: {
-      to: [to],
-      subject: 'Verify your Logic Nexus-AI onboarding request',
-      body: html,
-      provider: 'resend',
-      priority: 'high',
-      isVip: true
-    }
+    body: payload
   })
 
-  if (error) throw error
+  if (error) {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+    if (supabaseUrl && serviceRoleKey) {
+      const response = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${serviceRoleKey}`,
+          apikey: serviceRoleKey
+        },
+        body: JSON.stringify(payload)
+      })
+      const responseText = await response.text()
+      let responseJson: any = null
+      try {
+        responseJson = responseText ? JSON.parse(responseText) : null
+      } catch {
+        responseJson = null
+      }
+      if (!response.ok) {
+        const fallbackError = responseJson?.error || responseText || error.message || 'Unable to send verification email'
+        throw new Error(fallbackError)
+      }
+      if (responseJson?.success === false) {
+        throw new Error(responseJson?.error || 'Unable to send verification email')
+      }
+      return
+    }
+    throw new Error(error.message || 'Unable to send verification email')
+  }
   if (data?.success === false) {
     throw new Error(data?.error || 'Unable to send verification email')
   }
@@ -510,6 +541,18 @@ serveWithLogger(async (req, logger, supabase) => {
         success: false,
         error: 'Captcha verification failed',
         error_code: 'captcha_validation_failed'
+      })
+    }
+
+    const resendApiKey = Deno.env.get('RESEND_API_KEY') || ''
+    if (!resendApiKey) {
+      await logger.error('Email provider secret is missing for onboarding verification', {
+        missingSecret: 'RESEND_API_KEY'
+      })
+      return json(503, {
+        success: false,
+        error: 'Email service is not configured',
+        error_code: 'email_config_missing'
       })
     }
 
@@ -693,7 +736,8 @@ serveWithLogger(async (req, logger, supabase) => {
         normalizedEmailError.includes('smtp settings incomplete') ||
         normalizedEmailError.includes('email account not found') ||
         normalizedEmailError.includes('invalid request: provide accountid') ||
-        normalizedEmailError.includes('domain is not verified')
+        normalizedEmailError.includes('domain is not verified') ||
+        normalizedEmailError.includes('unauthorized')
       ) {
         return json(503, {
           success: false,
@@ -709,7 +753,8 @@ serveWithLogger(async (req, logger, supabase) => {
         normalizedEmailError.includes('502') ||
         normalizedEmailError.includes('503') ||
         normalizedEmailError.includes('fetch failed') ||
-        normalizedEmailError.includes('network')
+        normalizedEmailError.includes('network') ||
+        normalizedEmailError.includes('non-2xx status code')
       ) {
         return json(502, {
           success: false,
