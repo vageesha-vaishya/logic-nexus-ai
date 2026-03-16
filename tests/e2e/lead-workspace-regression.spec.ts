@@ -117,4 +117,72 @@ test.describe('lead workspace regressions', () => {
     const bottomYAfter = (await bottomSection.boundingBox())?.y ?? 0;
     expect(Math.abs(bottomYAfter - bottomYBefore)).toBeLessThanOrEqual(2);
   });
+
+  test('keeps communication options top-left aligned with accessible hit targets', async ({ page }) => {
+    await ensureAuthenticated(page);
+
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/dashboard/leads/new');
+
+    const communicationSection = page.locator('[aria-label="Communication section"]').first();
+    const tabsList = communicationSection.locator('[role="tablist"]').first();
+    const sendMessageTab = communicationSection.getByRole('tab', { name: 'Send Message' });
+    const notesTab = communicationSection.getByRole('tab', { name: 'Notes' });
+    const activitiesTab = communicationSection.getByRole('tab', { name: 'Lead Activities' });
+
+    test.skip((await communicationSection.count()) === 0, 'Communication section is not available in this environment');
+
+    await expect(communicationSection).toBeVisible();
+    await expect(sendMessageTab).toBeVisible();
+    await expect(notesTab).toBeVisible();
+    await expect(activitiesTab).toBeVisible();
+
+    const desktopMetrics = await page.evaluate(() => {
+      const section = document.querySelector('[aria-label="Communication section"]') as HTMLElement | null;
+      const tabs = section?.querySelector('[data-orientation="vertical"]') as HTMLElement | null;
+      const list = section?.querySelector('[role="tablist"]') as HTMLElement | null;
+      return {
+        tabsAlignItems: tabs ? getComputedStyle(tabs).alignItems : null,
+        tabsJustifyContent: tabs ? getComputedStyle(tabs).justifyContent : null,
+        listTopOffset: list ? list.getBoundingClientRect().top - section!.getBoundingClientRect().top : null,
+        listLeftOffset: list ? list.getBoundingClientRect().left - section!.getBoundingClientRect().left : null,
+      };
+    });
+
+    expect(desktopMetrics.tabsAlignItems).toBe('flex-start');
+    expect(desktopMetrics.tabsJustifyContent).toBe('flex-start');
+    expect(desktopMetrics.listTopOffset ?? 999).toBeLessThanOrEqual(32);
+    expect(desktopMetrics.listLeftOffset ?? 999).toBeLessThanOrEqual(32);
+
+    for (const tab of [sendMessageTab, notesTab, activitiesTab]) {
+      const box = await tab.boundingBox();
+      expect(box).not.toBeNull();
+      expect((box?.height ?? 0) >= 44).toBeTruthy();
+      expect((box?.width ?? 0) >= 44).toBeTruthy();
+    }
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/dashboard/leads/new');
+    await expect(tabsList).toBeVisible();
+
+    const mobileMetrics = await page.evaluate(() => {
+      const section = document.querySelector('[aria-label="Communication section"]') as HTMLElement | null;
+      const list = section?.querySelector('[role="tablist"]') as HTMLElement | null;
+      if (!section || !list) {
+        return null;
+      }
+      const style = getComputedStyle(list);
+      const firstTab = list.querySelector('[role="tab"]') as HTMLElement | null;
+      return {
+        flexWrap: style.flexWrap,
+        listLeftOffset: list.getBoundingClientRect().left - section.getBoundingClientRect().left,
+        firstTabLeftOffset: firstTab ? firstTab.getBoundingClientRect().left - list.getBoundingClientRect().left : null,
+      };
+    });
+
+    expect(mobileMetrics).not.toBeNull();
+    expect(mobileMetrics?.flexWrap).toBe('wrap');
+    expect(mobileMetrics?.listLeftOffset ?? 999).toBeLessThanOrEqual(24);
+    expect(mobileMetrics?.firstTabLeftOffset ?? 999).toBeGreaterThanOrEqual(0);
+  });
 });

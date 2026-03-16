@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Bold, Italic, List, ListOrdered, Plus, Save, Trash2, Underline, Pencil } from 'lucide-react';
+import { Bold, Italic, List, ListOrdered, Plus, Save, Trash2, Underline, Pencil, Send } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { createLeadWorkspaceEventBus } from '@/components/crm/lead-workspace-bus';
 import { cn } from '@/lib/utils';
@@ -1076,7 +1076,7 @@ export function LeadWorkspaceSections({
     : undefined;
 
   return (
-    <div className={cn('grid grid-cols-1 gap-6 xl:grid-cols-12', scrollingEnabled && 'xl:h-[calc(100vh-12.5rem)] xl:overflow-hidden')}>
+    <div className={cn('lead-workspace-tight-lines grid grid-cols-1 gap-6 xl:grid-cols-12', scrollingEnabled && 'xl:h-[calc(100vh-12.5rem)] xl:overflow-hidden')}>
       <div className={cn('space-y-6 xl:col-span-8', scrollingEnabled && 'xl:grid xl:h-full xl:min-h-0 xl:grid-rows-[minmax(320px,1.2fr)_minmax(280px,1fr)] xl:gap-6 xl:space-y-0 xl:overflow-hidden')}>
         <Card className={cn(scrollingEnabled && 'xl:flex xl:min-h-0 xl:flex-col xl:overflow-hidden')}>
           <CardContent
@@ -1446,13 +1446,13 @@ export function LeadWorkspaceSections({
             onKeyDown={handleScrollableKeyDown}
             aria-label="Communication section"
           >
-            <Tabs value={communicationTab} onValueChange={(value) => setCommunicationTab(value as CommunicationTabKey)} orientation="vertical" className="flex items-start gap-4">
-              <TabsList className="flex h-auto w-[140px] flex-col">
-                <TabsTrigger value="send_message">Send Message</TabsTrigger>
-                <TabsTrigger value="notes">Notes</TabsTrigger>
-                <TabsTrigger value="lead_activities">Lead Activities</TabsTrigger>
+            <Tabs value={communicationTab} onValueChange={(value) => setCommunicationTab(value as CommunicationTabKey)} orientation="vertical" className="flex flex-col items-start justify-start gap-4 md:flex-row">
+              <TabsList className="flex h-auto w-full flex-row flex-wrap items-start justify-start gap-1 self-start md:w-[180px] md:flex-col md:flex-nowrap">
+                <TabsTrigger value="send_message" className="min-h-11 justify-start px-3 text-left">Send Message</TabsTrigger>
+                <TabsTrigger value="notes" className="min-h-11 justify-start px-3 text-left">Notes</TabsTrigger>
+                <TabsTrigger value="lead_activities" className="min-h-11 justify-start px-3 text-left">Lead Activities</TabsTrigger>
               </TabsList>
-              <div className="flex-1">
+              <div className="flex-1 self-start">
                 <TabsContent value="send_message" className="mt-0 space-y-3">
                   {loadedCommunicationTabs.has('send_message') ? (
                     <>
@@ -1463,7 +1463,16 @@ export function LeadWorkspaceSections({
                       </div>
                       <Input value={composerSubject} onChange={(e) => setComposerSubject(e.target.value)} placeholder="Subject" />
                       <Textarea value={composerBody} onChange={(e) => setComposerBody(e.target.value)} className="min-h-[140px]" placeholder="Write message..." />
-                      <Button type="button" onClick={sendMessage}>Send Message</Button>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button type="button" size="icon" onClick={sendMessage} aria-label="Send message" title="Send Message">
+                              <Send className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Send Message</TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     </>
                   ) : null}
                 </TabsContent>
@@ -1486,12 +1495,27 @@ export function LeadWorkspaceSections({
                                 <p className="text-sm whitespace-pre-wrap">{note.description}</p>
                                 <div className="flex items-center justify-between">
                                   <span className="text-xs text-muted-foreground">{new Date(note.created_at).toLocaleString()}</span>
-                                  <Button type="button" size="sm" variant="ghost" onClick={() => {
-                                    setEditingNoteId(note.id);
-                                    setEditingNoteValue(note.description);
-                                  }}>
-                                    Edit
-                                  </Button>
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Button
+                                          type="button"
+                                          size="icon"
+                                          variant="ghost"
+                                          className="h-8 w-8 text-blue-600 hover:text-blue-700"
+                                          onClick={() => {
+                                            setEditingNoteId(note.id);
+                                            setEditingNoteValue(note.description);
+                                          }}
+                                          aria-label="Edit note"
+                                          title="Edit"
+                                        >
+                                          <Pencil className="h-4 w-4" />
+                                        </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent>Edit</TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
                                 </div>
                               </div>
                             )}
@@ -1499,7 +1523,23 @@ export function LeadWorkspaceSections({
                         ))}
                       </div>
                       <Textarea value={notesDraft} onChange={(e) => setNotesDraft(e.target.value)} className="min-h-[90px]" placeholder="Add note..." />
-                      <Button type="button" onClick={saveNote}>Add Note</Button>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              type="button"
+                              size="icon"
+                              className="bg-emerald-600 text-white hover:bg-emerald-700"
+                              onClick={saveNote}
+                              aria-label="Add note"
+                              title="Add Note"
+                            >
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Add Note</TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     </>
                   ) : null}
                 </TabsContent>
