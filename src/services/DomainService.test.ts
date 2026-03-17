@@ -48,7 +48,7 @@ describe('DomainService', () => {
             isPlatformAdmin: false,
           },
         }),
-      } as Response);
+      } as unknown as Response);
 
       const result = await DomainService.getAuthorizedDomains();
 
@@ -74,7 +74,7 @@ describe('DomainService', () => {
         status: 403,
         headers: jsonHeaders,
         json: async () => ({ error: 'Forbidden' }),
-      } as Response);
+      } as unknown as Response);
 
       await expect(DomainService.getAuthorizedDomains()).rejects.toThrow('Forbidden');
     });
@@ -86,7 +86,7 @@ describe('DomainService', () => {
         status: 500,
         headers: jsonHeaders,
         json: async () => ({ error: 'Internal Server Error', correlationId: 'corr-500' }),
-      } as Response);
+      } as unknown as Response);
 
       await expect(DomainService.getAuthorizedDomains()).rejects.toThrow('ref: corr-500');
     });
@@ -296,6 +296,110 @@ describe('DomainService', () => {
       expect(mockChain.delete).toHaveBeenCalled();
       expect(mockChain.eq).toHaveBeenCalledWith('id', '1');
       expect(spyInvalidate).toHaveBeenCalled();
+    });
+  });
+
+  describe('setTenantDomains', () => {
+    it('assigns and revokes domain memberships for a tenant', async () => {
+      const mockFetch = vi.mocked(fetch);
+      mockFetch.mockResolvedValue({
+        ok: true,
+        headers: { get: vi.fn().mockReturnValue('application/json') },
+        json: async () => ({ data: { ok: true } }),
+      } as unknown as Response);
+
+      const result = await DomainService.setTenantDomains('tenant-1', ['d1', 'd3'], ['d1', 'd2']);
+
+      expect(result.assigned).toBe(1);
+      expect(result.revoked).toBe(1);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(mockFetch).toHaveBeenNthCalledWith(
+        1,
+        '/api/v1/domain-assignments',
+        expect.objectContaining({
+          method: 'POST',
+          body: expect.stringContaining('"domainId":"d3"'),
+        }),
+      );
+      expect(mockFetch).toHaveBeenNthCalledWith(
+        2,
+        '/api/v1/domain-assignments',
+        expect.objectContaining({
+          method: 'DELETE',
+          body: expect.stringContaining('"domainId":"d2"'),
+        }),
+      );
+    });
+
+    it('throws parsed API errors with correlation id', async () => {
+      const mockFetch = vi.mocked(fetch);
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 403,
+        headers: { get: vi.fn().mockReturnValue('application/json') },
+        json: async () => ({ error: 'Forbidden', correlationId: 'corr-dom-1' }),
+      } as unknown as Response);
+
+      await expect(
+        DomainService.setTenantDomains('tenant-1', ['d1'], []),
+      ).rejects.toThrow('Forbidden (ref: corr-dom-1)');
+    });
+  });
+
+  describe('getDomainAssignmentAuditHistory', () => {
+    it('returns audit rows and sends query filters', async () => {
+      const mockFetch = vi.mocked(fetch);
+      mockFetch.mockResolvedValue({
+        ok: true,
+        headers: { get: vi.fn().mockReturnValue('application/json') },
+        json: async () => ({
+          data: [
+            {
+              id: 'a1',
+              action: 'DOMAIN_ASSIGN',
+              tenant_id: 'tenant-1',
+              domain_id: 'd1',
+              actor_user_id: 'user-1',
+              batch_id: 'batch-1',
+              metadata: { assigned: 1 },
+              created_at: '2026-03-17T12:00:00.000Z',
+            },
+          ],
+        }),
+      } as unknown as Response);
+
+      const rows = await DomainService.getDomainAssignmentAuditHistory({
+        tenantId: 'tenant-1',
+        domainId: 'd1',
+        batchId: 'batch-1',
+        limit: 20,
+      });
+
+      expect(rows).toHaveLength(1);
+      expect(rows[0].action).toBe('DOMAIN_ASSIGN');
+      expect(mockFetch).toHaveBeenCalledWith(
+        '/api/v1/domain-assignments?tenant_id=tenant-1&domain_id=d1&batch_id=batch-1&limit=20',
+        expect.objectContaining({
+          method: 'GET',
+          headers: expect.objectContaining({
+            Authorization: 'Bearer session-token',
+          }),
+        }),
+      );
+    });
+
+    it('throws parsed audit API errors', async () => {
+      const mockFetch = vi.mocked(fetch);
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 500,
+        headers: { get: vi.fn().mockReturnValue('application/json') },
+        json: async () => ({ error: 'Audit failure', correlationId: 'corr-audit-1' }),
+      } as unknown as Response);
+
+      await expect(
+        DomainService.getDomainAssignmentAuditHistory(),
+      ).rejects.toThrow('Audit failure (ref: corr-audit-1)');
     });
   });
 });

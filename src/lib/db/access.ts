@@ -355,10 +355,25 @@ export class ScopedDataAccess {
     this.logAudit('VIEW_CHANGE', resourceType, { viewMode });
   }
 
+  private createPlatformAdminAccessError() {
+    return {
+      message: 'Access denied - Platform admin privileges required',
+      code: 'platform_admin_required',
+      status: 403,
+    };
+  }
+
   /**
    * Retrieves a system setting by key.
    */
   public async getSystemSetting(key: string): Promise<{ data: { setting_value: any } | null, error: any }> {
+    if (!this.context.isPlatformAdmin) {
+      return {
+        data: null,
+        error: this.createPlatformAdminAccessError(),
+      };
+    }
+
     const result = await (this.supabase as any)
       .from('system_settings')
       .select('setting_value')
@@ -371,6 +386,13 @@ export class ScopedDataAccess {
    * Sets or updates a system setting.
    */
   public async setSystemSetting(key: string, value: any) {
+    if (!this.context.isPlatformAdmin) {
+      return {
+        data: null,
+        error: this.createPlatformAdminAccessError(),
+      };
+    }
+
     const payload = {
       setting_key: key,
       setting_value: value,

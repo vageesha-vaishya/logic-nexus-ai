@@ -3,9 +3,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { ObjectMenu } from './ObjectMenu';
 
+const mockUseAuth = vi.fn();
+
+vi.mock('@/hooks/useAuth', () => ({
+  useAuth: () => mockUseAuth(),
+}));
+
 describe('ObjectMenu', () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    mockUseAuth.mockReturnValue({
+      hasRole: vi.fn().mockImplementation((role: string) => role === 'platform_admin'),
+      hasPermission: vi.fn().mockReturnValue(true),
+      isPlatformAdmin: vi.fn().mockReturnValue(true),
+    });
   });
 
   afterEach(() => {
@@ -131,5 +142,23 @@ describe('ObjectMenu', () => {
     expect(screen.getByRole('link', { name: /themes customize look and feel/i })).toBeInTheDocument();
     expect(screen.getByTestId('app-launcher-content').className).toContain('overflow-y-auto');
     expect(screen.getByTestId('app-launcher-content').className).toContain('max-h-[min(78vh,720px)]');
+  });
+
+  it('hides Settings destination for non-platform-admin users', () => {
+    mockUseAuth.mockReturnValue({
+      hasRole: vi.fn().mockReturnValue(false),
+      hasPermission: vi.fn().mockReturnValue(true),
+      isPlatformAdmin: vi.fn().mockReturnValue(false),
+    });
+
+    render(
+      <MemoryRouter>
+        <ObjectMenu />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /app launcher/i }));
+
+    expect(screen.queryByRole('link', { name: /settings global and app settings/i })).not.toBeInTheDocument();
   });
 });

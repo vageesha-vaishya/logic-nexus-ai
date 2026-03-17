@@ -47,6 +47,31 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+function parseEmergencyBlockedEmails(): string[] {
+  const configured = String(import.meta.env.VITE_EMERGENCY_BLOCKED_EMAILS || '').trim();
+  if (!configured) return [];
+  return configured
+    .split(',')
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+export function isEmergencyBlockedEmail(email: string | null | undefined): boolean {
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+  if (!normalizedEmail) return false;
+  return new Set(parseEmergencyBlockedEmails()).has(normalizedEmail);
+}
+
+export function hasVerifiedPlatformAdminAccess(
+  platformAdminAccess: boolean,
+  roles: Array<{ role: string }>,
+  email?: string | null
+): boolean {
+  if (isEmergencyBlockedEmail(email)) return false;
+  if (!platformAdminAccess) return false;
+  return roles.some((role) => role.role === 'platform_admin');
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
@@ -54,6 +79,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [roles, setRoles] = useState<UserRole[]>([]);
   const [permissions, setPermissions] = useState<Permission[]>([]);
+  const [platformAdminAccess, setPlatformAdminAccess] = useState(false);
   const [loading, setLoading] = useState(true);
   const isFetchingRef = useRef(false);
 
@@ -113,6 +139,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return data;
   };
 
+  const fetchPlatformAdminAccess = async () => {
+    const { data, error } = await (supabase as any).rpc('is_current_user_platform_admin');
+    if (error) {
+      logger.warn('Failed to resolve strict platform admin access', { error, component: 'AuthProvider' });
+      return false;
+    }
+    return Boolean(data);
+  };
+
   const loadUserData = async (currentUser: User) => {
     try {
       logger.info('Loading user data', { userId: currentUser.id, component: 'AuthProvider' });
@@ -162,6 +197,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         timeout(5000, { parentsToChildren: {}, childrenToParents: {}, available: false }, 'roleHierarchy'),
       ]);
 
+      const platformAdminPromise = Promise.race([
+        fetchPlatformAdminAccess(),
+        timeout(5000, false, 'platformAdminAccess'),
+      ]);
+
       const rolesResult = await Promise.race([
         fetchUserRoles(currentUser.id),
         timeout(5000, [], 'userRoles')
@@ -169,14 +209,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       setRoles(rolesResult);
 
-      const [profileResult, customPermsResult, dynamicMapResult, hierarchyResult] = await Promise.all([
+      const [profileResult, customPermsResult, dynamicMapResult, hierarchyResult, platformAdminResult] = await Promise.all([
         profilePromise,
         customPermsPromise,
         dynamicMapPromise,
         hierarchyPromise,
+        platformAdminPromise,
       ]);
 
       setProfile(profileResult);
+      setPlatformAdminAccess(Boolean(platformAdminResult));
 
       const dynamicMap = dynamicMapResult || {};
       const hierarchyParents = (hierarchyResult as any)?.childrenToParents || {};
@@ -213,7 +255,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error: any) {
       logger.error('Error loading user data', { error: error.message, stack: error.stack, component: 'AuthProvider' });
       // Ensure we don't leave the app in a broken state
+      setProfile(null);
+      setRoles([]);
       setPermissions([]);
+      setPlatformAdminAccess(false);
     }
   };
 
@@ -243,6 +288,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Only load data if it's a new user or not yet loaded
         if (lastLoadedUserId !== currentSession.user.id) {
           lastLoadedUserId = currentSession.user.id;
+          setProfile(null);
+          setRoles([]);
+          setPermissions([]);
+          setPlatformAdminAccess(false);
           // Ensure loading is true while fetching user data
           setLoading(true);
           logger.info(`Starting user data load`, { userId: currentSession.user.id, component: 'AuthProvider' });
@@ -266,6 +315,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setProfile(null);
         setRoles([]);
         setPermissions([]);
+        setPlatformAdminAccess(false);
         setLoading(false);
       }
     };
@@ -366,6 +416,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setProfile(null);
     setRoles([]);
     setPermissions([]);
+    setPlatformAdminAccess(false);
     
     try {
       // Use scope: 'local' to avoid CORS/network issues with global sign out
@@ -389,17 +440,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const isPlatformAdmin = () => {
-    // Check if any role is platform_admin - this bypasses all permission checks
-    const result = roles.some(r => r.role === 'platform_admin');
-    return result;
+    const effectiveEmail = user?.email || profile?.email || null;
+    return hasVerifiedPlatformAdminAccess(platformAdminAccess, roles, effectiveEmail);
   };
   
   const isTenantAdmin = () => roles.some(r => r.role === 'tenant_admin');
   const isFranchiseAdmin = () => roles.some(r => r.role === 'franchise_admin');
 
   const hasPermission = (permission: Permission) => {
-    // Platform admin has implicit full access - check directly against roles array
-    const isAdmin = roles.some(r => r.role === 'platform_admin');
+    // Platform admin has implicit full access
+    const effectiveEmail = user?.email || profile?.email || null;
+    const isAdmin = hasVerifiedPlatformAdminAccess(platformAdminAccess, roles, effectiveEmail);
     if (isAdmin) return true;
     
     // Check for wildcard permission or specific permission

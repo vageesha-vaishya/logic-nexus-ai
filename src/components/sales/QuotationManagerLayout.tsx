@@ -51,8 +51,10 @@ import { useAuth } from '@/hooks/useAuth';
 import { AdvancedSearchFilter, FilterCriterion } from './AdvancedSearchFilter';
 import { ViewMode } from '@/components/ui/view-toggle';
 import { useSalesDashboard } from '@/contexts/SalesDashboardContext';
+import { useDomain } from '@/contexts/DomainContext';
 import { toast } from 'sonner';
 import { QuotationSidebar } from './QuotationSidebar';
+import { DomainSwitcher } from '@/components/navigation/DomainSwitcher';
 
 interface QuotationManagerLayoutProps {
   children: ReactNode;
@@ -83,6 +85,7 @@ export function QuotationManagerLayout({
   pagination
 }: QuotationManagerLayoutProps) {
   const { context, scopedDb, setScopePreference, preferences } = useCRM();
+  const { currentDomain } = useDomain();
   const { signOut, profile } = useAuth();
   const { 
     handleNavigation, 
@@ -418,6 +421,11 @@ export function QuotationManagerLayout({
           </Button>
           
           <h1 className="text-xl font-semibold text-gray-800 ml-2 hidden md:block">Quotations</h1>
+          {currentDomain?.code && (
+            <Badge variant="secondary" className="hidden lg:inline-flex">
+              {currentDomain.code}
+            </Badge>
+          )}
           
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -440,6 +448,7 @@ export function QuotationManagerLayout({
 
         {/* Middle: Search & Filter */}
         <div className="flex-1 max-w-3xl flex items-center gap-2">
+          <DomainSwitcher />
            <div className="relative flex-1 group">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 group-focus-within:text-[#714B67] transition-colors" />
             <Input 

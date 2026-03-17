@@ -17,10 +17,28 @@ export interface AuthorizedDomainsResponse {
   isPlatformAdmin: boolean;
 }
 
+export interface DomainTenantOption {
+  id: string;
+  name: string;
+  is_active?: boolean;
+}
+
+export interface DomainAssignmentAuditLog {
+  id: string;
+  action: string;
+  tenant_id: string | null;
+  domain_id: string | null;
+  actor_user_id: string | null;
+  batch_id: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
 let domainCache: PlatformDomain[] | null = null;
 let cacheTimestamp: number = 0;
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 const DOMAIN_API_PATH = '/api/v1/platform-domains';
+const DOMAIN_ASSIGNMENT_API_PATH = '/api/v1/domain-assignments';
 
 function normalizeDomainRows(rows: any[]): PlatformDomain[] {
   return (rows || [])
@@ -108,10 +126,144 @@ async function fallbackAuthorizedDomains(reason: string): Promise<AuthorizedDoma
 }
 
 export const DomainService = {
+  async getSessionToken(): Promise<string> {
+    const { data: sessionData } = await supabase.auth.getSession();
+    return sessionData?.session?.access_token || '';
+  },
+
+  async callDomainAssignmentApi(
+    method: 'POST' | 'DELETE',
+    payload: { domainId: string; tenantIds: string[]; batchId?: string },
+  ): Promise<{ data?: any; correlationId?: string; error?: string }> {
+    const accessToken = await this.getSessionToken();
+    const response = await fetch(DOMAIN_ASSIGNMENT_API_PATH, {
+      method,
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const contentType = response.headers.get('content-type') || '';
+    let body: any = {};
+    if (contentType.includes('application/json')) {
+      body = await response.json();
+    } else {
+      body = { error: await response.text() };
+    }
+
+    if (!response.ok) {
+      const parsedError = typeof body?.error === 'string' && body.error.trim()
+        ? body.error
+        : `Domain assignment request failed (${response.status})`;
+      if (body?.correlationId) {
+        throw new Error(`${parsedError} (ref: ${body.correlationId})`);
+      }
+      throw new Error(parsedError);
+    }
+
+    return body;
+  },
+
+  async getTenantOptions(): Promise<DomainTenantOption[]> {
+    const { data, error } = await (supabase as any)
+      .from('tenants')
+      .select('id, name, is_active')
+      .order('name');
+    if (error) throw error;
+    return (data || []) as DomainTenantOption[];
+  },
+
+  async getTenantAssignedDomainIds(tenantId: string): Promise<string[]> {
+    if (!tenantId) return [];
+    const { data, error } = await (supabase as any)
+      .from('domain_tenant')
+      .select('domain_id')
+      .eq('tenant_id', tenantId)
+      .eq('is_active', true);
+    if (error) throw error;
+    return Array.from(new Set((data || []).map((row: any) => String(row.domain_id))));
+  },
+
+  async setTenantDomains(tenantId: string, nextDomainIds: string[], currentDomainIds: string[]) {
+    const nextSet = new Set((nextDomainIds || []).map((id) => String(id)));
+    const currentSet = new Set((currentDomainIds || []).map((id) => String(id)));
+    const assignDomainIds = Array.from(nextSet).filter((id) => !currentSet.has(id));
+    const revokeDomainIds = Array.from(currentSet).filter((id) => !nextSet.has(id));
+    const batchId = crypto.randomUUID();
+
+    await Promise.all(assignDomainIds.map((domainId) =>
+      this.callDomainAssignmentApi('POST', {
+        domainId,
+        tenantIds: [tenantId],
+        batchId,
+      })
+    ));
+
+    await Promise.all(revokeDomainIds.map((domainId) =>
+      this.callDomainAssignmentApi('DELETE', {
+        domainId,
+        tenantIds: [tenantId],
+        batchId,
+      })
+    ));
+
+    return {
+      assigned: assignDomainIds.length,
+      revoked: revokeDomainIds.length,
+      batchId,
+    };
+  },
+
+  async getDomainAssignmentAuditHistory(filters?: {
+    tenantId?: string;
+    domainId?: string;
+    batchId?: string;
+    limit?: number;
+  }): Promise<DomainAssignmentAuditLog[]> {
+    const accessToken = await this.getSessionToken();
+    const params = new URLSearchParams();
+    if (filters?.tenantId) params.set('tenant_id', filters.tenantId);
+    if (filters?.domainId) params.set('domain_id', filters.domainId);
+    if (filters?.batchId) params.set('batch_id', filters.batchId);
+    if (filters?.limit) params.set('limit', String(filters.limit));
+    const queryString = params.toString();
+    const response = await fetch(`${DOMAIN_ASSIGNMENT_API_PATH}${queryString ? `?${queryString}` : ''}`, {
+      method: 'GET',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      },
+    });
+
+    const contentType = response.headers.get('content-type') || '';
+    let body: any = {};
+    if (contentType.includes('application/json')) {
+      body = await response.json();
+    } else {
+      body = { error: await response.text() };
+    }
+
+    if (!response.ok) {
+      const parsedError = typeof body?.error === 'string' && body.error.trim()
+        ? body.error
+        : `Domain audit request failed (${response.status})`;
+      if (body?.correlationId) {
+        throw new Error(`${parsedError} (ref: ${body.correlationId})`);
+      }
+      throw new Error(parsedError);
+    }
+
+    const rows = Array.isArray(body?.data) ? body.data : [];
+    return rows as DomainAssignmentAuditLog[];
+  },
+
   async getAuthorizedDomains(forceRefresh = false): Promise<AuthorizedDomainsResponse> {
     const cacheBypass = forceRefresh ? '?refresh=1' : '';
-    const { data: sessionData } = await supabase.auth.getSession();
-    const accessToken = sessionData?.session?.access_token || '';
+    const accessToken = await this.getSessionToken();
     logger.debug('[DomainService] requesting authorized domains', {
       component: 'DomainService',
       forceRefresh,

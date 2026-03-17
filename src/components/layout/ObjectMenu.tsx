@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/navigation-menu';
 import { OBJECT_GROUPS } from '@/config/object-groups';
 import { useSystemLogger } from '@/hooks/useSystemLogger';
+import { RoleGuard } from '@/components/auth/RoleGuard';
 
 export function ObjectMenu() {
   const systemLogger = useSystemLogger('ObjectMenu');
@@ -176,28 +177,34 @@ export function ObjectMenu() {
                     </div>
                     <ul className="space-y-2">
                       {group.items.map((item) => (
-                        <li key={item.name}>
-                          <NavigationMenuLink asChild>
-                            <Link
-                              to={item.to}
-                              onClick={closeMenu}
-                              className="flex items-center gap-3 rounded-md border border-transparent px-3 py-2 hover:bg-muted hover:text-foreground hover:border-border transition"
-                            >
-                              <item.icon className="h-4 w-4 shrink-0" />
-                              <div className="min-w-0">
-                                <p className="text-sm font-medium truncate">{item.name}</p>
-                                {item.description && (
-                                  <p className="text-xs text-muted-foreground truncate">{item.description}</p>
+                        <RoleGuard
+                          key={item.name}
+                          roles={item.roles ?? []}
+                          permissions={item.permissions}
+                        >
+                          <li>
+                            <NavigationMenuLink asChild>
+                              <Link
+                                to={item.to}
+                                onClick={closeMenu}
+                                className="flex items-center gap-3 rounded-md border border-transparent px-3 py-2 hover:bg-muted hover:text-foreground hover:border-border transition"
+                              >
+                                <item.icon className="h-4 w-4 shrink-0" />
+                                <div className="min-w-0">
+                                  <p className="text-sm font-medium truncate">{item.name}</p>
+                                  {item.description && (
+                                    <p className="text-xs text-muted-foreground truncate">{item.description}</p>
+                                  )}
+                                </div>
+                                {item.badge && (
+                                  <span className="ml-auto text-[10px] rounded bg-muted px-2 py-0.5 text-muted-foreground">
+                                    {item.badge}
+                                  </span>
                                 )}
-                              </div>
-                              {item.badge && (
-                                <span className="ml-auto text-[10px] rounded bg-muted px-2 py-0.5 text-muted-foreground">
-                                  {item.badge}
-                                </span>
-                              )}
-                            </Link>
-                          </NavigationMenuLink>
-                        </li>
+                              </Link>
+                            </NavigationMenuLink>
+                          </li>
+                        </RoleGuard>
                       ))}
                     </ul>
                   </div>

@@ -281,5 +281,57 @@ describe('ScopedDataAccess', () => {
       expect(mockQueryBuilder.eq).toHaveBeenCalledWith('tenant_id', 'tenant-123');
       expect(mockQueryBuilder.eq).toHaveBeenCalledWith('id', 'franchise-456');
     });
+
+    it('blocks non-platform admins from reading system settings', async () => {
+      const context: DataAccessContext = {
+        isPlatformAdmin: false,
+        isTenantAdmin: true,
+        isFranchiseAdmin: false,
+        tenantId: 'tenant-123',
+      };
+
+      const dao = new ScopedDataAccess(mockSupabase, context);
+      const result = await dao.getSystemSetting('standalone_quote_mode_enabled');
+
+      expect(result.data).toBeNull();
+      expect(result.error?.message).toBe('Access denied - Platform admin privileges required');
+      expect(result.error?.code).toBe('platform_admin_required');
+      expect(result.error?.status).toBe(403);
+      expect(mockSupabase.from).not.toHaveBeenCalledWith('system_settings');
+    });
+
+    it('blocks non-platform admins from writing system settings', async () => {
+      const context: DataAccessContext = {
+        isPlatformAdmin: false,
+        isTenantAdmin: false,
+        isFranchiseAdmin: true,
+        tenantId: 'tenant-123',
+        franchiseId: 'franchise-456',
+      };
+
+      const dao = new ScopedDataAccess(mockSupabase, context);
+      const result = await dao.setSystemSetting('standalone_quote_mode_enabled', true);
+
+      expect(result.data).toBeNull();
+      expect(result.error?.message).toBe('Access denied - Platform admin privileges required');
+      expect(result.error?.code).toBe('platform_admin_required');
+      expect(result.error?.status).toBe(403);
+      expect(mockSupabase.from).not.toHaveBeenCalledWith('system_settings');
+    });
+
+    it('allows platform admins to read system settings', async () => {
+      const context: DataAccessContext = {
+        isPlatformAdmin: true,
+        isTenantAdmin: false,
+        isFranchiseAdmin: false,
+      };
+
+      const dao = new ScopedDataAccess(mockSupabase, context);
+      await dao.getSystemSetting('standalone_quote_mode_enabled');
+
+      expect(mockSupabase.from).toHaveBeenCalledWith('system_settings');
+      expect(mockQueryBuilder.select).toHaveBeenCalledWith('setting_value');
+      expect(mockQueryBuilder.eq).toHaveBeenCalledWith('setting_key', 'standalone_quote_mode_enabled');
+    });
   });
 });

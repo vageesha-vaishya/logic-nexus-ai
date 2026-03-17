@@ -369,6 +369,7 @@ export async function resolveUserAccessProfile(userId: string): Promise<UserAcce
     ? roleRows.map((row: any) => String(row?.role || '')).filter(Boolean)
     : [];
   const isPlatformAdmin = roles.includes('platform_admin') || roles.includes('super_admin');
+  const isTenantAdmin = roles.includes('tenant_admin');
   const effectiveRoleRows = Array.isArray(roleRows) ? roleRows : [];
   const tenantScopedRole = effectiveRoleRows.find((row: any) => !!row?.tenant_id) || null;
   const franchiseScopedRole = effectiveRoleRows.find((row: any) => !!row?.franchise_id) || null;
@@ -382,8 +383,8 @@ export async function resolveUserAccessProfile(userId: string): Promise<UserAcce
   const tenantId = isPlatformAdmin && adminOverrideEnabled
     ? (overrideTenantId || roleTenantId)
     : roleTenantId;
-  const franchiseId = isPlatformAdmin && adminOverrideEnabled
-    ? (overrideFranchiseId || roleFranchiseId)
+  const franchiseId = (isPlatformAdmin || isTenantAdmin) && adminOverrideEnabled
+    ? (overrideFranchiseId || null)
     : roleFranchiseId;
 
   const normalizedUserId = String(userId || '').trim();
@@ -409,15 +410,11 @@ export function enforceAdminOverrideScope(
   const targetTenant = requestedTenantId || null;
   const targetFranchise = requestedFranchiseId || null;
 
-  if (!access.isPlatformAdmin && access.adminOverrideEnabled) {
-    throw new Error('Forbidden');
-  }
-
   if (!access.isPlatformAdmin) {
     if (targetTenant && targetTenant !== access.tenantId) {
       throw new Error('Forbidden');
     }
-    if (targetFranchise && targetFranchise !== access.franchiseId) {
+    if (targetFranchise && access.franchiseId && targetFranchise !== access.franchiseId) {
       throw new Error('Forbidden');
     }
     return;

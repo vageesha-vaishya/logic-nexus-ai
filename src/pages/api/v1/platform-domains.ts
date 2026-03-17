@@ -12,6 +12,14 @@ import {
 } from '../_utils/http';
 import { sendErrorResponse } from '../_utils/errorHandler';
 import { getSupabaseAdminClient } from '../_utils/supabaseAdmin';
+import { getCachedJson, setCachedJson } from '../_utils/redisCache';
+
+type AuthorizedDomainsPayload = {
+  domains: any[];
+  tenantDomainCount: number;
+  tenantId: string | null;
+  isPlatformAdmin: boolean;
+};
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {
   applyCors(req, res);
@@ -36,6 +44,21 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     enforceRateLimit(req, access.tenantId || '');
     const requestedDomainCode = typeof req.query.domain_code === 'string' ? req.query.domain_code : null;
     const domainAccess = await enforceDomainAccess(access, requestedDomainCode);
+    const cacheKey = [
+      'platform-domains',
+      access.userId || 'anon',
+      access.tenantId || 'global',
+      requestedDomainCode || 'all',
+      domainAccess.authorizedDomainCodes.join(','),
+    ].join(':');
+    const cached = await getCachedJson<AuthorizedDomainsPayload>(cacheKey);
+    if (cached) {
+      return res.status(200).json({
+        data: cached,
+        correlationId: ctx.correlationId,
+        version: 'v1',
+      });
+    }
     const supabase = getSupabaseAdminClient();
 
     if (!domainAccess.authorizedDomainCodes.length) {
@@ -74,13 +97,16 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       count: Array.isArray(data) ? data.length : 0,
     });
 
+    const responsePayload = {
+      domains: data || [],
+      tenantDomainCount: domainAccess.tenantDomainCount,
+      tenantId: access.tenantId,
+      isPlatformAdmin: access.isPlatformAdmin,
+    };
+    await setCachedJson(cacheKey, responsePayload, 120);
+
     return res.status(200).json({
-      data: {
-        domains: data || [],
-        tenantDomainCount: domainAccess.tenantDomainCount,
-        tenantId: access.tenantId,
-        isPlatformAdmin: access.isPlatformAdmin,
-      },
+      data: responsePayload,
       correlationId: ctx.correlationId,
       version: 'v1',
     });

@@ -19,7 +19,7 @@ interface CRMContextType {
 const CRMContext = createContext<CRMContextType | undefined>(undefined);
 
 export function CRMProvider({ children }: { children: ReactNode }) {
-  const { user, roles } = useAuth();
+  const { user, roles, isPlatformAdmin: hasPlatformAdminAccess } = useAuth();
   const [pref, setPref] = useState<{ tenant_id: string | null; franchise_id: string | null; admin_override_enabled: boolean } | null>(null);
   const [loadingPref, setLoadingPref] = useState(false);
   
@@ -32,14 +32,17 @@ export function CRMProvider({ children }: { children: ReactNode }) {
     () => roles.find((role) => !!role.franchise_id)?.franchise_id ?? null,
     [roles]
   );
+  const hasTenantAdminAccess = useMemo(
+    () => roles.some((role) => role.role === 'tenant_admin'),
+    [roles]
+  );
 
   const context = useMemo(() => {
-    const platformAdmin = roles.find(r => r.role === 'platform_admin');
     const tenantAdmin = roles.find(r => r.role === 'tenant_admin');
     const franchiseAdmin = roles.find(r => r.role === 'franchise_admin');
     const regularUser = roles.find(r => r.role === 'user');
 
-    const isPlatformAdmin = !!platformAdmin;
+    const isPlatformAdmin = hasPlatformAdminAccess();
     const isTenantAdmin = !!tenantAdmin;
     const isFranchiseAdmin = !!franchiseAdmin;
 
@@ -56,12 +59,8 @@ export function CRMProvider({ children }: { children: ReactNode }) {
       adminOverride = !!pref?.admin_override_enabled;
     } else if (isTenantAdmin) {
       effectiveTenant = baseTenant;
-      if (pref?.franchise_id) {
-         effectiveFranchise = pref.franchise_id;
-      } else {
-         effectiveFranchise = null;
-      }
-      adminOverride = false;
+      adminOverride = !!pref?.admin_override_enabled;
+      effectiveFranchise = adminOverride ? (pref?.franchise_id ?? null) : null;
     } else {
       effectiveTenant = baseTenant;
       effectiveFranchise = baseFranchise;
@@ -81,7 +80,7 @@ export function CRMProvider({ children }: { children: ReactNode }) {
       userId: user?.id,
       _version: contextVersion,
     };
-  }, [roles, pref, user?.id, contextVersion, ownedTenantId, ownedFranchiseId]);
+  }, [roles, pref, user?.id, contextVersion, ownedTenantId, ownedFranchiseId, hasPlatformAdminAccess]);
 
   useEffect(() => {
     async function loadPref() {
@@ -109,7 +108,7 @@ export function CRMProvider({ children }: { children: ReactNode }) {
   const setScopePreference = useCallback(async (tenantId: string | null, franchiseId: string | null, adminOverride?: boolean) => {
     if (!user) return;
     try {
-      const isPlatformAdmin = roles.some((role) => role.role === 'platform_admin');
+      const isPlatformAdmin = hasPlatformAdminAccess();
       let nextTenantId = tenantId;
       let nextFranchiseId = franchiseId;
 
@@ -148,25 +147,32 @@ export function CRMProvider({ children }: { children: ReactNode }) {
       console.error('Failed to set scope preference:', error);
       throw error;
     }
-  }, [user, pref?.admin_override_enabled, roles, ownedTenantId, ownedFranchiseId]);
+  }, [user, pref?.admin_override_enabled, ownedTenantId, ownedFranchiseId, hasPlatformAdminAccess]);
 
   const setAdminOverride = useCallback(async (enabled: boolean, tenantIdOverride?: string | null, franchiseIdOverride?: string | null) => {
     if (!user) return;
     try {
-      const isPlatformAdmin = roles.some((role) => role.role === 'platform_admin');
-      if (!isPlatformAdmin) {
-        throw new Error('Only platform admins can enable admin override');
+      const isPlatformAdmin = hasPlatformAdminAccess();
+      if (isPlatformAdmin) {
+        const requestedTenantId = ownedTenantId
+          ? ownedTenantId
+          : (tenantIdOverride ?? pref?.tenant_id ?? null);
+
+        await (supabase as any).rpc('set_admin_override', {
+          p_enabled: enabled,
+          p_tenant_id: requestedTenantId,
+          p_franchise_id: franchiseIdOverride ?? pref?.franchise_id ?? null,
+        });
+      } else if (hasTenantAdminAccess) {
+        await (supabase as any).rpc('set_user_scope_preference', {
+          p_tenant_id: ownedTenantId,
+          p_franchise_id: enabled ? (franchiseIdOverride ?? pref?.franchise_id ?? null) : null,
+          p_admin_override: enabled,
+        });
+      } else {
+        throw new Error('Only platform admins and tenant admins can enable admin override');
       }
 
-      const requestedTenantId = ownedTenantId
-        ? ownedTenantId
-        : (tenantIdOverride ?? pref?.tenant_id ?? null);
-
-      await (supabase as any).rpc('set_admin_override', {
-        p_enabled: enabled,
-        p_tenant_id: requestedTenantId,
-        p_franchise_id: franchiseIdOverride ?? pref?.franchise_id ?? null,
-      });
       const { data } = await (supabase as any)
         .from('user_preferences')
         .select('tenant_id, franchise_id, admin_override_enabled')
@@ -185,7 +191,7 @@ export function CRMProvider({ children }: { children: ReactNode }) {
       console.error('Failed to set admin override:', error);
       throw error;
     }
-  }, [user, pref?.tenant_id, pref?.franchise_id, roles, ownedTenantId]);
+  }, [user, pref?.tenant_id, pref?.franchise_id, ownedTenantId, hasPlatformAdminAccess, hasTenantAdminAccess]);
 
   const scopedDb = useMemo(() => new ScopedDataAccess(supabase, context), [context]);
 

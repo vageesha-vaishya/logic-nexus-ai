@@ -1,10 +1,10 @@
 import { renderHook, act } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // Restore real useAuth (overrides global mock from setup.ts)
 vi.unmock('@/hooks/useAuth');
 
-import { useAuth, AuthProvider } from './useAuth';
+import { useAuth, AuthProvider, hasVerifiedPlatformAdminAccess, isEmergencyBlockedEmail } from './useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 
@@ -23,6 +23,50 @@ vi.mock('@/integrations/supabase/client', () => ({
 vi.mock('react-router-dom', () => ({
   useNavigate: vi.fn(),
 }));
+
+describe('hasVerifiedPlatformAdminAccess', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('returns true when email is not blocked and admin signals are valid', () => {
+    expect(hasVerifiedPlatformAdminAccess(true, [{ role: 'platform_admin' }], 'valid.admin@company.com')).toBe(true);
+  });
+
+  it('returns false when strict admin access flag is false', () => {
+    expect(hasVerifiedPlatformAdminAccess(false, [{ role: 'platform_admin' }])).toBe(false);
+  });
+
+  it('returns false when strict admin access is true but role is not platform_admin', () => {
+    expect(hasVerifiedPlatformAdminAccess(true, [{ role: 'tenant_admin' }])).toBe(false);
+  });
+
+  it('returns false when identity is in configured emergency blocked list', () => {
+    vi.stubEnv('VITE_EMERGENCY_BLOCKED_EMAILS', 'bahuguna.vimal001@gmail.com');
+    expect(hasVerifiedPlatformAdminAccess(true, [{ role: 'platform_admin' }], 'bahuguna.vimal001@gmail.com')).toBe(false);
+  });
+
+  it('returns true only when strict admin access and platform_admin role are both present', () => {
+    expect(
+      hasVerifiedPlatformAdminAccess(true, [{ role: 'tenant_admin' }, { role: 'platform_admin' }])
+    ).toBe(true);
+  });
+});
+
+describe('isEmergencyBlockedEmail', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('matches configured blocked email case-insensitively', () => {
+    vi.stubEnv('VITE_EMERGENCY_BLOCKED_EMAILS', 'bahuguna.vimal001@gmail.com');
+    expect(isEmergencyBlockedEmail('BAHUGUNA.VIMAL001@GMAIL.COM')).toBe(true);
+  });
+
+  it('returns false when blocked list is not configured', () => {
+    expect(isEmergencyBlockedEmail('bahuguna.vimal001@gmail.com')).toBe(false);
+  });
+});
 
 describe('useAuth signOut', () => {
   const mockNavigate = vi.fn();

@@ -138,6 +138,18 @@ describe('http domain and scope guards', () => {
     expect(() => enforceAdminOverrideScope(access, 'tenant-1', 'fr-2')).toThrow('Forbidden');
   });
 
+  it('allows tenant admin override scope within tenant boundaries', () => {
+    const access = buildAccess({
+      roles: ['tenant_admin'],
+      tenantId: 'tenant-1',
+      franchiseId: 'fr-1',
+      adminOverrideEnabled: true,
+      overrideTenantId: 'tenant-1',
+      overrideFranchiseId: 'fr-1',
+    });
+    expect(() => enforceAdminOverrideScope(access, 'tenant-1', 'fr-1')).not.toThrow();
+  });
+
   it('allows single-domain tenant access without explicit assignment', async () => {
     const tenantQuery = createSelectEqChain(
       {
@@ -329,6 +341,39 @@ describe('http domain and scope guards', () => {
     expect(access.adminOverrideEnabled).toBe(true);
     expect(access.overrideTenantId).toBeNull();
     expect(access.tenantId).toBe('tenant-1');
+  });
+
+  it('applies tenant admin franchise override from preferences', async () => {
+    const rolesQuery = createSelectEqChain(
+      {
+        data: [{ role: 'tenant_admin', tenant_id: 'tenant-1', franchise_id: null }],
+        error: null,
+      },
+      1
+    );
+    const preferenceQuery = createMaybeSingleChain({
+      data: {
+        tenant_id: 'tenant-1',
+        franchise_id: 'fr-2',
+        admin_override_enabled: true,
+      },
+      error: null,
+    });
+
+    const supabaseMock = {
+      from: vi
+        .fn()
+        .mockReturnValueOnce(rolesQuery)
+        .mockReturnValueOnce(preferenceQuery),
+    } as any;
+
+    vi.mocked(getSupabaseAdminClient).mockReturnValue(supabaseMock);
+
+    const access = await resolveUserAccessProfile('user-1');
+    expect(access.isPlatformAdmin).toBe(false);
+    expect(access.tenantId).toBe('tenant-1');
+    expect(access.franchiseId).toBe('fr-2');
+    expect(access.adminOverrideEnabled).toBe(true);
   });
 
   it('revokes emergency-blocked user at authentication boundary', async () => {

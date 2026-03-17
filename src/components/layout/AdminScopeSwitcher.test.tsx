@@ -32,9 +32,9 @@ describe('AdminScopeSwitcher', () => {
     vi.clearAllMocks();
   });
 
-  it('should render nothing if user is not platform admin', () => {
+  it('should render nothing if user cannot use admin override', () => {
     (useCRM as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
-      context: { isPlatformAdmin: false },
+      context: { isPlatformAdmin: false, isTenantAdmin: false },
       preferences: {},
       setAdminOverride: mockSetAdminOverride,
       setScopePreference: mockSetScopePreference,
@@ -47,7 +47,7 @@ describe('AdminScopeSwitcher', () => {
 
   it('should render "Global Admin" button if user is platform admin and override is disabled', () => {
     (useCRM as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
-      context: { isPlatformAdmin: true },
+      context: { isPlatformAdmin: true, isTenantAdmin: false },
       preferences: { admin_override_enabled: false },
       setAdminOverride: mockSetAdminOverride,
       setScopePreference: mockSetScopePreference,
@@ -60,7 +60,7 @@ describe('AdminScopeSwitcher', () => {
 
   it('does not expose all-tenants label for tenant-bound platform admins', () => {
     (useCRM as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
-      context: { isPlatformAdmin: true, ownedTenantId: 'tenant-1' },
+      context: { isPlatformAdmin: true, isTenantAdmin: false, ownedTenantId: 'tenant-1' },
       preferences: { admin_override_enabled: true, tenant_id: 'tenant-1', franchise_id: null },
       setAdminOverride: mockSetAdminOverride,
       setScopePreference: mockSetScopePreference,
@@ -74,7 +74,7 @@ describe('AdminScopeSwitcher', () => {
 
   it('shows all tenants label only for unbound platform admins', () => {
     (useCRM as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
-      context: { isPlatformAdmin: true, ownedTenantId: null },
+      context: { isPlatformAdmin: true, isTenantAdmin: false, ownedTenantId: null },
       preferences: { admin_override_enabled: true, tenant_id: null, franchise_id: null },
       setAdminOverride: mockSetAdminOverride,
       setScopePreference: mockSetScopePreference,
@@ -83,5 +83,18 @@ describe('AdminScopeSwitcher', () => {
 
     render(<AdminScopeSwitcher />);
     expect(screen.getByText('All Tenants')).toBeInTheDocument();
+  });
+
+  it('renders tenant admin scope button when override is disabled', () => {
+    (useCRM as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+      context: { isPlatformAdmin: false, isTenantAdmin: true, tenantId: 'tenant-1', ownedTenantId: 'tenant-1' },
+      preferences: { admin_override_enabled: false, tenant_id: 'tenant-1', franchise_id: null },
+      setAdminOverride: mockSetAdminOverride,
+      setScopePreference: mockSetScopePreference,
+      scopedDb: createScopedDb([{ id: 'tenant-1', name: 'Miami Global Lines' }]),
+    });
+
+    render(<AdminScopeSwitcher />);
+    expect(screen.getByText('Tenant Admin')).toBeInTheDocument();
   });
 });

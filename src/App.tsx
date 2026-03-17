@@ -15,6 +15,7 @@ import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import { LeadsViewStateProvider } from "./hooks/useLeadsViewState";
 import { ThemeProvider } from "./hooks/useTheme";
 import { PipelineProvider } from "@/components/debug/pipeline/PipelineContext";
+import { PLATFORM_ADMIN_ROLE } from "@/config/permissions";
 
 // Eager: shell pages (needed immediately)
 import Landing from "./pages/Landing";
@@ -377,7 +378,7 @@ const App = () => (
             <Route 
               path="/dashboard/settings" 
               element={
-                <ProtectedRoute requiredPermissions={["admin.settings.manage"]}>
+                <ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required">
                   <Settings />
                 </ProtectedRoute>
               } 
@@ -385,7 +386,7 @@ const App = () => (
             <Route 
               path="/dashboard/settings/permissions" 
               element={
-                <ProtectedRoute requiredPermissions={["admin.settings.manage"]}>
+                <ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required">
                   <RolesPermissions />
                 </ProtectedRoute>
               } 
@@ -393,7 +394,7 @@ const App = () => (
             <Route 
               path="/dashboard/security-overview" 
               element={
-                <ProtectedRoute requiredPermissions={["admin.settings.manage"]}>
+                <ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required">
                   <SecurityOverview />
                 </ProtectedRoute>
               }
@@ -409,7 +410,7 @@ const App = () => (
             <Route 
               path="/dashboard/permissions" 
               element={
-                <ProtectedRoute requiredPermissions={["admin.settings.manage"]}>
+                <ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required">
                   <Navigate to="/dashboard/settings/permissions" replace />
                 </ProtectedRoute>
               }
@@ -633,7 +634,7 @@ const App = () => (
             <Route
               path="/dashboard/settings/channel-integrations"
               element={
-                <ProtectedRoute requiredPermissions={["admin.settings.manage"]}>
+                <ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required">
                   <ChannelIntegrations />
                 </ProtectedRoute>
               }
@@ -641,7 +642,7 @@ const App = () => (
             <Route 
               path="/dashboard/themes" 
               element={
-                <ProtectedRoute requiredPermissions={["admin.settings.manage"]}>
+                <ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required">
                   <ThemeManagement />
                 </ProtectedRoute>
               } 
@@ -650,7 +651,7 @@ const App = () => (
             <Route 
               path="/dashboard/ui-forms-demo" 
               element={
-                <ProtectedRoute requiredPermissions={["admin.settings.manage"]}>
+                <ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required">
                   <UIDemoForms />
                 </ProtectedRoute>
               } 
@@ -659,7 +660,7 @@ const App = () => (
             <Route 
               path="/dashboard/ui-advanced-demo" 
               element={
-                <ProtectedRoute requiredPermissions={["admin.settings.manage"]}>
+                <ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required">
                   <UIDemoAdvanced />
                 </ProtectedRoute>
               } 
@@ -669,46 +670,46 @@ const App = () => (
             <Route 
               path="/dashboard/settings/subscription" 
               element={
-                <ProtectedRoute requiredPermissions={["admin.settings.manage"]}>
+                <ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required">
                   <SubscriptionManagement />
                 </ProtectedRoute>
               } 
             />
             <Route 
               path="/dashboard/settings/quote-numbers" 
-              element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><QuoteNumberSettings /></ProtectedRoute>} 
+              element={<ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required"><QuoteNumberSettings /></ProtectedRoute>} 
             />
             <Route 
               path="/dashboard/settings/quotations" 
-              element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><QuotationSettings /></ProtectedRoute>} 
+              element={<ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required"><QuotationSettings /></ProtectedRoute>} 
             />
             {/* Settings → Data Management */}
             <Route 
               path="/dashboard/settings/data-management" 
-              element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><DataManagement /></ProtectedRoute>} 
+              element={<ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required"><DataManagement /></ProtectedRoute>} 
             />
             <Route 
               path="/dashboard/settings/domains" 
-              element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><PlatformDomains /></ProtectedRoute>} 
+              element={<ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required"><PlatformDomains /></ProtectedRoute>} 
             />
             <Route 
               path="/dashboard/settings/domains/:id" 
-              element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><PlatformDomainDetail /></ProtectedRoute>} 
+              element={<ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required"><PlatformDomainDetail /></ProtectedRoute>} 
             />
             <Route 
               path="/dashboard/settings/database-export" 
-              element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><DatabaseExport /></ProtectedRoute>} 
+              element={<ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required"><DatabaseExport /></ProtectedRoute>} 
             />
             <Route 
               path="/dashboard/settings/master-data" 
-              element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><MasterDataGeography /></ProtectedRoute>} 
+              element={<ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required"><MasterDataGeography /></ProtectedRoute>} 
             />
             <Route path="/dashboard/settings/master-data-hts" 
-              element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><MasterDataHTS /></ProtectedRoute>} 
+              element={<ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required"><MasterDataHTS /></ProtectedRoute>} 
             />
             <Route 
               path="/dashboard/settings/master-data-subscription-plans" 
-              element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><MasterDataSubscriptionPlans /></ProtectedRoute>} 
+              element={<ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required"><MasterDataSubscriptionPlans /></ProtectedRoute>} 
             />
             {/* Public customer portal */}
             <Route path="/portal/quote/:token" element={<QuotePortal />} />
@@ -740,10 +741,10 @@ const App = () => (
             <Route path="/dashboard/crm-workspace" element={<ProtectedRoute requiredPermissions={["dashboards.view"]}><CRMWorkspace /></ProtectedRoute>} />
             <Route path="/dashboard/leads-workspace" element={<Navigate to="/dashboard/leads/pipeline" replace />} />
             <Route path="/dashboard/more" element={<ProtectedRoute><More /></ProtectedRoute>} />
-            <Route path="/dashboard/settings/permissions" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><PermissionsMatrix /></ProtectedRoute>} />
+            <Route path="/dashboard/settings/permissions" element={<ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required"><PermissionsMatrix /></ProtectedRoute>} />
             <Route path="/dashboard/audit-logs" element={<ProtectedRoute><AuditLogs /></ProtectedRoute>} />
             <Route path="/dashboard/security-incidents" element={<ProtectedRoute><SecurityIncidents /></ProtectedRoute>} />
-            <Route path="/dashboard/settings/custom-roles" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><CustomRoles /></ProtectedRoute>} />
+            <Route path="/dashboard/settings/custom-roles" element={<ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required"><CustomRoles /></ProtectedRoute>} />
             <Route path="/dashboard/charge-categories" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><ChargeCategories /></ProtectedRoute>} />
             <Route path="/dashboard/charge-bases" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><ChargeBases /></ProtectedRoute>} />
             <Route path="/dashboard/currencies" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><Currencies /></ProtectedRoute>} />
@@ -811,8 +812,8 @@ const App = () => (
             <Route path="/dashboard/invoicing/orders" element={<ProtectedRoute><SalesPlaceholder /></ProtectedRoute>} />
             <Route path="/dashboard/reports/sales" element={<ProtectedRoute><SalesPlaceholder /></ProtectedRoute>} />
             <Route path="/dashboard/reports/reps" element={<ProtectedRoute><SalesPlaceholder /></ProtectedRoute>} />
-            <Route path="/dashboard/settings/teams" element={<ProtectedRoute><SalesPlaceholder /></ProtectedRoute>} />
-            <Route path="/dashboard/settings/activities" element={<ProtectedRoute><SalesPlaceholder /></ProtectedRoute>} />
+            <Route path="/dashboard/settings/teams" element={<ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required"><SalesPlaceholder /></ProtectedRoute>} />
+            <Route path="/dashboard/settings/activities" element={<ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required"><SalesPlaceholder /></ProtectedRoute>} />
             
             <Route path="*" element={<NotFound />} />
                         </Routes>

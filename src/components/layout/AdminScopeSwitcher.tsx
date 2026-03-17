@@ -27,6 +27,8 @@ export function AdminScopeSwitcher() {
   const currentTenantId = preferences?.tenant_id ?? null;
   const currentFranchiseId = preferences?.franchise_id ?? null;
   const isPlatformAdmin = context.isPlatformAdmin;
+  const isTenantAdmin = context.isTenantAdmin;
+  const canUseAdminOverride = isPlatformAdmin || isTenantAdmin;
   const ownedTenantId = context.ownedTenantId ?? null;
   const isTenantBoundPlatformAdmin = Boolean(ownedTenantId);
 
@@ -48,44 +50,45 @@ export function AdminScopeSwitcher() {
     setLoadingData(true);
     try {
       let tenantQuery = scopedDb.from('tenants').select('id, name').order('name');
-      if (ownedTenantId) {
-        tenantQuery = tenantQuery.eq('id', ownedTenantId);
+      const scopeTenantId = ownedTenantId ?? context.tenantId ?? null;
+      if (!isPlatformAdmin || scopeTenantId) {
+        tenantQuery = tenantQuery.eq('id', scopeTenantId);
       }
       const { data: tData } = await tenantQuery;
       setTenants(tData || []);
 
       const effectiveTenantId = tenantIdOverride !== undefined
         ? tenantIdOverride
-        : (currentTenantId || ownedTenantId);
+        : (currentTenantId || scopeTenantId);
       await loadFranchises(effectiveTenantId);
     } catch (e) {
       console.error(e);
       toast.error("Failed to load scope data");
     }
     setLoadingData(false);
-  }, [scopedDb, currentTenantId, loadFranchises, ownedTenantId]);
+  }, [scopedDb, currentTenantId, loadFranchises, ownedTenantId, context.tenantId, isPlatformAdmin]);
 
   useEffect(() => {
-    if (!isPlatformAdmin) {
-      console.debug('AdminScopeSwitcher: User is not platform admin. Context:', context);
+    if (!canUseAdminOverride) {
+      console.debug('AdminScopeSwitcher: User is not eligible for admin override. Context:', context);
     }
-  }, [isPlatformAdmin, context]);
+  }, [canUseAdminOverride, context]);
 
   useEffect(() => {
-    if (adminOverride && isPlatformAdmin) {
+    if (adminOverride && canUseAdminOverride) {
       if (open || tenants.length === 0) {
         loadData();
       }
     }
-  }, [adminOverride, open, isPlatformAdmin, loadData, tenants.length]);
+  }, [adminOverride, open, canUseAdminOverride, loadData, tenants.length]);
 
   useEffect(() => {
-    if (adminOverride && open && isPlatformAdmin) {
-      loadFranchises(currentTenantId || ownedTenantId);
+    if (adminOverride && open && canUseAdminOverride) {
+      loadFranchises(currentTenantId || ownedTenantId || context.tenantId || null);
     }
-  }, [currentTenantId, adminOverride, open, isPlatformAdmin, loadFranchises, ownedTenantId]);
+  }, [currentTenantId, adminOverride, open, canUseAdminOverride, loadFranchises, ownedTenantId, context.tenantId]);
 
-  if (!isPlatformAdmin) {
+  if (!canUseAdminOverride) {
     return null;
   }
 
@@ -93,7 +96,7 @@ export function AdminScopeSwitcher() {
     try {
       await setAdminOverride(checked);
       scopedDb.logViewPreference('admin_override', checked ? 'enabled' : 'disabled');
-      toast.success(checked ? "Scoped View Enabled" : "Global Admin View Restored");
+      toast.success(checked ? "Scoped View Enabled" : (isPlatformAdmin ? "Global Admin View Restored" : "Tenant-wide View Restored"));
       if (checked) {
         loadData();
       }
@@ -103,6 +106,9 @@ export function AdminScopeSwitcher() {
   };
 
   const handleTenantChange = async (val: string) => {
+    if (!isPlatformAdmin) {
+      return;
+    }
     if (val === 'all' && isTenantBoundPlatformAdmin) {
       toast.error("Tenant scope is locked to your assigned tenant");
       return;
@@ -120,9 +126,10 @@ export function AdminScopeSwitcher() {
 
   const handleFranchiseChange = async (val: string) => {
     const newVal = val === 'all' ? null : val;
+    const effectiveTenantId = currentTenantId || ownedTenantId || context.tenantId || null;
     try {
-      await setScopePreference(currentTenantId || ownedTenantId, newVal, adminOverride);
-      scopedDb.logViewPreference('scope_change', `Tenant: ${currentTenantId || 'All'}, Franchise: ${newVal || 'All'}`);
+      await setScopePreference(effectiveTenantId, newVal, adminOverride);
+      scopedDb.logViewPreference('scope_change', `Tenant: ${effectiveTenantId || 'All'}, Franchise: ${newVal || 'All'}`);
       toast.success("Franchise Scope Updated");
     } catch (error) {
       toast.error("Failed to update franchise scope");
@@ -130,8 +137,8 @@ export function AdminScopeSwitcher() {
   };
 
   const getScopeLabel = () => {
-    if (!adminOverride) return "Global Admin";
-    const effectiveTenantId = currentTenantId || ownedTenantId;
+    if (!adminOverride) return isPlatformAdmin ? "Global Admin" : "Tenant Admin";
+    const effectiveTenantId = currentTenantId || ownedTenantId || context.tenantId || null;
     if (!effectiveTenantId && !isTenantBoundPlatformAdmin) return "All Tenants";
     const tenant = tenants.find(t => t.id === effectiveTenantId);
     return tenant ? tenant.name : "Scoped View";
@@ -151,7 +158,7 @@ export function AdminScopeSwitcher() {
             <div className="space-y-1">
               <h4 className="font-medium leading-none">Admin Override</h4>
               <p className="text-sm text-muted-foreground">
-                View as specific tenant/franchise
+                {isPlatformAdmin ? "View as specific tenant/franchise" : "View as all or specific franchise"}
               </p>
             </div>
             <Switch
@@ -166,15 +173,15 @@ export function AdminScopeSwitcher() {
               <div className="space-y-2">
                 <Label>Tenant</Label>
                 <Select 
-                    value={currentTenantId || ownedTenantId || 'all'} 
+                    value={currentTenantId || ownedTenantId || context.tenantId || 'all'} 
                     onValueChange={handleTenantChange}
-                    disabled={loadingData || isTenantBoundPlatformAdmin}
+                    disabled={loadingData || !isPlatformAdmin || isTenantBoundPlatformAdmin}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select Tenant" />
                   </SelectTrigger>
                   <SelectContent>
-                    {!isTenantBoundPlatformAdmin && (
+                    {isPlatformAdmin && !isTenantBoundPlatformAdmin && (
                       <SelectItem value="all">All Tenants</SelectItem>
                     )}
                     {tenants.map((t) => (

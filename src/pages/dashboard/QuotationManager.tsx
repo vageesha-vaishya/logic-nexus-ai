@@ -14,6 +14,8 @@ import { Badge } from "@/components/ui/badge";
 import { Quote, QuoteStatus } from "./quotes-data";
 import { logger } from "@/lib/logger";
 import { QuotationDeleteService } from "@/services/quotation/QuotationDeleteService";
+import { useDomain } from "@/contexts/DomainContext";
+import { DomainQuotationIsolationService } from "@/services/quotation/DomainQuotationIsolationService";
 
 import { SalesDashboardProvider } from "@/contexts/SalesDashboardContext";
 
@@ -29,6 +31,7 @@ function QuotationManagerContent() {
   const { scopedDb } = useCRM();
   const { hasPermission } = useAuth();
   const { toast } = useToast();
+  const { currentDomain } = useDomain();
   
   // View State
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
@@ -56,6 +59,7 @@ function QuotationManagerContent() {
   const [bulkMode, setBulkMode] = useState(false);
   const [deleteInProgress, setDeleteInProgress] = useState(false);
   const quotationDeleteService = useMemo(() => new QuotationDeleteService(scopedDb), [scopedDb]);
+  const domainIsolationService = useMemo(() => new DomainQuotationIsolationService(), []);
 
   useEffect(() => {
     localStorage.setItem('quotesViewMode', viewMode);
@@ -63,12 +67,20 @@ function QuotationManagerContent() {
 
   useEffect(() => {
     fetchQuotes();
-  }, [searchQuery, activeFilters, pagination.current, pagination.pageSize]);
+  }, [searchQuery, activeFilters, pagination.current, pagination.pageSize, currentDomain?.id]);
 
   const fetchQuotes = async () => {
     try {
       setLoading(true);
       setError(null);
+      if (currentDomain?.code) {
+        domainIsolationService.ensurePluginIsolation(currentDomain.code);
+        domainIsolationService.runPluginHook(currentDomain.code, 'beforeFetch', {
+          domainId: currentDomain.id,
+          searchQuery,
+          filterCount: activeFilters.length,
+        });
+      }
       
       let query = scopedDb
         .from("quotes")
@@ -77,6 +89,22 @@ function QuotationManagerContent() {
           account:accounts (id, name),
           opportunity:opportunities!quotes_opportunity_id_fkey (id, name)
         `, { count: 'exact' });
+
+      if (currentDomain?.id) {
+        const scopedQuoteIds = await domainIsolationService.resolveQuoteIdsForDomain(scopedDb as any, currentDomain.id);
+        if (!scopedQuoteIds.length) {
+          setQuotes([]);
+          setPagination(prev => ({ ...prev, total: 0 }));
+          if (currentDomain.code) {
+            domainIsolationService.runPluginHook(currentDomain.code, 'afterFetch', {
+              domainId: currentDomain.id,
+              quoteCount: 0,
+            });
+          }
+          return;
+        }
+        query = query.in('id', scopedQuoteIds);
+      }
 
       // Apply Search
       if (searchQuery) {
@@ -124,8 +152,20 @@ function QuotationManagerContent() {
 
       setQuotes(transformedData);
       setPagination(prev => ({ ...prev, total: count || 0 }));
+      if (currentDomain?.code) {
+        domainIsolationService.runPluginHook(currentDomain.code, 'afterFetch', {
+          domainId: currentDomain.id,
+          quoteCount: transformedData.length,
+        });
+      }
 
     } catch (error: any) {
+      if (currentDomain?.code) {
+        domainIsolationService.runPluginHook(currentDomain.code, 'fetchError', {
+          domainId: currentDomain?.id || null,
+          message: error?.message || 'unknown',
+        });
+      }
       logger.error('Failed to fetch quotes', error);
       setError(error.message || "Failed to load quotations. Please check your connection and try again.");
       toast({

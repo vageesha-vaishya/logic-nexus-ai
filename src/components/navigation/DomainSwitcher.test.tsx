@@ -24,7 +24,7 @@ describe('DomainSwitcher', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('renders nothing when tenant has a single domain', () => {
+  it('renders active domain label when tenant has a single domain', () => {
     vi.mocked(useDomain).mockReturnValue({
       currentDomain: { id: '1', code: 'LOGISTICS', name: 'Logistics', description: null, is_active: true },
       setDomain: vi.fn(),
@@ -35,8 +35,8 @@ describe('DomainSwitcher', () => {
       isLoading: false,
     } as any);
 
-    const { container } = render(<DomainSwitcher />);
-    expect(container).toBeEmptyDOMElement();
+    render(<DomainSwitcher />);
+    expect(screen.getByText('Logistics')).toBeInTheDocument();
   });
 
   it('renders selector when multiple domains are available', () => {
