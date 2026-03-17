@@ -12,6 +12,7 @@ import { EmptyState } from '@/components/system/EmptyState';
 import { ViewMode } from '@/components/ui/view-toggle';
 import { EntityCard } from '@/components/system/EntityCard';
 import { useCRM } from '@/hooks/useCRM';
+import { logger } from '@/lib/logger';
 
 export default function Tenants() {
   const navigate = useNavigate();
@@ -33,7 +34,17 @@ export default function Tenants() {
 
   useEffect(() => {
     fetchTenants();
-  }, []);
+  }, [context.isPlatformAdmin, context.tenantId]);
+
+  const resolveErrorMessage = (error: unknown): string => {
+    if (error instanceof Error && error.message) return error.message;
+    if (typeof error === 'string' && error.trim()) return error;
+    if (error && typeof error === 'object') {
+      const message = (error as Record<string, unknown>).message;
+      if (typeof message === 'string' && message.trim()) return message;
+    }
+    return 'Failed to load tenant data';
+  };
 
   const fetchTenants = async () => {
     try {
@@ -55,7 +66,14 @@ export default function Tenants() {
       if (error) throw error;
       setTenants(data || []);
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
+      const message = resolveErrorMessage(error);
+      logger.error('Failed to fetch tenants', {
+        component: 'Tenants',
+        tenantId: context.tenantId || null,
+        isPlatformAdmin: context.isPlatformAdmin,
+        message,
+        error,
+      });
       toast({ title: 'Error', description: message, variant: 'destructive' });
     } finally {
       setLoading(false);

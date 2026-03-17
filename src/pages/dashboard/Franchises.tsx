@@ -14,6 +14,7 @@ import { FirstScreenTemplate } from '@/components/system/FirstScreenTemplate';
 import { EmptyState } from '@/components/system/EmptyState';
 import { ViewMode } from '@/components/ui/view-toggle';
 import { EntityCard } from '@/components/system/EntityCard';
+import { logger } from '@/lib/logger';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TenantFranchiseMappingList } from "@/components/franchise/TenantFranchiseMappingList";
@@ -21,13 +22,40 @@ import { TenantFranchiseMappingList } from "@/components/franchise/TenantFranchi
 export default function Franchises() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { context } = useCRM();
+  const { context, scopedDb } = useCRM();
   const [franchises, setFranchises] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('list');
 
   const fetchFranchises = useCallback(async () => {
+    const parsePayload = async (response: Response): Promise<{ json: any | null; text: string; isJson: boolean }> => {
+      const text = await response.text();
+      const contentType = String(response.headers.get('content-type') || '').toLowerCase();
+      const isJson = contentType.includes('application/json');
+      if (isJson) {
+        try {
+          return { json: JSON.parse(text), text, isJson: true };
+        } catch {
+          return { json: null, text, isJson: true };
+        }
+      }
+      return { json: null, text, isJson: false };
+    };
+
+    const loadScopedFranchises = async (): Promise<any[]> => {
+      let query = scopedDb
+        .from('franchises')
+        .select('id, name, code, tenant_id, is_active, created_at, address, tenants:tenants!franchises_tenant_id_fkey(name)')
+        .order('created_at', { ascending: false });
+      if (!context.isPlatformAdmin && context.tenantId) {
+        query = query.eq('tenant_id', context.tenantId);
+      }
+      const { data, error } = await query;
+      if (error) throw error;
+      return Array.isArray(data) ? data : [];
+    };
+
     try {
       const { data: sessionData } = await supabase.auth.getSession();
       const accessToken = sessionData?.session?.access_token || '';
@@ -41,22 +69,41 @@ export default function Franchises() {
         },
       });
 
-      const payload = await response.json();
-      if (!response.ok) {
-        throw new Error(payload?.error || 'Failed to load franchises');
+      const payload = await parsePayload(response);
+      if (!payload.isJson) {
+        logger.warn('Franchises API returned non-JSON response; falling back to scoped database query', {
+          component: 'Franchises',
+          status: response.status,
+          tenantId: context.tenantId || null,
+          isPlatformAdmin: context.isPlatformAdmin,
+          preview: payload.text.slice(0, 120),
+        });
+        const fallbackRows = await loadScopedFranchises();
+        setFranchises(fallbackRows);
+        return;
       }
 
-      setFranchises(Array.isArray(payload?.data) ? payload.data : []);
+      if (!response.ok) {
+        throw new Error(payload.json?.error || 'Failed to load franchises');
+      }
+
+      setFranchises(Array.isArray(payload.json?.data) ? payload.json.data : []);
     } catch (error: any) {
+      logger.error('Failed to fetch franchises', {
+        component: 'Franchises',
+        tenantId: context.tenantId || null,
+        isPlatformAdmin: context.isPlatformAdmin,
+        message: error?.message || String(error),
+      });
       toast({
         title: 'Error',
-        description: error.message,
+        description: error?.message || 'Failed to load franchises',
         variant: 'destructive',
       });
     } finally {
       setLoading(false);
     }
-  }, [context.isPlatformAdmin, context.tenantId, toast]);
+  }, [context.isPlatformAdmin, context.tenantId, scopedDb, toast]);
 
   useEffect(() => {
     fetchFranchises();

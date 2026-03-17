@@ -4,6 +4,8 @@ import { BrowserRouter } from 'react-router-dom';
 import Tenants from './Tenants';
 import { useCRM } from '@/hooks/useCRM';
 
+const toastSpy = vi.fn();
+
 vi.mock('@/components/layout/DashboardLayout', () => ({
   DashboardLayout: ({ children }: any) => <div>{children}</div>,
 }));
@@ -22,7 +24,7 @@ vi.mock('@/components/system/EmptyState', () => ({
 }));
 
 vi.mock('@/hooks/use-toast', () => ({
-  useToast: () => ({ toast: vi.fn() }),
+  useToast: () => ({ toast: toastSpy }),
 }));
 
 vi.mock('@/hooks/useCRM', () => ({
@@ -53,9 +55,23 @@ function createScopedDb(rows: any[]) {
   };
 }
 
+function createScopedDbError(error: unknown) {
+  const builder: any = {
+    select: vi.fn().mockReturnThis(),
+    order: vi.fn().mockReturnThis(),
+    eq: vi.fn().mockRejectedValue(error),
+    then: (_resolve: any, reject: any) => Promise.reject(error).catch(reject),
+  };
+  return {
+    from: vi.fn(() => builder),
+    builder,
+  };
+}
+
 describe('Tenants isolation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    toastSpy.mockReset();
   });
 
   it('filters tenants by authenticated tenant for tenant users', async () => {
@@ -100,5 +116,29 @@ describe('Tenants isolation', () => {
     });
     expect(builder.eq).not.toHaveBeenCalled();
     expect(screen.getByTestId('create-enabled')).toHaveTextContent('true');
+  });
+
+  it('shows extracted object message instead of unknown error fallback', async () => {
+    const { from } = createScopedDbError({ message: 'Tenant scope is missing' });
+    vi.mocked(useCRM).mockReturnValue({
+      context: { isPlatformAdmin: false, tenantId: 'tenant-1' },
+      scopedDb: { from },
+    } as any);
+
+    render(
+      <BrowserRouter>
+        <Tenants />
+      </BrowserRouter>
+    );
+
+    await waitFor(() => {
+      expect(toastSpy).toHaveBeenCalled();
+    });
+    expect(toastSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Error',
+        description: 'Tenant scope is missing',
+      }),
+    );
   });
 });

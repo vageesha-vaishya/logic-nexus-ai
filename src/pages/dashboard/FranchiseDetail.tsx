@@ -8,6 +8,7 @@ import { Store, Trash2, ArrowLeft, FileDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Papa from 'papaparse';
 import { useCRM } from '@/hooks/useCRM';
+import { logger } from '@/lib/logger';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,9 +32,33 @@ export default function FranchiseDetail() {
 
   useEffect(() => {
     fetchFranchise();
-  }, [id]);
+  }, [id, context.isPlatformAdmin, context.tenantId]);
 
   const fetchFranchise = async () => {
+    const parsePayload = async (response: Response): Promise<{ json: any | null; text: string; isJson: boolean }> => {
+      const text = await response.text();
+      const contentType = String(response.headers.get('content-type') || '').toLowerCase();
+      const isJson = contentType.includes('application/json');
+      if (isJson) {
+        try {
+          return { json: JSON.parse(text), text, isJson: true };
+        } catch {
+          return { json: null, text, isJson: true };
+        }
+      }
+      return { json: null, text, isJson: false };
+    };
+
+    const loadScopedFranchise = async (): Promise<any | null> => {
+      let query = scopedDb.from('franchises').select('*').eq('id', id).limit(1);
+      if (!context.isPlatformAdmin && context.tenantId) {
+        query = query.eq('tenant_id', context.tenantId);
+      }
+      const { data, error } = await query.maybeSingle();
+      if (error) throw error;
+      return data || null;
+    };
+
     try {
       const { data: sessionData } = await supabase.auth.getSession();
       const accessToken = sessionData?.session?.access_token || '';
@@ -52,16 +77,34 @@ export default function FranchiseDetail() {
           ...(!context.isPlatformAdmin && context.tenantId ? { 'x-tenant-id': context.tenantId } : {}),
         },
       });
-      const payload = await response.json().catch(() => null);
-      if (!response.ok) {
-        throw new Error(payload?.error || 'Failed to load franchise');
+      const payload = await parsePayload(response);
+      if (!payload.isJson) {
+        logger.warn('Franchise detail API returned non-JSON response; falling back to scoped database query', {
+          component: 'FranchiseDetail',
+          franchiseId: id || null,
+          status: response.status,
+          preview: payload.text.slice(0, 120),
+        });
+        const fallbackRow = await loadScopedFranchise();
+        setFranchise(fallbackRow);
+        return;
       }
-      const row = Array.isArray(payload?.data) ? payload.data[0] || null : null;
+      if (!response.ok) {
+        throw new Error(payload.json?.error || 'Failed to load franchise');
+      }
+      const row = Array.isArray(payload.json?.data) ? payload.json.data[0] || null : null;
       setFranchise(row);
     } catch (error: any) {
+      logger.error('Failed to fetch franchise detail', {
+        component: 'FranchiseDetail',
+        franchiseId: id || null,
+        tenantId: context.tenantId || null,
+        isPlatformAdmin: context.isPlatformAdmin,
+        message: error?.message || String(error),
+      });
       toast({
         title: 'Error',
-        description: error.message,
+        description: error?.message || 'Failed to load franchise',
         variant: 'destructive',
       });
     } finally {

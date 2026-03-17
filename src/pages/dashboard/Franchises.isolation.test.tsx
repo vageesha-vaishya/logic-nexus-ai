@@ -4,6 +4,8 @@ import { BrowserRouter } from 'react-router-dom';
 import Franchises from './Franchises';
 import { useCRM } from '@/hooks/useCRM';
 
+const toastSpy = vi.fn();
+
 vi.mock('@/components/layout/DashboardLayout', () => ({
   DashboardLayout: ({ children }: any) => <div>{children}</div>,
 }));
@@ -28,7 +30,7 @@ vi.mock('@/components/ui/tabs', () => ({
 }));
 
 vi.mock('@/hooks/use-toast', () => ({
-  useToast: () => ({ toast: vi.fn() }),
+  useToast: () => ({ toast: toastSpy }),
 }));
 
 vi.mock('@/hooks/useCRM', () => ({
@@ -48,17 +50,37 @@ vi.mock('@/integrations/supabase/client', () => ({
 }));
 
 describe('Franchises isolation', () => {
+  function createScopedDb(rows: any[] = []) {
+    const result = { data: rows, error: null };
+    const builder: any = {
+      select: vi.fn().mockReturnThis(),
+      order: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      then: (resolve: any) => Promise.resolve(result).then(resolve),
+    };
+    return {
+      from: vi.fn(() => builder),
+      builder,
+    };
+  }
+
   beforeEach(() => {
     vi.clearAllMocks();
+    toastSpy.mockReset();
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ data: [] }),
+      text: async () => JSON.stringify({ data: [] }),
+      headers: {
+        get: () => 'application/json',
+      },
     }));
   });
 
   it('sends tenant header for tenant users', async () => {
+    const { from } = createScopedDb();
     vi.mocked(useCRM).mockReturnValue({
       context: { isPlatformAdmin: false, tenantId: 'tenant-1' },
+      scopedDb: { from },
     } as any);
 
     render(
@@ -78,8 +100,10 @@ describe('Franchises isolation', () => {
   });
 
   it('omits tenant header for platform admins', async () => {
+    const { from } = createScopedDb();
     vi.mocked(useCRM).mockReturnValue({
       context: { isPlatformAdmin: true, tenantId: 'tenant-1' },
+      scopedDb: { from },
     } as any);
 
     render(
@@ -97,5 +121,34 @@ describe('Franchises isolation', () => {
       'Content-Type': 'application/json',
     });
     expect((init?.headers as Record<string, string>)['x-tenant-id']).toBeUndefined();
+  });
+
+  it('falls back to scoped database query when API returns html', async () => {
+    const { from } = createScopedDb([{ id: 'fr-1', name: 'Fallback Franchise' }]);
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () => '<!doctype html><html></html>',
+      headers: {
+        get: () => 'text/html',
+      },
+    }));
+    vi.mocked(useCRM).mockReturnValue({
+      context: { isPlatformAdmin: false, tenantId: 'tenant-1' },
+      scopedDb: { from },
+    } as any);
+
+    render(
+      <BrowserRouter>
+        <Franchises />
+      </BrowserRouter>
+    );
+
+    await waitFor(() => {
+      expect(from).toHaveBeenCalledWith('franchises');
+    });
+    expect(toastSpy).not.toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Error' }),
+    );
   });
 });

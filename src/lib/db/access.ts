@@ -224,6 +224,13 @@ export class ScopedDataAccess {
       return query;
     }
 
+    if (table === 'tenants' as TableName) {
+      if (ctx.tenantId) {
+        query = query.eq('id', ctx.tenantId);
+      }
+      return query;
+    }
+
     // Quotation Configuration is tenant-scoped only (no franchise column)
     if (table === 'quotation_configuration' as TableName || table === 'quote_number_config_tenant' as TableName) {
       if (ctx.tenantId) {
@@ -319,7 +326,7 @@ export class ScopedDataAccess {
 
     if (shouldInject) {
       // Ports/Locations are global, do not inject scope
-      if (table === 'ports_locations') {
+      if (table === 'ports_locations' || table === 'tenants') {
         return newValue;
       }
 

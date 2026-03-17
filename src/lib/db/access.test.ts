@@ -263,7 +263,7 @@ describe('ScopedDataAccess', () => {
 
       const dao = new ScopedDataAccess(mockSupabase, context);
       dao.from('tenants', true).select();
-      expect(mockQueryBuilder.eq).toHaveBeenCalledWith('tenant_id', 'tenant-123');
+      expect(mockQueryBuilder.eq).toHaveBeenCalledWith('id', 'tenant-123');
     });
 
     it('enforces franchise scope on franchises table even when global flag is passed', () => {
