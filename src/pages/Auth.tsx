@@ -99,7 +99,7 @@ export default function Auth() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     try {
       loginSchema.parse({ email, password });
     } catch (error) {
@@ -112,8 +112,7 @@ export default function Auth() {
     setLoading(true);
 
     try {
-      // Add timeout protection for sign in
-      const timeoutPromise = new Promise((_, reject) => 
+      const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error('Request timed out. Please check your connection.')), 15000)
       );
 
@@ -121,30 +120,27 @@ export default function Auth() {
         signIn(email, password),
         timeoutPromise
       ]) as { error: any };
-      
+
       const { error } = result;
 
       if (error) {
         console.error('Sign in error:', error);
-        
-        // If initial admin credentials fail, attempt to auto-seed the admin account
+
         const isAdminEmail = email.trim().toLowerCase() === 'bahuguna.vimal@gmail.com';
         if (error.message.includes('Invalid login credentials') && isAdminEmail) {
           try {
             console.log('Attempting to seed admin account...');
-            // Add timeout protection for seeding too
             const seedResult = await Promise.race([
               invokeFunction('seed-platform-admin', {
                 body: { email, password }
               }),
               new Promise((_, reject) => setTimeout(() => reject(new Error('Seeding timed out')), 10000))
             ]) as { data: any, error: any };
-            
+
             const { data, error: seedError } = seedResult;
-  
+
             if (seedError) {
               console.error('Seeding error:', seedError);
-              // Fall back to guidance if seeding fails
               toast.error('Admin account not found. Use Setup to create it.');
             } else if (data?.success) {
               toast.success('Admin created. Signing you in...');
@@ -157,14 +153,13 @@ export default function Auth() {
             }
           } catch (e: any) {
             console.error('Seeding failed:', e);
-            // Edge function may not be deployed; guide the user
             toast.error('Setup required. Please run Platform Setup.');
           }
         } else if (error.message.includes('Email not confirmed')) {
           toast.error('Please verify your email address');
         } else if (error.message.includes('Failed to fetch')) {
-          toast.error('Connection Error', { 
-            description: 'Could not connect to the server. Please check your internet connection or VPN.' 
+          toast.error('Connection Error', {
+            description: 'Could not connect to the server. Please check your internet connection or VPN.'
           });
         } else {
           toast.error(error.message);
@@ -172,7 +167,7 @@ export default function Auth() {
         setLoading(false);
         return;
       }
-  
+
       toast.success('Welcome back!');
       navigate(from, { replace: true });
     } catch (err: any) {
@@ -195,91 +190,50 @@ export default function Auth() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {recoveryMode ? (
-            <form onSubmit={handleRecoverySubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="recovery-password">New Password</Label>
-                <Input
-                  id="recovery-password"
-                  type="password"
-                  autoComplete="new-password"
-                  placeholder="••••••••••••"
-                  value={recoveryPassword}
-                  onChange={(event) => setRecoveryPassword(event.target.value)}
-                  required
-                  disabled={loading}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="recovery-confirm-password">Confirm Password</Label>
-                <Input
-                  id="recovery-confirm-password"
-                  type="password"
-                  autoComplete="new-password"
-                  placeholder="••••••••••••"
-                  value={recoveryConfirmPassword}
-                  onChange={(event) => setRecoveryConfirmPassword(event.target.value)}
-                  required
-                  disabled={loading}
-                />
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Use 12+ characters including uppercase, lowercase, number, and symbol.
-              </p>
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Updating password...
-                  </>
-                ) : (
-                  'Update Password'
-                )}
-              </Button>
-            </form>
-          ) : (
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  data-testid="email-input"
-                  type="email"
-                  placeholder="admin@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  disabled={loading}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  data-testid="password-input"
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  disabled={loading}
-                />
-              </div>
-              <Button type="submit" className="w-full" disabled={loading} data-testid="login-btn">
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Signing in...
-                  </>
-                ) : (
-                  'Sign In'
-                )}
-              </Button>
-              <div className="pt-2 text-center text-sm text-muted-foreground">
-                First time setup? <a href="/setup-admin" className="text-primary underline">Create Platform Admin</a>
-              </div>
-            </form>
-          )}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                data-testid="email-input"
+                type="email"
+                placeholder="admin@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                disabled={loading}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                data-testid="password-input"
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                disabled={loading}
+              />
+            </div>
+            <Button type="submit" className="w-full" disabled={loading} data-testid="login-btn">
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Signing in...
+                </>
+              ) : (
+                'Sign In'
+              )}
+            </Button>
+            <div className="pt-2 text-center text-sm text-muted-foreground">
+              First time setup? <a href="/setup-admin" className="text-primary underline">Create Platform Admin</a>
+            </div>
+            <div className="text-center text-sm text-muted-foreground">
+              New customer? <a href="/register-organization" className="text-primary underline">Register organization</a>
+            </div>
+          </form>
         </CardContent>
       </Card>
     </div>

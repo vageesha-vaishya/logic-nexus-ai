@@ -86,7 +86,8 @@ export async function invokeAnonymous<T = any>(functionName: string, body: any):
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'apikey': supabasePublicKey
+                'apikey': supabasePublicKey,
+                'Authorization': `Bearer ${supabasePublicKey}`
             },
             body: JSON.stringify(enrichPayload(body)),
             signal: controller.signal

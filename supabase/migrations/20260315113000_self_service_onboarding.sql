@@ -62,12 +62,16 @@ BEGIN
     CHECK (billing_period IN ('monthly', 'annual'));
   END IF;
 END $$;
+
 CREATE INDEX IF NOT EXISTS idx_self_service_onboarding_requests_status
 ON public.self_service_onboarding_requests(status, created_at DESC);
+
 CREATE INDEX IF NOT EXISTS idx_self_service_onboarding_requests_admin_email
 ON public.self_service_onboarding_requests(admin_email);
+
 CREATE INDEX IF NOT EXISTS idx_self_service_onboarding_requests_verification_expires_at
 ON public.self_service_onboarding_requests(verification_expires_at);
+
 CREATE TABLE IF NOT EXISTS public.self_service_onboarding_rate_limits (
     id TEXT PRIMARY KEY,
     scope TEXT NOT NULL,
@@ -88,10 +92,13 @@ BEGIN
     CHECK (scope IN ('ip', 'email'));
   END IF;
 END $$;
+
 CREATE INDEX IF NOT EXISTS idx_self_service_onboarding_rate_limits_scope
 ON public.self_service_onboarding_rate_limits(scope, blocked_until);
+
 ALTER TABLE public.self_service_onboarding_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.self_service_onboarding_rate_limits ENABLE ROW LEVEL SECURITY;
+
 DROP POLICY IF EXISTS "Service role manages self service onboarding requests" ON public.self_service_onboarding_requests;
 CREATE POLICY "Service role manages self service onboarding requests"
 ON public.self_service_onboarding_requests
@@ -116,6 +123,8 @@ CREATE TRIGGER update_self_service_onboarding_rate_limits_updated_at
 BEFORE UPDATE ON public.self_service_onboarding_rate_limits
 FOR EACH ROW
 EXECUTE FUNCTION public.update_updated_at_column();
+
 GRANT SELECT, INSERT, UPDATE ON public.self_service_onboarding_requests TO service_role;
 GRANT SELECT, INSERT, UPDATE ON public.self_service_onboarding_rate_limits TO service_role;
+
 COMMIT;

@@ -2,22 +2,23 @@ import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { useState, useMemo, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
+import { useState, useEffect } from 'react';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
 import { CrudFormLayout } from '@/components/system/CrudFormLayout';
 import { FormSection } from '@/components/system/FormSection';
 import { FormStepper } from '@/components/system/FormStepper';
-
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DomainService, PlatformDomain } from '@/services/DomainService';
+import { useCRM } from '@/hooks/useCRM';
+import { invokeFunction } from '@/lib/supabase-functions';
+import { calculateScaledPrice } from '@/utils/subscriptionScaling';
+import { THEME_PRESETS } from '@/theme/themes';
 
 const tenantSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
@@ -45,6 +46,35 @@ const tenantSchema = z.object({
   channels_twitter: z.string().optional(),
   channels_linkedin: z.string().optional(),
   channels_facebook: z.string().optional(),
+  legal_name: z.string().optional(),
+  registered_address: z.string().optional(),
+  tax_id: z.string().optional(),
+  default_payment_terms: z.string().optional(),
+  tax_jurisdiction: z.string().optional(),
+  tax_registration_type: z.string().optional(),
+  gstin: z.string().optional(),
+  vat_number: z.string().optional(),
+  cin_or_registration_number: z.string().optional(),
+  kyc_status: z.string().optional(),
+  legal_emergency_contact_name: z.string().optional(),
+  legal_emergency_contact_phone: z.string().optional(),
+  data_residency_region: z.string().optional(),
+  data_residency_legal_basis: z.string().optional(),
+  data_residency_retention_policy: z.string().optional(),
+  data_residency_encryption_required: z.boolean().default(true),
+  support_preferred_channel: z.string().optional(),
+  support_escalation_level: z.string().optional(),
+  selected_plan_id: z.string().optional(),
+  selected_billing_period: z.string().optional(),
+  requested_user_count: z.string().optional(),
+  requested_franchise_count: z.string().optional(),
+  payment_provider: z.string().optional(),
+  verify_domain_immediately: z.boolean().default(true),
+  login_template_name: z.string().optional(),
+  personalization_target: z.string().optional(),
+  welcome_kit_email: z.string().email('Invalid email').optional().or(z.literal('')),
+  trigger_guided_tour: z.boolean().default(true),
+  auto_create_onboarding_checklist: z.boolean().default(true),
 });
 
 type TenantFormValues = z.infer<typeof tenantSchema>;
@@ -54,12 +84,666 @@ interface TenantFormProps {
   onSuccess?: () => void;
 }
 
+interface SubscriptionPlan {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string | null;
+  tier: string | null;
+  price_monthly: number;
+  price_annual: number | null;
+  currency: string;
+  billing_period: string;
+  is_active: boolean;
+  user_scaling_factor?: number | null;
+  min_users?: number | null;
+  max_users?: number | null;
+}
+
+interface ActiveSubscription {
+  id: string;
+  plan_id: string;
+  status: string;
+  metadata: any;
+}
+
+interface OnboardingPhase2Result {
+  integrated: boolean;
+  message: string | null;
+  paymentRequired?: boolean;
+  paymentVerified?: boolean;
+}
+
 export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { scopedDb, supabase } = useCRM();
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [pendingData, setPendingData] = useState<TenantFormValues | null>(null);
   const [domains, setDomains] = useState<PlatformDomain[]>([]);
+  const [tenantProfile, setTenantProfile] = useState<any>(null);
+  const [availablePlans, setAvailablePlans] = useState<SubscriptionPlan[]>([]);
+  const [activeSubscription, setActiveSubscription] = useState<ActiveSubscription | null>(null);
+
+  const parseRequestedCount = (value?: string) => {
+    const parsed = Number.parseInt(String(value || '').trim(), 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+  };
+
+  const mergeStepPayloads = (existing: any, next: any) => {
+    return {
+      ...(existing || {}),
+      ...(next || {}),
+      phase1: {
+        ...((existing || {}).phase1 || {}),
+        ...((next || {}).phase1 || {}),
+      },
+      phase2: {
+        ...((existing || {}).phase2 || {}),
+        ...((next || {}).phase2 || {}),
+      },
+      phase3: {
+        ...((existing || {}).phase3 || {}),
+        ...((next || {}).phase3 || {}),
+      },
+    };
+  };
+
+  const upsertOnboardingSession = async (
+    tenantId: string,
+    userId: string | null,
+    sessionPatch: {
+      status: string;
+      current_step: string;
+      completed_at?: string | null;
+      failure_reason?: string | null;
+      step_payloads?: any;
+    }
+  ) => {
+    const { data: existingSession } = await scopedDb
+      .from('tenant_onboarding_sessions')
+      .select('step_payloads')
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+
+    const mergedPayloads = mergeStepPayloads(existingSession?.step_payloads || {}, sessionPatch.step_payloads || {});
+
+    const { error } = await scopedDb
+      .from('tenant_onboarding_sessions')
+      .upsert(
+        {
+          tenant_id: tenantId,
+          status: sessionPatch.status,
+          current_step: sessionPatch.current_step,
+          started_by: userId,
+          step_payloads: mergedPayloads,
+          failure_reason: sessionPatch.failure_reason || null,
+          completed_at: sessionPatch.completed_at === undefined ? null : sessionPatch.completed_at,
+        },
+        { onConflict: 'tenant_id' }
+      );
+
+    if (error) throw error;
+  };
+
+  const applyPhase2PlanAndPayment = async ({
+    tenantId,
+    tenantName,
+    values,
+    userId,
+  }: {
+    tenantId: string;
+    tenantName: string;
+    values: TenantFormValues;
+    userId: string | null;
+  }): Promise<OnboardingPhase2Result> => {
+    const selectedPlanId = (values.selected_plan_id || '').trim();
+    if (!selectedPlanId) {
+      return { integrated: false, message: null, paymentRequired: false, paymentVerified: false };
+    }
+
+    const selectedPlan = availablePlans.find((p) => p.id === selectedPlanId);
+    if (!selectedPlan) {
+      throw new Error('Selected subscription plan is unavailable');
+    }
+
+    const billingPeriod = values.selected_billing_period === 'annual' ? 'annual' : 'monthly';
+    const paymentProvider = (values.payment_provider || 'mock').trim() || 'mock';
+    const requestedUserCount = parseRequestedCount(values.requested_user_count);
+    const requestedFranchiseCount = parseRequestedCount(values.requested_franchise_count);
+    const baseMonthly = Number(selectedPlan.price_monthly || 0);
+    const scalingResult = calculateScaledPrice(
+      {
+        price_monthly: baseMonthly,
+        user_scaling_factor: Number(selectedPlan.user_scaling_factor ?? 0),
+        min_users: Number(selectedPlan.min_users ?? 0),
+        max_users: selectedPlan.max_users ?? null,
+      },
+      requestedUserCount
+    );
+    const amountDue = Number((billingPeriod === 'annual' ? scalingResult.annual_price : scalingResult.monthly_price).toFixed(2));
+    const currency = (selectedPlan.currency || 'USD').toUpperCase();
+    const isFreePlan = (selectedPlan.tier || '').toLowerCase() === 'free' || amountDue <= 0;
+    const nowIso = new Date().toISOString();
+    const periodMs = billingPeriod === 'annual' ? 365 * 24 * 60 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000;
+    const periodEndIso = new Date(Date.now() + periodMs).toISOString();
+    const dueDateIso = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+    await scopedDb
+      .from('tenant_subscriptions')
+      .update({
+        status: 'canceled',
+        canceled_at: nowIso,
+      })
+      .eq('tenant_id', tenantId)
+      .eq('status', 'active');
+
+    const { data: createdSubscription, error: subscriptionError } = await scopedDb
+      .from('tenant_subscriptions')
+      .insert({
+        tenant_id: tenantId,
+        plan_id: selectedPlan.id,
+        status: isFreePlan ? 'active' : 'trial',
+        current_period_start: nowIso,
+        current_period_end: periodEndIso,
+        metadata: {
+          source: 'tenant_onboarding_phase2',
+          billing_period: billingPeriod,
+          payment_provider: paymentProvider,
+          payment_status: isFreePlan ? 'not_required' : 'pending',
+          requested_user_count: requestedUserCount,
+          requested_franchise_count: requestedFranchiseCount,
+          plan_slug: selectedPlan.slug,
+          plan_tier: selectedPlan.tier,
+        },
+      })
+      .select('id')
+      .single();
+
+    if (subscriptionError) throw subscriptionError;
+
+    const { error: invoiceError } = await scopedDb
+      .from('subscription_invoices')
+      .insert({
+        tenant_id: tenantId,
+        subscription_id: createdSubscription.id,
+        invoice_number: `ONB-${Date.now()}`,
+        amount_due: amountDue,
+        amount_paid: isFreePlan ? amountDue : 0,
+        currency,
+        status: isFreePlan ? 'paid' : 'open',
+        due_date: isFreePlan ? null : dueDateIso,
+        paid_at: isFreePlan ? nowIso : null,
+        billing_reason: 'onboarding_plan_selection',
+        metadata: {
+          onboarding_phase: 'phase2',
+          plan_id: selectedPlan.id,
+          plan_name: selectedPlan.name,
+          billing_period: billingPeriod,
+          requested_user_count: requestedUserCount,
+          requested_franchise_count: requestedFranchiseCount,
+          payment_provider: paymentProvider,
+        },
+      });
+    if (invoiceError) throw invoiceError;
+
+    const allowedTiers = ['free', 'basic', 'starter', 'business', 'professional', 'enterprise'];
+    const normalizedTier = (selectedPlan.tier || '').toLowerCase();
+    const derivedTier = allowedTiers.includes(normalizedTier) ? normalizedTier : null;
+    if (derivedTier) {
+      await scopedDb
+        .from('tenants')
+        .update({ subscription_tier: derivedTier })
+        .eq('id', tenantId);
+    }
+
+    if (isFreePlan) {
+      await upsertOnboardingSession(tenantId, userId, {
+        status: 'provisioning',
+        current_step: 'domain_provisioning',
+        step_payloads: {
+          phase2: {
+            plan_selected: true,
+            payment_required: false,
+            payment_verified: true,
+            subscription_id: createdSubscription.id,
+            plan_id: selectedPlan.id,
+            amount_due: amountDue,
+            currency,
+          },
+        },
+      });
+      return {
+        integrated: true,
+        message: 'Free plan activated. Onboarding moved to provisioning.',
+        paymentRequired: false,
+        paymentVerified: true,
+      };
+    }
+
+    const { data: orchestratorData, error: orchestratorError } = await invokeFunction<{
+      success: boolean;
+      payment_session_id?: string;
+      payment_url?: string;
+      provider_metadata?: any;
+      message?: string;
+    }>('tenant-onboarding-orchestrator', {
+      body: {
+        action: 'create_payment_session',
+        tenant_id: tenantId,
+        subscription_id: createdSubscription.id,
+        plan_id: selectedPlan.id,
+        amount_due: amountDue,
+        currency,
+        billing_period: billingPeriod,
+        payment_provider: paymentProvider,
+        requested_user_count: requestedUserCount,
+        requested_franchise_count: requestedFranchiseCount,
+      },
+    });
+
+    if (orchestratorError || !orchestratorData?.success) {
+      const reason = orchestratorError?.message || orchestratorData?.message || 'Payment session creation failed';
+      await upsertOnboardingSession(tenantId, userId, {
+        status: 'support_assisted',
+        current_step: 'payment',
+        failure_reason: reason,
+        step_payloads: {
+          phase2: {
+            plan_selected: true,
+            payment_required: true,
+            payment_verified: false,
+            payment_session_creation_failed: true,
+            subscription_id: createdSubscription.id,
+            plan_id: selectedPlan.id,
+            amount_due: amountDue,
+            currency,
+          },
+        },
+      });
+      await scopedDb
+        .from('activities')
+        .insert({
+          activity_type: 'task',
+          status: 'open',
+          priority: 'high',
+          subject: 'Payment support required during tenant onboarding',
+          description: `Payment session creation failed for tenant ${tenantName}. Reason: ${reason}`,
+          tenant_id: tenantId,
+          franchise_id: null,
+          account_id: null,
+          contact_id: null,
+          lead_id: null,
+          created_by: userId,
+        } as any);
+      return {
+        integrated: true,
+        message: 'Plan saved but payment setup needs support assistance.',
+        paymentRequired: true,
+        paymentVerified: false,
+      };
+    }
+
+    const paymentSessionId = orchestratorData.payment_session_id || null;
+    const paymentUrl = orchestratorData.payment_url || null;
+    const providerMetadata = orchestratorData.provider_metadata || null;
+
+    await scopedDb
+      .from('tenant_subscriptions')
+      .update({
+        metadata: {
+          source: 'tenant_onboarding_phase2',
+          billing_period: billingPeriod,
+          payment_provider: paymentProvider,
+          payment_status: 'pending',
+          requested_user_count: requestedUserCount,
+          requested_franchise_count: requestedFranchiseCount,
+          payment_session_id: paymentSessionId,
+          payment_url: paymentUrl,
+          provider_metadata: providerMetadata,
+          plan_slug: selectedPlan.slug,
+          plan_tier: selectedPlan.tier,
+        },
+      })
+      .eq('id', createdSubscription.id);
+
+    await upsertOnboardingSession(tenantId, userId, {
+      status: 'payment_pending',
+      current_step: 'payment',
+      step_payloads: {
+        phase2: {
+          plan_selected: true,
+          payment_required: true,
+          payment_verified: false,
+          subscription_id: createdSubscription.id,
+          plan_id: selectedPlan.id,
+          amount_due: amountDue,
+          currency,
+          payment_session_id: paymentSessionId,
+          payment_url: paymentUrl,
+        },
+      },
+    });
+
+    return {
+      integrated: true,
+      message: paymentUrl
+        ? `Payment session created. Complete payment using: ${paymentUrl}`
+        : 'Payment session created and awaiting completion.',
+      paymentRequired: true,
+      paymentVerified: false,
+    };
+  };
+
+  const applyPhase3DomainPersonalizationWelcome = async ({
+    tenantId,
+    tenantName,
+    values,
+    userId,
+    phase2Result,
+  }: {
+    tenantId: string;
+    tenantName: string;
+    values: TenantFormValues;
+    userId: string | null;
+    phase2Result: OnboardingPhase2Result;
+  }) => {
+    const domainName = (values.domain || '').trim().toLowerCase();
+    const shouldVerifyDomain = values.verify_domain_immediately ?? true;
+    const selectedTemplateName = (values.login_template_name || '').trim();
+    const personalizationTarget = values.personalization_target === 'franchise' ? 'franchise' : 'tenant';
+    const welcomeKitEmail = (values.welcome_kit_email || values.contact_primary_email || '').trim();
+    const shouldStartGuidedTour = values.trigger_guided_tour ?? true;
+    const shouldCreateChecklist = values.auto_create_onboarding_checklist ?? true;
+
+    if (phase2Result.paymentRequired && !phase2Result.paymentVerified) {
+      await upsertOnboardingSession(tenantId, userId, {
+        status: 'payment_pending',
+        current_step: 'payment',
+        step_payloads: {
+          phase3: {
+            queued_after_payment: true,
+            domain_name: domainName || null,
+            template_name: selectedTemplateName || null,
+            personalization_target: personalizationTarget,
+            welcome_kit_email: welcomeKitEmail || null,
+            guided_tour_enabled: shouldStartGuidedTour,
+            checklist_requested: shouldCreateChecklist,
+          },
+        },
+      });
+      return {
+        integrated: false,
+        message: 'Phase 3 preferences saved and queued until payment is verified.',
+      };
+    }
+
+    let domainProvisioningRequested = false;
+    let domainVerified = false;
+    let domainRecordId: string | null = null;
+    let domainFailureReason: string | null = null;
+
+    if (domainName) {
+      domainProvisioningRequested = true;
+      try {
+        const { data: existingDomain, error: existingDomainError } = await scopedDb
+          .from('tenant_domains')
+          .select('id, domain_name, is_verified')
+          .eq('tenant_id', tenantId)
+          .eq('domain_name', domainName)
+          .maybeSingle();
+        if (existingDomainError) throw existingDomainError;
+
+        if (existingDomain?.id) {
+          domainRecordId = existingDomain.id;
+          domainVerified = Boolean(existingDomain.is_verified);
+        } else {
+          const { data: registerData, error: registerError } = await invokeFunction<any>('domains-register', {
+            body: { domain_name: domainName, tenant_id: tenantId },
+          });
+          if (registerError) throw registerError;
+          if (registerData?.error) throw new Error(registerData.error);
+          domainRecordId = registerData?.domain?.id || null;
+          domainVerified = Boolean(registerData?.domain?.is_verified);
+        }
+
+        if (shouldVerifyDomain && domainRecordId) {
+          const { data: verifyData, error: verifyError } = await invokeFunction<any>('domains-verify', {
+            body: { domain_id: domainRecordId },
+          });
+          if (verifyError) throw verifyError;
+          if (verifyData?.error) throw new Error(verifyData.error);
+          domainVerified = Boolean(
+            verifyData?.results?.spf &&
+            verifyData?.results?.dmarc &&
+            verifyData?.results?.dkim
+          );
+        }
+      } catch (error: any) {
+        domainFailureReason = error?.message || 'Domain provisioning failed';
+      }
+    }
+
+    if (domainFailureReason) {
+      await upsertOnboardingSession(tenantId, userId, {
+        status: 'support_assisted',
+        current_step: 'domain_provisioning',
+        failure_reason: domainFailureReason,
+        step_payloads: {
+          phase3: {
+            domain_provisioning_requested: true,
+            domain_verified: false,
+            domain_name: domainName,
+            domain_id: domainRecordId,
+          },
+        },
+      });
+      await scopedDb
+        .from('activities')
+        .insert({
+          activity_type: 'task',
+          status: 'open',
+          priority: 'high',
+          subject: 'Domain provisioning support required during tenant onboarding',
+          description: `Domain provisioning failed for tenant ${tenantName}. Reason: ${domainFailureReason}`,
+          tenant_id: tenantId,
+          franchise_id: null,
+          account_id: null,
+          contact_id: null,
+          lead_id: null,
+          created_by: userId,
+        } as any);
+      return {
+        integrated: true,
+        message: 'Domain provisioning requires support assistance.',
+      };
+    }
+
+    let personalizationPublished = false;
+    if (selectedTemplateName) {
+      const selectedPreset = THEME_PRESETS.find((preset) => preset.name === selectedTemplateName);
+      if (!selectedPreset) {
+        throw new Error('Selected login template is unavailable');
+      }
+
+      const tokens = {
+        start: selectedPreset.start,
+        end: selectedPreset.end,
+        primary: selectedPreset.primary,
+        accent: selectedPreset.accent,
+        angle: selectedPreset.angle,
+        radius: selectedPreset.radius,
+        sidebarBackground: selectedPreset.sidebarBackground,
+        sidebarAccent: selectedPreset.sidebarAccent,
+        dark: selectedPreset.dark,
+        bgStart: selectedPreset.bgStart,
+        bgEnd: selectedPreset.bgEnd,
+        bgAngle: selectedPreset.bgAngle,
+        onboarding_target_scope: personalizationTarget,
+        preview_mode: true,
+        onboarding_phase: 'phase3',
+      };
+
+      await scopedDb
+        .from('ui_themes')
+        .update({ is_default: false })
+        .eq('scope', 'tenant')
+        .eq('tenant_id', tenantId);
+
+      await scopedDb
+        .from('ui_themes')
+        .delete()
+        .eq('scope', 'tenant')
+        .eq('tenant_id', tenantId)
+        .eq('name', selectedTemplateName);
+
+      const { error: themeInsertError } = await scopedDb
+        .from('ui_themes')
+        .insert({
+          name: selectedTemplateName,
+          scope: 'tenant',
+          tenant_id: tenantId,
+          franchise_id: null,
+          user_id: null,
+          is_active: true,
+          is_default: true,
+          tokens,
+        } as any);
+      if (themeInsertError) throw themeInsertError;
+      personalizationPublished = true;
+    }
+
+    if (shouldCreateChecklist) {
+      await scopedDb
+        .from('activities')
+        .insert([
+          {
+            activity_type: 'task',
+            status: 'open',
+            priority: 'medium',
+            subject: 'Welcome checklist: create first franchise',
+            description: `Create the first franchise for tenant ${tenantName} to complete activation.`,
+            tenant_id: tenantId,
+            franchise_id: null,
+            account_id: null,
+            contact_id: null,
+            lead_id: null,
+            created_by: userId,
+          },
+          {
+            activity_type: 'task',
+            status: 'open',
+            priority: 'medium',
+            subject: 'Welcome checklist: invite users',
+            description: `Invite users and assign roles for tenant ${tenantName}.`,
+            tenant_id: tenantId,
+            franchise_id: null,
+            account_id: null,
+            contact_id: null,
+            lead_id: null,
+            created_by: userId,
+          },
+          {
+            activity_type: 'task',
+            status: 'open',
+            priority: 'medium',
+            subject: 'Welcome checklist: connect communication channels',
+            description: `Configure email, WhatsApp, Telegram, X, phone, and webhook channels for tenant ${tenantName}.`,
+            tenant_id: tenantId,
+            franchise_id: null,
+            account_id: null,
+            contact_id: null,
+            lead_id: null,
+            created_by: userId,
+          },
+        ] as any);
+    }
+
+    await scopedDb
+      .from('activities')
+      .insert({
+        activity_type: 'note',
+        status: 'completed',
+        priority: 'low',
+        subject: 'Welcome kit initiated',
+        description: welcomeKitEmail
+          ? `Welcome kit initiated for ${tenantName}. Target email: ${welcomeKitEmail}. Guided tour ${shouldStartGuidedTour ? 'enabled' : 'disabled'}.`
+          : `Welcome kit initiated for ${tenantName}. Guided tour ${shouldStartGuidedTour ? 'enabled' : 'disabled'}.`,
+        tenant_id: tenantId,
+        franchise_id: null,
+        account_id: null,
+        contact_id: null,
+        lead_id: null,
+        created_by: userId,
+      } as any);
+
+    const { data: tenantSettingsRow } = await scopedDb
+      .from('tenants')
+      .select('settings')
+      .eq('id', tenantId)
+      .maybeSingle();
+    const currentSettings = (tenantSettingsRow?.settings || {}) as any;
+    const onboardingFlags = {
+      ...(currentSettings?.onboarding_flags || {}),
+      domain_provisioning_requested: domainProvisioningRequested,
+      domain_verified: domainVerified,
+      personalization_published: personalizationPublished,
+      welcome_kit_initiated: true,
+      guided_tour_enabled: shouldStartGuidedTour,
+      phase3_completed: (!domainName || !shouldVerifyDomain || domainVerified),
+    };
+    const nextSettings = {
+      ...currentSettings,
+      onboarding_flags: onboardingFlags,
+      personalization: {
+        ...(currentSettings?.personalization || {}),
+        template_name: selectedTemplateName || currentSettings?.personalization?.template_name || null,
+        target_scope: personalizationTarget,
+        preview_mode: true,
+      },
+      welcome_kit: {
+        ...(currentSettings?.welcome_kit || {}),
+        initiated: true,
+        email: welcomeKitEmail || currentSettings?.welcome_kit?.email || null,
+        guided_tour_enabled: shouldStartGuidedTour,
+        checklist_created: shouldCreateChecklist,
+      },
+    };
+    await scopedDb
+      .from('tenants')
+      .update({ settings: nextSettings })
+      .eq('id', tenantId);
+
+    const phase3Complete = !domainName || !shouldVerifyDomain || domainVerified;
+    await upsertOnboardingSession(tenantId, userId, {
+      status: phase3Complete ? 'active' : 'provisioning',
+      current_step: phase3Complete ? 'welcome_kit' : 'domain_provisioning',
+      completed_at: phase3Complete ? new Date().toISOString() : null,
+      step_payloads: {
+        phase3: {
+          domain_provisioning_requested: domainProvisioningRequested,
+          domain_verified: domainVerified,
+          domain_name: domainName || null,
+          domain_id: domainRecordId,
+          template_name: selectedTemplateName || null,
+          personalization_target: personalizationTarget,
+          personalization_published: personalizationPublished,
+          welcome_kit_initiated: true,
+          welcome_kit_email: welcomeKitEmail || null,
+          guided_tour_enabled: shouldStartGuidedTour,
+          checklist_created: shouldCreateChecklist,
+          phase3_completed: phase3Complete,
+        },
+      },
+    });
+
+    return {
+      integrated: true,
+      message: phase3Complete
+        ? 'Domain, personalization, and welcome kit completed.'
+        : 'Domain setup is pending verification. Personalization and welcome kit are initiated.',
+    };
+  };
 
   useEffect(() => {
     if (!DomainService) {
@@ -82,7 +766,87 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
           variant: 'destructive' 
         });
       });
-  }, []);
+  }, [toast]);
+
+  useEffect(() => {
+    const loadTenantProfile = async () => {
+      if (!tenant?.id) return;
+
+      try {
+        const { data, error } = await scopedDb
+          .from('tenant_profile')
+          .select('*')
+          .eq('tenant_id', tenant.id)
+          .maybeSingle();
+
+        if (error) throw error;
+        if (data) setTenantProfile(data);
+      } catch (error: any) {
+        toast({
+          title: 'Error',
+          description: error?.message || 'Failed to load tenant profile',
+          variant: 'destructive',
+        });
+      }
+    };
+
+    loadTenantProfile();
+  }, [tenant?.id, scopedDb, toast]);
+
+  useEffect(() => {
+    const loadPlans = async () => {
+      try {
+        const { data, error } = await scopedDb
+          .from('subscription_plans', true)
+          .select('id, name, slug, description, tier, price_monthly, price_annual, currency, billing_period, is_active, user_scaling_factor, min_users, max_users')
+          .eq('is_active', true)
+          .eq('plan_type', 'crm_base')
+          .order('price_monthly');
+        if (error) throw error;
+        setAvailablePlans((data || []) as SubscriptionPlan[]);
+      } catch (error: any) {
+        toast({
+          title: 'Error',
+          description: error?.message || 'Failed to load subscription plans',
+          variant: 'destructive',
+        });
+      }
+    };
+    loadPlans();
+  }, [scopedDb, toast]);
+
+  useEffect(() => {
+    const loadActiveSubscription = async () => {
+      if (!tenant?.id) return;
+      try {
+        const { data, error } = await scopedDb
+          .from('tenant_subscriptions')
+          .select('id, plan_id, status, metadata')
+          .eq('tenant_id', tenant.id)
+          .eq('status', 'active')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (error) throw error;
+        if (data) {
+          const normalized = data as ActiveSubscription;
+          setActiveSubscription(normalized);
+          form.setValue('selected_plan_id', normalized.plan_id || '');
+          form.setValue('selected_billing_period', String((normalized.metadata as any)?.billing_period || 'monthly'));
+          form.setValue('payment_provider', String((normalized.metadata as any)?.payment_provider || 'mock'));
+          form.setValue('requested_user_count', String((normalized.metadata as any)?.requested_user_count || ''));
+          form.setValue('requested_franchise_count', String((normalized.metadata as any)?.requested_franchise_count || ''));
+        }
+      } catch (error: any) {
+        toast({
+          title: 'Error',
+          description: error?.message || 'Failed to load active subscription',
+          variant: 'destructive',
+        });
+      }
+    };
+    loadActiveSubscription();
+  }, [tenant?.id, scopedDb, toast]);
 
   const form = useForm<TenantFormValues>({
     resolver: zodResolver(tenantSchema),
@@ -112,8 +876,76 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
       channels_twitter: tenant?.settings?.channels?.social?.twitter || '',
       channels_linkedin: tenant?.settings?.channels?.social?.linkedin || '',
       channels_facebook: tenant?.settings?.channels?.social?.facebook || '',
+      legal_name: '',
+      registered_address: '',
+      tax_id: '',
+      default_payment_terms: '',
+      tax_jurisdiction: '',
+      tax_registration_type: '',
+      gstin: '',
+      vat_number: '',
+      cin_or_registration_number: '',
+      kyc_status: '',
+      legal_emergency_contact_name: '',
+      legal_emergency_contact_phone: '',
+      data_residency_region: tenant?.settings?.data_residency?.region || '',
+      data_residency_legal_basis: tenant?.settings?.data_residency?.legal_basis || '',
+      data_residency_retention_policy: tenant?.settings?.data_residency?.retention_policy || '',
+      data_residency_encryption_required: tenant?.settings?.data_residency?.encryption_required ?? true,
+      support_preferred_channel: tenant?.settings?.support?.preferred_channel || '',
+      support_escalation_level: tenant?.settings?.support?.escalation_level || '',
+      selected_plan_id: '',
+      selected_billing_period: 'monthly',
+      requested_user_count: '',
+      requested_franchise_count: '',
+      payment_provider: 'mock',
+      verify_domain_immediately: true,
+      login_template_name: 'Default Simple',
+      personalization_target: 'tenant',
+      welcome_kit_email: tenant?.settings?.contacts?.primary?.email || '',
+      trigger_guided_tour: true,
+      auto_create_onboarding_checklist: true,
     },
   });
+
+  const selectedPlanId = form.watch('selected_plan_id');
+  const selectedBillingPeriod = form.watch('selected_billing_period') || 'monthly';
+  const requestedUserCount = parseRequestedCount(form.watch('requested_user_count'));
+  const selectedPlanForPreview = availablePlans.find((p) => p.id === selectedPlanId);
+  const planPricingPreview = selectedPlanForPreview
+    ? (() => {
+        const scaled = calculateScaledPrice(
+          {
+            price_monthly: Number(selectedPlanForPreview.price_monthly || 0),
+            user_scaling_factor: Number(selectedPlanForPreview.user_scaling_factor ?? 0),
+            min_users: Number(selectedPlanForPreview.min_users ?? 0),
+            max_users: selectedPlanForPreview.max_users ?? null,
+          },
+          requestedUserCount
+        );
+        return selectedBillingPeriod === 'annual' ? scaled.annual_price : scaled.monthly_price;
+      })()
+    : null;
+
+  useEffect(() => {
+    if (!tenantProfile) return;
+
+    form.reset({
+      ...form.getValues(),
+      legal_name: tenantProfile.legal_name || '',
+      registered_address: tenantProfile.registered_address || '',
+      tax_id: tenantProfile.tax_id || '',
+      default_payment_terms: tenantProfile.default_payment_terms || '',
+      tax_jurisdiction: tenantProfile.tax_jurisdiction || '',
+      tax_registration_type: tenantProfile.tax_registration_type || '',
+      gstin: tenantProfile.gstin || '',
+      vat_number: tenantProfile.vat_number || '',
+      cin_or_registration_number: tenantProfile.cin_or_registration_number || '',
+      kyc_status: tenantProfile.kyc_status || '',
+      legal_emergency_contact_name: tenantProfile.emergency_contact_info?.name || '',
+      legal_emergency_contact_phone: tenantProfile.emergency_contact_info?.phone || '',
+    });
+  }, [tenantProfile, form]);
 
   const handleFormSubmit = (values: TenantFormValues) => {
     setPendingData(values);
@@ -130,6 +962,8 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
 
   const onSubmit = async (values: TenantFormValues) => {
     try {
+      const userResponse = await supabase.auth.getUser();
+      const userId = userResponse?.data?.user?.id || null;
       const existingSettings = (() => {
         try {
           return values.settings ? JSON.parse(values.settings) : (tenant?.settings || {});
@@ -173,7 +1007,39 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
             facebook: values.channels_facebook || existingSettings?.channels?.social?.facebook || '',
           },
         },
+        data_residency: {
+          region: values.data_residency_region || existingSettings?.data_residency?.region || '',
+          legal_basis: values.data_residency_legal_basis || existingSettings?.data_residency?.legal_basis || '',
+          retention_policy: values.data_residency_retention_policy || existingSettings?.data_residency?.retention_policy || '',
+          encryption_required: values.data_residency_encryption_required ?? existingSettings?.data_residency?.encryption_required ?? true,
+        },
+        support: {
+          preferred_channel: values.support_preferred_channel || existingSettings?.support?.preferred_channel || '',
+          escalation_level: values.support_escalation_level || existingSettings?.support?.escalation_level || '',
+        },
       };
+
+      const legalProfileComplete = Boolean(
+        (values.legal_name || '').trim() &&
+        (values.registered_address || '').trim() &&
+        (values.default_payment_terms || '').trim()
+      );
+      const dataResidencyComplete = Boolean((values.data_residency_region || '').trim());
+      const phase1Complete = legalProfileComplete && dataResidencyComplete;
+
+      const onboardingStatus = phase1Complete ? 'submitted' : 'draft';
+      const onboardingStep = phase1Complete ? 'plan_selection' : 'identity_legal';
+
+      const onboardingFlags = {
+        ...(nextSettings?.onboarding_flags || {}),
+        identity_profile_completed: legalProfileComplete,
+        data_residency_completed: dataResidencyComplete,
+        phase1_completed: phase1Complete,
+      };
+
+      const dataResidencySettings = nextSettings?.data_residency || {};
+      const supportSettings = nextSettings?.support || {};
+
       const data = {
         name: values.name,
         slug: values.slug,
@@ -181,57 +1047,185 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
         domain: values.domain || null,
         logo_url: values.logo_url || null,
         is_active: values.is_active,
-        settings: nextSettings,
+        settings: {
+          ...nextSettings,
+          data_residency: dataResidencySettings,
+          support: supportSettings,
+          onboarding_flags: onboardingFlags,
+        },
+      };
+
+      const profileData = {
+        legal_name: values.legal_name || null,
+        registered_address: values.registered_address || null,
+        tax_id: values.tax_id || null,
+        default_payment_terms: values.default_payment_terms || null,
+        emergency_contact_info: {
+          name: values.legal_emergency_contact_name || '',
+          phone: values.legal_emergency_contact_phone || '',
+        },
+        tax_jurisdiction: values.tax_jurisdiction || null,
+        tax_registration_type: values.tax_registration_type || null,
+        gstin: values.gstin || null,
+        vat_number: values.vat_number || null,
+        cin_or_registration_number: values.cin_or_registration_number || null,
+        kyc_status: values.kyc_status || null,
       };
 
       if (tenant) {
-        const { error } = await supabase
+        const { error } = await scopedDb
           .from('tenants')
           .update(data)
           .eq('id', tenant.id);
 
         if (error) throw error;
 
-        try {
-          const user = await supabase.auth.getUser();
-          const userId = user?.data?.user?.id || null;
-          const { error: actErr } = await supabase
-            .from('activities')
-            .insert({
-              activity_type: 'note',
-              status: 'completed',
-              priority: 'low',
-              subject: 'Tenant settings updated',
-              description: `Settings updated for tenant ${data.name}`,
+        const { error: profileError } = await scopedDb
+          .from('tenant_profile')
+          .upsert(
+            {
               tenant_id: tenant.id,
-              franchise_id: null,
-              account_id: null,
-              contact_id: null,
-              lead_id: null,
-              created_by: userId,
-            } as any);
-          if (actErr) {
-            // ignore audit failure to not block update
-          }
-        } catch {
-          // ignore audit exceptions
+              ...profileData,
+            },
+            { onConflict: 'tenant_id' }
+          );
+        if (profileError) throw profileError;
+
+        const { error: sessionError } = await scopedDb
+          .from('tenant_onboarding_sessions')
+          .upsert(
+            {
+              tenant_id: tenant.id,
+              status: onboardingStatus,
+              current_step: onboardingStep,
+              started_by: userId,
+              step_payloads: {
+                phase1: {
+                  legal_profile_completed: legalProfileComplete,
+                  data_residency_completed: dataResidencyComplete,
+                },
+              },
+              completed_at: phase1Complete ? new Date().toISOString() : null,
+            },
+            { onConflict: 'tenant_id' }
+          );
+        if (sessionError) throw sessionError;
+
+        const phase2Result = await applyPhase2PlanAndPayment({
+          tenantId: tenant.id,
+          tenantName: data.name,
+          values,
+          userId,
+        });
+        const phase3Result = await applyPhase3DomainPersonalizationWelcome({
+          tenantId: tenant.id,
+          tenantName: data.name,
+          values,
+          userId,
+          phase2Result,
+        });
+
+        const { error: actErr } = await scopedDb
+          .from('activities')
+          .insert({
+            activity_type: 'note',
+            status: 'completed',
+            priority: 'low',
+            subject: 'Tenant onboarding phase 1 updated',
+            description: `Core onboarding data updated for tenant ${data.name}`,
+            tenant_id: tenant.id,
+            franchise_id: null,
+            account_id: null,
+            contact_id: null,
+            lead_id: null,
+            created_by: userId,
+          } as any);
+        if (actErr) {
+          console.warn('Activity logging failed:', actErr.message);
         }
 
         toast({
           title: 'Success',
-          description: 'Tenant updated successfully',
+          description: [phase2Result.message, phase3Result.message].filter(Boolean).join(' ') || 'Tenant updated successfully',
         });
         onSuccess?.();
       } else {
-        const { error } = await supabase
+        const { data: createdTenant, error } = await scopedDb
           .from('tenants')
-          .insert([data]);
+          .insert(data)
+          .select('id, name')
+          .single();
 
         if (error) throw error;
+        if (!createdTenant?.id) throw new Error('Tenant creation succeeded but tenant id is missing');
+
+        const { error: profileError } = await scopedDb
+          .from('tenant_profile')
+          .upsert(
+            {
+              tenant_id: createdTenant.id,
+              ...profileData,
+            },
+            { onConflict: 'tenant_id' }
+          );
+        if (profileError) throw profileError;
+
+        const { error: sessionError } = await scopedDb
+          .from('tenant_onboarding_sessions')
+          .upsert(
+            {
+              tenant_id: createdTenant.id,
+              status: onboardingStatus,
+              current_step: onboardingStep,
+              started_by: userId,
+              step_payloads: {
+                phase1: {
+                  legal_profile_completed: legalProfileComplete,
+                  data_residency_completed: dataResidencyComplete,
+                },
+              },
+              completed_at: phase1Complete ? new Date().toISOString() : null,
+            },
+            { onConflict: 'tenant_id' }
+          );
+        if (sessionError) throw sessionError;
+
+        const phase2Result = await applyPhase2PlanAndPayment({
+          tenantId: createdTenant.id,
+          tenantName: createdTenant.name,
+          values,
+          userId,
+        });
+        const phase3Result = await applyPhase3DomainPersonalizationWelcome({
+          tenantId: createdTenant.id,
+          tenantName: createdTenant.name,
+          values,
+          userId,
+          phase2Result,
+        });
+
+        const { error: actErr } = await scopedDb
+          .from('activities')
+          .insert({
+            activity_type: 'note',
+            status: 'completed',
+            priority: 'low',
+            subject: 'Tenant onboarding phase 1 created',
+            description: `Core onboarding data created for tenant ${createdTenant.name}`,
+            tenant_id: createdTenant.id,
+            franchise_id: null,
+            account_id: null,
+            contact_id: null,
+            lead_id: null,
+            created_by: userId,
+          } as any);
+        if (actErr) {
+          console.warn('Activity logging failed:', actErr.message);
+        }
 
         toast({
           title: 'Success',
-          description: 'Tenant created successfully',
+          description: [phase2Result.message, phase3Result.message].filter(Boolean).join(' ') || 'Tenant created successfully',
         });
         navigate('/dashboard/tenants');
       }
@@ -249,13 +1243,17 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
       <Form {...form}>
         <CrudFormLayout
           title={tenant ? 'Edit Tenant' : 'New Tenant'}
-          description="Organization profile, contacts, channels, and settings"
+          description="Organization profile, legal identity, residency controls, contacts, channels, and settings"
           onCancel={() => navigate('/dashboard/tenants')}
           onSave={() => form.handleSubmit(handleFormSubmit)()}
         >
           <FormStepper
             steps={[
               { id: 'details', label: 'Details' },
+              { id: 'legal-tax', label: 'Legal & Tax' },
+              { id: 'residency', label: 'Data Residency' },
+              { id: 'plan-payment', label: 'Plan & Payment' },
+              { id: 'domain-personalization-welcome', label: 'Domain + Personalization + Welcome' },
               { id: 'demographics', label: 'Demographics' },
               { id: 'contacts', label: 'Contacts' },
               { id: 'channels', label: 'Channels' },
@@ -346,6 +1344,445 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
           )}
         />
 
+        <FormSection title="Legal & Tax Identity">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField control={form.control} name="legal_name" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Legal Name</FormLabel>
+                <FormControl><Input placeholder="Acme Corporation Private Limited" {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="default_payment_terms" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Default Payment Terms</FormLabel>
+                <FormControl><Input placeholder="Net 30" {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField control={form.control} name="tax_id" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Tax ID</FormLabel>
+                <FormControl><Input placeholder="Tax registration identifier" {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="tax_jurisdiction" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Tax Jurisdiction</FormLabel>
+                <FormControl><Input placeholder="India / EU / US / Other" {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField control={form.control} name="tax_registration_type" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Tax Registration Type</FormLabel>
+                <FormControl><Input placeholder="GST / VAT / EIN" {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="kyc_status" render={({ field }) => (
+              <FormItem>
+                <FormLabel>KYC Status</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value || ''}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select KYC status" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="in_review">In Review</SelectItem>
+                    <SelectItem value="verified">Verified</SelectItem>
+                    <SelectItem value="rejected">Rejected</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )} />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <FormField control={form.control} name="gstin" render={({ field }) => (
+              <FormItem>
+                <FormLabel>GSTIN</FormLabel>
+                <FormControl><Input placeholder="India GSTIN" {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="vat_number" render={({ field }) => (
+              <FormItem>
+                <FormLabel>VAT Number</FormLabel>
+                <FormControl><Input placeholder="EU / International VAT Number" {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="cin_or_registration_number" render={({ field }) => (
+              <FormItem>
+                <FormLabel>CIN / Registration Number</FormLabel>
+                <FormControl><Input placeholder="Company registration number" {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+          </div>
+          <FormField control={form.control} name="registered_address" render={({ field }) => (
+            <FormItem>
+              <FormLabel>Registered Address</FormLabel>
+              <FormControl>
+                <Textarea placeholder="Registered legal address" rows={3} {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )} />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField control={form.control} name="legal_emergency_contact_name" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Compliance Emergency Contact Name</FormLabel>
+                <FormControl><Input placeholder="Full name" {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="legal_emergency_contact_phone" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Compliance Emergency Contact Phone</FormLabel>
+                <FormControl><Input placeholder="+1 555-0000" {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+          </div>
+        </FormSection>
+        <Separator />
+        <FormSection title="Data Residency and Support">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <FormField control={form.control} name="data_residency_region" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Data Residency Region</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value || ''}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select region" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="india">India</SelectItem>
+                    <SelectItem value="eu">EU</SelectItem>
+                    <SelectItem value="us">US</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="data_residency_legal_basis" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Legal Basis</FormLabel>
+                <FormControl><Input placeholder="Contract / Consent / Legitimate interest" {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="data_residency_retention_policy" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Retention Policy</FormLabel>
+                <FormControl><Input placeholder="e.g., 7 years" {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField control={form.control} name="support_preferred_channel" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Support Preferred Channel</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value || ''}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select support channel" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="email">Email</SelectItem>
+                    <SelectItem value="phone">Phone</SelectItem>
+                    <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                    <SelectItem value="portal">Portal</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="support_escalation_level" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Support Escalation Level</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value || ''}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select escalation level" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="standard">Standard</SelectItem>
+                    <SelectItem value="priority">Priority</SelectItem>
+                    <SelectItem value="critical">Critical</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )} />
+          </div>
+          <FormField
+            control={form.control}
+            name="data_residency_encryption_required"
+            render={({ field }) => (
+              <FormItem className="flex items-center justify-between rounded-lg border p-4">
+                <div className="space-y-0.5">
+                  <FormLabel>Encryption Required</FormLabel>
+                  <div className="text-sm text-muted-foreground">
+                    Require encrypted storage for tenant data
+                  </div>
+                </div>
+                <FormControl>
+                  <Switch checked={field.value} onCheckedChange={field.onChange} />
+                </FormControl>
+              </FormItem>
+            )}
+          />
+        </FormSection>
+        <Separator />
+        <FormSection title="Plan and Payment">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField
+              control={form.control}
+              name="selected_plan_id"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Subscription Plan</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value || ''}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a plan" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {availablePlans.map((plan) => (
+                        <SelectItem key={plan.id} value={plan.id}>
+                          {plan.name} ({(plan.currency || 'USD').toUpperCase()} {plan.price_monthly}/month)
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormDescription>Required to continue onboarding beyond Phase 1</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="selected_billing_period"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Billing Period</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value || 'monthly'}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select billing period" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="monthly">Monthly</SelectItem>
+                      <SelectItem value="annual">Annual</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <FormField
+              control={form.control}
+              name="requested_user_count"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Requested Users</FormLabel>
+                  <FormControl>
+                    <Input type="number" min="0" placeholder="e.g. 25" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="requested_franchise_count"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Requested Franchises</FormLabel>
+                  <FormControl>
+                    <Input type="number" min="0" placeholder="e.g. 5" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="payment_provider"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Payment Provider</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value || 'mock'}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select provider" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="mock">Mock Gateway</SelectItem>
+                      <SelectItem value="stripe">Stripe</SelectItem>
+                      <SelectItem value="razorpay">Razorpay</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+          {selectedPlanForPreview && (
+            <div className="rounded-lg border p-4 text-sm">
+              <div className="font-medium">{selectedPlanForPreview.name}</div>
+              <div className="text-muted-foreground">
+                {(selectedPlanForPreview.currency || 'USD').toUpperCase()} {Number(planPricingPreview || 0).toFixed(2)} /{selectedBillingPeriod === 'annual' ? 'year' : 'month'}
+              </div>
+              {selectedPlanForPreview.description && (
+                <div className="mt-2 text-muted-foreground">{selectedPlanForPreview.description}</div>
+              )}
+            </div>
+          )}
+          {activeSubscription && (
+            <div className="text-xs text-muted-foreground">
+              Existing active subscription detected and will be replaced after confirmation.
+            </div>
+          )}
+        </FormSection>
+        <Separator />
+        <FormSection title="Domain, Personalization, and Welcome">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField
+              control={form.control}
+              name="verify_domain_immediately"
+              render={({ field }) => (
+                <FormItem className="flex items-center justify-between rounded-lg border p-4">
+                  <div className="space-y-0.5">
+                    <FormLabel>Verify Domain Immediately</FormLabel>
+                    <div className="text-sm text-muted-foreground">
+                      Run provisioning verification as part of onboarding submission
+                    </div>
+                  </div>
+                  <FormControl>
+                    <Switch checked={field.value} onCheckedChange={field.onChange} />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="personalization_target"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Personalization Target</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value || 'tenant'}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select target scope" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="tenant">Tenant Login</SelectItem>
+                      <SelectItem value="franchise">Franchise Login</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+          <FormField
+            control={form.control}
+            name="login_template_name"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Login Template</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value || ''}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select template preset" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {THEME_PRESETS.map((preset) => (
+                      <SelectItem key={preset.name} value={preset.name}>
+                        {preset.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormDescription>Template is saved in preview mode and published to tenant scope.</FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField
+              control={form.control}
+              name="welcome_kit_email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Welcome Kit Email</FormLabel>
+                  <FormControl>
+                    <Input placeholder="admin@tenant.com" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="auto_create_onboarding_checklist"
+              render={({ field }) => (
+                <FormItem className="flex items-center justify-between rounded-lg border p-4">
+                  <div className="space-y-0.5">
+                    <FormLabel>Create Activation Checklist</FormLabel>
+                    <div className="text-sm text-muted-foreground">
+                      Auto-create onboarding checklist tasks for tenant admins
+                    </div>
+                  </div>
+                  <FormControl>
+                    <Switch checked={field.value} onCheckedChange={field.onChange} />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+          </div>
+          <FormField
+            control={form.control}
+            name="trigger_guided_tour"
+            render={({ field }) => (
+              <FormItem className="flex items-center justify-between rounded-lg border p-4">
+                <div className="space-y-0.5">
+                  <FormLabel>Enable Guided Tour</FormLabel>
+                  <div className="text-sm text-muted-foreground">
+                    Mark first-login guided tour as enabled in welcome kit settings
+                  </div>
+                </div>
+                <FormControl>
+                  <Switch checked={field.value} onCheckedChange={field.onChange} />
+                </FormControl>
+              </FormItem>
+            )}
+          />
+        </FormSection>
+        <Separator />
         <FormSection title="Demographics">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <FormField control={form.control} name="demographics_age_group" render={({ field }) => (

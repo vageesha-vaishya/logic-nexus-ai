@@ -46,13 +46,17 @@ BEGIN
     CHECK (drop_off_risk_score >= 0 AND drop_off_risk_score <= 100);
   END IF;
 END $$;
+
 CREATE INDEX IF NOT EXISTS idx_tenant_onboarding_sessions_support_status
 ON public.tenant_onboarding_sessions(support_status);
+
 CREATE INDEX IF NOT EXISTS idx_tenant_onboarding_sessions_sla_due_at
 ON public.tenant_onboarding_sessions(sla_due_at)
 WHERE support_status IN ('open', 'in_progress', 'escalated');
+
 CREATE INDEX IF NOT EXISTS idx_tenant_onboarding_sessions_assist_queue
 ON public.tenant_onboarding_sessions(status, support_status, support_priority, sla_due_at);
+
 CREATE OR REPLACE FUNCTION public.apply_onboarding_support_automation()
 RETURNS trigger
 LANGUAGE plpgsql

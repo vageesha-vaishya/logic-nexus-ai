@@ -24,6 +24,7 @@ import OAuthCallback from "./pages/OAuthCallback";
 import SetupAdmin from "./pages/SetupAdmin";
 import Unauthorized from "./pages/Unauthorized";
 import NotFound from "./pages/NotFound";
+import SelfServiceOnboarding from "./pages/SelfServiceOnboarding";
 
 // Lazy: all dashboard pages (loaded on navigation)
 const lazyWithRetry = <T extends { default: ComponentType<unknown> }>(
@@ -76,6 +77,7 @@ const OpportunityDetail = lazy(() => import("./pages/dashboard/OpportunityDetail
 const OpportunitiesPipeline = lazy(() => import("./pages/dashboard/OpportunitiesPipeline"));
 const LeadRouting = lazy(() => import("./pages/dashboard/LeadRouting"));
 const QueueManagement = lazy(() => import("./pages/dashboard/QueueManagement"));
+const OnboardingOperations = lazy(() => import("./pages/dashboard/OnboardingOperations"));
 const LeadAssignment = lazy(() => import("./pages/dashboard/LeadAssignment"));
 const EmailManagement = lazy(() => import("./pages/dashboard/EmailManagement"));
 const CommunicationsHub = lazy(() => import("./pages/dashboard/CommunicationsHub"));
@@ -212,6 +214,7 @@ const App = () => (
                         <Routes>
             <Route path="/" element={<Landing />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/register-organization" element={<SelfServiceOnboarding />} />
             <Route path="/oauth/callback" element={<OAuthCallback />} />
             <Route path="/setup-admin" element={<SetupAdmin />} />
             <Route path="/unauthorized" element={<Unauthorized />} />
@@ -604,6 +607,14 @@ const App = () => (
               element={
                 <ProtectedRoute requiredPermissions={["admin.lead_routing.manage"]}>
                   <QueueManagement />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/dashboard/onboarding-operations" 
+              element={
+                <ProtectedRoute requiredRole="platform_admin" requiredPermissions={["admin.settings.manage"]}>
+                  <OnboardingOperations />
                 </ProtectedRoute>
               } 
             />

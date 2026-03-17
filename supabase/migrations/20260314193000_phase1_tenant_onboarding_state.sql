@@ -19,15 +19,21 @@ CREATE TABLE IF NOT EXISTS public.tenant_onboarding_sessions (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     completed_at TIMESTAMPTZ
 );
+
 CREATE UNIQUE INDEX IF NOT EXISTS uq_tenant_onboarding_sessions_tenant_id
 ON public.tenant_onboarding_sessions(tenant_id);
+
 CREATE INDEX IF NOT EXISTS idx_tenant_onboarding_sessions_status
 ON public.tenant_onboarding_sessions(status);
+
 CREATE INDEX IF NOT EXISTS idx_tenant_onboarding_sessions_step
 ON public.tenant_onboarding_sessions(current_step);
+
 CREATE INDEX IF NOT EXISTS idx_tenant_onboarding_sessions_updated_at
 ON public.tenant_onboarding_sessions(updated_at DESC);
+
 ALTER TABLE public.tenant_onboarding_sessions ENABLE ROW LEVEL SECURITY;
+
 DROP POLICY IF EXISTS "Platform admins manage tenant profile" ON public.tenant_profile;
 CREATE POLICY "Platform admins manage tenant profile"
 ON public.tenant_profile
@@ -110,6 +116,8 @@ CREATE TRIGGER update_tenant_profile_updated_at
 BEFORE UPDATE ON public.tenant_profile
 FOR EACH ROW
 EXECUTE FUNCTION public.update_updated_at_column();
+
 GRANT SELECT, INSERT, UPDATE ON public.tenant_onboarding_sessions TO authenticated;
 GRANT SELECT ON public.tenant_onboarding_sessions TO service_role;
+
 COMMIT;

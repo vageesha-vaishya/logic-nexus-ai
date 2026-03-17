@@ -1,7 +1,9 @@
 BEGIN;
+
 ALTER TABLE public.self_service_onboarding_requests
   ADD COLUMN IF NOT EXISTS country_id UUID,
   ADD COLUMN IF NOT EXISTS currency_id UUID;
+
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -41,8 +43,11 @@ SET currency_id = currency_row.id
 FROM public.currencies currency_row
 WHERE request_row.currency_id IS NULL
   AND upper(trim(coalesce(request_row.currency, ''))) = upper(trim(coalesce(currency_row.code, '')));
+
 CREATE INDEX IF NOT EXISTS idx_self_service_onboarding_requests_country_id
 ON public.self_service_onboarding_requests(country_id);
+
 CREATE INDEX IF NOT EXISTS idx_self_service_onboarding_requests_currency_id
 ON public.self_service_onboarding_requests(currency_id);
+
 COMMIT;

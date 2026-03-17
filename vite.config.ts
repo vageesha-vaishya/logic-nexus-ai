@@ -44,6 +44,22 @@ export default defineConfig(({ mode }) => {
     host: "0.0.0.0",
     port: 8081,
     strictPort: true,
+    headers: {
+      "Content-Security-Policy": [
+        "default-src 'self'",
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com",
+        "style-src 'self' 'unsafe-inline'",
+        "img-src 'self' data: blob: https:",
+        "font-src 'self' data: https:",
+        "connect-src 'self' https: ws: wss:",
+        "frame-src 'self' https://challenges.cloudflare.com",
+        "worker-src 'self' blob:",
+        "base-uri 'self'",
+        "form-action 'self'",
+        "object-src 'none'",
+        "frame-ancestors 'none'"
+      ].join("; "),
+    },
     proxy: {
       '/functions/v1': {
         target: env.VITE_SUPABASE_URL || 'https://gzhxgoigflftharcmdqj.supabase.co',
@@ -57,15 +73,6 @@ export default defineConfig(({ mode }) => {
         },
       },
     },
-    // headers: {
-    //   "Permissions-Policy": [
-    //     "browsing-topics=()",
-    //     "run-ad-auction=()",
-    //     "join-ad-interest-group=()",
-    //     "private-state-token-redemption=()",
-    //     "private-state-token-issuance=()"
-    //   ].join(", "),
-    // },
   },
   plugins: [
     react(),

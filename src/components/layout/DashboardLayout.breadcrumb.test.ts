@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { APP_MENU } from '@/config/navigation';
 import { resolveActiveSurface, resolveBreadcrumbTrail } from './DashboardLayout';
 
@@ -59,5 +61,23 @@ describe('DashboardLayout breadcrumb resolution', () => {
     });
 
     expect(mismatches).toEqual([]);
+  });
+
+  it('restricts onboarding operations navigation to platform admins', () => {
+    const onboardingItem = APP_MENU.flatMap((module) => module.items).find(
+      (item) => item.path === '/dashboard/onboarding-operations'
+    );
+
+    expect(onboardingItem).toBeDefined();
+    expect(onboardingItem?.roles).toEqual(['platform_admin']);
+    expect(onboardingItem?.permissions).toContain('admin.settings.manage');
+  });
+
+  it('enforces platform admin role for onboarding operations route', () => {
+    const appFile = resolve(process.cwd(), 'src/App.tsx');
+    const appSource = readFileSync(appFile, 'utf8');
+    const routePattern = /path="\/dashboard\/onboarding-operations"[\s\S]*?ProtectedRoute requiredRole="platform_admin" requiredPermissions=\{\["admin\.settings\.manage"\]\}/;
+
+    expect(routePattern.test(appSource)).toBe(true);
   });
 });

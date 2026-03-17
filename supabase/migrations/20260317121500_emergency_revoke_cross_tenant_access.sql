@@ -22,7 +22,7 @@ BEGIN
 
     DELETE FROM public.user_roles
     WHERE user_id = v_user_id
-      AND role IN ('platform_admin', 'super_admin');
+      AND role = 'platform_admin';
 
     UPDATE public.user_preferences
     SET admin_override_enabled = false,
