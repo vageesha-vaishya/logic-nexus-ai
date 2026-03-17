@@ -1,5 +1,4 @@
 BEGIN;
-
 ALTER TABLE public.tenant_profile
 ADD COLUMN IF NOT EXISTS tax_jurisdiction TEXT,
 ADD COLUMN IF NOT EXISTS tax_registration_type TEXT,
@@ -7,7 +6,6 @@ ADD COLUMN IF NOT EXISTS gstin TEXT,
 ADD COLUMN IF NOT EXISTS vat_number TEXT,
 ADD COLUMN IF NOT EXISTS cin_or_registration_number TEXT,
 ADD COLUMN IF NOT EXISTS kyc_status TEXT;
-
 CREATE TABLE IF NOT EXISTS public.tenant_onboarding_sessions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
@@ -43,7 +41,6 @@ FOR ALL
 TO authenticated
 USING (public.is_platform_admin(auth.uid()))
 WITH CHECK (public.is_platform_admin(auth.uid()));
-
 DROP POLICY IF EXISTS "Tenant admins can insert their profile" ON public.tenant_profile;
 CREATE POLICY "Tenant admins can insert their profile"
 ON public.tenant_profile
@@ -53,7 +50,6 @@ WITH CHECK (
   public.has_role(auth.uid(), 'tenant_admin'::public.app_role)
   AND tenant_id = public.get_user_tenant_id(auth.uid())
 );
-
 DROP POLICY IF EXISTS "Tenant admins can update their profile" ON public.tenant_profile;
 CREATE POLICY "Tenant admins can update their profile"
 ON public.tenant_profile
@@ -67,7 +63,6 @@ WITH CHECK (
   public.has_role(auth.uid(), 'tenant_admin'::public.app_role)
   AND tenant_id = public.get_user_tenant_id(auth.uid())
 );
-
 DROP POLICY IF EXISTS "Tenant admins can view their profile" ON public.tenant_profile;
 CREATE POLICY "Tenant admins can view their profile"
 ON public.tenant_profile
@@ -77,7 +72,6 @@ USING (
   tenant_id = public.get_user_tenant_id(auth.uid())
   OR public.is_platform_admin(auth.uid())
 );
-
 DROP POLICY IF EXISTS "Platform admins manage tenant onboarding sessions" ON public.tenant_onboarding_sessions;
 CREATE POLICY "Platform admins manage tenant onboarding sessions"
 ON public.tenant_onboarding_sessions
@@ -85,7 +79,6 @@ FOR ALL
 TO authenticated
 USING (public.is_platform_admin(auth.uid()))
 WITH CHECK (public.is_platform_admin(auth.uid()));
-
 DROP POLICY IF EXISTS "Tenant admins view tenant onboarding sessions" ON public.tenant_onboarding_sessions;
 CREATE POLICY "Tenant admins view tenant onboarding sessions"
 ON public.tenant_onboarding_sessions
@@ -94,7 +87,6 @@ TO authenticated
 USING (
   tenant_id = public.get_user_tenant_id(auth.uid())
 );
-
 DROP POLICY IF EXISTS "Tenant admins insert tenant onboarding sessions" ON public.tenant_onboarding_sessions;
 CREATE POLICY "Tenant admins insert tenant onboarding sessions"
 ON public.tenant_onboarding_sessions
@@ -103,7 +95,6 @@ TO authenticated
 WITH CHECK (
   tenant_id = public.get_user_tenant_id(auth.uid())
 );
-
 DROP POLICY IF EXISTS "Tenant admins update tenant onboarding sessions" ON public.tenant_onboarding_sessions;
 CREATE POLICY "Tenant admins update tenant onboarding sessions"
 ON public.tenant_onboarding_sessions
@@ -115,13 +106,11 @@ USING (
 WITH CHECK (
   tenant_id = public.get_user_tenant_id(auth.uid())
 );
-
 DROP TRIGGER IF EXISTS update_tenant_onboarding_sessions_updated_at ON public.tenant_onboarding_sessions;
 CREATE TRIGGER update_tenant_onboarding_sessions_updated_at
 BEFORE UPDATE ON public.tenant_onboarding_sessions
 FOR EACH ROW
 EXECUTE FUNCTION public.update_updated_at_column();
-
 DROP TRIGGER IF EXISTS update_tenant_profile_updated_at ON public.tenant_profile;
 CREATE TRIGGER update_tenant_profile_updated_at
 BEFORE UPDATE ON public.tenant_profile

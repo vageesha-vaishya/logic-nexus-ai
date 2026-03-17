@@ -20,6 +20,9 @@ const loginSchema = z.object({
 export default function Auth() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [recoveryMode, setRecoveryMode] = useState(false);
+  const [recoveryPassword, setRecoveryPassword] = useState('');
+  const [recoveryConfirmPassword, setRecoveryConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const { signIn, user } = useAuth();
   const navigate = useNavigate();
@@ -32,6 +35,67 @@ export default function Auth() {
       navigate(from, { replace: true });
     }
   }, [user, navigate, from]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    const queryParams = new URLSearchParams(window.location.search);
+    const hashType = hashParams.get('type');
+    const queryType = queryParams.get('type');
+    if (hashType === 'recovery' || queryType === 'recovery') {
+      setRecoveryMode(true);
+    }
+
+    const { data: subscription } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setRecoveryMode(true);
+      }
+    });
+
+    return () => {
+      subscription.subscription.unsubscribe();
+    };
+  }, []);
+
+  const validateStrongPassword = (value: string) => {
+    if (value.length < 12) return false;
+    if (!/[a-z]/.test(value)) return false;
+    if (!/[A-Z]/.test(value)) return false;
+    if (!/[0-9]/.test(value)) return false;
+    if (!/[^A-Za-z0-9]/.test(value)) return false;
+    return true;
+  };
+
+  const handleRecoverySubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!validateStrongPassword(recoveryPassword)) {
+      toast.error('Password must be 12+ chars with upper, lower, number, and symbol.');
+      return;
+    }
+    if (recoveryPassword !== recoveryConfirmPassword) {
+      toast.error('Passwords do not match.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: recoveryPassword });
+      if (error) throw error;
+      toast.success('Password reset successful. Please sign in.');
+      setRecoveryMode(false);
+      setRecoveryPassword('');
+      setRecoveryConfirmPassword('');
+      if (typeof window !== 'undefined') {
+        const cleanPath = window.location.pathname;
+        window.history.replaceState({}, document.title, cleanPath);
+      }
+      await supabase.auth.signOut();
+    } catch (error: any) {
+      toast.error(error?.message || 'Unable to reset password.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -127,10 +191,11 @@ export default function Auth() {
           </div>
           <CardTitle className="text-2xl font-bold">SOS Logistic Pro Enterprise</CardTitle>
           <CardDescription>
-            Sign in to your account to continue
+            {recoveryMode ? 'Set a new password for your account' : 'Sign in to your account to continue'}
           </CardDescription>
         </CardHeader>
         <CardContent>
+<<<<<<< HEAD
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
@@ -175,6 +240,93 @@ export default function Auth() {
               New customer? <a href="/register-organization" className="text-primary underline">Register organization</a>
             </div>
           </form>
+=======
+          {recoveryMode ? (
+            <form onSubmit={handleRecoverySubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="recovery-password">New Password</Label>
+                <Input
+                  id="recovery-password"
+                  type="password"
+                  autoComplete="new-password"
+                  placeholder="••••••••••••"
+                  value={recoveryPassword}
+                  onChange={(event) => setRecoveryPassword(event.target.value)}
+                  required
+                  disabled={loading}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="recovery-confirm-password">Confirm Password</Label>
+                <Input
+                  id="recovery-confirm-password"
+                  type="password"
+                  autoComplete="new-password"
+                  placeholder="••••••••••••"
+                  value={recoveryConfirmPassword}
+                  onChange={(event) => setRecoveryConfirmPassword(event.target.value)}
+                  required
+                  disabled={loading}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Use 12+ characters including uppercase, lowercase, number, and symbol.
+              </p>
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Updating password...
+                  </>
+                ) : (
+                  'Update Password'
+                )}
+              </Button>
+            </form>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  data-testid="email-input"
+                  type="email"
+                  placeholder="admin@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  disabled={loading}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  data-testid="password-input"
+                  type="password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  disabled={loading}
+                />
+              </div>
+              <Button type="submit" className="w-full" disabled={loading} data-testid="login-btn">
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Signing in...
+                  </>
+                ) : (
+                  'Sign In'
+                )}
+              </Button>
+              <div className="pt-2 text-center text-sm text-muted-foreground">
+                First time setup? <a href="/setup-admin" className="text-primary underline">Create Platform Admin</a>
+              </div>
+            </form>
+          )}
+>>>>>>> origin/main
         </CardContent>
       </Card>
     </div>

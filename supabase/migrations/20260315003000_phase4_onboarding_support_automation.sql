@@ -1,5 +1,4 @@
 BEGIN;
-
 ALTER TABLE public.tenant_onboarding_sessions
 ADD COLUMN IF NOT EXISTS support_status TEXT NOT NULL DEFAULT 'not_required',
 ADD COLUMN IF NOT EXISTS support_priority TEXT NOT NULL DEFAULT 'medium',
@@ -11,7 +10,6 @@ ADD COLUMN IF NOT EXISTS last_escalated_at TIMESTAMPTZ,
 ADD COLUMN IF NOT EXISTS escalation_count INTEGER NOT NULL DEFAULT 0,
 ADD COLUMN IF NOT EXISTS drop_off_risk_score INTEGER NOT NULL DEFAULT 0,
 ADD COLUMN IF NOT EXISTS last_activity_at TIMESTAMPTZ NOT NULL DEFAULT now();
-
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -24,7 +22,6 @@ BEGIN
     CHECK (support_status IN ('not_required', 'open', 'in_progress', 'escalated', 'resolved'));
   END IF;
 END $$;
-
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -37,7 +34,6 @@ BEGIN
     CHECK (support_priority IN ('low', 'medium', 'high', 'critical'));
   END IF;
 END $$;
-
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -118,11 +114,9 @@ BEGIN
   RETURN NEW;
 END;
 $$;
-
 DROP TRIGGER IF EXISTS apply_onboarding_support_automation ON public.tenant_onboarding_sessions;
 CREATE TRIGGER apply_onboarding_support_automation
 BEFORE INSERT OR UPDATE ON public.tenant_onboarding_sessions
 FOR EACH ROW
 EXECUTE FUNCTION public.apply_onboarding_support_automation();
-
 COMMIT;

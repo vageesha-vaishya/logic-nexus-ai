@@ -16,7 +16,6 @@ BEGIN
       FOREIGN KEY (country_id) REFERENCES public.countries(id) ON DELETE RESTRICT;
   END IF;
 END $$;
-
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -29,19 +28,16 @@ BEGIN
       FOREIGN KEY (currency_id) REFERENCES public.currencies(id) ON DELETE RESTRICT;
   END IF;
 END $$;
-
 UPDATE public.self_service_onboarding_requests request_row
 SET country_id = country_row.id
 FROM public.countries country_row
 WHERE request_row.country_id IS NULL
   AND upper(trim(coalesce(request_row.country, ''))) = upper(trim(coalesce(country_row.code_iso2, '')));
-
 UPDATE public.self_service_onboarding_requests request_row
 SET country_id = country_row.id
 FROM public.countries country_row
 WHERE request_row.country_id IS NULL
   AND upper(trim(coalesce(request_row.country, ''))) = upper(trim(coalesce(country_row.name, '')));
-
 UPDATE public.self_service_onboarding_requests request_row
 SET currency_id = currency_row.id
 FROM public.currencies currency_row

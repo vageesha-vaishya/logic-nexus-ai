@@ -1,5 +1,4 @@
 BEGIN;
-
 CREATE TABLE IF NOT EXISTS public.self_service_onboarding_requests (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     status TEXT NOT NULL DEFAULT 'pending_verification',
@@ -33,7 +32,6 @@ CREATE TABLE IF NOT EXISTS public.self_service_onboarding_requests (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     completed_at TIMESTAMPTZ
 );
-
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -44,7 +42,6 @@ BEGIN
     CHECK (status IN ('pending_verification', 'email_verified', 'provisioning', 'completed', 'failed', 'expired'));
   END IF;
 END $$;
-
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -55,7 +52,6 @@ BEGIN
     CHECK (plan_tier IN ('free', 'professional', 'enterprise'));
   END IF;
 END $$;
-
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -86,7 +82,6 @@ CREATE TABLE IF NOT EXISTS public.self_service_onboarding_rate_limits (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -111,7 +106,6 @@ FOR ALL
 TO service_role
 USING (true)
 WITH CHECK (true);
-
 DROP POLICY IF EXISTS "Service role manages self service onboarding rate limits" ON public.self_service_onboarding_rate_limits;
 CREATE POLICY "Service role manages self service onboarding rate limits"
 ON public.self_service_onboarding_rate_limits
@@ -119,13 +113,11 @@ FOR ALL
 TO service_role
 USING (true)
 WITH CHECK (true);
-
 DROP TRIGGER IF EXISTS update_self_service_onboarding_requests_updated_at ON public.self_service_onboarding_requests;
 CREATE TRIGGER update_self_service_onboarding_requests_updated_at
 BEFORE UPDATE ON public.self_service_onboarding_requests
 FOR EACH ROW
 EXECUTE FUNCTION public.update_updated_at_column();
-
 DROP TRIGGER IF EXISTS update_self_service_onboarding_rate_limits_updated_at ON public.self_service_onboarding_rate_limits;
 CREATE TRIGGER update_self_service_onboarding_rate_limits_updated_at
 BEFORE UPDATE ON public.self_service_onboarding_rate_limits

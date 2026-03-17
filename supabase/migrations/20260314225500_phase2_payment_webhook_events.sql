@@ -1,5 +1,4 @@
 BEGIN;
-
 CREATE TABLE IF NOT EXISTS public.payment_webhook_events (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   provider TEXT NOT NULL,
@@ -25,7 +24,6 @@ ON public.payment_webhook_events
 FOR SELECT
 TO authenticated
 USING (public.is_platform_admin(auth.uid()));
-
 DROP POLICY IF EXISTS "Platform admins manage payment webhook events" ON public.payment_webhook_events;
 CREATE POLICY "Platform admins manage payment webhook events"
 ON public.payment_webhook_events
@@ -33,7 +31,6 @@ FOR ALL
 TO authenticated
 USING (public.is_platform_admin(auth.uid()))
 WITH CHECK (public.is_platform_admin(auth.uid()));
-
 DROP TRIGGER IF EXISTS update_payment_webhook_events_updated_at ON public.payment_webhook_events;
 CREATE TRIGGER update_payment_webhook_events_updated_at
 BEFORE UPDATE ON public.payment_webhook_events
