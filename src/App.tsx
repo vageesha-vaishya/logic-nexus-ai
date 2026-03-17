@@ -572,7 +572,7 @@ const App = () => (
             <Route 
               path="/dashboard/onboarding-operations" 
               element={
-                <ProtectedRoute requiredPermissions={["admin.settings.manage"]}>
+                <ProtectedRoute requiredRole="platform_admin" requiredPermissions={["admin.settings.manage"]}>
                   <OnboardingOperations />
                 </ProtectedRoute>
               } 

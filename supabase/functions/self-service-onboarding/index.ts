@@ -2,6 +2,7 @@
 /// <reference path="../types.d.ts" />
 import { serveWithLogger } from '../_shared/logger.ts'
 import { corsHeaders } from '../_shared/cors.ts'
+import { requireAuth } from '../_shared/auth.ts'
 import { z } from 'zod'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
@@ -63,6 +64,52 @@ const verifyEmailSchema = z.object({
     .regex(/[A-Z]/, 'Password must include at least one uppercase letter')
     .regex(/\d/, 'Password must include at least one number')
     .regex(/[^A-Za-z0-9]/, 'Password must include at least one special character')
+    .optional()
+})
+
+const adminListSchema = z.object({
+  action: z.literal('admin_list_requests'),
+  status: z.string().optional(),
+  search: z.string().optional(),
+  from_date: z.string().optional(),
+  to_date: z.string().optional(),
+  limit: z.number().int().min(1).max(200).optional()
+})
+
+const adminDetailSchema = z.object({
+  action: z.literal('admin_get_request_detail'),
+  request_id: z.string().uuid()
+})
+
+const adminTriggerVerificationSchema = z.object({
+  action: z.literal('admin_trigger_verification_email'),
+  request_id: z.string().uuid(),
+  comment: z.string().max(500).optional()
+})
+
+const adminConfirmEmailSchema = z.object({
+  action: z.literal('admin_confirm_email'),
+  request_id: z.string().uuid(),
+  comment: z.string().max(500).optional()
+})
+
+const adminApproveSchema = z.object({
+  action: z.literal('admin_approve_request'),
+  request_id: z.string().uuid(),
+  comment: z.string().max(1000).optional()
+})
+
+const adminRejectSchema = z.object({
+  action: z.literal('admin_reject_request'),
+  request_id: z.string().uuid(),
+  comment: z.string().min(3).max(1500)
+})
+
+const adminBulkSchema = z.object({
+  action: z.literal('admin_bulk_action'),
+  operation: z.enum(['approve', 'reject', 'trigger_verification_email', 'confirm_email']),
+  request_ids: z.array(z.string().uuid()).min(1).max(100),
+  comment: z.string().max(1500).optional()
 })
 
 const listDomainsSchema = z.object({
@@ -453,6 +500,296 @@ const getMatchingPlan = async (supabase: SupabaseClient, tier: 'free' | 'profess
   return data[0]
 }
 
+const generateStrongPassword = (): string => {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789'
+  const specials = '!@#$%^&*()-_=+[]{}'
+  const randomChunk = (len: number, chars: string) =>
+    Array.from(crypto.getRandomValues(new Uint32Array(len)))
+      .map((n) => chars[n % chars.length])
+      .join('')
+  return `${randomChunk(6, alphabet)}${randomChunk(2, specials)}${randomChunk(4, '0123456789')}${randomChunk(4, alphabet)}`
+}
+
+const normalizeRequestStatus = (rawStatus: string): string => {
+  if (rawStatus === 'provisioning') return 'in_progress'
+  return rawStatus
+}
+
+const getPlatformOwnerRecipients = async (supabase: SupabaseClient): Promise<string[]> => {
+  const { data: roleRows, error: roleError } = await supabase
+    .from('user_roles')
+    .select('user_id')
+    .eq('role', 'platform_admin')
+  if (roleError || !roleRows || roleRows.length === 0) return []
+
+  const userIds = roleRows.map((row: any) => row.user_id).filter(Boolean)
+  if (userIds.length === 0) return []
+
+  const { data: profileRows, error: profileError } = await supabase
+    .from('profiles')
+    .select('email')
+    .in('id', userIds)
+  if (profileError || !profileRows) return []
+
+  return Array.from(
+    new Set(
+      profileRows
+        .map((row: any) => sanitizeEmail(row.email || ''))
+        .filter((email) => email.length > 5 && email.includes('@'))
+    )
+  )
+}
+
+const sendEmailNotification = async (
+  supabase: SupabaseClient,
+  to: string[],
+  subject: string,
+  html: string
+) => {
+  if (!Array.isArray(to) || to.length === 0) return
+  const payload = {
+    to,
+    subject,
+    body: html,
+    provider: 'resend',
+    priority: 'high',
+    isVip: true
+  }
+  const { data, error } = await supabase.functions.invoke('send-email', { body: payload })
+  if (error) throw new Error(error.message || 'Unable to send notification email')
+  if (data?.success === false) throw new Error(data?.error || 'Unable to send notification email')
+}
+
+const logOnboardingAudit = async (
+  supabase: SupabaseClient,
+  userId: string,
+  requestId: string,
+  action: string,
+  details: Record<string, unknown>
+) => {
+  await supabase.from('audit_logs').insert({
+    user_id: userId,
+    action,
+    resource_type: 'self_service_onboarding_request',
+    resource_id: requestId,
+    details
+  })
+}
+
+type PlatformOwnerAuthResult =
+  | { authorized: true; userId: string }
+  | { authorized: false; response: Response }
+
+const requirePlatformOwner = async (req: Request, logger: any, supabase: SupabaseClient): Promise<PlatformOwnerAuthResult> => {
+  const auth = await requireAuth(req, logger)
+  if (auth.error || !auth.user) {
+    return {
+      authorized: false,
+      response: json(401, { success: false, error: 'Unauthorized' })
+    }
+  }
+
+  const { data: isAdmin, error: adminCheckError } = await supabase.rpc('is_platform_admin', {
+    check_user_id: auth.user.id
+  })
+  if (adminCheckError || !isAdmin) {
+    return {
+      authorized: false,
+      response: json(403, { success: false, error: 'Forbidden. Platform Owner role is required' })
+    }
+  }
+
+  return { authorized: true, userId: auth.user.id }
+}
+
+const performProvisioningForRequest = async (
+  supabase: SupabaseClient,
+  logger: any,
+  requestRow: any
+) => {
+  if (requestRow.tenant_id) {
+    const { data: existingTenant } = await supabase
+      .from('tenants')
+      .select('id')
+      .eq('id', requestRow.tenant_id)
+      .limit(1)
+      .maybeSingle()
+    if (existingTenant?.id) {
+      return {
+        success: true,
+        tenant_id: existingTenant.id,
+        onboarding_session_id: requestRow.onboarding_session_id || null
+      }
+    }
+  }
+
+  const requestPayload = requestRow.request_payload || {}
+  const initialConfig = requestPayload.initial_config || {}
+  const isPaidPlan = requestRow.plan_tier !== 'free'
+  let resolvedCountryCode = sanitizeText(requestRow.country || '', 80).toUpperCase()
+  let resolvedCountryName = sanitizeText(requestRow.country || '', 120)
+  let resolvedCurrencyCode = sanitizeText(requestRow.currency || initialConfig.currency || 'USD', 3).toUpperCase()
+
+  if (requestRow.country_id) {
+    const { data: countryRef, error: countryRefError } = await supabase
+      .from('countries')
+      .select('id, name, code_iso2')
+      .eq('id', requestRow.country_id)
+      .limit(1)
+      .maybeSingle()
+    if (countryRefError) throw new Error(countryRefError.message || 'Unable to resolve country reference')
+    if (!countryRef?.id) throw new Error('Country reference is invalid for this onboarding request')
+    resolvedCountryCode = sanitizeText(countryRef.code_iso2 || resolvedCountryCode, 80).toUpperCase()
+    resolvedCountryName = sanitizeText(countryRef.name || resolvedCountryName, 120)
+  }
+
+  if (requestRow.currency_id) {
+    const { data: currencyRef, error: currencyRefError } = await supabase
+      .from('currencies')
+      .select('id, code')
+      .eq('id', requestRow.currency_id)
+      .limit(1)
+      .maybeSingle()
+    if (currencyRefError) throw new Error(currencyRefError.message || 'Unable to resolve currency reference')
+    if (!currencyRef?.id) throw new Error('Currency reference is invalid for this onboarding request')
+    resolvedCurrencyCode = sanitizeText(currencyRef.code || resolvedCurrencyCode, 3).toUpperCase()
+  }
+
+  const orgSlug = await buildUniqueSlug(supabase, requestRow.organization_slug || requestRow.organization_name)
+  const { data: tenant, error: tenantError } = await supabase
+    .from('tenants')
+    .insert({
+      name: requestRow.organization_name,
+      slug: orgSlug,
+      subscription_tier: requestRow.plan_tier,
+      max_users: requestRow.requested_user_count,
+      max_franchises: requestRow.requested_franchise_count,
+      country: resolvedCountryCode || resolvedCountryName,
+      status: isPaidPlan ? 'pending' : 'active',
+      settings: {
+        onboarding_source: 'self_service',
+        onboarding_status: isPaidPlan ? 'payment_pending' : 'active',
+        data_residency: { region: requestRow.data_residency },
+        locale: {
+          currency: resolvedCurrencyCode || 'USD',
+          timezone: initialConfig.timezone || 'UTC',
+          preferred_language: initialConfig.preferred_language || 'en'
+        }
+      }
+    })
+    .select('id, name')
+    .single()
+  if (tenantError || !tenant) throw new Error(tenantError?.message || 'Tenant creation failed')
+
+  const generatedPassword = generateStrongPassword()
+  const { data: createdUser, error: userError } = await supabase.auth.admin.createUser({
+    email: requestRow.admin_email,
+    password: generatedPassword,
+    email_confirm: true,
+    user_metadata: {
+      first_name: requestRow.admin_first_name,
+      last_name: requestRow.admin_last_name,
+      tenant_id: tenant.id
+    },
+    app_metadata: {
+      role: 'tenant_admin',
+      tenant_id: tenant.id
+    }
+  })
+
+  if (userError || !createdUser?.user) {
+    await supabase.from('tenants').delete().eq('id', tenant.id)
+    throw new Error(userError?.message || 'Admin user creation failed')
+  }
+
+  const adminUserId = createdUser.user.id
+  await supabase.from('profiles').upsert({
+    id: adminUserId,
+    email: requestRow.admin_email,
+    first_name: requestRow.admin_first_name,
+    last_name: requestRow.admin_last_name,
+    tenant_id: tenant.id
+  })
+  await supabase.from('user_roles').upsert({
+    user_id: adminUserId,
+    role: 'tenant_admin',
+    tenant_id: tenant.id
+  })
+  await supabase.from('tenant_profile').upsert({
+    tenant_id: tenant.id,
+    legal_name: requestPayload.legal_name || requestRow.organization_name,
+    registered_address: requestPayload.registered_address || null,
+    tax_id: requestPayload.tax_id || null,
+    tax_jurisdiction: requestPayload.tax_jurisdiction || null,
+    country_of_operation: resolvedCountryName || resolvedCountryCode || requestRow.country,
+    data_residency_region: requestRow.data_residency
+  }, { onConflict: 'tenant_id' })
+
+  const { data: onboardingSession, error: sessionError } = await supabase
+    .from('tenant_onboarding_sessions')
+    .upsert({
+      tenant_id: tenant.id,
+      status: isPaidPlan ? 'payment_pending' : 'active',
+      current_step: isPaidPlan ? 'payment' : 'completed',
+      started_by: adminUserId,
+      step_payloads: {
+        source: 'self_service',
+        product: 'logic-nexus-ai',
+        legal_profile_completed: true,
+        data_residency_completed: true,
+        email_verified: true
+      },
+      completed_at: isPaidPlan ? null : new Date().toISOString()
+    }, { onConflict: 'tenant_id' })
+    .select('id')
+    .single()
+  if (sessionError || !onboardingSession) throw new Error(sessionError?.message || 'Onboarding session creation failed')
+
+  const plan = await getMatchingPlan(supabase, requestRow.plan_tier)
+  if (plan) {
+    const now = new Date()
+    const trialEnd = isPaidPlan ? addMinutes(now, 7 * 24 * 60) : null
+    const nextPeriodEnd = requestRow.billing_period === 'annual'
+      ? new Date(now.getFullYear() + 1, now.getMonth(), now.getDate()).toISOString()
+      : new Date(now.getFullYear(), now.getMonth() + 1, now.getDate()).toISOString()
+    await supabase.from('tenant_subscriptions').insert({
+      tenant_id: tenant.id,
+      plan_id: plan.id,
+      status: isPaidPlan ? 'trial' : 'active',
+      current_period_start: now.toISOString(),
+      current_period_end: nextPeriodEnd,
+      trial_end: trialEnd,
+      metadata: {
+        source: 'self_service_onboarding',
+        requested_user_count: requestRow.requested_user_count,
+        requested_franchise_count: requestRow.requested_franchise_count,
+        billing_period: requestRow.billing_period
+      }
+    })
+  }
+
+  try {
+    await sendEmailNotification(
+      supabase,
+      [requestRow.admin_email],
+      'Your Logic Nexus-AI workspace is ready',
+      `<p>Your onboarding request for <strong>${sanitizeText(requestRow.organization_name || '', 120)}</strong> has been approved and provisioned.</p><p>Sign in with your email and use password reset if needed.</p>`
+    )
+  } catch (emailError: any) {
+    await logger.warn('Post-provisioning notification email failed', {
+      requestId: requestRow.id,
+      error: String(emailError?.message || emailError)
+    })
+  }
+
+  return {
+    success: true,
+    tenant_id: tenant.id,
+    admin_user_id: adminUserId,
+    onboarding_session_id: onboardingSession.id
+  }
+}
+
 serveWithLogger(async (req, logger, supabase) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -538,6 +875,442 @@ serveWithLogger(async (req, logger, supabase) => {
     return json(200, {
       success: true,
       is_unique: isUnique
+    })
+  }
+
+  if (action === 'admin_list_requests') {
+    const parsed = adminListSchema.safeParse(payload)
+    if (!parsed.success) {
+      return json(422, { success: false, error: 'Validation failed', issues: parsed.error.issues })
+    }
+    const auth = await requirePlatformOwner(req, logger, supabase)
+    if (!auth.authorized) return auth.response
+
+    const filters = parsed.data
+    const queryLimit = filters.limit || 100
+    let query = supabase
+      .from('self_service_onboarding_requests')
+      .select('id, status, organization_name, organization_slug, admin_email, admin_first_name, admin_last_name, verified_at, verification_sent_at, verification_expires_at, verification_attempt_count, failure_reason, created_at, updated_at, completed_at, tenant_id, request_payload')
+      .order('updated_at', { ascending: false })
+      .limit(queryLimit)
+
+    if (filters.status && filters.status !== 'all') {
+      query = query.eq('status', filters.status)
+    }
+    if (filters.from_date) {
+      query = query.gte('created_at', new Date(filters.from_date).toISOString())
+    }
+    if (filters.to_date) {
+      query = query.lte('created_at', new Date(filters.to_date).toISOString())
+    }
+    if (filters.search && filters.search.trim().length > 0) {
+      const search = sanitizeText(filters.search, 120)
+      query = query.or(
+        `organization_name.ilike.%${search}%,admin_email.ilike.%${search}%,admin_first_name.ilike.%${search}%,admin_last_name.ilike.%${search}%`
+      )
+    }
+
+    const { data, error } = await query
+    if (error) {
+      await logger.error('Failed to list onboarding requests for admin', { error: error.message })
+      return json(500, { success: false, error: 'Unable to load onboarding requests' })
+    }
+
+    return json(200, {
+      success: true,
+      requests: (data || []).map((row: any) => ({
+        ...row,
+        status: normalizeRequestStatus(row.status)
+      }))
+    })
+  }
+
+  if (action === 'admin_get_request_detail') {
+    const parsed = adminDetailSchema.safeParse(payload)
+    if (!parsed.success) {
+      return json(422, { success: false, error: 'Validation failed', issues: parsed.error.issues })
+    }
+    const auth = await requirePlatformOwner(req, logger, supabase)
+    if (!auth.authorized) return auth.response
+
+    const { data, error } = await supabase
+      .from('self_service_onboarding_requests')
+      .select('*')
+      .eq('id', parsed.data.request_id)
+      .single()
+    if (error || !data) {
+      return json(404, { success: false, error: 'Onboarding request not found' })
+    }
+
+    return json(200, {
+      success: true,
+      request: {
+        ...data,
+        status: normalizeRequestStatus(data.status)
+      }
+    })
+  }
+
+  if (action === 'admin_trigger_verification_email') {
+    const parsed = adminTriggerVerificationSchema.safeParse(payload)
+    if (!parsed.success) {
+      return json(422, { success: false, error: 'Validation failed', issues: parsed.error.issues })
+    }
+    const auth = await requirePlatformOwner(req, logger, supabase)
+    if (!auth.authorized) return auth.response
+
+    const { data: requestRow, error: requestError } = await supabase
+      .from('self_service_onboarding_requests')
+      .select('*')
+      .eq('id', parsed.data.request_id)
+      .single()
+    if (requestError || !requestRow) {
+      return json(404, { success: false, error: 'Onboarding request not found' })
+    }
+
+    const verificationCode = generateVerificationCode()
+    const verificationCodeHash = await sha256Hex(verificationCode)
+    const nowIso = new Date().toISOString()
+    const nextStatus = requestRow.status === 'rejected' ? 'pending_verification' : requestRow.status
+    const { error: updateError } = await supabase
+      .from('self_service_onboarding_requests')
+      .update({
+        verification_code_hash: verificationCodeHash,
+        verification_expires_at: addMinutes(new Date(), 15),
+        verification_sent_at: nowIso,
+        verification_attempt_count: 0,
+        status: nextStatus,
+        failure_reason: null
+      })
+      .eq('id', requestRow.id)
+    if (updateError) {
+      return json(500, { success: false, error: 'Unable to trigger verification email' })
+    }
+
+    try {
+      await sendVerificationEmail(supabase, requestRow.admin_email, verificationCode, requestRow.organization_name)
+    } catch (error: any) {
+      await logger.error('Manual trigger verification email failed', { requestId: requestRow.id, error: String(error?.message || error) })
+      return json(502, { success: false, error: 'Verification email delivery failed' })
+    }
+
+    await logOnboardingAudit(supabase, auth.userId as string, requestRow.id, 'manual_verification_email_triggered', {
+      comment: parsed.data.comment || null
+    })
+
+    return json(200, { success: true, status: normalizeRequestStatus(nextStatus) })
+  }
+
+  if (action === 'admin_confirm_email') {
+    const parsed = adminConfirmEmailSchema.safeParse(payload)
+    if (!parsed.success) {
+      return json(422, { success: false, error: 'Validation failed', issues: parsed.error.issues })
+    }
+    const auth = await requirePlatformOwner(req, logger, supabase)
+    if (!auth.authorized) return auth.response
+
+    const { data: requestRow, error: requestError } = await supabase
+      .from('self_service_onboarding_requests')
+      .select('id, status, admin_email, organization_name')
+      .eq('id', parsed.data.request_id)
+      .single()
+    if (requestError || !requestRow) {
+      return json(404, { success: false, error: 'Onboarding request not found' })
+    }
+    if (requestRow.status === 'rejected') {
+      return json(409, { success: false, error: 'Rejected request cannot be confirmed' })
+    }
+
+    const { error: updateError } = await supabase
+      .from('self_service_onboarding_requests')
+      .update({
+        status: 'email_verified',
+        verified_at: new Date().toISOString(),
+        verification_attempt_count: 0,
+        failure_reason: null
+      })
+      .eq('id', requestRow.id)
+    if (updateError) {
+      return json(500, { success: false, error: 'Unable to confirm email ownership' })
+    }
+
+    await logOnboardingAudit(supabase, auth.userId as string, requestRow.id, 'manual_email_confirmed', {
+      comment: parsed.data.comment || null
+    })
+
+    return json(200, { success: true, status: 'email_verified' })
+  }
+
+  if (action === 'admin_reject_request') {
+    const parsed = adminRejectSchema.safeParse(payload)
+    if (!parsed.success) {
+      return json(422, { success: false, error: 'Validation failed', issues: parsed.error.issues })
+    }
+    const auth = await requirePlatformOwner(req, logger, supabase)
+    if (!auth.authorized) return auth.response
+
+    const comment = sanitizeText(parsed.data.comment, 1500)
+    if (!comment) return json(422, { success: false, error: 'Rejection comment is required' })
+
+    const { data: requestRow, error: requestError } = await supabase
+      .from('self_service_onboarding_requests')
+      .select('id, status, admin_email, organization_name')
+      .eq('id', parsed.data.request_id)
+      .single()
+    if (requestError || !requestRow) {
+      return json(404, { success: false, error: 'Onboarding request not found' })
+    }
+    if (requestRow.status === 'completed') {
+      return json(409, { success: false, error: 'Completed request cannot be rejected' })
+    }
+
+    const { error: updateError } = await supabase
+      .from('self_service_onboarding_requests')
+      .update({
+        status: 'rejected',
+        failure_reason: comment
+      })
+      .eq('id', requestRow.id)
+    if (updateError) {
+      return json(500, { success: false, error: 'Unable to reject onboarding request' })
+    }
+
+    await logOnboardingAudit(supabase, auth.userId as string, requestRow.id, 'onboarding_rejected', { comment })
+    try {
+      await sendEmailNotification(
+        supabase,
+        [requestRow.admin_email],
+        'Your Logic Nexus-AI onboarding request was rejected',
+        `<p>Your onboarding request for <strong>${sanitizeText(requestRow.organization_name || '', 120)}</strong> was rejected.</p><p>Reason: ${comment}</p>`
+      )
+    } catch (notifyError: any) {
+      await logger.warn('Failed sending rejection notification', { requestId: requestRow.id, error: String(notifyError?.message || notifyError) })
+    }
+
+    return json(200, { success: true, status: 'rejected' })
+  }
+
+  if (action === 'admin_approve_request') {
+    const parsed = adminApproveSchema.safeParse(payload)
+    if (!parsed.success) {
+      return json(422, { success: false, error: 'Validation failed', issues: parsed.error.issues })
+    }
+    const auth = await requirePlatformOwner(req, logger, supabase)
+    if (!auth.authorized) return auth.response
+
+    const { data: requestRow, error: requestError } = await supabase
+      .from('self_service_onboarding_requests')
+      .select('*')
+      .eq('id', parsed.data.request_id)
+      .single()
+    if (requestError || !requestRow) {
+      return json(404, { success: false, error: 'Onboarding request not found' })
+    }
+
+    if (requestRow.status === 'completed' && requestRow.tenant_id) {
+      return json(200, { success: true, status: 'completed', tenant_id: requestRow.tenant_id })
+    }
+    if (requestRow.status === 'rejected') {
+      return json(409, { success: false, error: 'Rejected request cannot be approved' })
+    }
+    if (!requestRow.verified_at && requestRow.status !== 'email_verified' && requestRow.status !== 'approved') {
+      return json(409, { success: false, error: 'Email ownership must be verified before approval' })
+    }
+
+    const lockStatuses = ['email_verified', 'approved', 'pending_verification']
+    const { data: lockRows, error: lockError } = await supabase
+      .from('self_service_onboarding_requests')
+      .update({
+        status: 'in_progress',
+        failure_reason: null
+      })
+      .eq('id', requestRow.id)
+      .in('status', lockStatuses)
+      .select('*')
+    if (lockError) {
+      return json(500, { success: false, error: 'Unable to start provisioning' })
+    }
+    if (!lockRows || lockRows.length === 0) {
+      return json(409, { success: false, error: 'Request is already being processed' })
+    }
+
+    await logOnboardingAudit(supabase, auth.userId as string, requestRow.id, 'onboarding_approved', {
+      comment: parsed.data.comment || null
+    })
+
+    const freshRow = lockRows[0]
+    try {
+      const provisioned = await performProvisioningForRequest(supabase, logger, freshRow)
+      await supabase
+        .from('self_service_onboarding_requests')
+        .update({
+          status: 'completed',
+          tenant_id: provisioned.tenant_id,
+          admin_user_id: provisioned.admin_user_id || freshRow.admin_user_id || null,
+          onboarding_session_id: provisioned.onboarding_session_id || freshRow.onboarding_session_id || null,
+          completed_at: new Date().toISOString(),
+          failure_reason: null
+        })
+        .eq('id', requestRow.id)
+
+      const platformOwners = await getPlatformOwnerRecipients(supabase)
+      await Promise.allSettled([
+        sendEmailNotification(
+          supabase,
+          [freshRow.admin_email],
+          'Your Logic Nexus-AI onboarding request is approved',
+          `<p>Your request for <strong>${sanitizeText(freshRow.organization_name || '', 120)}</strong> has been approved and provisioned.</p>`
+        ),
+        sendEmailNotification(
+          supabase,
+          platformOwners,
+          'Self-service onboarding request completed',
+          `<p>Request <strong>${freshRow.id}</strong> for <strong>${sanitizeText(freshRow.organization_name || '', 120)}</strong> is completed.</p>`
+        )
+      ])
+
+      return json(200, {
+        success: true,
+        status: 'completed',
+        tenant_id: provisioned.tenant_id,
+        onboarding_session_id: provisioned.onboarding_session_id
+      })
+    } catch (error: any) {
+      await supabase
+        .from('self_service_onboarding_requests')
+        .update({
+          status: 'failed',
+          failure_reason: sanitizeText(String(error?.message || 'Provisioning failed'), 500)
+        })
+        .eq('id', requestRow.id)
+      await logger.error('Manual approval provisioning failed', {
+        requestId: requestRow.id,
+        error: String(error?.message || error)
+      })
+      return json(500, { success: false, error: String(error?.message || 'Tenant provisioning failed') })
+    }
+  }
+
+  if (action === 'admin_bulk_action') {
+    const parsed = adminBulkSchema.safeParse(payload)
+    if (!parsed.success) {
+      return json(422, { success: false, error: 'Validation failed', issues: parsed.error.issues })
+    }
+    const auth = await requirePlatformOwner(req, logger, supabase)
+    if (!auth.authorized) return auth.response
+    if (parsed.data.operation === 'reject' && !parsed.data.comment?.trim()) {
+      return json(422, { success: false, error: 'Rejection comment is required for bulk reject' })
+    }
+
+    const successes: Array<{ request_id: string; status: string }> = []
+    const failures: Array<{ request_id: string; error: string }> = []
+    for (const requestId of parsed.data.request_ids) {
+      try {
+        if (parsed.data.operation === 'trigger_verification_email') {
+          const code = generateVerificationCode()
+          const hash = await sha256Hex(code)
+          const { data: row, error: rowError } = await supabase
+            .from('self_service_onboarding_requests')
+            .select('id, status, admin_email, organization_name')
+            .eq('id', requestId)
+            .single()
+          if (rowError || !row) throw new Error('Request not found')
+          const nextStatus = row.status === 'rejected' ? 'pending_verification' : row.status
+          const { error: updateError } = await supabase
+            .from('self_service_onboarding_requests')
+            .update({
+              verification_code_hash: hash,
+              verification_expires_at: addMinutes(new Date(), 15),
+              verification_sent_at: new Date().toISOString(),
+              verification_attempt_count: 0,
+              status: nextStatus
+            })
+            .eq('id', requestId)
+          if (updateError) throw new Error(updateError.message || 'Failed to update request')
+          await sendVerificationEmail(supabase, row.admin_email, code, row.organization_name)
+          await logOnboardingAudit(supabase, auth.userId as string, requestId, 'bulk_manual_verification_email_triggered', {
+            comment: parsed.data.comment || null
+          })
+          successes.push({ request_id: requestId, status: normalizeRequestStatus(nextStatus) })
+          continue
+        }
+
+        if (parsed.data.operation === 'confirm_email') {
+          const { error: updateError } = await supabase
+            .from('self_service_onboarding_requests')
+            .update({
+              status: 'email_verified',
+              verified_at: new Date().toISOString(),
+              verification_attempt_count: 0,
+              failure_reason: null
+            })
+            .eq('id', requestId)
+          if (updateError) throw new Error(updateError.message || 'Failed to confirm email')
+          await logOnboardingAudit(supabase, auth.userId as string, requestId, 'bulk_manual_email_confirmed', {
+            comment: parsed.data.comment || null
+          })
+          successes.push({ request_id: requestId, status: 'email_verified' })
+          continue
+        }
+
+        if (parsed.data.operation === 'reject') {
+          const comment = sanitizeText(parsed.data.comment || '', 1500)
+          const { error: updateError } = await supabase
+            .from('self_service_onboarding_requests')
+            .update({ status: 'rejected', failure_reason: comment })
+            .eq('id', requestId)
+          if (updateError) throw new Error(updateError.message || 'Failed to reject request')
+          await logOnboardingAudit(supabase, auth.userId as string, requestId, 'bulk_onboarding_rejected', { comment })
+          successes.push({ request_id: requestId, status: 'rejected' })
+          continue
+        }
+
+        const { data: row, error: rowError } = await supabase
+          .from('self_service_onboarding_requests')
+          .select('*')
+          .eq('id', requestId)
+          .single()
+        if (rowError || !row) throw new Error('Request not found')
+        if (!row.verified_at && row.status !== 'email_verified' && row.status !== 'approved') {
+          throw new Error('Email must be verified before approval')
+        }
+        const { data: lockRows, error: lockError } = await supabase
+          .from('self_service_onboarding_requests')
+          .update({ status: 'in_progress', failure_reason: null })
+          .eq('id', requestId)
+          .in('status', ['email_verified', 'approved', 'pending_verification'])
+          .select('*')
+        if (lockError) throw new Error(lockError.message || 'Unable to start provisioning')
+        if (!lockRows || lockRows.length === 0) throw new Error('Request is already being processed')
+        const provisioned = await performProvisioningForRequest(supabase, logger, lockRows[0])
+        await supabase
+          .from('self_service_onboarding_requests')
+          .update({
+            status: 'completed',
+            tenant_id: provisioned.tenant_id,
+            admin_user_id: provisioned.admin_user_id || lockRows[0].admin_user_id || null,
+            onboarding_session_id: provisioned.onboarding_session_id || lockRows[0].onboarding_session_id || null,
+            completed_at: new Date().toISOString(),
+            failure_reason: null
+          })
+          .eq('id', requestId)
+        await logOnboardingAudit(supabase, auth.userId as string, requestId, 'bulk_onboarding_approved', {
+          comment: parsed.data.comment || null
+        })
+        successes.push({ request_id: requestId, status: 'completed' })
+      } catch (error: any) {
+        failures.push({
+          request_id: requestId,
+          error: String(error?.message || error || 'Failed')
+        })
+      }
+    }
+
+    return json(200, {
+      success: true,
+      operation: parsed.data.operation,
+      successes,
+      failures
     })
   }
 
@@ -847,236 +1620,40 @@ serveWithLogger(async (req, logger, supabase) => {
       return json(400, { success: false, error: 'Invalid verification code' })
     }
 
-    const requestPayload = requestRow.request_payload || {}
-    const initialConfig = requestPayload.initial_config || {}
-    const isPaidPlan = requestRow.plan_tier !== 'free'
-    let resolvedCountryCode = sanitizeText(requestRow.country || '', 80).toUpperCase()
-    let resolvedCountryName = sanitizeText(requestRow.country || '', 120)
-    let resolvedCurrencyCode = sanitizeText(requestRow.currency || initialConfig.currency || 'USD', 3).toUpperCase()
-
-    if (requestRow.country_id) {
-      const { data: countryRef, error: countryRefError } = await supabase
-        .from('countries')
-        .select('id, name, code_iso2')
-        .eq('id', requestRow.country_id)
-        .limit(1)
-        .maybeSingle()
-
-      if (countryRefError) {
-        await logger.error('Failed loading country reference from onboarding request', {
-          requestId: requestRow.id,
-          countryId: requestRow.country_id,
-          error: countryRefError.message
-        })
-        return json(500, { success: false, error: 'Unable to resolve country reference' })
-      }
-
-      if (!countryRef?.id) {
-        return json(422, { success: false, error: 'Country reference is invalid for this onboarding request' })
-      }
-
-      resolvedCountryCode = sanitizeText(countryRef.code_iso2 || resolvedCountryCode, 80).toUpperCase()
-      resolvedCountryName = sanitizeText(countryRef.name || resolvedCountryName, 120)
-    }
-
-    if (requestRow.currency_id) {
-      const { data: currencyRef, error: currencyRefError } = await supabase
-        .from('currencies')
-        .select('id, code, name')
-        .eq('id', requestRow.currency_id)
-        .limit(1)
-        .maybeSingle()
-
-      if (currencyRefError) {
-        await logger.error('Failed loading currency reference from onboarding request', {
-          requestId: requestRow.id,
-          currencyId: requestRow.currency_id,
-          error: currencyRefError.message
-        })
-        return json(500, { success: false, error: 'Unable to resolve currency reference' })
-      }
-
-      if (!currencyRef?.id) {
-        return json(422, { success: false, error: 'Currency reference is invalid for this onboarding request' })
-      }
-
-      resolvedCurrencyCode = sanitizeText(currencyRef.code || resolvedCurrencyCode, 3).toUpperCase()
-    }
-
-    await supabase
+    const verifiedAt = new Date().toISOString()
+    const { error: updateError } = await supabase
       .from('self_service_onboarding_requests')
       .update({
-        status: 'provisioning',
-        verified_at: new Date().toISOString(),
-        verification_attempt_count: 0
+        status: 'email_verified',
+        verified_at: verifiedAt,
+        verification_attempt_count: 0,
+        failure_reason: null
       })
       .eq('id', requestRow.id)
-
-    const orgSlug = await buildUniqueSlug(supabase, requestRow.organization_slug || requestRow.organization_name)
-
-    const { data: tenant, error: tenantError } = await supabase
-      .from('tenants')
-      .insert({
-        name: requestRow.organization_name,
-        slug: orgSlug,
-        subscription_tier: requestRow.plan_tier,
-        max_users: requestRow.requested_user_count,
-        max_franchises: requestRow.requested_franchise_count,
-        country: resolvedCountryCode || resolvedCountryName,
-        status: isPaidPlan ? 'pending' : 'active',
-        settings: {
-          onboarding_source: 'self_service',
-          onboarding_status: isPaidPlan ? 'payment_pending' : 'active',
-          data_residency: {
-            region: requestRow.data_residency
-          },
-          locale: {
-            currency: resolvedCurrencyCode || 'USD',
-            timezone: initialConfig.timezone || 'UTC',
-            preferred_language: initialConfig.preferred_language || 'en'
-          }
-        }
-      })
-      .select('id, name')
-      .single()
-
-    if (tenantError || !tenant) {
-      await supabase
-        .from('self_service_onboarding_requests')
-        .update({ status: 'failed', failure_reason: tenantError?.message || 'Tenant creation failed' })
-        .eq('id', requestRow.id)
-      return json(500, { success: false, error: 'Tenant provisioning failed' })
+    if (updateError) {
+      return json(500, { success: false, error: 'Unable to update verification status' })
     }
 
-    const { data: createdUser, error: userError } = await supabase.auth.admin.createUser({
-      email: requestRow.admin_email,
-      password: input.admin_password,
-      email_confirm: true,
-      user_metadata: {
-        first_name: requestRow.admin_first_name,
-        last_name: requestRow.admin_last_name,
-        tenant_id: tenant.id
-      },
-      app_metadata: {
-        role: 'tenant_admin',
-        tenant_id: tenant.id
-      }
-    })
-
-    if (userError || !createdUser?.user) {
-      await supabase
-        .from('tenants')
-        .delete()
-        .eq('id', tenant.id)
-      await supabase
-        .from('self_service_onboarding_requests')
-        .update({ status: 'failed', failure_reason: userError?.message || 'Admin user creation failed' })
-        .eq('id', requestRow.id)
-      return json(500, { success: false, error: 'Admin user provisioning failed' })
-    }
-
-    const adminUserId = createdUser.user.id
-
-    await supabase
-      .from('profiles')
-      .upsert({
-        id: adminUserId,
-        email: requestRow.admin_email,
-        first_name: requestRow.admin_first_name,
-        last_name: requestRow.admin_last_name,
-        tenant_id: tenant.id
-      })
-
-    await supabase
-      .from('user_roles')
-      .upsert({
-        user_id: adminUserId,
-        role: 'tenant_admin',
-        tenant_id: tenant.id
-      })
-
-    const legalName = requestPayload.legal_name || requestRow.organization_name
-    await supabase
-      .from('tenant_profile')
-      .upsert({
-        tenant_id: tenant.id,
-        legal_name: legalName,
-        registered_address: requestPayload.registered_address || null,
-        tax_id: requestPayload.tax_id || null,
-        tax_jurisdiction: requestPayload.tax_jurisdiction || null,
-        country_of_operation: resolvedCountryName || resolvedCountryCode || requestRow.country,
-        data_residency_region: requestRow.data_residency
-      }, { onConflict: 'tenant_id' })
-
-    const { data: onboardingSession, error: sessionError } = await supabase
-      .from('tenant_onboarding_sessions')
-      .upsert({
-        tenant_id: tenant.id,
-        status: isPaidPlan ? 'payment_pending' : 'active',
-        current_step: isPaidPlan ? 'payment' : 'completed',
-        started_by: adminUserId,
-        step_payloads: {
-          source: 'self_service',
-          product: 'logic-nexus-ai',
-          legal_profile_completed: true,
-          data_residency_completed: true,
-          email_verified: true
-        },
-        completed_at: isPaidPlan ? null : new Date().toISOString()
-      }, { onConflict: 'tenant_id' })
-      .select('id')
-      .single()
-
-    if (sessionError || !onboardingSession) {
-      await supabase
-        .from('self_service_onboarding_requests')
-        .update({ status: 'failed', failure_reason: sessionError?.message || 'Onboarding session creation failed', tenant_id: tenant.id, admin_user_id: adminUserId })
-        .eq('id', requestRow.id)
-      return json(500, { success: false, error: 'Onboarding session provisioning failed' })
-    }
-
-    const plan = await getMatchingPlan(supabase, requestRow.plan_tier)
-    if (plan) {
-      const now = new Date()
-      const trialEnd = isPaidPlan ? addMinutes(now, 7 * 24 * 60) : null
-      const nextPeriodEnd = requestRow.billing_period === 'annual'
-        ? new Date(now.getFullYear() + 1, now.getMonth(), now.getDate()).toISOString()
-        : new Date(now.getFullYear(), now.getMonth() + 1, now.getDate()).toISOString()
-
-      await supabase
-        .from('tenant_subscriptions')
-        .insert({
-          tenant_id: tenant.id,
-          plan_id: plan.id,
-          status: isPaidPlan ? 'trial' : 'active',
-          current_period_start: now.toISOString(),
-          current_period_end: nextPeriodEnd,
-          trial_end: trialEnd,
-          metadata: {
-            source: 'self_service_onboarding',
-            requested_user_count: requestRow.requested_user_count,
-            requested_franchise_count: requestRow.requested_franchise_count,
-            billing_period: requestRow.billing_period
-          }
-        })
-    }
-
-    await supabase
-      .from('self_service_onboarding_requests')
-      .update({
-        status: isPaidPlan ? 'email_verified' : 'completed',
-        tenant_id: tenant.id,
-        admin_user_id: adminUserId,
-        onboarding_session_id: onboardingSession.id,
-        completed_at: isPaidPlan ? null : new Date().toISOString()
-      })
-      .eq('id', requestRow.id)
+    const platformOwners = await getPlatformOwnerRecipients(supabase)
+    await Promise.allSettled([
+      sendEmailNotification(
+        supabase,
+        [requestRow.admin_email],
+        'Email verified. Request is pending Platform Owner approval',
+        `<p>Your email for <strong>${sanitizeText(requestRow.organization_name || '', 120)}</strong> has been verified.</p><p>Your request now requires Platform Owner approval before provisioning starts.</p>`
+      ),
+      sendEmailNotification(
+        supabase,
+        platformOwners,
+        'Self-service onboarding request ready for approval',
+        `<p>Request <strong>${requestRow.id}</strong> for <strong>${sanitizeText(requestRow.organization_name || '', 120)}</strong> has completed email verification and is awaiting approval.</p>`
+      )
+    ])
 
     return json(200, {
       success: true,
-      status: isPaidPlan ? 'payment_pending' : 'completed',
-      tenant_id: tenant.id,
-      onboarding_session_id: onboardingSession.id
+      status: 'email_verified',
+      approval_required: true
     })
   }
 
