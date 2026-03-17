@@ -11,6 +11,8 @@ type CaptchaVerificationResult = {
   error_codes?: string[]
 }
 
+type CaptchaProviderName = 'turnstile' | 'recaptcha' | 'dev_bypass' | 'none'
+
 const startRegistrationSchema = z.object({
   action: z.literal('start_registration'),
   organization_name: z.string().min(2).max(120),
@@ -20,6 +22,7 @@ const startRegistrationSchema = z.object({
   requested_user_count: z.number().int().min(1).max(10000).default(2),
   requested_franchise_count: z.number().int().min(0).max(10000).default(1),
   data_residency: z.string().min(2).max(80),
+  captcha_provider: z.enum(['turnstile', 'recaptcha', 'dev_bypass', 'none']).optional(),
   captcha_token: z.string().min(5),
   legal_name: z.string().max(160).nullish(),
   tax_id: z.string().max(80).nullish(),
@@ -153,7 +156,11 @@ const isValidIpAddress = (value: string): boolean => {
   return ipv6Match
 }
 
-const verifyCaptcha = async (token: string, ipAddress: string): Promise<CaptchaVerificationResult> => {
+const verifyCaptcha = async (
+  token: string,
+  ipAddress: string,
+  providerHint?: CaptchaProviderName
+): Promise<CaptchaVerificationResult> => {
   const turnstileSecret = Deno.env.get('TURNSTILE_SECRET_KEY') || Deno.env.get('CAPTCHA_TURNSTILE_SECRET_KEY')
   const recaptchaSecret = Deno.env.get('RECAPTCHA_SECRET_KEY') || Deno.env.get('CAPTCHA_RECAPTCHA_SECRET_KEY')
   const rawAllowBypass = (Deno.env.get('ALLOW_DEV_CAPTCHA_BYPASS') || Deno.env.get('CAPTCHA_ALLOW_DEV_BYPASS') || '').trim().toLowerCase()
@@ -166,7 +173,10 @@ const verifyCaptcha = async (token: string, ipAddress: string): Promise<CaptchaV
     return { success: false, provider: 'none', reason: 'token_missing' }
   }
 
-  if (turnstileSecret) {
+  const verifyTurnstile = async (): Promise<CaptchaVerificationResult> => {
+    if (!turnstileSecret) {
+      return { success: false, provider: 'turnstile', reason: 'config_missing' }
+    }
     try {
       const body = new URLSearchParams({
         secret: turnstileSecret,
@@ -204,7 +214,10 @@ const verifyCaptcha = async (token: string, ipAddress: string): Promise<CaptchaV
     }
   }
 
-  if (recaptchaSecret) {
+  const verifyRecaptcha = async (): Promise<CaptchaVerificationResult> => {
+    if (!recaptchaSecret) {
+      return { success: false, provider: 'recaptcha', reason: 'config_missing' }
+    }
     try {
       const body = new URLSearchParams({
         secret: recaptchaSecret,
@@ -246,6 +259,29 @@ const verifyCaptcha = async (token: string, ipAddress: string): Promise<CaptchaV
     }
   }
 
+  const normalizedProviderHint: CaptchaProviderName =
+    providerHint === 'turnstile' || providerHint === 'recaptcha' || providerHint === 'dev_bypass' || providerHint === 'none'
+      ? providerHint
+      : 'none'
+
+  if (normalizedProviderHint === 'turnstile') {
+    const turnstileResult = await verifyTurnstile()
+    if (turnstileResult.success) return turnstileResult
+    if (turnstileResult.reason === 'provider_request_failed' && recaptchaSecret) {
+      return verifyRecaptcha()
+    }
+    return turnstileResult
+  }
+
+  if (normalizedProviderHint === 'recaptcha') {
+    const recaptchaResult = await verifyRecaptcha()
+    if (recaptchaResult.success) return recaptchaResult
+    if (recaptchaResult.reason === 'provider_request_failed' && turnstileSecret) {
+      return verifyTurnstile()
+    }
+    return recaptchaResult
+  }
+
   if (allowBypass && trimmedToken === bypassToken) {
     return {
       success: true,
@@ -256,6 +292,32 @@ const verifyCaptcha = async (token: string, ipAddress: string): Promise<CaptchaV
 
   if (allowBypass) {
     return { success: false, provider: 'dev_bypass', reason: 'invalid_bypass' }
+  }
+
+  if (turnstileSecret) {
+    const turnstileResult = await verifyTurnstile()
+    if (turnstileResult.success) {
+      return turnstileResult
+    }
+    if (recaptchaSecret && turnstileResult.reason !== 'provider_request_failed') {
+      const recaptchaResult = await verifyRecaptcha()
+      if (recaptchaResult.success) {
+        return recaptchaResult
+      }
+      return recaptchaResult
+    }
+    if (recaptchaSecret && turnstileResult.reason === 'provider_request_failed') {
+      const recaptchaResult = await verifyRecaptcha()
+      if (recaptchaResult.success) {
+        return recaptchaResult
+      }
+      return recaptchaResult.reason === 'provider_request_failed' ? turnstileResult : recaptchaResult
+    }
+    return turnstileResult
+  }
+
+  if (recaptchaSecret) {
+    return verifyRecaptcha()
   }
 
   return { success: false, provider: 'none', reason: 'config_missing' }
@@ -511,7 +573,7 @@ serveWithLogger(async (req, logger, supabase) => {
       return json(429, { success: false, error: 'Too many requests', retry_after_seconds: emailRate.retry_after_seconds })
     }
 
-    const captchaResult = await verifyCaptcha(input.captcha_token, ipAddress)
+    const captchaResult = await verifyCaptcha(input.captcha_token, ipAddress, input.captcha_provider)
     if (!captchaResult.success) {
       await logger.warn('Captcha verification failed', {
         ipAddress,

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { z } from 'zod'
 import { toast } from 'sonner'
@@ -42,9 +42,24 @@ type TurnstileApi = {
   remove: (widgetId: string) => void
 }
 
+type RecaptchaApi = {
+  render: (
+    element: string | HTMLElement,
+    options: {
+      sitekey: string
+      callback: (token: string) => void
+      'expired-callback'?: () => void
+      'error-callback'?: () => void
+      theme?: 'light' | 'dark'
+    }
+  ) => number
+  reset: (widgetId?: number) => void
+}
+
 declare global {
   interface Window {
     turnstile?: TurnstileApi
+    grecaptcha?: RecaptchaApi
   }
 }
 
@@ -70,8 +85,10 @@ const features = [
 const customerProof = ['Global Freight Group', 'Orbit Supply Chain', 'Aster Manufacturing', 'Helix Healthcare Logistics']
 const passwordPolicy = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{12,128}$/
 const turnstileSiteKey = String(import.meta.env.VITE_TURNSTILE_SITE_KEY || '').trim()
+const recaptchaSiteKey = String(import.meta.env.VITE_RECAPTCHA_SITE_KEY || '').trim()
 const allowDevCaptchaBypass = import.meta.env.DEV && String(import.meta.env.VITE_ALLOW_DEV_CAPTCHA_BYPASS || '').trim().toLowerCase() === 'true'
 const captchaContainerId = 'self-service-onboarding-captcha'
+const captchaInitTimeoutMs = 4000
 
 const schema = z.object({
   organization_name: z.string().min(2, 'Organization name is required'),
@@ -99,6 +116,7 @@ const schema = z.object({
   domain: z.string().optional(),
   industry: z.string().optional(),
   website: z.string().optional(),
+  captcha_provider: z.enum(['turnstile', 'recaptcha', 'dev_bypass', 'none']).optional(),
   captcha_token: z.string().min(5, 'Captcha token is required')
 })
 
@@ -126,6 +144,9 @@ type FieldErrors = Partial<Record<FieldErrorKey, string>>
 const stepIds = ['package', 'organization', 'admin', 'compliance', 'verify'] as const
 
 export default function SelfServiceOnboarding() {
+  const preferredCaptchaProvider = turnstileSiteKey ? 'turnstile' : recaptchaSiteKey ? 'recaptcha' : 'none'
+  const turnstileWidgetIdRef = useRef<string | null>(null)
+  const recaptchaWidgetIdRef = useRef<number | null>(null)
   const [stepIndex, setStepIndex] = useState(0)
   const [submitting, setSubmitting] = useState(false)
   const [verifying, setVerifying] = useState(false)
@@ -144,7 +165,11 @@ export default function SelfServiceOnboarding() {
   const [verificationCode, setVerificationCode] = useState('')
   const [status, setStatus] = useState<'form' | 'verification' | 'completed'>('form')
   const [tenantId, setTenantId] = useState<string | null>(null)
-  const [captchaScriptReady, setCaptchaScriptReady] = useState(false)
+  const [turnstileScriptReady, setTurnstileScriptReady] = useState(false)
+  const [recaptchaScriptReady, setRecaptchaScriptReady] = useState(false)
+  const [activeCaptchaProvider, setActiveCaptchaProvider] = useState<'turnstile' | 'recaptcha' | 'none'>(
+    preferredCaptchaProvider
+  )
   const [captchaWidgetError, setCaptchaWidgetError] = useState<string | null>(null)
   const [showAdminPassword, setShowAdminPassword] = useState(false)
   const [showAdminPasswordConfirm, setShowAdminPasswordConfirm] = useState(false)
@@ -171,6 +196,7 @@ export default function SelfServiceOnboarding() {
     domain: '',
     industry: '',
     website: '',
+    captcha_provider: preferredCaptchaProvider,
     captcha_token: import.meta.env.DEV ? 'dev-captcha-pass' : ''
   })
 
@@ -205,14 +231,24 @@ export default function SelfServiceOnboarding() {
   useEffect(() => {
     if (!turnstileSiteKey) return
     if (window.turnstile) {
-      setCaptchaScriptReady(true)
+      setTurnstileScriptReady(true)
       return
     }
 
     const existingScript = document.getElementById('turnstile-api-script') as HTMLScriptElement | null
     if (existingScript) {
-      const handleLoad = () => setCaptchaScriptReady(true)
-      const handleError = () => setCaptchaWidgetError('Unable to load CAPTCHA widget')
+      const handleLoad = () => setTurnstileScriptReady(true)
+      const handleError = () => {
+        if (recaptchaSiteKey) {
+          setActiveCaptchaProvider('recaptcha')
+          updateField('captcha_provider', 'recaptcha')
+          setCaptchaWidgetError('Primary CAPTCHA unavailable. Switched to backup verification.')
+        } else {
+          setActiveCaptchaProvider('none')
+          updateField('captcha_provider', allowDevCaptchaBypass ? 'dev_bypass' : 'none')
+          setCaptchaWidgetError('Unable to load CAPTCHA widget')
+        }
+      }
       existingScript.addEventListener('load', handleLoad)
       existingScript.addEventListener('error', handleError)
       return () => {
@@ -226,42 +262,164 @@ export default function SelfServiceOnboarding() {
     script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'
     script.async = true
     script.defer = true
-    script.onload = () => setCaptchaScriptReady(true)
-    script.onerror = () => setCaptchaWidgetError('Unable to load CAPTCHA widget')
+    script.onload = () => setTurnstileScriptReady(true)
+    script.onerror = () => {
+      if (recaptchaSiteKey) {
+        setActiveCaptchaProvider('recaptcha')
+        updateField('captcha_provider', 'recaptcha')
+        setCaptchaWidgetError('Primary CAPTCHA unavailable. Switched to backup verification.')
+      } else {
+        setActiveCaptchaProvider('none')
+        updateField('captcha_provider', allowDevCaptchaBypass ? 'dev_bypass' : 'none')
+        setCaptchaWidgetError('Unable to load CAPTCHA widget')
+      }
+    }
     document.head.appendChild(script)
   }, [])
 
   useEffect(() => {
+    if (activeCaptchaProvider !== 'recaptcha') return
+    if (!recaptchaSiteKey) return
+    if (window.grecaptcha) {
+      setRecaptchaScriptReady(true)
+      return
+    }
+
+    const existingScript = document.getElementById('recaptcha-api-script') as HTMLScriptElement | null
+    if (existingScript) {
+      const handleLoad = () => setRecaptchaScriptReady(true)
+      const handleError = () => setCaptchaWidgetError('Backup CAPTCHA failed to load. Please retry.')
+      existingScript.addEventListener('load', handleLoad)
+      existingScript.addEventListener('error', handleError)
+      return () => {
+        existingScript.removeEventListener('load', handleLoad)
+        existingScript.removeEventListener('error', handleError)
+      }
+    }
+
+    const script = document.createElement('script')
+    script.id = 'recaptcha-api-script'
+    script.src = 'https://www.google.com/recaptcha/api.js?render=explicit'
+    script.async = true
+    script.defer = true
+    script.onload = () => setRecaptchaScriptReady(true)
+    script.onerror = () => setCaptchaWidgetError('Backup CAPTCHA failed to load. Please retry.')
+    document.head.appendChild(script)
+  }, [activeCaptchaProvider])
+
+  useEffect(() => {
+    if (!turnstileSiteKey) return
+    if (!recaptchaSiteKey) return
+    if (stepIds[stepIndex] !== 'verify') return
+    if (activeCaptchaProvider !== 'turnstile') return
+    if (turnstileScriptReady) return
+
+    const timeoutId = window.setTimeout(() => {
+      setActiveCaptchaProvider('recaptcha')
+      updateField('captcha_provider', 'recaptcha')
+      updateField('captcha_token', '')
+      setCaptchaWidgetError('Primary CAPTCHA timed out. Switched to backup verification.')
+    }, captchaInitTimeoutMs)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [stepIndex, activeCaptchaProvider, turnstileScriptReady])
+
+  useEffect(() => {
     if (!turnstileSiteKey) return
     if (stepIds[stepIndex] !== 'verify') return
-    if (!captchaScriptReady || !window.turnstile) return
+    if (activeCaptchaProvider !== 'turnstile') return
+    if (!turnstileScriptReady || !window.turnstile) return
     const container = document.getElementById(captchaContainerId)
     if (!container) return
 
     container.innerHTML = ''
-    const widgetId = window.turnstile.render(`#${captchaContainerId}`, {
-      sitekey: turnstileSiteKey,
-      callback: (token: string) => {
-        setCaptchaWidgetError(null)
-        updateField('captcha_token', token)
-      },
-      'expired-callback': () => {
-        updateField('captcha_token', '')
-        setFieldErrors((prev) => ({ ...prev, captcha_token: 'Captcha expired. Please verify again.' }))
-      },
-      'error-callback': () => {
-        updateField('captcha_token', '')
-        setCaptchaWidgetError('Captcha verification encountered an error. Please retry.')
-      },
-      theme: 'light'
-    })
-
-    return () => {
-      if (widgetId && window.turnstile) {
-        window.turnstile.remove(widgetId)
+    try {
+      const widgetId = window.turnstile.render(`#${captchaContainerId}`, {
+        sitekey: turnstileSiteKey,
+        callback: (token: string) => {
+          setCaptchaWidgetError(null)
+          updateField('captcha_provider', 'turnstile')
+          updateField('captcha_token', token)
+        },
+        'expired-callback': () => {
+          updateField('captcha_provider', 'turnstile')
+          updateField('captcha_token', '')
+          setFieldErrors((prev) => ({ ...prev, captcha_token: 'Captcha expired. Please verify again.' }))
+        },
+        'error-callback': () => {
+          updateField('captcha_token', '')
+          if (recaptchaSiteKey) {
+            setActiveCaptchaProvider('recaptcha')
+            updateField('captcha_provider', 'recaptcha')
+            setCaptchaWidgetError('Primary CAPTCHA encountered an error. Switched to backup verification.')
+          } else {
+            setCaptchaWidgetError('Captcha verification encountered an error. Please retry.')
+          }
+        },
+        theme: 'light'
+      })
+      turnstileWidgetIdRef.current = widgetId
+    } catch {
+      updateField('captcha_token', '')
+      if (recaptchaSiteKey) {
+        setActiveCaptchaProvider('recaptcha')
+        updateField('captcha_provider', 'recaptcha')
+        setCaptchaWidgetError('Primary CAPTCHA unavailable. Switched to backup verification.')
+      } else {
+        setCaptchaWidgetError('Unable to initialize CAPTCHA widget')
       }
     }
-  }, [captchaScriptReady, stepIndex])
+
+    return () => {
+      if (turnstileWidgetIdRef.current && window.turnstile) {
+        window.turnstile.remove(turnstileWidgetIdRef.current)
+        turnstileWidgetIdRef.current = null
+      }
+    }
+  }, [turnstileScriptReady, stepIndex, activeCaptchaProvider])
+
+  useEffect(() => {
+    if (!recaptchaSiteKey) return
+    if (stepIds[stepIndex] !== 'verify') return
+    if (activeCaptchaProvider !== 'recaptcha') return
+    if (!recaptchaScriptReady || !window.grecaptcha) return
+    const container = document.getElementById(captchaContainerId)
+    if (!container) return
+
+    container.innerHTML = ''
+    try {
+      const widgetId = window.grecaptcha.render(`#${captchaContainerId}`, {
+        sitekey: recaptchaSiteKey,
+        callback: (token: string) => {
+          setCaptchaWidgetError(null)
+          updateField('captcha_provider', 'recaptcha')
+          updateField('captcha_token', token)
+        },
+        'expired-callback': () => {
+          updateField('captcha_provider', 'recaptcha')
+          updateField('captcha_token', '')
+          setFieldErrors((prev) => ({ ...prev, captcha_token: 'Captcha expired. Please verify again.' }))
+        },
+        'error-callback': () => {
+          updateField('captcha_provider', 'recaptcha')
+          updateField('captcha_token', '')
+          setCaptchaWidgetError('Backup CAPTCHA encountered an error. Please retry.')
+        },
+        theme: 'light'
+      })
+      recaptchaWidgetIdRef.current = widgetId
+    } catch {
+      updateField('captcha_token', '')
+      setCaptchaWidgetError('Unable to initialize backup CAPTCHA widget')
+    }
+
+    return () => {
+      if (recaptchaWidgetIdRef.current !== null && window.grecaptcha) {
+        window.grecaptcha.reset(recaptchaWidgetIdRef.current)
+        recaptchaWidgetIdRef.current = null
+      }
+    }
+  }, [stepIndex, activeCaptchaProvider, recaptchaScriptReady])
 
   useEffect(() => {
     const loadDomainOptions = async () => {
@@ -596,6 +754,7 @@ export default function SelfServiceOnboarding() {
         requested_user_count: form.requested_user_count,
         requested_franchise_count: form.requested_franchise_count,
         data_residency: form.data_residency,
+        captcha_provider: form.captcha_provider,
         captcha_token: form.captcha_token,
         legal_name: form.legal_name || null,
         tax_id: form.tax_id || null,
@@ -1099,9 +1258,12 @@ export default function SelfServiceOnboarding() {
                   </Card>
                   <div className="space-y-2">
                     <Label htmlFor="captcha_token">Captcha Token <span className="text-destructive">*</span></Label>
-                    {turnstileSiteKey ? (
+                    {(turnstileSiteKey || recaptchaSiteKey) ? (
                       <div className="space-y-2">
                         <div id={captchaContainerId} className={fieldErrors.captcha_token ? 'rounded-md border border-destructive p-2' : ''} />
+                        <p className="text-xs text-muted-foreground">
+                          Active CAPTCHA provider: {activeCaptchaProvider === 'turnstile' ? 'Cloudflare Turnstile' : activeCaptchaProvider === 'recaptcha' ? 'Google reCAPTCHA' : 'None'}
+                        </p>
                         {captchaWidgetError && <p className="text-xs text-destructive">{captchaWidgetError}</p>}
                         {!captchaWidgetError && !form.captcha_token && <p className="text-xs text-muted-foreground">Complete CAPTCHA challenge to continue.</p>}
                       </div>
@@ -1115,9 +1277,9 @@ export default function SelfServiceOnboarding() {
                       />
                     )}
                     {fieldErrors.captcha_token && <p className="text-xs text-destructive">{fieldErrors.captcha_token}</p>}
-                    {!turnstileSiteKey && (
+                    {!turnstileSiteKey && !recaptchaSiteKey && (
                       <p className="text-xs text-muted-foreground">
-                        CAPTCHA site key is not configured in frontend. Set VITE_TURNSTILE_SITE_KEY.
+                        CAPTCHA site key is not configured in frontend. Set VITE_TURNSTILE_SITE_KEY or VITE_RECAPTCHA_SITE_KEY.
                       </p>
                     )}
                   </div>
