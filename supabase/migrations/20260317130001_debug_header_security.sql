@@ -1,6 +1,23 @@
 ALTER TABLE public.system_settings
   ADD COLUMN IF NOT EXISTS updated_by UUID REFERENCES auth.users(id);
 
+DELETE FROM public.system_settings ss
+USING (
+  SELECT id
+  FROM (
+    SELECT
+      id,
+      ROW_NUMBER() OVER (
+        PARTITION BY setting_key
+        ORDER BY updated_at DESC NULLS LAST, created_at DESC NULLS LAST, id DESC
+      ) AS row_num
+    FROM public.system_settings
+    WHERE tenant_id IS NULL
+  ) ranked
+  WHERE ranked.row_num > 1
+) duplicates
+WHERE ss.id = duplicates.id;
+
 CREATE UNIQUE INDEX IF NOT EXISTS system_settings_global_setting_key_unique
   ON public.system_settings (setting_key)
   WHERE tenant_id IS NULL;
@@ -8,19 +25,29 @@ CREATE UNIQUE INDEX IF NOT EXISTS system_settings_global_setting_key_unique
 DO $$
 BEGIN
   IF to_regclass('public.platform_system_config') IS NOT NULL THEN
+    UPDATE public.system_settings target
+    SET
+      setting_value = source.setting_value,
+      updated_at = source.updated_at,
+      updated_by = source.updated_by
+    FROM public.platform_system_config source
+    WHERE target.tenant_id IS NULL
+      AND target.setting_key = source.setting_key;
+
     INSERT INTO public.system_settings (tenant_id, setting_key, setting_value, updated_at, updated_by)
     SELECT
       NULL,
-      setting_key,
-      setting_value,
-      updated_at,
-      updated_by
-    FROM public.platform_system_config
-    ON CONFLICT (setting_key) WHERE tenant_id IS NULL
-    DO UPDATE SET
-      setting_value = EXCLUDED.setting_value,
-      updated_at = EXCLUDED.updated_at,
-      updated_by = EXCLUDED.updated_by;
+      source.setting_key,
+      source.setting_value,
+      source.updated_at,
+      source.updated_by
+    FROM public.platform_system_config source
+    WHERE NOT EXISTS (
+      SELECT 1
+      FROM public.system_settings target
+      WHERE target.tenant_id IS NULL
+        AND target.setting_key = source.setting_key
+    );
 
     DROP TABLE public.platform_system_config;
   END IF;
@@ -70,19 +97,24 @@ BEGIN
     RAISE EXCEPTION 'Platform admin privileges required';
   END IF;
 
-  INSERT INTO public.system_settings (tenant_id, setting_key, setting_value, updated_at, updated_by)
-  VALUES (
-    NULL,
-    'header_debug_button',
-    jsonb_build_object('enabled', p_enabled),
-    now(),
-    v_user_id
-  )
-  ON CONFLICT (setting_key) WHERE tenant_id IS NULL
-  DO UPDATE SET
-    setting_value = EXCLUDED.setting_value,
+  UPDATE public.system_settings
+  SET
+    setting_value = jsonb_build_object('enabled', p_enabled),
     updated_at = now(),
-    updated_by = v_user_id;
+    updated_by = v_user_id
+  WHERE tenant_id IS NULL
+    AND setting_key = 'header_debug_button';
+
+  IF NOT FOUND THEN
+    INSERT INTO public.system_settings (tenant_id, setting_key, setting_value, updated_at, updated_by)
+    VALUES (
+      NULL,
+      'header_debug_button',
+      jsonb_build_object('enabled', p_enabled),
+      now(),
+      v_user_id
+    );
+  END IF;
 
   INSERT INTO public.app_feature_flags (flag_key, is_enabled, description)
   VALUES (
