@@ -1,4 +1,5 @@
 import { logger } from '@/lib/logger';
+import { DomainQuotationIsolationService } from '@/services/quotation/DomainQuotationIsolationService';
 
 type SupabaseAdmin = {
   from: (table: string) => any;
@@ -62,7 +63,10 @@ function ensurePayload(input: DomainAssignmentInput): DomainAssignmentInput {
 }
 
 export class DomainAssignmentService {
-  constructor(private readonly supabase: SupabaseAdmin) {}
+  constructor(
+    private readonly supabase: SupabaseAdmin,
+    private readonly domainIsolationService: DomainQuotationIsolationService = new DomainQuotationIsolationService(),
+  ) {}
 
   async assignTenants(input: DomainAssignmentInput): Promise<DomainAssignmentResult> {
     const payload = ensurePayload(input);
@@ -107,6 +111,17 @@ export class DomainAssignmentService {
       reactivated,
       skipped,
     });
+
+    if (assigned > 0 || reactivated > 0) {
+      const domainCode = await this.resolveDomainCode(payload.domainId);
+      if (domainCode) {
+        await this.domainIsolationService.onDomainAssign(this.supabase as any, {
+          domainId: payload.domainId,
+          domainCode,
+          assignedBy: payload.actorUserId,
+        });
+      }
+    }
 
     logger.info('[DomainAssignmentService] tenant bulk assignment complete', {
       batchId: payload.batchId,
@@ -163,6 +178,17 @@ export class DomainAssignmentService {
       revoked,
       skipped,
     });
+
+    if (revoked > 0) {
+      const domainCode = await this.resolveDomainCode(payload.domainId);
+      if (domainCode) {
+        this.domainIsolationService.onDomainRevoke({
+          domainId: payload.domainId,
+          domainCode,
+          revokedBy: payload.actorUserId,
+        });
+      }
+    }
 
     logger.info('[DomainAssignmentService] tenant bulk revoke complete', {
       batchId: payload.batchId,
@@ -222,5 +248,19 @@ export class DomainAssignmentService {
     if (error) {
       throw new Error(error.message);
     }
+  }
+
+  private async resolveDomainCode(domainId: string): Promise<string | null> {
+    const { data, error } = await this.supabase
+      .from('platform_domains')
+      .select('code')
+      .eq('id', domainId)
+      .limit(1)
+      .maybeSingle();
+    if (error) {
+      throw new Error(error.message);
+    }
+    const code = String((data as any)?.code || '').trim().toUpperCase();
+    return code || null;
   }
 }

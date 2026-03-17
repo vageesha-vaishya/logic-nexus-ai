@@ -4,6 +4,10 @@ import { DomainAssignmentService } from './DomainAssignmentService';
 describe('DomainAssignmentService', () => {
   const from = vi.fn();
   const supabase = { from } as any;
+  const isolationService = {
+    onDomainAssign: vi.fn().mockResolvedValue(undefined),
+    onDomainRevoke: vi.fn(),
+  } as any;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -31,10 +35,18 @@ describe('DomainAssignmentService', () => {
       if (table === 'domain_audit_log') {
         return { insert };
       }
+      if (table === 'platform_domains') {
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          limit: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({ data: { code: 'LOGISTICS' }, error: null }),
+        };
+      }
       return {};
     });
 
-    const service = new DomainAssignmentService(supabase);
+    const service = new DomainAssignmentService(supabase, isolationService);
     const result = await service.assignTenants({
       domainId: 'domain-1',
       tenantIds: ['tenant-1', 'tenant-2', 'tenant-3'],
@@ -52,6 +64,11 @@ describe('DomainAssignmentService', () => {
     });
     expect(upsert).toHaveBeenCalledTimes(1);
     expect(insert).toHaveBeenCalledTimes(1);
+    expect(isolationService.onDomainAssign).toHaveBeenCalledWith(supabase, {
+      domainId: 'domain-1',
+      domainCode: 'LOGISTICS',
+      assignedBy: 'user-1',
+    });
   });
 
   it('revokes active assignments and reports skipped entries', async () => {
@@ -77,10 +94,18 @@ describe('DomainAssignmentService', () => {
       if (table === 'domain_audit_log') {
         return { insert };
       }
+      if (table === 'platform_domains') {
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          limit: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({ data: { code: 'LOGISTICS' }, error: null }),
+        };
+      }
       return {};
     });
 
-    const service = new DomainAssignmentService(supabase);
+    const service = new DomainAssignmentService(supabase, isolationService);
     const result = await service.revokeTenants({
       domainId: 'domain-1',
       tenantIds: ['tenant-1', 'tenant-2', 'tenant-3'],
@@ -97,6 +122,11 @@ describe('DomainAssignmentService', () => {
     });
     expect(chain.update).toHaveBeenCalledWith({ is_active: false });
     expect(insert).toHaveBeenCalledTimes(1);
+    expect(isolationService.onDomainRevoke).toHaveBeenCalledWith({
+      domainId: 'domain-1',
+      domainCode: 'LOGISTICS',
+      revokedBy: 'user-1',
+    });
   });
 
   it('lists audit history with bounded limit', async () => {

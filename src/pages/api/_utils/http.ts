@@ -226,7 +226,7 @@ export function applyCors(req: ApiRequest, res: ApiResponse, options: CorsOption
   }
   res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Methods', normalizedMethods.join(','));
-  res.setHeader('Access-Control-Allow-Headers', 'Authorization,Content-Type,Cookie,x-csrf-token,x-tenant-id,x-user-id,x-user-role,x-user-permissions,x-correlation-id');
+  res.setHeader('Access-Control-Allow-Headers', 'Authorization,Content-Type,Cookie,x-csrf-token,x-tenant-id,x-domain-id,x-user-id,x-user-role,x-user-permissions,x-correlation-id');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
 }
 

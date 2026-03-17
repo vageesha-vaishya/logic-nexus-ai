@@ -141,4 +141,44 @@ describe('API: /quotations/[id]/versions', () => {
     expect(mockEq).toHaveBeenCalledWith('quote_number', 'legacy-quote-001');
     expect(mockEq).toHaveBeenCalledWith('id', 'legacy-quote-001');
   });
+
+  it('rejects requests when X-Domain-ID does not resolve to an active domain', async () => {
+    const { req, res } = createMocks({
+      method: 'GET',
+      query: { id: 'q1', page: '1', limit: '10' },
+      headers: { 'x-tenant-id': 't1', 'x-domain-id': 'UNKNOWN_DOMAIN' }
+    });
+
+    mockMaybeSingle
+      .mockResolvedValueOnce({ data: { id: 'q-resolved' }, error: null })
+      .mockResolvedValueOnce({ data: null, error: null });
+
+    await handler(req, res);
+
+    expect(res._getStatusCode()).toBe(403);
+    expect(JSON.parse(res._getData())).toEqual({ error: 'Forbidden' });
+    expect(QuotationVersionService.prototype.listVersions).not.toHaveBeenCalled();
+    expect(mockEq).toHaveBeenCalledWith('code', 'UNKNOWN_DOMAIN');
+  });
+
+  it('rejects requests when quote is outside requested domain scope', async () => {
+    const { req, res } = createMocks({
+      method: 'GET',
+      query: { id: 'q1', page: '1', limit: '10' },
+      headers: { 'x-tenant-id': 't1', 'x-domain-id': 'LOGISTICS' }
+    });
+
+    mockMaybeSingle
+      .mockResolvedValueOnce({ data: { id: 'q-resolved' }, error: null })
+      .mockResolvedValueOnce({ data: { id: 'domain-1' }, error: null })
+      .mockResolvedValueOnce({ data: null, error: null });
+
+    await handler(req, res);
+
+    expect(res._getStatusCode()).toBe(403);
+    expect(JSON.parse(res._getData())).toEqual({ error: 'Forbidden' });
+    expect(QuotationVersionService.prototype.listVersions).not.toHaveBeenCalled();
+    expect(mockEq).toHaveBeenCalledWith('domain_id', 'domain-1');
+    expect(mockEq).toHaveBeenCalledWith('quote_id', 'q-resolved');
+  });
 });

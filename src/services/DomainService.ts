@@ -39,6 +39,17 @@ let cacheTimestamp: number = 0;
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 const DOMAIN_API_PATH = '/api/v1/platform-domains';
 const DOMAIN_ASSIGNMENT_API_PATH = '/api/v1/domain-assignments';
+const DOMAIN_CONFIG_API_PATH = '/api/v1/domain-config';
+
+export interface DomainConfigPayload {
+  id?: string;
+  domain_id: string;
+  plugin_name: string;
+  environment: string;
+  json_settings: Record<string, unknown>;
+  encrypted_secrets: string | null;
+  updated_at?: string;
+}
 
 function normalizeDomainRows(rows: any[]): PlatformDomain[] {
   return (rows || [])
@@ -346,6 +357,62 @@ export const DomainService = {
       tenantId: typeof data.tenantId === 'string' ? data.tenantId : null,
       isPlatformAdmin: Boolean(data.isPlatformAdmin),
     };
+  },
+
+  async getDomainConfig(
+    domainId: string,
+    pluginName = 'QUOTATION',
+    environment = 'prod'
+  ): Promise<DomainConfigPayload | null> {
+    const accessToken = await this.getSessionToken();
+    const params = new URLSearchParams({
+      domain_id: domainId,
+      plugin_name: pluginName.toUpperCase(),
+      environment,
+    });
+    const response = await fetch(`${DOMAIN_CONFIG_API_PATH}?${params.toString()}`, {
+      method: 'GET',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      },
+    });
+    const body = await response.json();
+    if (!response.ok) {
+      throw new Error(String(body?.error || `Failed to load domain config (${response.status})`));
+    }
+    return body?.data || null;
+  },
+
+  async upsertDomainConfig(payload: {
+    domainId: string;
+    pluginName?: string;
+    environment?: string;
+    jsonSettings: Record<string, unknown>;
+    encryptedSecrets?: string | null;
+  }): Promise<DomainConfigPayload> {
+    const accessToken = await this.getSessionToken();
+    const response = await fetch(DOMAIN_CONFIG_API_PATH, {
+      method: 'PUT',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      },
+      body: JSON.stringify({
+        domainId: payload.domainId,
+        pluginName: payload.pluginName || 'QUOTATION',
+        environment: payload.environment || 'prod',
+        jsonSettings: payload.jsonSettings,
+        encryptedSecrets: payload.encryptedSecrets ?? null,
+      }),
+    });
+    const body = await response.json();
+    if (!response.ok) {
+      throw new Error(String(body?.error || `Failed to update domain config (${response.status})`));
+    }
+    return body.data as DomainConfigPayload;
   },
 
   /**

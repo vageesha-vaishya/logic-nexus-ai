@@ -538,7 +538,7 @@ const App = () => (
             <Route 
               path="/dashboard/quotes" 
               element={
-                <ProtectedRoute>
+                <ProtectedRoute requiredPermissions={["quotes.view"]}>
                   <Quotes />
                 </ProtectedRoute>
               } 
@@ -554,7 +554,7 @@ const App = () => (
             <Route 
               path="/dashboard/quotes/pipeline" 
               element={
-                <ProtectedRoute>
+                <ProtectedRoute requiredPermissions={["quotes.view"]}>
                   <QuotesPipeline />
                 </ProtectedRoute>
               } 
@@ -570,7 +570,7 @@ const App = () => (
             <Route 
               path="/dashboard/quotes/new" 
               element={
-                <ProtectedRoute>
+                <ProtectedRoute requiredPermissions={["quotes.create"]}>
                   <QuoteNew />
                 </ProtectedRoute>
               } 
@@ -578,7 +578,7 @@ const App = () => (
             <Route 
               path="/dashboard/quotes/:id" 
               element={
-                <ProtectedRoute>
+                <ProtectedRoute requiredPermissions={["quotes.view"]}>
                   <QuoteDetail />
                 </ProtectedRoute>
               } 

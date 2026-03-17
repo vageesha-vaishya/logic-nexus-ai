@@ -8,7 +8,7 @@ import { QuotationVersionHistory } from '@/components/sales/QuotationVersionHist
 import { UnifiedQuoteComposer } from '@/components/sales/unified-composer/UnifiedQuoteComposer';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
-import { Cloud, CloudOff, Loader2 } from 'lucide-react';
+import { CloudOff, Loader2 } from 'lucide-react';
 import { ShareQuoteDialog } from '@/components/sales/portal/ShareQuoteDialog';
 import { SendQuoteDialog } from '@/components/sales/SendQuoteDialog';
 import { QuotePreviewModal } from '@/components/sales/QuotePreviewModal';
@@ -23,6 +23,8 @@ import { logger } from '@/lib/logger';
 import { useAuth } from '@/hooks/useAuth';
 import { FEATURE_FLAGS, useAppFeatureFlag } from '@/lib/feature-flags';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
+import { useCRMModuleNavigationState } from '@/hooks/useCRMModuleNavigationState';
 
 const RETRY_DELAYS_MS = [0, 500, 1200];
 const DEFAULT_RANKING_CRITERIA = { cost: 0.4, transit_time: 0.3, reliability: 0.3 };
@@ -145,6 +147,7 @@ export default function QuoteDetail() {
   const { hasPermission } = useAuth();
   const { enabled: quoteImportExportEnabled } = useAppFeatureFlag(FEATURE_FLAGS.QUOTATION_IMPORT_EXPORT_V2, true);
   const canUseQuoteImportExport = quoteImportExportEnabled && (hasPermission('quotes.import_export') || hasPermission('import_quotation') || hasPermission('export_quotation'));
+  const { viewMode, theme, setViewMode, setTheme } = useCRMModuleNavigationState('quotes', { viewMode: 'pipeline', theme: 'Azure Sky' });
 
   useEffect(() => {
     setSelectedComparisonOptionId(urlOptionId || null);
@@ -841,6 +844,20 @@ export default function QuoteDetail() {
     setReloadToken((v) => v + 1);
   };
 
+  const handleHeaderViewModeChange = (mode: 'pipeline' | 'card' | 'grid' | 'list') => {
+    if (mode === 'pipeline') {
+      setViewMode(mode);
+      navigate('/dashboard/quotes/pipeline');
+      return;
+    }
+    setViewMode(mode);
+    if (mode === 'list') {
+      navigate('/dashboard/quotes');
+      return;
+    }
+    navigate(`/dashboard/quotes?view=${mode}`);
+  };
+
   useEffect(() => {
     if (config?.multi_option_enabled === false && activeSection === 'comparison') {
       setActiveSection('versions');
@@ -977,7 +994,21 @@ export default function QuoteDetail() {
         ]}
         actions={
           resolvedId && (
-            <>
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <CRMModuleHeaderNavigation
+                moduleLabel="Quotes"
+                viewMode={viewMode}
+                theme={theme}
+                onViewModeChange={handleHeaderViewModeChange}
+                onThemeChange={setTheme}
+                onCreate={() => navigate('/dashboard/quotes/new')}
+                createLabel="New Quote"
+                onRefresh={handleRetry}
+                onImportExport={() => navigate('/dashboard/quotes/import-export')}
+                controlSequence={['pipeline', 'card', 'grid', 'list', 'create', 'refresh', 'importExport', 'theme']}
+                iconOnly
+                layout="compact"
+              />
               <Button 
                   variant="outline" 
                   onClick={() => setShowSaveVersion(true)}
@@ -1028,7 +1059,7 @@ export default function QuoteDetail() {
                   quoteNumber={quoteNumber ?? (resolvedId ?? '')} 
                   versionId={versionId || ''}
               />
-            </>
+            </div>
           )
         }
       >

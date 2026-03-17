@@ -113,4 +113,33 @@ describe('CRM module navigation workflow consistency', () => {
     expect(dashboardLayout).toContain('<GlobalSearch />');
     expect(dashboardLayout).not.toContain("window.dispatchEvent(new CustomEvent('shell:open-global-search'))");
   });
+
+  it('keeps quotation manager aligned with domain-aware kanban dashboard baseline', () => {
+    const quotationManager = read('src/pages/dashboard/QuotationManager.tsx');
+    const versionsApi = read('src/pages/api/v1/quotations/[id]/versions.ts');
+    const domainService = read('src/services/DomainService.ts');
+    const apiHttp = read('src/pages/api/_utils/http.ts');
+    expect(quotationManager).toContain('KanbanFilters');
+    expect(quotationManager).toContain("const [selectedStatuses, setSelectedStatuses]");
+    expect(quotationManager).toContain('resolveQuoteIdsForDomain');
+    expect(quotationManager).toContain('Total Quotes');
+    expect(quotationManager).toContain('Accepted');
+    expect(versionsApi).toContain("req.headers['x-domain-id']");
+    expect(versionsApi).toContain("from('quotation_domain')");
+    expect(domainService).toContain('getDomainConfig(');
+    expect(domainService).toContain('upsertDomainConfig(');
+    expect(apiHttp).toContain('x-domain-id');
+  });
+
+  it('enforces quote route permissions and pipeline-first dashboard state', () => {
+    const appContent = read('src/App.tsx');
+    const quotationManager = read('src/pages/dashboard/QuotationManager.tsx');
+    expect(appContent).toContain('path="/dashboard/quotes/pipeline"');
+    expect(appContent).toContain('<ProtectedRoute requiredPermissions={["quotes.view"]}>');
+    expect(appContent).toContain('path="/dashboard/quotes/new"');
+    expect(appContent).toContain('<ProtectedRoute requiredPermissions={["quotes.create"]}>');
+    expect(quotationManager).toContain("const [viewMode, setViewMode] = useState<ViewMode>('board');");
+    expect(quotationManager).toContain("navigate('/dashboard/quotes');");
+    expect(quotationManager).not.toContain("localStorage.getItem('quotesViewMode')");
+  });
 });

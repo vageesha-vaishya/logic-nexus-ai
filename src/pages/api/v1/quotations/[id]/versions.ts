@@ -1,6 +1,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { QuotationVersionService } from '@/services/quotation/QuotationVersionService';
+import { logger } from '@/lib/logger';
 
 interface ApiRequest {
   method?: string;
@@ -22,6 +23,7 @@ const supabase = createClient(
 
 const versionService = new QuotationVersionService(supabase);
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const DOMAIN_CODE_REGEX = /^[A-Z0-9_-]{2,64}$/;
 
 async function resolveQuoteId(quoteRef: string, tenantId: string): Promise<string | null> {
   const normalizedQuoteRef = String(quoteRef || '').trim();
@@ -67,6 +69,42 @@ async function resolveQuoteId(quoteRef: string, tenantId: string): Promise<strin
   return resolvedQuote?.id ? String(resolvedQuote.id) : null;
 }
 
+function parseDomainCodeHeader(req: ApiRequest): string | null {
+  const raw = String(req.headers['x-domain-id'] || '').trim().toUpperCase();
+  if (!raw) return null;
+  if (!DOMAIN_CODE_REGEX.test(raw)) {
+    throw new Error('Invalid X-Domain-ID header format');
+  }
+  return raw;
+}
+
+async function resolveDomainIdByCode(domainCode: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('platform_domains')
+    .select('id')
+    .eq('code', domainCode)
+    .eq('is_active', true)
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return data?.id ? String(data.id) : null;
+}
+
+async function assertQuoteBelongsToDomain(quoteId: string, domainId: string, tenantId: string): Promise<boolean> {
+  let query = supabase
+    .from('quotation_domain')
+    .select('quote_id')
+    .eq('quote_id', quoteId)
+    .eq('domain_id', domainId)
+    .eq('is_active', true);
+  if (tenantId) {
+    query = query.eq('tenant_id', tenantId);
+  }
+  const { data, error } = await query.limit(1).maybeSingle();
+  if (error) throw new Error(error.message);
+  return Boolean(data?.quote_id);
+}
+
 export default async function handler(req: ApiRequest, res: ApiResponse) {
   const rawId = req.query['id'];
   const quoteIdStr = Array.isArray(rawId) ? String(rawId[0]) : (rawId as string | undefined);
@@ -81,9 +119,33 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
   const userId = (req.headers['x-user-id'] as string) || 'system';
 
   try {
+    const requestedDomainCode = parseDomainCodeHeader(req);
     const resolvedQuoteId = await resolveQuoteId(quoteIdStr, tenantId);
     if (!resolvedQuoteId) {
       return res.status(404).json({ error: 'Quote not found' });
+    }
+
+    if (requestedDomainCode) {
+      const domainId = await resolveDomainIdByCode(requestedDomainCode);
+      if (!domainId) {
+        logger.warn('[QuotationVersionAPI] rejected unknown domain header', {
+          quoteRef: quoteIdStr,
+          requestedDomainCode,
+          tenantId,
+          userId,
+        });
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+      const belongsToDomain = await assertQuoteBelongsToDomain(resolvedQuoteId, domainId, tenantId);
+      if (!belongsToDomain) {
+        logger.warn('[QuotationVersionAPI] quote access blocked by domain isolation', {
+          quoteId: resolvedQuoteId,
+          requestedDomainCode,
+          tenantId,
+          userId,
+        });
+        return res.status(403).json({ error: 'Forbidden' });
+      }
     }
 
     switch (req.method) {

@@ -6,7 +6,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { BrowserRouter } from 'react-router-dom';
 import '@testing-library/jest-dom';
 import { stages } from './quotes-data';
-import { DashboardLayout } from '@/components/layout/DashboardLayout';
 
 // Mock dependencies
 vi.mock('@/hooks/useCRM');
@@ -87,7 +86,12 @@ describe('QuotesPipeline', () => {
     const mockScopedDb = {
       from: vi.fn().mockReturnThis(),
       select: vi.fn().mockReturnThis(),
-      order: vi.fn().mockResolvedValue({ data: [], error: null }),
+      or: vi.fn().mockReturnThis(),
+      ilike: vi.fn().mockReturnThis(),
+      gt: vi.fn().mockReturnThis(),
+      lt: vi.fn().mockReturnThis(),
+      range: vi.fn().mockReturnThis(),
+      order: vi.fn().mockResolvedValue({ data: [], count: 0, error: null }),
       limit: vi.fn().mockReturnThis(),
       update: vi.fn().mockReturnThis(),
       delete: vi.fn().mockReturnThis(),
@@ -109,14 +113,15 @@ describe('QuotesPipeline', () => {
     });
   });
 
-  it('renders pipeline title', async () => {
+  it('renders quotation dashboard summary cards', async () => {
     render(
       <BrowserRouter>
         <QuotesPipeline />
       </BrowserRouter>
     );
     
-    expect(screen.getByText('Quotes Pipeline')).toBeInTheDocument();
+    expect(await screen.findByText('Total Quotes')).toBeInTheDocument();
+    expect(screen.getByText('In Progress')).toBeInTheDocument();
   });
 
   it('renders new quote button', async () => {
@@ -126,8 +131,7 @@ describe('QuotesPipeline', () => {
       </BrowserRouter>
     );
 
-    const buttons = screen.getAllByText('New Quote');
-    expect(buttons.length).toBeGreaterThanOrEqual(1);
+    expect(await screen.findByText('New')).toBeInTheDocument();
   });
 
   it('fetches quotes on mount', async () => {
@@ -144,7 +148,7 @@ describe('QuotesPipeline', () => {
     });
   });
 
-  it('renders swim lanes', async () => {
+  it('renders kanban filters and quotation board shell', async () => {
     render(
       <BrowserRouter>
         <QuotesPipeline />
@@ -152,8 +156,8 @@ describe('QuotesPipeline', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId('swim-lane')).toBeInTheDocument();
-      expect(screen.getByText('All Quotes')).toBeInTheDocument();
+      expect(screen.getByPlaceholderText('Search...')).toBeInTheDocument();
+      expect(screen.getByText('Bulk Select')).toBeInTheDocument();
     });
   });
 });

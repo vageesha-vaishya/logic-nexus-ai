@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useCRM } from "@/hooks/useCRM";
 import { useAuth } from "@/hooks/useAuth";
 import { QuotationManagerLayout } from "@/components/sales/QuotationManagerLayout";
@@ -11,11 +12,13 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle, CheckSquare, RefreshCcw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Quote, QuoteStatus } from "./quotes-data";
+import { Quote, QuoteStatus, stages, statusConfig } from "./quotes-data";
 import { logger } from "@/lib/logger";
 import { QuotationDeleteService } from "@/services/quotation/QuotationDeleteService";
 import { useDomain } from "@/contexts/DomainContext";
 import { DomainQuotationIsolationService } from "@/services/quotation/DomainQuotationIsolationService";
+import { KanbanFilters } from "@/components/kanban/KanbanFilters";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 import { SalesDashboardProvider } from "@/contexts/SalesDashboardContext";
 
@@ -32,11 +35,10 @@ function QuotationManagerContent() {
   const { hasPermission } = useAuth();
   const { toast } = useToast();
   const { currentDomain } = useDomain();
+  const navigate = useNavigate();
   
   // View State
-  const [viewMode, setViewMode] = useState<ViewMode>(() => {
-    return (localStorage.getItem('quotesViewMode') as ViewMode) || 'board';
-  });
+  const [viewMode, setViewMode] = useState<ViewMode>('board');
 
   // Data State
   const [quotes, setQuotes] = useState<Quote[]>([]);
@@ -46,6 +48,7 @@ function QuotationManagerContent() {
   // Filter State
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilters, setActiveFilters] = useState<FilterCriterion[]>([]);
+  const [selectedStatuses, setSelectedStatuses] = useState<QuoteStatus[]>([...stages]);
   
   // Pagination State
   const [pagination, setPagination] = useState({
@@ -62,24 +65,26 @@ function QuotationManagerContent() {
   const domainIsolationService = useMemo(() => new DomainQuotationIsolationService(), []);
 
   useEffect(() => {
-    localStorage.setItem('quotesViewMode', viewMode);
-  }, [viewMode]);
-
-  useEffect(() => {
     fetchQuotes();
-  }, [searchQuery, activeFilters, pagination.current, pagination.pageSize, currentDomain?.id]);
+  }, [searchQuery, activeFilters, pagination.current, pagination.pageSize, currentDomain?.id, selectedStatuses]);
 
   const fetchQuotes = async () => {
+    let pluginHooksEnabled = false;
     try {
       setLoading(true);
       setError(null);
       if (currentDomain?.code) {
-        domainIsolationService.ensurePluginIsolation(currentDomain.code);
-        domainIsolationService.runPluginHook(currentDomain.code, 'beforeFetch', {
-          domainId: currentDomain.id,
-          searchQuery,
-          filterCount: activeFilters.length,
-        });
+        try {
+          domainIsolationService.ensurePluginIsolation(currentDomain.code);
+          pluginHooksEnabled = true;
+          domainIsolationService.runPluginHook(currentDomain.code, 'beforeFetch', {
+            domainId: currentDomain.id,
+            searchQuery,
+            filterCount: activeFilters.length,
+          });
+        } catch (hookError) {
+          logger.warn('Skipping quotation plugin hooks for domain fetch', hookError);
+        }
       }
       
       let query = scopedDb
@@ -95,7 +100,7 @@ function QuotationManagerContent() {
         if (!scopedQuoteIds.length) {
           setQuotes([]);
           setPagination(prev => ({ ...prev, total: 0 }));
-          if (currentDomain.code) {
+          if (currentDomain.code && pluginHooksEnabled) {
             domainIsolationService.runPluginHook(currentDomain.code, 'afterFetch', {
               domainId: currentDomain.id,
               quoteCount: 0,
@@ -132,6 +137,10 @@ function QuotationManagerContent() {
         }
       });
 
+      if (selectedStatuses.length > 0 && selectedStatuses.length !== stages.length) {
+        query = query.in('status', selectedStatuses);
+      }
+
       // Pagination
       const from = (pagination.current - 1) * pagination.pageSize;
       const to = from + pagination.pageSize - 1;
@@ -152,7 +161,7 @@ function QuotationManagerContent() {
 
       setQuotes(transformedData);
       setPagination(prev => ({ ...prev, total: count || 0 }));
-      if (currentDomain?.code) {
+      if (currentDomain?.code && pluginHooksEnabled) {
         domainIsolationService.runPluginHook(currentDomain.code, 'afterFetch', {
           domainId: currentDomain.id,
           quoteCount: transformedData.length,
@@ -160,7 +169,7 @@ function QuotationManagerContent() {
       }
 
     } catch (error: any) {
-      if (currentDomain?.code) {
+      if (currentDomain?.code && pluginHooksEnabled) {
         domainIsolationService.runPluginHook(currentDomain.code, 'fetchError', {
           domainId: currentDomain?.id || null,
           message: error?.message || 'unknown',
@@ -296,10 +305,28 @@ function QuotationManagerContent() {
     setPagination(prev => ({ ...prev, current: 1 }));
   };
 
+  const quoteStats = useMemo(() => {
+    const total = quotes.length;
+    const accepted = quotes.filter((quote) => quote.status === 'accepted').length;
+    const inProgress = quotes.filter((quote) =>
+      ['draft', 'pricing_review', 'approved', 'sent', 'customer_reviewing', 'revision_requested'].includes(quote.status)
+    ).length;
+    const rejected = quotes.filter((quote) => ['rejected', 'expired'].includes(quote.status)).length;
+    return { total, accepted, inProgress, rejected };
+  }, [quotes]);
+
+  const handleViewModeChange = (mode: ViewMode) => {
+    if (mode === 'list') {
+      navigate('/dashboard/quotes');
+      return;
+    }
+    setViewMode('board');
+  };
+
   return (
     <QuotationManagerLayout
       viewMode={viewMode}
-      onViewModeChange={setViewMode}
+      onViewModeChange={handleViewModeChange}
       searchQuery={searchQuery}
       onSearchChange={setSearchQuery}
       activeFilters={activeFilters}
@@ -332,6 +359,68 @@ function QuotationManagerContent() {
         </div>
       ) : (
         <>
+          <div className="mb-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardDescription className="text-xs">Total Quotes</CardDescription>
+                <CardTitle className="text-2xl">{quoteStats.total}</CardTitle>
+              </CardHeader>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardDescription className="text-xs">Accepted</CardDescription>
+                <CardTitle className="text-2xl">{quoteStats.accepted}</CardTitle>
+              </CardHeader>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardDescription className="text-xs">In Progress</CardDescription>
+                <CardTitle className="text-2xl">{quoteStats.inProgress}</CardTitle>
+              </CardHeader>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardDescription className="text-xs">Not Closed</CardDescription>
+                <CardTitle className="text-2xl">{quoteStats.rejected}</CardTitle>
+              </CardHeader>
+            </Card>
+          </div>
+
+          <div className="mb-4">
+            <Card className="rounded-md border-muted">
+              <CardContent className="p-2">
+                <KanbanFilters
+                  searchQuery={searchQuery}
+                  onSearchChange={(value) => {
+                    setSearchQuery(value);
+                    setPagination((prev) => ({ ...prev, current: 1 }));
+                  }}
+                  filters={{ status: selectedStatuses }}
+                  onFilterChange={(_, values) => {
+                    const safeValues = values.filter((value): value is QuoteStatus => stages.includes(value as QuoteStatus));
+                    setSelectedStatuses(safeValues.length > 0 ? safeValues : [...stages]);
+                    setPagination((prev) => ({ ...prev, current: 1 }));
+                  }}
+                  onReset={() => {
+                    setSearchQuery('');
+                    setSelectedStatuses([...stages]);
+                    setPagination((prev) => ({ ...prev, current: 1 }));
+                  }}
+                  availableFilters={[
+                    {
+                      id: 'status',
+                      label: 'Status',
+                      options: stages.map((stage) => ({
+                        label: statusConfig[stage].label.replace(/^[^\s]+\s/, ''),
+                        value: stage,
+                      })),
+                    },
+                  ]}
+                />
+              </CardContent>
+            </Card>
+          </div>
+
           <div className="mb-4 flex items-center gap-2">
             <Button
               variant={bulkMode ? "default" : "outline"}
