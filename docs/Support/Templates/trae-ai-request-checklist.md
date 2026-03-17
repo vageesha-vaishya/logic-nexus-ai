@@ -17,3 +17,11 @@ Use this checklist to make your requests consistent, concrete, and testable.
 - Add validation steps (console checks, API responses).
 - Include fallback plan or rollback note if risky.
 - Avoid unrelated refactors; keep scope tight.
+
+## Code Review Checklist for New Tables
+
+- If migration adds `CREATE TABLE`, confirm schema/code overlap analysis is attached.
+- Confirm review lists candidate existing tables and extension feasibility result.
+- Confirm written justification explains why extension is not reasonable.
+- Confirm database architecture team approval reference is provided.
+- Confirm migration includes `DB-VERIFICATION:` and `DB-ARCH-APPROVAL:` metadata lines.

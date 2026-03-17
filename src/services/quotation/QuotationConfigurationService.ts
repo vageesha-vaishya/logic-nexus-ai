@@ -9,6 +9,12 @@ export interface BrandingSettings {
   secondary_color?: string;
   accent_color?: string;
   font_family?: string;
+  custom_css?: string;
+  white_label_enabled?: boolean;
+  favicon_url?: string;
+  cdn_base_url?: string;
+  domain_overrides?: Record<string, unknown>;
+  franchise_overrides?: Record<string, unknown>;
   header_text?: string;
   sub_header_text?: string;
   footer_text?: string;

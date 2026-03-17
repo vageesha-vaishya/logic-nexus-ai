@@ -111,6 +111,15 @@ export function FranchiseForm({ franchise, onSuccess }: FranchiseFormProps) {
   };
 
   const fetchManagers = async (tenantId: string) => {
+    if (!context.isPlatformAdmin && context.tenantId && tenantId !== context.tenantId) {
+      toast({
+        title: 'Forbidden',
+        description: 'You can only load managers from your tenant scope.',
+        variant: 'destructive',
+      });
+      setManagers([]);
+      return;
+    }
     // Get users associated with this tenant
     const { data: userRoles } = await scopedDb
       .from('user_roles')
@@ -157,6 +166,9 @@ export function FranchiseForm({ franchise, onSuccess }: FranchiseFormProps) {
 
   const onSubmit = async (values: FranchiseFormValues) => {
     try {
+      if (!context.isPlatformAdmin && context.tenantId && values.tenant_id !== context.tenantId) {
+        throw new Error('Forbidden');
+      }
       const data = {
         name: values.name,
         code: values.code,

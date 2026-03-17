@@ -5,9 +5,9 @@ import { FranchiseForm } from '@/components/admin/FranchiseForm';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Store, Trash2, ArrowLeft, FileDown } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import Papa from 'papaparse';
+import { useCRM } from '@/hooks/useCRM';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,6 +25,7 @@ export default function FranchiseDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { context, scopedDb, supabase } = useCRM();
   const [franchise, setFranchise] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -34,14 +35,29 @@ export default function FranchiseDetail() {
 
   const fetchFranchise = async () => {
     try {
-      const { data, error } = await supabase
-        .from('franchises')
-        .select('*')
-        .eq('id', id)
-        .single();
-
-      if (error) throw error;
-      setFranchise(data);
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData?.session?.access_token || '';
+      const search = new URLSearchParams();
+      if (id) search.set('franchise_id', id);
+      if (!context.isPlatformAdmin && context.tenantId) {
+        search.set('tenant_id', context.tenantId);
+      }
+      const suffix = search.toString() ? `?${search.toString()}` : '';
+      const response = await fetch(`/api/v1/franchises${suffix}`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+          ...(!context.isPlatformAdmin && context.tenantId ? { 'x-tenant-id': context.tenantId } : {}),
+        },
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(payload?.error || 'Failed to load franchise');
+      }
+      const row = Array.isArray(payload?.data) ? payload.data[0] || null : null;
+      setFranchise(row);
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -55,7 +71,13 @@ export default function FranchiseDetail() {
 
   const handleDelete = async () => {
     try {
-      const { error } = await supabase
+      if (!id) {
+        throw new Error('Franchise scope missing');
+      }
+      if (!context.isPlatformAdmin && context.tenantId && franchise?.tenant_id !== context.tenantId) {
+        throw new Error('Forbidden');
+      }
+      const { error } = await scopedDb
         .from('franchises')
         .delete()
         .eq('id', id);

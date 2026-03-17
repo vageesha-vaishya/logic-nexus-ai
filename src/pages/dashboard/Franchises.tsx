@@ -37,7 +37,7 @@ export default function Franchises() {
         headers: {
           'Content-Type': 'application/json',
           ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-          ...(context.tenantId ? { 'x-tenant-id': context.tenantId } : {}),
+          ...(!context.isPlatformAdmin && context.tenantId ? { 'x-tenant-id': context.tenantId } : {}),
         },
       });
 
@@ -56,7 +56,7 @@ export default function Franchises() {
     } finally {
       setLoading(false);
     }
-  }, [context.tenantId, toast]);
+  }, [context.isPlatformAdmin, context.tenantId, toast]);
 
   useEffect(() => {
     fetchFranchises();

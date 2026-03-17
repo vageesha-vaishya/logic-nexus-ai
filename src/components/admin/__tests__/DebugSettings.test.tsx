@@ -10,7 +10,7 @@ vi.mock('@/hooks/useAuth');
 vi.mock('@/hooks/use-toast');
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: {
-    from: vi.fn(),
+    rpc: vi.fn(),
     auth: {
       updateUser: vi.fn(),
       refreshSession: vi.fn(),
@@ -24,20 +24,19 @@ describe('DebugSettingsCard', () => {
   const mockUpdateUser = supabase.auth.updateUser as any;
   const mockRefreshSession = supabase.auth.refreshSession as any;
   const mockGetUser = supabase.auth.getUser as any;
-  const mockFrom = supabase.from as any;
+  const mockRpc = supabase.rpc as any;
 
   beforeEach(() => {
     vi.clearAllMocks();
     (useToast as any).mockReturnValue({ toast: mockToast });
-    mockFrom.mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({
-          limit: vi.fn().mockReturnValue({
-            maybeSingle: vi.fn().mockResolvedValue({ data: { is_enabled: false }, error: null }),
-          }),
-        }),
-      }),
-      upsert: vi.fn().mockResolvedValue({ error: null }),
+    mockRpc.mockImplementation((fnName: string) => {
+      if (fnName === 'get_platform_debug_button_enabled') {
+        return Promise.resolve({ data: false, error: null });
+      }
+      if (fnName === 'set_platform_debug_button_enabled') {
+        return Promise.resolve({ data: true, error: null });
+      }
+      return Promise.resolve({ data: null, error: null });
     });
     mockUpdateUser.mockResolvedValue({ data: { user: {} }, error: null });
     mockRefreshSession.mockResolvedValue({ data: { session: {} }, error: null });

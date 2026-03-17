@@ -6,16 +6,17 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Plus, Building2 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { FirstScreenTemplate } from '@/components/system/FirstScreenTemplate';
 import { EmptyState } from '@/components/system/EmptyState';
 import { ViewMode } from '@/components/ui/view-toggle';
 import { EntityCard } from '@/components/system/EntityCard';
+import { useCRM } from '@/hooks/useCRM';
 
 export default function Tenants() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { context, scopedDb } = useCRM();
   interface Tenant {
     id: string;
     name: string;
@@ -36,10 +37,20 @@ export default function Tenants() {
 
   const fetchTenants = async () => {
     try {
-      const { data, error } = await supabase
-        .from('tenants')
+      let query = scopedDb
+        .from('tenants', true)
         .select('*')
         .order('created_at', { ascending: false });
+
+      if (!context.isPlatformAdmin) {
+        if (!context.tenantId) {
+          setTenants([]);
+          return;
+        }
+        query = query.eq('id', context.tenantId);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       setTenants(data || []);
@@ -60,7 +71,7 @@ export default function Tenants() {
         viewMode={viewMode}
         onViewModeChange={setViewMode}
         availableModes={['card', 'grid', 'list']}
-        onCreate={() => navigate('/dashboard/tenants/new')}
+        onCreate={context.isPlatformAdmin ? () => navigate('/dashboard/tenants/new') : undefined}
       >
 
         <Card>
@@ -77,8 +88,8 @@ export default function Tenants() {
               <EmptyState
                 title="No tenants found"
                 description="Create your first tenant to get started."
-                actionLabel="New Tenant"
-                onAction={() => navigate('/dashboard/tenants/new')}
+                actionLabel={context.isPlatformAdmin ? 'New Tenant' : undefined}
+                onAction={context.isPlatformAdmin ? () => navigate('/dashboard/tenants/new') : undefined}
               />
             ) : viewMode === 'list' ? (
               <Table>

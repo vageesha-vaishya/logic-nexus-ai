@@ -12,9 +12,13 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Building2, Trash2, ArrowLeft, Upload, FileText, Check, Clock, RefreshCcw, Download } from 'lucide-react';
+import { BrandingSettingsForm } from '@/components/settings/BrandingSettingsForm';
+import type { BrandingSettings } from '@/services/quotation/QuotationConfigurationService';
+import { sanitizeBrandingCss } from '@/lib/utils/sanitizer';
 import { useCRM } from '@/hooks/useCRM';
 import { invokeFunction } from '@/lib/supabase-functions';
 import { useToast } from '@/hooks/use-toast';
+import { TenantBrandingService } from '@/services/branding/TenantBrandingService';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,9 +38,15 @@ export default function TenantDetail() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { supabase, context, scopedDb } = useCRM();
+  const isPlatformAdmin = context.isPlatformAdmin;
+  const effectiveTenantId = useMemo(
+    () => (isPlatformAdmin ? (id || null) : (context.tenantId || null)),
+    [context.tenantId, id, isPlatformAdmin]
+  );
+  const isRestrictedBrandingView = !isPlatformAdmin;
   const [tenant, setTenant] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'profile'|'contracts'|'documents'|'import'|'reports'>('profile');
+  const [activeTab, setActiveTab] = useState<'information'|'branding'|'contracts'|'documents'|'import'|'reports'>('information');
   const settings = useMemo(() => tenant?.settings || {}, [tenant]);
   
   // Contracts state (persisted in settings.contracts)
@@ -59,18 +69,40 @@ export default function TenantDetail() {
   const [importFile, setImportFile] = useState<File | null>(null);
   const [useLLMRefine, setUseLLMRefine] = useState(true);
   const [importErrors, setImportErrors] = useState<Array<{ row: number; message: string }>>([]);
+  const [brandingSaving, setBrandingSaving] = useState(false);
+
+  useEffect(() => {
+    if (isRestrictedBrandingView) {
+      setActiveTab('branding');
+    } else {
+      setActiveTab('information');
+    }
+  }, [isRestrictedBrandingView]);
 
   useEffect(() => {
     fetchTenant();
-  }, [id]);
+  }, [effectiveTenantId, id, isPlatformAdmin]);
 
   const fetchTenant = async () => {
     try {
+      if (!effectiveTenantId) {
+        setTenant(null);
+        return;
+      }
+      if (!isPlatformAdmin && id && context.tenantId && id !== context.tenantId) {
+        toast({
+          title: 'Forbidden',
+          description: 'You can only access your own branding configuration.',
+          variant: 'destructive',
+        });
+        navigate('/dashboard/tenant-branding', { replace: true });
+        return;
+      }
       const { data, error } = await supabase
         .from('tenants')
         .select('*')
-        .eq('id', id)
-        .single();
+        .eq('id', effectiveTenantId)
+        .maybeSingle();
 
       if (error) throw error;
       setTenant(data);
@@ -87,11 +119,19 @@ export default function TenantDetail() {
   };
 
   const handleDelete = async () => {
+    if (!isPlatformAdmin || !effectiveTenantId) {
+      toast({
+        title: 'Forbidden',
+        description: 'Only platform administrators can delete tenants.',
+        variant: 'destructive',
+      });
+      return;
+    }
     try {
       const { error } = await supabase
         .from('tenants')
         .delete()
-        .eq('id', id);
+        .eq('id', effectiveTenantId);
 
       if (error) throw error;
 
@@ -110,16 +150,51 @@ export default function TenantDetail() {
   };
   
   const saveSettings = async (next: any, successMessage = 'Settings saved') => {
+    if (!isPlatformAdmin || !effectiveTenantId) {
+      toast({
+        title: 'Forbidden',
+        description: 'Only platform administrators can update tenant administration settings.',
+        variant: 'destructive',
+      });
+      return;
+    }
     try {
       const { error } = await scopedDb
         .from('tenants')
         .update({ settings: next })
-        .eq('id', id);
+        .eq('id', effectiveTenantId);
       if (error) throw error;
       setTenant((t: any) => ({ ...t, settings: next }));
       toast({ title: 'Success', description: successMessage });
     } catch (e: any) {
       toast({ title: 'Error', description: e?.message, variant: 'destructive' });
+    }
+  };
+
+  const saveBranding = async (payload: BrandingSettings) => {
+    if (!effectiveTenantId) return;
+    try {
+      setBrandingSaving(true);
+      const sanitized: BrandingSettings = {
+        ...payload,
+        custom_css: sanitizeBrandingCss(payload.custom_css || ''),
+      };
+      await TenantBrandingService.updateBranding(sanitized, effectiveTenantId);
+      const nextSettings = { ...(tenant?.settings || {}), branding_settings: sanitized };
+      setTenant((current: any) => ({
+        ...current,
+        branding_settings: sanitized,
+        settings: nextSettings,
+      }));
+      toast({ title: 'Success', description: 'Branding saved' });
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error?.message || 'Failed to save branding',
+        variant: 'destructive',
+      });
+    } finally {
+      setBrandingSaving(false);
     }
   };
   
@@ -443,7 +518,9 @@ export default function TenantDetail() {
   if (!tenant) {
     return (
       <DashboardLayout>
-        <div className="text-center py-8">Tenant not found</div>
+        <div className="text-center py-8">
+          {isRestrictedBrandingView ? 'Tenant branding scope is unavailable' : 'Tenant not found'}
+        </div>
       </DashboardLayout>
     );
   }
@@ -453,59 +530,92 @@ export default function TenantDetail() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard/tenants')}>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate(isPlatformAdmin ? '/dashboard/tenants' : '/dashboard')}
+            >
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <div>
               <h1 className="text-3xl font-bold">{tenant.name}</h1>
-              <p className="text-muted-foreground">Enterprise tenant management</p>
+              <p className="text-muted-foreground">
+                {isPlatformAdmin ? 'Enterprise tenant management' : 'Tenant branding configuration'}
+              </p>
             </div>
           </div>
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="destructive" size="icon">
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Delete Tenant</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Are you sure you want to delete this tenant? This action cannot be undone.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+          {isPlatformAdmin && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="icon">
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete Tenant</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to delete this tenant? This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
         </div>
 
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
-          <TabsList className="w-full grid grid-cols-5">
-            <TabsTrigger value="profile">Profile</TabsTrigger>
-            <TabsTrigger value="contracts">Contracts</TabsTrigger>
-            <TabsTrigger value="documents">Documents</TabsTrigger>
-            <TabsTrigger value="import">Import/Export</TabsTrigger>
-            <TabsTrigger value="reports">Reports</TabsTrigger>
+          <TabsList className={`w-full grid ${isPlatformAdmin ? 'grid-cols-6' : 'grid-cols-1'}`}>
+            {isPlatformAdmin && <TabsTrigger value="information">Tenant Information</TabsTrigger>}
+            {isPlatformAdmin && <TabsTrigger value="branding">Tenant Branding</TabsTrigger>}
+            {!isPlatformAdmin && <TabsTrigger value="branding">Tenant Branding</TabsTrigger>}
+            {isPlatformAdmin && <TabsTrigger value="contracts">Contracts</TabsTrigger>}
+            {isPlatformAdmin && <TabsTrigger value="documents">Documents</TabsTrigger>}
+            {isPlatformAdmin && <TabsTrigger value="import">Import/Export</TabsTrigger>}
+            {isPlatformAdmin && <TabsTrigger value="reports">Reports</TabsTrigger>}
           </TabsList>
           
-          <TabsContent value="profile" className="mt-4">
+          {isPlatformAdmin && (
+            <TabsContent value="information" className="mt-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Building2 className="h-5 w-5" />
+                    Tenant Information
+                  </CardTitle>
+                  <CardDescription>Maintain core details and expanded profile</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <TenantForm tenant={tenant} onSuccess={fetchTenant} />
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
+
+          <TabsContent value="branding" className="mt-4">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Building2 className="h-5 w-5" />
-                  Tenant Information
-                </CardTitle>
-                <CardDescription>Maintain core details and expanded profile</CardDescription>
+                <CardTitle>Tenant Branding</CardTitle>
+                <CardDescription>
+                  {isPlatformAdmin
+                    ? 'Configure logo, colors, white-label, and domain/franchise overrides.'
+                    : 'Manage your tenant branding without administrative tenant access.'}
+                </CardDescription>
               </CardHeader>
               <CardContent>
-                <TenantForm tenant={tenant} onSuccess={fetchTenant} />
+                <BrandingSettingsForm
+                  initialSettings={(tenant?.branding_settings || tenant?.settings?.branding_settings || {}) as BrandingSettings}
+                  onSave={saveBranding}
+                  saving={brandingSaving}
+                />
               </CardContent>
             </Card>
           </TabsContent>
           
+          {isPlatformAdmin && (
           <TabsContent value="contracts" className="mt-4">
             <Card>
               <CardHeader>
@@ -635,7 +745,9 @@ export default function TenantDetail() {
               </CardContent>
             </Card>
           </TabsContent>
+          )}
           
+          {isPlatformAdmin && (
           <TabsContent value="documents" className="mt-4">
             <Card>
               <CardHeader>
@@ -687,7 +799,9 @@ export default function TenantDetail() {
               </CardContent>
             </Card>
           </TabsContent>
+          )}
           
+          {isPlatformAdmin && (
           <TabsContent value="import" className="mt-4">
             <Card>
               <CardHeader>
@@ -760,7 +874,9 @@ export default function TenantDetail() {
               </CardContent>
             </Card>
           </TabsContent>
+          )}
           
+          {isPlatformAdmin && (
           <TabsContent value="reports" className="mt-4">
             <Card>
               <CardHeader>
@@ -780,6 +896,7 @@ export default function TenantDetail() {
               </CardContent>
             </Card>
           </TabsContent>
+          )}
         </Tabs>
       </div>
     </DashboardLayout>

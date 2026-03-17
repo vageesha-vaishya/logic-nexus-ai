@@ -1,8 +1,12 @@
 import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { DashboardLayout } from '../DashboardLayout';
+
+const mockUseAuth = vi.fn();
+const mockUseCRM = vi.fn();
+const mockUseAppFeatureFlag = vi.fn();
 
 vi.mock('../AppSidebar', () => ({
   AppSidebar: () => <aside data-testid="app-sidebar" />,
@@ -53,34 +57,20 @@ vi.mock('@/hooks/useKeyboardShortcuts', () => ({
 }));
 
 vi.mock('@/hooks/useAuth', () => ({
-  useAuth: () => ({
-    user: { email: 'admin@example.com', user_metadata: {} },
-    profile: { first_name: 'Admin', last_name: 'User', avatar_url: null },
-    roles: [{ role: 'platform_admin' }],
-  }),
+  useAuth: () => mockUseAuth(),
 }));
 
 vi.mock('@/hooks/useCRM', () => ({
-  useCRM: () => ({
-    context: { isPlatformAdmin: true, tenantId: null, franchiseId: null },
-    scopedDb: {
-      from: () => ({
-        select: () => ({
-          eq: () => ({
-            maybeSingle: async () => ({ data: null, error: null }),
-          }),
-        }),
-      }),
-    },
-  }),
+  useCRM: () => mockUseCRM(),
 }));
 
 vi.mock('@/lib/feature-flags', () => ({
   FEATURE_FLAGS: {
     USER_INFO_HEADER_MODULE: 'user_info_header_module',
+    USER_INFO_HEADER_DUAL_MODE: 'user_info_header_dual_mode',
     HEADER_DEBUG_BUTTON: 'header_debug_button',
   },
-  useAppFeatureFlag: (key: string) => ({ enabled: key === 'header_debug_button' ? false : false, isLoading: false, error: null }),
+  useAppFeatureFlag: (key: string) => mockUseAppFeatureFlag(key),
 }));
 
 vi.mock('@/components/ui/global-search', () => ({
@@ -88,6 +78,30 @@ vi.mock('@/components/ui/global-search', () => ({
 }));
 
 describe('DashboardLayout overflow behavior', () => {
+  beforeEach(() => {
+    document.documentElement.removeAttribute('data-header-banner-visible');
+    document.documentElement.removeAttribute('data-header-banner-content');
+    mockUseAuth.mockReturnValue({
+      user: { email: 'admin@example.com', user_metadata: {} },
+      profile: { first_name: 'Admin', last_name: 'User', avatar_url: null },
+      roles: [{ role: 'platform_admin' }],
+    });
+    mockUseCRM.mockReturnValue({
+      context: { isPlatformAdmin: true, tenantId: null, franchiseId: null },
+      scopedDb: {
+        from: () => ({
+          select: () => ({
+            eq: () => ({
+              maybeSingle: async () => ({ data: null, error: null }),
+            }),
+          }),
+        }),
+        rpc: vi.fn().mockResolvedValue({ data: true, error: null }),
+      },
+    });
+    mockUseAppFeatureFlag.mockImplementation((key: string) => ({ enabled: key === 'header_debug_button' ? false : false, isLoading: false, error: null }));
+  });
+
   it('prevents page-level horizontal scrolling by hiding overflow-x', () => {
     render(
       <MemoryRouter initialEntries={['/dashboard/leads']}>
@@ -114,5 +128,58 @@ describe('DashboardLayout overflow behavior', () => {
     expect(screen.getByTestId('global-search')).toBeInTheDocument();
     expect(screen.queryByLabelText('Pipeline Debugger')).not.toBeInTheDocument();
     expect(screen.queryByTestId('pipeline-dashboard')).not.toBeInTheDocument();
+  });
+
+  it('keeps debug button absent for non-platform users even when flag is enabled', () => {
+    mockUseAuth.mockReturnValue({
+      user: { email: 'tenant@example.com', user_metadata: {} },
+      profile: { first_name: 'Tenant', last_name: 'User', avatar_url: null },
+      roles: [{ role: 'tenant_admin' }],
+    });
+    mockUseCRM.mockReturnValue({
+      context: { isPlatformAdmin: false, tenantId: 'tenant-1', franchiseId: null },
+      scopedDb: {
+        from: () => ({
+          select: () => ({
+            eq: () => ({
+              maybeSingle: async () => ({ data: { id: 'tenant-1', name: 'Tenant One', subscription_status: 'active' }, error: null }),
+            }),
+          }),
+        }),
+        rpc: vi.fn().mockResolvedValue({ data: false, error: null }),
+      },
+    });
+    mockUseAppFeatureFlag.mockImplementation((key: string) => ({ enabled: key === 'header_debug_button', isLoading: false, error: null }));
+
+    render(
+      <MemoryRouter initialEntries={['/dashboard/leads']}>
+        <DashboardLayout>
+          <div>Content</div>
+        </DashboardLayout>
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByLabelText('Pipeline Debugger')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('pipeline-dashboard')).not.toBeInTheDocument();
+  });
+
+  it('preserves legacy header notification payload during dual-mode transition', async () => {
+    document.documentElement.setAttribute('data-header-banner-visible', '1');
+    document.documentElement.setAttribute('data-header-banner-content', 'Legacy API Notification');
+    mockUseAppFeatureFlag.mockImplementation((key: string) => ({
+      enabled: key === 'user_info_header_module' || key === 'user_info_header_dual_mode',
+      isLoading: false,
+      error: null,
+    }));
+
+    render(
+      <MemoryRouter initialEntries={['/dashboard/leads']}>
+        <DashboardLayout>
+          <div>Content</div>
+        </DashboardLayout>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText('Legacy API Notification')).toBeInTheDocument();
   });
 });

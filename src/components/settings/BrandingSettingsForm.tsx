@@ -9,6 +9,7 @@ import { BrandingSettings } from '@/services/quotation/QuotationConfigurationSer
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Save, Loader2 } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 
 interface BrandingSettingsFormProps {
   initialSettings: BrandingSettings;
@@ -45,11 +46,19 @@ export function BrandingSettingsForm({ initialSettings, onSave, saving }: Brandi
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [domainOverridesText, setDomainOverridesText] = useState('');
+  const [franchiseOverridesText, setFranchiseOverridesText] = useState('');
 
   // Sync initial settings when they change (e.g. loaded from parent)
   useEffect(() => {
     if (initialSettings) {
       setSettings(prev => ({ ...prev, ...initialSettings }));
+      setDomainOverridesText(
+        initialSettings.domain_overrides ? JSON.stringify(initialSettings.domain_overrides, null, 2) : ''
+      );
+      setFranchiseOverridesText(
+        initialSettings.franchise_overrides ? JSON.stringify(initialSettings.franchise_overrides, null, 2) : ''
+      );
     }
   }, [initialSettings]);
 
@@ -113,7 +122,36 @@ export function BrandingSettingsForm({ initialSettings, onSave, saving }: Brandi
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await onSave(settings);
+    let domainOverrides: Record<string, unknown> | undefined = undefined;
+    let franchiseOverrides: Record<string, unknown> | undefined = undefined;
+
+    try {
+      if (domainOverridesText.trim()) {
+        const parsed = JSON.parse(domainOverridesText);
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+          toast.error('Domain overrides must be a JSON object');
+          return;
+        }
+        domainOverrides = parsed as Record<string, unknown>;
+      }
+      if (franchiseOverridesText.trim()) {
+        const parsed = JSON.parse(franchiseOverridesText);
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+          toast.error('Franchise overrides must be a JSON object');
+          return;
+        }
+        franchiseOverrides = parsed as Record<string, unknown>;
+      }
+    } catch {
+      toast.error('Invalid JSON in branding overrides');
+      return;
+    }
+
+    await onSave({
+      ...settings,
+      domain_overrides: domainOverrides,
+      franchise_overrides: franchiseOverrides,
+    });
   };
 
   return (
@@ -208,6 +246,80 @@ export function BrandingSettingsForm({ initialSettings, onSave, saving }: Brandi
               onChange={(e) => handleTextChange('company_address', e.target.value)}
               placeholder="Full business address..."
               rows={3}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Brand Delivery</CardTitle>
+          <CardDescription>Configure white-label behavior, CDN assets, and custom CSS.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between rounded-lg border p-3">
+            <div className="space-y-1">
+              <Label htmlFor="white_label_enabled">White Label Mode</Label>
+              <p className="text-sm text-muted-foreground">Hide platform branding and use tenant identity.</p>
+            </div>
+            <Switch
+              id="white_label_enabled"
+              checked={Boolean(settings.white_label_enabled)}
+              onCheckedChange={(checked) => setSettings(prev => ({ ...prev, white_label_enabled: checked }))}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="favicon_url">Favicon URL</Label>
+              <Input
+                id="favicon_url"
+                value={settings.favicon_url || ''}
+                onChange={(e) => handleTextChange('favicon_url', e.target.value)}
+                placeholder="https://cdn.example.com/tenant/favicon.ico"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="cdn_base_url">CDN Base URL</Label>
+              <Input
+                id="cdn_base_url"
+                value={settings.cdn_base_url || ''}
+                onChange={(e) => handleTextChange('cdn_base_url', e.target.value)}
+                placeholder="https://cdn.example.com/tenant-assets"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="custom_css">Custom CSS</Label>
+            <Textarea
+              id="custom_css"
+              value={settings.custom_css || ''}
+              onChange={(e) => handleTextChange('custom_css', e.target.value)}
+              placeholder=":root { --sidebar-width: 18rem; }"
+              rows={6}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="domain_overrides">Domain Overrides (JSON)</Label>
+            <Textarea
+              id="domain_overrides"
+              value={domainOverridesText}
+              onChange={(e) => setDomainOverridesText(e.target.value)}
+              placeholder='{"tenant.example.com":{"primary_color":"#334155"}}'
+              rows={6}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="franchise_overrides">Franchise Overrides (JSON)</Label>
+            <Textarea
+              id="franchise_overrides"
+              value={franchiseOverridesText}
+              onChange={(e) => setFranchiseOverridesText(e.target.value)}
+              placeholder='{"franchise-uuid":{"logo_url":"https://cdn.example.com/logo.png"}}'
+              rows={6}
             />
           </div>
         </CardContent>

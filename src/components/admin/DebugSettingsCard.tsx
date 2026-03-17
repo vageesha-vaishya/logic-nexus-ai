@@ -23,15 +23,10 @@ export function DebugSettingsCard() {
   useEffect(() => {
     let cancelled = false;
     const loadHeaderDebugFlag = async () => {
-      const { data, error } = await supabase
-        .from('app_feature_flags')
-        .select('is_enabled')
-        .eq('flag_key', 'header_debug_button')
-        .limit(1)
-        .maybeSingle();
+      const { data, error } = await supabase.rpc('get_platform_debug_button_enabled');
       if (cancelled) return;
       if (error) return;
-      setHeaderDebugEnabled(!!data?.is_enabled);
+      setHeaderDebugEnabled(!!data);
     };
     loadHeaderDebugFlag();
     return () => {
@@ -103,16 +98,10 @@ export function DebugSettingsCard() {
     setHeaderDebugEnabled(enabled);
     setIsLoading(true);
     try {
-      const { error } = await supabase
-        .from('app_feature_flags')
-        .upsert(
-          {
-            flag_key: 'header_debug_button',
-            is_enabled: enabled,
-            description: 'Controls platform admin visibility of Banner Header debug button',
-          },
-          { onConflict: 'flag_key' },
-        );
+      const { error } = await supabase.rpc('set_platform_debug_button_enabled', {
+        p_enabled: enabled,
+        p_reason: 'Updated from System Debug Mode card',
+      });
 
       if (error) throw error;
 

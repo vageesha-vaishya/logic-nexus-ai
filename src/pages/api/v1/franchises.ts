@@ -8,6 +8,7 @@ import {
   enforceRateLimit,
   handlePreflight,
   logApiEvent,
+  sanitizeQueryId,
   resolveAndApplyAccessContext,
 } from '../_utils/http';
 import { sendErrorResponse } from '../_utils/errorHandler';
@@ -38,6 +39,20 @@ async function writeAuditLog(
   }
 }
 
+function resolveTenantScope(req: ApiRequest, access: { isPlatformAdmin: boolean; tenantId: string | null }): string | null {
+  const requestedTenantId = sanitizeQueryId(req.query.tenant_id, 'tenant_id');
+  if (access.isPlatformAdmin) {
+    return requestedTenantId || null;
+  }
+  if (!access.tenantId) {
+    throw new Error('Forbidden');
+  }
+  if (requestedTenantId && requestedTenantId !== access.tenantId) {
+    throw new Error('Forbidden');
+  }
+  return access.tenantId;
+}
+
 export default async function handler(req: ApiRequest, res: ApiResponse) {
   applyCors(req, res, { methods: ['GET'] });
   if (handlePreflight(req, res)) return;
@@ -61,11 +76,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
     const access = await resolveAndApplyAccessContext(req, ctx);
     enforceRateLimit(req, access.tenantId || '');
-
-    const tenantId = access.tenantId || '';
-    if (!tenantId) {
-      throw new Error('Forbidden');
-    }
+    const tenantId = resolveTenantScope(req, access);
+    const requestedFranchiseId = sanitizeQueryId(req.query.franchise_id, 'franchise_id');
 
     const isActiveQuery = typeof req.query.is_active === 'string'
       ? req.query.is_active.toLowerCase().trim()
@@ -76,8 +88,15 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     let query = getSupabaseAdminClient()
       .from('franchises')
       .select('id, name, code, tenant_id, is_active, created_at, address, tenants:tenants!franchises_tenant_id_fkey(name)')
-      .eq('tenant_id', tenantId)
       .order('created_at', { ascending: false });
+
+    if (tenantId) {
+      query = query.eq('tenant_id', tenantId);
+    }
+
+    if (requestedFranchiseId) {
+      query = query.eq('id', requestedFranchiseId).limit(1);
+    }
 
     if (filterByActive) {
       query = query.eq('is_active', onlyActive);
@@ -88,7 +107,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       throw new Error(error.message);
     }
 
-    const count = Array.isArray(data) ? data.length : 0;
+    const rows = Array.isArray(data) ? data : [];
+    const count = rows.length;
     logApiEvent('info', '[FranchiseAPI] tenant franchises fetched', {
       correlationId: ctx.correlationId,
       userId: access.userId,
@@ -97,6 +117,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       isPlatformAdmin: access.isPlatformAdmin,
       adminOverrideEnabled: access.adminOverrideEnabled,
       requestedTenantHeader: req.headers['x-tenant-id'] || null,
+      requestedTenantId: sanitizeQueryId(req.query.tenant_id, 'tenant_id') || null,
+      requestedFranchiseId: requestedFranchiseId || null,
       franchiseScope: access.franchiseId || null,
       filterByActive,
       onlyActive: filterByActive ? onlyActive : null,
@@ -105,12 +127,14 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
     await writeAuditLog(getSupabaseAdminClient(), {
       userId: access.userId,
-      tenantId,
+      tenantId: tenantId || '',
       franchiseId: access.franchiseId || '',
       details: {
         correlationId: ctx.correlationId,
         role: ctx.role,
         isPlatformAdmin: access.isPlatformAdmin,
+        requestedTenantId: sanitizeQueryId(req.query.tenant_id, 'tenant_id') || null,
+        requestedFranchiseId: requestedFranchiseId || null,
         filterByActive,
         onlyActive: filterByActive ? onlyActive : null,
         count,
@@ -118,7 +142,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     });
 
     return res.status(200).json({
-      data: data || [],
+      data: rows,
       correlationId: ctx.correlationId,
       version: 'v1',
     });

@@ -11,6 +11,7 @@ export const FEATURE_FLAGS = {
   LEAD_WORKSPACE_ENHANCEMENTS_V1: 'lead_workspace_enhancements_v1',
   LEAD_WORKSPACE_SCROLLING_V1: 'lead_workspace_scrolling_v1',
   USER_INFO_HEADER_MODULE: 'user_info_header_module',
+  USER_INFO_HEADER_DUAL_MODE: 'user_info_header_dual_mode',
   HEADER_DEBUG_BUTTON: 'header_debug_button',
 } as const;
 
@@ -18,6 +19,36 @@ export type FeatureFlagKey = (typeof FEATURE_FLAGS)[keyof typeof FEATURE_FLAGS];
 
 export function useAppFeatureFlag(key: FeatureFlagKey, defaultValue: boolean = false) {
   const { isEnabled, isLoading, error } = useFeatureFlags();
-  const enabled = isEnabled(key, defaultValue);
+  const envOverride = resolveFeatureFlagEnvOverride(key);
+  const enabled = envOverride ?? isEnabled(key, defaultValue);
   return { enabled, isLoading, error };
+}
+
+function resolveFeatureFlagEnvOverride(key: FeatureFlagKey): boolean | undefined {
+  if (typeof import.meta === 'undefined' || !import.meta.env) return undefined;
+  const mapRaw = import.meta.env.VITE_FEATURE_FLAG_OVERRIDES;
+  if (typeof mapRaw === 'string' && mapRaw.trim()) {
+    try {
+      const parsed = JSON.parse(mapRaw) as Record<string, unknown>;
+      const mappedValue = parsed[key];
+      if (typeof mappedValue === 'boolean') return mappedValue;
+      if (typeof mappedValue === 'string') return normalizeBoolean(mappedValue);
+    } catch {
+      return undefined;
+    }
+  }
+
+  const specificKey = `VITE_FF_${key.toUpperCase()}`;
+  const specificRaw = (import.meta.env as Record<string, unknown>)[specificKey];
+  if (typeof specificRaw === 'boolean') return specificRaw;
+  if (typeof specificRaw === 'string') return normalizeBoolean(specificRaw);
+
+  return undefined;
+}
+
+function normalizeBoolean(value: string): boolean | undefined {
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'true' || normalized === '1' || normalized === 'on') return true;
+  if (normalized === 'false' || normalized === '0' || normalized === 'off') return false;
+  return undefined;
 }

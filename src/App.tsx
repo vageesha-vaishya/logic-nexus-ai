@@ -10,6 +10,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./hooks/useAuth";
 import { CRMProvider } from "./hooks/useCRM";
 import { DomainContextProvider } from "./contexts/DomainContext";
+import { TenantBrandingProvider } from "./contexts/TenantBrandingContext";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import { LeadsViewStateProvider } from "./hooks/useLeadsViewState";
 import { ThemeProvider } from "./hooks/useTheme";
@@ -198,15 +199,16 @@ const App = () => (
       <AuthProvider>
         <CRMProvider>
           <DomainContextProvider>
-            <ThemeProvider>
-              <TooltipProvider>
-                <SidebarProvider defaultOpen={false}>
-                  <StickyActionsProvider>
-                    <LeadsViewStateProvider>
-                      <PipelineProvider>
-                      <Sonner />
-                      <Suspense fallback={<div className="flex items-center justify-center h-screen"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
-                      <Routes>
+            <TenantBrandingProvider>
+              <ThemeProvider>
+                <TooltipProvider>
+                  <SidebarProvider defaultOpen={false}>
+                    <StickyActionsProvider>
+                      <LeadsViewStateProvider>
+                        <PipelineProvider>
+                        <Sonner />
+                        <Suspense fallback={<div className="flex items-center justify-center h-screen"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
+                        <Routes>
             <Route path="/" element={<Landing />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/oauth/callback" element={<OAuthCallback />} />
@@ -435,6 +437,14 @@ const App = () => (
                   <TenantDetail />
                 </ProtectedRoute>
               } 
+            />
+            <Route
+              path="/dashboard/tenant-branding"
+              element={
+                <ProtectedRoute>
+                  <TenantDetail />
+                </ProtectedRoute>
+              }
             />
             <Route 
               path="/dashboard/franchises" 
@@ -805,14 +815,15 @@ const App = () => (
             <Route path="/dashboard/settings/activities" element={<ProtectedRoute><SalesPlaceholder /></ProtectedRoute>} />
             
             <Route path="*" element={<NotFound />} />
-          </Routes>
-                </Suspense>
+                        </Routes>
+                      </Suspense>
                       </PipelineProvider>
                     </LeadsViewStateProvider>
                   </StickyActionsProvider>
                 </SidebarProvider>
               </TooltipProvider>
-            </ThemeProvider>
+              </ThemeProvider>
+            </TenantBrandingProvider>
           </DomainContextProvider>
         </CRMProvider>
       </AuthProvider>

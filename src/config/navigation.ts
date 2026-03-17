@@ -128,6 +128,7 @@ export const APP_MENU: MenuModule[] = [
       { name: 'Communications Hub', path: '/dashboard/communications-hub', icon: Mail, description: 'Unified messages across channels', permissions: ['email.manage'] },
       { name: 'Email Management', path: '/dashboard/email-management', icon: Mail, description: 'Manage emails', permissions: ['email.manage'] },
       { name: 'Roles & Permissions', path: '/dashboard/settings/permissions', icon: Cog, description: 'Configure access control', permissions: ['admin.settings.manage'] },
+      { name: 'Tenant Branding', path: '/dashboard/tenant-branding', icon: Palette, description: 'Configure your tenant branding', roles: ['tenant_admin', 'franchise_admin', 'user'] },
       { name: 'Theme Management', path: '/dashboard/themes', icon: Palette, description: 'Customize theme' },
       { name: 'Subscription', path: '/dashboard/settings/subscription', icon: CreditCard, description: 'Manage plan and usage' },
       { name: 'Data Management', path: '/dashboard/settings/data-management', icon: Cog, description: 'Database options and quote numbering' },

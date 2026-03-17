@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { sanitizePayload, sanitizeRichTextHtml, stripHtmlTags } from './sanitizer';
+import { sanitizeBrandingCss, sanitizePayload, sanitizeRichTextHtml, stripHtmlTags } from './sanitizer';
 
 describe('sanitizePayload', () => {
   it('should return simple objects unchanged', () => {
@@ -197,5 +197,21 @@ describe('stripHtmlTags', () => {
   it('returns visible text content only', () => {
     const output = stripHtmlTags('<p>Hello <strong>World</strong>&nbsp;</p>');
     expect(output).toBe('Hello World');
+  });
+});
+
+describe('sanitizeBrandingCss', () => {
+  it('removes import, javascript urls, and expression payloads', () => {
+    const input = `
+      @import url("https://evil.test/x.css");
+      .x { background-image: url("javascript:alert(1)"); color: red; }
+      .y { width: expression(alert(2)); behavior: url(#default#time2); }
+    `;
+    const output = sanitizeBrandingCss(input);
+    expect(output).not.toContain('@import');
+    expect(output).not.toContain('javascript:');
+    expect(output).not.toContain('expression(');
+    expect(output).not.toContain('behavior:');
+    expect(output).toContain('color: red');
   });
 });

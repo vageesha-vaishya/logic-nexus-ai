@@ -107,3 +107,17 @@ export function stripHtmlTags(input: string): string {
     .replace(/\s+/g, ' ')
     .trim();
 }
+
+export function sanitizeBrandingCss(input: string): string {
+  if (!input) return '';
+  const maxLength = 12000;
+  const normalized = String(input).slice(0, maxLength);
+  return normalized
+    .replace(/<[^>]*>/g, '')
+    .replace(/@import[\s\S]*?;/gi, '')
+    .replace(/expression\s*\([^)]*\)/gi, '')
+    .replace(/behavior\s*:[^;]+;?/gi, '')
+    .replace(/javascript\s*:/gi, '')
+    .replace(/url\s*\(\s*['"]?\s*javascript:[^)]+\)/gi, 'url()')
+    .trim();
+}
