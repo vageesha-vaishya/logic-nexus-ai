@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { DashboardLayout } from '../DashboardLayout';
@@ -52,8 +52,39 @@ vi.mock('@/hooks/useKeyboardShortcuts', () => ({
   useKeyboardShortcuts: () => {},
 }));
 
+vi.mock('@/hooks/useAuth', () => ({
+  useAuth: () => ({
+    user: { email: 'admin@example.com', user_metadata: {} },
+    profile: { first_name: 'Admin', last_name: 'User', avatar_url: null },
+    roles: [{ role: 'platform_admin' }],
+  }),
+}));
+
+vi.mock('@/hooks/useCRM', () => ({
+  useCRM: () => ({
+    context: { isPlatformAdmin: true, tenantId: null, franchiseId: null },
+    scopedDb: {
+      from: () => ({
+        select: () => ({
+          eq: () => ({
+            maybeSingle: async () => ({ data: null, error: null }),
+          }),
+        }),
+      }),
+    },
+  }),
+}));
+
+vi.mock('@/lib/feature-flags', () => ({
+  FEATURE_FLAGS: {
+    USER_INFO_HEADER_MODULE: 'user_info_header_module',
+    HEADER_DEBUG_BUTTON: 'header_debug_button',
+  },
+  useAppFeatureFlag: (key: string) => ({ enabled: key === 'header_debug_button' ? false : false, isLoading: false, error: null }),
+}));
+
 vi.mock('@/components/ui/global-search', () => ({
-  GlobalSearch: () => <div data-testid="global-search" />,
+  GlobalSearch: () => <button aria-label="Open global search" data-testid="global-search">Search</button>,
 }));
 
 describe('DashboardLayout overflow behavior', () => {
@@ -70,8 +101,7 @@ describe('DashboardLayout overflow behavior', () => {
     expect(main).toHaveClass('overflow-x-hidden');
   });
 
-  it('opens global search from header search button', () => {
-    const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
+  it('renders a single global search control in header', () => {
     render(
       <MemoryRouter initialEntries={['/dashboard/leads']}>
         <DashboardLayout>
@@ -80,9 +110,9 @@ describe('DashboardLayout overflow behavior', () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getByLabelText('Open global search'));
-    expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'shell:open-global-search' }));
+    expect(screen.getAllByLabelText('Open global search')).toHaveLength(1);
     expect(screen.getByTestId('global-search')).toBeInTheDocument();
-    dispatchSpy.mockRestore();
+    expect(screen.queryByLabelText('Pipeline Debugger')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('pipeline-dashboard')).not.toBeInTheDocument();
   });
 });

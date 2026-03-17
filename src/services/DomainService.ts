@@ -1,5 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
+import { logger } from '@/lib/logger';
 
 export interface PlatformDomain {
   id: string;
@@ -9,11 +10,192 @@ export interface PlatformDomain {
   is_active: boolean;
 }
 
+export interface AuthorizedDomainsResponse {
+  domains: PlatformDomain[];
+  tenantDomainCount: number;
+  tenantId: string | null;
+  isPlatformAdmin: boolean;
+}
+
 let domainCache: PlatformDomain[] | null = null;
 let cacheTimestamp: number = 0;
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const DOMAIN_API_PATH = '/api/v1/platform-domains';
+
+function normalizeDomainRows(rows: any[]): PlatformDomain[] {
+  return (rows || [])
+    .map((row: any) => row?.platform_domains || row)
+    .filter((row: any) => row && row.code && row.is_active !== false)
+    .map((row: any) => ({
+      id: String(row.id || ''),
+      code: String(row.code || ''),
+      name: String(row.name || ''),
+      description: row.description == null ? null : String(row.description),
+      is_active: Boolean(row.is_active ?? true),
+    }));
+}
+
+async function resolveTenantDomainsClientSide(): Promise<{ domains: PlatformDomain[]; tenantDomainCount: number }> {
+  const { data: tenantAssignmentRows, error: tenantAssignmentError } = await (supabase as any)
+    .from('tenant_domain_assignments')
+    .select('platform_domains!inner(id, code, name, description, is_active)')
+    .eq('is_active', true);
+
+  let tenantDomains = normalizeDomainRows(tenantAssignmentRows || []);
+  const missingAssignments = (tenantAssignmentError as any)?.code === '42P01';
+
+  if (tenantAssignmentError && !missingAssignments) {
+    throw tenantAssignmentError;
+  }
+
+  if (tenantDomains.length === 0) {
+    const { data: tenantFallbackRows, error: tenantFallbackError } = await (supabase as any)
+      .from('tenants')
+      .select('platform_domains!tenants_domain_id_fkey(id, code, name, description, is_active)')
+      .limit(1);
+
+    if (tenantFallbackError) {
+      throw tenantFallbackError;
+    }
+
+    tenantDomains = normalizeDomainRows(tenantFallbackRows || []);
+  }
+
+  const tenantDomainCount = tenantDomains.length;
+  if (tenantDomainCount <= 1) {
+    return { domains: tenantDomains, tenantDomainCount };
+  }
+
+  const { data: userData } = await supabase.auth.getUser();
+  const userId = userData?.user?.id || '';
+  if (!userId) {
+    return { domains: tenantDomains, tenantDomainCount };
+  }
+
+  const { data: userAssignmentRows, error: userAssignmentError } = await (supabase as any)
+    .from('user_domain_assignments')
+    .select('platform_domains!inner(id, code, name, description, is_active)')
+    .eq('is_active', true)
+    .eq('user_id', userId);
+
+  if (userAssignmentError && (userAssignmentError as any)?.code !== '42P01') {
+    throw userAssignmentError;
+  }
+
+  if (!userAssignmentError) {
+    const assignedCodes = new Set(
+      normalizeDomainRows(userAssignmentRows || [])
+        .map((domain) => domain.code.toUpperCase())
+    );
+    tenantDomains = tenantDomains.filter((domain) => assignedCodes.has(domain.code.toUpperCase()));
+  }
+
+  return { domains: tenantDomains, tenantDomainCount };
+}
+
+async function fallbackAuthorizedDomains(reason: string): Promise<AuthorizedDomainsResponse> {
+  logger.warn('[DomainService] falling back to client-side domain resolution', {
+    component: 'DomainService',
+    reason,
+  });
+  const { domains, tenantDomainCount } = await resolveTenantDomainsClientSide();
+  return {
+    domains,
+    tenantDomainCount,
+    tenantId: null,
+    isPlatformAdmin: false,
+  };
+}
 
 export const DomainService = {
+  async getAuthorizedDomains(forceRefresh = false): Promise<AuthorizedDomainsResponse> {
+    const cacheBypass = forceRefresh ? '?refresh=1' : '';
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData?.session?.access_token || '';
+    logger.debug('[DomainService] requesting authorized domains', {
+      component: 'DomainService',
+      forceRefresh,
+      hasSessionToken: Boolean(accessToken),
+    });
+    const response = await fetch(`${DOMAIN_API_PATH}${cacheBypass}`, {
+      method: 'GET',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      },
+    });
+
+    const contentType = response.headers.get('content-type') || '';
+
+    if (!response.ok) {
+      const fallbackMessage = `Failed to load authorized domains (${response.status})`;
+      let parsedMessage = fallbackMessage;
+      let correlationId: string | null = null;
+      try {
+        const payload = contentType.includes('application/json')
+          ? await response.json()
+          : { error: await response.text() };
+        correlationId = typeof payload?.correlationId === 'string' ? payload.correlationId : null;
+        parsedMessage = typeof payload?.error === 'string' && payload.error.trim()
+          ? payload.error
+          : fallbackMessage;
+      } catch {
+        parsedMessage = fallbackMessage;
+      }
+      logger.error('[DomainService] authorized domains request failed', {
+        component: 'DomainService',
+        status: response.status,
+        correlationId,
+        message: parsedMessage,
+      });
+      if (correlationId) {
+        throw new Error(`${parsedMessage} (ref: ${correlationId})`);
+      }
+      throw new Error(parsedMessage);
+    }
+    if (!contentType.includes('application/json')) {
+      const preview = (await response.text()).slice(0, 120);
+      logger.error('[DomainService] non-JSON response from authorized domains API', {
+        component: 'DomainService',
+        status: response.status,
+        contentType: contentType || 'unknown',
+        responsePreview: preview,
+      });
+      return fallbackAuthorizedDomains(`non-json-response:${contentType || 'unknown'}`);
+    }
+
+    let payload: any;
+    try {
+      payload = await response.json();
+    } catch (error) {
+      logger.error('[DomainService] failed to parse authorized domains JSON payload', {
+        component: 'DomainService',
+        status: response.status,
+        contentType,
+        message: error instanceof Error ? error.message : 'unknown',
+      });
+      return fallbackAuthorizedDomains('json-parse-failure');
+    }
+    const data = payload?.data || {};
+    const domains = Array.isArray(data.domains) ? data.domains : [];
+    logger.info('[DomainService] authorized domains loaded', {
+      component: 'DomainService',
+      correlationId: typeof payload?.correlationId === 'string' ? payload.correlationId : null,
+      count: domains.length,
+      tenantDomainCount: Number(data.tenantDomainCount || 0),
+      tenantId: typeof data.tenantId === 'string' ? data.tenantId : null,
+      isPlatformAdmin: Boolean(data.isPlatformAdmin),
+    });
+
+    return {
+      domains: domains as PlatformDomain[],
+      tenantDomainCount: Number(data.tenantDomainCount || 0),
+      tenantId: typeof data.tenantId === 'string' ? data.tenantId : null,
+      isPlatformAdmin: Boolean(data.isPlatformAdmin),
+    };
+  },
+
   /**
    * Fetches all platform domains with in-memory caching.
    * Useful for dropdowns and type validation.

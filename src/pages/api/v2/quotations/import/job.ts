@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { ApiRequest, ApiResponse } from '../../../_utils/types';
 import { getSupabaseAdminClient } from '../../../_utils/supabaseAdmin';
-import { applyCors, authenticateRequest, buildApiContext, enforceAnyPermission, enforceCsrfProtection, enforceHttps, enforceRateLimit, enforceRoles, handlePreflight, logApiEvent } from '../../../_utils/http';
+import { applyCors, authenticateRequest, buildApiContext, enforceAnyPermission, enforceCsrfProtection, enforceHttps, enforceRateLimit, enforceRoles, handlePreflight, logApiEvent, resolveAndApplyAccessContext } from '../../../_utils/http';
 import { sendErrorResponse } from '../../../_utils/errorHandler';
 import { cancelQueuedQuotationImportJob } from './queue';
 
@@ -35,6 +35,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     const auth = await authenticateRequest(req);
     ctx.userId = auth.userId;
     ctx.role = auth.role;
+    await resolveAndApplyAccessContext(req, ctx);
     enforceRoles(auth.role, ['admin', 'operations', 'sales', 'developer']);
     enforceAnyPermission(auth.permissions, ['import_quotation', 'quotes.import_export', 'export_quotation']);
 

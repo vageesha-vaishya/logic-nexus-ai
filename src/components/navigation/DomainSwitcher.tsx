@@ -10,10 +10,14 @@ import {
 import { Layers } from 'lucide-react';
 
 export function DomainSwitcher() {
-  const { currentDomain, setDomain, availableDomains, isLoading } = useDomain();
+  const { currentDomain, setDomain, availableDomains, showDomainSelector, isLoading } = useDomain();
 
   if (isLoading) {
     return <div className="h-9 w-[200px] animate-pulse rounded-md bg-muted" />;
+  }
+
+  if (!showDomainSelector || availableDomains.length <= 1) {
+    return null;
   }
 
   return (

@@ -17,6 +17,8 @@ interface SearchResult {
 
 const PER_ENTITY_LIMIT = 5;
 const TOTAL_RESULTS_LIMIT = 20;
+const SEARCH_HISTORY_KEY = "shell:global-search-history";
+const SEARCH_HISTORY_LIMIT = 8;
 
 export function GlobalSearch() {
   const [open, setOpen] = useState(false);
@@ -24,6 +26,7 @@ export function GlobalSearch() {
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasMoreResults, setHasMoreResults] = useState(false);
+  const [searchHistory, setSearchHistory] = useState<string[]>([]);
   const navigate = useNavigate();
   const { scopedDb } = useCRM();
 
@@ -47,6 +50,18 @@ export function GlobalSearch() {
   }, []);
 
   useEffect(() => {
+    const savedHistory = localStorage.getItem(SEARCH_HISTORY_KEY);
+    if (savedHistory) {
+      try {
+        const parsed = JSON.parse(savedHistory);
+        if (Array.isArray(parsed)) {
+          setSearchHistory(parsed.filter((item) => typeof item === "string"));
+        }
+      } catch {
+        setSearchHistory([]);
+      }
+    }
+
     const down = (e: KeyboardEvent) => {
       if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
@@ -183,6 +198,12 @@ export function GlobalSearch() {
   }, [query, performSearch]);
 
   const handleSelect = (result: SearchResult) => {
+    const normalizedQuery = query.trim();
+    if (normalizedQuery) {
+      const nextHistory = [normalizedQuery, ...searchHistory.filter((item) => item !== normalizedQuery)].slice(0, SEARCH_HISTORY_LIMIT);
+      setSearchHistory(nextHistory);
+      localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(nextHistory));
+    }
     navigate(result.path);
     setOpen(false);
     setQuery("");
@@ -204,12 +225,14 @@ export function GlobalSearch() {
       <button
         onClick={() => setOpen(true)}
         className={cn(
-          "flex items-center gap-2 px-3 py-1.5 text-sm text-muted-foreground",
-          "border border-input rounded-md bg-background hover:bg-accent transition-colors",
+          "flex items-center gap-2 px-3 py-1.5 text-sm text-foreground",
+          "border border-input rounded-md bg-background hover:bg-accent transition-colors shadow-sm",
           "w-44 sm:w-56 lg:w-64"
         )}
+        aria-label="Open global search"
+        title="Open global search"
       >
-        <Search className="h-4 w-4" />
+        <Search className="h-5 w-5 text-primary" />
         <span>Search...</span>
         <kbd className="ml-auto pointer-events-none hidden h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100 sm:inline-flex">
           <span className="text-xs">⌘</span>K
@@ -223,6 +246,16 @@ export function GlobalSearch() {
           onValueChange={setQuery}
         />
         <CommandList>
+          {!loading && !query.trim() && searchHistory.length > 0 && (
+            <CommandGroup heading="Recent Searches">
+              {searchHistory.map((item) => (
+                <CommandItem key={item} value={`recent ${item}`.toLowerCase()} onSelect={() => setQuery(item)} className="cursor-pointer">
+                  <Search className="mr-2 h-4 w-4" />
+                  <span>{item}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          )}
           {loading && (
             <div className="flex items-center justify-center py-6">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />

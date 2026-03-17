@@ -8,6 +8,7 @@ import {
   enforceRoles,
   handlePreflight,
   logApiEvent,
+  resolveAndApplyAccessContext,
   sanitizeQueryId,
 } from '@/pages/api/_utils/http';
 import { sendErrorResponse } from '@/pages/api/_utils/errorHandler';
@@ -32,6 +33,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     const auth = await authenticateRequest(req);
     ctx.userId = auth.userId;
     ctx.role = auth.role;
+    await resolveAndApplyAccessContext(req, ctx);
     enforceRoles(auth.role, ['admin', 'operations', 'sales', 'developer', 'user']);
 
     const leadId = sanitizeQueryId(req.query.id, 'id');

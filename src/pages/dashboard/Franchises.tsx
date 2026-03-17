@@ -1,11 +1,10 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Store, FileDown, FileUp } from 'lucide-react';
+import { Store } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useCRM } from '@/hooks/useCRM';
@@ -22,7 +21,7 @@ import { TenantFranchiseMappingList } from "@/components/franchise/TenantFranchi
 export default function Franchises() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { context, scopedDb } = useCRM();
+  const { context } = useCRM();
   const [franchises, setFranchises] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -30,15 +29,24 @@ export default function Franchises() {
 
   const fetchFranchises = useCallback(async () => {
     try {
-      const { data, error } = await scopedDb
-        .from('franchises')
-        // Disambiguate embed: direct FK franchises.tenant_id -> tenants.id
-        // Avoid PostgREST error: more than one relationship between franchises and tenants
-        .select('*, tenants:tenants!franchises_tenant_id_fkey(name)')
-        .order('created_at', { ascending: false });
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData?.session?.access_token || '';
+      const response = await fetch('/api/v1/franchises', {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+          ...(context.tenantId ? { 'x-tenant-id': context.tenantId } : {}),
+        },
+      });
 
-      if (error) throw error;
-      setFranchises(data || []);
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload?.error || 'Failed to load franchises');
+      }
+
+      setFranchises(Array.isArray(payload?.data) ? payload.data : []);
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -48,7 +56,7 @@ export default function Franchises() {
     } finally {
       setLoading(false);
     }
-  }, [scopedDb, toast]);
+  }, [context.tenantId, toast]);
 
   useEffect(() => {
     fetchFranchises();

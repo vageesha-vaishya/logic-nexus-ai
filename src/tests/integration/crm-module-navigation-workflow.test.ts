@@ -108,8 +108,9 @@ describe('CRM module navigation workflow consistency', () => {
     expect(globalSearch).toContain('"module"');
     expect(globalSearch).toContain('["module", "lead", "account", "contact", "quote", "opportunity"]');
     expect(globalSearch).toContain('"w-44 sm:w-56 lg:w-64"');
-    expect(dashboardLayout).toContain("className=\"inline-flex\"");
-    expect(dashboardLayout).toContain("window.dispatchEvent(new CustomEvent('shell:open-global-search'))");
-    expect(dashboardLayout).toContain("className={cn('block', !showGlobalSearch && 'hidden')}");
+    expect(globalSearch).toContain('SEARCH_HISTORY_KEY');
+    expect(globalSearch).toContain('Recent Searches');
+    expect(dashboardLayout).toContain('<GlobalSearch />');
+    expect(dashboardLayout).not.toContain("window.dispatchEvent(new CustomEvent('shell:open-global-search'))");
   });
 });

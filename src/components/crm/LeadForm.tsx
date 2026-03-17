@@ -484,156 +484,28 @@ export function LeadForm({
             </TooltipProvider>
           }
         >
-          <FormGrid columns={4}>
-              <>
-                {context.isPlatformAdmin && (
-                  <LayoutItem span={2}>
-                    <FormField
-                      control={form.control}
-                      name="tenant_id"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Tenant *</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value || undefined} disabled={!canEditTenantScope}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select tenant" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {tenants.map((tenant) => (
-                                <SelectItem key={tenant.id} value={tenant.id}>
-                                  {tenant.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </LayoutItem>
-                )}
-
-                {(context.isTenantAdmin || context.isPlatformAdmin) && franchises.length > 0 && (
-                  <LayoutItem span={2}>
-                    <FormField
-                      control={form.control}
-                      name="franchise_id"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Franchise</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value || undefined} disabled={!canEditTenantScope}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select franchise" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {franchises.map((franchise) => (
-                                <SelectItem key={franchise.id} value={franchise.id}>
-                                  {franchise.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </LayoutItem>
-                )}
-
-                {!context.isTenantAdmin && !context.isPlatformAdmin && currentFranchise && (
-                  <LayoutItem span={2}>
-                    <div className="space-y-2">
-                      <FormLabel>Franchise</FormLabel>
-                      <Input value={currentFranchise.name} disabled readOnly className="bg-muted" />
-                    </div>
-                  </LayoutItem>
-                )}
-
-                <LayoutItem span={2}>
+          <FormGrid columns={4} className="gap-x-4 gap-y-5">
+            <>
+              {context.isPlatformAdmin && (
+                <LayoutItem span={1}>
                   <FormField
                     control={form.control}
-                    name="first_name"
+                    name="tenant_id"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>First Name *</FormLabel>
-                        <FormControl>
-                          <Input placeholder="John" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </LayoutItem>
-
-                <LayoutItem span={2}>
-                  <FormField
-                    control={form.control}
-                    name="last_name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Last Name *</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Doe" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </LayoutItem>
-
-                <LayoutItem span={2}>
-                  <FormField
-                    control={form.control}
-                    name="company"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Company</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Acme Corp" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </LayoutItem>
-
-                <LayoutItem span={2}>
-                  <FormField
-                    control={form.control}
-                    name="title"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Title</FormLabel>
-                        <FormControl>
-                          <Input placeholder="CEO" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </LayoutItem>
-
-                <LayoutItem span={2}>
-                  <FormField
-                    control={form.control}
-                    name="lead_type"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Lead Type *</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
+                        <FormLabel>Tenant *</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value || undefined} disabled={!canEditTenantScope}>
                           <FormControl>
                             <SelectTrigger>
-                              <SelectValue placeholder="Select type" />
+                              <SelectValue placeholder="Select tenant" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="standard">Standard</SelectItem>
-                            <SelectItem value="enterprise">Enterprise</SelectItem>
-                            <SelectItem value="partner">Partner</SelectItem>
+                            {tenants.map((tenant) => (
+                              <SelectItem key={tenant.id} value={tenant.id}>
+                                {tenant.name}
+                              </SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -641,61 +513,28 @@ export function LeadForm({
                     )}
                   />
                 </LayoutItem>
-              </>
-              <>
-                <LayoutItem span={2}>
-                  <FormField
-                    control={form.control}
-                    name="email"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Email</FormLabel>
-                        <FormControl>
-                          <Input placeholder="john@example.com" type="email" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </LayoutItem>
+              )}
 
-                <LayoutItem span={2}>
+              {(context.isTenantAdmin || context.isPlatformAdmin) && franchises.length > 0 && (
+                <LayoutItem span={1}>
                   <FormField
                     control={form.control}
-                    name="phone"
+                    name="franchise_id"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Phone</FormLabel>
-                        <FormControl>
-                          <Input placeholder="+1 (555) 123-4567" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </LayoutItem>
-
-                <LayoutItem span={2}>
-                  <FormField
-                    control={form.control}
-                    name="source"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Source *</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
+                        <FormLabel>Franchise</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value || undefined} disabled={!canEditTenantScope}>
                           <FormControl>
                             <SelectTrigger>
-                              <SelectValue placeholder="Select source" />
+                              <SelectValue placeholder="Select franchise" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="website">Website</SelectItem>
-                            <SelectItem value="referral">Referral</SelectItem>
-                            <SelectItem value="email">Email</SelectItem>
-                            <SelectItem value="phone">Phone</SelectItem>
-                            <SelectItem value="social">Social Media</SelectItem>
-                            <SelectItem value="event">Event</SelectItem>
-                            <SelectItem value="other">Other</SelectItem>
+                            {franchises.map((franchise) => (
+                              <SelectItem key={franchise.id} value={franchise.id}>
+                                {franchise.name}
+                              </SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -703,165 +542,324 @@ export function LeadForm({
                     )}
                   />
                 </LayoutItem>
+              )}
 
-                {watchedSource === 'referral' && (
-                  <LayoutItem span={2}>
-                    <FormField
-                      control={form.control}
-                      name="referral_name"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Referral Name *</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Referrer name" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </LayoutItem>
-                )}
-              </>
-              <>
-                <LayoutItem span={2}>
-                  <FormField
-                    control={form.control}
-                    name="status"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Status *</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select status" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="new">New</SelectItem>
-                            <SelectItem value="contacted">Contacted</SelectItem>
-                            <SelectItem value="qualified">Qualified</SelectItem>
-                            <SelectItem value="proposal">Proposal</SelectItem>
-                            <SelectItem value="negotiation">Negotiation</SelectItem>
-                            <SelectItem value="won">Won</SelectItem>
-                            <SelectItem value="lost">Lost</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+              {!context.isTenantAdmin && !context.isPlatformAdmin && currentFranchise && (
+                <LayoutItem span={1}>
+                  <div className="space-y-2">
+                    <FormLabel>Franchise</FormLabel>
+                    <Input value={currentFranchise.name} disabled readOnly className="bg-muted" />
+                  </div>
                 </LayoutItem>
+              )}
 
-                <LayoutItem span={2}>
+              <LayoutItem span={1}>
+                <FormField
+                  control={form.control}
+                  name="first_name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>First Name *</FormLabel>
+                      <FormControl>
+                        <Input placeholder="John" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </LayoutItem>
+
+              <LayoutItem span={1}>
+                <FormField
+                  control={form.control}
+                  name="last_name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Last Name *</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Doe" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </LayoutItem>
+
+              <LayoutItem span={1}>
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email</FormLabel>
+                      <FormControl>
+                        <Input placeholder="john@example.com" type="email" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </LayoutItem>
+
+              <LayoutItem span={1}>
+                <FormField
+                  control={form.control}
+                  name="phone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Phone</FormLabel>
+                      <FormControl>
+                        <Input placeholder="+1 (555) 123-4567" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </LayoutItem>
+
+              <LayoutItem span={1}>
+                <FormField
+                  control={form.control}
+                  name="company"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Company</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Acme Corp" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </LayoutItem>
+
+              <LayoutItem span={1}>
+                <FormField
+                  control={form.control}
+                  name="title"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Title</FormLabel>
+                      <FormControl>
+                        <Input placeholder="CEO" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </LayoutItem>
+
+              <LayoutItem span={1}>
+                <FormField
+                  control={form.control}
+                  name="lead_type"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Lead Type *</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select type" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="standard">Standard</SelectItem>
+                          <SelectItem value="enterprise">Enterprise</SelectItem>
+                          <SelectItem value="partner">Partner</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </LayoutItem>
+
+              <LayoutItem span={1}>
+                <FormField
+                  control={form.control}
+                  name="status"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Status *</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select status" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="new">New</SelectItem>
+                          <SelectItem value="contacted">Contacted</SelectItem>
+                          <SelectItem value="qualified">Qualified</SelectItem>
+                          <SelectItem value="proposal">Proposal</SelectItem>
+                          <SelectItem value="negotiation">Negotiation</SelectItem>
+                          <SelectItem value="won">Won</SelectItem>
+                          <SelectItem value="lost">Lost</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </LayoutItem>
+
+              <LayoutItem span={1}>
+                <FormField
+                  control={form.control}
+                  name="source"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Source *</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select source" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="website">Website</SelectItem>
+                          <SelectItem value="referral">Referral</SelectItem>
+                          <SelectItem value="email">Email</SelectItem>
+                          <SelectItem value="phone">Phone</SelectItem>
+                          <SelectItem value="social">Social Media</SelectItem>
+                          <SelectItem value="event">Event</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </LayoutItem>
+
+              <LayoutItem span={1}>
+                <FormField
+                  control={form.control}
+                  name="expected_close_date"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Expected Close Date *</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </LayoutItem>
+
+              {watchedSource === 'referral' && (
+                <LayoutItem span={1}>
                   <FormField
                     control={form.control}
-                    name="expected_close_date"
+                    name="referral_name"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Expected Close Date *</FormLabel>
+                        <FormLabel>Referral Name *</FormLabel>
                         <FormControl>
-                          <Input type="date" {...field} />
+                          <Input placeholder="Referrer name" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
                 </LayoutItem>
+              )}
 
+              <LayoutItem span={1}>
+                <FormField
+                  control={form.control}
+                  name="estimated_value"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Estimated Value {(watchedLeadType === 'enterprise' || ['proposal', 'negotiation', 'won'].includes(watchedStatus)) ? '*' : ''}</FormLabel>
+                      <FormControl>
+                        <Input placeholder="10000" type="number" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </LayoutItem>
+
+              <LayoutItem span={2}>
+                <FormField
+                  control={form.control}
+                  name="service_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>
+                        {isSuggestingService ? (
+                          <span className="flex items-center gap-2">
+                            Interested Service
+                            <span className="text-xs text-muted-foreground animate-pulse">(AI Analyzing...)</span>
+                          </span>
+                        ) : (
+                          "Interested Service *"
+                        )}
+                      </FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g. Sea Freight" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </LayoutItem>
+
+              {watchedLeadType === 'enterprise' && (
+                <LayoutItem span={1}>
+                  <FormField
+                    control={form.control}
+                    name="stakeholders_count"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Stakeholders Count *</FormLabel>
+                        <FormControl>
+                          <Input placeholder="4" type="number" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </LayoutItem>
+              )}
+
+              {watchedLeadType === 'enterprise' && (
+                <LayoutItem span={2}>
+                  <FormField
+                    control={form.control}
+                    name="decision_timeline"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Decision Timeline</FormLabel>
+                        <FormControl>
+                          <Input placeholder="e.g. 30-45 days" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </LayoutItem>
+              )}
+
+              {watchedStatus === 'lost' && (
                 <LayoutItem span={4}>
                   <FormField
                     control={form.control}
-                    name="service_id"
+                    name="lost_reason"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>
-                          {isSuggestingService ? (
-                            <span className="flex items-center gap-2">
-                              Interested Service
-                              <span className="text-xs text-muted-foreground animate-pulse">(AI Analyzing...)</span>
-                            </span>
-                          ) : (
-                            "Interested Service *"
-                          )}
-                        </FormLabel>
+                        <FormLabel>Loss Reason *</FormLabel>
                         <FormControl>
-                          <Input placeholder="e.g. Sea Freight" {...field} />
+                          <Textarea className="min-h-[80px]" placeholder="What caused this lead to be lost?" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
                 </LayoutItem>
-
-                <LayoutItem span={2}>
-                  <FormField
-                    control={form.control}
-                    name="estimated_value"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Estimated Value {(watchedLeadType === 'enterprise' || ['proposal', 'negotiation', 'won'].includes(watchedStatus)) ? '*' : ''}</FormLabel>
-                        <FormControl>
-                          <Input placeholder="10000" type="number" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </LayoutItem>
-
-                {watchedLeadType === 'enterprise' && (
-                  <LayoutItem span={2}>
-                    <FormField
-                      control={form.control}
-                      name="stakeholders_count"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Stakeholders Count *</FormLabel>
-                          <FormControl>
-                            <Input placeholder="4" type="number" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </LayoutItem>
-                )}
-
-                {watchedLeadType === 'enterprise' && (
-                  <LayoutItem span={4}>
-                    <FormField
-                      control={form.control}
-                      name="decision_timeline"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Decision Timeline</FormLabel>
-                          <FormControl>
-                            <Input placeholder="e.g. 30-45 days" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </LayoutItem>
-                )}
-
-                {watchedStatus === 'lost' && (
-                  <LayoutItem span={4}>
-                    <FormField
-                      control={form.control}
-                      name="lost_reason"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Loss Reason *</FormLabel>
-                          <FormControl>
-                            <Textarea className="min-h-[80px]" placeholder="What caused this lead to be lost?" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </LayoutItem>
-                )}
+              )}
 
                 {!hideNarrativeFields ? (
                   <>

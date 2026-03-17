@@ -205,6 +205,21 @@ describe('ScopedDataAccess', () => {
       expect(mockQueryBuilder.eq).not.toHaveBeenCalledWith('franchise_id', 'franchise-xyz');
     });
 
+    it('should let Tenant Admin list all tenant franchises without franchise id restriction', () => {
+      const context: DataAccessContext = {
+        isPlatformAdmin: false,
+        isTenantAdmin: true,
+        isFranchiseAdmin: false,
+        tenantId: 'tenant-abc',
+        franchiseId: 'franchise-xyz',
+      };
+      const dao = new ScopedDataAccess(mockSupabase, context);
+      dao.from('franchises').select();
+      expect(mockQueryBuilder.eq).toHaveBeenCalledWith('tenant_id', 'tenant-abc');
+      expect(mockQueryBuilder.eq).not.toHaveBeenCalledWith('id', 'franchise-xyz');
+      expect(mockQueryBuilder.eq).not.toHaveBeenCalledWith('franchise_id', 'franchise-xyz');
+    });
+
     it('should not inject franchise_id on contacts insert', () => {
       const context: DataAccessContext = {
         isPlatformAdmin: false,
@@ -235,6 +250,36 @@ describe('ScopedDataAccess', () => {
       withScope(mockQueryBuilder, context);
       // Should NOT call eq('tenant_id', ...)
       expect(mockQueryBuilder.eq).not.toHaveBeenCalled();
+    });
+
+    it('enforces tenant scope on tenants table even when global flag is passed', () => {
+      const context: DataAccessContext = {
+        isPlatformAdmin: true,
+        isTenantAdmin: false,
+        isFranchiseAdmin: false,
+        adminOverrideEnabled: true,
+        tenantId: 'tenant-123',
+      };
+
+      const dao = new ScopedDataAccess(mockSupabase, context);
+      dao.from('tenants', true).select();
+      expect(mockQueryBuilder.eq).toHaveBeenCalledWith('tenant_id', 'tenant-123');
+    });
+
+    it('enforces franchise scope on franchises table even when global flag is passed', () => {
+      const context: DataAccessContext = {
+        isPlatformAdmin: true,
+        isTenantAdmin: false,
+        isFranchiseAdmin: false,
+        adminOverrideEnabled: true,
+        tenantId: 'tenant-123',
+        franchiseId: 'franchise-456',
+      };
+
+      const dao = new ScopedDataAccess(mockSupabase, context);
+      dao.from('franchises', true).select();
+      expect(mockQueryBuilder.eq).toHaveBeenCalledWith('tenant_id', 'tenant-123');
+      expect(mockQueryBuilder.eq).toHaveBeenCalledWith('id', 'franchise-456');
     });
   });
 });

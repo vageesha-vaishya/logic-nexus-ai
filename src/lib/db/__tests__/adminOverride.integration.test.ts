@@ -109,4 +109,30 @@ describe('Admin Override Integration Flow', () => {
     // This implies we CANNOT see tenant-B data
     expect(mockQueryBuilder.eq).toHaveBeenCalledWith('tenant_id', 'tenant-A');
   });
+
+  it('should overwrite forged tenant payload during scoped insert', async () => {
+    const context: DataAccessContext = {
+      isPlatformAdmin: true,
+      isTenantAdmin: false,
+      isFranchiseAdmin: false,
+      adminOverrideEnabled: true,
+      tenantId: 'tenant-A',
+      franchiseId: 'franchise-A1',
+      userId: 'admin-1',
+    };
+
+    const dao = new ScopedDataAccess(mockSupabase, context);
+
+    await dao.from('leads').insert({
+      name: 'Forged Lead',
+      tenant_id: 'tenant-B',
+      franchise_id: 'franchise-B1',
+    });
+
+    expect(mockQueryBuilder.insert).toHaveBeenCalledWith({
+      name: 'Forged Lead',
+      tenant_id: 'tenant-A',
+      franchise_id: 'franchise-A1',
+    });
+  });
 });

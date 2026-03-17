@@ -10,6 +10,8 @@ export const FEATURE_FLAGS = {
   LEAD_THREE_SECTION_LAYOUT: 'lead_three_section_layout',
   LEAD_WORKSPACE_ENHANCEMENTS_V1: 'lead_workspace_enhancements_v1',
   LEAD_WORKSPACE_SCROLLING_V1: 'lead_workspace_scrolling_v1',
+  USER_INFO_HEADER_MODULE: 'user_info_header_module',
+  HEADER_DEBUG_BUTTON: 'header_debug_button',
 } as const;
 
 export type FeatureFlagKey = (typeof FEATURE_FLAGS)[keyof typeof FEATURE_FLAGS];
