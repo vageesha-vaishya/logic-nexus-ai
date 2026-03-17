@@ -1,29 +1,34 @@
 import { Navigate, useLocation } from 'react-router-dom';
-import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Loader2 } from 'lucide-react';
-import type { Permission } from '@/config/permissions';
+import { PLATFORM_ADMIN_ROLE, type AppRole, type Permission } from '@/config/permissions';
 import { logger } from '@/lib/logger';
-import { supabase } from '@/integrations/supabase/client';
-
-type AppRole = 'platform_admin' | 'tenant_admin' | 'franchise_admin' | 'user';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
   requiredRole?: AppRole;
   requireAuth?: boolean;
-  requiredPermissions?: Permission[]; // Optional permissions gate (ANY match)
+  requiredPermissions?: Permission[];
+  accessDeniedMessage?: string;
 }
 
 export function ProtectedRoute({ 
   children, 
   requiredRole,
   requireAuth = true,
-  requiredPermissions
+  requiredPermissions,
+  accessDeniedMessage
 }: ProtectedRouteProps) {
   const { user, loading, hasRole, hasPermission, isPlatformAdmin } = useAuth();
   const location = useLocation();
+  const isSettingsRoute =
+    location.pathname === '/dashboard/settings' ||
+    location.pathname.startsWith('/dashboard/settings/');
+  const e2eBypassEnabled =
+    import.meta.env.MODE === 'test' ||
+    String(import.meta.env.VITE_ENABLE_E2E_AUTH_BYPASS || '').trim().toLowerCase() === 'true';
   const e2eBypassAuth =
+    e2eBypassEnabled &&
     typeof window !== 'undefined' &&
     typeof navigator !== 'undefined' &&
     navigator.webdriver &&
@@ -47,10 +52,42 @@ export function ProtectedRoute({
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }
 
-  // Platform Admin bypasses specific role checks
-  if (requiredRole && !hasRole(requiredRole) && !isPlatformAdmin()) {
+  if (isSettingsRoute && !isPlatformAdmin()) {
+    logger.warn('Access denied. Settings route requires verified platform admin access.', { userId: user?.id, path: location.pathname, component: 'ProtectedRoute' });
+    return (
+      <Navigate
+        to="/unauthorized"
+        state={{
+          reason: 'missing_role',
+          requiredRole: PLATFORM_ADMIN_ROLE,
+          from: location.pathname + location.search,
+          message: accessDeniedMessage || 'Access denied - Platform admin privileges required',
+        }}
+        replace
+      />
+    );
+  }
+
+  const hasRequiredRole = requiredRole
+    ? requiredRole === PLATFORM_ADMIN_ROLE
+      ? isPlatformAdmin()
+      : hasRole(requiredRole) || isPlatformAdmin()
+    : true;
+
+  if (!hasRequiredRole) {
     logger.warn(`Access denied. User missing required role: ${requiredRole}`, { userId: user?.id, role: requiredRole, component: 'ProtectedRoute' });
-    return <Navigate to="/unauthorized" state={{ reason: 'missing_role', requiredRole }} replace />;
+    return (
+      <Navigate
+        to="/unauthorized"
+        state={{
+          reason: 'missing_role',
+          requiredRole,
+          from: location.pathname + location.search,
+          message: accessDeniedMessage,
+        }}
+        replace
+      />
+    );
   }
 
   if (requiredPermissions && requiredPermissions.length > 0) {

@@ -10,7 +10,6 @@ create table if not exists public.queues (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-
 -- Create queue_members table (many-to-many between queues and users)
 create table if not exists public.queue_members (
   id uuid primary key default gen_random_uuid(),
@@ -19,21 +18,17 @@ create table if not exists public.queue_members (
   created_at timestamptz not null default now(),
   unique (queue_id, user_id)
 );
-
 create index if not exists idx_queues_tenant_id on public.queues(tenant_id);
 create index if not exists idx_queue_members_queue_id on public.queue_members(queue_id);
 create index if not exists idx_queue_members_user_id on public.queue_members(user_id);
-
 alter table public.queues enable row level security;
 alter table public.queue_members enable row level security;
-
 -- Queues policies
 create policy "Platform admins can manage all queues"
 on public.queues
 for all
 using (is_platform_admin(auth.uid()))
 with check (is_platform_admin(auth.uid()));
-
 create policy "Tenant admins can manage tenant queues"
 on public.queues
 for all
@@ -45,14 +40,12 @@ with check (
   has_role(auth.uid(), 'tenant_admin'::public.app_role)
   and tenant_id = get_user_tenant_id(auth.uid())
 );
-
 -- Queue members policies
 create policy "Platform admins can manage all queue members"
 on public.queue_members
 for all
 using (is_platform_admin(auth.uid()))
 with check (is_platform_admin(auth.uid()));
-
 create policy "Tenant admins can manage members of their tenant queues"
 on public.queue_members
 for all
@@ -74,6 +67,5 @@ with check (
       and q.tenant_id = get_user_tenant_id(auth.uid())
   )
 );
-
 -- Best-effort schema cache refresh signal
 select pg_notify('pgrst', 'reload schema');

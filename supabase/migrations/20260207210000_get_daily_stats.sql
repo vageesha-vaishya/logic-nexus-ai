@@ -3,7 +3,6 @@
 -- Date: 2026-02-07
 
 BEGIN;
-
 CREATE OR REPLACE FUNCTION public.get_daily_stats(p_days integer DEFAULT 30)
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -93,5 +92,4 @@ BEGIN
   RETURN v_result;
 END;
 $$;
-
 COMMIT;

@@ -1,7 +1,6 @@
 -- Seed data for geography master tables: continents, countries, states, cities
 
 BEGIN;
-
 -- Continents (global)
 INSERT INTO public.continents (name, code_international, code_national, is_active)
 VALUES
@@ -13,7 +12,6 @@ VALUES
   ('Oceania', 'OC', NULL, true),
   ('Antarctica', 'AN', NULL, true)
 ON CONFLICT (code_international) DO UPDATE SET name = EXCLUDED.name, is_active = EXCLUDED.is_active;
-
 -- Countries (global)
 INSERT INTO public.countries (continent_id, name, code_iso2, code_iso3, code_national, phone_code, is_active)
 VALUES
@@ -24,7 +22,6 @@ VALUES
   ((SELECT id FROM public.continents WHERE code_international = 'AS'), 'China', 'CN', 'CHN', NULL, '+86', true),
   ((SELECT id FROM public.continents WHERE code_international = 'OC'), 'Australia', 'AU', 'AUS', NULL, '+61', true)
 ON CONFLICT (code_iso2) DO UPDATE SET name = EXCLUDED.name, continent_id = EXCLUDED.continent_id, is_active = EXCLUDED.is_active;
-
 -- States / Provinces (insert if not exists)
 DO $$
 DECLARE
@@ -101,7 +98,6 @@ BEGIN
     ON CONFLICT DO NOTHING;
   END IF;
 END$$;
-
 -- Cities (insert if not exists)
 DO $$
 DECLARE
@@ -176,5 +172,4 @@ BEGIN
     ON CONFLICT DO NOTHING;
   END IF;
 END$$;
-
 COMMIT;

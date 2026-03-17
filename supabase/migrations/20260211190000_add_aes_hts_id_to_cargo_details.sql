@@ -7,10 +7,8 @@ BEGIN
         CREATE INDEX IF NOT EXISTS idx_cargo_details_aes_hts_id ON public.cargo_details(aes_hts_id);
     END IF;
 END $$;
-
 -- Drop table if exists to ensure schema consistency during development
 DROP TABLE IF EXISTS public.global_hs_roots CASCADE;
-
 -- Create global_hs_roots table (WCO HS Nomenclature Roots)
 CREATE TABLE public.global_hs_roots (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -30,17 +28,13 @@ CREATE TABLE public.global_hs_roots (
     -- Or just rely on app logic/seeding. 
     -- Let's use a conditional unique index for chapters.
 );
-
 CREATE UNIQUE INDEX IF NOT EXISTS idx_global_hs_roots_chapter ON public.global_hs_roots(chapter_code) WHERE heading_code IS NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_global_hs_roots_heading ON public.global_hs_roots(chapter_code, heading_code) WHERE heading_code IS NOT NULL;
-
 -- Enable RLS
 ALTER TABLE public.global_hs_roots ENABLE ROW LEVEL SECURITY;
-
 -- RLS Policies (Read-only for most, Admin manage)
 CREATE POLICY "Public read access" ON public.global_hs_roots FOR SELECT USING (true);
 CREATE POLICY "Admin write access" ON public.global_hs_roots FOR ALL USING (is_platform_admin(auth.uid()));
-
 -- Seed WCO Chapters (Sample - Sections I-XVI)
 INSERT INTO public.global_hs_roots (chapter_code, level, description)
 VALUES

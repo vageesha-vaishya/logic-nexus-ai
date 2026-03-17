@@ -7,6 +7,9 @@ import { supabase } from '@/integrations/supabase/client';
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: {
     from: vi.fn(),
+    auth: {
+      getSession: vi.fn(),
+    },
   },
 }));
 
@@ -19,6 +22,102 @@ describe('DomainService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     DomainService.invalidateCache();
+    vi.stubGlobal('fetch', vi.fn());
+    (supabase.auth.getSession as any).mockResolvedValue({
+      data: {
+        session: {
+          access_token: 'session-token',
+        },
+      },
+    });
+  });
+
+  describe('getAuthorizedDomains', () => {
+    const jsonHeaders = { get: vi.fn().mockReturnValue('application/json') };
+
+    it('should return authorized domains payload from API', async () => {
+      const mockFetch = vi.mocked(fetch);
+      mockFetch.mockResolvedValue({
+        ok: true,
+        headers: jsonHeaders,
+        json: async () => ({
+          data: {
+            domains: mockDomains,
+            tenantDomainCount: 2,
+            tenantId: 'tenant-1',
+            isPlatformAdmin: false,
+          },
+        }),
+      } as unknown as Response);
+
+      const result = await DomainService.getAuthorizedDomains();
+
+      expect(fetch).toHaveBeenCalledWith('/api/v1/platform-domains', expect.any(Object));
+      expect(fetch).toHaveBeenCalledWith(
+        '/api/v1/platform-domains',
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            Authorization: 'Bearer session-token',
+          }),
+        })
+      );
+      expect(result.domains).toEqual(mockDomains);
+      expect(result.tenantDomainCount).toBe(2);
+      expect(result.tenantId).toBe('tenant-1');
+      expect(result.isPlatformAdmin).toBe(false);
+    });
+
+    it('should throw when API responds with an error', async () => {
+      const mockFetch = vi.mocked(fetch);
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 403,
+        headers: jsonHeaders,
+        json: async () => ({ error: 'Forbidden' }),
+      } as unknown as Response);
+
+      await expect(DomainService.getAuthorizedDomains()).rejects.toThrow('Forbidden');
+    });
+
+    it('should include correlation reference in thrown errors', async () => {
+      const mockFetch = vi.mocked(fetch);
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 500,
+        headers: jsonHeaders,
+        json: async () => ({ error: 'Internal Server Error', correlationId: 'corr-500' }),
+      } as unknown as Response);
+
+      await expect(DomainService.getAuthorizedDomains()).rejects.toThrow('ref: corr-500');
+    });
+
+    it('should recover when API returns HTML instead of JSON', async () => {
+      const mockFetch = vi.mocked(fetch);
+      const tenantAssignmentsChain = {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockResolvedValue({
+          data: [{ platform_domains: mockDomains[0] }],
+          error: null,
+        }),
+      };
+
+      (supabase.from as any).mockImplementation((table: string) => {
+        if (table === 'tenant_domain_assignments') return tenantAssignmentsChain;
+        throw new Error(`Unexpected table: ${table}`);
+      });
+
+      mockFetch.mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: { get: vi.fn().mockReturnValue('text/html') },
+        text: async () => '<!doctype html><html></html>',
+      } as unknown as Response);
+
+      const result = await DomainService.getAuthorizedDomains();
+      expect(result.domains).toEqual([mockDomains[0]]);
+      expect(result.tenantDomainCount).toBe(1);
+      expect(result.isPlatformAdmin).toBe(false);
+    });
   });
 
   describe('getAllDomains', () => {
@@ -197,6 +296,110 @@ describe('DomainService', () => {
       expect(mockChain.delete).toHaveBeenCalled();
       expect(mockChain.eq).toHaveBeenCalledWith('id', '1');
       expect(spyInvalidate).toHaveBeenCalled();
+    });
+  });
+
+  describe('setTenantDomains', () => {
+    it('assigns and revokes domain memberships for a tenant', async () => {
+      const mockFetch = vi.mocked(fetch);
+      mockFetch.mockResolvedValue({
+        ok: true,
+        headers: { get: vi.fn().mockReturnValue('application/json') },
+        json: async () => ({ data: { ok: true } }),
+      } as unknown as Response);
+
+      const result = await DomainService.setTenantDomains('tenant-1', ['d1', 'd3'], ['d1', 'd2']);
+
+      expect(result.assigned).toBe(1);
+      expect(result.revoked).toBe(1);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(mockFetch).toHaveBeenNthCalledWith(
+        1,
+        '/api/v1/domain-assignments',
+        expect.objectContaining({
+          method: 'POST',
+          body: expect.stringContaining('"domainId":"d3"'),
+        }),
+      );
+      expect(mockFetch).toHaveBeenNthCalledWith(
+        2,
+        '/api/v1/domain-assignments',
+        expect.objectContaining({
+          method: 'DELETE',
+          body: expect.stringContaining('"domainId":"d2"'),
+        }),
+      );
+    });
+
+    it('throws parsed API errors with correlation id', async () => {
+      const mockFetch = vi.mocked(fetch);
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 403,
+        headers: { get: vi.fn().mockReturnValue('application/json') },
+        json: async () => ({ error: 'Forbidden', correlationId: 'corr-dom-1' }),
+      } as unknown as Response);
+
+      await expect(
+        DomainService.setTenantDomains('tenant-1', ['d1'], []),
+      ).rejects.toThrow('Forbidden (ref: corr-dom-1)');
+    });
+  });
+
+  describe('getDomainAssignmentAuditHistory', () => {
+    it('returns audit rows and sends query filters', async () => {
+      const mockFetch = vi.mocked(fetch);
+      mockFetch.mockResolvedValue({
+        ok: true,
+        headers: { get: vi.fn().mockReturnValue('application/json') },
+        json: async () => ({
+          data: [
+            {
+              id: 'a1',
+              action: 'DOMAIN_ASSIGN',
+              tenant_id: 'tenant-1',
+              domain_id: 'd1',
+              actor_user_id: 'user-1',
+              batch_id: 'batch-1',
+              metadata: { assigned: 1 },
+              created_at: '2026-03-17T12:00:00.000Z',
+            },
+          ],
+        }),
+      } as unknown as Response);
+
+      const rows = await DomainService.getDomainAssignmentAuditHistory({
+        tenantId: 'tenant-1',
+        domainId: 'd1',
+        batchId: 'batch-1',
+        limit: 20,
+      });
+
+      expect(rows).toHaveLength(1);
+      expect(rows[0].action).toBe('DOMAIN_ASSIGN');
+      expect(mockFetch).toHaveBeenCalledWith(
+        '/api/v1/domain-assignments?tenant_id=tenant-1&domain_id=d1&batch_id=batch-1&limit=20',
+        expect.objectContaining({
+          method: 'GET',
+          headers: expect.objectContaining({
+            Authorization: 'Bearer session-token',
+          }),
+        }),
+      );
+    });
+
+    it('throws parsed audit API errors', async () => {
+      const mockFetch = vi.mocked(fetch);
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 500,
+        headers: { get: vi.fn().mockReturnValue('application/json') },
+        json: async () => ({ error: 'Audit failure', correlationId: 'corr-audit-1' }),
+      } as unknown as Response);
+
+      await expect(
+        DomainService.getDomainAssignmentAuditHistory(),
+      ).rejects.toThrow('Audit failure (ref: corr-audit-1)');
     });
   });
 });

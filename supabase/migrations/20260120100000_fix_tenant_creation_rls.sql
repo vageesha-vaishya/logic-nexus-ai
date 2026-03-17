@@ -36,10 +36,8 @@ BEGIN
     END IF;
   END IF;
 END $$;
-
 -- 2. Reset and Re-apply RLS policies for tenants to ensure INSERT is allowed
 ALTER TABLE public.tenants ENABLE ROW LEVEL SECURITY;
-
 -- Drop existing policies to avoid conflicts
 DROP POLICY IF EXISTS "Platform admins full access to tenants" ON public.tenants;
 DROP POLICY IF EXISTS "Platform admins can insert tenants" ON public.tenants;
@@ -48,37 +46,30 @@ DROP POLICY IF EXISTS "Platform admins can update tenants" ON public.tenants;
 DROP POLICY IF EXISTS "Platform admins can delete tenants" ON public.tenants;
 DROP POLICY IF EXISTS "Platform admins can update all tenants" ON public.tenants;
 DROP POLICY IF EXISTS "Platform admins can delete all tenants" ON public.tenants;
-
 -- Create explicit policies for clarity and coverage
 
 -- SELECT: Platform admins can see all
 CREATE POLICY "Platform admins can view all tenants"
   ON public.tenants FOR SELECT
   USING (public.is_platform_admin(auth.uid()));
-
 -- INSERT: Only Platform admins can create tenants
 CREATE POLICY "Platform admins can insert tenants"
   ON public.tenants FOR INSERT
   WITH CHECK (public.is_platform_admin(auth.uid()));
-
 -- UPDATE: Platform admins can update all
 CREATE POLICY "Platform admins can update all tenants"
   ON public.tenants FOR UPDATE
   USING (public.is_platform_admin(auth.uid()));
-
 -- DELETE: Platform admins can delete all
 CREATE POLICY "Platform admins can delete all tenants"
   ON public.tenants FOR DELETE
   USING (public.is_platform_admin(auth.uid()));
-
 -- Ensure Tenant Admin policies are preserved/restored
 -- (Dropping first to ensure no duplicates if naming varied)
 DROP POLICY IF EXISTS "Tenant admins can view own tenant" ON public.tenants;
-
 CREATE POLICY "Tenant admins can view own tenant"
   ON public.tenants FOR SELECT
   USING (id = public.get_user_tenant_id(auth.uid()));
-
 -- 3. Verify is_platform_admin function (idempotent replacement)
 CREATE OR REPLACE FUNCTION public.is_platform_admin(check_user_id UUID)
 RETURNS BOOLEAN

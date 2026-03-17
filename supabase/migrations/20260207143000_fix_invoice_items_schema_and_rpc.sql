@@ -2,29 +2,23 @@
 -- Description: Adds missing tenant_id and type columns to invoice_line_items. Updates create_invoice_from_shipment to use correct columns.
 
 BEGIN;
-
 -- 1. Schema Updates
 ALTER TABLE public.invoice_line_items
 ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES public.tenants(id) ON DELETE CASCADE,
 ADD COLUMN IF NOT EXISTS type TEXT CHECK (type IN ('service', 'product', 'tax', 'adjustment')) DEFAULT 'service';
-
 -- Populate tenant_id from invoice if missing (for existing records)
 UPDATE public.invoice_line_items ili
 SET tenant_id = i.tenant_id
 FROM public.invoices i
 WHERE ili.invoice_id = i.id
 AND ili.tenant_id IS NULL;
-
 -- Make tenant_id NOT NULL after population (if we are sure all invoices have tenants, which they should)
 -- However, to be safe in migration, we might skip SET NOT NULL if table is empty or ensure it works.
 -- Given it's a new table from Phase 1, it might be empty or small.
 ALTER TABLE public.invoice_line_items
 ALTER COLUMN tenant_id SET NOT NULL;
-
 CREATE INDEX IF NOT EXISTS idx_invoice_items_tenant ON public.invoice_line_items(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_invoice_items_type ON public.invoice_line_items(type);
-
-
 -- 2. Update RPC
 CREATE OR REPLACE FUNCTION public.create_invoice_from_shipment(
   p_shipment_id UUID,
@@ -188,5 +182,4 @@ BEGIN
   RETURN v_invoice_id;
 END;
 $$ LANGUAGE plpgsql;
-
 COMMIT;

@@ -5,15 +5,17 @@ import { StickyActionsProvider } from "@/components/layout/StickyActionsContext"
 import { logger } from "@/lib/logger";
 import { initializePlugins } from "./plugins/init";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, type ComponentType } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./hooks/useAuth";
 import { CRMProvider } from "./hooks/useCRM";
 import { DomainContextProvider } from "./contexts/DomainContext";
+import { TenantBrandingProvider } from "./contexts/TenantBrandingContext";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import { LeadsViewStateProvider } from "./hooks/useLeadsViewState";
 import { ThemeProvider } from "./hooks/useTheme";
 import { PipelineProvider } from "@/components/debug/pipeline/PipelineContext";
+import { PLATFORM_ADMIN_ROLE } from "@/config/permissions";
 
 // Eager: shell pages (needed immediately)
 import Landing from "./pages/Landing";
@@ -25,6 +27,18 @@ import NotFound from "./pages/NotFound";
 import SelfServiceOnboarding from "./pages/SelfServiceOnboarding";
 
 // Lazy: all dashboard pages (loaded on navigation)
+const lazyWithRetry = <T extends { default: ComponentType<unknown> }>(
+  importer: () => Promise<T>
+) =>
+  lazy(() =>
+    importer().catch(() =>
+      new Promise((resolve) => setTimeout(resolve, 800)).then(importer)
+    )
+  );
+
+const DashboardRouter = lazy(() =>
+  import("./components/dashboard/DashboardRouter").then((module) => ({ default: module.DashboardRouter }))
+);
 const Dashboards = lazy(() => import("./pages/dashboard/Dashboards"));
 const Accounts = lazy(() => import("./pages/dashboard/Accounts"));
 const AccountsImportExport = lazy(() => import("./pages/dashboard/AccountsImportExport"));
@@ -37,11 +51,12 @@ const ContactNew = lazy(() => import("./pages/dashboard/ContactNew"));
 const ContactDetail = lazy(() => import("./pages/dashboard/ContactDetail"));
 const ContactsPipeline = lazy(() => import("./pages/dashboard/ContactsPipeline"));
 const Leads = lazy(() => import("./pages/dashboard/Leads"));
-const LeadNew = lazy(() => import("./pages/dashboard/LeadNew"));
+const LeadNew = lazyWithRetry(() => import("./pages/dashboard/LeadNew"));
 const LeadDetail = lazy(() => import("./pages/dashboard/LeadDetail"));
 const LeadsImportExport = lazy(() => import("./pages/dashboard/LeadsImportExport"));
 const LeadsPipeline = lazy(() => import("./pages/dashboard/LeadsPipeline"));
 const Activities = lazy(() => import("./pages/dashboard/Activities"));
+const ActivitiesImportExport = lazy(() => import("./pages/dashboard/ActivitiesImportExport"));
 const ActivityNew = lazy(() => import("./pages/dashboard/ActivityNew"));
 const ActivityDetail = lazy(() => import("./pages/dashboard/ActivityDetail"));
 const Settings = lazy(() => import("./pages/dashboard/Settings"));
@@ -56,6 +71,7 @@ const Users = lazy(() => import("./pages/dashboard/Users"));
 const UserNew = lazy(() => import("./pages/dashboard/UserNew"));
 const UserDetail = lazy(() => import("./pages/dashboard/UserDetail"));
 const Opportunities = lazy(() => import("./pages/dashboard/Opportunities"));
+const OpportunitiesImportExport = lazy(() => import("./pages/dashboard/OpportunitiesImportExport"));
 const OpportunityNew = lazy(() => import("./pages/dashboard/OpportunityNew"));
 const OpportunityDetail = lazy(() => import("./pages/dashboard/OpportunityDetail"));
 const OpportunitiesPipeline = lazy(() => import("./pages/dashboard/OpportunitiesPipeline"));
@@ -186,15 +202,16 @@ const App = () => (
       <AuthProvider>
         <CRMProvider>
           <DomainContextProvider>
-            <ThemeProvider>
-              <TooltipProvider>
-                <SidebarProvider defaultOpen={false}>
-                  <StickyActionsProvider>
-                    <LeadsViewStateProvider>
-                      <PipelineProvider>
-                      <Sonner />
-                      <Suspense fallback={<div className="flex items-center justify-center h-screen"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
-                      <Routes>
+            <TenantBrandingProvider>
+              <ThemeProvider>
+                <TooltipProvider>
+                  <SidebarProvider defaultOpen={false}>
+                    <StickyActionsProvider>
+                      <LeadsViewStateProvider>
+                        <PipelineProvider>
+                        <Sonner />
+                        <Suspense fallback={<div className="flex items-center justify-center h-screen"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
+                        <Routes>
             <Route path="/" element={<Landing />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/register-organization" element={<SelfServiceOnboarding />} />
@@ -204,8 +221,8 @@ const App = () => (
             <Route 
               path="/dashboard" 
               element={
-                <ProtectedRoute>
-                  <Dashboards />
+                <ProtectedRoute requiredPermissions={["dashboards.view"]}>
+                  <DashboardRouter />
                 </ProtectedRoute>
               } 
             />
@@ -346,6 +363,14 @@ const App = () => (
               } 
             />
             <Route 
+              path="/dashboard/activities/import-export" 
+              element={
+                <ProtectedRoute requiredPermissions={["activities.create"]}>
+                  <ActivitiesImportExport />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
               path="/dashboard/activities/:id" 
               element={
                 <ProtectedRoute requiredPermissions={["activities.view"]}>
@@ -356,7 +381,7 @@ const App = () => (
             <Route 
               path="/dashboard/settings" 
               element={
-                <ProtectedRoute requiredPermissions={["admin.settings.manage"]}>
+                <ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required">
                   <Settings />
                 </ProtectedRoute>
               } 
@@ -364,7 +389,7 @@ const App = () => (
             <Route 
               path="/dashboard/settings/permissions" 
               element={
-                <ProtectedRoute requiredPermissions={["admin.settings.manage"]}>
+                <ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required">
                   <RolesPermissions />
                 </ProtectedRoute>
               } 
@@ -372,7 +397,7 @@ const App = () => (
             <Route 
               path="/dashboard/security-overview" 
               element={
-                <ProtectedRoute requiredPermissions={["admin.settings.manage"]}>
+                <ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required">
                   <SecurityOverview />
                 </ProtectedRoute>
               }
@@ -388,7 +413,7 @@ const App = () => (
             <Route 
               path="/dashboard/permissions" 
               element={
-                <ProtectedRoute requiredPermissions={["admin.settings.manage"]}>
+                <ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required">
                   <Navigate to="/dashboard/settings/permissions" replace />
                 </ProtectedRoute>
               }
@@ -416,6 +441,14 @@ const App = () => (
                   <TenantDetail />
                 </ProtectedRoute>
               } 
+            />
+            <Route
+              path="/dashboard/tenant-branding"
+              element={
+                <ProtectedRoute>
+                  <TenantDetail />
+                </ProtectedRoute>
+              }
             />
             <Route 
               path="/dashboard/franchises" 
@@ -486,6 +519,14 @@ const App = () => (
               element={
                 <ProtectedRoute requiredPermissions={["opportunities.create"]}>
                   <OpportunityNew />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/dashboard/opportunities/import-export" 
+              element={
+                <ProtectedRoute requiredPermissions={["opportunities.create"]}>
+                  <OpportunitiesImportExport />
                 </ProtectedRoute>
               } 
             />
@@ -604,7 +645,7 @@ const App = () => (
             <Route
               path="/dashboard/settings/channel-integrations"
               element={
-                <ProtectedRoute requiredPermissions={["admin.settings.manage"]}>
+                <ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required">
                   <ChannelIntegrations />
                 </ProtectedRoute>
               }
@@ -612,7 +653,7 @@ const App = () => (
             <Route 
               path="/dashboard/themes" 
               element={
-                <ProtectedRoute requiredPermissions={["admin.settings.manage"]}>
+                <ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required">
                   <ThemeManagement />
                 </ProtectedRoute>
               } 
@@ -621,7 +662,7 @@ const App = () => (
             <Route 
               path="/dashboard/ui-forms-demo" 
               element={
-                <ProtectedRoute requiredPermissions={["admin.settings.manage"]}>
+                <ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required">
                   <UIDemoForms />
                 </ProtectedRoute>
               } 
@@ -630,7 +671,7 @@ const App = () => (
             <Route 
               path="/dashboard/ui-advanced-demo" 
               element={
-                <ProtectedRoute requiredPermissions={["admin.settings.manage"]}>
+                <ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required">
                   <UIDemoAdvanced />
                 </ProtectedRoute>
               } 
@@ -640,46 +681,46 @@ const App = () => (
             <Route 
               path="/dashboard/settings/subscription" 
               element={
-                <ProtectedRoute requiredPermissions={["admin.settings.manage"]}>
+                <ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required">
                   <SubscriptionManagement />
                 </ProtectedRoute>
               } 
             />
             <Route 
               path="/dashboard/settings/quote-numbers" 
-              element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><QuoteNumberSettings /></ProtectedRoute>} 
+              element={<ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required"><QuoteNumberSettings /></ProtectedRoute>} 
             />
             <Route 
               path="/dashboard/settings/quotations" 
-              element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><QuotationSettings /></ProtectedRoute>} 
+              element={<ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required"><QuotationSettings /></ProtectedRoute>} 
             />
             {/* Settings → Data Management */}
             <Route 
               path="/dashboard/settings/data-management" 
-              element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><DataManagement /></ProtectedRoute>} 
+              element={<ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required"><DataManagement /></ProtectedRoute>} 
             />
             <Route 
               path="/dashboard/settings/domains" 
-              element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><PlatformDomains /></ProtectedRoute>} 
+              element={<ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required"><PlatformDomains /></ProtectedRoute>} 
             />
             <Route 
               path="/dashboard/settings/domains/:id" 
-              element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><PlatformDomainDetail /></ProtectedRoute>} 
+              element={<ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required"><PlatformDomainDetail /></ProtectedRoute>} 
             />
             <Route 
               path="/dashboard/settings/database-export" 
-              element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><DatabaseExport /></ProtectedRoute>} 
+              element={<ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required"><DatabaseExport /></ProtectedRoute>} 
             />
             <Route 
               path="/dashboard/settings/master-data" 
-              element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><MasterDataGeography /></ProtectedRoute>} 
+              element={<ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required"><MasterDataGeography /></ProtectedRoute>} 
             />
             <Route path="/dashboard/settings/master-data-hts" 
-              element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><MasterDataHTS /></ProtectedRoute>} 
+              element={<ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required"><MasterDataHTS /></ProtectedRoute>} 
             />
             <Route 
               path="/dashboard/settings/master-data-subscription-plans" 
-              element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><MasterDataSubscriptionPlans /></ProtectedRoute>} 
+              element={<ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required"><MasterDataSubscriptionPlans /></ProtectedRoute>} 
             />
             {/* Public customer portal */}
             <Route path="/portal/quote/:token" element={<QuotePortal />} />
@@ -711,10 +752,10 @@ const App = () => (
             <Route path="/dashboard/crm-workspace" element={<ProtectedRoute requiredPermissions={["dashboards.view"]}><CRMWorkspace /></ProtectedRoute>} />
             <Route path="/dashboard/leads-workspace" element={<Navigate to="/dashboard/leads/pipeline" replace />} />
             <Route path="/dashboard/more" element={<ProtectedRoute><More /></ProtectedRoute>} />
-            <Route path="/dashboard/settings/permissions" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><PermissionsMatrix /></ProtectedRoute>} />
+            <Route path="/dashboard/settings/permissions" element={<ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required"><PermissionsMatrix /></ProtectedRoute>} />
             <Route path="/dashboard/audit-logs" element={<ProtectedRoute><AuditLogs /></ProtectedRoute>} />
             <Route path="/dashboard/security-incidents" element={<ProtectedRoute><SecurityIncidents /></ProtectedRoute>} />
-            <Route path="/dashboard/settings/custom-roles" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><CustomRoles /></ProtectedRoute>} />
+            <Route path="/dashboard/settings/custom-roles" element={<ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required"><CustomRoles /></ProtectedRoute>} />
             <Route path="/dashboard/charge-categories" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><ChargeCategories /></ProtectedRoute>} />
             <Route path="/dashboard/charge-bases" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><ChargeBases /></ProtectedRoute>} />
             <Route path="/dashboard/currencies" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><Currencies /></ProtectedRoute>} />
@@ -782,18 +823,19 @@ const App = () => (
             <Route path="/dashboard/invoicing/orders" element={<ProtectedRoute><SalesPlaceholder /></ProtectedRoute>} />
             <Route path="/dashboard/reports/sales" element={<ProtectedRoute><SalesPlaceholder /></ProtectedRoute>} />
             <Route path="/dashboard/reports/reps" element={<ProtectedRoute><SalesPlaceholder /></ProtectedRoute>} />
-            <Route path="/dashboard/settings/teams" element={<ProtectedRoute><SalesPlaceholder /></ProtectedRoute>} />
-            <Route path="/dashboard/settings/activities" element={<ProtectedRoute><SalesPlaceholder /></ProtectedRoute>} />
+            <Route path="/dashboard/settings/teams" element={<ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required"><SalesPlaceholder /></ProtectedRoute>} />
+            <Route path="/dashboard/settings/activities" element={<ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required"><SalesPlaceholder /></ProtectedRoute>} />
             
             <Route path="*" element={<NotFound />} />
-          </Routes>
-                </Suspense>
+                        </Routes>
+                      </Suspense>
                       </PipelineProvider>
                     </LeadsViewStateProvider>
                   </StickyActionsProvider>
                 </SidebarProvider>
               </TooltipProvider>
-            </ThemeProvider>
+              </ThemeProvider>
+            </TenantBrandingProvider>
           </DomainContextProvider>
         </CRMProvider>
       </AuthProvider>

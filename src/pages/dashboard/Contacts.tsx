@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Search, User, Mail, Phone, Building2, Download } from 'lucide-react';
+import { Plus, Search, User, Mail, Phone, Building2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,11 +7,13 @@ import TitleStrip from '@/components/ui/title-strip';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHeader, TableRow, SortableHead } from '@/components/ui/table';
 import { useSort } from '@/hooks/useSort';
-import { ViewToggle, ViewMode } from '@/components/ui/view-toggle';
 import { useCRM } from '@/hooks/useCRM';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { useTheme } from '@/hooks/useTheme';
+import { useCRMModuleNavigationState } from '@/hooks/useCRMModuleNavigationState';
+import { CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
 
 interface Contact {
   id: string;
@@ -26,11 +28,19 @@ interface Contact {
 }
 
 export default function Contacts() {
+  const navigate = useNavigate();
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [viewMode, setViewMode] = useState<ViewMode>('card');
   const { supabase, context, scopedDb } = useCRM();
+  const { setActive } = useTheme();
+  const {
+    viewMode,
+    theme,
+    hydrated,
+    setViewMode,
+    setTheme,
+  } = useCRMModuleNavigationState('contacts', { viewMode: 'pipeline', theme: 'Azure Sky' });
 
   useEffect(() => {
     if (process.env.NODE_ENV === 'development') {
@@ -68,6 +78,11 @@ export default function Contacts() {
     fetchContacts();
   }, [fetchContacts]);
 
+  useEffect(() => {
+    if (!hydrated) return;
+    setActive(theme);
+  }, [hydrated, setActive, theme]);
+
   const filteredContacts = contacts.filter(contact =>
     `${contact.first_name} ${contact.last_name}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
     contact.email?.toLowerCase().includes(searchQuery.toLowerCase())
@@ -92,22 +107,23 @@ export default function Contacts() {
           <p className="text-muted-foreground">Manage your business contacts</p>
         </div>
         <div className="flex items-center gap-2">
-          <ViewToggle value={viewMode} onChange={setViewMode} />
-          <Button asChild variant="outline">
-            <Link to="/dashboard/contacts/import-export">
-              <Download className="mr-2 h-4 w-4" />
-              Import/Export
-            </Link>
-          </Button>
-          <Button asChild variant="outline">
-            <Link to="/dashboard/contacts/pipeline">Pipeline View</Link>
-          </Button>
-          <Button asChild>
-            <Link to="/dashboard/contacts/new">
-              <Plus className="mr-2 h-4 w-4" />
-              New Contact
-            </Link>
-          </Button>
+          <CRMModuleHeaderNavigation
+            moduleLabel="Contacts"
+            viewMode={viewMode}
+            theme={theme}
+            onViewModeChange={(mode) => {
+              if (mode === 'pipeline') {
+                navigate('/dashboard/contacts/pipeline');
+                return;
+              }
+              setViewMode(mode);
+            }}
+            onThemeChange={setTheme}
+            onCreate={() => navigate('/dashboard/contacts/new')}
+            createLabel="New Contact"
+            onRefresh={fetchContacts}
+            onImportExport={() => navigate('/dashboard/contacts/import-export')}
+          />
         </div>
       </div>
 

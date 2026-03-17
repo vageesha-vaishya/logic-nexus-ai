@@ -48,7 +48,6 @@ BEGIN
   RETURN result;
 END;
 $$;
-
 -- Grant execute permission to authenticated users
 GRANT EXECUTE ON FUNCTION get_system_log_stats(timestamptz, timestamptz) TO authenticated;
 GRANT EXECUTE ON FUNCTION get_system_log_stats(timestamptz, timestamptz) TO service_role;

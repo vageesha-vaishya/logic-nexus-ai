@@ -8,15 +8,12 @@ create table if not exists public.quote_audit_logs (
     user_agent text,
     created_at timestamptz default now()
 );
-
 -- RLS
 alter table public.quote_audit_logs enable row level security;
-
 -- Drop policies if they exist to avoid errors on re-run
 drop policy if exists "Admins can view all audit logs" on public.quote_audit_logs;
 drop policy if exists "Users can view their own audit logs" on public.quote_audit_logs;
 drop policy if exists "Service role can insert logs" on public.quote_audit_logs;
-
 -- Admins can view all
 create policy "Admins can view all audit logs"
     on public.quote_audit_logs
@@ -30,13 +27,11 @@ create policy "Admins can view all audit logs"
             and ur.role::text = 'platform_admin'
         )
     );
-
 -- Users can view their own
 create policy "Users can view their own audit logs"
     on public.quote_audit_logs
     for select
     using ( auth.uid() = user_id );
-
 -- Service role can insert (and authenticated users for now, controlled by app logic)
 create policy "Service role can insert logs"
     on public.quote_audit_logs

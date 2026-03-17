@@ -5,18 +5,14 @@
 -- 4. Ensures referential integrity
 
 BEGIN;
-
 -----------------------------------------------------------------------------
 -- 1. Schema Updates: Link Categories to Domains
 -----------------------------------------------------------------------------
 -- Ensure 'code' in platform_domains is nullable (it's legacy)
 ALTER TABLE platform_domains ALTER COLUMN code DROP NOT NULL;
-
 ALTER TABLE service_categories 
 ADD COLUMN IF NOT EXISTS domain_id UUID REFERENCES platform_domains(id);
-
 CREATE INDEX IF NOT EXISTS idx_service_categories_domain_id ON service_categories(domain_id);
-
 -----------------------------------------------------------------------------
 -- 2. Seed Platform Domains
 -----------------------------------------------------------------------------
@@ -44,7 +40,6 @@ BEGIN
     RETURN v_id;
 END;
 $$ LANGUAGE plpgsql;
-
 DO $$
 DECLARE
     v_logistics_id UUID;
@@ -164,8 +159,6 @@ BEGIN
     ON CONFLICT (name) DO NOTHING;
 
 END $$;
-
 -- Drop helper function
 DROP FUNCTION upsert_platform_domain;
-
 COMMIT;

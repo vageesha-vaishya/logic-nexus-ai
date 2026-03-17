@@ -1,6 +1,5 @@
 DROP POLICY IF EXISTS quote_charges_read_alignment ON public.quote_charges;
 DROP POLICY IF EXISTS quote_charges_read ON public.quote_charges;
-
 CREATE POLICY quote_charges_read_alignment ON public.quote_charges FOR SELECT
 USING (
   tenant_id = get_user_tenant_id(auth.uid())

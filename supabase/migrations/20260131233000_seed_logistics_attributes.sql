@@ -2,7 +2,6 @@
 -- Depends on 20260131230000_cleanup_legacy_service_types.sql
 
 BEGIN;
-
 DO $$
 DECLARE
     v_ocean_freight UUID;
@@ -61,5 +60,4 @@ BEGIN
     END IF;
 
 END $$;
-
 COMMIT;

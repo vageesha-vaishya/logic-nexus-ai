@@ -1,4 +1,3 @@
-
 -- Migration to add MGL-Main-Template with Matrix Rate Table
 
 DO $$
@@ -6,14 +5,9 @@ DECLARE
     v_tenant_id UUID;
     v_template_id UUID;
 BEGIN
-    -- Get MGL Tenant ID
-    SELECT id INTO v_tenant_id FROM tenants WHERE name ILIKE '%Miami Global Lines%' LIMIT 1;
-    
-    -- Ensure we found the tenant
-    IF v_tenant_id IS NULL THEN
-        RAISE NOTICE 'Tenant Miami Global Lines not found. Skipping MGL-Main-Template creation.';
-        RETURN;
-    END IF;
+    -- Get MGL Tenant ID (assuming it exists, otherwise this will be global or fail gracefully)
+    -- If no tenant found, we insert as global template (tenant_id IS NULL)
+    SELECT id INTO v_tenant_id FROM tenants WHERE name LIKE '%Miami Global Lines%' LIMIT 1;
 
     -- Delete existing if any (to allow re-run)
     DELETE FROM quote_templates WHERE name = 'MGL-Main-Template';
@@ -25,7 +19,7 @@ BEGIN
         'Main template for MGL with Matrix Rate Table',
         'General',
         '{
-            "layout": "matrix",
+            "layout": "mgl_matrix",
             "header": {
                 "show_logo": true,
                 "company_info": true,
@@ -42,45 +36,24 @@ BEGIN
                 },
                 {
                     "type": "key_value_grid",
-                    "height": 80,
-                    "config": { "columns": 2 },
+                    "height": 100,
                     "grid_fields": [
                         { "key": "customer.company_name", "label": "Customer" },
-                        { "key": "customer.contact_name", "label": "Attn" },
-                        { "key": "customer.address", "label": "Address" },
-                        { "key": "customer.phone", "label": "Phone" },
-                        { "key": "customer.email", "label": "Email" },
-                        { "key": "customer.code", "label": "Customer Code" },
-                        { "key": "customer.inquiry_number", "label": "Inquiry No" }
-                    ]
-                },
-                {
-                    "type": "key_value_grid",
-                    "height": 80,
-                    "config": { "columns": 2 },
-                    "grid_fields": [
                         { "key": "quote.quote_number", "label": "Quote Ref" },
                         { "key": "quote.created_at", "label": "Date", "format": "date" },
                         { "key": "quote.expiration_date", "label": "Valid Until", "format": "date" },
-                        { "key": "quote.origin.location_name", "label": "Origin" },
-                        { "key": "quote.destination.location_name", "label": "Destination" },
-                        { "key": "quote.service_level", "label": "Service Level" }
+                        { "key": "customer.contact_name", "label": "Attn" },
+                        { "key": "legs[0].pol", "label": "Origin" },
+                        { "key": "legs[0].pod", "label": "Destination" },
+                        { "key": "items[0].commodity", "label": "Commodity" }
                     ]
                 },
                 {
                     "type": "matrix_rate_table",
-                    "height": 200,
+                    "height": 300,
                     "page_break_before": false,
                     "content": {
-                        "text": "Freight Rates Options"
-                    }
-                },
-                {
-                    "type": "detailed_matrix_rate_table",
-                    "height": 300,
-                    "page_break_before": true,
-                    "content": {
-                        "text": "Detailed Charges Breakdown"
+                        "text": "Freight Rates"
                     }
                 },
                 {

@@ -296,8 +296,8 @@ export function DataTable<T extends { id?: string | number }>({
           )}
         </div>
       ) : (
-        <div className="rounded-md border overflow-hidden">
-          <Table>
+        <div className="rounded-md border overflow-hidden [&>div]:overflow-x-hidden">
+          <Table className="table-fixed">
             <TableHeader>
               <TableRow>
                 {selection && (
@@ -322,7 +322,7 @@ export function DataTable<T extends { id?: string | number }>({
                         direction={sortState?.direction}
                         sortOrder={multiSort.sorts.length > 1 && sortIndex >= 0 ? sortIndex + 1 : undefined}
                         onSort={(f, m) => multiSort.onSort(f, m)}
-                        className={col.className}
+                        className={cn('truncate', col.className)}
                         style={{ width: col.width }}
                       >
                         {col.header}
@@ -338,7 +338,7 @@ export function DataTable<T extends { id?: string | number }>({
                         activeField={sorting.field}
                         direction={sorting.direction}
                         onSort={sorting.onSort}
-                        className={col.className}
+                        className={cn('truncate', col.className)}
                         style={{ width: col.width }}
                       >
                         {col.header}
@@ -348,7 +348,7 @@ export function DataTable<T extends { id?: string | number }>({
                   return (
                     <TableHead 
                       key={key + index} 
-                      className={col.className}
+                      className={cn('truncate', col.className)}
                       style={{ width: col.width }}
                     >
                       {col.header}
@@ -388,7 +388,7 @@ export function DataTable<T extends { id?: string | number }>({
                         </TableCell>
                       )}
                       {columns.map((col, colIndex) => (
-                        <TableCell key={String(col.key) + colIndex} className={col.className}>
+                        <TableCell key={String(col.key) + colIndex} className={cn('max-w-0 break-words', col.className)}>
                           {col.render ? col.render(row) : (row as any)[col.key]}
                         </TableCell>
                       ))}

@@ -42,7 +42,7 @@ export default function ThemeManagement() {
   const [stripWidth, setStripWidth] = useState('22px');
   const [stripAngle, setStripAngle] = useState('14deg');
   const [headerBannerVisible, setHeaderBannerVisible] = useState(false);
-  const [headerBannerContent, setHeaderBannerContent] = useState('System notification');
+  const [headerBannerContent, setHeaderBannerContent] = useState('');
   const [headerBannerColor, setHeaderBannerColor] = useState('217 91% 60%');
   const [headerBannerTextColor, setHeaderBannerTextColor] = useState('0 0% 100%');
   const [headerBannerHeight, setHeaderBannerHeight] = useState('48px');
@@ -96,7 +96,7 @@ export default function ThemeManagement() {
         setHeaderBannerContent(
           typeof (found as any).headerBannerContent === 'string'
             ? (found as any).headerBannerContent
-            : (found.name === 'Default Simple' ? 'System notification' : domBannerContent)
+            : (found.name === 'Default Simple' ? '' : domBannerContent)
         );
         if (typeof (found as any).headerBannerColor === 'string') {
           setHeaderBannerColor((found as any).headerBannerColor);
@@ -299,7 +299,7 @@ export default function ThemeManagement() {
                 <Button variant="outline" size="sm" onClick={resetTableDefaults}>Reset Table Defaults</Button>
               </div>
               <div className="col-span-full mt-2 border-t pt-4">
-                <div className="text-sm font-medium mb-3">Header Notification Banner</div>
+                <div className="text-sm font-medium mb-3">Header Banner</div>
                 <div className="grid gap-4 md:grid-cols-6">
                   <div className="space-y-2 flex items-center gap-2">
                     <Switch checked={headerBannerVisible} onCheckedChange={setHeaderBannerVisible} />
@@ -307,7 +307,7 @@ export default function ThemeManagement() {
                   </div>
                   <div className="space-y-2 md:col-span-3">
                     <label className="text-sm">Banner Content</label>
-                    <Input value={headerBannerContent} onChange={(e) => setHeaderBannerContent(e.target.value)} placeholder="Type notification content" />
+                    <Input value={headerBannerContent} onChange={(e) => setHeaderBannerContent(e.target.value)} placeholder="Type banner content" />
                     <p className="text-xs text-muted-foreground">Displays existing header labels and text fields exactly with the banner background.</p>
                   </div>
                   <HslPicker label="Banner Background" value={headerBannerColor} onChange={setHeaderBannerColor} />
@@ -462,7 +462,7 @@ export default function ThemeManagement() {
                           headerBannerVisible: typeof (p as any).headerBannerVisible === 'boolean'
                             ? (p as any).headerBannerVisible
                             : p.name === 'Default Simple',
-                          headerBannerContent: (p as any).headerBannerContent ?? 'System notification',
+                          headerBannerContent: (p as any).headerBannerContent ?? '',
                           headerBannerColor: (p as any).headerBannerColor ?? p.accent ?? p.primary ?? '217 91% 60%',
                           headerBannerTextColor: (p as any).headerBannerTextColor ?? '0 0% 100%',
                           headerBannerHeight: (p as any).headerBannerHeight ?? '48px',
@@ -504,7 +504,7 @@ export default function ThemeManagement() {
                                 : typeof (p as any).headerBannerVisible === 'boolean'
                                   ? (p as any).headerBannerVisible
                                   : false,
-                              headerBannerContent: (p as any).headerBannerContent ?? 'System notification',
+                              headerBannerContent: (p as any).headerBannerContent ?? '',
                               headerBannerColor: (p as any).headerBannerColor ?? p.accent ?? p.primary ?? '217 91% 60%',
                               headerBannerTextColor: (p as any).headerBannerTextColor ?? '0 0% 100%',
                               headerBannerHeight: (p as any).headerBannerHeight ?? '48px',
@@ -540,7 +540,7 @@ export default function ThemeManagement() {
                           : typeof (p as any).headerBannerVisible === 'boolean'
                             ? (p as any).headerBannerVisible
                             : false);
-                        setHeaderBannerContent((p as any).headerBannerContent || 'System notification');
+                        setHeaderBannerContent((p as any).headerBannerContent || '');
                         setHeaderBannerColor((p as any).headerBannerColor || p.accent || p.primary || '217 91% 60%');
                         setHeaderBannerTextColor((p as any).headerBannerTextColor || '0 0% 100%');
                         setHeaderBannerHeight((p as any).headerBannerHeight || '48px');

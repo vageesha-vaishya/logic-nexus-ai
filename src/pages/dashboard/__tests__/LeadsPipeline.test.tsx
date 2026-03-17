@@ -1,7 +1,7 @@
 
 import { render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import LeadsPipeline from '../LeadsPipeline';
+import LeadsPipeline, { getVisiblePipelineStages, parseSelectedPipelineStages } from '../LeadsPipeline';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
@@ -11,7 +11,10 @@ vi.mock('@/hooks/useCRM', () => ({
     supabase: {
       from: vi.fn(() => ({
         select: vi.fn(() => ({
-          order: vi.fn(() => Promise.resolve({ data: [], error: null }))
+          eq: vi.fn(() => ({
+            order: vi.fn(() => Promise.resolve({ data: [], error: null })),
+          })),
+          order: vi.fn(() => Promise.resolve({ data: [], error: null })),
         }))
       })),
       channel: vi.fn(() => ({
@@ -24,7 +27,10 @@ vi.mock('@/hooks/useCRM', () => ({
     scopedDb: {
       from: vi.fn(() => ({
         select: vi.fn(() => ({
-          order: vi.fn(() => Promise.resolve({ data: [], error: null }))
+          eq: vi.fn(() => ({
+            order: vi.fn(() => Promise.resolve({ data: [], error: null })),
+          })),
+          order: vi.fn(() => Promise.resolve({ data: [], error: null })),
         }))
       }))
     }
@@ -33,13 +39,31 @@ vi.mock('@/hooks/useCRM', () => ({
 
 vi.mock('@/hooks/useLeadsViewState', () => ({
   useLeadsViewState: () => ({
-    state: { theme: 'light' },
+    state: {
+      theme: 'light',
+      hydrated: true,
+      hydrationSource: 'storage',
+      view: 'pipeline',
+      pipeline: {
+        q: '',
+        status: [],
+        tab: 'board',
+      },
+    },
     setTheme: vi.fn(),
     setView: vi.fn(),
     setPipeline: vi.fn(),
     setWorkspace: vi.fn()
   }),
   LeadsViewStateProvider: ({ children }: any) => <div>{children}</div>
+}));
+
+vi.mock('@/services/pipeline-service', () => ({
+  PipelineService: {
+    listLeads: vi.fn().mockResolvedValue({ data: [], totalCount: 0 }),
+    transitionLeadStage: vi.fn(),
+    updateLead: vi.fn(),
+  },
 }));
 
 vi.mock('@/components/debug/pipeline/PipelineContext', () => ({
@@ -82,15 +106,29 @@ describe('LeadsPipeline', () => {
       </QueryClientProvider>
     );
 
-    // Should verify that the component renders without crashing
-    // Depending on the default view, it might render board or list
-    // The mocked fetch should resolve and loading state should clear
-    
-    // Check for board or list
     await waitFor(() => {
-        const board = screen.queryByTestId('pipeline-board');
-        const list = screen.queryByTestId('pipeline-list');
-        expect(board || list).toBeInTheDocument();
+      expect(screen.getByText(/Leads Pipeline|leads\.title/i)).toBeInTheDocument();
     });
+  });
+
+  it('parses only valid status values from query params', () => {
+    expect(parseSelectedPipelineStages('won,qualified,invalid,new')).toEqual(['won', 'qualified', 'new']);
+    expect(parseSelectedPipelineStages('')).toEqual([]);
+    expect(parseSelectedPipelineStages(null)).toEqual([]);
+  });
+
+  it('returns all stages when no status filter is selected', () => {
+    const visible = getVisiblePipelineStages([]);
+    expect(visible).toEqual(['new', 'contacted', 'qualified', 'proposal', 'negotiation', 'won', 'lost', 'converted']);
+  });
+
+  it('returns only selected status sections preserving pipeline order', () => {
+    const visible = getVisiblePipelineStages(['won', 'qualified', 'new']);
+    expect(visible).toEqual(['new', 'qualified', 'won']);
+  });
+
+  it('handles empty filter output safely when selected statuses are unavailable', () => {
+    const visible = getVisiblePipelineStages(['won']).filter((stage) => stage === 'new');
+    expect(visible).toEqual([]);
   });
 });

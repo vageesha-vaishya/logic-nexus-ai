@@ -10,10 +10,21 @@ import {
 import { Layers } from 'lucide-react';
 
 export function DomainSwitcher() {
-  const { currentDomain, setDomain, availableDomains, isLoading } = useDomain();
+  const { currentDomain, setDomain, availableDomains, showDomainSelector, isLoading } = useDomain();
+  const singleDomain = currentDomain || availableDomains[0] || null;
 
   if (isLoading) {
     return <div className="h-9 w-[200px] animate-pulse rounded-md bg-muted" />;
+  }
+
+  if (!showDomainSelector || availableDomains.length <= 1) {
+    if (!singleDomain) return null;
+    return (
+      <div className="flex items-center gap-2 px-3 h-9 rounded-md border bg-background max-w-[240px]">
+        <Layers className="h-4 w-4 text-muted-foreground shrink-0" />
+        <span className="text-sm truncate font-medium">{singleDomain.name}</span>
+      </div>
+    );
   }
 
   return (

@@ -1,14 +1,11 @@
-
 -- Fix Global HS Roots Schema Mismatch
 -- The existing global_hs_roots table has an old schema (chapter_code, etc.)
 -- We need to replace it with the new schema (hs6_code, generated chapter/heading)
 
 BEGIN;
-
 -- 1. Drop the old table and cascade to remove the FK constraint on aes_hts_codes
 -- This drops the constraint 'aes_hts_codes_global_hs_root_id_fkey' but preserves aes_hts_codes data
 DROP TABLE IF EXISTS public.global_hs_roots CASCADE;
-
 -- 2. Recreate global_hs_roots with correct schema
 CREATE TABLE public.global_hs_roots (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -24,13 +21,10 @@ CREATE TABLE public.global_hs_roots (
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now()
 );
-
 -- 3. Enable RLS
 ALTER TABLE public.global_hs_roots ENABLE ROW LEVEL SECURITY;
-
 CREATE POLICY "Authenticated users can view global_hs_roots"
     ON public.global_hs_roots FOR SELECT TO authenticated USING (true);
-
 CREATE POLICY "Admins can manage global_hs_roots"
     ON public.global_hs_roots FOR ALL TO authenticated
     USING (
@@ -40,13 +34,11 @@ CREATE POLICY "Admins can manage global_hs_roots"
             AND ur.role::text IN ('admin', 'super_admin', 'platform_admin')
         )
     );
-
 -- 4. Re-create Indexes
 CREATE INDEX idx_global_hs_roots_hs6_code ON public.global_hs_roots(hs6_code);
 CREATE INDEX idx_global_hs_roots_chapter ON public.global_hs_roots(chapter);
 CREATE INDEX idx_global_hs_roots_heading ON public.global_hs_roots(heading);
 CREATE INDEX idx_global_hs_roots_browsing ON public.global_hs_roots(chapter, heading);
-
 -- 5. Seed Data from aes_hts_codes
 -- Extract unique 6-digit roots
 INSERT INTO public.global_hs_roots (hs6_code, description)
@@ -57,7 +49,6 @@ SELECT DISTINCT
 FROM public.aes_hts_codes c1
 WHERE subheading IS NOT NULL AND length(subheading) = 6
 ON CONFLICT (hs6_code) DO NOTHING;
-
 -- 6. Backfill Chapter/Heading Descriptions
 UPDATE public.global_hs_roots g
 SET 
@@ -76,30 +67,24 @@ SET
         LIMIT 1
     )
 WHERE chapter_description IS NULL OR heading_description IS NULL;
-
 -- Fallback for missing descriptions
 UPDATE public.global_hs_roots
 SET 
     chapter_description = COALESCE(chapter_description, 'Chapter ' || chapter),
     heading_description = COALESCE(heading_description, 'Heading ' || heading);
-
 -- 7. Restore Foreign Key on aes_hts_codes
 -- First, clean up any old bad references (set to NULL)
 UPDATE public.aes_hts_codes SET global_hs_root_id = NULL;
-
 -- Re-link based on hs6_code matching subheading
 UPDATE public.aes_hts_codes a
 SET global_hs_root_id = g.id
 FROM public.global_hs_roots g
 WHERE a.subheading = g.hs6_code;
-
 -- Add the constraint back
 ALTER TABLE public.aes_hts_codes 
 ADD CONSTRAINT aes_hts_codes_global_hs_root_id_fkey 
 FOREIGN KEY (global_hs_root_id) REFERENCES public.global_hs_roots(id);
-
 CREATE INDEX IF NOT EXISTS idx_aes_hts_codes_global_hs_root_id ON public.aes_hts_codes(global_hs_root_id);
-
 -- 8. Ensure RPC exists and is correct (just to be safe)
 CREATE OR REPLACE FUNCTION get_global_hs_hierarchy(
   level_type text, 
@@ -171,5 +156,4 @@ BEGIN
   END IF;
 END;
 $$;
-
 COMMIT;

@@ -1,4 +1,3 @@
-
 -- Fix trigger logic to use UPDATE/INSERT pattern instead of ON CONFLICT
 -- This resolves potential issues with unique constraint resolution in some contexts
 

@@ -3,18 +3,15 @@
 -- Seeded Count: 384
 
 BEGIN;
-
 -- Ensure port_type column exists
 ALTER TABLE public.ports_locations 
 ADD COLUMN IF NOT EXISTS port_type text[];
-
 -- Create a temp table for the new data
 CREATE TEMP TABLE temp_aes_ports (
     code text,
     name text,
     modes text[]
 );
-
 INSERT INTO temp_aes_ports (code, name, modes) VALUES
 ('0101', 'PORTLAND, ME', '{"Vessel","Air"}'),
 ('0102', 'BANGOR, ME', '{"Vessel","Air"}'),
@@ -400,8 +397,6 @@ INSERT INTO temp_aes_ports (code, name, modes) VALUES
 ('5583', 'FORTH WORTH ALLIANCE AIRPORT, TX', '{"Air"}'),
 ('5584', 'ADDISON AIRPORT, TX', '{"Air"}'),
 ('8000', 'U.S. MAIL EXPORTS', '{"Vessel","Air","Rail","Road"}');
-
-
 -- Update existing ports with Schedule D code and name normalization
 -- We match primarily on Code if it exists (but it might not be in port_locations yet)
 -- Or we match on Name if code is missing in DB
@@ -414,14 +409,12 @@ SET
     updated_at = NOW()
 FROM temp_aes_ports t
 WHERE pl.schedule_d_code = t.code;
-
 -- 1b. Cleanup: Reset schedule_d_code for ports that are NOT in the authoritative list
 -- This removes invalid/outdated codes (like the bad 2786 assignments)
 UPDATE public.ports_locations
 SET schedule_d_code = NULL, port_type = NULL
 WHERE schedule_d_code IS NOT NULL
 AND schedule_d_code NOT IN (SELECT code FROM temp_aes_ports);
-
 -- 2. Update existing records by Name where Schedule D code is NULL
 UPDATE public.ports_locations pl
 SET 
@@ -435,7 +428,6 @@ AND (
     OR upper(pl.city) || ', ' || upper(pl.state_province) = upper(t.name) -- Match "CITY, ST" format
     OR upper(pl.location_name) LIKE upper(t.name) || '%' -- Partial match
 );
-
 -- 3. Insert NEW ports that don't exist
 INSERT INTO public.ports_locations (
     location_name,
@@ -459,7 +451,6 @@ WHERE NOT EXISTS (
     SELECT 1 FROM public.ports_locations pl 
     WHERE pl.schedule_d_code = t.code
 );
-
 -- 4. Log the operation
 INSERT INTO public.audit_logs (action, resource_type, details)
 VALUES (
@@ -471,7 +462,5 @@ VALUES (
         'source', 'appendix_d_port_cd_122025_508c.pdf'
     )
 );
-
 DROP TABLE temp_aes_ports;
-
 COMMIT;

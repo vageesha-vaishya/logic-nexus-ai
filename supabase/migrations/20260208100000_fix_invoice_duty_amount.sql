@@ -1,4 +1,3 @@
-
 CREATE OR REPLACE FUNCTION public.create_invoice_from_shipment(
   p_shipment_id UUID,
   p_tenant_id UUID

@@ -16,7 +16,6 @@ BEGIN
     ON DELETE SET NULL;
   END IF;
 END $$;
-
 -- Add foreign key for account_id if not exists
 DO $$ 
 BEGIN
@@ -32,7 +31,6 @@ BEGIN
     ON DELETE SET NULL;
   END IF;
 END $$;
-
 -- Add foreign key for contact_id if not exists
 DO $$ 
 BEGIN

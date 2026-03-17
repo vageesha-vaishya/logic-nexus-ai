@@ -23,12 +23,10 @@ CREATE TABLE IF NOT EXISTS public.master_hts (
     CONSTRAINT master_hts_code_unique UNIQUE (hts_code),
     CONSTRAINT master_hts_format_check CHECK (hts_code ~ '^[0-9]{4}(\.[0-9]{2}){0,3}$')
 );
-
 -- Indexing for performance
 CREATE INDEX IF NOT EXISTS idx_master_hts_code ON public.master_hts(hts_code);
 CREATE INDEX IF NOT EXISTS idx_master_hts_verified ON public.master_hts(verified_flag);
 CREATE INDEX IF NOT EXISTS idx_master_hts_active ON public.master_hts(is_active);
-
 -- 2. Discrepancy Logs
 CREATE TABLE IF NOT EXISTS public.discrepancy_logs (
     log_id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -44,7 +42,6 @@ CREATE TABLE IF NOT EXISTS public.discrepancy_logs (
     created_at timestamp with time zone DEFAULT now(),
     resolved_at timestamp with time zone
 );
-
 -- 3. Verification Reports (Auditable)
 CREATE TABLE IF NOT EXISTS public.hts_verification_reports (
     report_id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -59,7 +56,6 @@ CREATE TABLE IF NOT EXISTS public.hts_verification_reports (
     
     report_url text -- Link to generated PDF/XBRL if stored
 );
-
 -- 4. Feature Flags for Application Layer
 CREATE TABLE IF NOT EXISTS public.app_feature_flags (
     flag_key text PRIMARY KEY,
@@ -67,14 +63,12 @@ CREATE TABLE IF NOT EXISTS public.app_feature_flags (
     description text,
     updated_at timestamp with time zone DEFAULT now()
 );
-
 -- Seed default flags
 INSERT INTO public.app_feature_flags (flag_key, is_enabled, description)
 VALUES 
     ('hts_auto_retire', false, 'Automatically retire deactivated codes without manual review'),
     ('hts_queue_new_codes', true, 'Queue new HTS codes for manual review before activation')
 ON CONFLICT (flag_key) DO NOTHING;
-
 -- 5. Trigger for Master HTS History (Reusing similar logic to aes_hts_codes)
 CREATE TABLE IF NOT EXISTS public.master_hts_history (
     history_id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -85,7 +79,6 @@ CREATE TABLE IF NOT EXISTS public.master_hts_history (
     changed_at timestamp with time zone DEFAULT now(),
     checksum_sha256 character varying(64)
 );
-
 CREATE OR REPLACE FUNCTION public.handle_master_hts_history()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -101,7 +94,6 @@ BEGIN
     RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
-
 DROP TRIGGER IF EXISTS trg_master_hts_history ON public.master_hts;
 CREATE TRIGGER trg_master_hts_history
 AFTER INSERT OR UPDATE OR DELETE ON public.master_hts

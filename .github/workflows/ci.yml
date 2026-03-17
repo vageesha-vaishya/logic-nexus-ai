@@ -13,6 +13,46 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Enforce new-table governance
+      run: |
+        set -euo pipefail
+
+        if [ "${{ github.event_name }}" = "pull_request" ]; then
+          BASE_REF="origin/${{ github.base_ref }}"
+          git fetch origin "${{ github.base_ref }}" --depth=1
+        else
+          BASE_REF="HEAD~1"
+        fi
+
+        CHANGED_MIGRATIONS=$(git diff --name-only "$BASE_REF"...HEAD -- 'supabase/migrations/*.sql' || true)
+        if [ -z "$CHANGED_MIGRATIONS" ]; then
+          echo "No migration changes detected."
+          exit 0
+        fi
+
+        VIOLATIONS=0
+        for FILE in $CHANGED_MIGRATIONS; do
+          if git diff "$BASE_REF"...HEAD -- "$FILE" | grep -Eiq '^\+.*create table( if not exists)? '; then
+            if ! grep -Eq '^-- DB-VERIFICATION:\s+\S+' "$FILE"; then
+              echo "Missing DB-VERIFICATION metadata in $FILE"
+              VIOLATIONS=1
+            fi
+            if ! grep -Eq '^-- DB-ARCH-APPROVAL:\s+\S+' "$FILE"; then
+              echo "Missing DB-ARCH-APPROVAL metadata in $FILE"
+              VIOLATIONS=1
+            fi
+          fi
+        done
+
+        if [ "$VIOLATIONS" -ne 0 ]; then
+          echo "New-table migration governance check failed."
+          exit 1
+        fi
+
+        echo "New-table migration governance check passed."
 
     - name: Setup Node.js
       uses: actions/setup-node@v4

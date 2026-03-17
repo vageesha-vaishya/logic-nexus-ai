@@ -9,10 +9,8 @@ CREATE TABLE IF NOT EXISTS public.opportunity_probability_history (
   changed_by UUID REFERENCES auth.users(id),
   changed_at TIMESTAMPTZ DEFAULT now()
 );
-
 -- Enable RLS
 ALTER TABLE public.opportunity_probability_history ENABLE ROW LEVEL SECURITY;
-
 -- RLS Policies
 CREATE POLICY "Users can view history of opportunities they can view"
   ON public.opportunity_probability_history FOR SELECT
@@ -24,7 +22,6 @@ CREATE POLICY "Users can view history of opportunities they can view"
       -- For simplicity, assuming if you can see the opportunity, you can see its history
     )
   );
-
 -- Function to log changes
 CREATE OR REPLACE FUNCTION public.log_opportunity_probability_changes()
 RETURNS TRIGGER AS $$
@@ -49,7 +46,6 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
-
 -- Trigger
 DROP TRIGGER IF EXISTS log_opportunity_probability_changes_trigger ON public.opportunities;
 CREATE TRIGGER log_opportunity_probability_changes_trigger

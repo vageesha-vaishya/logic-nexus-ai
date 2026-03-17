@@ -1,10 +1,8 @@
-
 -- Fix Hierarchy RPC Types
 -- Date: 2026-02-12
 -- Description: Explicitly cast VARCHAR columns to TEXT to match RPC return type definition.
 
 BEGIN;
-
 CREATE OR REPLACE FUNCTION get_global_hs_hierarchy(
   level_type text, -- 'chapter', 'heading', 'subheading', 'code'
   parent_code text DEFAULT NULL,
@@ -91,5 +89,4 @@ BEGIN
   END IF;
 END;
 $$;
-
 COMMIT;

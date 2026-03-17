@@ -3,7 +3,6 @@
 -- Implements "Database layer" of the duplicate prevention strategy.
 
 BEGIN;
-
 -- 1. Container Types Constraints
 -- Ensure name is unique to prevent duplicate types like "Dry Standard" vs "Dry"
 DO $$ BEGIN
@@ -12,7 +11,6 @@ DO $$ BEGIN
         ADD CONSTRAINT container_types_name_key UNIQUE (name);
     END IF;
 END $$;
-
 -- 2. Container Sizes Constraints
 -- Ensure size names are unique within a type (e.g., can't have two "20ft" for "Dry Standard")
 DO $$ BEGIN
@@ -21,18 +19,15 @@ DO $$ BEGIN
         ADD CONSTRAINT container_sizes_type_id_name_key UNIQUE (type_id, name);
     END IF;
 END $$;
-
 -- Ensure ISO codes are unique where provided (global standard)
 -- Note: Using partial index for non-null ISO codes
 CREATE UNIQUE INDEX IF NOT EXISTS container_sizes_iso_code_key 
 ON public.container_sizes (iso_code) 
 WHERE iso_code IS NOT NULL;
-
 -- 3. Update Foreign Key to ON DELETE CASCADE (as requested)
--- Explicitly drop the constraint if it exists by name to avoid conflicts
-ALTER TABLE public.container_sizes DROP CONSTRAINT IF EXISTS container_sizes_type_id_fkey;
+-- First drop existing constraint if possible (name might vary, so we try standard names)
+-- We'll use a DO block to find and drop the constraint safely
 
--- Also try to drop any other constraint on this column to avoid duplicates (best effort)
 DO $$
 DECLARE
     fk_name text;
@@ -41,21 +36,18 @@ BEGIN
     FROM pg_constraint
     WHERE conrelid = 'public.container_sizes'::regclass
     AND confrelid = 'public.container_types'::regclass
-    AND contype = 'f'
-    AND conname != 'container_sizes_type_id_fkey'; -- Don't try to drop what we just dropped (if it was the same)
+    AND contype = 'f';
 
     IF fk_name IS NOT NULL THEN
         EXECUTE 'ALTER TABLE public.container_sizes DROP CONSTRAINT ' || fk_name;
     END IF;
 END $$;
-
 -- Re-add the constraint with ON DELETE CASCADE
 ALTER TABLE public.container_sizes
 ADD CONSTRAINT container_sizes_type_id_fkey
 FOREIGN KEY (type_id)
 REFERENCES public.container_types (id)
 ON DELETE CASCADE;
-
 -- 4. Database Triggers for Duplicate Detection (audit/logging)
 -- Create a function to log attempts to insert duplicates (if they were to bypass constraints, though constraints stop them)
 -- Or more usefully, sanitize input before insert.
@@ -80,15 +72,12 @@ BEGIN
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
-
 DROP TRIGGER IF EXISTS trigger_normalize_container_types ON public.container_types;
 CREATE TRIGGER trigger_normalize_container_types
 BEFORE INSERT OR UPDATE ON public.container_types
 FOR EACH ROW EXECUTE FUNCTION public.normalize_container_data();
-
 DROP TRIGGER IF EXISTS trigger_normalize_container_sizes ON public.container_sizes;
 CREATE TRIGGER trigger_normalize_container_sizes
 BEFORE INSERT OR UPDATE ON public.container_sizes
 FOR EACH ROW EXECUTE FUNCTION public.normalize_container_data();
-
 COMMIT;

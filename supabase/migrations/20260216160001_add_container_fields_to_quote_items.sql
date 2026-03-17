@@ -2,16 +2,13 @@
 -- Description: Adds type, container_type_id, and container_size_id to quote_items via logistics.quote_items_extension
 
 BEGIN;
-
 -- 1. Add columns to logistics.quote_items_extension
 ALTER TABLE logistics.quote_items_extension
 ADD COLUMN IF NOT EXISTS type text DEFAULT 'loose',
 ADD COLUMN IF NOT EXISTS container_type_id uuid REFERENCES container_types(id),
 ADD COLUMN IF NOT EXISTS container_size_id uuid REFERENCES container_sizes(id);
-
 -- 2. Drop existing View (CASCADE to drop trigger)
 DROP VIEW IF EXISTS public.quote_items CASCADE;
-
 -- 3. Recreate View with New Columns
 CREATE OR REPLACE VIEW public.quote_items AS
 SELECT
@@ -48,7 +45,6 @@ SELECT
     e.attributes
 FROM public.quote_items_core c
 LEFT JOIN logistics.quote_items_extension e ON c.id = e.quote_item_id;
-
 -- 4. Update Trigger Function
 CREATE OR REPLACE FUNCTION public.fn_quote_items_view_handler()
 RETURNS TRIGGER AS $$
@@ -181,10 +177,8 @@ BEGIN
     RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
-
 -- 5. Re-bind Trigger to View
 CREATE TRIGGER quote_items_view_trigger
 INSTEAD OF INSERT OR UPDATE OR DELETE ON public.quote_items
 FOR EACH ROW EXECUTE FUNCTION public.fn_quote_items_view_handler();
-
 COMMIT;

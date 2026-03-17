@@ -3,11 +3,9 @@
 -- Imported Count: 439
 
 BEGIN;
-
 -- Ensure necessary columns exist
 ALTER TABLE public.ports_locations 
 ADD COLUMN IF NOT EXISTS port_type text[];
-
 -- Create a temp table for import
 CREATE TEMP TABLE temp_us_ports (
     location_code text,
@@ -18,7 +16,6 @@ CREATE TEMP TABLE temp_us_ports (
     port_type text[],
     location_type text
 );
-
 INSERT INTO temp_us_ports (location_code, location_name, city, state_province, country_code, port_type, location_type) VALUES
 ('0101', 'SOUTH PORTLAND', 'SOUTH PORTLAND', 'ME', 'US', '{"Passenger","Vessel","Air"}', 'seaport'),
 ('0102', 'BANGOR', 'BANGOR', 'ME', 'US', '{"Passenger","Vessel","Air"}', 'seaport'),
@@ -459,8 +456,6 @@ INSERT INTO temp_us_ports (location_code, location_name, city, state_province, c
 ('5584', 'ADDISON', 'ADDISON', 'TX', 'US', '{"Passenger","Air"}', 'airport'),
 ('5588', 'DALLAS', 'DALLAS', 'TX', 'US', '{"Passenger","Air"}', 'airport'),
 ('8000', 'WASHINGTON', 'WASHINGTON', 'DC', 'US', '{"Mail"}', 'terminal');
-
-
 -- 1. Update existing ports by location_code
 UPDATE public.ports_locations pl
 SET 
@@ -475,7 +470,6 @@ SET
     updated_at = NOW()
 FROM temp_us_ports t
 WHERE pl.location_code = t.location_code;
-
 -- 2. Insert NEW ports
 INSERT INTO public.ports_locations (
     location_code,
@@ -511,7 +505,6 @@ WHERE NOT EXISTS (
     SELECT 1 FROM public.ports_locations pl 
     WHERE pl.location_code = t.location_code
 );
-
 -- 3. Log the operation
 INSERT INTO public.audit_logs (action, resource_type, details)
 VALUES (
@@ -523,7 +516,5 @@ VALUES (
         'source', 'AESTIR_Export_Reference_Data.xlsx'
     )
 );
-
 DROP TABLE temp_us_ports;
-
 COMMIT;

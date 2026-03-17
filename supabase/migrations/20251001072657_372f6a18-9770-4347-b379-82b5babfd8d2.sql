@@ -18,7 +18,6 @@ BEGIN
     last_assigned_at = NOW();
 END;
 $$;
-
 -- Create function to decrement user lead count
 CREATE OR REPLACE FUNCTION public.decrement_user_lead_count(
   p_user_id UUID,

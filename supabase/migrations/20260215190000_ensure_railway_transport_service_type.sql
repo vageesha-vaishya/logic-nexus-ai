@@ -4,4 +4,3 @@ values ('railway_transport', 'Rail transport', true)
 on conflict (code) do update
   set name = excluded.name,
       is_active = true;
-

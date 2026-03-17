@@ -86,12 +86,13 @@ export const DashboardHeader = () => {
   };
 
   const handleAdminOverrideToggle = async (checked: boolean) => {
+    const previousValue = adminOverrideEnabled;
     setAdminOverrideEnabled(checked);
     try {
-      // Ensure we pass the currently selected tenant and franchise
       await setAdminOverride(checked, selectedTenant || null, selectedFranchise || null);
       toast({ title: checked ? "Admin override enabled" : "Admin override disabled" });
     } catch (e: any) {
+      setAdminOverrideEnabled(previousValue);
       toast({ title: "Failed to set admin override", description: e?.message || String(e), variant: "destructive" });
     }
   };
@@ -142,7 +143,7 @@ export const DashboardHeader = () => {
             </div>
           )}
         </div>
-        <Button variant="ghost" size="icon" className="relative" aria-label="Notifications">
+        <Button variant="ghost" size="icon" className="relative" aria-label="Alert Center">
           <Bell className="w-5 h-5" />
           <Badge 
             variant="destructive" 

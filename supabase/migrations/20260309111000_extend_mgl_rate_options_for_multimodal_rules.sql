@@ -18,7 +18,6 @@ ALTER TABLE public.rate_options
   ADD COLUMN IF NOT EXISTS standalone_mode boolean NOT NULL DEFAULT false,
   ADD COLUMN IF NOT EXISTS option_ordinal integer,
   ADD COLUMN IF NOT EXISTS multimodal_rule_config jsonb NOT NULL DEFAULT '{}'::jsonb;
-
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -41,6 +40,5 @@ BEGIN
       CHECK (option_ordinal IS NULL OR option_ordinal IN (1, 2, 3, 4));
   END IF;
 END $$;
-
 CREATE INDEX IF NOT EXISTS idx_rate_options_quote_context_standalone
   ON public.rate_options (tenant_id, quote_id, quote_version_id, standalone_mode, option_ordinal);

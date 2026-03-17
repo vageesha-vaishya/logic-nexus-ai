@@ -1,4 +1,3 @@
-
 ALTER TABLE public.quotation_version_option_legs
 ADD COLUMN IF NOT EXISTS flight_number text,
 ADD COLUMN IF NOT EXISTS voyage_number text,

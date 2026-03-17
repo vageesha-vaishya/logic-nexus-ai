@@ -38,7 +38,6 @@ CREATE TABLE public.email_accounts (
   
   UNIQUE(user_id, email_address)
 );
-
 -- Create emails table
 CREATE TABLE public.emails (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -94,7 +93,6 @@ CREATE TABLE public.emails (
   
   UNIQUE(account_id, message_id)
 );
-
 -- Create email filters table
 CREATE TABLE public.email_filters (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -119,7 +117,6 @@ CREATE TABLE public.email_filters (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
-
 -- Create email templates table
 CREATE TABLE public.email_templates (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -143,12 +140,10 @@ CREATE TABLE public.email_templates (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
-
 -- Create indexes
 CREATE INDEX idx_email_accounts_user_id ON public.email_accounts(user_id);
 CREATE INDEX idx_email_accounts_tenant_id ON public.email_accounts(tenant_id);
 CREATE INDEX idx_email_accounts_franchise_id ON public.email_accounts(franchise_id);
-
 CREATE INDEX idx_emails_account_id ON public.emails(account_id);
 CREATE INDEX idx_emails_tenant_id ON public.emails(tenant_id);
 CREATE INDEX idx_emails_franchise_id ON public.emails(franchise_id);
@@ -159,41 +154,32 @@ CREATE INDEX idx_emails_folder ON public.emails(folder);
 CREATE INDEX idx_emails_lead_id ON public.emails(lead_id);
 CREATE INDEX idx_emails_contact_id ON public.emails(contact_id);
 CREATE INDEX idx_emails_received_at ON public.emails(received_at DESC);
-
 CREATE INDEX idx_email_filters_user_id ON public.email_filters(user_id);
 CREATE INDEX idx_email_filters_account_id ON public.email_filters(account_id);
 CREATE INDEX idx_email_filters_priority ON public.email_filters(priority DESC);
-
 CREATE INDEX idx_email_templates_tenant_id ON public.email_templates(tenant_id);
 CREATE INDEX idx_email_templates_franchise_id ON public.email_templates(franchise_id);
-
 -- Enable RLS
 ALTER TABLE public.email_accounts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.emails ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.email_filters ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.email_templates ENABLE ROW LEVEL SECURITY;
-
 -- RLS Policies for email_accounts
 CREATE POLICY "Users can view own email accounts"
   ON public.email_accounts FOR SELECT
   USING (user_id = auth.uid());
-
 CREATE POLICY "Users can create own email accounts"
   ON public.email_accounts FOR INSERT
   WITH CHECK (user_id = auth.uid());
-
 CREATE POLICY "Users can update own email accounts"
   ON public.email_accounts FOR UPDATE
   USING (user_id = auth.uid());
-
 CREATE POLICY "Users can delete own email accounts"
   ON public.email_accounts FOR DELETE
   USING (user_id = auth.uid());
-
 CREATE POLICY "Platform admins can manage all email accounts"
   ON public.email_accounts FOR ALL
   USING (is_platform_admin(auth.uid()));
-
 -- RLS Policies for emails
 CREATE POLICY "Users can view emails from their accounts"
   ON public.emails FOR SELECT
@@ -202,7 +188,6 @@ CREATE POLICY "Users can view emails from their accounts"
       SELECT id FROM public.email_accounts WHERE user_id = auth.uid()
     )
   );
-
 CREATE POLICY "Users can create emails"
   ON public.emails FOR INSERT
   WITH CHECK (
@@ -210,7 +195,6 @@ CREATE POLICY "Users can create emails"
       SELECT id FROM public.email_accounts WHERE user_id = auth.uid()
     )
   );
-
 CREATE POLICY "Users can update their emails"
   ON public.emails FOR UPDATE
   USING (
@@ -218,20 +202,16 @@ CREATE POLICY "Users can update their emails"
       SELECT id FROM public.email_accounts WHERE user_id = auth.uid()
     )
   );
-
 CREATE POLICY "Platform admins can manage all emails"
   ON public.emails FOR ALL
   USING (is_platform_admin(auth.uid()));
-
 -- RLS Policies for email_filters
 CREATE POLICY "Users can manage own email filters"
   ON public.email_filters FOR ALL
   USING (user_id = auth.uid());
-
 CREATE POLICY "Platform admins can manage all email filters"
   ON public.email_filters FOR ALL
   USING (is_platform_admin(auth.uid()));
-
 -- RLS Policies for email_templates
 CREATE POLICY "Users can view tenant templates"
   ON public.email_templates FOR SELECT
@@ -239,42 +219,34 @@ CREATE POLICY "Users can view tenant templates"
     tenant_id = get_user_tenant_id(auth.uid()) AND
     (is_shared = true OR created_by = auth.uid())
   );
-
 CREATE POLICY "Users can create templates"
   ON public.email_templates FOR INSERT
   WITH CHECK (
     tenant_id = get_user_tenant_id(auth.uid()) AND
     created_by = auth.uid()
   );
-
 CREATE POLICY "Users can update own templates"
   ON public.email_templates FOR UPDATE
   USING (created_by = auth.uid());
-
 CREATE POLICY "Users can delete own templates"
   ON public.email_templates FOR DELETE
   USING (created_by = auth.uid());
-
 CREATE POLICY "Platform admins can manage all templates"
   ON public.email_templates FOR ALL
   USING (is_platform_admin(auth.uid()));
-
 -- Create updated_at triggers
 CREATE TRIGGER update_email_accounts_updated_at
   BEFORE UPDATE ON public.email_accounts
   FOR EACH ROW
   EXECUTE FUNCTION public.update_updated_at_column();
-
 CREATE TRIGGER update_emails_updated_at
   BEFORE UPDATE ON public.emails
   FOR EACH ROW
   EXECUTE FUNCTION public.update_updated_at_column();
-
 CREATE TRIGGER update_email_filters_updated_at
   BEFORE UPDATE ON public.email_filters
   FOR EACH ROW
   EXECUTE FUNCTION public.update_updated_at_column();
-
 CREATE TRIGGER update_email_templates_updated_at
   BEFORE UPDATE ON public.email_templates
   FOR EACH ROW

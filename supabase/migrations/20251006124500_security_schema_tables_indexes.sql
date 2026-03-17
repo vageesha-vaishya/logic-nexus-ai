@@ -44,7 +44,6 @@ AS $$
   WHERE n.nspname = 'public' AND c.relkind IN ('r','v')
   ORDER BY c.relname;
 $$ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public;
-
 -- Function: List constraints across public tables (PK, FK, UNIQUE, CHECK)
 CREATE OR REPLACE FUNCTION public.get_table_constraints()
 RETURNS TABLE (
@@ -126,7 +125,6 @@ AS $$
   SELECT * FROM ck
   ORDER BY table_name, constraint_name;
 $$ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public;
-
 -- Function: List indexes across public tables
 CREATE OR REPLACE FUNCTION public.get_table_indexes()
 RETURNS TABLE (

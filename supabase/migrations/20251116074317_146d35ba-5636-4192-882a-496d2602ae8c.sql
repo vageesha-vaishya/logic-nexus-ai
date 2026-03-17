@@ -69,13 +69,10 @@ BEGIN
     ADD COLUMN pod_documents JSONB DEFAULT '[]';
   END IF;
 END $$;
-
 -- Create index on pod_status for faster queries
 CREATE INDEX IF NOT EXISTS idx_shipments_pod_status ON public.shipments(pod_status);
-
 -- Create index on pod_received_at for date-based queries
 CREATE INDEX IF NOT EXISTS idx_shipments_pod_received_at ON public.shipments(pod_received_at);
-
 COMMENT ON COLUMN public.shipments.pod_status IS 'Status of proof of delivery: pending, received, rejected, disputed';
 COMMENT ON COLUMN public.shipments.pod_received_at IS 'Timestamp when POD was received';
 COMMENT ON COLUMN public.shipments.pod_received_by IS 'Name of person who received the shipment';

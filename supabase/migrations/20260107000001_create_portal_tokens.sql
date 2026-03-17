@@ -12,17 +12,13 @@ CREATE TABLE IF NOT EXISTS public.portal_tokens (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   created_by UUID REFERENCES auth.users(id)
 );
-
 CREATE INDEX IF NOT EXISTS idx_portal_tokens_token ON public.portal_tokens(token);
-
 ALTER TABLE public.portal_tokens ENABLE ROW LEVEL SECURITY;
-
 CREATE POLICY "Internal users manage tokens" ON public.portal_tokens
   FOR ALL
   TO authenticated
   USING (true)
   WITH CHECK (true);
-
 -- Function to verify token and get quote details
 CREATE OR REPLACE FUNCTION public.get_quote_by_token(p_token TEXT)
 RETURNS JSONB
@@ -72,9 +68,7 @@ BEGIN
   );
 END;
 $$;
-
 GRANT EXECUTE ON FUNCTION public.get_quote_by_token(TEXT) TO anon;
-
 CREATE TABLE IF NOT EXISTS public.quote_acceptances (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   quote_id UUID NOT NULL REFERENCES public.quotes(id) ON DELETE CASCADE,
@@ -88,10 +82,8 @@ CREATE TABLE IF NOT EXISTS public.quote_acceptances (
   metadata JSONB DEFAULT '{}'::jsonb,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
-
 CREATE INDEX IF NOT EXISTS idx_quote_acceptances_token ON public.quote_acceptances(token_id);
 CREATE INDEX IF NOT EXISTS idx_quote_acceptances_quote ON public.quote_acceptances(quote_id);
-
 CREATE OR REPLACE FUNCTION public.accept_quote_by_token(
   p_token TEXT,
   p_decision TEXT,
@@ -155,5 +147,4 @@ BEGIN
   RETURN jsonb_build_object('success', true, 'quote_id', v_token_record.quote_id, 'decision', p_decision);
 END;
 $$;
-
 GRANT EXECUTE ON FUNCTION public.accept_quote_by_token(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) TO anon;

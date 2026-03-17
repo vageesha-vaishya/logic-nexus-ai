@@ -10,6 +10,7 @@ vi.mock('@/hooks/useAuth');
 vi.mock('@/hooks/use-toast');
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: {
+    rpc: vi.fn(),
     auth: {
       updateUser: vi.fn(),
       refreshSession: vi.fn(),
@@ -23,10 +24,20 @@ describe('DebugSettingsCard', () => {
   const mockUpdateUser = supabase.auth.updateUser as any;
   const mockRefreshSession = supabase.auth.refreshSession as any;
   const mockGetUser = supabase.auth.getUser as any;
+  const mockRpc = supabase.rpc as any;
 
   beforeEach(() => {
     vi.clearAllMocks();
     (useToast as any).mockReturnValue({ toast: mockToast });
+    mockRpc.mockImplementation((fnName: string) => {
+      if (fnName === 'get_platform_debug_button_enabled') {
+        return Promise.resolve({ data: false, error: null });
+      }
+      if (fnName === 'set_platform_debug_button_enabled') {
+        return Promise.resolve({ data: true, error: null });
+      }
+      return Promise.resolve({ data: null, error: null });
+    });
     mockUpdateUser.mockResolvedValue({ data: { user: {} }, error: null });
     mockRefreshSession.mockResolvedValue({ data: { session: {} }, error: null });
     mockGetUser.mockResolvedValue({ 
@@ -57,7 +68,7 @@ describe('DebugSettingsCard', () => {
     });
 
     render(<DebugSettingsCard />);
-    const switchElement = screen.getByRole('switch');
+    const switchElement = screen.getAllByRole('switch')[1];
     expect(switchElement).toBeChecked();
   });
 
@@ -79,7 +90,7 @@ describe('DebugSettingsCard', () => {
     });
 
     render(<DebugSettingsCard />);
-    const switchElement = screen.getByRole('switch');
+    const switchElement = screen.getAllByRole('switch')[1];
     
     // Toggle OFF
     fireEvent.click(switchElement);
@@ -124,7 +135,7 @@ describe('DebugSettingsCard', () => {
       });
 
     render(<DebugSettingsCard />);
-    const switchElement = screen.getByRole('switch');
+    const switchElement = screen.getAllByRole('switch')[1];
     
     // Toggle OFF
     fireEvent.click(switchElement);
@@ -151,7 +162,7 @@ describe('DebugSettingsCard', () => {
     mockUpdateUser.mockResolvedValue({ data: null, error: { message: 'Update failed' } });
 
     render(<DebugSettingsCard />);
-    const switchElement = screen.getByRole('switch');
+    const switchElement = screen.getAllByRole('switch')[1];
     
     // Toggle ON
     fireEvent.click(switchElement);

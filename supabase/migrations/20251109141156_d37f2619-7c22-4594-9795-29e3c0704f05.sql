@@ -1,7 +1,6 @@
 -- Geography master tables: continents, countries, states, cities
 
 BEGIN;
-
 -- Continents
 CREATE TABLE IF NOT EXISTS public.continents (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -12,7 +11,6 @@ CREATE TABLE IF NOT EXISTS public.continents (
   is_active boolean DEFAULT true,
   created_at timestamptz DEFAULT now()
 );
-
 -- Countries
 CREATE TABLE IF NOT EXISTS public.countries (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -26,7 +24,6 @@ CREATE TABLE IF NOT EXISTS public.countries (
   is_active boolean DEFAULT true,
   created_at timestamptz DEFAULT now()
 );
-
 -- States/Provinces
 CREATE TABLE IF NOT EXISTS public.states (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -38,7 +35,6 @@ CREATE TABLE IF NOT EXISTS public.states (
   is_active boolean DEFAULT true,
   created_at timestamptz DEFAULT now()
 );
-
 -- Cities
 CREATE TABLE IF NOT EXISTS public.cities (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -51,42 +47,34 @@ CREATE TABLE IF NOT EXISTS public.cities (
   is_active boolean DEFAULT true,
   created_at timestamptz DEFAULT now()
 );
-
 ALTER TABLE public.continents ADD COLUMN IF NOT EXISTS tenant_id uuid NULL;
 ALTER TABLE public.countries ADD COLUMN IF NOT EXISTS tenant_id uuid NULL;
 ALTER TABLE public.states ADD COLUMN IF NOT EXISTS tenant_id uuid NULL;
 ALTER TABLE public.cities ADD COLUMN IF NOT EXISTS tenant_id uuid NULL;
-
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_countries_continent ON public.countries (continent_id);
 CREATE INDEX IF NOT EXISTS idx_states_country ON public.states (country_id);
 CREATE INDEX IF NOT EXISTS idx_cities_state_country ON public.cities (state_id, country_id);
-
 -- Enable RLS
 ALTER TABLE public.continents ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.countries ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.states ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.cities ENABLE ROW LEVEL SECURITY;
-
 -- RLS Policies: read global (tenant_id NULL) or same tenant, manage same tenant
 DROP POLICY IF EXISTS continents_read ON public.continents;
 CREATE POLICY continents_read ON public.continents FOR SELECT USING (tenant_id IS NULL OR tenant_id = get_user_tenant_id(auth.uid()));
 DROP POLICY IF EXISTS continents_manage ON public.continents;
 CREATE POLICY continents_manage ON public.continents FOR ALL USING (tenant_id = get_user_tenant_id(auth.uid())) WITH CHECK (tenant_id = get_user_tenant_id(auth.uid()));
-
 DROP POLICY IF EXISTS countries_read ON public.countries;
 CREATE POLICY countries_read ON public.countries FOR SELECT USING (tenant_id IS NULL OR tenant_id = get_user_tenant_id(auth.uid()));
 DROP POLICY IF EXISTS countries_manage ON public.countries;
 CREATE POLICY countries_manage ON public.countries FOR ALL USING (tenant_id = get_user_tenant_id(auth.uid())) WITH CHECK (tenant_id = get_user_tenant_id(auth.uid()));
-
 DROP POLICY IF EXISTS states_read ON public.states;
 CREATE POLICY states_read ON public.states FOR SELECT USING (tenant_id IS NULL OR tenant_id = get_user_tenant_id(auth.uid()));
 DROP POLICY IF EXISTS states_manage ON public.states;
 CREATE POLICY states_manage ON public.states FOR ALL USING (tenant_id = get_user_tenant_id(auth.uid())) WITH CHECK (tenant_id = get_user_tenant_id(auth.uid()));
-
 DROP POLICY IF EXISTS cities_read ON public.cities;
 CREATE POLICY cities_read ON public.cities FOR SELECT USING (tenant_id IS NULL OR tenant_id = get_user_tenant_id(auth.uid()));
 DROP POLICY IF EXISTS cities_manage ON public.cities;
 CREATE POLICY cities_manage ON public.cities FOR ALL USING (tenant_id = get_user_tenant_id(auth.uid())) WITH CHECK (tenant_id = get_user_tenant_id(auth.uid()));
-
 COMMIT;

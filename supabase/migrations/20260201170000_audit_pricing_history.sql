@@ -76,7 +76,6 @@ BEGIN
   RETURN NULL; -- Return value ignored for AFTER triggers
 END;
 $$;
-
 -- 2. Create Triggers
 
 -- Trigger for Services
@@ -85,7 +84,6 @@ CREATE TRIGGER trg_audit_services
   AFTER INSERT OR UPDATE OR DELETE ON public.services
   FOR EACH ROW
   EXECUTE FUNCTION audit_pricing_change();
-
 -- Trigger for Service Pricing Tiers
 DO $$
 BEGIN

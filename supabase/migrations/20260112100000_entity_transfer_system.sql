@@ -13,7 +13,6 @@ BEGIN
         CREATE TYPE public.transfer_status AS ENUM ('pending', 'approved', 'rejected', 'completed', 'failed');
     END IF;
 END $$;
-
 DO $$
 BEGIN
     IF NOT EXISTS (
@@ -25,7 +24,6 @@ BEGIN
         CREATE TYPE public.transfer_type AS ENUM ('tenant_to_tenant', 'tenant_to_franchise', 'franchise_to_franchise');
     END IF;
 END $$;
-
 DO $$
 BEGIN
     IF NOT EXISTS (
@@ -37,7 +35,6 @@ BEGIN
         CREATE TYPE public.transfer_entity_type AS ENUM ('lead', 'opportunity', 'quote', 'shipment', 'account', 'contact', 'activity');
     END IF;
 END $$;
-
 -- 2. Create Transfer Requests Table
 CREATE TABLE IF NOT EXISTS entity_transfers (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -53,7 +50,6 @@ CREATE TABLE IF NOT EXISTS entity_transfers (
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
-
 -- 3. Create Transfer Items Table
 CREATE TABLE IF NOT EXISTS entity_transfer_items (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -65,11 +61,9 @@ CREATE TABLE IF NOT EXISTS entity_transfer_items (
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
-
 -- 4. Enable RLS
 ALTER TABLE entity_transfers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE entity_transfer_items ENABLE ROW LEVEL SECURITY;
-
 -- 5. RLS Policies
 
 -- View: Users can see transfers where they are source or target admin (simplified for now to tenant access)
@@ -83,7 +77,6 @@ CREATE POLICY "Users can view transfers for their tenant" ON entity_transfers
             SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()
         )
     );
-
 -- Create: Users can create transfers from their tenant
 CREATE POLICY "Users can create transfers from their tenant" ON entity_transfers
     FOR INSERT
@@ -92,7 +85,6 @@ CREATE POLICY "Users can create transfers from their tenant" ON entity_transfers
             SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()
         )
     );
-
 -- Update: Target tenant admins can approve/reject, Source can cancel (if pending)
 CREATE POLICY "Target admins can update status" ON entity_transfers
     FOR UPDATE
@@ -101,7 +93,6 @@ CREATE POLICY "Target admins can update status" ON entity_transfers
             SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()
         )
     );
-
 -- Items policies inherit from parent transfer access roughly (simplified)
 CREATE POLICY "View transfer items" ON entity_transfer_items
     FOR SELECT
@@ -115,7 +106,6 @@ CREATE POLICY "View transfer items" ON entity_transfer_items
             )
         )
     );
-
 CREATE POLICY "Create transfer items" ON entity_transfer_items
     FOR INSERT
     WITH CHECK (
@@ -125,7 +115,6 @@ CREATE POLICY "Create transfer items" ON entity_transfer_items
             AND et.source_tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid())
         )
     );
-
 -- 6. RPC: Execute Transfer
 CREATE OR REPLACE FUNCTION execute_transfer(p_transfer_id UUID, p_approver_id UUID)
 RETURNS JSONB

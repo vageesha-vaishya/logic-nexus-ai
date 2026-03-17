@@ -4,18 +4,14 @@
 ALTER TABLE IF EXISTS public.quote_number_config_tenant
   ADD COLUMN IF NOT EXISTS reset_policy text NOT NULL DEFAULT 'none',
   ADD CONSTRAINT quote_number_config_tenant_reset_policy_chk CHECK (reset_policy IN ('none','daily','monthly','yearly'));
-
 ALTER TABLE IF EXISTS public.quote_number_config_franchise
   ADD COLUMN IF NOT EXISTS reset_policy text NOT NULL DEFAULT 'none',
   ADD CONSTRAINT quote_number_config_franchise_reset_policy_chk CHECK (reset_policy IN ('none','daily','monthly','yearly'));
-
 -- Add last reset bucket to sequences
 ALTER TABLE IF EXISTS public.quote_sequences_tenant
   ADD COLUMN IF NOT EXISTS last_reset_bucket text;
-
 ALTER TABLE IF EXISTS public.quote_sequences_franchise
   ADD COLUMN IF NOT EXISTS last_reset_bucket text;
-
 -- Helper function: current bucket based on reset policy
 CREATE OR REPLACE FUNCTION public._current_reset_bucket(p_policy text)
 RETURNS text
@@ -36,7 +32,6 @@ BEGIN
   RETURN v_bucket;
 END;
 $$;
-
 -- Replace generator to respect reset policy
 CREATE OR REPLACE FUNCTION public.generate_quote_number(p_tenant_id uuid, p_franchise_id uuid)
 RETURNS text
@@ -98,7 +93,6 @@ BEGIN
   RETURN v_prefix || v_date || lpad(v_seq::text, 8, '0');
 END;
 $$;
-
 -- Preview next quote number without incrementing
 CREATE OR REPLACE FUNCTION public.preview_next_quote_number(p_tenant_id uuid, p_franchise_id uuid)
 RETURNS text

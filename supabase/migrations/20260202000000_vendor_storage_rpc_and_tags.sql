@@ -2,15 +2,12 @@
 -- Description: Adds tags/folder columns and storage management functions
 
 BEGIN;
-
 -- 1. Add Metadata Columns
 ALTER TABLE public.vendor_documents 
 ADD COLUMN IF NOT EXISTS tags text[] DEFAULT '{}',
 ADD COLUMN IF NOT EXISTS folder text DEFAULT 'General';
-
 ALTER TABLE public.vendor_contracts 
 ADD COLUMN IF NOT EXISTS tags text[] DEFAULT '{}';
-
 -- 2. Create Storage Management Functions
 
 -- Function to increment (or decrement) storage usage
@@ -32,7 +29,6 @@ BEGIN
         updated_at = now();
 END;
 $$;
-
 -- Function to check quota availability
 -- Returns remaining bytes. If negative, over quota.
 -- Default quota: 1GB (1073741824 bytes)
@@ -59,9 +55,7 @@ BEGIN
     RETURN (v_current_usage + p_new_bytes) <= v_quota;
 END;
 $$;
-
 -- 3. Grant execute permissions
 GRANT EXECUTE ON FUNCTION public.increment_vendor_storage TO authenticated;
 GRANT EXECUTE ON FUNCTION public.check_vendor_storage_quota TO authenticated;
-
 COMMIT;

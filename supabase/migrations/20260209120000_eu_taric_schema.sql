@@ -3,7 +3,6 @@
 -- Description: Implements the taric_codes schema for EU 10-digit tariff classification.
 
 BEGIN;
-
 --------------------------------------------------------------------------------
 -- 1. Create taric_codes table
 --------------------------------------------------------------------------------
@@ -36,17 +35,14 @@ CREATE TABLE IF NOT EXISTS public.taric_codes (
     -- Constraints
     CONSTRAINT uq_taric_code_validity UNIQUE (taric_code, valid_from)
 );
-
 -- 2. Create Indices for Performance
 CREATE INDEX IF NOT EXISTS idx_taric_codes_code ON public.taric_codes(taric_code);
 CREATE INDEX IF NOT EXISTS idx_taric_codes_hs6 ON public.taric_codes(hs6_code);
 CREATE INDEX IF NOT EXISTS idx_taric_codes_global_root ON public.taric_codes(global_hs_root_id);
 CREATE INDEX IF NOT EXISTS idx_taric_codes_description ON public.taric_codes USING GIN(to_tsvector('english', description));
 CREATE INDEX IF NOT EXISTS idx_taric_codes_attributes ON public.taric_codes USING GIN(attributes);
-
 -- 3. Enable RLS
 ALTER TABLE public.taric_codes ENABLE ROW LEVEL SECURITY;
-
 -- 4. Create RLS Policies
 DROP POLICY IF EXISTS "Authenticated users can view taric_codes" ON public.taric_codes;
 CREATE POLICY "Authenticated users can view taric_codes"
@@ -54,7 +50,6 @@ CREATE POLICY "Authenticated users can view taric_codes"
     FOR SELECT
     TO authenticated
     USING (true);
-
 DROP POLICY IF EXISTS "Admins can manage taric_codes" ON public.taric_codes;
 CREATE POLICY "Admins can manage taric_codes"
     ON public.taric_codes
@@ -67,7 +62,6 @@ CREATE POLICY "Admins can manage taric_codes"
             AND ur.role::text IN ('admin', 'super_admin', 'platform_admin')
         )
     );
-
 -- 5. Trigger for Linking to Global Root on Insert/Update
 CREATE OR REPLACE FUNCTION public.link_taric_to_global_root()
 RETURNS TRIGGER AS $$
@@ -82,21 +76,18 @@ BEGIN
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
-
 DROP TRIGGER IF EXISTS trg_link_taric_global_root ON public.taric_codes;
 CREATE TRIGGER trg_link_taric_global_root
     BEFORE INSERT OR UPDATE OF taric_code
     ON public.taric_codes
     FOR EACH ROW
     EXECUTE FUNCTION public.link_taric_to_global_root();
-
 -- 6. Update Hierarchy RPC to support Jurisdictions
 -- We modify the existing RPC to accept a 'jurisdiction' parameter
 -- Default is 'US' (AES) to maintain backward compatibility if needed, 
 -- but ideally the UI sends it.
 
 DROP FUNCTION IF EXISTS get_global_hs_hierarchy(text, text);
-
 CREATE OR REPLACE FUNCTION get_global_hs_hierarchy(
   level_type text, -- 'chapter', 'heading', 'subheading', 'code'
   parent_code text DEFAULT NULL,
@@ -189,7 +180,5 @@ BEGIN
   END IF;
 END;
 $$;
-
 GRANT EXECUTE ON FUNCTION get_global_hs_hierarchy(text, text, text) TO authenticated;
-
 COMMIT;

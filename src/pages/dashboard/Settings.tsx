@@ -25,29 +25,55 @@ export default function Settings() {
   const { toast } = useToast();
   const [standaloneEnabled, setStandaloneEnabled] = useState<boolean>(false);
   const [loadingStandalone, setLoadingStandalone] = useState<boolean>(false);
-  const isAdmin = context.isPlatformAdmin || context.isTenantAdmin;
+  const isPlatformAdmin = context.isPlatformAdmin;
 
   useEffect(() => {
     let active = true;
     (async () => {
+      if (!isPlatformAdmin) {
+        setLoadingStandalone(false);
+        return;
+      }
       try {
         setLoadingStandalone(true);
-        const { data } = await scopedDb.getSystemSetting('standalone_quote_mode_enabled');
+        const { data, error } = await scopedDb.getSystemSetting('standalone_quote_mode_enabled');
+        if (error) {
+          throw new Error(String(error?.message || 'Failed to load standalone quote mode setting'));
+        }
         if (!active) return;
         setStandaloneEnabled(Boolean(data?.setting_value));
-      } catch {
-        // ignore
+      } catch (error: any) {
+        if (!active) return;
+        toast({
+          title: 'Access denied',
+          description: error?.message || 'Unable to load system setting',
+          variant: 'destructive',
+        });
       } finally {
         if (active) setLoadingStandalone(false);
       }
     })();
     return () => { active = false; };
-  }, [scopedDb]);
+  }, [isPlatformAdmin, scopedDb]);
+
+  if (!isPlatformAdmin) {
+    return (
+      <DashboardLayout>
+        <div className="space-y-4">
+          <h1 className="text-3xl font-bold">Access Denied</h1>
+          <p className="text-muted-foreground">Access denied - Platform admin privileges required</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   const applyStandaloneToggle = async (checked: boolean) => {
     try {
       setLoadingStandalone(true);
-      await scopedDb.setSystemSetting('standalone_quote_mode_enabled', checked);
+      const { error } = await scopedDb.setSystemSetting('standalone_quote_mode_enabled', checked);
+      if (error) {
+        throw new Error(String(error?.message || 'Failed to update standalone quote mode setting'));
+      }
       setStandaloneEnabled(checked);
       toast({ title: 'Saved', description: checked ? 'Standalone Quote Mode enabled' : 'Standalone Quote Mode disabled' });
     } catch (e: any) {

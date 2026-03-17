@@ -3,7 +3,6 @@
 -- Description: Implements the cn_hs_codes schema for China 13-digit tariff classification.
 
 BEGIN;
-
 --------------------------------------------------------------------------------
 -- 1. Create cn_hs_codes table
 --------------------------------------------------------------------------------
@@ -35,21 +34,17 @@ CREATE TABLE IF NOT EXISTS public.cn_hs_codes (
     CONSTRAINT uq_cn_code_effective UNIQUE (cn_code, effective_date),
     CONSTRAINT check_cn_code_format CHECK (cn_code ~ '^\d{13}$')
 );
-
 -- 2. Create Indices for Performance
 CREATE INDEX IF NOT EXISTS idx_cn_hs_codes_code ON public.cn_hs_codes(cn_code);
 CREATE INDEX IF NOT EXISTS idx_cn_hs_codes_hs6 ON public.cn_hs_codes(hs6_code);
 CREATE INDEX IF NOT EXISTS idx_cn_hs_codes_global_root ON public.cn_hs_codes(global_hs_root_id);
 CREATE INDEX IF NOT EXISTS idx_cn_hs_codes_description ON public.cn_hs_codes USING GIN(to_tsvector('english', description));
-
 -- 3. Enable RLS
 ALTER TABLE public.cn_hs_codes ENABLE ROW LEVEL SECURITY;
-
 -- 4. Create RLS Policies
 DROP POLICY IF EXISTS "Authenticated users can view cn_hs_codes" ON public.cn_hs_codes;
 CREATE POLICY "Authenticated users can view cn_hs_codes"
     ON public.cn_hs_codes FOR SELECT TO authenticated USING (true);
-
 DROP POLICY IF EXISTS "Admins can manage cn_hs_codes" ON public.cn_hs_codes;
 CREATE POLICY "Admins can manage cn_hs_codes"
     ON public.cn_hs_codes FOR ALL TO authenticated
@@ -60,7 +55,6 @@ CREATE POLICY "Admins can manage cn_hs_codes"
             AND ur.role::text IN ('admin', 'super_admin', 'platform_admin')
         )
     );
-
 -- 5. Trigger for Linking to Global Root on Insert/Update
 CREATE OR REPLACE FUNCTION public.link_cn_to_global_root()
 RETURNS TRIGGER AS $$
@@ -73,14 +67,12 @@ BEGIN
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
-
 DROP TRIGGER IF EXISTS trg_link_cn_global_root ON public.cn_hs_codes;
 CREATE TRIGGER trg_link_cn_global_root
     BEFORE INSERT OR UPDATE OF cn_code
     ON public.cn_hs_codes
     FOR EACH ROW
     EXECUTE FUNCTION public.link_cn_to_global_root();
-
 -- 6. Update Hierarchy RPC to support CN Jurisdiction
 CREATE OR REPLACE FUNCTION get_global_hs_hierarchy(
   level_type text, -- 'chapter', 'heading', 'subheading', 'code'
@@ -186,5 +178,4 @@ BEGIN
   END IF;
 END;
 $$;
-
 COMMIT;

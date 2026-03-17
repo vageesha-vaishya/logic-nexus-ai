@@ -1,4 +1,3 @@
-
 -- Create vendor_document_versions table
 CREATE TABLE IF NOT EXISTS public.vendor_document_versions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -13,10 +12,8 @@ CREATE TABLE IF NOT EXISTS public.vendor_document_versions (
     comments TEXT,
     UNIQUE(document_id, version_number)
 );
-
 -- Enable RLS
 ALTER TABLE public.vendor_document_versions ENABLE ROW LEVEL SECURITY;
-
 -- Policies (matching vendor_documents)
 DROP POLICY IF EXISTS "Vendor document versions are viewable by tenant users" ON public.vendor_document_versions;
 CREATE POLICY "Vendor document versions are viewable by tenant users"
@@ -29,7 +26,6 @@ CREATE POLICY "Vendor document versions are viewable by tenant users"
             AND (v.tenant_id = (select auth.jwt() ->> 'tenant_id')::uuid OR v.tenant_id IS NULL)
         )
     );
-
 DROP POLICY IF EXISTS "Vendor document versions are insertable by tenant users" ON public.vendor_document_versions;
 CREATE POLICY "Vendor document versions are insertable by tenant users"
     ON public.vendor_document_versions FOR INSERT
@@ -41,7 +37,6 @@ CREATE POLICY "Vendor document versions are insertable by tenant users"
             AND (v.tenant_id = (select auth.jwt() ->> 'tenant_id')::uuid OR v.tenant_id IS NULL)
         )
     );
-
 DROP POLICY IF EXISTS "Vendor document versions are deletable by tenant admins" ON public.vendor_document_versions;
 CREATE POLICY "Vendor document versions are deletable by tenant admins"
     ON public.vendor_document_versions FOR DELETE

@@ -1,4 +1,3 @@
-
 -- Create RPC to fetch templates securely (bypassing RLS for cross-tenant access by admins/support)
 CREATE OR REPLACE FUNCTION get_templates_secure(p_tenant_id UUID DEFAULT NULL)
 RETURNS TABLE (
@@ -25,7 +24,6 @@ BEGIN
   ORDER BY t.name ASC;
 END;
 $$;
-
 -- Grant execute permission to authenticated users
 GRANT EXECUTE ON FUNCTION get_templates_secure(UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION get_templates_secure(UUID) TO service_role;

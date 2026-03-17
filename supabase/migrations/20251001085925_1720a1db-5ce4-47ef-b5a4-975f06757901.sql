@@ -14,24 +14,19 @@ CREATE TABLE IF NOT EXISTS public.oauth_configurations (
   updated_at TIMESTAMPTZ DEFAULT now(),
   UNIQUE(user_id, provider)
 );
-
 -- Enable RLS
 ALTER TABLE public.oauth_configurations ENABLE ROW LEVEL SECURITY;
-
 -- RLS Policies
 CREATE POLICY "Users can manage own OAuth configs"
   ON public.oauth_configurations
   FOR ALL
   USING (user_id = auth.uid());
-
 CREATE POLICY "Platform admins can manage all OAuth configs"
   ON public.oauth_configurations
   FOR ALL
   USING (is_platform_admin(auth.uid()));
-
 -- Create index
 CREATE INDEX idx_oauth_configurations_user_provider ON public.oauth_configurations(user_id, provider);
-
 -- Add updated_at trigger
 CREATE TRIGGER update_oauth_configurations_updated_at
   BEFORE UPDATE ON public.oauth_configurations

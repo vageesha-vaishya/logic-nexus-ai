@@ -18,15 +18,12 @@ CREATE TABLE IF NOT EXISTS public.scheduled_emails (
   error_message TEXT,
   created_at TIMESTAMPTZ DEFAULT now()
 );
-
 -- Enable RLS
 ALTER TABLE public.scheduled_emails ENABLE ROW LEVEL SECURITY;
-
 -- RLS Policies for Scheduled Emails
 CREATE POLICY "Users can manage their own scheduled emails"
   ON public.scheduled_emails
   USING (user_id = auth.uid());
-
 CREATE POLICY "Platform admins can view all scheduled emails"
   ON public.scheduled_emails
   FOR SELECT
@@ -36,7 +33,6 @@ CREATE POLICY "Platform admins can view all scheduled emails"
       WHERE ur.user_id = auth.uid() AND ur.role IN ('platform_admin')
     )
   );
-
 -- 2. Email Audit Log Table
 CREATE TABLE IF NOT EXISTS public.email_audit_log (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -49,10 +45,8 @@ CREATE TABLE IF NOT EXISTS public.email_audit_log (
   user_agent TEXT,
   created_at TIMESTAMPTZ DEFAULT now()
 );
-
 -- Enable RLS
 ALTER TABLE public.email_audit_log ENABLE ROW LEVEL SECURITY;
-
 -- RLS Policies for Email Audit Log
 CREATE POLICY "Platform admins view all email logs"
   ON public.email_audit_log
@@ -63,7 +57,6 @@ CREATE POLICY "Platform admins view all email logs"
       WHERE ur.user_id = auth.uid() AND ur.role IN ('platform_admin')
     )
   );
-
 CREATE POLICY "Tenant admins view tenant email logs"
   ON public.email_audit_log
   FOR SELECT
@@ -74,7 +67,6 @@ CREATE POLICY "Tenant admins view tenant email logs"
     )
     AND tenant_id = (SELECT tenant_id FROM public.profiles WHERE id = auth.uid())
   );
-
 -- 3. Add AI Columns to Emails Table
 ALTER TABLE public.emails 
 ADD COLUMN IF NOT EXISTS ai_category TEXT,
@@ -82,7 +74,6 @@ ADD COLUMN IF NOT EXISTS ai_sentiment TEXT,
 ADD COLUMN IF NOT EXISTS ai_urgency TEXT,
 ADD COLUMN IF NOT EXISTS ai_summary TEXT,
 ADD COLUMN IF NOT EXISTS ai_processed_at TIMESTAMPTZ;
-
 -- 4. Automatic Audit Trigger
 CREATE OR REPLACE FUNCTION public.log_email_action()
 RETURNS TRIGGER
@@ -104,7 +95,6 @@ BEGIN
   RETURN NEW;
 END;
 $$;
-
 -- Trigger for emails table (Audit Logging)
 DROP TRIGGER IF EXISTS on_email_change ON public.emails;
 CREATE TRIGGER on_email_change

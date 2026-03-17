@@ -9,6 +9,7 @@ type UnauthorizedState = {
   missingPermissions?: string[];
   requiredRole?: string;
   from?: string;
+  message?: string;
 } | null;
 
 export default function Unauthorized() {
@@ -42,7 +43,7 @@ export default function Unauthorized() {
         <div className="space-y-2">
           <h1 className="text-3xl font-bold tracking-tight">Access Denied</h1>
           <p className="text-muted-foreground">
-            You don't have permission to access this resource.
+            {state?.message || "You don't have permission to access this resource."}
           </p>
           
           {state?.missingPermissions && (

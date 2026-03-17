@@ -17,7 +17,6 @@ CREATE TABLE IF NOT EXISTS public.carriers (
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
-
 -- Create consignees database
 CREATE TABLE IF NOT EXISTS public.consignees (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -34,7 +33,6 @@ CREATE TABLE IF NOT EXISTS public.consignees (
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
-
 -- Create ports and locations database
 CREATE TABLE IF NOT EXISTS public.ports_locations (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -55,7 +53,6 @@ CREATE TABLE IF NOT EXISTS public.ports_locations (
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
-
 -- Add references to quotes table
 ALTER TABLE public.quotes
   ADD COLUMN IF NOT EXISTS contact_id UUID,
@@ -63,51 +60,40 @@ ALTER TABLE public.quotes
   ADD COLUMN IF NOT EXISTS consignee_id UUID REFERENCES public.consignees(id),
   ADD COLUMN IF NOT EXISTS origin_port_id UUID REFERENCES public.ports_locations(id),
   ADD COLUMN IF NOT EXISTS destination_port_id UUID REFERENCES public.ports_locations(id);
-
 -- Enable RLS
 ALTER TABLE public.carriers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.consignees ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.ports_locations ENABLE ROW LEVEL SECURITY;
-
 -- RLS Policies for carriers
 CREATE POLICY "Platform admins can manage all carriers"
   ON public.carriers FOR ALL
   USING (is_platform_admin(auth.uid()));
-
 CREATE POLICY "Tenant admins can manage carriers"
   ON public.carriers FOR ALL
   USING (has_role(auth.uid(), 'tenant_admin'::app_role) AND tenant_id = get_user_tenant_id(auth.uid()));
-
 CREATE POLICY "Users can view tenant carriers"
   ON public.carriers FOR SELECT
   USING (tenant_id = get_user_tenant_id(auth.uid()));
-
 -- RLS Policies for consignees
 CREATE POLICY "Platform admins can manage all consignees"
   ON public.consignees FOR ALL
   USING (is_platform_admin(auth.uid()));
-
 CREATE POLICY "Tenant admins can manage consignees"
   ON public.consignees FOR ALL
   USING (has_role(auth.uid(), 'tenant_admin'::app_role) AND tenant_id = get_user_tenant_id(auth.uid()));
-
 CREATE POLICY "Users can view tenant consignees"
   ON public.consignees FOR SELECT
   USING (tenant_id = get_user_tenant_id(auth.uid()));
-
 -- RLS Policies for ports_locations
 CREATE POLICY "Platform admins can manage all ports"
   ON public.ports_locations FOR ALL
   USING (is_platform_admin(auth.uid()));
-
 CREATE POLICY "Tenant admins can manage ports"
   ON public.ports_locations FOR ALL
   USING (has_role(auth.uid(), 'tenant_admin'::app_role) AND tenant_id = get_user_tenant_id(auth.uid()));
-
 CREATE POLICY "Users can view tenant ports"
   ON public.ports_locations FOR SELECT
   USING (tenant_id = get_user_tenant_id(auth.uid()));
-
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_carriers_tenant ON public.carriers(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_consignees_tenant ON public.consignees(tenant_id);

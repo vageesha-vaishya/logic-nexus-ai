@@ -4,14 +4,11 @@
 -- standard Schedule D codes. It handles both matching existing ports and inserting new ones.
 
 BEGIN;
-
 -- 1. Add schedule_d_code column if it doesn't exist
 ALTER TABLE public.ports_locations
 ADD COLUMN IF NOT EXISTS schedule_d_code text;
-
 -- Add index for fast lookups
 CREATE INDEX IF NOT EXISTS idx_ports_locations_schedule_d_code ON public.ports_locations(schedule_d_code);
-
 -- 2. Define the seeding logic in a DO block
 DO $$
 DECLARE
@@ -588,5 +585,4 @@ BEGIN
     DROP TABLE temp_schedule_d_ports;
 
 END $$;
-
 COMMIT;

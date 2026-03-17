@@ -7,6 +7,9 @@ interface DomainContextType {
   currentDomain: PlatformDomain | null;
   setDomain: (code: string) => Promise<void>;
   availableDomains: PlatformDomain[];
+  showDomainSelector: boolean;
+  tenantDomainCount: number;
+  isPlatformAdmin: boolean;
   isLoading: boolean;
 }
 
@@ -15,6 +18,9 @@ const DomainContext = createContext<DomainContextType | undefined>(undefined);
 export function DomainContextProvider({ children }: { children: React.ReactNode }) {
   const [currentDomain, setCurrentDomainState] = useState<PlatformDomain | null>(null);
   const [availableDomains, setAvailableDomains] = useState<PlatformDomain[]>([]);
+  const [showDomainSelector, setShowDomainSelector] = useState(false);
+  const [tenantDomainCount, setTenantDomainCount] = useState(0);
+  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -25,10 +31,13 @@ export function DomainContextProvider({ children }: { children: React.ReactNode 
     try {
       setIsLoading(true);
       logger.debug('Loading platform domains...', { component: 'DomainContext' });
-      const domains = await DomainService.getAllDomains();
+      const authorized = await DomainService.getAuthorizedDomains();
+      const domains = authorized.domains;
       setAvailableDomains(domains);
+      setTenantDomainCount(authorized.tenantDomainCount);
+      setIsPlatformAdmin(authorized.isPlatformAdmin);
+      setShowDomainSelector(authorized.isPlatformAdmin || authorized.tenantDomainCount > 1);
 
-      // Restore from localStorage or default to Logistics
       const savedCode = localStorage.getItem('active_domain_code');
       const targetDomain = 
         domains.find(d => d.code === savedCode) || 
@@ -43,7 +52,7 @@ export function DomainContextProvider({ children }: { children: React.ReactNode 
       }
     } catch (error: any) {
       logger.error('Failed to load domains', { error: error.message, component: 'DomainContext' });
-      toast.error('Failed to load platform domains');
+      toast.error(error?.message || 'Failed to load platform domains');
     } finally {
       setIsLoading(false);
     }
@@ -55,16 +64,23 @@ export function DomainContextProvider({ children }: { children: React.ReactNode 
       setCurrentDomainState(domain);
       localStorage.setItem('active_domain_code', code);
       toast.success(`Switched to ${domain.name}`);
-      
-      // Optional: Force reload to clear any stale state from other domains
-      // window.location.reload(); 
     } else {
       console.warn(`Domain ${code} not found`);
     }
   };
 
   return (
-    <DomainContext.Provider value={{ currentDomain, setDomain, availableDomains, isLoading }}>
+    <DomainContext.Provider
+      value={{
+        currentDomain,
+        setDomain,
+        availableDomains,
+        showDomainSelector,
+        tenantDomainCount,
+        isPlatformAdmin,
+        isLoading,
+      }}
+    >
       {children}
     </DomainContext.Provider>
   );

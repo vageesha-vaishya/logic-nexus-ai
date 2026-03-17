@@ -89,7 +89,10 @@ interface DataImportExportProps {
   }) => Promise<boolean> | boolean;
   // Navigation
   listPath: string; // e.g., "/dashboard/leads"
+  showBackToListButton?: boolean;
   enableAutoCorrection?: boolean;
+  headerActions?: React.ReactNode;
+  containerStyle?: React.CSSProperties;
 }
 
 type ParsedRow = Record<string, unknown>;
@@ -196,6 +199,7 @@ export default function DataImportExport({
   additionalExportTemplates = [],
   onTransformRecord,
   listPath,
+  showBackToListButton = true,
   enableAutoCorrection = true,
   onExportFilterApply,
   onPrepareExportData,
@@ -205,6 +209,8 @@ export default function DataImportExport({
   initialTemplateName,
   autoRunExportFormat,
   onCustomExport,
+  headerActions,
+  containerStyle,
 }: DataImportExportProps) {
   const navigate = useNavigate();
   const { supabase, context, scopedDb } = useCRM();
@@ -1164,15 +1170,20 @@ export default function DataImportExport({
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
+      <div className="space-y-6" style={containerStyle}>
+        <div className="flex items-start justify-between gap-4 sm:items-center">
           <div>
             <h1 className="text-3xl font-bold">{entityName} Import/Export</h1>
             <p className="text-muted-foreground">Manage your {entityName.toLowerCase()} data in bulk</p>
           </div>
-          <Button variant="outline" onClick={() => navigate(listPath)}>
-            Back to List
-          </Button>
+          <div className="flex items-center gap-2">
+            {headerActions}
+            {showBackToListButton && (
+              <Button variant="outline" onClick={() => navigate(listPath)}>
+                Back to List
+              </Button>
+            )}
+          </div>
         </div>
 
         <Tabs defaultValue="operations" className="w-full">

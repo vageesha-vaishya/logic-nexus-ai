@@ -3,14 +3,36 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { DashboardTemplateLoader } from './DashboardTemplateLoader';
 import { UserRole } from '@/types/dashboardTemplates';
 import { useCRM } from '@/hooks/useCRM';
+import { logger } from '@/lib/logger';
 
 // Map auth system roles to dashboard roles
 const AUTH_ROLE_TO_DASHBOARD_ROLE: Record<string, UserRole> = {
-  platform_admin: 'crm_executive',
-  tenant_admin: 'crm_sales_manager',
-  franchise_admin: 'crm_account_executive',
+  platform_admin: 'enterprise_executive',
+  tenant_admin: 'enterprise_operations',
+  franchise_admin: 'enterprise_operations',
   user: 'crm_sales_rep',
 };
+
+const ROLE_ALIASES: Record<string, UserRole> = {
+  operations: 'enterprise_operations',
+  executive: 'enterprise_executive',
+};
+
+const VALID_DASHBOARD_ROLES = new Set<UserRole>([
+  'enterprise_operations',
+  'enterprise_executive',
+  'crm_sales_rep',
+  'crm_sales_manager',
+  'crm_account_executive',
+  'crm_executive',
+  'logistics_dispatcher',
+  'logistics_fleet_manager',
+  'logistics_ops_manager',
+  'logistics_executive',
+  'sales_quote_manager',
+  'sales_manager',
+  'sales_executive',
+]);
 
 export function DashboardRouter() {
   const { context, user, scopedDb } = useCRM();
@@ -18,6 +40,38 @@ export function DashboardRouter() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const contextRoleToDashboardRole = (): UserRole => {
+      if (context?.isPlatformAdmin) {
+        return AUTH_ROLE_TO_DASHBOARD_ROLE.platform_admin;
+      }
+      if (context?.isTenantAdmin) {
+        return AUTH_ROLE_TO_DASHBOARD_ROLE.tenant_admin;
+      }
+      if (context?.isFranchiseAdmin) {
+        return AUTH_ROLE_TO_DASHBOARD_ROLE.franchise_admin;
+      }
+      return AUTH_ROLE_TO_DASHBOARD_ROLE.user;
+    };
+
+    const normalizeDashboardRole = (rawRole: unknown): UserRole => {
+      if (typeof rawRole !== 'string' || rawRole.trim().length === 0) {
+        return contextRoleToDashboardRole();
+      }
+
+      const candidate = rawRole.trim();
+      const aliasResolved = ROLE_ALIASES[candidate] ?? candidate;
+      if (VALID_DASHBOARD_ROLES.has(aliasResolved as UserRole)) {
+        return aliasResolved as UserRole;
+      }
+
+      logger.warn('Unknown dashboard_role profile value. Falling back to context role mapping.', {
+        userId: user?.id,
+        dashboardRole: candidate,
+        component: 'DashboardRouter',
+      });
+      return contextRoleToDashboardRole();
+    };
+
     const determineDashboardRole = async () => {
       try {
         if (!user?.id) {
@@ -33,29 +87,19 @@ export function DashboardRouter() {
           .single();
 
         if (!error && profileData?.dashboard_role) {
-          setUserRole(profileData.dashboard_role as UserRole);
+          setUserRole(normalizeDashboardRole(profileData.dashboard_role));
           setLoading(false);
           return;
         }
 
-        // Method 2: Map auth roles to dashboard roles
-        let dashboardRole: UserRole = 'crm_sales_rep';
-
-        if (context?.isPlatformAdmin) {
-          dashboardRole = AUTH_ROLE_TO_DASHBOARD_ROLE['platform_admin'];
-        } else if (context?.isTenantAdmin) {
-          dashboardRole = AUTH_ROLE_TO_DASHBOARD_ROLE['tenant_admin'];
-        } else if (context?.isFranchiseAdmin) {
-          dashboardRole = AUTH_ROLE_TO_DASHBOARD_ROLE['franchise_admin'];
-        } else {
-          dashboardRole = AUTH_ROLE_TO_DASHBOARD_ROLE['user'];
-        }
-
-        setUserRole(dashboardRole);
+        setUserRole(contextRoleToDashboardRole());
       } catch (error) {
-        console.error('Failed to determine dashboard role:', error);
-        // Default to sales rep if error
-        setUserRole('crm_sales_rep');
+        logger.error('Failed to determine dashboard role', {
+          error,
+          userId: user?.id,
+          component: 'DashboardRouter',
+        });
+        setUserRole(contextRoleToDashboardRole());
       } finally {
         setLoading(false);
       }

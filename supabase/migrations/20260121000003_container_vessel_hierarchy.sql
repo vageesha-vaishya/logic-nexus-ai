@@ -4,7 +4,6 @@
 -- Date: 2026-01-21
 
 BEGIN;
-
 --------------------------------------------------------------------------------
 -- 1. Container Category Level Implementation
 --------------------------------------------------------------------------------
@@ -18,7 +17,6 @@ CREATE TABLE IF NOT EXISTS public.container_types (
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now()
 );
-
 -- Add new columns safely
 DO $$
 BEGIN
@@ -27,7 +25,6 @@ BEGIN
     ALTER TABLE public.container_types ADD COLUMN IF NOT EXISTS requires_power BOOLEAN DEFAULT false;
     ALTER TABLE public.container_types ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
 END $$;
-
 -- Container Type Attributes (for sub-category tracking)
 CREATE TABLE IF NOT EXISTS public.container_type_attributes (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -38,7 +35,6 @@ CREATE TABLE IF NOT EXISTS public.container_type_attributes (
     validation_rule JSONB,
     created_at TIMESTAMPTZ DEFAULT now()
 );
-
 --------------------------------------------------------------------------------
 -- 2. Container Size Level Implementation
 --------------------------------------------------------------------------------
@@ -50,7 +46,6 @@ CREATE TABLE IF NOT EXISTS public.container_sizes (
     name TEXT NOT NULL,
     created_at TIMESTAMPTZ DEFAULT now()
 );
-
 -- Add new columns safely
 DO $$
 BEGIN
@@ -64,7 +59,6 @@ BEGIN
     ALTER TABLE public.container_sizes ADD COLUMN IF NOT EXISTS is_high_cube BOOLEAN DEFAULT false;
     ALTER TABLE public.container_sizes ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true;
 END $$;
-
 --------------------------------------------------------------------------------
 -- 3. Container Quantity Level Implementation (Transaction/Inventory)
 --------------------------------------------------------------------------------
@@ -76,7 +70,6 @@ DO $$ BEGIN
 EXCEPTION
     WHEN duplicate_object THEN null;
 END $$;
-
 -- Container Inventory/Transactions
 CREATE TABLE IF NOT EXISTS public.container_tracking (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -91,7 +84,6 @@ CREATE TABLE IF NOT EXISTS public.container_tracking (
     -- Snapshot fields for historical integrity
     teu_total NUMERIC(10,2)
 );
-
 -- Trigger to calculate TEU total on insert/update
 CREATE OR REPLACE FUNCTION public.calculate_container_teu()
 RETURNS TRIGGER AS $$
@@ -106,20 +98,16 @@ BEGIN
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
-
 DROP TRIGGER IF EXISTS trigger_calculate_container_teu ON public.container_tracking;
 CREATE TRIGGER trigger_calculate_container_teu
 BEFORE INSERT OR UPDATE ON public.container_tracking
 FOR EACH ROW
 EXECUTE FUNCTION public.calculate_container_teu();
-
 -- Index for historical trend analysis
 CREATE INDEX IF NOT EXISTS idx_container_tracking_tenant_date 
 ON public.container_tracking (tenant_id, recorded_at);
-
 CREATE INDEX IF NOT EXISTS idx_container_tracking_size_status 
 ON public.container_tracking (size_id, status);
-
 --------------------------------------------------------------------------------
 -- 4. Mother Mode of Transportation Hierarchy (Vessels)
 --------------------------------------------------------------------------------
@@ -131,7 +119,6 @@ CREATE TABLE IF NOT EXISTS public.vessel_types (
     name TEXT NOT NULL,
     description TEXT
 );
-
 -- Vessel Classes
 CREATE TABLE IF NOT EXISTS public.vessel_classes (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -142,7 +129,6 @@ CREATE TABLE IF NOT EXISTS public.vessel_classes (
     draft_limit_meters NUMERIC(5,2),
     beam_limit_meters NUMERIC(5,2)
 );
-
 -- Specific Vessels
 CREATE TABLE IF NOT EXISTS public.vessels (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -157,7 +143,6 @@ CREATE TABLE IF NOT EXISTS public.vessels (
     current_status TEXT DEFAULT 'active',
     metadata JSONB
 );
-
 -- Operational Metrics (Time-series data for vessels)
 CREATE TABLE IF NOT EXISTS public.vessel_operational_metrics (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -168,49 +153,25 @@ CREATE TABLE IF NOT EXISTS public.vessel_operational_metrics (
     port_calls_count INTEGER,
     average_speed_knots NUMERIC
 );
-
 --------------------------------------------------------------------------------
 -- Seed Data (Safe Upserts)
 --------------------------------------------------------------------------------
 
 -- Seed Container Types
-DO $$
-BEGIN
-  IF EXISTS (
-    SELECT 1
-    FROM information_schema.columns
-    WHERE table_schema = 'public'
-      AND table_name = 'container_types'
-      AND column_name = 'category'
-  ) THEN
-    INSERT INTO public.container_types (code, name, requires_temperature, category) VALUES
-    ('STD', 'Standard Dry', false, 'Standard'),
-    ('RF', 'Refrigerated', true, 'Reefer'),
-    ('OT', 'Open Top', false, 'Open Top'),
-    ('FR', 'Flat Rack', false, 'Flat Rack'),
-    ('TK', 'Tank', false, 'Tank')
-    ON CONFLICT (code) DO UPDATE SET
-      requires_temperature = EXCLUDED.requires_temperature,
-      category = EXCLUDED.category;
-  ELSE
-    INSERT INTO public.container_types (code, name, requires_temperature) VALUES
-    ('STD', 'Standard Dry', false),
-    ('RF', 'Refrigerated', true),
-    ('OT', 'Open Top', false),
-    ('FR', 'Flat Rack', false),
-    ('TK', 'Tank', false)
-    ON CONFLICT (code) DO UPDATE SET
-      requires_temperature = EXCLUDED.requires_temperature;
-  END IF;
-END $$;
-
+INSERT INTO public.container_types (code, name, requires_temperature) VALUES
+('STD', 'Standard Dry', false),
+('RF', 'Refrigerated', true),
+('OT', 'Open Top', false),
+('FR', 'Flat Rack', false),
+('TK', 'Tank', false)
+ON CONFLICT (code) DO UPDATE SET 
+    requires_temperature = EXCLUDED.requires_temperature;
 -- Seed Vessel Types
 INSERT INTO public.vessel_types (code, name) VALUES
 ('CONT', 'Container Ship'),
 ('BULK', 'Bulk Carrier'),
 ('TANK', 'Tanker')
 ON CONFLICT (code) DO NOTHING;
-
 --------------------------------------------------------------------------------
 -- RLS Policies
 --------------------------------------------------------------------------------
@@ -221,78 +182,46 @@ BEGIN
     EXECUTE format('DROP POLICY IF EXISTS %I ON %I', policy_name, table_name);
 END;
 $$ LANGUAGE plpgsql;
-
 ALTER TABLE public.container_tracking ENABLE ROW LEVEL SECURITY;
-
 SELECT drop_policy_if_exists('container_tracking', 'Tenants can view their own container tracking');
 CREATE POLICY "Tenants can view their own container tracking"
 ON public.container_tracking FOR SELECT
 USING (tenant_id = (SELECT auth.jwt() ->> 'tenant_id')::uuid);
-
 SELECT drop_policy_if_exists('container_tracking', 'Tenants can insert their own container tracking');
 CREATE POLICY "Tenants can insert their own container tracking"
 ON public.container_tracking FOR INSERT
 WITH CHECK (tenant_id = (SELECT auth.jwt() ->> 'tenant_id')::uuid);
-
 -- Reference tables
 ALTER TABLE public.container_types ENABLE ROW LEVEL SECURITY;
 SELECT drop_policy_if_exists('container_types', 'Public read container types');
 CREATE POLICY "Public read container types" ON public.container_types FOR SELECT TO authenticated USING (true);
-
 ALTER TABLE public.container_sizes ENABLE ROW LEVEL SECURITY;
 SELECT drop_policy_if_exists('container_sizes', 'Public read container sizes');
 CREATE POLICY "Public read container sizes" ON public.container_sizes FOR SELECT TO authenticated USING (true);
-
 ALTER TABLE public.vessel_types ENABLE ROW LEVEL SECURITY;
 SELECT drop_policy_if_exists('vessel_types', 'Public read vessel types');
 CREATE POLICY "Public read vessel types" ON public.vessel_types FOR SELECT TO authenticated USING (true);
-
 ALTER TABLE public.vessel_classes ENABLE ROW LEVEL SECURITY;
 SELECT drop_policy_if_exists('vessel_classes', 'Public read vessel classes');
 CREATE POLICY "Public read vessel classes" ON public.vessel_classes FOR SELECT TO authenticated USING (true);
-
 ALTER TABLE public.vessels ENABLE ROW LEVEL SECURITY;
 SELECT drop_policy_if_exists('vessels', 'Public read vessels');
 CREATE POLICY "Public read vessels" ON public.vessels FOR SELECT TO authenticated USING (true);
-
 --------------------------------------------------------------------------------
 -- Views for Drill-Down Reporting
 --------------------------------------------------------------------------------
 
-DROP VIEW IF EXISTS public.view_container_inventory_summary;
-DO $$
-BEGIN
-  IF EXISTS (
-    SELECT 1
-    FROM information_schema.columns
-    WHERE table_schema = 'public'
-      AND table_name = 'container_sizes'
-      AND column_name = 'name'
-  ) AND EXISTS (
-    SELECT 1
-    FROM information_schema.columns
-    WHERE table_schema = 'public'
-      AND table_name = 'container_sizes'
-      AND column_name = 'type_id'
-  ) THEN
-    EXECUTE $sql$
-      CREATE OR REPLACE VIEW public.view_container_inventory_summary AS
-      SELECT
-          ct.tenant_id,
-          c_type.name as category,
-          c_size.name as size,
-          c_size.iso_code,
-          sum(ct.quantity) as total_quantity,
-          sum(ct.teu_total) as total_teu,
-          ct.status
-      FROM public.container_tracking ct
-      JOIN public.container_sizes c_size ON ct.size_id = c_size.id
-      JOIN public.container_types c_type ON c_size.type_id = c_type.id
-      GROUP BY ct.tenant_id, c_type.name, c_size.name, c_size.iso_code, ct.status;
-    $sql$;
-  ELSE
-    RAISE NOTICE 'Skipping view_container_inventory_summary: legacy container_sizes schema.';
-  END IF;
-END $$;
-
+CREATE OR REPLACE VIEW public.view_container_inventory_summary AS
+SELECT 
+    ct.tenant_id,
+    c_type.name as category,
+    c_size.name as size,
+    c_size.iso_code,
+    sum(ct.quantity) as total_quantity,
+    sum(ct.teu_total) as total_teu,
+    ct.status
+FROM public.container_tracking ct
+JOIN public.container_sizes c_size ON ct.size_id = c_size.id
+JOIN public.container_types c_type ON c_size.type_id = c_type.id
+GROUP BY ct.tenant_id, c_type.name, c_size.name, c_size.iso_code, ct.status;
 COMMIT;

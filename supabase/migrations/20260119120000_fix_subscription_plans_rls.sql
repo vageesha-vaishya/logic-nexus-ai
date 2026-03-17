@@ -15,14 +15,11 @@ AS $$
     WHERE user_id = check_user_id AND role = 'platform_admin'
   );
 $$;
-
 COMMENT ON FUNCTION public.is_actual_platform_admin(UUID) IS 'Check if a user has the platform_admin role, ignoring any admin_override_enabled preferences.';
-
 -- 2. Update the RLS policy for subscription_plans to use the new function.
 -- This allows platform admins to Insert/Update/Delete plans even if they are currently viewing as a tenant.
 
 DROP POLICY IF EXISTS "Platform admins can manage subscription plans" ON public.subscription_plans;
-
 CREATE POLICY "Platform admins can manage subscription plans"
   ON public.subscription_plans
   FOR ALL

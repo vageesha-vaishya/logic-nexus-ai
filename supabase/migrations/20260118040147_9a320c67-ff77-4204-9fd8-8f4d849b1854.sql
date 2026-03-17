@@ -9,23 +9,17 @@ CREATE TABLE IF NOT EXISTS public.import_overrides (
     action TEXT NOT NULL,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
-
 -- Enable RLS
 ALTER TABLE public.import_overrides ENABLE ROW LEVEL SECURITY;
-
 -- RLS Policies
 CREATE POLICY "Users can view their overrides" ON public.import_overrides
     FOR SELECT USING (auth.uid() = user_id);
-
 CREATE POLICY "Users can insert overrides" ON public.import_overrides
     FOR INSERT WITH CHECK (auth.uid() = user_id);
-
 CREATE POLICY "Platform admins can manage all overrides" ON public.import_overrides
     FOR ALL USING (public.is_platform_admin(auth.uid()));
-
 -- Index for performance
 CREATE INDEX idx_import_overrides_user_id ON public.import_overrides(user_id);
-
 -- Fix: Recreate assign_lead_with_transaction without explicit COMMIT/ROLLBACK
 CREATE OR REPLACE FUNCTION public.assign_lead_with_transaction(
   p_lead_id uuid,
@@ -59,7 +53,6 @@ EXCEPTION WHEN OTHERS THEN
     RAISE;
 END;
 $$;
-
 -- Fix: Recreate logic_nexus_import_dry_run with corrected search_path
 CREATE OR REPLACE FUNCTION public.logic_nexus_import_dry_run(
   p_tables jsonb,

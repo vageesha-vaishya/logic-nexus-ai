@@ -3,7 +3,6 @@
 -- Removes obsolete/duplicate data.
 
 BEGIN;
-
 -----------------------------------------------------------------------------
 -- 0. Schema Fixes (FK Constraints)
 -----------------------------------------------------------------------------
@@ -37,7 +36,6 @@ BEGIN
   FOREIGN KEY (mode_id) REFERENCES service_modes(id) ON DELETE SET NULL;
 
 END $$;
-
 -----------------------------------------------------------------------------
 -- 1. Service Modes (Canonical List)
 -----------------------------------------------------------------------------
@@ -54,11 +52,9 @@ ON CONFLICT (code) DO UPDATE SET
   icon_name = EXCLUDED.icon_name,
   display_order = EXCLUDED.display_order,
   is_active = true;
-
 -- Deprecate obsolete modes (e.g., 'trucking' if it exists separately from 'road')
 -- We migrate 'trucking' to 'road' if possible, or disable it.
 UPDATE service_modes SET is_active = false WHERE code NOT IN ('ocean', 'air', 'road', 'rail', 'digital');
-
 -----------------------------------------------------------------------------
 -- 2. Service Categories (Canonical List)
 -----------------------------------------------------------------------------
@@ -74,13 +70,11 @@ ON CONFLICT (code) DO UPDATE SET
   description = EXCLUDED.description,
   icon_name = EXCLUDED.icon_name,
   display_order = EXCLUDED.display_order;
-
 -- Remove/Disable unknown categories
 -- Safe delete: only delete if not referenced
 DELETE FROM service_categories 
 WHERE code NOT IN ('transport', 'storage', 'customs', 'insurance', 'handling', 'trading')
   AND id NOT IN (SELECT category_id FROM service_types WHERE category_id IS NOT NULL);
-
 -----------------------------------------------------------------------------
 -- 3. Service Types (Canonical List)
 -----------------------------------------------------------------------------
@@ -242,5 +236,4 @@ BEGIN
     display_order = EXCLUDED.display_order;
 
 END $$;
-
 COMMIT;

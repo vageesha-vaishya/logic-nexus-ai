@@ -15,12 +15,14 @@ import { useCRM } from '@/hooks/useCRM';
 import { useAssignableUsers, AssignableUser } from '@/hooks/useAssignableUsers';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { useStickyActions } from '@/components/layout/StickyActionsContext';
-import { ViewToggle, ViewMode } from '@/components/ui/view-toggle';
 import ActivityBoard from '@/components/crm/ActivityBoard';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { format, isToday, isFuture, isPast, startOfDay } from 'date-fns';
 import { matchText, TextOp } from '@/lib/utils';
+import { useTheme } from '@/hooks/useTheme';
+import { useCRMModuleNavigationState } from '@/hooks/useCRMModuleNavigationState';
+import { CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
 
 interface Activity {
   id: string;
@@ -67,8 +69,16 @@ export default function Activities() {
   const [assignableUsers, setAssignableUsers] = useState<AssignableUser[]>([]);
   const [showHelp, setShowHelp] = useState(false);
   const [leadNamesById, setLeadNamesById] = useState<Record<string, string>>({});
-  const [viewMode, setViewMode] = useState<ViewMode>('card');
   const navigate = useNavigate();
+  const { setActive } = useTheme();
+  const {
+    viewMode,
+    theme,
+    hydrated,
+    setViewMode,
+    setTheme,
+  } = useCRMModuleNavigationState('activities', { viewMode: 'pipeline', theme: 'Azure Sky' });
+  const activityViewMode = viewMode === 'pipeline' ? 'board' : viewMode;
 
   // Advanced per-column filters
   const [subjectQuery, setSubjectQuery] = useState('');
@@ -156,6 +166,11 @@ export default function Activities() {
   useEffect(() => {
     fetchActivities();
   }, [fetchActivities]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    setActive(theme);
+  }, [hydrated, setActive, theme]);
 
   const handleMarkComplete = async (activityId: string) => {
     try {
@@ -403,7 +418,17 @@ export default function Activities() {
           <p className="text-muted-foreground">Manage your tasks and activities</p>
         </div>
         <div className="flex gap-2 flex-wrap items-center">
-          <ViewToggle value={viewMode} onChange={setViewMode} modes={['list', 'card', 'grid', 'board']} />
+          <CRMModuleHeaderNavigation
+            moduleLabel="Activities"
+            viewMode={viewMode}
+            theme={theme}
+            onViewModeChange={setViewMode}
+            onThemeChange={setTheme}
+            onCreate={() => navigate('/dashboard/activities/new')}
+            createLabel="New Activity"
+            onRefresh={fetchActivities}
+            onImportExport={() => navigate('/dashboard/activities/import-export')}
+          />
           <Button asChild variant="outline" size="sm">
             <Link to="/dashboard/activities/new?type=email">
               <Mail className="mr-2 h-4 w-4" />
@@ -724,7 +749,7 @@ export default function Activities() {
             )}
           </CardContent>
         </Card>
-      ) : viewMode === 'list' ? (
+      ) : activityViewMode === 'list' ? (
         <Card>
           <CardHeader>
             <TitleStrip label="All Activities" />
@@ -821,9 +846,9 @@ export default function Activities() {
             </div>
           </CardContent>
         </Card>
-      ) : viewMode === 'board' ? (
+      ) : activityViewMode === 'board' ? (
         <ActivityBoard activities={filteredActivitiesAdvanced} onStatusChange={handleStatusChange} />
-      ) : viewMode === 'grid' ? (
+      ) : activityViewMode === 'grid' ? (
         <div className="space-y-2">
           <TitleStrip label="All Activities" />
           <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">

@@ -17,8 +17,6 @@ CREATE TABLE IF NOT EXISTS public.ai_audit_logs (
   error_message text,
   created_at timestamptz DEFAULT now()
 );
-
 ALTER TABLE public.ai_audit_logs ENABLE ROW LEVEL SECURITY;
-
 CREATE INDEX IF NOT EXISTS idx_ai_audit_tenant_date ON public.ai_audit_logs (tenant_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_ai_audit_function ON public.ai_audit_logs (function_name, created_at DESC);

@@ -1,11 +1,9 @@
-
 -- Migration: Fix Analytics Cost Column
 -- Description: Updates analytics RPCs to remove reference to non-existent 'total_cost' column in shipments table.
 --              Temporarily sets cost to 0 until a proper cost tracking mechanism is identified.
 -- Date: 2026-02-07
 
 BEGIN;
-
 -- 1. Fix Get Financial Metrics
 CREATE OR REPLACE FUNCTION public.get_financial_metrics(period text DEFAULT '12m')
 RETURNS TABLE (
@@ -55,7 +53,6 @@ BEGIN
   ORDER BY m.month;
 END;
 $$;
-
 -- 2. Fix Get Dashboard Stats
 CREATE OR REPLACE FUNCTION public.get_dashboard_stats()
 RETURNS TABLE (
@@ -91,7 +88,6 @@ BEGIN
     ) as total_profit;
 END;
 $$;
-
 -- 3. Fix Get Daily Stats
 CREATE OR REPLACE FUNCTION public.get_daily_stats(p_days integer DEFAULT 30)
 RETURNS jsonb
@@ -177,5 +173,4 @@ BEGIN
   RETURN v_result;
 END;
 $$;
-
 COMMIT;

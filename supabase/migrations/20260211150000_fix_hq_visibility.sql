@@ -21,7 +21,6 @@ CREATE POLICY "Users can view franchise accounts" ON public.accounts
             franchise_id = public.get_user_franchise_id(auth.uid())
         )
     );
-
 DROP POLICY IF EXISTS "Users can create franchise accounts" ON public.accounts;
 CREATE POLICY "Users can create franchise accounts" ON public.accounts
     FOR INSERT
@@ -33,14 +32,12 @@ CREATE POLICY "Users can create franchise accounts" ON public.accounts
             franchise_id = public.get_user_franchise_id(auth.uid())
         )
     );
-
 -- =====================================================
 -- 2. CONTACTS
 -- =====================================================
 -- Drop old policies (names might vary, dropping likely candidates)
 DROP POLICY IF EXISTS "Users can view franchise contacts" ON public.contacts;
-DROP POLICY IF EXISTS "Users can view contacts" ON public.contacts; 
-
+DROP POLICY IF EXISTS "Users can view contacts" ON public.contacts;
 CREATE POLICY "Users can view franchise contacts" ON public.contacts
     FOR SELECT
     USING (
@@ -51,7 +48,6 @@ CREATE POLICY "Users can view franchise contacts" ON public.contacts
             franchise_id = public.get_user_franchise_id(auth.uid())
         )
     );
-
 -- =====================================================
 -- 3. LEADS
 -- =====================================================
@@ -69,7 +65,6 @@ CREATE POLICY "Users can view assigned leads" ON public.leads
             franchise_id = public.get_user_franchise_id(auth.uid())
         )
     );
-
 -- =====================================================
 -- 4. OPPORTUNITIES
 -- =====================================================
@@ -86,7 +81,6 @@ CREATE POLICY "Users can view franchise opportunities" ON public.opportunities
             franchise_id = public.get_user_franchise_id(auth.uid())
         )
     );
-
 -- =====================================================
 -- 5. QUOTES
 -- =====================================================
@@ -103,7 +97,6 @@ CREATE POLICY "Users can view own quotes" ON public.quotes
             franchise_id = public.get_user_franchise_id(auth.uid())
         )
     );
-
 -- =====================================================
 -- 6. SHIPMENTS
 -- =====================================================

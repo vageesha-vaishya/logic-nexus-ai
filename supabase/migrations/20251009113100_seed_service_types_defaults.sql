@@ -1,6 +1,5 @@
 -- Seed default service types (idempotent)
 BEGIN;
-
 INSERT INTO public.service_types (name, description, is_active)
 VALUES
   ('ocean', 'Ocean freight', true),
@@ -11,5 +10,4 @@ VALUES
   ('railway_transport', 'Railway transport', true)
 ON CONFLICT (name)
 DO UPDATE SET is_active = EXCLUDED.is_active;
-
 COMMIT;

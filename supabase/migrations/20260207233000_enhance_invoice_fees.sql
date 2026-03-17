@@ -1,5 +1,4 @@
 BEGIN;
-
 -- 1. Update calculate_duty to return detailed MPF/HMF totals
 CREATE OR REPLACE FUNCTION public.calculate_duty(
   p_origin_country TEXT,
@@ -109,7 +108,6 @@ BEGIN
   );
 END;
 $$;
-
 -- 2. Update create_invoice_from_shipment to include breakdown metadata
 CREATE OR REPLACE FUNCTION public.create_invoice_from_shipment(
   p_shipment_id UUID,
@@ -299,5 +297,4 @@ BEGIN
   RETURN v_invoice_id;
 END;
 $$ LANGUAGE plpgsql;
-
 COMMIT;

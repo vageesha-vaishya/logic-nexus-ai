@@ -18,10 +18,8 @@ CREATE TABLE IF NOT EXISTS public.shipment_delays (
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
-
 -- Enable RLS
 ALTER TABLE public.shipment_delays ENABLE ROW LEVEL SECURITY;
-
 -- RLS Policies
 DO $$ 
 BEGIN
@@ -34,7 +32,6 @@ BEGIN
         USING (tenant_id = (SELECT auth.jwt() ->> 'tenant_id')::UUID);
   END IF;
 END $$;
-
 DO $$ 
 BEGIN
   IF NOT EXISTS (
@@ -46,14 +43,11 @@ BEGIN
         USING (tenant_id = (SELECT auth.jwt() ->> 'tenant_id')::UUID);
   END IF;
 END $$;
-
 -- Trigger for updated_at
 DROP TRIGGER IF EXISTS update_shipment_delays_modtime ON public.shipment_delays;
 CREATE TRIGGER update_shipment_delays_modtime
     BEFORE UPDATE ON public.shipment_delays
     FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
-
-
 -- 2. Create Delay Detection RPC
 CREATE OR REPLACE FUNCTION public.check_shipment_delays(p_tenant_id UUID DEFAULT NULL)
 RETURNS JSONB AS $$

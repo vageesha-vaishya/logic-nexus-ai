@@ -1,5 +1,9 @@
 import DataImportExport, { DataField, ExportTemplate } from '@/components/system/DataImportExport';
 import * as z from 'zod';
+import { useNavigate } from 'react-router-dom';
+import { CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
+import { LeadsPrimaryView, useLeadsViewState } from '@/hooks/useLeadsViewState';
+import { themeStyleFromPreset } from '@/lib/theme-utils';
 
 const leadFields: DataField[] = [
   { key: 'first_name', label: 'First Name', required: true, aliases: ['fname', 'given_name'] },
@@ -56,6 +60,41 @@ const defaultTemplate: ExportTemplate = {
 };
 
 export default function LeadsImportExport() {
+  const navigate = useNavigate();
+  const { state: viewState, setTheme, setView, setPipeline } = useLeadsViewState();
+  const currentTheme = viewState.theme;
+
+  const handleThemeChange = (val: string) => {
+    setTheme(val);
+    try {
+      localStorage.setItem('leadsTheme', val);
+    } catch {
+      return;
+    }
+  };
+
+  const handleHeaderViewModeChange = (mode: LeadsPrimaryView) => {
+    if (mode === 'pipeline') {
+      try {
+        localStorage.setItem('leadsViewMode', 'pipeline');
+      } catch {
+        void 0;
+      }
+      setView('pipeline');
+      setPipeline({ q: '', status: [], tab: 'board' });
+      navigate('/dashboard/leads/pipeline');
+      return;
+    }
+
+    try {
+      localStorage.setItem('leadsViewMode', mode);
+    } catch {
+      void 0;
+    }
+    setView(mode);
+    navigate('/dashboard/leads');
+  };
+
   return (
     <DataImportExport
       entityName="Leads"
@@ -65,6 +104,35 @@ export default function LeadsImportExport() {
       validationSchema={leadSchema}
       defaultExportTemplate={defaultTemplate}
       listPath="/dashboard/leads"
+      showBackToListButton={false}
+      containerStyle={themeStyleFromPreset(currentTheme)}
+      headerActions={
+        <CRMModuleHeaderNavigation
+          moduleLabel="Leads"
+          viewMode="list"
+          theme={currentTheme}
+          onViewModeChange={(mode) => handleHeaderViewModeChange(mode as LeadsPrimaryView)}
+          onThemeChange={handleThemeChange}
+          onCreate={() => navigate('/dashboard/leads/new')}
+          createLabel="New Lead"
+          onRefresh={() => navigate(0)}
+          analyticsActive={false}
+          onAnalyticsClick={() => {
+            try {
+              localStorage.setItem('leadsViewMode', 'pipeline');
+            } catch {
+              void 0;
+            }
+            setView('pipeline');
+            setPipeline({ q: '', status: [], tab: 'analytics' });
+            navigate('/dashboard/leads/pipeline?view=analytics');
+          }}
+          onImportExport={() => navigate('/dashboard/leads/import-export')}
+          controlSequence={['pipeline', 'list', 'create', 'card', 'grid', 'refresh', 'analytics', 'importExport', 'theme']}
+          iconOnly
+          layout="compact"
+        />
+      }
     />
   );
 }

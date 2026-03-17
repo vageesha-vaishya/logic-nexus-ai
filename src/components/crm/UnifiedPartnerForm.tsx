@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -106,6 +106,8 @@ interface UnifiedPartnerFormProps {
   onSubmit: (data: PartnerFormData) => Promise<void>;
   onCancel: () => void;
   isLoading?: boolean;
+  autoSave?: boolean;
+  autoSaveDelayMs?: number;
 }
 
 export function UnifiedPartnerForm({ 
@@ -114,7 +116,9 @@ export function UnifiedPartnerForm({
   mode = 'create', 
   onSubmit, 
   onCancel,
-  isLoading = false
+  isLoading = false,
+  autoSave = false,
+  autoSaveDelayMs = 1200
 }: UnifiedPartnerFormProps) {
   // Determine initial type
   const defaultType = entityType === 'contact' ? 'individual' : 'company';
@@ -154,6 +158,7 @@ export function UnifiedPartnerForm({
   const { scopedDb, context, supabase } = useCRM();
   const [accounts, setAccounts] = useState<any[]>([]);
   const [tenants, setTenants] = useState<any[]>([]);
+  const autoSaveTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     async function fetchTenants() {
@@ -182,6 +187,25 @@ export function UnifiedPartnerForm({
     }
     fetchAccounts();
   }, [scopedDb]);
+
+  useEffect(() => {
+    if (!autoSave || mode !== 'edit') return;
+    const subscription = form.watch(() => {
+      if (!form.formState.isDirty || form.formState.isSubmitting) return;
+      if (autoSaveTimerRef.current) {
+        window.clearTimeout(autoSaveTimerRef.current);
+      }
+      autoSaveTimerRef.current = window.setTimeout(() => {
+        form.handleSubmit(onSubmit)();
+      }, autoSaveDelayMs);
+    });
+    return () => {
+      subscription.unsubscribe();
+      if (autoSaveTimerRef.current) {
+        window.clearTimeout(autoSaveTimerRef.current);
+      }
+    };
+  }, [autoSave, autoSaveDelayMs, form, mode, onSubmit]);
 
   // Enterprise Input Style Helper
   const inputStyle = "border-0 border-b border-gray-300 rounded-none focus-visible:ring-0 focus-visible:border-[#714B67] px-0 h-9 placeholder:text-gray-300";

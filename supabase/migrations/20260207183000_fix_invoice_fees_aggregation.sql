@@ -1,5 +1,4 @@
 BEGIN;
-
 -- Update create_invoice_from_shipment to use aggregated total_fees for MPF/HMF
 -- ensuring the Min/Max clamping logic from calculate_duty is respected.
 
@@ -220,5 +219,4 @@ BEGIN
   RETURN v_invoice_id;
 END;
 $$ LANGUAGE plpgsql;
-
 COMMIT;

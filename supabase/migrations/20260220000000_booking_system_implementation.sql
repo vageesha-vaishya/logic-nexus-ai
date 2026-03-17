@@ -2,7 +2,6 @@
 -- Description: Implements the Booking System (Phase 1 & 2) and refactors Booking Agents to use Bookings.
 
 BEGIN;
-
 -- 1. Create bookings table
 CREATE TABLE IF NOT EXISTS public.bookings (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -42,10 +41,8 @@ CREATE TABLE IF NOT EXISTS public.bookings (
     updated_at TIMESTAMPTZ DEFAULT now(),
     created_by UUID REFERENCES auth.users(id)
 );
-
 -- 2. RLS Policies for bookings
 ALTER TABLE public.bookings ENABLE ROW LEVEL SECURITY;
-
 DO $$ 
 BEGIN
   IF NOT EXISTS (
@@ -61,7 +58,6 @@ BEGIN
         );
   END IF;
 END $$;
-
 DO $$ 
 BEGIN
   IF NOT EXISTS (
@@ -73,7 +69,6 @@ BEGIN
         );
   END IF;
 END $$;
-
 DO $$ 
 BEGIN
   IF NOT EXISTS (
@@ -85,26 +80,21 @@ BEGIN
         );
   END IF;
 END $$;
-
 -- 3. Link shipments to bookings
 ALTER TABLE public.shipments ADD COLUMN IF NOT EXISTS booking_id UUID REFERENCES public.bookings(id);
-
 -- 4. Update booking_executions to link to bookings
 ALTER TABLE public.booking_executions ADD COLUMN IF NOT EXISTS booking_id UUID REFERENCES public.bookings(id);
-
 -- 5. Trigger for updated_at
 DROP TRIGGER IF EXISTS update_bookings_modtime ON public.bookings;
 CREATE TRIGGER update_bookings_modtime
     BEFORE UPDATE ON public.bookings
     FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
-
 -- 6. Indexes
 CREATE INDEX IF NOT EXISTS idx_bookings_tenant ON public.bookings(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_bookings_quote ON public.bookings(quote_id);
 CREATE INDEX IF NOT EXISTS idx_bookings_carrier ON public.bookings(carrier_id);
 CREATE INDEX IF NOT EXISTS idx_shipments_booking ON public.shipments(booking_id);
 CREATE INDEX IF NOT EXISTS idx_booking_executions_booking ON public.booking_executions(booking_id);
-
 -- 7. Create Helper Function to Convert Quote to Booking
 CREATE OR REPLACE FUNCTION public.convert_quote_to_booking(
     p_quote_id UUID,
@@ -149,8 +139,6 @@ BEGIN
     RETURN v_booking_id;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
-
-
 -- 8. Refactor execute_booking to use convert_quote_to_booking
 CREATE OR REPLACE FUNCTION public.execute_booking(
     p_agent_id UUID,
@@ -245,5 +233,4 @@ EXCEPTION WHEN OTHERS THEN
     RAISE; 
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
-
 COMMIT;

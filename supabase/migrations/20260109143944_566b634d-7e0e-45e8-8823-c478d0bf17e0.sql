@@ -2,7 +2,6 @@
 
 ALTER TABLE public.import_history ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.import_history_details ENABLE ROW LEVEL SECURITY;
-
 -- Drop previous policies (names may vary across earlier iterations)
 DROP POLICY IF EXISTS "Users can view import history" ON public.import_history;
 DROP POLICY IF EXISTS "Users can insert import history" ON public.import_history;
@@ -11,14 +10,12 @@ DROP POLICY IF EXISTS "Users can delete import history" ON public.import_history
 DROP POLICY IF EXISTS "Users can view import history for their tenant" ON public.import_history;
 DROP POLICY IF EXISTS "Users can insert import history for their tenant" ON public.import_history;
 DROP POLICY IF EXISTS "Users can update import history for their tenant" ON public.import_history;
-
 DROP POLICY IF EXISTS "Users can view import details" ON public.import_history_details;
 DROP POLICY IF EXISTS "Users can insert import details" ON public.import_history_details;
 DROP POLICY IF EXISTS "Users can update import details" ON public.import_history_details;
 DROP POLICY IF EXISTS "Users can view import details for their tenant" ON public.import_history_details;
 DROP POLICY IF EXISTS "Users can insert import details for their tenant" ON public.import_history_details;
 DROP POLICY IF EXISTS "Users can update import details for their tenant" ON public.import_history_details;
-
 -- Helper predicate embedded in each policy:
 -- 1) platform_admin can access everything
 -- 2) otherwise limited to user's tenant_id(s) from user_roles
@@ -41,7 +38,6 @@ USING (
       AND ur.tenant_id IS NOT NULL
   )
 );
-
 CREATE POLICY "Import history: insert"
 ON public.import_history
 FOR INSERT
@@ -59,7 +55,6 @@ WITH CHECK (
       AND ur.tenant_id IS NOT NULL
   )
 );
-
 CREATE POLICY "Import history: update"
 ON public.import_history
 FOR UPDATE
@@ -91,7 +86,6 @@ WITH CHECK (
       AND ur.tenant_id IS NOT NULL
   )
 );
-
 -- import_history_details policies (linked via import_id -> import_history.tenant_id)
 CREATE POLICY "Import details: select"
 ON public.import_history_details
@@ -114,7 +108,6 @@ USING (
     )
   )
 );
-
 CREATE POLICY "Import details: insert"
 ON public.import_history_details
 FOR INSERT
@@ -136,7 +129,6 @@ WITH CHECK (
     )
   )
 );
-
 CREATE POLICY "Import details: update"
 ON public.import_history_details
 FOR UPDATE
@@ -176,7 +168,6 @@ WITH CHECK (
     )
   )
 );
-
 -- Ensure authenticated role has table privileges (RLS still enforces row access)
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.import_history TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.import_history_details TO authenticated;

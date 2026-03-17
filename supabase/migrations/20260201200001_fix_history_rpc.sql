@@ -1,9 +1,6 @@
-
 -- Fix get_service_history RPC signature mismatch
 BEGIN;
-
 DROP FUNCTION IF EXISTS public.get_service_history(UUID, INTEGER, INTEGER);
-
 CREATE OR REPLACE FUNCTION public.get_service_history(
   p_service_id UUID,
   p_limit INTEGER DEFAULT 50,
@@ -43,10 +40,8 @@ BEGIN
   OFFSET p_offset;
 END;
 $$;
-
 -- Also fix get_tier_history just in case
 DROP FUNCTION IF EXISTS public.get_tier_history(UUID, INTEGER, INTEGER);
-
 CREATE OR REPLACE FUNCTION public.get_tier_history(
   p_tier_id UUID,
   p_limit INTEGER DEFAULT 50,
@@ -86,5 +81,4 @@ BEGIN
   OFFSET p_offset;
 END;
 $$;
-
 COMMIT;

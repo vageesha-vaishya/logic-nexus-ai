@@ -2,12 +2,10 @@
 -- This aliases the existing 'scac' column logic
 ALTER TABLE public.carriers
 ADD COLUMN IF NOT EXISTS scac_code TEXT;
-
 -- Sync existing scac values to scac_code
 UPDATE public.carriers
 SET scac_code = scac
 WHERE scac IS NOT NULL AND scac_code IS NULL;
-
 -- Create a trigger to keep them in sync (optional, but good practice if we maintain both)
 CREATE OR REPLACE FUNCTION sync_scac_columns()
 RETURNS TRIGGER AS $$
@@ -20,7 +18,6 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
-
 DROP TRIGGER IF EXISTS trg_sync_scac ON public.carriers;
 CREATE TRIGGER trg_sync_scac
 BEFORE INSERT OR UPDATE ON public.carriers

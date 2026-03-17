@@ -1,5 +1,5 @@
-import type { Meta, StoryObj } from '@storybook/react';
-import { action } from '@storybook/addon-actions';
+import type { Meta, StoryObj } from '@storybook/react-vite';
+import { action } from 'storybook/actions';
 import { useEffect, useState, type MouseEvent, type PropsWithChildren } from 'react';
 import { DispatcherDashboard } from './DispatcherDashboard';
 import { BrowserRouter, useLocation, useNavigationType } from 'react-router-dom';
@@ -138,56 +138,98 @@ export const MockData: Story = {
 export const BaselineDesktopLive: Story = {
   name: 'Baseline/Desktop/Live',
   args: {},
+
   parameters: {
-    layout: 'fullscreen',
-    viewport: { defaultViewport: 'desktop' },
+    layout: 'fullscreen'
   },
+
+  globals: {
+    viewport: {
+      value: 'desktop',
+      isRotated: false
+    }
+  }
 };
 
 export const BaselineTabletLive: Story = {
   name: 'Baseline/Tablet/Live',
   args: {},
+
   parameters: {
-    layout: 'fullscreen',
-    viewport: { defaultViewport: 'tablet' },
+    layout: 'fullscreen'
   },
+
+  globals: {
+    viewport: {
+      value: 'tablet',
+      isRotated: false
+    }
+  }
 };
 
 export const BaselineMobileLive: Story = {
   name: 'Baseline/Mobile/Live',
   args: {},
+
   parameters: {
-    layout: 'fullscreen',
-    viewport: { defaultViewport: 'small' },
+    layout: 'fullscreen'
   },
+
+  globals: {
+    viewport: {
+      value: 'small',
+      isRotated: false
+    }
+  }
 };
 
 export const BaselineDesktopMock: Story = {
   name: 'Baseline/Desktop/Mock',
   args: {},
+
   parameters: {
     useMockData: true,
-    layout: 'fullscreen',
-    viewport: { defaultViewport: 'desktop' },
+    layout: 'fullscreen'
   },
+
+  globals: {
+    viewport: {
+      value: 'desktop',
+      isRotated: false
+    }
+  }
 };
 
 export const BaselineTabletMock: Story = {
   name: 'Baseline/Tablet/Mock',
   args: {},
+
   parameters: {
     useMockData: true,
-    layout: 'fullscreen',
-    viewport: { defaultViewport: 'tablet' },
+    layout: 'fullscreen'
   },
+
+  globals: {
+    viewport: {
+      value: 'tablet',
+      isRotated: false
+    }
+  }
 };
 
 export const BaselineMobileMock: Story = {
   name: 'Baseline/Mobile/Mock',
   args: {},
+
   parameters: {
     useMockData: true,
-    layout: 'fullscreen',
-    viewport: { defaultViewport: 'small' },
+    layout: 'fullscreen'
   },
+
+  globals: {
+    viewport: {
+      value: 'small',
+      isRotated: false
+    }
+  }
 };

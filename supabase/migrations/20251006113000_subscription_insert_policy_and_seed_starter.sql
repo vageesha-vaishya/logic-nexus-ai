@@ -3,7 +3,6 @@
 -- and adds a base Starter plan for end-to-end testing.
 
 BEGIN;
-
 -- INSERT policy: Tenant admins can create subscriptions for their own tenant
 DO $$
 BEGIN
@@ -22,7 +21,6 @@ BEGIN
       );
   END IF;
 END$$;
-
 -- Seed Starter plan if it does not already exist
 INSERT INTO public.subscription_plans (
   name,
@@ -69,5 +67,4 @@ DO UPDATE SET
   sort_order = EXCLUDED.sort_order,
   description = EXCLUDED.description,
   updated_at = now();
-
 COMMIT;

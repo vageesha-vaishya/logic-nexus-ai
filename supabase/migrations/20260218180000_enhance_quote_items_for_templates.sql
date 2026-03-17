@@ -2,10 +2,8 @@
 ALTER TABLE "logistics"."quote_items_extension"
 ADD COLUMN IF NOT EXISTS "container_type_id" uuid REFERENCES "public"."container_types"("id"),
 ADD COLUMN IF NOT EXISTS "container_size_id" uuid REFERENCES "public"."container_sizes"("id");
-
 -- Drop view to recreate
 DROP VIEW IF EXISTS "public"."quote_items";
-
 -- Recreate view with joins
 CREATE OR REPLACE VIEW "public"."quote_items" AS
 SELECT
@@ -38,7 +36,6 @@ FROM "public"."quote_items_core" c
 LEFT JOIN "logistics"."quote_items_extension" l ON c.id = l.quote_item_id
 LEFT JOIN "public"."container_types" ct ON l.container_type_id = ct.id
 LEFT JOIN "public"."container_sizes" cs ON l.container_size_id = cs.id;
-
 -- Update Insert Function
 CREATE OR REPLACE FUNCTION public.quote_items_insert_func()
 RETURNS TRIGGER AS $$
@@ -66,7 +63,6 @@ BEGIN
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
-
 -- Update Update Function
 CREATE OR REPLACE FUNCTION public.quote_items_update_func()
 RETURNS TRIGGER AS $$

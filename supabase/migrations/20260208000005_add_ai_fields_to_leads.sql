@@ -1,5 +1,4 @@
 CREATE EXTENSION IF NOT EXISTS vector;
-
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -23,5 +22,4 @@ BEGIN
     ALTER TABLE public.leads ADD COLUMN embedding vector(1536);
   END IF;
 END $$;
-
 CREATE INDEX IF NOT EXISTS idx_leads_embedding ON public.leads USING hnsw (embedding vector_cosine_ops);

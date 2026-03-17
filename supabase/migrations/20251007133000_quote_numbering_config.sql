@@ -7,7 +7,6 @@ CREATE TABLE IF NOT EXISTS public.quote_number_config_tenant (
   prefix text NOT NULL DEFAULT 'QUO',
   CONSTRAINT quote_number_config_tenant_prefix_len CHECK (char_length(prefix) = 3)
 );
-
 -- Franchise-level prefix config (overrides tenant when present)
 CREATE TABLE IF NOT EXISTS public.quote_number_config_franchise (
   tenant_id uuid NOT NULL,
@@ -16,13 +15,11 @@ CREATE TABLE IF NOT EXISTS public.quote_number_config_franchise (
   CONSTRAINT quote_number_config_franchise_prefix_len CHECK (char_length(prefix) = 3),
   CONSTRAINT quote_number_config_franchise_pk PRIMARY KEY (tenant_id, franchise_id)
 );
-
 -- Tenant-level sequence storage (independent per tenant)
 CREATE TABLE IF NOT EXISTS public.quote_sequences_tenant (
   tenant_id uuid PRIMARY KEY,
   seq_value bigint NOT NULL DEFAULT 0
 );
-
 -- Franchise-level sequence storage (independent per franchise within a tenant)
 CREATE TABLE IF NOT EXISTS public.quote_sequences_franchise (
   tenant_id uuid NOT NULL,
@@ -30,7 +27,6 @@ CREATE TABLE IF NOT EXISTS public.quote_sequences_franchise (
   seq_value bigint NOT NULL DEFAULT 0,
   CONSTRAINT quote_sequences_franchise_pk PRIMARY KEY (tenant_id, franchise_id)
 );
-
 -- Function: get next sequence and build quote number
 CREATE OR REPLACE FUNCTION public.generate_quote_number(p_tenant_id uuid, p_franchise_id uuid)
 RETURNS text
@@ -86,10 +82,8 @@ BEGIN
   RETURN v_prefix || v_date || lpad(v_seq::text, 8, '0');
 END;
 $$;
-
 COMMENT ON FUNCTION public.generate_quote_number(uuid, uuid)
 IS 'Generates quote_number as <PREFIX(3)><YY><MM><DD><SEQ(8)>, with franchise override and atomic per-tenant/franchise sequence.';
-
 -- Trigger function to set quote_number before insert
 CREATE OR REPLACE FUNCTION public.trg_set_quote_number_before_insert()
 RETURNS trigger
@@ -107,7 +101,6 @@ BEGIN
   RETURN NEW;
 END;
 $$;
-
 -- Create trigger on public.quotes
 DROP TRIGGER IF EXISTS trg_set_quote_number_before_insert ON public.quotes;
 CREATE TRIGGER trg_set_quote_number_before_insert

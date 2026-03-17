@@ -1,6 +1,5 @@
 -- Opportunity items table and syncing from primary quote items
 BEGIN;
-
 -- Create opportunity_items table mirroring quote_items (commerce schema)
 CREATE TABLE IF NOT EXISTS public.opportunity_items (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -17,11 +16,8 @@ CREATE TABLE IF NOT EXISTS public.opportunity_items (
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
-
 ALTER TABLE public.opportunity_items ENABLE ROW LEVEL SECURITY;
-
 CREATE INDEX IF NOT EXISTS idx_opportunity_items_opportunity_id ON public.opportunity_items(opportunity_id);
-
 -- Minimal RLS policies aligned with quotes access
 DO $$
 BEGIN
@@ -36,7 +32,6 @@ BEGIN
       USING (is_platform_admin(auth.uid()));
   END IF;
 END$$;
-
 -- Function: sync opportunity_items from a primary quote's items
 CREATE OR REPLACE FUNCTION public.sync_opportunity_items_from_quote(p_quote_id UUID)
 RETURNS VOID AS $$
@@ -67,7 +62,6 @@ BEGIN
   ORDER BY qi.line_number;
 END;
 $$ LANGUAGE plpgsql;
-
 -- Extend quote_items triggers to also run syncing after recalculation
 CREATE OR REPLACE FUNCTION public.recalculate_and_sync_quote_trigger()
 RETURNS TRIGGER AS $$
@@ -114,23 +108,19 @@ BEGIN
   END IF;
 END;
 $$ LANGUAGE plpgsql;
-
 DROP TRIGGER IF EXISTS trg_quote_items_recalc_total_ins ON public.quote_items;
 CREATE TRIGGER trg_quote_items_recalc_total_ins
   AFTER INSERT ON public.quote_items
   FOR EACH ROW
   EXECUTE FUNCTION public.recalculate_and_sync_quote_trigger();
-
 DROP TRIGGER IF EXISTS trg_quote_items_recalc_total_upd ON public.quote_items;
 CREATE TRIGGER trg_quote_items_recalc_total_upd
   AFTER UPDATE ON public.quote_items
   FOR EACH ROW
   EXECUTE FUNCTION public.recalculate_and_sync_quote_trigger();
-
 DROP TRIGGER IF EXISTS trg_quote_items_recalc_total_del ON public.quote_items;
 CREATE TRIGGER trg_quote_items_recalc_total_del
   AFTER DELETE ON public.quote_items
   FOR EACH ROW
   EXECUTE FUNCTION public.recalculate_and_sync_quote_trigger();
-
 COMMIT;

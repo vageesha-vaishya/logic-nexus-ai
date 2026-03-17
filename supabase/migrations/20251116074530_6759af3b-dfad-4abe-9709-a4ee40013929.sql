@@ -25,7 +25,6 @@ BEGIN
   );
 END;
 $$;
-
 -- Create a convenience function to check current user
 CREATE OR REPLACE FUNCTION public.is_current_user_platform_admin()
 RETURNS BOOLEAN
@@ -35,7 +34,6 @@ SET search_path = public
 AS $$
   SELECT public.is_platform_admin(auth.uid());
 $$;
-
 -- Create a function to get all platform admin users
 CREATE OR REPLACE FUNCTION public.get_platform_admins()
 RETURNS TABLE(
@@ -63,7 +61,6 @@ AS $$
     AND p.is_active = true
   ORDER BY ur.assigned_at DESC;
 $$;
-
 COMMENT ON FUNCTION public.is_platform_admin(UUID) IS 'Check if a specific user has platform admin role and is active. Returns false if user_id is NULL or user is inactive.';
 COMMENT ON FUNCTION public.is_current_user_platform_admin() IS 'Check if the current authenticated user is a platform admin';
 COMMENT ON FUNCTION public.get_platform_admins() IS 'Get list of all active platform administrators';

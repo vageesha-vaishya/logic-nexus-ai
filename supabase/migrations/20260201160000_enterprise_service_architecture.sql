@@ -2,22 +2,17 @@
 -- Addresses: Global/Tenant Hierarchy, Pricing/Billing/Fulfillment Engines
 
 BEGIN;
-
 -----------------------------------------------------------------------------
 -- 1. Enable Global Services (Tenant-Agnostic)
 -----------------------------------------------------------------------------
 -- Allow tenant_id to be NULL for Global/Template services
 ALTER TABLE public.services ALTER COLUMN tenant_id DROP NOT NULL;
-
 -- Add Hierarchy & Template Flags
 ALTER TABLE public.services 
 ADD COLUMN IF NOT EXISTS parent_service_id UUID REFERENCES public.services(id) ON DELETE SET NULL,
 ADD COLUMN IF NOT EXISTS is_template BOOLEAN DEFAULT false;
-
 CREATE INDEX IF NOT EXISTS idx_services_parent_id ON public.services(parent_service_id);
 CREATE INDEX IF NOT EXISTS idx_services_is_template ON public.services(is_template);
-
-
 -----------------------------------------------------------------------------
 -- 2. Enterprise Configuration Modules (JSONB)
 -----------------------------------------------------------------------------
@@ -28,13 +23,10 @@ ADD COLUMN IF NOT EXISTS billing_config JSONB DEFAULT '{}'::jsonb,
 ADD COLUMN IF NOT EXISTS pricing_config JSONB DEFAULT '{}'::jsonb,
 ADD COLUMN IF NOT EXISTS fulfillment_config JSONB DEFAULT '{}'::jsonb,
 ADD COLUMN IF NOT EXISTS compliance_config JSONB DEFAULT '{}'::jsonb;
-
 COMMENT ON COLUMN public.services.billing_config IS 'Billing rules: tax_code, gl_accounts, invoice_trigger, billing_frequency';
 COMMENT ON COLUMN public.services.pricing_config IS 'Pricing rules: model (flat/tiered), currency, uom, price_lists';
 COMMENT ON COLUMN public.services.fulfillment_config IS 'Ops rules: provisioning_type (manual/auto), workflow_id, sla_hours';
 COMMENT ON COLUMN public.services.compliance_config IS 'Regulatory: required_docs, hazmat_class, customs_codes';
-
-
 -----------------------------------------------------------------------------
 -- 3. Vendor Relationship Management (VRM) Support
 -----------------------------------------------------------------------------
@@ -51,9 +43,7 @@ CREATE TABLE IF NOT EXISTS public.vendors (
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now()
 );
-
 CREATE INDEX IF NOT EXISTS idx_vendors_tenant ON public.vendors(tenant_id);
-
 -- Service <-> Vendor Linkage (Many-to-Many)
 CREATE TABLE IF NOT EXISTS public.service_vendors (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -65,11 +55,8 @@ CREATE TABLE IF NOT EXISTS public.service_vendors (
     created_at TIMESTAMPTZ DEFAULT now(),
     UNIQUE(service_id, vendor_id)
 );
-
 CREATE INDEX IF NOT EXISTS idx_service_vendors_service ON public.service_vendors(service_id);
 CREATE INDEX IF NOT EXISTS idx_service_vendors_vendor ON public.service_vendors(vendor_id);
-
-
 -----------------------------------------------------------------------------
 -- 4. Advanced Pricing Tiers (Relational)
 -----------------------------------------------------------------------------
@@ -84,10 +71,7 @@ CREATE TABLE IF NOT EXISTS public.service_pricing_tiers (
     currency TEXT DEFAULT 'USD',
     created_at TIMESTAMPTZ DEFAULT now()
 );
-
 CREATE INDEX IF NOT EXISTS idx_pricing_tiers_service ON public.service_pricing_tiers(service_id);
-
-
 -----------------------------------------------------------------------------
 -- 5. Fix Unique Constraint for Global Services (Before Seeding)
 -----------------------------------------------------------------------------
@@ -97,8 +81,6 @@ CREATE INDEX IF NOT EXISTS idx_pricing_tiers_service ON public.service_pricing_t
 CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_global_service_code 
 ON public.services (service_code) 
 WHERE tenant_id IS NULL;
-
-
 -----------------------------------------------------------------------------
 -- 6. Seed Enterprise Example: Global Ocean Service
 -----------------------------------------------------------------------------
@@ -141,7 +123,6 @@ BEGIN
                 service_name, 
                 service_type, 
                 service_type_id,
-                shipment_type,
                 description, 
                 is_template, 
                 base_price, 
@@ -157,7 +138,6 @@ BEGIN
                 'Global Ocean FCL 20ft Standard', 
                 'ocean', 
                 v_ocean_type_id,
-                'ocean_freight',
                 'Template for Ocean FCL 20ft shipments with standard billing rules', 
                 true, 
                 0, -- Base price is 0 for template
@@ -210,6 +190,4 @@ BEGIN
     END IF;
 
 END $$;
-
-
 COMMIT;

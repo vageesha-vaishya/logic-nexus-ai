@@ -10,17 +10,13 @@ CREATE TABLE IF NOT EXISTS notifications (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   metadata JSONB DEFAULT '{}'::jsonb
 );
-
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
-
 DROP POLICY IF EXISTS "Users can view own notifications" ON notifications;
 CREATE POLICY "Users can view own notifications" ON notifications
   FOR SELECT USING (auth.uid() = user_id);
-
 DROP POLICY IF EXISTS "Users can update own notifications" ON notifications;
 CREATE POLICY "Users can update own notifications" ON notifications
   FOR UPDATE USING (auth.uid() = user_id);
-
 -- Function to find expiring contracts
 CREATE OR REPLACE FUNCTION get_expiring_contracts(days_threshold INT DEFAULT 30)
 RETURNS TABLE (
@@ -51,7 +47,6 @@ BEGIN
     AND vc.end_date >= CURRENT_DATE;
 END;
 $$;
-
 -- Function for data retention (archive old docs)
 -- Adds 'archived' status to DocumentStatus type if not present (handled in app logic mostly, but good to have DB support)
 -- Note: Check constraints on status might fail if 'archived' is not allowed.

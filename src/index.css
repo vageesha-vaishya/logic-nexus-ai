@@ -159,3 +159,31 @@ All colors MUST be HSL.
     @apply bg-muted/20; /* Slight background to indicate scroll area */
   }
 }
+
+@layer components {
+  .lead-workspace-tight-lines {
+    --lead-workspace-line-height: 1.2;
+  }
+
+  .lead-workspace-tight-lines :is(
+      h1,
+      h2,
+      h3,
+      h4,
+      h5,
+      h6,
+      p,
+      span,
+      label,
+      small,
+      li,
+      td,
+      th,
+      a,
+      button,
+      input,
+      textarea
+    ) {
+    line-height: var(--lead-workspace-line-height);
+  }
+}

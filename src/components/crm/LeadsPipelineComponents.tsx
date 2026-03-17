@@ -53,7 +53,6 @@ export function ContactsSection({ leads, className }: { leads: Lead[]; className
     <Card className={cn("h-full", className)}>
       <CardHeader>
         <CardTitle>Contacts</CardTitle>
-        <CardDescription>Key people related to active leads</CardDescription>
       </CardHeader>
       <CardContent className="p-0">
         <ScrollArea className="h-[400px]">

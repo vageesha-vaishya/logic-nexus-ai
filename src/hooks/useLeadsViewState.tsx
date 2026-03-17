@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useReducer, useRef, useCallback } from 'react';
+import { THEME_PRESETS } from '@/theme/themes';
 
 export type LeadsPrimaryView = 'pipeline' | 'card' | 'grid' | 'list';
 export type LeadsPipelineTab = 'board' | 'analytics';
@@ -30,6 +31,8 @@ type LeadsWorkspaceFilters = {
   pageSize: number;
   sortField: string;
   sortDirection: 'asc' | 'desc';
+  listVisibleFields: string[];
+  groupBy: 'none' | 'status' | 'source' | 'assigned_to' | 'industry' | 'created_date';
 };
 
 type LeadsPipelineState = {
@@ -60,6 +63,8 @@ export type LeadsViewState = {
 };
 
 const STORAGE_KEY = 'leads.viewState.v1';
+const DEFAULT_THEME = 'Azure Sky';
+const VALID_THEME_NAMES = new Set(THEME_PRESETS.map((theme) => theme.name));
 
 const defaultWorkspace: LeadsWorkspaceFilters = {
   searchQuery: '',
@@ -88,14 +93,16 @@ const defaultWorkspace: LeadsWorkspaceFilters = {
   pageSize: 10,
   sortField: 'created_at',
   sortDirection: 'desc',
+  listVisibleFields: ['company', 'status', 'score', 'estimated_value', 'actions', 'email_under_name'],
+  groupBy: 'none',
 };
 
 const defaultState: LeadsViewState = {
   version: 1,
   hydrated: false,
   hydrationSource: 'default',
-  view: 'card',
-  theme: 'SOS Brand',
+  view: 'pipeline',
+  theme: DEFAULT_THEME,
   workspace: defaultWorkspace,
   pipeline: { q: '', status: [], tab: 'board' },
   selection: { selectedIds: [] },
@@ -205,6 +212,13 @@ function safeStringify(value: any): string | null {
   }
 }
 
+function normalizeTheme(theme: unknown): string {
+  if (typeof theme === 'string' && VALID_THEME_NAMES.has(theme)) {
+    return theme;
+  }
+  return DEFAULT_THEME;
+}
+
 export function LeadsViewStateProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(reducer, defaultState);
   const didHydrate = useRef(false);
@@ -214,7 +228,14 @@ export function LeadsViewStateProvider({ children }: { children: React.ReactNode
     didHydrate.current = true;
     const raw = safeParse(localStorage.getItem(STORAGE_KEY));
     if (raw) {
-      dispatch({ type: 'hydrate', payload: { ...raw, hydrationSource: 'storage' } });
+      dispatch({
+        type: 'hydrate',
+        payload: {
+          ...raw,
+          theme: normalizeTheme(raw.theme),
+          hydrationSource: 'storage',
+        },
+      });
       return;
     }
 
@@ -224,7 +245,7 @@ export function LeadsViewStateProvider({ children }: { children: React.ReactNode
     if (legacyView && ['pipeline', 'card', 'grid', 'list'].includes(legacyView)) {
       payload.view = legacyView as LeadsPrimaryView;
     }
-    if (legacyTheme) payload.theme = legacyTheme;
+    if (legacyTheme) payload.theme = normalizeTheme(legacyTheme);
     payload.hydrationSource = legacyView || legacyTheme ? 'legacy' : 'default';
     dispatch({ type: 'hydrate', payload });
   }, []);

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { sanitizePayload } from './sanitizer';
+import { sanitizeBrandingCss, sanitizePayload, sanitizeRichTextHtml, stripHtmlTags } from './sanitizer';
 
 describe('sanitizePayload', () => {
   it('should return simple objects unchanged', () => {
@@ -175,5 +175,43 @@ describe('sanitizePayload', () => {
     expect(output.cargo.items[0].ref.self).toBeUndefined();
     expect(output.cargo.inputRef).toBeUndefined();
     expect(output.cargo.component).toBeUndefined();
+  });
+});
+
+describe('sanitizeRichTextHtml', () => {
+  it('removes disallowed tags and event handlers', () => {
+    const input = '<p onclick="alert(1)">Safe</p><script>alert(2)</script><img src=x onerror=alert(3) />';
+    const output = sanitizeRichTextHtml(input);
+    expect(output).toBe('<p>Safe</p>');
+  });
+
+  it('keeps valid anchor hrefs and removes javascript href', () => {
+    const safe = sanitizeRichTextHtml('<a href="https://example.com">Link</a>');
+    const unsafe = sanitizeRichTextHtml('<a href="javascript:alert(1)">Bad</a>');
+    expect(safe).toBe('<a href="https://example.com">Link</a>');
+    expect(unsafe).toBe('<a>Bad</a>');
+  });
+});
+
+describe('stripHtmlTags', () => {
+  it('returns visible text content only', () => {
+    const output = stripHtmlTags('<p>Hello <strong>World</strong>&nbsp;</p>');
+    expect(output).toBe('Hello World');
+  });
+});
+
+describe('sanitizeBrandingCss', () => {
+  it('removes import, javascript urls, and expression payloads', () => {
+    const input = `
+      @import url("https://evil.test/x.css");
+      .x { background-image: url("javascript:alert(1)"); color: red; }
+      .y { width: expression(alert(2)); behavior: url(#default#time2); }
+    `;
+    const output = sanitizeBrandingCss(input);
+    expect(output).not.toContain('@import');
+    expect(output).not.toContain('javascript:');
+    expect(output).not.toContain('expression(');
+    expect(output).not.toContain('behavior:');
+    expect(output).toContain('color: red');
   });
 });

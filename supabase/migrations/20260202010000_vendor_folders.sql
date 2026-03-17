@@ -2,7 +2,6 @@
 -- Description: Creates vendor_folders table and updates documents/contracts to link to it
 
 BEGIN;
-
 -- 1. Create vendor_folders table
 CREATE TABLE IF NOT EXISTS public.vendor_folders (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -17,21 +16,17 @@ CREATE TABLE IF NOT EXISTS public.vendor_folders (
     -- Ensure unique folder names per parent (or root) per vendor
     UNIQUE(vendor_id, parent_id, name)
 );
-
 -- 2. Add folder_id to vendor_documents and vendor_contracts
 ALTER TABLE public.vendor_documents 
 ADD COLUMN IF NOT EXISTS folder_id UUID REFERENCES public.vendor_folders(id) ON DELETE SET NULL;
-
 -- 3. Enable RLS
 ALTER TABLE public.vendor_folders ENABLE ROW LEVEL SECURITY;
-
 -- 4. RLS Policies
 -- Platform Admin: Full Access
 DROP POLICY IF EXISTS "Platform Admin Full Access Folders" ON public.vendor_folders;
 CREATE POLICY "Platform Admin Full Access Folders" ON public.vendor_folders
     FOR ALL
     USING (public.is_platform_admin(auth.uid()));
-
 -- Tenant Access: View/Edit based on tenant
 DROP POLICY IF EXISTS "Tenant Access Folders" ON public.vendor_folders;
 CREATE POLICY "Tenant Access Folders" ON public.vendor_folders
@@ -46,7 +41,6 @@ CREATE POLICY "Tenant Access Folders" ON public.vendor_folders
             )
         )
     );
-
 -- 5. Helper Function to create default folders
 CREATE OR REPLACE FUNCTION public.create_default_vendor_folders()
 RETURNS TRIGGER
@@ -63,19 +57,16 @@ BEGIN
     RETURN NEW;
 END;
 $$;
-
 -- Trigger to create default folders on vendor creation
 DROP TRIGGER IF EXISTS trigger_create_default_vendor_folders ON public.vendors;
 CREATE TRIGGER trigger_create_default_vendor_folders
 AFTER INSERT ON public.vendors
 FOR EACH ROW
 EXECUTE FUNCTION public.create_default_vendor_folders();
-
 -- 6. Backfill existing folders (Optional/Best Effort)
 -- Create folders for existing vendors if they don't have any
 INSERT INTO public.vendor_folders (vendor_id, name, permissions)
 SELECT id, 'General', '{"read": ["*"], "write": ["*"]}'::jsonb
 FROM public.vendors v
 WHERE NOT EXISTS (SELECT 1 FROM public.vendor_folders vf WHERE vf.vendor_id = v.id);
-
 COMMIT;

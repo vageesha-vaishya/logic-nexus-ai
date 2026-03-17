@@ -63,7 +63,6 @@ BEGIN
     ALTER TABLE public.carrier_rates ADD COLUMN status TEXT DEFAULT 'active';
   END IF;
 END $$;
-
 -- Create carrier_rate_charges table for detailed charge breakdown
 CREATE TABLE IF NOT EXISTS public.carrier_rate_charges (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -78,26 +77,21 @@ CREATE TABLE IF NOT EXISTS public.carrier_rate_charges (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
-
 -- Enable RLS on carrier_rate_charges
 ALTER TABLE public.carrier_rate_charges ENABLE ROW LEVEL SECURITY;
-
 -- RLS Policies for carrier_rate_charges
 CREATE POLICY "Platform admins can manage all carrier rate charges"
   ON public.carrier_rate_charges FOR ALL
   USING (is_platform_admin(auth.uid()));
-
 CREATE POLICY "Tenant admins can manage carrier rate charges"
   ON public.carrier_rate_charges FOR ALL
   USING (
     has_role(auth.uid(), 'tenant_admin'::app_role) 
     AND tenant_id = get_user_tenant_id(auth.uid())
   );
-
 CREATE POLICY "Users can view tenant carrier rate charges"
   ON public.carrier_rate_charges FOR SELECT
   USING (tenant_id = get_user_tenant_id(auth.uid()));
-
 -- Add foreign key constraints if they don't exist
 DO $$
 BEGIN
@@ -121,7 +115,6 @@ BEGIN
     FOREIGN KEY (carrier_rate_id) REFERENCES public.carrier_rates(id) ON DELETE CASCADE;
   END IF;
 END $$;
-
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_carrier_rates_carrier_id ON public.carrier_rates(carrier_id);
 CREATE INDEX IF NOT EXISTS idx_carrier_rates_origin_port ON public.carrier_rates(origin_port_id);

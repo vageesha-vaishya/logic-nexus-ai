@@ -1,5 +1,4 @@
 BEGIN;
-
 CREATE OR REPLACE FUNCTION public.create_invoice_from_shipment(
   p_shipment_id UUID,
   p_tenant_id UUID
@@ -78,27 +77,6 @@ BEGIN
     auth.uid()
   )
   RETURNING id INTO v_invoice_id;
-
-  -- 4.1 Add Freight Charges (if available)
-  IF v_shipment.total_charges > 0 THEN
-     INSERT INTO public.invoice_line_items (
-       invoice_id,
-       tenant_id,
-       description,
-       quantity,
-       unit_price,
-       type,
-       metadata
-     ) VALUES (
-       v_invoice_id,
-       p_tenant_id,
-       'Freight Charges',
-       1,
-       v_shipment.total_charges,
-       'service',
-       jsonb_build_object('source', 'shipment_total')
-     );
-  END IF;
 
   -- 5. Calculate Duties & Taxes (Landed Cost Engine)
   
@@ -212,5 +190,4 @@ BEGIN
   RETURN v_invoice_id;
 END;
 $$ LANGUAGE plpgsql;
-
 COMMIT;

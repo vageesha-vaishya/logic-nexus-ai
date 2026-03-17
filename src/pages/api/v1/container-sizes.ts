@@ -1,7 +1,7 @@
 import type { ApiRequest, ApiResponse } from '../_utils/types';
 import { getSupabaseAdminClient } from '../_utils/supabaseAdmin';
 import { ContainerMetadataApiService } from '@/services/logistics/ContainerMetadataApiService';
-import { applyCors, authenticateRequest, buildApiContext, enforceHttps, enforceRateLimit, enforceRoles, handlePreflight, logApiEvent, sanitizeQueryId } from '../_utils/http';
+import { applyCors, authenticateRequest, buildApiContext, enforceHttps, enforceRateLimit, enforceRoles, handlePreflight, logApiEvent, resolveAndApplyAccessContext, sanitizeQueryId } from '../_utils/http';
 import { sendErrorResponse } from '../_utils/errorHandler';
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {
@@ -22,6 +22,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     const auth = await authenticateRequest(req);
     ctx.userId = auth.userId;
     ctx.role = auth.role;
+    await resolveAndApplyAccessContext(req, ctx);
     enforceRoles(auth.role, ['admin', 'operations', 'sales', 'developer', 'user']);
 
     const typeId = sanitizeQueryId(req.query.typeId, 'typeId');

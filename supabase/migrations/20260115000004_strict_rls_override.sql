@@ -10,20 +10,16 @@ CREATE TABLE IF NOT EXISTS public.admin_override_audit (
     enabled BOOLEAN,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
-
 -- Enable RLS on audit table
 ALTER TABLE public.admin_override_audit ENABLE ROW LEVEL SECURITY;
-
 -- Audit Policies
 DROP POLICY IF EXISTS "Users view own admin override audit" ON public.admin_override_audit;
 CREATE POLICY "Users view own admin override audit" ON public.admin_override_audit FOR SELECT USING (user_id = auth.uid());
-
 DROP POLICY IF EXISTS "Platform admins manage admin override audit" ON public.admin_override_audit;
 CREATE POLICY "Platform admins manage admin override audit" ON public.admin_override_audit FOR ALL 
 USING (
     EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'platform_admin')
 );
-
 -- 2. Update is_platform_admin to return FALSE if override is enabled
 CREATE OR REPLACE FUNCTION public.is_platform_admin(check_user_id UUID)
 RETURNS BOOLEAN
@@ -41,7 +37,6 @@ AS $$
     WHERE user_id = check_user_id AND admin_override_enabled = true
   );
 $$;
-
 -- 3. Update has_role to masquerade as tenant/franchise admin if override is enabled
 CREATE OR REPLACE FUNCTION public.has_role(check_user_id UUID, check_role app_role)
 RETURNS BOOLEAN
@@ -90,7 +85,6 @@ BEGIN
   );
 END;
 $$;
-
 -- 8. Fix Profiles RLS Policy to use helper functions (avoid direct join bypass)
 DROP POLICY IF EXISTS "Admins can view all profiles in their scope" ON public.profiles;
 CREATE POLICY "Admins can view all profiles in their scope"
@@ -106,7 +100,6 @@ CREATE POLICY "Admins can view all profiles in their scope"
       WHERE ur.user_id = public.profiles.id AND ur.franchise_id = public.get_user_franchise_id(auth.uid())
     ))
   );
-
 DROP POLICY IF EXISTS "Admins can update profiles in their scope" ON public.profiles;
 CREATE POLICY "Admins can update profiles in their scope"
   ON public.profiles FOR UPDATE
@@ -121,7 +114,6 @@ CREATE POLICY "Admins can update profiles in their scope"
       WHERE ur.user_id = public.profiles.id AND ur.franchise_id = public.get_user_franchise_id(auth.uid())
     ))
   );
-
 -- 4. Update get_user_tenant_id to return override tenant
 CREATE OR REPLACE FUNCTION public.get_user_tenant_id(check_user_id UUID)
 RETURNS UUID
@@ -169,7 +161,6 @@ BEGIN
   RETURN v_role_tenant_id;
 END;
 $$;
-
 -- 5. Update get_user_franchise_id to return override franchise
 CREATE OR REPLACE FUNCTION public.get_user_franchise_id(check_user_id UUID)
 RETURNS UUID
@@ -211,7 +202,6 @@ BEGIN
   RETURN v_role_franchise_id;
 END;
 $$;
-
 -- 6. Update set_admin_override to log audit
 CREATE OR REPLACE FUNCTION public.set_admin_override(
     p_enabled BOOLEAN,
@@ -251,12 +241,11 @@ BEGIN
     VALUES (auth.uid(), p_tenant_id, p_franchise_id, p_enabled);
 END;
 $$;
-
 -- 7. Update set_user_scope_preference to log audit for platform admins
 CREATE OR REPLACE FUNCTION public.set_user_scope_preference(
-    p_tenant_id UUID DEFAULT NULL,
-    p_franchise_id UUID DEFAULT NULL,
-    p_admin_override BOOLEAN DEFAULT false
+    p_tenant_id UUID,
+    p_franchise_id UUID,
+    p_admin_override BOOLEAN
 )
 RETURNS VOID
 LANGUAGE plpgsql

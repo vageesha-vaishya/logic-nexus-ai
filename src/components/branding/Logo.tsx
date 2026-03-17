@@ -1,31 +1,39 @@
 import React from 'react';
 import logoImage from '@/assets/sos-logistics-logo-3d.png';
+import { cn } from '@/lib/utils';
+import { useTenantBranding } from '@/contexts/TenantBrandingContext';
 
 type LogoProps = {
   showWordmark?: boolean;
   size?: number;
   className?: string;
   wordmarkClassName?: string;
+  imageClassName?: string;
 };
 
 export const Logo: React.FC<LogoProps> = ({ 
   showWordmark = false, 
   size = 40, 
   className, 
-  wordmarkClassName 
+  wordmarkClassName,
+  imageClassName,
 }) => {
+  const { branding } = useTenantBranding();
+  const src = branding?.logoUrl || logoImage;
+  const title = branding?.companyName || 'SOS Logistic Pro';
+
   return (
-    <div className={`flex items-center gap-3 ${className || ''}`}>
+    <div className={cn('flex items-center gap-3', className)}>
       <img 
-        src={logoImage}
-        alt="SOS Logistic Pro Logo"
-        className="object-contain"
+        src={src}
+        alt={`${title} Logo`}
+        className={cn('aspect-square object-contain transition-[width,height] duration-300 ease-out', imageClassName)}
         style={{ width: size, height: size }}
       />
 
       {showWordmark && (
         <div className={wordmarkClassName || 'leading-tight'}>
-          <div className="font-semibold text-foreground">SOS Logistic Pro</div>
+          <div className="font-semibold text-foreground">{title}</div>
           <div className="text-xs text-muted-foreground">Enterprise</div>
         </div>
       )}

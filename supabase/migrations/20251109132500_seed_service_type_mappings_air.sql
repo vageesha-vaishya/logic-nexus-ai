@@ -1,5 +1,5 @@
 -- Seed default service type mappings for tenant 9e2686ba
--- Air → International Air, Express
+-- Air ÔåÆ International Air, Express
 
 DO $$
 DECLARE

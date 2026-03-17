@@ -2,10 +2,8 @@
 ALTER TABLE public.custom_role_permissions 
 ADD COLUMN IF NOT EXISTS access_type TEXT NOT NULL DEFAULT 'grant' 
 CHECK (access_type IN ('grant', 'deny'));
-
 -- Drop and recreate the function with new return type
 DROP FUNCTION IF EXISTS public.get_user_custom_permissions(UUID);
-
 CREATE OR REPLACE FUNCTION public.get_user_custom_permissions(check_user_id UUID)
 RETURNS TABLE(permission_key TEXT, access_type TEXT)
 LANGUAGE SQL

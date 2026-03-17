@@ -11,7 +11,6 @@ INSERT INTO public.service_types (name, description, is_active) VALUES
 ('Moving Services', 'Residential and commercial moving', true),
 ('Trucking', 'Ground transportation by truck', true)
 ON CONFLICT (name) DO NOTHING;
-
 -- Seed services with different modes and types
 DO $$
 DECLARE

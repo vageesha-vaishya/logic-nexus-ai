@@ -8,7 +8,6 @@ BEGIN
   -- The project already defines these in prior migrations.
   NULL;
 END $$;
-
 CREATE OR REPLACE FUNCTION public.execute_insert_batch(statements text[])
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -66,7 +65,6 @@ BEGIN
   );
 END;
 $$;
-
 -- Grant execute to authenticated users; function enforces role checks internally
 DO $$
 BEGIN
@@ -76,5 +74,4 @@ BEGIN
     NULL;
   END IF;
 END $$;
-
 GRANT EXECUTE ON FUNCTION public.execute_insert_batch(text[]) TO authenticated;

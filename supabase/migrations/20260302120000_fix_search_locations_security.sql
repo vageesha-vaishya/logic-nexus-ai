@@ -1,5 +1,4 @@
 DROP FUNCTION IF EXISTS public.search_locations(text, integer);
-
 CREATE OR REPLACE FUNCTION public.search_locations(search_text text, limit_count integer DEFAULT 10)
  RETURNS TABLE(id uuid, location_name text, location_code text, location_type text, country text, city text, rank real)
  LANGUAGE plpgsql

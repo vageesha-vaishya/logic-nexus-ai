@@ -20,7 +20,6 @@ BEGIN
     END LOOP;
   END IF;
 END $$;
-
 DO $$
 DECLARE lbl text;
 BEGIN
@@ -40,7 +39,6 @@ BEGIN
     END LOOP;
   END IF;
 END $$;
-
 DO $$
 DECLARE lbl text;
 BEGIN
@@ -60,7 +58,6 @@ BEGIN
     END LOOP;
   END IF;
 END $$;
-
 DO $$
 DECLARE lbl text;
 BEGIN
@@ -80,7 +77,6 @@ BEGIN
     END LOOP;
   END IF;
 END $$;
-
 -- 1. Subscription Plans Table
 CREATE TABLE public.subscription_plans (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -102,7 +98,6 @@ CREATE TABLE public.subscription_plans (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
-
 -- 2. Tenant Subscriptions Table
 CREATE TABLE public.tenant_subscriptions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -122,7 +117,6 @@ CREATE TABLE public.tenant_subscriptions (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
   UNIQUE(tenant_id, plan_id, status)
 );
-
 -- 3. Usage Records Table
 CREATE TABLE public.usage_records (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -137,7 +131,6 @@ CREATE TABLE public.usage_records (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
-
 -- 4. Subscription Invoices Table
 CREATE TABLE public.subscription_invoices (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -157,7 +150,6 @@ CREATE TABLE public.subscription_invoices (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
-
 -- 5. Subscription Features Table
 CREATE TABLE public.subscription_features (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -169,14 +161,12 @@ CREATE TABLE public.subscription_features (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
-
 -- 6. Update Tenants Table with Stripe fields
 ALTER TABLE public.tenants 
   ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT UNIQUE,
   ADD COLUMN IF NOT EXISTS billing_email TEXT,
   ADD COLUMN IF NOT EXISTS payment_method JSONB DEFAULT '{}'::jsonb,
   ADD COLUMN IF NOT EXISTS billing_address JSONB DEFAULT '{}'::jsonb;
-
 -- Create indexes for performance
 CREATE INDEX idx_tenant_subscriptions_tenant ON public.tenant_subscriptions(tenant_id);
 CREATE INDEX idx_tenant_subscriptions_status ON public.tenant_subscriptions(status);
@@ -185,7 +175,6 @@ CREATE INDEX idx_usage_records_tenant_feature ON public.usage_records(tenant_id,
 CREATE INDEX idx_usage_records_period ON public.usage_records(period_start, period_end);
 CREATE INDEX idx_subscription_invoices_tenant ON public.subscription_invoices(tenant_id);
 CREATE INDEX idx_subscription_invoices_stripe ON public.subscription_invoices(stripe_invoice_id);
-
 -- Create helper function: Check if tenant has a specific feature
 CREATE OR REPLACE FUNCTION public.tenant_has_feature(
   _tenant_id UUID,
@@ -210,7 +199,6 @@ AS $$
       )
   );
 $$;
-
 -- Create helper function: Check usage limit for a feature
 CREATE OR REPLACE FUNCTION public.check_usage_limit(
   _tenant_id UUID,
@@ -251,7 +239,6 @@ BEGIN
   RETURN current_usage < usage_limit;
 END;
 $$;
-
 -- Create helper function: Increment feature usage
 CREATE OR REPLACE FUNCTION public.increment_feature_usage(
   _tenant_id UUID,
@@ -284,7 +271,6 @@ BEGIN
     updated_at = now();
 END;
 $$;
-
 -- Create helper function: Get tenant's current plan tier
 CREATE OR REPLACE FUNCTION public.get_tenant_plan_tier(
   _tenant_id UUID
@@ -304,31 +290,26 @@ AS $$
   ORDER BY ts.current_period_end DESC
   LIMIT 1;
 $$;
-
 -- Enable RLS on all subscription tables
 ALTER TABLE public.subscription_plans ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tenant_subscriptions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.usage_records ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.subscription_invoices ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.subscription_features ENABLE ROW LEVEL SECURITY;
-
 -- RLS Policies for subscription_plans (Public read for active plans)
 CREATE POLICY "Anyone can view active subscription plans"
   ON public.subscription_plans
   FOR SELECT
   USING (is_active = true);
-
 CREATE POLICY "Platform admins can manage subscription plans"
   ON public.subscription_plans
   FOR ALL
   USING (public.is_platform_admin(auth.uid()));
-
 -- RLS Policies for tenant_subscriptions
 CREATE POLICY "Platform admins can manage all subscriptions"
   ON public.tenant_subscriptions
   FOR ALL
   USING (public.is_platform_admin(auth.uid()));
-
 CREATE POLICY "Tenant admins can view own subscriptions"
   ON public.tenant_subscriptions
   FOR SELECT
@@ -336,7 +317,6 @@ CREATE POLICY "Tenant admins can view own subscriptions"
     public.has_role(auth.uid(), 'tenant_admin'::app_role) 
     AND tenant_id = public.get_user_tenant_id(auth.uid())
   );
-
 CREATE POLICY "Tenant admins can update own subscriptions"
   ON public.tenant_subscriptions
   FOR UPDATE
@@ -344,13 +324,11 @@ CREATE POLICY "Tenant admins can update own subscriptions"
     public.has_role(auth.uid(), 'tenant_admin'::app_role) 
     AND tenant_id = public.get_user_tenant_id(auth.uid())
   );
-
 -- RLS Policies for usage_records
 CREATE POLICY "Platform admins can manage all usage records"
   ON public.usage_records
   FOR ALL
   USING (public.is_platform_admin(auth.uid()));
-
 CREATE POLICY "Tenant admins can view own usage records"
   ON public.usage_records
   FOR SELECT
@@ -358,13 +336,11 @@ CREATE POLICY "Tenant admins can view own usage records"
     public.has_role(auth.uid(), 'tenant_admin'::app_role) 
     AND tenant_id = public.get_user_tenant_id(auth.uid())
   );
-
 -- RLS Policies for subscription_invoices
 CREATE POLICY "Platform admins can manage all invoices"
   ON public.subscription_invoices
   FOR ALL
   USING (public.is_platform_admin(auth.uid()));
-
 CREATE POLICY "Tenant admins can view own invoices"
   ON public.subscription_invoices
   FOR SELECT
@@ -372,39 +348,32 @@ CREATE POLICY "Tenant admins can view own invoices"
     public.has_role(auth.uid(), 'tenant_admin'::app_role) 
     AND tenant_id = public.get_user_tenant_id(auth.uid())
   );
-
 -- RLS Policies for subscription_features (Public read)
 CREATE POLICY "Anyone can view subscription features"
   ON public.subscription_features
   FOR SELECT
   USING (true);
-
 CREATE POLICY "Platform admins can manage subscription features"
   ON public.subscription_features
   FOR ALL
   USING (public.is_platform_admin(auth.uid()));
-
 -- Add updated_at trigger for all subscription tables
 CREATE TRIGGER update_subscription_plans_updated_at
   BEFORE UPDATE ON public.subscription_plans
   FOR EACH ROW
   EXECUTE FUNCTION public.update_updated_at_column();
-
 CREATE TRIGGER update_tenant_subscriptions_updated_at
   BEFORE UPDATE ON public.tenant_subscriptions
   FOR EACH ROW
   EXECUTE FUNCTION public.update_updated_at_column();
-
 CREATE TRIGGER update_usage_records_updated_at
   BEFORE UPDATE ON public.usage_records
   FOR EACH ROW
   EXECUTE FUNCTION public.update_updated_at_column();
-
 CREATE TRIGGER update_subscription_invoices_updated_at
   BEFORE UPDATE ON public.subscription_invoices
   FOR EACH ROW
   EXECUTE FUNCTION public.update_updated_at_column();
-
 CREATE TRIGGER update_subscription_features_updated_at
   BEFORE UPDATE ON public.subscription_features
   FOR EACH ROW

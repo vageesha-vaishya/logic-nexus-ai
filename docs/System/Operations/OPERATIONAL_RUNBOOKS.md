@@ -81,3 +81,40 @@ If a critical bug is found in the Dashboard (e.g., white screen of death):
 **Future State (Phase 2):**
 -   Integrate Sentry for frontend error tracking.
 -   Set up Supabase database alerts for slow queries (>500ms).
+
+## 5. Security Incident Playbook: Domain Access and Admin Override
+
+### Incident Summary
+-   **Issue A:** Domain loading failures for tenant-scoped users due to missing assignment fallbacks and opaque client errors.
+-   **Issue B:** Cross-tenant access risk from trusted tenant headers and non-strict override scope handling.
+
+### Remediation Implemented
+1.  **Server-side scope authority**
+    -   API context now resolves tenant and franchise from authenticated role/profile data.
+    -   Incoming tenant and franchise headers are validated and blocked when mismatched.
+2.  **Override guard hardening**
+    -   Non-platform users are blocked from any cross-tenant or cross-franchise scope requests.
+    -   Platform admin override sessions are constrained to resolved ownership scope.
+3.  **Scoped write protection**
+    -   Tenant and franchise identifiers in scoped writes are enforced from access context.
+    -   Client-provided tenant/franchise payload spoofing is overwritten in scoped mode.
+4.  **Domain diagnostics improvements**
+    -   Domain API and client service now emit structured telemetry with correlation IDs.
+    -   Client surfaces correlation references in error messages for faster triage.
+
+### Validation Matrix
+-   Unit tests cover:
+    -   Header spoofing rejection for tenant scope.
+    -   Platform override franchise mismatch rejection.
+    -   Domain access fallback behavior for assignment table absence.
+    -   Scoped write overwrite behavior for forged tenant/franchise payloads.
+-   Quality gates:
+    -   `npm run lint`
+    -   `npm run typecheck`
+    -   Targeted Vitest suites for domain access and scoped data access.
+
+### Ongoing Monitoring Protocol
+1.  Track `correlationId` from client error to API logs for all domain-load incidents.
+2.  Alert on repeated `Forbidden` responses with tenant/franchise mismatch metadata.
+3.  Review admin override audit and role assignments weekly for unexpected scope changes.
+4.  Include cross-tenant spoofing regression tests in every release gate.

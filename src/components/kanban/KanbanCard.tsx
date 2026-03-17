@@ -16,6 +16,7 @@ export interface KanbanItem {
   subtitle?: string;
   status: string;
   priority?: "low" | "medium" | "high" | "critical";
+  probability?: number;
   value?: number;
   currency?: string;
   assignee?: {
@@ -35,9 +36,10 @@ interface KanbanCardProps {
   isOverlay?: boolean;
   onUpdate?: (id: string, updates: Partial<KanbanItem>) => Promise<void>;
   onView?: (id: string) => void;
+  themeVariant?: "default" | "reference";
 }
 
-export const KanbanCard = memo(function KanbanCard({ item, isOverlay, onUpdate, onView }: KanbanCardProps) {
+export const KanbanCard = memo(function KanbanCard({ item, isOverlay, onUpdate, onView, themeVariant = "default" }: KanbanCardProps) {
   const {
     setNodeRef,
     attributes,
@@ -69,10 +71,10 @@ export const KanbanCard = memo(function KanbanCard({ item, isOverlay, onUpdate, 
   };
 
   const priorityBorderColors = {
-    low: "border-l-slate-400",
-    medium: "border-l-blue-400",
-    high: "border-l-amber-500",
-    critical: "border-l-red-600",
+    low: themeVariant === "reference" ? "border-l-blue-200" : "border-l-slate-400",
+    medium: themeVariant === "reference" ? "border-l-blue-400" : "border-l-blue-400",
+    high: themeVariant === "reference" ? "border-l-amber-500" : "border-l-amber-500",
+    critical: themeVariant === "reference" ? "border-l-red-500" : "border-l-red-600",
   };
 
   if (isDragging) {
@@ -80,7 +82,7 @@ export const KanbanCard = memo(function KanbanCard({ item, isOverlay, onUpdate, 
       <div
         ref={setNodeRef}
         style={style}
-        className="opacity-40 bg-muted/50 h-[120px] rounded-lg border-2 border-dashed border-primary/20"
+        className={cn("opacity-40 h-[120px] rounded-lg border-2 border-dashed", themeVariant === "reference" ? "bg-white border-[#d8dee8]" : "bg-muted/50 border-primary/20")}
       />
     );
   }
@@ -107,20 +109,20 @@ export const KanbanCard = memo(function KanbanCard({ item, isOverlay, onUpdate, 
     >
       <Card 
         className={cn(
-          "relative overflow-hidden transition-all duration-200 border-l-4 hover:shadow-md",
+          "relative overflow-hidden transition-all duration-300 ease-in-out border-l-4 transform-gpu",
           priorityBorderColors[item.priority || "low"],
-          isOverlay ? "shadow-xl ring-2 ring-primary/20" : "shadow-sm"
+          themeVariant === "reference" ? "border border-[#e7ebf2] bg-white hover:shadow-sm hover:-translate-y-0.5 hover:scale-[1.02] active:scale-[0.995]" : "hover:shadow-md hover:-translate-y-0.5 active:scale-[0.995]",
+          isOverlay ? "shadow-xl ring-2 ring-primary/20" : themeVariant === "reference" ? "shadow-none" : "shadow-sm"
         )}
       >
         <CardHeader className="p-2.5 space-y-1.5">
-            {/* Header: Badges & Title */}
             <div className="flex justify-between items-start gap-2">
               <div className="space-y-1 flex-1">
                 <div className="flex items-center gap-2">
                    <Badge 
                     variant="outline" 
                     className={cn(
-                      "text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0 h-5 border-0", 
+                      "text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0 h-5 border-0 transition-all duration-300 ease-in-out group-hover:scale-105 group-hover:-translate-y-px group-active:scale-95", 
                       priorityColors[item.priority || "low"]
                     )}
                   >
@@ -132,7 +134,6 @@ export const KanbanCard = memo(function KanbanCard({ item, isOverlay, onUpdate, 
                     </span>
                   )}
                 </div>
-                {/* Editable Title */}
                 <div className="font-semibold text-sm leading-tight text-card-foreground line-clamp-2" onPointerDown={(e) => e.stopPropagation()}>
                    <EditableText 
                       value={item.title} 
@@ -158,15 +159,13 @@ export const KanbanCard = memo(function KanbanCard({ item, isOverlay, onUpdate, 
               )}
             </div>
 
-            {/* Subtitle / Company */}
             {item.subtitle && (
               <p className="text-xs text-muted-foreground truncate">
                 {item.subtitle}
               </p>
             )}
 
-            {/* Footer: Value & Assignees */}
-            <div className="flex items-center justify-between pt-1.5 mt-1 border-t border-border/40">
+            <div className={cn("flex items-center justify-between pt-1.5 mt-1 border-t", themeVariant === "reference" ? "border-[#edf1f7]" : "border-border/40")}>
               <div className="font-medium text-xs tabular-nums" onPointerDown={(e) => e.stopPropagation()}>
                  <EditableText 
                     value={item.value || 0} 
@@ -177,7 +176,6 @@ export const KanbanCard = memo(function KanbanCard({ item, isOverlay, onUpdate, 
                   />
               </div>
 
-              {/* Avatar Group */}
               <div className="flex items-center -space-x-1.5">
                 {assignees.slice(0, 3).map((u, i) => (
                   <Avatar key={i} className="h-5 w-5 border-2 border-background ring-1 ring-border/10">

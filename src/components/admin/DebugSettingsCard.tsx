@@ -11,6 +11,7 @@ export function DebugSettingsCard() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [localDebugEnabled, setLocalDebugEnabled] = useState(false);
+  const [headerDebugEnabled, setHeaderDebugEnabled] = useState(false);
 
   // Sync local state with user metadata, but only when not loading to prevent flickering
   useEffect(() => {
@@ -18,6 +19,20 @@ export function DebugSettingsCard() {
       setLocalDebugEnabled(!!user.user_metadata?.debug_mode_enabled);
     }
   }, [user?.user_metadata?.debug_mode_enabled, isLoading, user]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadHeaderDebugFlag = async () => {
+      const { data, error } = await supabase.rpc('get_platform_debug_button_enabled');
+      if (cancelled) return;
+      if (error) return;
+      setHeaderDebugEnabled(!!data);
+    };
+    loadHeaderDebugFlag();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Only Platform Admins can see this
   if (!isPlatformAdmin()) {
@@ -79,6 +94,33 @@ export function DebugSettingsCard() {
     }
   };
 
+  const toggleHeaderDebugButton = async (enabled: boolean) => {
+    setHeaderDebugEnabled(enabled);
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.rpc('set_platform_debug_button_enabled', {
+        p_enabled: enabled,
+        p_reason: 'Updated from System Debug Mode card',
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: enabled ? 'Header Debug Button Enabled' : 'Header Debug Button Disabled',
+        description: enabled ? 'Platform admins can access the Banner Header debug button.' : 'Banner Header debug button is hidden from all interfaces.',
+      });
+    } catch (error: any) {
+      setHeaderDebugEnabled(!enabled);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to update header debug button setting',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <Card className="border-orange-200 dark:border-orange-900 bg-orange-50/50 dark:bg-orange-900/10">
       <CardHeader>
@@ -94,7 +136,21 @@ export function DebugSettingsCard() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="flex items-center justify-between space-x-4">
+        <div className="space-y-5">
+          <div className="flex items-center justify-between space-x-4">
+            <div className="flex flex-col space-y-1">
+              <span className="text-sm font-medium leading-none">Banner Header Debug Button</span>
+              <span className="text-sm text-muted-foreground">
+                System-wide visibility for the debug button across all pages.
+              </span>
+            </div>
+            <Switch
+              checked={headerDebugEnabled}
+              onCheckedChange={toggleHeaderDebugButton}
+              disabled={isLoading}
+            />
+          </div>
+          <div className="flex items-center justify-between space-x-4">
           <div className="flex flex-col space-y-1">
             <span className="text-sm font-medium leading-none">Enable Data Inspectors</span>
             <span className="text-sm text-muted-foreground">
@@ -106,6 +162,7 @@ export function DebugSettingsCard() {
             onCheckedChange={toggleDebugMode}
             disabled={isLoading}
           />
+        </div>
         </div>
       </CardContent>
     </Card>

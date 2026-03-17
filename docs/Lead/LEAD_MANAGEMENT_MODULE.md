@@ -39,10 +39,22 @@ CREATE TABLE public.leads (
   franchise_id UUID REFERENCES public.franchises(id) ON DELETE SET NULL,
   first_name TEXT NOT NULL,
   last_name TEXT NOT NULL,
-  company TEXT,
-  title TEXT,
-  email TEXT,
-  phone TEXT,
+  company_name VARCHAR(255) NOT NULL,
+  address_line1 VARCHAR(255),
+  address_line2 VARCHAR(255),
+  city VARCHAR(120),
+  state VARCHAR(120),
+  country VARCHAR(120),
+  website VARCHAR(2048),
+  contact_name VARCHAR(255) NOT NULL,
+  title VARCHAR(120),
+  email VARCHAR(320),
+  job_position VARCHAR(120),
+  phone VARCHAR(40),
+  mobile VARCHAR(40),
+  salesperson_id UUID REFERENCES public.res_users(id) ON DELETE SET NULL,
+  sales_team VARCHAR(255) REFERENCES public.crm_team(id) ON DELETE SET NULL,
+  priority VARCHAR(20) DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high', 'urgent')),
   status public.lead_status DEFAULT 'new',
   source public.lead_source DEFAULT 'other',
   estimated_value DECIMAL(15,2),
@@ -54,12 +66,80 @@ CREATE TABLE public.leads (
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
+
+CREATE TABLE crm.tag (
+  id VARCHAR(255) PRIMARY KEY,
+  tenant_id UUID REFERENCES public.tenants(id) ON DELETE CASCADE,
+  name VARCHAR(120) NOT NULL
+);
+
+CREATE TABLE public.lead_tag_rel (
+  lead_id UUID NOT NULL REFERENCES public.leads(id) ON DELETE CASCADE,
+  tag_id VARCHAR(255) NOT NULL REFERENCES crm.tag(id) ON DELETE CASCADE,
+  PRIMARY KEY (lead_id, tag_id)
+);
 ```
 
 **Integration Points**:
 *   **`tenants`**: Strict foreign key enforcement for multi-tenancy.
-*   **`profiles`**: Links to `owner_id` for user assignment.
+*   **`res_users`**: Links to `salesperson_id` for sales ownership.
+*   **`crm_team`**: Links to `sales_team` for team assignment.
+*   **`crm.tag` + `lead_tag_rel`**: Many-to-many tagging model.
+*   **`profiles`**: Links to `owner_id` for legacy queue ownership compatibility.
 *   **`queues`**: Links to `owner_queue_id` for pool-based assignment.
+
+**Lead Entity Relationship Diagram**:
+```mermaid
+erDiagram
+  TENANTS ||--o{ LEADS : owns
+  FRANCHISES ||--o{ LEADS : scopes
+  RES_USERS ||--o{ LEADS : assigned_salesperson
+  CRM_TEAM ||--o{ LEADS : assigned_team
+  LEADS ||--o{ LEAD_TAG_REL : has
+  TAG ||--o{ LEAD_TAG_REL : classifies
+
+  LEADS {
+    uuid id PK
+    varchar company_name
+    varchar address_line1
+    varchar address_line2
+    varchar city
+    varchar state
+    varchar country
+    varchar website
+    varchar contact_name
+    varchar title
+    varchar email
+    varchar job_position
+    varchar phone
+    varchar mobile
+    uuid salesperson_id FK
+    varchar sales_team FK
+    varchar priority
+  }
+```
+
+**Lead Data Dictionary (Canonical CRM Fields)**:
+
+| Logical Field | Physical Column | Type | Nullability | Constraint / Relationship |
+| :--- | :--- | :--- | :---: | :--- |
+| Company Name | `company_name` | `VARCHAR(255)` | No | Required |
+| Street | `address_line1` | `VARCHAR(255)` | Yes | Optional |
+| Street 2 | `address_line2` | `VARCHAR(255)` | Yes | Optional |
+| City | `city` | `VARCHAR(120)` | Yes | Optional |
+| State | `state` | `VARCHAR(120)` | Yes | Optional |
+| Country | `country` | `VARCHAR(120)` | Yes | Optional |
+| Website | `website` | `VARCHAR(2048)` | Yes | URL check constraint |
+| Contact Name | `contact_name` | `VARCHAR(255)` | No | Required |
+| Title | `title` | `VARCHAR(120)` | Yes | Optional |
+| Email | `email` | `VARCHAR(320)` | Yes | RFC-5322 check constraint |
+| Job Position | `job_position` | `VARCHAR(120)` | Yes | Optional |
+| Phone | `phone` | `VARCHAR(40)` | Yes | E.164 trigger normalization + check |
+| Mobile | `mobile` | `VARCHAR(40)` | Yes | E.164 trigger normalization + check |
+| Salesperson | `salesperson_id` | `UUID` | Yes | FK → `public.res_users(id)` ON DELETE SET NULL |
+| Sales Team | `sales_team` | `VARCHAR(255)` | Yes | FK → `public.crm_team(id)` ON DELETE SET NULL |
+| Priority | `priority` | `VARCHAR(20)` | Yes | CHECK IN (`low`,`medium`,`high`,`urgent`) |
+| Tags | `lead_tag_rel` | relation | n/a | M:N `public.leads` ↔ `crm.tag` |
 
 **Data Import Order (pg_dump-based migrations)**:
 *   Parent tables must be imported before children to satisfy foreign keys.
@@ -256,3 +336,22 @@ When a lead is marked `converted`:
 *   **Lead**: Unqualified prospect.
 *   **Activity**: Interaction event.
 *   **Queue**: Container for unassigned leads.
+
+---
+
+## Pipeline Status Filter Behavior (2026-03)
+
+### User-Facing Changes
+*   Status filtering in Pipeline now controls both lead cards and visible status columns.
+*   Selecting statuses shows only matching columns in canonical order:
+    `new -> contacted -> qualified -> proposal -> negotiation -> won -> lost -> converted`.
+*   Clearing status selection restores all status columns.
+*   The filter toolbar now includes explicit **Select All** and **Select None** actions.
+*   A visible status indicator row shows exactly which columns are currently displayed.
+*   Empty results are now explicit:
+    *   If no columns are selected: "No status columns selected".
+    *   If columns exist but no leads match: "No leads match the current filters".
+
+### Session Persistence
+*   Pipeline filter state (`q`, `status`, `view`) persists in browser storage and is restored on reload when URL params are absent.
+*   URL query parameters remain the source of truth when present.

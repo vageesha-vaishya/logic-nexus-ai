@@ -8,7 +8,6 @@ BEGIN
         CREATE TYPE quotation_version_status AS ENUM ('draft', 'active', 'archived', 'deleted');
     END IF;
 END $$;
-
 -- 2. Enhance quotation_versions table
 ALTER TABLE quotation_versions 
     ADD COLUMN IF NOT EXISTS status quotation_version_status DEFAULT 'draft',
@@ -17,7 +16,6 @@ ALTER TABLE quotation_versions
     ADD COLUMN IF NOT EXISTS locked_by UUID REFERENCES auth.users(id),
     ADD COLUMN IF NOT EXISTS parent_version_id UUID REFERENCES quotation_versions(id),
     ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'::jsonb;
-
 -- 3. Create audit log table for versions
 CREATE TABLE IF NOT EXISTS quotation_version_audit_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -27,14 +25,11 @@ CREATE TABLE IF NOT EXISTS quotation_version_audit_logs (
     details JSONB DEFAULT '{}'::jsonb,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
-
 -- 4. Create Indexes
 CREATE INDEX IF NOT EXISTS idx_quotation_versions_status ON quotation_versions(status);
 CREATE INDEX IF NOT EXISTS idx_quotation_version_audit_logs_version_id ON quotation_version_audit_logs(quotation_version_id);
-
 -- 5. Enable RLS on audit logs
 ALTER TABLE quotation_version_audit_logs ENABLE ROW LEVEL SECURITY;
-
 CREATE POLICY "Users can view audit logs for their tenant" 
 ON quotation_version_audit_logs FOR SELECT 
 USING (
@@ -45,7 +40,6 @@ USING (
         AND q.tenant_id = get_user_tenant_id(auth.uid())
     )
 );
-
 -- 6. Function to handle soft delete
 CREATE OR REPLACE FUNCTION soft_delete_quotation_version(version_id UUID, user_id UUID)
 RETURNS BOOLEAN AS $$
@@ -61,7 +55,6 @@ BEGIN
     RETURN TRUE;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
-
 -- 7. Function to purge old versions (Retention Policy)
 CREATE OR REPLACE FUNCTION purge_old_quotation_versions(retention_days INTEGER DEFAULT 90)
 RETURNS INTEGER AS $$

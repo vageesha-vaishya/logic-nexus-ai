@@ -1,13 +1,10 @@
-
 -- Update Landed Cost Engine RPC to match Frontend
 -- Date: 2026-02-06
 -- Description: Updates calculate_duty RPC to accept JSONB items and return JSONB summary.
 
 BEGIN;
-
 -- Drop old signature to avoid confusion
 DROP FUNCTION IF EXISTS public.calculate_duty(text, text, numeric);
-
 -- New signature matching CargoDetailsForm.tsx
 CREATE OR REPLACE FUNCTION public.calculate_duty(
   p_origin_country TEXT,
@@ -80,8 +77,6 @@ BEGIN
   );
 END;
 $$ LANGUAGE plpgsql;
-
 GRANT EXECUTE ON FUNCTION public.calculate_duty(TEXT, TEXT, JSONB) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.calculate_duty(TEXT, TEXT, JSONB) TO service_role;
-
 COMMIT;

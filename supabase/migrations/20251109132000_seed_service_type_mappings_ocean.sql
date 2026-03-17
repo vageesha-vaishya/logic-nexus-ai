@@ -1,5 +1,5 @@
 -- Seed default service type mappings for tenant 9e2686ba
--- Ocean → International Ocean FCL, FCL (Full Container Load), LCL (Less than Container Load)
+-- Ocean ÔåÆ International Ocean FCL, FCL (Full Container Load), LCL (Less than Container Load)
 
 DO $$
 DECLARE

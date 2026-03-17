@@ -1,5 +1,4 @@
 BEGIN;
-
 -- 1. Seed HTS Code if missing (for testing/demo)
 DO $$
 DECLARE
@@ -19,7 +18,6 @@ BEGIN
     VALUES (v_hts_id, 'US', 'MFN', 0.05, 'Seed');
   END IF;
 END $$;
-
 -- 3. Update create_invoice_from_shipment RPC to use new calculate_duty signature
 CREATE OR REPLACE FUNCTION public.create_invoice_from_shipment(
   p_shipment_id UUID,
@@ -185,5 +183,4 @@ BEGIN
   RETURN v_invoice_id;
 END;
 $$ LANGUAGE plpgsql;
-
 COMMIT;

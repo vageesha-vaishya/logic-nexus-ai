@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react';
+import type { Meta, StoryObj } from '@storybook/react-vite';
 import { InteractionTimeline, Activity } from '../../components/crm/InteractionTimeline';
 import { mockActivities } from './mock-data';
 import { SkeletonCards } from '@/components/ui/skeleton-table';

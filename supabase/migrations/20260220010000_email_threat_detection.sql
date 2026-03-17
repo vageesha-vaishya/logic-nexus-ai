@@ -7,13 +7,11 @@ DO $$ BEGIN
 EXCEPTION
     WHEN duplicate_object THEN null;
 END $$;
-
 -- 2. Add columns to emails table
 ALTER TABLE public.emails
 ADD COLUMN IF NOT EXISTS security_status public.email_security_status DEFAULT 'pending',
 ADD COLUMN IF NOT EXISTS security_metadata JSONB DEFAULT '{}'::jsonb,
 ADD COLUMN IF NOT EXISTS quarantine_reason TEXT,
 ADD COLUMN IF NOT EXISTS scanned_at TIMESTAMPTZ;
-
 -- 3. Index for security queries
 CREATE INDEX IF NOT EXISTS idx_emails_security_status ON public.emails(security_status);

@@ -1,5 +1,5 @@
-import { Home, LogOut, Loader2, Menu } from 'lucide-react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { LogOut, Loader2 } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
@@ -13,12 +13,11 @@ import {
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { CommandCenterButton } from '@/components/navigation/CommandCenterButton';
 import { CommandCenterNav } from '@/components/navigation/CommandCenterNav';
 import { motion } from 'framer-motion';
 
 export function AppSidebar() {
-  const { state, setOpen, isMobile, setOpenMobile } = useSidebar();
+  const { state, setOpen, isMobile, setOpenMobile, toggleSidebar } = useSidebar();
   const { signOut, profile } = useAuth();
   
   // Force collapsed state on initial load
@@ -30,6 +29,8 @@ export function AppSidebar() {
   // }, []);
 
   const collapsed = state === 'collapsed';
+  const expandedLogoSize = isMobile ? 42 : 44;
+  const collapsedLogoSize = isMobile ? 48 : 52;
   const location = useLocation();
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [isSigningOut, setIsSigningOut] = useState(false);
@@ -89,8 +90,6 @@ export function AppSidebar() {
 
   return (
     <>
-      <CommandCenterButton />
-      
       {/* Semi-transparent backdrop for mobile/expanded state */}
       {!collapsed && (
         <motion.div 
@@ -109,17 +108,28 @@ export function AppSidebar() {
         )} 
         collapsible="icon"
       >
-        <SidebarHeader className="h-16 flex items-center justify-between px-4 border-b">
-          {!collapsed && (
-             <div className="flex items-center gap-2">
-               <Logo size={32} showWordmark wordmarkClassName="hidden sm:block" />
-             </div>
-          )}
-          {collapsed && (
-            <div className="flex w-full justify-center">
-              <Logo size={24} />
-            </div>
-          )}
+        <SidebarHeader className="h-16 flex items-center justify-between px-3 border-b">
+          <Button
+            data-sidebar="trigger"
+            variant="ghost"
+            className={cn(
+              "h-full p-0 hover:bg-transparent",
+              collapsed ? "w-full justify-center" : "justify-start"
+            )}
+            aria-label="Toggle Sidebar"
+            onClick={toggleSidebar}
+          >
+            {!collapsed && (
+              <div className="flex items-center gap-2">
+                <Logo size={expandedLogoSize} showWordmark wordmarkClassName="hidden sm:block" />
+              </div>
+            )}
+            {collapsed && (
+              <div className="flex w-full justify-center">
+                <Logo size={collapsedLogoSize} />
+              </div>
+            )}
+          </Button>
         </SidebarHeader>
 
         <SidebarContent ref={scrollRef} className="py-2 pr-1">

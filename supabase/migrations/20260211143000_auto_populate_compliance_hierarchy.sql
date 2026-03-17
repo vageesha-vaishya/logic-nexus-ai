@@ -12,11 +12,6 @@ DECLARE
     v_tenant_id UUID;
     v_franchise_id UUID;
 BEGIN
-    -- Default performed_by to current user if not set
-    IF NEW.performed_by IS NULL THEN
-        NEW.performed_by := auth.uid();
-    END IF;
-
     -- Only populate if performed_by is set (which it should be)
     IF NEW.performed_by IS NOT NULL THEN
         -- Get tenant and franchise from user_roles
@@ -40,10 +35,8 @@ BEGIN
     RETURN NEW;
 END;
 $$;
-
 -- Trigger definition
 DROP TRIGGER IF EXISTS tr_compliance_screenings_hierarchy ON public.compliance_screenings;
-
 CREATE TRIGGER tr_compliance_screenings_hierarchy
     BEFORE INSERT ON public.compliance_screenings
     FOR EACH ROW

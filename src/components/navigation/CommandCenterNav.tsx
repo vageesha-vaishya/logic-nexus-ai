@@ -190,7 +190,7 @@ export function CommandCenterNav() {
       { title: 'Users', url: '/dashboard/users', icon: Users, roles: ['platform_admin', 'tenant_admin', 'franchise_admin'], permissions: ['admin.users.manage'] },
       { title: 'Transfer Center', url: '/dashboard/transfers', icon: ArrowRightLeft, roles: ['platform_admin'], permissions: ['transfers.view'] },
       { title: 'System Logs', url: '/dashboard/system-logs', icon: Activity, roles: ['platform_admin'] },
-      { title: 'Settings', url: '/dashboard/settings', icon: Settings, roles: ['platform_admin', 'tenant_admin', 'franchise_admin'], permissions: ['admin.settings.manage'] },
+      { title: 'Settings', url: '/dashboard/settings', icon: Settings, roles: ['platform_admin'], permissions: ['admin.settings.manage'] },
     ];
 
     return [

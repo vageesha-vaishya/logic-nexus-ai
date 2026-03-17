@@ -5,9 +5,10 @@ import { FranchiseForm } from '@/components/admin/FranchiseForm';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Store, Trash2, ArrowLeft, FileDown } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import Papa from 'papaparse';
+import { useCRM } from '@/hooks/useCRM';
+import { logger } from '@/lib/logger';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,27 +26,85 @@ export default function FranchiseDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { context, scopedDb, supabase } = useCRM();
   const [franchise, setFranchise] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchFranchise();
-  }, [id]);
+  }, [id, context.isPlatformAdmin, context.tenantId]);
 
   const fetchFranchise = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('franchises')
-        .select('*')
-        .eq('id', id)
-        .single();
+    const parsePayload = async (response: Response): Promise<{ json: any | null; text: string; isJson: boolean }> => {
+      const text = await response.text();
+      const contentType = String(response.headers.get('content-type') || '').toLowerCase();
+      const isJson = contentType.includes('application/json');
+      if (isJson) {
+        try {
+          return { json: JSON.parse(text), text, isJson: true };
+        } catch {
+          return { json: null, text, isJson: true };
+        }
+      }
+      return { json: null, text, isJson: false };
+    };
 
+    const loadScopedFranchise = async (): Promise<any | null> => {
+      let query = scopedDb.from('franchises').select('*').eq('id', id).limit(1);
+      if (!context.isPlatformAdmin && context.tenantId) {
+        query = query.eq('tenant_id', context.tenantId);
+      }
+      const { data, error } = await query.maybeSingle();
       if (error) throw error;
-      setFranchise(data);
+      return data || null;
+    };
+
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData?.session?.access_token || '';
+      const search = new URLSearchParams();
+      if (id) search.set('franchise_id', id);
+      if (!context.isPlatformAdmin && context.tenantId) {
+        search.set('tenant_id', context.tenantId);
+      }
+      const suffix = search.toString() ? `?${search.toString()}` : '';
+      const response = await fetch(`/api/v1/franchises${suffix}`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+          ...(!context.isPlatformAdmin && context.tenantId ? { 'x-tenant-id': context.tenantId } : {}),
+        },
+      });
+      const payload = await parsePayload(response);
+      if (!payload.isJson) {
+        logger.warn('Franchise detail API returned non-JSON response; falling back to scoped database query', {
+          component: 'FranchiseDetail',
+          franchiseId: id || null,
+          status: response.status,
+          preview: payload.text.slice(0, 120),
+        });
+        const fallbackRow = await loadScopedFranchise();
+        setFranchise(fallbackRow);
+        return;
+      }
+      if (!response.ok) {
+        throw new Error(payload.json?.error || 'Failed to load franchise');
+      }
+      const row = Array.isArray(payload.json?.data) ? payload.json.data[0] || null : null;
+      setFranchise(row);
     } catch (error: any) {
+      logger.error('Failed to fetch franchise detail', {
+        component: 'FranchiseDetail',
+        franchiseId: id || null,
+        tenantId: context.tenantId || null,
+        isPlatformAdmin: context.isPlatformAdmin,
+        message: error?.message || String(error),
+      });
       toast({
         title: 'Error',
-        description: error.message,
+        description: error?.message || 'Failed to load franchise',
         variant: 'destructive',
       });
     } finally {
@@ -55,7 +114,13 @@ export default function FranchiseDetail() {
 
   const handleDelete = async () => {
     try {
-      const { error } = await supabase
+      if (!id) {
+        throw new Error('Franchise scope missing');
+      }
+      if (!context.isPlatformAdmin && context.tenantId && franchise?.tenant_id !== context.tenantId) {
+        throw new Error('Forbidden');
+      }
+      const { error } = await scopedDb
         .from('franchises')
         .delete()
         .eq('id', id);

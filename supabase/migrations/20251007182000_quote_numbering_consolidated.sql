@@ -11,11 +11,9 @@ CREATE TABLE IF NOT EXISTS public.quote_number_config_tenant (
   CONSTRAINT quote_number_config_tenant_prefix_len CHECK (char_length(prefix) = 3),
   CONSTRAINT quote_number_config_tenant_reset_policy_chk CHECK (reset_policy IN ('none','daily','monthly','yearly'))
 );
-
 -- Add columns/constraints when table already exists
 ALTER TABLE IF EXISTS public.quote_number_config_tenant
   ADD COLUMN IF NOT EXISTS reset_policy text NOT NULL DEFAULT 'none';
-
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -26,7 +24,6 @@ BEGIN
       ADD CONSTRAINT quote_number_config_tenant_reset_policy_chk CHECK (reset_policy IN ('none','daily','monthly','yearly'));
   END IF;
 END $$;
-
 CREATE TABLE IF NOT EXISTS public.quote_number_config_franchise (
   tenant_id uuid NOT NULL,
   franchise_id uuid NOT NULL,
@@ -36,10 +33,8 @@ CREATE TABLE IF NOT EXISTS public.quote_number_config_franchise (
   CONSTRAINT quote_number_config_franchise_reset_policy_chk CHECK (reset_policy IN ('none','daily','monthly','yearly')),
   CONSTRAINT quote_number_config_franchise_pk PRIMARY KEY (tenant_id, franchise_id)
 );
-
 ALTER TABLE IF EXISTS public.quote_number_config_franchise
   ADD COLUMN IF NOT EXISTS reset_policy text NOT NULL DEFAULT 'none';
-
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -50,7 +45,6 @@ BEGIN
       ADD CONSTRAINT quote_number_config_franchise_reset_policy_chk CHECK (reset_policy IN ('none','daily','monthly','yearly'));
   END IF;
 END $$;
-
 -- =============================
 -- Tables: Sequences storage
 -- =============================
@@ -59,10 +53,8 @@ CREATE TABLE IF NOT EXISTS public.quote_sequences_tenant (
   seq_value bigint NOT NULL DEFAULT 0,
   last_reset_bucket text
 );
-
 ALTER TABLE IF EXISTS public.quote_sequences_tenant
   ADD COLUMN IF NOT EXISTS last_reset_bucket text;
-
 CREATE TABLE IF NOT EXISTS public.quote_sequences_franchise (
   tenant_id uuid NOT NULL,
   franchise_id uuid NOT NULL,
@@ -70,10 +62,8 @@ CREATE TABLE IF NOT EXISTS public.quote_sequences_franchise (
   last_reset_bucket text,
   CONSTRAINT quote_sequences_franchise_pk PRIMARY KEY (tenant_id, franchise_id)
 );
-
 ALTER TABLE IF EXISTS public.quote_sequences_franchise
   ADD COLUMN IF NOT EXISTS last_reset_bucket text;
-
 -- =============================
 -- Helper: Current reset bucket
 -- =============================
@@ -96,7 +86,6 @@ BEGIN
   RETURN v_bucket;
 END;
 $$;
-
 -- =============================
 -- Generator: Next quote number (increments sequence)
 -- =============================
@@ -160,7 +149,6 @@ BEGIN
   RETURN v_prefix || v_date || lpad(v_seq::text, 8, '0');
 END;
 $$;
-
 -- =============================
 -- Preview: Next quote number (does not increment)
 -- =============================
@@ -226,19 +214,16 @@ BEGIN
   RETURN v_prefix || v_date || lpad(v_next_seq::text, '0', 8);
 END;
 $$;
-
 -- =============================
 -- Grants
 -- =============================
 GRANT EXECUTE ON FUNCTION public.preview_next_quote_number(uuid, uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.generate_quote_number(uuid, uuid) TO authenticated;
-
 -- =============================
 -- RLS Policies (basic management)
 -- =============================
 ALTER TABLE public.quote_number_config_tenant ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.quote_number_config_franchise ENABLE ROW LEVEL SECURITY;
-
 -- Tenant admins can manage tenant config
 DO $$
 BEGIN
@@ -251,7 +236,6 @@ BEGIN
       WITH CHECK (tenant_id = public.get_user_tenant_id(auth.uid()));
   END IF;
 END $$;
-
 -- Franchise admins can manage franchise config; tenant admins can manage all franchise configs in their tenant
 DO $$
 BEGIN
@@ -270,5 +254,4 @@ BEGIN
       );
   END IF;
 END $$;
-
--- End of migration
+-- End of migration;

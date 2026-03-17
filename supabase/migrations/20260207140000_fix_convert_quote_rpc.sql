@@ -2,7 +2,6 @@
 -- Description: Adds logic to determine shipment_type from quote.service_type_id or service_level, defaulting to ocean_freight.
 
 BEGIN;
-
 CREATE OR REPLACE FUNCTION public.convert_quote_to_shipment(
   p_quote_id UUID,
   p_tenant_id UUID
@@ -168,5 +167,4 @@ BEGIN
   RETURN v_shipment_id;
 END;
 $$ LANGUAGE plpgsql;
-
 COMMIT;

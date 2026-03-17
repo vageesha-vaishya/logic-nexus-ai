@@ -14,7 +14,6 @@ CREATE TABLE IF NOT EXISTS public.booking_agents (
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
-
 -- 2. Create booking_executions table (Audit Log for Agents)
 CREATE TABLE IF NOT EXISTS public.booking_executions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -25,11 +24,9 @@ CREATE TABLE IF NOT EXISTS public.booking_executions (
     log JSONB DEFAULT '{}'::jsonb, -- Detailed decision log
     executed_at TIMESTAMPTZ DEFAULT NOW()
 );
-
 -- 3. Enable RLS
 ALTER TABLE public.booking_agents ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.booking_executions ENABLE ROW LEVEL SECURITY;
-
 -- 4. RLS Policies
 -- Booking Agents: Tenant isolation
 DO $$ 
@@ -43,7 +40,6 @@ BEGIN
         ));
   END IF;
 END $$;
-
 DO $$ 
 BEGIN
   IF NOT EXISTS (
@@ -55,7 +51,6 @@ BEGIN
         ));
   END IF;
 END $$;
-
 -- Booking Executions: Tenant isolation (via agent)
 DO $$ 
 BEGIN
@@ -74,13 +69,11 @@ BEGIN
         );
   END IF;
 END $$;
-
 -- 5. Trigger for updated_at
 DROP TRIGGER IF EXISTS update_booking_agents_modtime ON public.booking_agents;
 CREATE TRIGGER update_booking_agents_modtime
     BEFORE UPDATE ON public.booking_agents
     FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
-
 -- 6. Indexes
 CREATE INDEX IF NOT EXISTS idx_booking_agents_tenant ON public.booking_agents(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_booking_executions_agent ON public.booking_executions(agent_id);

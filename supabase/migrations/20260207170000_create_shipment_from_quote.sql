@@ -2,7 +2,6 @@
 -- This function converts a Quotation into a Shipment record, copying relevant details.
 
 BEGIN;
-
 CREATE OR REPLACE FUNCTION public.create_shipment_from_quote(
   p_quote_id UUID,
   p_tenant_id UUID
@@ -132,5 +131,4 @@ BEGIN
   RETURN v_shipment_id;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
-
 COMMIT;

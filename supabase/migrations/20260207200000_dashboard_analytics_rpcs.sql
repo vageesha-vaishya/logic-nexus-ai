@@ -3,7 +3,6 @@
 -- Date: 2026-02-03
 
 BEGIN;
-
 -- 1. Get Financial Metrics (Revenue vs Cost)
 CREATE OR REPLACE FUNCTION public.get_financial_metrics(period text DEFAULT '12m')
 RETURNS TABLE (
@@ -56,7 +55,6 @@ BEGIN
   ORDER BY m.month;
 END;
 $$;
-
 -- 2. Get Shipment Volume by Carrier
 CREATE OR REPLACE FUNCTION public.get_carrier_volume(period text DEFAULT '12m')
 RETURNS TABLE (
@@ -80,7 +78,6 @@ BEGIN
   LIMIT 10;
 END;
 $$;
-
 -- 3. Get Dashboard Stats (Cards)
 CREATE OR REPLACE FUNCTION public.get_dashboard_stats()
 RETURNS TABLE (
@@ -118,5 +115,4 @@ BEGIN
     ) as total_profit;
 END;
 $$;
-
 COMMIT;

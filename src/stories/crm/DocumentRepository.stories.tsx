@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react';
+import type { Meta, StoryObj } from '@storybook/react-vite';
 import { DocumentRepository, Document } from '../../components/crm/DocumentRepository';
 import { mockDocuments, mockUsers } from './mock-data';
 import { SkeletonCards } from '@/components/ui/skeleton-table';

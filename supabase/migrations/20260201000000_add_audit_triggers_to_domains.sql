@@ -2,7 +2,6 @@
 -- Depends on: 20260131235000_comprehensive_domain_seeding.sql
 
 BEGIN;
-
 -- 0. Ensure audit_row_change function exists
 CREATE OR REPLACE FUNCTION audit_row_change()
 RETURNS TRIGGER
@@ -86,29 +85,24 @@ BEGIN
   END IF;
 END;
 $$;
-
 -- 1. Platform Domains
 DROP TRIGGER IF EXISTS audit_platform_domains ON platform_domains;
 CREATE TRIGGER audit_platform_domains
 AFTER INSERT OR UPDATE OR DELETE ON platform_domains
 FOR EACH ROW EXECUTE FUNCTION audit_row_change();
-
 -- 2. Service Categories
 DROP TRIGGER IF EXISTS audit_service_categories ON service_categories;
 CREATE TRIGGER audit_service_categories
 AFTER INSERT OR UPDATE OR DELETE ON service_categories
 FOR EACH ROW EXECUTE FUNCTION audit_row_change();
-
 -- 3. Service Types
 DROP TRIGGER IF EXISTS audit_service_types ON service_types;
 CREATE TRIGGER audit_service_types
 AFTER INSERT OR UPDATE OR DELETE ON service_types
 FOR EACH ROW EXECUTE FUNCTION audit_row_change();
-
 -- 4. Service Modes
 DROP TRIGGER IF EXISTS audit_service_modes ON service_modes;
 CREATE TRIGGER audit_service_modes
 AFTER INSERT OR UPDATE OR DELETE ON service_modes
 FOR EACH ROW EXECUTE FUNCTION audit_row_change();
-
 COMMIT;

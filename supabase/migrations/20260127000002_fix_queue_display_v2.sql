@@ -18,14 +18,10 @@ CREATE TABLE IF NOT EXISTS public.queue_rules (
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now()
 );
-
 -- Index for performance
 CREATE INDEX IF NOT EXISTS idx_queue_rules_tenant_priority ON public.queue_rules(tenant_id, priority DESC);
-
 -- Enable RLS on rules
 ALTER TABLE public.queue_rules ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "Tenant admins can manage queue rules" ON public.queue_rules;
 CREATE POLICY "Tenant admins can manage queue rules" ON public.queue_rules
     FOR ALL
     USING (
@@ -36,7 +32,6 @@ CREATE POLICY "Tenant admins can manage queue rules" ON public.queue_rules
         public.has_role(auth.uid(), 'tenant_admin'::public.app_role) 
         AND tenant_id = public.get_user_tenant_id(auth.uid())
     );
-
 -- 2. Auto-Assignment Function
 CREATE OR REPLACE FUNCTION public.process_email_queue_assignment()
 RETURNS TRIGGER
@@ -92,15 +87,12 @@ BEGIN
     RETURN NEW;
 END;
 $$;
-
 -- 3. Attach Trigger to Emails
 DROP TRIGGER IF EXISTS trg_assign_email_queue ON public.emails;
 CREATE TRIGGER trg_assign_email_queue
     BEFORE INSERT ON public.emails
     FOR EACH ROW
     EXECUTE FUNCTION public.process_email_queue_assignment();
-
-
 -- 4. Robust Get Queue Counts (Updated)
 CREATE OR REPLACE FUNCTION get_queue_counts()
 RETURNS JSON
@@ -150,10 +142,8 @@ BEGIN
     RETURN COALESCE(v_result, '{}'::json);
 END;
 $$;
-
 -- 5. Strict RLS Policy for Email Queues
 DROP POLICY IF EXISTS "Users can view emails in their queues" ON public.emails;
-
 CREATE POLICY "Users can view emails in their queues"
 ON public.emails
 FOR SELECT
@@ -176,7 +166,6 @@ USING (
     )
   )
 );
-
 -- 6. Ensure Queue Members Table Exists & RLS
 CREATE TABLE IF NOT EXISTS public.queue_members (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -185,12 +174,9 @@ CREATE TABLE IF NOT EXISTS public.queue_members (
     created_at TIMESTAMPTZ DEFAULT now(),
     UNIQUE(queue_id, user_id)
 );
-
 ALTER TABLE public.queue_members ENABLE ROW LEVEL SECURITY;
-
 -- 7. Ensure Queues Table RLS (Strict Visibility)
 ALTER TABLE public.queues ENABLE ROW LEVEL SECURITY;
-
 DROP POLICY IF EXISTS "Users can view queues they are members of" ON public.queues;
 CREATE POLICY "Users can view queues they are members of"
 ON public.queues FOR SELECT
@@ -202,8 +188,6 @@ USING (
   )
   OR public.has_role(auth.uid(), 'tenant_admin'::public.app_role)
 );
-
-
 -- 8. Seed Default Queues and Rules (Idempotent)
 DO $$
 DECLARE

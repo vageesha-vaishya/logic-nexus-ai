@@ -15,7 +15,6 @@ CREATE TABLE IF NOT EXISTS quote_templates (
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
-
 -- Portal Tokens Table for sharing quotes
 CREATE TABLE IF NOT EXISTS portal_tokens (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -26,7 +25,6 @@ CREATE TABLE IF NOT EXISTS portal_tokens (
   accessed_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT now()
 );
-
 -- Auth Roles Table (for dynamic role management)
 CREATE TABLE IF NOT EXISTS auth_roles (
   id TEXT PRIMARY KEY,
@@ -38,7 +36,6 @@ CREATE TABLE IF NOT EXISTS auth_roles (
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
-
 -- Auth Permissions Table
 CREATE TABLE IF NOT EXISTS auth_permissions (
   id TEXT PRIMARY KEY,
@@ -46,7 +43,6 @@ CREATE TABLE IF NOT EXISTS auth_permissions (
   description TEXT,
   created_at TIMESTAMPTZ DEFAULT now()
 );
-
 -- Auth Role Permissions Junction Table
 CREATE TABLE IF NOT EXISTS auth_role_permissions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -55,7 +51,6 @@ CREATE TABLE IF NOT EXISTS auth_role_permissions (
   created_at TIMESTAMPTZ DEFAULT now(),
   UNIQUE(role_id, permission_id)
 );
-
 -- Lead Activities Table (for lead scoring)
 CREATE TABLE IF NOT EXISTS lead_activities (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -64,7 +59,6 @@ CREATE TABLE IF NOT EXISTS lead_activities (
   metadata JSONB DEFAULT '{}',
   created_at TIMESTAMPTZ DEFAULT now()
 );
-
 -- Lead Score Config Table
 CREATE TABLE IF NOT EXISTS lead_score_config (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -75,7 +69,6 @@ CREATE TABLE IF NOT EXISTS lead_score_config (
   updated_at TIMESTAMPTZ DEFAULT now(),
   UNIQUE(tenant_id)
 );
-
 -- Lead Score Logs Table
 CREATE TABLE IF NOT EXISTS lead_score_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -85,7 +78,6 @@ CREATE TABLE IF NOT EXISTS lead_score_logs (
   change_reason TEXT,
   created_at TIMESTAMPTZ DEFAULT now()
 );
-
 -- Shipment Attachments Table
 CREATE TABLE IF NOT EXISTS shipment_attachments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -97,7 +89,6 @@ CREATE TABLE IF NOT EXISTS shipment_attachments (
   uploaded_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ DEFAULT now()
 );
-
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_quote_templates_tenant ON quote_templates(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_portal_tokens_quote ON portal_tokens(quote_id);
@@ -106,7 +97,6 @@ CREATE INDEX IF NOT EXISTS idx_auth_role_permissions_role ON auth_role_permissio
 CREATE INDEX IF NOT EXISTS idx_lead_activities_lead ON lead_activities(lead_id);
 CREATE INDEX IF NOT EXISTS idx_lead_score_logs_lead ON lead_score_logs(lead_id);
 CREATE INDEX IF NOT EXISTS idx_shipment_attachments_shipment ON shipment_attachments(shipment_id);
-
 -- Enable RLS
 ALTER TABLE quote_templates ENABLE ROW LEVEL SECURITY;
 ALTER TABLE portal_tokens ENABLE ROW LEVEL SECURITY;
@@ -117,7 +107,6 @@ ALTER TABLE lead_activities ENABLE ROW LEVEL SECURITY;
 ALTER TABLE lead_score_config ENABLE ROW LEVEL SECURITY;
 ALTER TABLE lead_score_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE shipment_attachments ENABLE ROW LEVEL SECURITY;
-
 -- RLS Policies for quote_templates
 DROP POLICY IF EXISTS "Users can view their tenant templates" ON quote_templates;
 CREATE POLICY "Users can view their tenant templates" ON quote_templates
@@ -125,14 +114,12 @@ CREATE POLICY "Users can view their tenant templates" ON quote_templates
     tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid())
     OR EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'platform_admin')
   );
-
 DROP POLICY IF EXISTS "Users can manage their tenant templates" ON quote_templates;
 CREATE POLICY "Users can manage their tenant templates" ON quote_templates
   FOR ALL USING (
     tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid())
     OR EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'platform_admin')
   );
-
 -- RLS Policies for portal_tokens
 DROP POLICY IF EXISTS "Users can view their quote tokens" ON portal_tokens;
 CREATE POLICY "Users can view their quote tokens" ON portal_tokens
@@ -140,39 +127,31 @@ CREATE POLICY "Users can view their quote tokens" ON portal_tokens
     quote_id IN (SELECT id FROM quotes WHERE tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()))
     OR EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'platform_admin')
   );
-
 DROP POLICY IF EXISTS "Users can manage their quote tokens" ON portal_tokens;
 CREATE POLICY "Users can manage their quote tokens" ON portal_tokens
   FOR ALL USING (
     quote_id IN (SELECT id FROM quotes WHERE tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()))
     OR EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'platform_admin')
   );
-
 -- RLS Policies for auth tables (admin only)
 DROP POLICY IF EXISTS "Platform admins can manage auth_roles" ON auth_roles;
 CREATE POLICY "Platform admins can manage auth_roles" ON auth_roles
   FOR ALL USING (EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'platform_admin'));
-
 DROP POLICY IF EXISTS "All authenticated can read auth_roles" ON auth_roles;
 CREATE POLICY "All authenticated can read auth_roles" ON auth_roles
   FOR SELECT USING (auth.uid() IS NOT NULL);
-
 DROP POLICY IF EXISTS "Platform admins can manage auth_permissions" ON auth_permissions;
 CREATE POLICY "Platform admins can manage auth_permissions" ON auth_permissions
   FOR ALL USING (EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'platform_admin'));
-
 DROP POLICY IF EXISTS "All authenticated can read auth_permissions" ON auth_permissions;
 CREATE POLICY "All authenticated can read auth_permissions" ON auth_permissions
   FOR SELECT USING (auth.uid() IS NOT NULL);
-
 DROP POLICY IF EXISTS "Platform admins can manage auth_role_permissions" ON auth_role_permissions;
 CREATE POLICY "Platform admins can manage auth_role_permissions" ON auth_role_permissions
   FOR ALL USING (EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'platform_admin'));
-
 DROP POLICY IF EXISTS "All authenticated can read auth_role_permissions" ON auth_role_permissions;
 CREATE POLICY "All authenticated can read auth_role_permissions" ON auth_role_permissions
   FOR SELECT USING (auth.uid() IS NOT NULL);
-
 -- RLS Policies for lead_activities
 DROP POLICY IF EXISTS "Users can view their tenant lead activities" ON lead_activities;
 CREATE POLICY "Users can view their tenant lead activities" ON lead_activities
@@ -180,14 +159,12 @@ CREATE POLICY "Users can view their tenant lead activities" ON lead_activities
     lead_id IN (SELECT id FROM leads WHERE tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()))
     OR EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'platform_admin')
   );
-
 DROP POLICY IF EXISTS "Users can manage their tenant lead activities" ON lead_activities;
 CREATE POLICY "Users can manage their tenant lead activities" ON lead_activities
   FOR ALL USING (
     lead_id IN (SELECT id FROM leads WHERE tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()))
     OR EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'platform_admin')
   );
-
 -- RLS Policies for lead_score_config
 DROP POLICY IF EXISTS "Users can view their tenant score config" ON lead_score_config;
 CREATE POLICY "Users can view their tenant score config" ON lead_score_config
@@ -195,14 +172,12 @@ CREATE POLICY "Users can view their tenant score config" ON lead_score_config
     tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid())
     OR EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'platform_admin')
   );
-
 DROP POLICY IF EXISTS "Admins can manage score config" ON lead_score_config;
 CREATE POLICY "Admins can manage score config" ON lead_score_config
   FOR ALL USING (
     tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid() AND role IN ('tenant_admin', 'platform_admin'))
     OR EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'platform_admin')
   );
-
 -- RLS Policies for lead_score_logs
 DROP POLICY IF EXISTS "Users can view their tenant score logs" ON lead_score_logs;
 CREATE POLICY "Users can view their tenant score logs" ON lead_score_logs
@@ -210,7 +185,6 @@ CREATE POLICY "Users can view their tenant score logs" ON lead_score_logs
     lead_id IN (SELECT id FROM leads WHERE tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()))
     OR EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'platform_admin')
   );
-
 -- RLS Policies for shipment_attachments
 DROP POLICY IF EXISTS "Users can view their shipment attachments" ON shipment_attachments;
 CREATE POLICY "Users can view their shipment attachments" ON shipment_attachments
@@ -218,20 +192,16 @@ CREATE POLICY "Users can view their shipment attachments" ON shipment_attachment
     shipment_id IN (SELECT id FROM shipments WHERE tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()))
     OR EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'platform_admin')
   );
-
 DROP POLICY IF EXISTS "Users can manage their shipment attachments" ON shipment_attachments;
 CREATE POLICY "Users can manage their shipment attachments" ON shipment_attachments
   FOR ALL USING (
     shipment_id IN (SELECT id FROM shipments WHERE tenant_id IN (SELECT tenant_id FROM user_roles WHERE user_id = auth.uid()))
     OR EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'platform_admin')
   );
-
 -- Update triggers
 DROP TRIGGER IF EXISTS update_quote_templates_updated_at ON quote_templates;
 CREATE TRIGGER update_quote_templates_updated_at BEFORE UPDATE ON quote_templates FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
 DROP TRIGGER IF EXISTS update_auth_roles_updated_at ON auth_roles;
 CREATE TRIGGER update_auth_roles_updated_at BEFORE UPDATE ON auth_roles FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
 DROP TRIGGER IF EXISTS update_lead_score_config_updated_at ON lead_score_config;
 CREATE TRIGGER update_lead_score_config_updated_at BEFORE UPDATE ON lead_score_config FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

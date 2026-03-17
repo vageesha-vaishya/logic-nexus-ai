@@ -12,6 +12,9 @@ import { Plus, Trash2, ArrowUpDown, Info, Users, List, PlayCircle } from 'lucide
 import { useNavigate } from 'react-router-dom';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
+import { CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
+import { themeStyleFromPreset } from '@/lib/theme-utils';
+import { LeadsPrimaryView, useLeadsViewState } from '@/hooks/useLeadsViewState';
 
 interface AssignmentRule {
   id: string;
@@ -26,7 +29,9 @@ interface AssignmentRule {
 
 export default function LeadRouting() {
   const navigate = useNavigate();
-  const { supabase, context } = useCRM();
+  const { supabase, context, scopedDb } = useCRM();
+  const { state: viewState, setTheme, setView, setPipeline } = useLeadsViewState();
+  const currentTheme = viewState.theme;
   const [rules, setRules] = useState<AssignmentRule[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [queues, setQueues] = useState<any[]>([]);
@@ -48,6 +53,39 @@ export default function LeadRouting() {
     fetchQueues();
   }, [context.tenantId]);
 
+  const handleThemeChange = (val: string) => {
+    setTheme(val);
+    try {
+      localStorage.setItem('leadsTheme', val);
+    } catch {
+      return;
+    }
+  };
+
+  const handleHeaderViewModeChange = (mode: LeadsPrimaryView) => {
+    if (mode === 'pipeline') {
+      try {
+        localStorage.setItem('leadsViewMode', 'pipeline');
+      } catch {
+        void 0;
+      }
+      scopedDb.logViewPreference('leads', 'pipeline');
+      setView('pipeline');
+      setPipeline({ q: '', status: [], tab: 'board' });
+      navigate('/dashboard/leads/pipeline');
+      return;
+    }
+
+    try {
+      localStorage.setItem('leadsViewMode', mode);
+    } catch {
+      void 0;
+    }
+    scopedDb.logViewPreference('leads', mode);
+    setView(mode);
+    navigate('/dashboard/leads');
+  };
+
   const fetchRules = async () => {
     try {
       if (!context.tenantId) {
@@ -55,7 +93,7 @@ export default function LeadRouting() {
         setLoading(false);
         return;
       }
-      const { data, error } = await supabase
+      const { data, error } = await scopedDb
         .from('lead_assignment_rules')
         .select('*')
         .eq('tenant_id', context.tenantId)
@@ -217,10 +255,38 @@ export default function LeadRouting() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Lead Routing</h1>
-          <p className="text-muted-foreground">Configure automatic lead assignment rules</p>
+      <div style={themeStyleFromPreset(currentTheme)} className="space-y-6 transition-colors duration-300">
+        <div className="flex items-start justify-between gap-4 sm:items-center">
+          <div>
+            <h1 className="text-3xl font-bold">Lead Routing</h1>
+            <p className="text-muted-foreground">Configure automatic lead assignment rules</p>
+          </div>
+          <CRMModuleHeaderNavigation
+            moduleLabel="Leads"
+            viewMode="list"
+            theme={currentTheme}
+            onViewModeChange={(mode) => handleHeaderViewModeChange(mode as LeadsPrimaryView)}
+            onThemeChange={handleThemeChange}
+            onCreate={() => navigate('/dashboard/leads/new')}
+            createLabel="New Lead"
+            onRefresh={fetchRules}
+            analyticsActive={false}
+            onAnalyticsClick={() => {
+              try {
+                localStorage.setItem('leadsViewMode', 'pipeline');
+              } catch {
+                void 0;
+              }
+              scopedDb.logViewPreference('leads', 'pipeline');
+              setView('pipeline');
+              setPipeline({ q: '', status: [], tab: 'analytics' });
+              navigate('/dashboard/leads/pipeline?view=analytics');
+            }}
+            onImportExport={() => navigate('/dashboard/leads/import-export')}
+            controlSequence={['pipeline', 'list', 'create', 'card', 'grid', 'refresh', 'analytics', 'importExport', 'theme']}
+            iconOnly
+            layout="compact"
+          />
         </div>
 
         <Alert>

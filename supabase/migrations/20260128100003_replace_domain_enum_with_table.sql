@@ -12,70 +12,13 @@ CREATE TABLE IF NOT EXISTS public.platform_domains (
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now()
 );
-
--- Ensure a unique index exists for ON CONFLICT (code) across legacy schemas
-DO $$
-DECLARE
-  rec record;
-BEGIN
-  -- De-dupe any existing duplicate codes so we can create a unique index safely.
-  FOR rec IN
-    SELECT code
-    FROM public.platform_domains
-    GROUP BY code
-    HAVING count(*) > 1
-  LOOP
-    UPDATE public.platform_domains pd
-    SET code = pd.code || '-' || substring(pd.id::text, 1, 8)
-    WHERE pd.code = rec.code
-      AND pd.id <> (
-        SELECT min(id) FROM public.platform_domains WHERE code = rec.code
-      );
-  END LOOP;
-
-  -- Create a unique index if no unique constraint/index exists yet.
-  IF NOT EXISTS (
-    SELECT 1
-    FROM pg_index i
-    JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
-    WHERE i.indrelid = 'public.platform_domains'::regclass
-      AND i.indisunique = true
-      AND a.attname = 'code'
-  ) THEN
-    EXECUTE 'CREATE UNIQUE INDEX IF NOT EXISTS platform_domains_code_unique ON public.platform_domains(code)';
-  END IF;
-END $$;
-
 -- 2. Populate platform_domains with initial data
--- Use DO block to handle potential name conflicts by updating codes if necessary
-DO $$
-BEGIN
-    -- Logistics (Standard)
-    INSERT INTO public.platform_domains (code, name, description)
-    VALUES ('logistics', 'Logistics & Freight', 'Core logistics and freight forwarding capabilities')
-    ON CONFLICT (code) DO NOTHING;
-
-    -- Banking
-    -- If 'Banking & Finance' exists (likely with code 'BANKING'), update code to 'banking'
-    IF EXISTS (SELECT 1 FROM public.platform_domains WHERE name = 'Banking & Finance' AND code != 'banking') THEN
-        UPDATE public.platform_domains SET code = 'banking' WHERE name = 'Banking & Finance';
-    ELSE
-        INSERT INTO public.platform_domains (code, name, description)
-        VALUES ('banking', 'Banking & Finance', 'Financial services and loan origination')
-        ON CONFLICT (code) DO NOTHING;
-    END IF;
-
-    -- Telecom
-    -- If 'Telecommunications' exists (likely with code 'TELECOM'), update code to 'telecom'
-    IF EXISTS (SELECT 1 FROM public.platform_domains WHERE name = 'Telecommunications' AND code != 'telecom') THEN
-        UPDATE public.platform_domains SET code = 'telecom' WHERE name = 'Telecommunications';
-    ELSE
-        INSERT INTO public.platform_domains (code, name, description)
-        VALUES ('telecom', 'Telecommunications', 'Subscription billing and service management')
-        ON CONFLICT (code) DO NOTHING;
-    END IF;
-END $$;
-
+INSERT INTO public.platform_domains (code, name, description)
+VALUES 
+  ('logistics', 'Logistics & Freight', 'Core logistics and freight forwarding capabilities'),
+  ('banking', 'Banking & Finance', 'Financial services and loan origination'),
+  ('telecom', 'Telecommunications', 'Subscription billing and service management')
+ON CONFLICT (code) DO NOTHING;
 -- 3. Ensure tenants has domain_id column
 DO $$
 BEGIN
@@ -83,7 +26,6 @@ BEGIN
         ALTER TABLE public.tenants ADD COLUMN domain_id uuid REFERENCES public.platform_domains(id);
     END IF;
 END $$;
-
 -- 4. Migrate existing data (if any) from domain_type enum to domain_id
 -- We assume 'logistics' is the default if domain_type is missing or null
 DO $$
@@ -122,7 +64,6 @@ BEGIN
       WHERE domain_id IS NULL;
   END IF;
 END $$;
-
 -- 5. Drop domain_type column and enum
 DO $$
 BEGIN
@@ -134,6 +75,5 @@ BEGIN
         DROP TYPE public.domain_type;
     END IF;
 END $$;
-
 -- 6. Add Not Null constraint to domain_id after population
 ALTER TABLE public.tenants ALTER COLUMN domain_id SET NOT NULL;

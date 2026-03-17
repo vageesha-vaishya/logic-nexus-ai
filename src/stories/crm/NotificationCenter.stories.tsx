@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react';
+import type { Meta, StoryObj } from '@storybook/react-vite';
 import { NotificationCenter, NotificationItem } from '../../components/crm/NotificationCenter';
 import { SkeletonCards } from '@/components/ui/skeleton-table';
 import { EmptyState, emptyStates } from '@/components/ui/empty-state';

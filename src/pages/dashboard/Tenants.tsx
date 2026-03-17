@@ -6,16 +6,18 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Plus, Building2 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { FirstScreenTemplate } from '@/components/system/FirstScreenTemplate';
 import { EmptyState } from '@/components/system/EmptyState';
 import { ViewMode } from '@/components/ui/view-toggle';
 import { EntityCard } from '@/components/system/EntityCard';
+import { useCRM } from '@/hooks/useCRM';
+import { logger } from '@/lib/logger';
 
 export default function Tenants() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { context, scopedDb } = useCRM();
   interface Tenant {
     id: string;
     name: string;
@@ -32,19 +34,46 @@ export default function Tenants() {
 
   useEffect(() => {
     fetchTenants();
-  }, []);
+  }, [context.isPlatformAdmin, context.tenantId]);
+
+  const resolveErrorMessage = (error: unknown): string => {
+    if (error instanceof Error && error.message) return error.message;
+    if (typeof error === 'string' && error.trim()) return error;
+    if (error && typeof error === 'object') {
+      const message = (error as Record<string, unknown>).message;
+      if (typeof message === 'string' && message.trim()) return message;
+    }
+    return 'Failed to load tenant data';
+  };
 
   const fetchTenants = async () => {
     try {
-      const { data, error } = await supabase
-        .from('tenants')
+      let query = scopedDb
+        .from('tenants', true)
         .select('*')
         .order('created_at', { ascending: false });
+
+      if (!context.isPlatformAdmin) {
+        if (!context.tenantId) {
+          setTenants([]);
+          return;
+        }
+        query = query.eq('id', context.tenantId);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       setTenants(data || []);
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
+      const message = resolveErrorMessage(error);
+      logger.error('Failed to fetch tenants', {
+        component: 'Tenants',
+        tenantId: context.tenantId || null,
+        isPlatformAdmin: context.isPlatformAdmin,
+        message,
+        error,
+      });
       toast({ title: 'Error', description: message, variant: 'destructive' });
     } finally {
       setLoading(false);
@@ -60,7 +89,7 @@ export default function Tenants() {
         viewMode={viewMode}
         onViewModeChange={setViewMode}
         availableModes={['card', 'grid', 'list']}
-        onCreate={() => navigate('/dashboard/tenants/new')}
+        onCreate={context.isPlatformAdmin ? () => navigate('/dashboard/tenants/new') : undefined}
       >
 
         <Card>
@@ -77,8 +106,8 @@ export default function Tenants() {
               <EmptyState
                 title="No tenants found"
                 description="Create your first tenant to get started."
-                actionLabel="New Tenant"
-                onAction={() => navigate('/dashboard/tenants/new')}
+                actionLabel={context.isPlatformAdmin ? 'New Tenant' : undefined}
+                onAction={context.isPlatformAdmin ? () => navigate('/dashboard/tenants/new') : undefined}
               />
             ) : viewMode === 'list' ? (
               <Table>

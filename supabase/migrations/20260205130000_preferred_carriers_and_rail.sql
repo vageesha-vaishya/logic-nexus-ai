@@ -11,31 +11,25 @@ CREATE TABLE IF NOT EXISTS public.vendor_preferred_carriers (
   updated_by UUID REFERENCES auth.users(id),
   UNIQUE(vendor_id, carrier_id, mode)
 );
-
 -- Trigger for updated_at
 DROP TRIGGER IF EXISTS update_vendor_preferred_carriers_updated_at ON public.vendor_preferred_carriers;
 CREATE TRIGGER update_vendor_preferred_carriers_updated_at
 BEFORE UPDATE ON public.vendor_preferred_carriers
 FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-
 -- RLS
 ALTER TABLE public.vendor_preferred_carriers ENABLE ROW LEVEL SECURITY;
-
 DROP POLICY IF EXISTS "Authenticated users can view preferred carriers" ON public.vendor_preferred_carriers;
 CREATE POLICY "Authenticated users can view preferred carriers"
   ON public.vendor_preferred_carriers FOR SELECT
   USING (auth.role() = 'authenticated');
-
 DROP POLICY IF EXISTS "Authenticated users can manage preferred carriers" ON public.vendor_preferred_carriers;
 CREATE POLICY "Authenticated users can manage preferred carriers"
   ON public.vendor_preferred_carriers FOR ALL
   USING (auth.role() = 'authenticated');
-
 -- Ensure 'rail' exists in transport_modes if it's a table
 INSERT INTO public.transport_modes (code, name, description, is_active)
 VALUES ('rail', 'Rail Freight', 'Rail transport services', true)
 ON CONFLICT (code) DO NOTHING;
-
 -- Create RPC to get preferred carriers
 CREATE OR REPLACE FUNCTION get_vendor_preferred_carriers(p_vendor_id UUID, p_mode TEXT DEFAULT NULL)
 RETURNS TABLE (

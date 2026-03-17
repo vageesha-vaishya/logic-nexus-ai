@@ -12,12 +12,12 @@ import {
   defaultDropAnimationSideEffects,
   DropAnimation,
 } from "@dnd-kit/core";
-import { sortableKeyboardCoordinates, arrayMove } from "@dnd-kit/sortable";
-import { useState, useEffect } from "react";
+import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { KanbanColumn } from "./KanbanColumn";
 import { KanbanCard, KanbanItem } from "./KanbanCard";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 
 export type ColumnType = {
   id: string;
@@ -32,11 +32,29 @@ interface KanbanBoardProps {
   onItemUpdate?: (id: string, updates: Partial<KanbanItem>) => Promise<void>;
   onItemClick?: (id: string) => void;
   className?: string;
+  scrollPersistenceKey?: string;
+  themeVariant?: "default" | "reference";
 }
 
-export function KanbanBoard({ columns, items, onDragEnd, onItemUpdate, onItemClick, className }: KanbanBoardProps) {
+export function KanbanBoard({
+  columns,
+  items,
+  onDragEnd,
+  onItemUpdate,
+  onItemClick,
+  className,
+  scrollPersistenceKey,
+  themeVariant = "default",
+}: KanbanBoardProps) {
   const [activeItem, setActiveItem] = useState<KanbanItem | null>(null);
   const [activeColumn, setActiveColumn] = useState<ColumnType | null>(null);
+  const [showLeftFade, setShowLeftFade] = useState(false);
+  const [showRightFade, setShowRightFade] = useState(false);
+  const [topScrollContentWidth, setTopScrollContentWidth] = useState(0);
+  const topHorizontalScrollRef = useRef<HTMLDivElement | null>(null);
+  const horizontalScrollRef = useRef<HTMLDivElement | null>(null);
+  const verticalScrollByColumnRef = useRef<Record<string, number>>({});
+  const isSyncingHorizontalRef = useRef(false);
   
   // Group items by column
   const [groupedItems, setGroupedItems] = useState<Record<string, KanbanItem[]>>({});
@@ -51,6 +69,106 @@ export function KanbanBoard({ columns, items, onDragEnd, onItemUpdate, onItemCli
     });
     setGroupedItems(grouped);
   }, [items, columns]);
+
+  const persistedScrollStorageKey = useMemo(() => {
+    if (!scrollPersistenceKey) return null;
+    return `kanban-scroll:${scrollPersistenceKey}`;
+  }, [scrollPersistenceKey]);
+
+  const updateHorizontalScrollIndicators = useCallback(() => {
+    const element = horizontalScrollRef.current;
+    if (!element) return;
+    const maxLeft = element.scrollWidth - element.clientWidth;
+    setShowLeftFade(element.scrollLeft > 0);
+    setShowRightFade(element.scrollLeft < maxLeft - 1);
+    setTopScrollContentWidth(element.scrollWidth);
+  }, []);
+
+  const savePersistedScrollState = useCallback((left: number) => {
+    if (!persistedScrollStorageKey) return;
+    try {
+      localStorage.setItem(
+        persistedScrollStorageKey,
+        JSON.stringify({
+          left,
+          tops: verticalScrollByColumnRef.current,
+        })
+      );
+    } catch {
+      return;
+    }
+  }, [persistedScrollStorageKey]);
+
+  useEffect(() => {
+    const element = horizontalScrollRef.current;
+    if (!element) return;
+    if (!persistedScrollStorageKey) {
+      updateHorizontalScrollIndicators();
+      return;
+    }
+    try {
+      const raw = localStorage.getItem(persistedScrollStorageKey);
+      if (raw) {
+        const parsed = JSON.parse(raw) as { left?: number; tops?: Record<string, number> };
+        if (typeof parsed.left === 'number') {
+          element.scrollLeft = parsed.left;
+        }
+        if (parsed.tops && typeof parsed.tops === 'object') {
+          verticalScrollByColumnRef.current = parsed.tops;
+        }
+      }
+    } catch {
+      void 0;
+    }
+    updateHorizontalScrollIndicators();
+  }, [persistedScrollStorageKey, columns.length, updateHorizontalScrollIndicators]);
+
+  useEffect(() => {
+    const mainElement = horizontalScrollRef.current;
+    const topElement = topHorizontalScrollRef.current;
+    if (!mainElement || !topElement) return;
+    const onMainScroll = () => {
+      if (isSyncingHorizontalRef.current) return;
+      isSyncingHorizontalRef.current = true;
+      topElement.scrollLeft = mainElement.scrollLeft;
+      isSyncingHorizontalRef.current = false;
+      updateHorizontalScrollIndicators();
+      savePersistedScrollState(mainElement.scrollLeft);
+    };
+    const onTopScroll = () => {
+      if (isSyncingHorizontalRef.current) return;
+      isSyncingHorizontalRef.current = true;
+      mainElement.scrollLeft = topElement.scrollLeft;
+      isSyncingHorizontalRef.current = false;
+      updateHorizontalScrollIndicators();
+      savePersistedScrollState(mainElement.scrollLeft);
+    };
+    const onResize = () => updateHorizontalScrollIndicators();
+    const resizeObserver = new ResizeObserver(() => {
+      updateHorizontalScrollIndicators();
+    });
+    resizeObserver.observe(mainElement);
+    topElement.scrollLeft = mainElement.scrollLeft;
+    onMainScroll();
+    mainElement.addEventListener('scroll', onMainScroll, { passive: true });
+    topElement.addEventListener('scroll', onTopScroll, { passive: true });
+    window.addEventListener('resize', onResize);
+    return () => {
+      mainElement.removeEventListener('scroll', onMainScroll);
+      topElement.removeEventListener('scroll', onTopScroll);
+      window.removeEventListener('resize', onResize);
+      resizeObserver.disconnect();
+    };
+  }, [savePersistedScrollState, updateHorizontalScrollIndicators, columns.length]);
+
+  const handleColumnScrollTopChange = useCallback((columnId: string, scrollTop: number) => {
+    verticalScrollByColumnRef.current = {
+      ...verticalScrollByColumnRef.current,
+      [columnId]: scrollTop,
+    };
+    const left = horizontalScrollRef.current?.scrollLeft ?? 0;
+    savePersistedScrollState(left);
+  }, [savePersistedScrollState]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -202,7 +320,7 @@ export function KanbanBoard({ columns, items, onDragEnd, onItemUpdate, onItemCli
       initial={{ opacity: 0 }} 
       animate={{ opacity: 1 }} 
       transition={{ duration: 0.5 }}
-      className="h-full"
+      className={`h-full min-h-0 ${className ?? ''}`}
       data-testid="kanban-board"
     >
       <DndContext
@@ -212,24 +330,114 @@ export function KanbanBoard({ columns, items, onDragEnd, onItemUpdate, onItemCli
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
       >
-        <div className="flex h-full gap-3 pb-4 overflow-x-auto snap-x snap-mandatory">
-           {columns.map((col) => (
-             <KanbanColumn
-               key={col.id}
-               column={{
-                 ...col,
-                 items: groupedItems[col.id] || []
-               }}
-               onItemUpdate={onItemUpdate}
-               onItemView={onItemClick}
-             />
-           ))}
+        <div className="relative h-full min-h-0">
+          <div
+            ref={topHorizontalScrollRef}
+            className={`mb-2 h-4 overflow-x-auto overflow-y-hidden rounded-md border [scrollbar-gutter:stable] touch-pan-x ${themeVariant === "reference" ? "border-[#e4e8f0] bg-white" : "border-border/60 bg-background/80"}`}
+            data-testid="kanban-top-horizontal-scroll"
+            tabIndex={0}
+            onWheel={(event) => {
+              const el = topHorizontalScrollRef.current;
+              if (!el) return;
+              if (Math.abs(event.deltaY) > Math.abs(event.deltaX)) {
+                el.scrollLeft += event.deltaY;
+                event.preventDefault();
+              }
+            }}
+            onKeyDown={(event) => {
+              const el = topHorizontalScrollRef.current;
+              if (!el) return;
+              const viewportStep = Math.max(160, Math.floor(el.clientWidth * 0.6));
+              if (event.key === 'ArrowRight') {
+                el.scrollBy({ left: 120, behavior: 'smooth' });
+                event.preventDefault();
+              } else if (event.key === 'ArrowLeft') {
+                el.scrollBy({ left: -120, behavior: 'smooth' });
+                event.preventDefault();
+              } else if (event.key === 'PageDown') {
+                el.scrollBy({ left: viewportStep, behavior: 'smooth' });
+                event.preventDefault();
+              } else if (event.key === 'PageUp') {
+                el.scrollBy({ left: -viewportStep, behavior: 'smooth' });
+                event.preventDefault();
+              } else if (event.key === 'Home') {
+                el.scrollTo({ left: 0, behavior: 'smooth' });
+                event.preventDefault();
+              } else if (event.key === 'End') {
+                el.scrollTo({ left: el.scrollWidth, behavior: 'smooth' });
+                event.preventDefault();
+              }
+            }}
+          >
+            <div style={{ width: `${Math.max(topScrollContentWidth, 1)}px` }} className="h-px" aria-hidden="true" />
+          </div>
+          {showLeftFade && (
+            <div
+              className={`pointer-events-none absolute bottom-0 left-0 top-5 z-10 w-6 ${themeVariant === "reference" ? "bg-gradient-to-r from-white to-transparent" : "bg-gradient-to-r from-background to-transparent"}`}
+              aria-hidden="true"
+              data-testid="kanban-scroll-left-indicator"
+            />
+          )}
+          {showRightFade && (
+            <div
+              className={`pointer-events-none absolute bottom-0 right-0 top-5 z-10 w-6 ${themeVariant === "reference" ? "bg-gradient-to-l from-white to-transparent" : "bg-gradient-to-l from-background to-transparent"}`}
+              aria-hidden="true"
+              data-testid="kanban-scroll-right-indicator"
+            />
+          )}
+          <div
+            ref={horizontalScrollRef}
+            className="flex h-full min-h-0 gap-3 overflow-x-auto overflow-y-hidden pb-4 pr-1 [scrollbar-gutter:stable] touch-pan-x"
+            data-testid="kanban-horizontal-scroll"
+            tabIndex={0}
+            onKeyDown={(event) => {
+              const el = horizontalScrollRef.current;
+              if (!el) return;
+              const viewportStep = Math.max(160, Math.floor(el.clientWidth * 0.6));
+              if (event.key === 'ArrowRight') {
+                el.scrollBy({ left: 120, behavior: 'smooth' });
+                event.preventDefault();
+              } else if (event.key === 'ArrowLeft') {
+                el.scrollBy({ left: -120, behavior: 'smooth' });
+                event.preventDefault();
+              } else if (event.key === 'PageDown') {
+                el.scrollBy({ left: viewportStep, behavior: 'smooth' });
+                event.preventDefault();
+              } else if (event.key === 'PageUp') {
+                el.scrollBy({ left: -viewportStep, behavior: 'smooth' });
+                event.preventDefault();
+              } else if (event.key === 'Home') {
+                el.scrollTo({ left: 0, behavior: 'smooth' });
+                event.preventDefault();
+              } else if (event.key === 'End') {
+                el.scrollTo({ left: el.scrollWidth, behavior: 'smooth' });
+                event.preventDefault();
+              }
+            }}
+          >
+            <AnimatePresence initial={false} mode="popLayout">
+              {columns.map((col) => (
+                <KanbanColumn
+                  key={col.id}
+                  column={{
+                    ...col,
+                    items: groupedItems[col.id] || []
+                  }}
+                  onItemUpdate={onItemUpdate}
+                  onItemView={onItemClick}
+                  initialScrollTop={verticalScrollByColumnRef.current[col.id] ?? 0}
+                  onScrollTopChange={handleColumnScrollTopChange}
+                  themeVariant={themeVariant}
+                />
+              ))}
+            </AnimatePresence>
+          </div>
         </div>
 
         {createPortal(
           <DragOverlay dropAnimation={dropAnimation}>
             {activeItem && (
-              <KanbanCard item={activeItem} isOverlay />
+              <KanbanCard item={activeItem} isOverlay themeVariant={themeVariant} />
             )}
             {activeColumn && (
                <div className="w-[85vw] sm:w-[300px] h-[500px] bg-muted/50 rounded-xl border-2 border-primary" />

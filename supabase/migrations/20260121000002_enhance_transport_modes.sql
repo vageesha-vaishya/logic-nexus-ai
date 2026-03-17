@@ -2,7 +2,6 @@
 ALTER TABLE public.transport_modes 
 ADD COLUMN IF NOT EXISTS validation_rules JSONB DEFAULT '{}'::jsonb,
 ADD COLUMN IF NOT EXISTS supported_units JSONB DEFAULT '[]'::jsonb;
-
 -- Seed update for existing modes
 -- Air
 UPDATE public.transport_modes 
@@ -15,7 +14,6 @@ SET
   }'::jsonb,
   supported_units = '["kg", "lbs"]'::jsonb
 WHERE code = 'air';
-
 -- Ocean
 UPDATE public.transport_modes 
 SET 
@@ -26,7 +24,6 @@ SET
   }'::jsonb,
   supported_units = '["cbm", "teu", "feu"]'::jsonb
 WHERE code = 'ocean';
-
 -- Road
 UPDATE public.transport_modes 
 SET 
@@ -37,7 +34,6 @@ SET
   }'::jsonb,
   supported_units = '["kg", "lbs", "ton"]'::jsonb
 WHERE code = 'road';
-
 -- Rail
 UPDATE public.transport_modes 
 SET 

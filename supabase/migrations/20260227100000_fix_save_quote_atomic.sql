@@ -240,7 +240,7 @@ BEGIN
   IF v_version_id IS NULL THEN
     v_version_id := gen_random_uuid();
     INSERT INTO quotation_versions (
-      id, tenant_id, quote_id, version_number, major, minor, 
+      id, tenant_id, quote_id, version_number, major_version, minor_version, 
       status, is_active, is_current, created_at, updated_at
     ) VALUES (
       v_version_id, v_tenant_id, v_quote_id, 1, 1, 0, 
@@ -838,4 +838,4 @@ BEGIN
   END IF;
 
   RETURN v_quote_id;
-END $$;
+END $$;;

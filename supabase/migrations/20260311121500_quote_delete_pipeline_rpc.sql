@@ -528,4 +528,4 @@ BEGIN
     'stats', v_stats
   );
 END;
-$$;
+$$;;

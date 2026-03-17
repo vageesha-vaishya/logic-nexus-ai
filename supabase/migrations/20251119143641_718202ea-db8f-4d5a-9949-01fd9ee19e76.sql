@@ -21,7 +21,6 @@ BEGIN
   RETURN v_max_version + 1;
 END;
 $$;
-
 -- Trigger to auto-assign version number
 CREATE OR REPLACE FUNCTION auto_assign_version_number()
 RETURNS TRIGGER
@@ -36,13 +35,11 @@ BEGIN
   RETURN NEW;
 END;
 $$;
-
 DROP TRIGGER IF EXISTS trigger_auto_assign_version_number ON quotation_versions;
 CREATE TRIGGER trigger_auto_assign_version_number
   BEFORE INSERT ON quotation_versions
   FOR EACH ROW
   EXECUTE FUNCTION auto_assign_version_number();
-
 -- =====================================================
 -- 2. STATUS WORKFLOW VALIDATION
 -- =====================================================
@@ -82,13 +79,11 @@ BEGIN
   RETURN NEW;
 END;
 $$;
-
 DROP TRIGGER IF EXISTS trigger_validate_version_status ON quotation_versions;
 CREATE TRIGGER trigger_validate_version_status
   BEFORE INSERT OR UPDATE ON quotation_versions
   FOR EACH ROW
   EXECUTE FUNCTION validate_version_status_transition();
-
 -- =====================================================
 -- 3. MARGIN CALCULATIONS
 -- =====================================================
@@ -139,7 +134,6 @@ BEGIN
   RETURN QUERY SELECT v_total_buy, v_total_sell, v_margin_amount, v_margin_percentage, v_charge_count;
 END;
 $$;
-
 -- Trigger to auto-update option totals when charges change
 CREATE OR REPLACE FUNCTION update_option_margins_on_charge_change()
 RETURNS TRIGGER
@@ -181,13 +175,11 @@ BEGIN
   RETURN COALESCE(NEW, OLD);
 END;
 $$;
-
 DROP TRIGGER IF EXISTS trigger_update_option_margins ON quote_charges;
 CREATE TRIGGER trigger_update_option_margins
   AFTER INSERT OR UPDATE OR DELETE ON quote_charges
   FOR EACH ROW
   EXECUTE FUNCTION update_option_margins_on_charge_change();
-
 -- =====================================================
 -- 4. CUSTOMER SELECTION VALIDATION
 -- =====================================================
@@ -224,13 +216,11 @@ BEGIN
   RETURN NEW;
 END;
 $$;
-
 DROP TRIGGER IF EXISTS trigger_validate_customer_selection ON customer_selections;
 CREATE TRIGGER trigger_validate_customer_selection
   BEFORE INSERT OR UPDATE ON customer_selections
   FOR EACH ROW
   EXECUTE FUNCTION validate_single_selection_per_version();
-
 -- =====================================================
 -- 5. AUTOMATIC AUDIT LOGGING
 -- =====================================================
@@ -282,13 +272,11 @@ BEGIN
   RETURN COALESCE(NEW, OLD);
 END;
 $$;
-
 DROP TRIGGER IF EXISTS trigger_log_version_changes ON quotation_versions;
 CREATE TRIGGER trigger_log_version_changes
   AFTER INSERT OR UPDATE OR DELETE ON quotation_versions
   FOR EACH ROW
   EXECUTE FUNCTION log_version_changes();
-
 -- Function to log option changes
 CREATE OR REPLACE FUNCTION log_option_changes()
 RETURNS TRIGGER
@@ -336,13 +324,11 @@ BEGIN
   RETURN COALESCE(NEW, OLD);
 END;
 $$;
-
 DROP TRIGGER IF EXISTS trigger_log_option_changes ON quotation_version_options;
 CREATE TRIGGER trigger_log_option_changes
   AFTER INSERT OR UPDATE OR DELETE ON quotation_version_options
   FOR EACH ROW
   EXECUTE FUNCTION log_option_changes();
-
 -- =====================================================
 -- 6. HELPER FUNCTIONS FOR BUSINESS LOGIC
 -- =====================================================
@@ -378,7 +364,6 @@ BEGIN
   WHERE id = v_quote_id;
 END;
 $$;
-
 -- Function to compare two versions
 CREATE OR REPLACE FUNCTION compare_versions(p_version_id_1 UUID, p_version_id_2 UUID)
 RETURNS JSONB
@@ -407,7 +392,6 @@ BEGIN
   RETURN v_comparison;
 END;
 $$;
-
 COMMENT ON FUNCTION calculate_next_version_number IS 'Calculates the next version number for a quote';
 COMMENT ON FUNCTION auto_assign_version_number IS 'Automatically assigns version numbers to new quotation versions';
 COMMENT ON FUNCTION validate_version_status_transition IS 'Enforces valid status transitions for quotation versions';

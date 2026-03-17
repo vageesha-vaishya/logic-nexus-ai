@@ -30,6 +30,7 @@ import { EmailHistoryPanel } from '@/components/email/EmailHistoryPanel';
 import { OpportunityHistoryTab } from '@/components/crm/OpportunityHistoryTab';
 import { Opportunity, OpportunityHistory, OpportunityStage, stageColors, stageLabels } from './opportunities-data';
 import type { Database } from '@/integrations/supabase/types';
+import { useStickyActions } from '@/components/layout/StickyActionsContext';
 
 export default function OpportunityDetail() {
   const { id } = useParams();
@@ -299,8 +300,46 @@ export default function OpportunityDetail() {
     return null;
   }
 
+  const StickyActionsRegister = () => {
+    const { setActions, clearActions } = useStickyActions();
+
+    useEffect(() => {
+      if (isEditing) {
+        setActions({
+          right: [
+            <Button key="cancel-edit" variant="outline" onClick={() => setIsEditing(false)}>
+              Cancel
+            </Button>,
+          ],
+        });
+        return () => clearActions();
+      }
+
+      setActions({
+        right: [
+          <Button key="new-opportunity" variant="outline" onClick={() => navigate('/dashboard/opportunities/new')}>
+            New Opportunity
+          </Button>,
+          <Button key="edit-opportunity" variant="outline" onClick={() => setIsEditing(true)}>
+            <Edit className="mr-2 h-4 w-4" />
+            Edit
+          </Button>,
+          <Button key="delete-opportunity" variant="destructive" onClick={() => setShowDeleteDialog(true)}>
+            <Trash2 className="mr-2 h-4 w-4" />
+            Delete
+          </Button>,
+        ],
+      });
+
+      return () => clearActions();
+    }, [clearActions, isEditing, navigate, setActions]);
+
+    return null;
+  };
+
   return (
     <DashboardLayout>
+      <StickyActionsRegister />
       <div className="max-w-4xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">

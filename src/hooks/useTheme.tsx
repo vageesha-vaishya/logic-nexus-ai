@@ -88,7 +88,7 @@ const buildPresetTheme = (preset: (typeof THEME_PRESETS)[number]): SavedTheme =>
   stripWidth: (preset as any).stripWidth ?? '22px',
   stripAngle: (preset as any).stripAngle ?? '14deg',
   headerBannerVisible: typeof (preset as any).headerBannerVisible === 'boolean' ? (preset as any).headerBannerVisible : preset.name === 'Default Simple',
-  headerBannerContent: (preset as any).headerBannerContent ?? 'System notification',
+  headerBannerContent: (preset as any).headerBannerContent ?? '',
   headerBannerColor: normalizeHslToken((preset as any).headerBannerColor ?? preset.accent ?? preset.primary, '217 91% 60%'),
   headerBannerTextColor: normalizeHslToken((preset as any).headerBannerTextColor, '0 0% 100%'),
   headerBannerHeight: (preset as any).headerBannerHeight ?? '48px',
@@ -106,7 +106,7 @@ const normalizeSavedThemeForStartup = (theme: SavedTheme): SavedTheme => {
         ? theme.headerBannerVisible
         : false,
     headerBannerContent: isDefaultSimpleTheme
-      ? (typeof theme.headerBannerContent === 'string' && theme.headerBannerContent.trim() ? theme.headerBannerContent : 'System notification')
+      ? (typeof theme.headerBannerContent === 'string' ? theme.headerBannerContent : '')
       : theme.headerBannerContent,
     headerBannerColor: normalizeHslToken(theme.headerBannerColor || theme.stripColor || theme.accent || theme.primary, '217 91% 60%'),
     headerBannerTextColor: normalizeHslToken(theme.headerBannerTextColor, '0 0% 100%'),
@@ -236,7 +236,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         : existingBannerVisible;
     const existingBannerContent = root.getAttribute('data-header-banner-content') || '';
     const headerBannerContent = isDefaultSimpleTheme
-      ? (typeof t.headerBannerContent === 'string' && t.headerBannerContent.trim() ? t.headerBannerContent : 'System notification')
+      ? (typeof t.headerBannerContent === 'string' ? t.headerBannerContent : '')
       : typeof t.headerBannerContent === 'string'
         ? t.headerBannerContent
         : existingBannerContent;
@@ -416,9 +416,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                 ? row.tokens.headerBannerVisible
                 : undefined,
             headerBannerContent: row.name === 'Default Simple'
-              ? ((typeof row.tokens.headerBannerContent === 'string' && row.tokens.headerBannerContent.trim())
-                ? row.tokens.headerBannerContent
-                : 'System notification')
+              ? (typeof row.tokens.headerBannerContent === 'string' ? row.tokens.headerBannerContent : '')
               : typeof row.tokens.headerBannerContent === 'string'
                 ? row.tokens.headerBannerContent
                 : undefined,

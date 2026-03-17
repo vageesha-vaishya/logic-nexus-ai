@@ -72,8 +72,6 @@ BEGIN
     FOR INSERT
     WITH CHECK (auth.uid() = user_id);
 END $$;
-
-
 -- 2) Documents and document_versions for long-form docs
 DO $$
 BEGIN
@@ -187,8 +185,6 @@ BEGIN
   CREATE POLICY "Allow insert/update access to authenticated users" ON public.document_versions
     FOR ALL TO authenticated USING (true);
 END $$;
-
-
 -- 3) Seed an initial document + version with compact, safely-quoted content
 DO $$
 DECLARE
@@ -241,30 +237,22 @@ BEGIN
       RAISE NOTICE 'Skipping document_versions seed insert due to error: %', SQLERRM;
   END;
 END $$;
-
-
 -- 4) Ensure dashboards.view permission exists and is granted
 INSERT INTO auth_permissions (id, category, description)
 VALUES ('dashboards.view', 'Dashboard', 'View dashboards')
 ON CONFLICT (id) DO NOTHING;
-
 INSERT INTO auth_role_permissions (role_id, permission_id)
 VALUES ('platform_admin', 'dashboards.view')
 ON CONFLICT (role_id, permission_id) DO NOTHING;
-
 INSERT INTO auth_role_permissions (role_id, permission_id)
 VALUES ('tenant_admin', 'dashboards.view')
 ON CONFLICT (role_id, permission_id) DO NOTHING;
-
 INSERT INTO auth_role_permissions (role_id, permission_id)
 VALUES ('franchise_admin', 'dashboards.view')
 ON CONFLICT (role_id, permission_id) DO NOTHING;
-
 INSERT INTO auth_role_permissions (role_id, permission_id)
 VALUES ('user', 'dashboards.view')
 ON CONFLICT (role_id, permission_id) DO NOTHING;
-
-
 -- 5) Import history and details tables + RLS/policies
 DO $$
 BEGIN

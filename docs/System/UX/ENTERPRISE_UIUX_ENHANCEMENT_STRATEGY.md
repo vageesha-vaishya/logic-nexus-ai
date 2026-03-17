@@ -1046,3 +1046,77 @@ Status legend:
 2. Keep blocked routes tagged as `Blocked` until dependency is cleared
 3. Promote route to `Done` only after module DoD and global gates pass
 4. Use Sections 23–27 for audit closure before final rollout
+
+## 29) Banner Header Operational Control
+
+### 29.1 System Notification Transition (Dual Mode)
+
+- Runtime switch: `user_info_header_module`
+- Transition switch: `user_info_header_dual_mode`
+- Environment override map: `VITE_FEATURE_FLAG_OVERRIDES` with JSON payload per flag key
+- Environment override per-flag: `VITE_FF_<FLAG_KEY_UPPERCASE>`
+- Legacy compatibility behavior:
+  - Existing banner payload and content source remain unchanged
+  - Dual mode renders legacy text and user scope summary concurrently
+  - Disabling `user_info_header_module` reverts to legacy-only banner rendering
+
+### 29.2 User Scope Banner Data Contract
+
+- User display:
+  - Name from profile fields, then auth metadata, then email fallback
+  - Role badge derived from authenticated roles
+  - Avatar image with initials fallback when image is unavailable
+- Tenant display:
+  - Tenant name
+  - Tenant ID with clipboard copy affordance
+  - Subscription status badge with active/expired/suspended tone mapping
+- Franchise display:
+  - Franchise name and ID
+  - Region list from `regions[]` when present, with single-region fallback
+- State handling:
+  - Loading state while tenant/franchise scope resolves
+  - Error state when scoped lookup fails
+  - Empty state for global context without tenant scope
+
+### 29.3 Secure Debug Button Control
+
+- Persistent control plane:
+  - Setting key: `header_debug_button`
+  - Storage table: `public.system_settings` (global row with `tenant_id IS NULL`)
+  - Read RPC: `public.get_platform_debug_button_enabled()`
+  - Write RPC: `public.set_platform_debug_button_enabled(p_enabled, p_reason)`
+- Access validation and monitoring:
+  - Gate RPC: `public.validate_debug_access_attempt(p_action)`
+  - Server-side platform-admin enforcement through `public.is_platform_admin(auth.uid())`
+  - Audit actions:
+    - `debug_button_setting_updated`
+    - `debug_access_attempt`
+    - `debug_access_denied`
+    - `debug_access_rate_limited`
+  - Rate limit policy: deny after 20 access attempts per user per minute
+- UI enforcement:
+  - Debug trigger and dashboard component are not mounted when access conditions fail
+  - Button click re-validates on server before opening the debugger
+
+### 29.4 Security and Accessibility Checklist
+
+- OWASP alignment:
+  - Enforce server-side authorization for all debug control operations
+  - Maintain immutable audit trail for privileged actions and denied attempts
+  - Avoid client-only trust for privileged UI behavior
+- WCAG 2.1 AA checkpoints:
+  - Keyboard reachable copy control and debug trigger
+  - `aria-label` coverage for icon-only actions
+  - Loading and status signals surfaced with accessible text labels
+
+### 29.5 Test Coverage Baseline
+
+- Unit coverage:
+  - `src/components/layout/__tests__/DashboardLayout.overflow.test.tsx`
+  - `src/components/admin/__tests__/DebugSettings.test.tsx`
+- Integration coverage:
+  - `src/tests/integration/crm-module-navigation-workflow.test.ts`
+- Minimum acceptance:
+  - Non-platform users never receive debug button DOM nodes
+  - Dual-mode flag preserves legacy banner payload visibility
+  - Platform admin debug access path remains functional and gated

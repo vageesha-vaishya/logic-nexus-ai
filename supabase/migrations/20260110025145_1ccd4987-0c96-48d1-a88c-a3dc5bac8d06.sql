@@ -3,7 +3,6 @@
 -- 1) Import reporting
 ALTER TABLE public.import_history
   ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ;
-
 CREATE TABLE IF NOT EXISTS public.import_errors (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   import_id UUID NOT NULL REFERENCES public.import_history(id) ON DELETE CASCADE,
@@ -13,14 +12,11 @@ CREATE TABLE IF NOT EXISTS public.import_errors (
   raw_data JSONB,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-
 ALTER TABLE public.import_errors ENABLE ROW LEVEL SECURITY;
-
 -- Clean up potentially older/unsafe policies (idempotent)
 DROP POLICY IF EXISTS "Users can view import errors" ON public.import_errors;
 DROP POLICY IF EXISTS "Users can insert import errors" ON public.import_errors;
 DROP POLICY IF EXISTS "Platform admins can manage all import errors" ON public.import_errors;
-
 -- Scoped policies (platform admin OR same-tenant via import_history)
 CREATE POLICY "Import errors: select" ON public.import_errors
 FOR SELECT
@@ -38,7 +34,6 @@ USING (
       )
   )
 );
-
 CREATE POLICY "Import errors: insert" ON public.import_errors
 FOR INSERT
 WITH CHECK (
@@ -55,22 +50,16 @@ WITH CHECK (
       )
   )
 );
-
 CREATE POLICY "Import errors: update (platform admin)" ON public.import_errors
 FOR UPDATE
 USING (public.is_platform_admin(auth.uid()))
 WITH CHECK (public.is_platform_admin(auth.uid()));
-
 CREATE POLICY "Import errors: delete (platform admin)" ON public.import_errors
 FOR DELETE
 USING (public.is_platform_admin(auth.uid()));
-
 CREATE INDEX IF NOT EXISTS idx_import_errors_import_id
   ON public.import_errors(import_id);
-
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.import_errors TO authenticated;
-
-
 -- 2) Transfer system (missing tables/types/functions)
 DO $$
 BEGIN
@@ -101,7 +90,6 @@ BEGIN
     CREATE TYPE public.transfer_entity_type AS ENUM ('lead', 'opportunity', 'quote', 'shipment', 'account', 'contact', 'activity');
   END IF;
 END $$;
-
 CREATE TABLE IF NOT EXISTS public.entity_transfers (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   source_tenant_id UUID NOT NULL REFERENCES public.tenants(id),
@@ -116,7 +104,6 @@ CREATE TABLE IF NOT EXISTS public.entity_transfers (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-
 -- Add the exact FK names the frontend expects for PostgREST joins
 DO $$
 BEGIN
@@ -142,7 +129,6 @@ BEGIN
       FOREIGN KEY (approved_by) REFERENCES public.profiles(id) ON DELETE SET NULL;
   END IF;
 END $$;
-
 CREATE TABLE IF NOT EXISTS public.entity_transfer_items (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   transfer_id UUID NOT NULL REFERENCES public.entity_transfers(id) ON DELETE CASCADE,
@@ -153,26 +139,21 @@ CREATE TABLE IF NOT EXISTS public.entity_transfer_items (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-
 ALTER TABLE public.entity_transfers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.entity_transfer_items ENABLE ROW LEVEL SECURITY;
-
 -- Updated-at triggers (safe if function exists)
 DROP TRIGGER IF EXISTS update_entity_transfers_updated_at ON public.entity_transfers;
 CREATE TRIGGER update_entity_transfers_updated_at
 BEFORE UPDATE ON public.entity_transfers
 FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
-
 DROP TRIGGER IF EXISTS update_entity_transfer_items_updated_at ON public.entity_transfer_items;
 CREATE TRIGGER update_entity_transfer_items_updated_at
 BEFORE UPDATE ON public.entity_transfer_items
 FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
-
 -- Policies (drop old names if they exist)
 DROP POLICY IF EXISTS "Users can view transfers for their tenant" ON public.entity_transfers;
 DROP POLICY IF EXISTS "Users can create transfers from their tenant" ON public.entity_transfers;
 DROP POLICY IF EXISTS "Target admins can update status" ON public.entity_transfers;
-
 CREATE POLICY "Entity transfers: select" ON public.entity_transfers
 FOR SELECT
 USING (
@@ -186,7 +167,6 @@ USING (
     WHERE ur.user_id = auth.uid() AND ur.tenant_id IS NOT NULL
   )
 );
-
 CREATE POLICY "Entity transfers: insert" ON public.entity_transfers
 FOR INSERT
 WITH CHECK (
@@ -196,7 +176,6 @@ WITH CHECK (
   ))
   AND requested_by = auth.uid()
 );
-
 CREATE POLICY "Entity transfers: update" ON public.entity_transfers
 FOR UPDATE
 USING (
@@ -206,15 +185,12 @@ USING (
     WHERE ur.user_id = auth.uid() AND ur.tenant_id IS NOT NULL
   )
 );
-
 CREATE POLICY "Entity transfers: delete (platform admin)" ON public.entity_transfers
 FOR DELETE
 USING (public.is_platform_admin(auth.uid()));
-
 -- Items
 DROP POLICY IF EXISTS "View transfer items" ON public.entity_transfer_items;
 DROP POLICY IF EXISTS "Create transfer items" ON public.entity_transfer_items;
-
 CREATE POLICY "Entity transfer items: select" ON public.entity_transfer_items
 FOR SELECT
 USING (
@@ -229,7 +205,6 @@ USING (
       )
   )
 );
-
 CREATE POLICY "Entity transfer items: insert" ON public.entity_transfer_items
 FOR INSERT
 WITH CHECK (
@@ -244,20 +219,15 @@ WITH CHECK (
       )
   )
 );
-
 CREATE POLICY "Entity transfer items: update (platform admin)" ON public.entity_transfer_items
 FOR UPDATE
 USING (public.is_platform_admin(auth.uid()))
 WITH CHECK (public.is_platform_admin(auth.uid()));
-
 CREATE POLICY "Entity transfer items: delete (platform admin)" ON public.entity_transfer_items
 FOR DELETE
 USING (public.is_platform_admin(auth.uid()));
-
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.entity_transfers TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.entity_transfer_items TO authenticated;
-
-
 -- 3) RPCs expected by the frontend
 CREATE OR REPLACE FUNCTION public.execute_transfer(p_transfer_id UUID, p_approver_id UUID)
 RETURNS JSONB
@@ -386,10 +356,7 @@ BEGIN
   );
 END;
 $$;
-
 GRANT EXECUTE ON FUNCTION public.execute_transfer(UUID, UUID) TO authenticated;
-
-
 CREATE OR REPLACE FUNCTION public.assign_franchisee_account_contact(
   p_tenant_id UUID,
   p_franchise_id UUID,
@@ -550,5 +517,4 @@ BEGIN
   );
 END;
 $$;
-
 GRANT EXECUTE ON FUNCTION public.assign_franchisee_account_contact(UUID, UUID, JSONB, JSONB) TO authenticated;

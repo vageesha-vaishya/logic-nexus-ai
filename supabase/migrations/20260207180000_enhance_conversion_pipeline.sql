@@ -1,5 +1,4 @@
 BEGIN;
-
 -- 1. Enhance create_shipment_from_quote to copy cargo_details
 CREATE OR REPLACE FUNCTION public.create_shipment_from_quote(
   p_quote_id UUID,
@@ -174,8 +173,6 @@ BEGIN
   RETURN v_shipment_id;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
-
-
 -- 2. Update create_invoice_from_shipment to use cargo_details for Duty
 CREATE OR REPLACE FUNCTION public.create_invoice_from_shipment(
   p_shipment_id UUID,
@@ -398,5 +395,4 @@ BEGIN
   RETURN v_invoice_id;
 END;
 $$ LANGUAGE plpgsql;
-
 COMMIT;

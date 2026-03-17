@@ -3,7 +3,6 @@
 -- Date: 2026-03-06
 
 BEGIN;
-
 --------------------------------------------------------------------------------
 -- 1. Extend Quotation Configuration Table
 --------------------------------------------------------------------------------
@@ -21,7 +20,6 @@ BEGIN
         ADD COLUMN branding_settings JSONB DEFAULT '{}'::jsonb;
     END IF;
 END $$;
-
 --------------------------------------------------------------------------------
 -- 2. Create Storage Bucket for Organization Assets
 --------------------------------------------------------------------------------
@@ -30,7 +28,6 @@ END $$;
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('organization-assets', 'organization-assets', true)
 ON CONFLICT (id) DO NOTHING;
-
 --------------------------------------------------------------------------------
 -- 3. Storage Policies (RLS) for Organization Assets
 --------------------------------------------------------------------------------
@@ -43,7 +40,6 @@ DROP POLICY IF EXISTS "Public Read Access for Organization Assets" ON storage.ob
 CREATE POLICY "Public Read Access for Organization Assets"
 ON storage.objects FOR SELECT
 USING (bucket_id = 'organization-assets');
-
 -- Policy: Authenticated Upload Access (Tenant Isolation)
 -- Users can only upload to their tenant's folder: organization-assets/{tenant_id}/*
 DROP POLICY IF EXISTS "Authenticated Upload Access for Organization Assets" ON storage.objects;
@@ -54,7 +50,6 @@ WITH CHECK (
     bucket_id = 'organization-assets' AND
     (storage.foldername(name))[1]::uuid = (select get_user_tenant_id(auth.uid()))
 );
-
 -- Policy: Authenticated Update Access (Tenant Isolation)
 -- Users can only update files in their tenant's folder
 DROP POLICY IF EXISTS "Authenticated Update Access for Organization Assets" ON storage.objects;
@@ -65,7 +60,6 @@ USING (
     bucket_id = 'organization-assets' AND
     (storage.foldername(name))[1]::uuid = (select get_user_tenant_id(auth.uid()))
 );
-
 -- Policy: Authenticated Delete Access (Tenant Isolation)
 -- Users can only delete files in their tenant's folder
 DROP POLICY IF EXISTS "Authenticated Delete Access for Organization Assets" ON storage.objects;
@@ -76,5 +70,4 @@ USING (
     bucket_id = 'organization-assets' AND
     (storage.foldername(name))[1]::uuid = (select get_user_tenant_id(auth.uid()))
 );
-
 COMMIT;

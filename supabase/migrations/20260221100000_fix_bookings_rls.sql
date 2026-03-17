@@ -6,7 +6,6 @@
 DROP POLICY IF EXISTS "Users can view bookings in their tenant" ON public.bookings;
 DROP POLICY IF EXISTS "Users can create bookings in their tenant" ON public.bookings;
 DROP POLICY IF EXISTS "Users can update bookings in their tenant" ON public.bookings;
-
 -- 2. Recreate policies with Platform Admin bypass
 
 -- SELECT Policy
@@ -28,7 +27,6 @@ CREATE POLICY "Users can view bookings" ON public.bookings
             )
         )
     );
-
 -- Simplify the SELECT logic for non-admins to match original intent but be safer:
 -- If get_user_franchise_id returns a value, enforce it. If null, assume tenant-wide access (like Tenant Admin).
 -- But wait, standard users might also have null franchise_id but shouldn't see everything if they are restricted?
@@ -63,7 +61,6 @@ CREATE POLICY "Users can view bookings" ON public.bookings
             )
         )
     );
-
 -- INSERT Policy
 CREATE POLICY "Users can create bookings" ON public.bookings
     FOR INSERT WITH CHECK (
@@ -71,7 +68,6 @@ CREATE POLICY "Users can create bookings" ON public.bookings
         OR 
         tenant_id = public.get_user_tenant_id(auth.uid())
     );
-
 -- UPDATE Policy
 CREATE POLICY "Users can update bookings" ON public.bookings
     FOR UPDATE USING (
@@ -79,7 +75,6 @@ CREATE POLICY "Users can update bookings" ON public.bookings
         OR 
         tenant_id = public.get_user_tenant_id(auth.uid())
     );
-
 -- DELETE Policy (Adding this as it was missing)
 CREATE POLICY "Users can delete bookings" ON public.bookings
     FOR DELETE USING (

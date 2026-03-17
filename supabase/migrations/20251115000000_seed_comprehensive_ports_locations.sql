@@ -6,7 +6,6 @@
 -- Total Entries: 154
 
 BEGIN;
-
 -- Ensure tenant_id is nullable (already done in previous migrations, but safe to re-assert via logic if needed, 
 -- here we assume schema is ready as per previous analysis)
 
@@ -43,7 +42,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'USLAX')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -73,7 +71,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'USLGB')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -103,7 +100,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'USNYC')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -133,7 +129,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'USSAV')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -163,7 +158,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'USHOU')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -193,7 +187,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'USSEA')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -223,7 +216,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'USTAC')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -253,7 +245,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'USCHS')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -283,7 +274,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'USORF')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -313,7 +303,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'USOAK')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -343,7 +332,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'USMIA')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -373,7 +361,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'USJAX')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -403,7 +390,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'USBAL')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -433,7 +419,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'USMSY')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -463,7 +448,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'USPHL')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -493,7 +477,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'USMOB')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -523,7 +506,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'USILM')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -553,7 +535,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'USBOS')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -583,7 +564,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'USPDX')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -613,7 +593,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'USANC')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -643,7 +622,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'USHNL')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -673,7 +651,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'PRSJU')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -703,7 +680,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'USGPT')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -733,7 +709,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'USTPA')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -763,7 +738,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'USPEF')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -793,7 +767,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'CNSHA')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -823,7 +796,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'SGSIN')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -853,7 +825,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'CNNBG')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -883,7 +854,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'CNSZX')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -913,7 +883,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'CNCAN')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -943,7 +912,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'KRPUS')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -973,7 +941,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'CNTAO')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -1003,7 +970,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'HKHKG')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -1033,7 +999,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'CNTSN')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -1063,7 +1028,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'NLRTM')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -1093,7 +1057,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'BEANR')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -1123,7 +1086,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'AEJEA')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -1153,7 +1115,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'MYPKG')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -1183,7 +1144,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'DEHAM')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -1213,7 +1173,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'MYTPP')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -1243,7 +1202,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'THLCH')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -1273,7 +1231,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'TWKHH')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -1303,7 +1260,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'IDTPP')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -1333,7 +1289,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'VNSGN')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -1363,7 +1318,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'LKCMB')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -1393,7 +1347,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'PHMNL')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -1423,7 +1376,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'GBFXT')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -1453,7 +1405,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'ESVLC')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -1483,7 +1434,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'GRPIR')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -1513,7 +1463,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'ESALG')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -1543,7 +1492,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'DEBRV')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -1573,7 +1521,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'ITGIT')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -1603,7 +1550,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'INMUN')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -1633,7 +1579,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'INNSA')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -1663,7 +1608,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'BRSSZ')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -1693,7 +1637,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'PECLL')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -1723,7 +1666,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'CLSAI')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -1753,7 +1695,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'CAVAN')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -1783,7 +1724,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'CAMTR')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -1813,7 +1753,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'LAX')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -1843,7 +1782,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'JFK')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -1873,7 +1811,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'ORD')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -1903,7 +1840,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'ATL')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -1933,7 +1869,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'DFW')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -1963,7 +1898,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'DEN')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -1993,7 +1927,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'SFO')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -2023,7 +1956,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'SEA')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -2053,7 +1985,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'MIA')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -2083,7 +2014,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'MCO')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -2113,7 +2043,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'EWR')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -2143,7 +2072,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'LAS')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -2173,7 +2101,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'PHX')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -2203,7 +2130,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'CLT')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -2233,7 +2159,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'IAH')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -2263,7 +2188,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'BOS')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -2293,7 +2217,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'MSP')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -2323,7 +2246,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'DTW')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -2353,7 +2275,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'PHL')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -2383,7 +2304,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'LGA')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -2413,7 +2333,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'SLC')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -2443,7 +2362,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'FLL')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -2473,7 +2391,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'BWI')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -2503,7 +2420,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'IAD')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -2533,7 +2449,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'DCA')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -2563,7 +2478,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'SAN')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -2593,7 +2507,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'TPA')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -2623,7 +2536,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'PDX')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -2653,7 +2565,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'HNL')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -2683,7 +2594,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'ANC')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -2713,7 +2623,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'LHR')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -2743,7 +2652,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'DXB')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -2773,7 +2681,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'HND')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -2803,7 +2710,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'CDG')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -2833,7 +2739,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'AMS')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -2863,7 +2768,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'FRA')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -2893,7 +2797,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'IST')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -2923,7 +2826,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'SIN')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -2953,7 +2855,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'ICN')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -2983,7 +2884,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'BKK')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -3013,8 +2913,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'HKG')
 );
-
-
 -- Batch 2
 INSERT INTO public.ports_locations (
   tenant_id, 
@@ -3045,7 +2943,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'DOH')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -3075,7 +2972,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'MAD')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -3105,7 +3001,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'PEK')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -3135,7 +3030,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'PVG')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -3165,7 +3059,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'CAN')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -3195,7 +3088,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'MUC')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -3225,7 +3117,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'YYZ')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -3255,7 +3146,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'YVR')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -3285,7 +3175,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'YUL')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -3315,7 +3204,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'MEX')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -3345,7 +3233,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'GRU')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -3375,7 +3262,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'SYD')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -3405,7 +3291,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'BOM')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -3435,7 +3320,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'DEL')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -3465,7 +3349,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'ZRH')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -3495,7 +3378,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'CPH')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -3525,7 +3407,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'OSL')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -3555,7 +3436,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'ARN')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -3585,7 +3465,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'HEL')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -3615,7 +3494,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'BRU')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -3645,7 +3523,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'VIE')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -3675,7 +3552,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'FCO')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -3705,7 +3581,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'MXP')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -3735,7 +3610,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'DUB')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -3765,7 +3639,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'JNB')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -3795,7 +3668,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'CAI')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -3825,7 +3697,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'BOG')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -3855,7 +3726,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'LIM')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -3885,7 +3755,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'SCL')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -3915,7 +3784,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'EZE')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -3945,7 +3813,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'AKL')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -3975,7 +3842,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'MEL')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -4005,7 +3871,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'BNE')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -4035,7 +3900,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'PER')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -4065,7 +3929,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'USCHI-RL')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -4095,7 +3958,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'USMKC-RL')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -4125,7 +3987,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'USMEM-RL')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -4155,7 +4016,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'USSTL-RL')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -4185,7 +4045,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'USATL-RL')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -4215,7 +4074,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'USDAL-RL')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -4245,7 +4103,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'USHOU-RL')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -4275,7 +4132,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'USMSP-RL')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -4305,7 +4161,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'USDTW-RL')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -4335,7 +4190,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'USDEN-RL')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -4365,7 +4219,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'USSLC-RL')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -4395,7 +4248,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'USPDX-RL')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -4425,7 +4277,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'USSEA-RL')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -4455,7 +4306,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'USLAX-RL')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -4485,7 +4335,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'USEWR-RL')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -4515,7 +4364,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'USJAX-RL')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -4545,7 +4393,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'USSAV-RL')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -4575,7 +4422,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'USCHS-RL')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -4605,7 +4451,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'USMSY-RL')
 );
-
 INSERT INTO public.ports_locations (
   tenant_id, 
   location_name, 
@@ -4635,5 +4480,4 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.ports_locations 
   WHERE (tenant_id IS NULL) AND (location_code = 'USELP-RL')
 );
-
 COMMIT;

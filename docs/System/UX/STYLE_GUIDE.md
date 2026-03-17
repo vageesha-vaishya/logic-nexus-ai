@@ -36,3 +36,12 @@
 *   [ ] All interactive elements have `aria-label` or visible text.
 *   [ ] Color is not the only conveyor of information (use icons/text too).
 *   [ ] Focus states are visible (`ring-2 ring-ring`).
+
+## 7. CRM Header Navigation Standard
+*   Every CRM module page must use `CRMModuleHeaderNavigation` in the top actions area.
+*   Header control order is fixed: `Pipeline`, `Card`, `Grid`, `List`, `New`, `Refresh`, `Import/Export`, `Theme`.
+*   Lead module uses `New Lead` label while other modules use module-specific `New` label.
+*   Theme selector must default to `Azure Sky` for first-time users and persist per module.
+*   View mode must persist per module and survive page refresh and module switching.
+*   Pipeline option should route to module pipeline page when a dedicated route exists.
+*   Header controls must remain keyboard accessible and expose aria labels.

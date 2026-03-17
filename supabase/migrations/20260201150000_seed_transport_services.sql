@@ -3,7 +3,6 @@
 -- Focuses on Ocean, Air, Road, and Rail variations.
 
 BEGIN;
-
 DO $$
 DECLARE
     v_tenant_id UUID;
@@ -158,5 +157,4 @@ BEGIN
     END IF;
 
 END $$;
-
 COMMIT;

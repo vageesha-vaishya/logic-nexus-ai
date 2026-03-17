@@ -1,17 +1,14 @@
 -- Step 1: Add service_type_id column to quotes table
 ALTER TABLE public.quotes
 ADD COLUMN IF NOT EXISTS service_type_id UUID REFERENCES public.service_types(id);
-
 -- Step 2: Update quotes with matching service types
 UPDATE public.quotes q
 SET service_type_id = st.id
 FROM public.service_types st
 WHERE st.name = q.service_type;
-
 -- Step 3: Drop service_type text column from quotes
 ALTER TABLE public.quotes
 DROP COLUMN IF EXISTS service_type;
-
 -- Step 4: Check if quote_items table has mode or service_type column
 DO $$
 BEGIN

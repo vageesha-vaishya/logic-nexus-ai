@@ -1,10 +1,8 @@
-
 -- Compliance Screening Module (RPS)
 -- Date: 2026-02-07
 -- Description: Adds RPS Watchlist and screening RPCs.
 
 BEGIN;
-
 --------------------------------------------------------------------------------
 -- 1. RPS Watchlist (Mock Data Source)
 --------------------------------------------------------------------------------
@@ -18,13 +16,10 @@ CREATE TABLE IF NOT EXISTS public.rps_watch_list (
   match_score_threshold INTEGER DEFAULT 80, -- Minimum score to trigger match
   created_at TIMESTAMPTZ DEFAULT now()
 );
-
 -- Index for fuzzy search (using trigram if available, else simple index)
 CREATE INDEX IF NOT EXISTS idx_rps_name ON public.rps_watch_list(name);
-
 -- RLS
 ALTER TABLE public.rps_watch_list ENABLE ROW LEVEL SECURITY;
-
 DO $$ 
 BEGIN
   IF NOT EXISTS (
@@ -33,7 +28,6 @@ BEGIN
     CREATE POLICY "Public read rps list" ON public.rps_watch_list FOR SELECT USING (true);
   END IF;
 END $$;
-
 --------------------------------------------------------------------------------
 -- 2. RPS Screening RPC
 --------------------------------------------------------------------------------
@@ -74,5 +68,4 @@ BEGIN
   RETURN QUERY SELECT v_found, v_details;
 END;
 $$;
-
 COMMIT;

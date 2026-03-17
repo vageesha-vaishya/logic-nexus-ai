@@ -4,7 +4,6 @@
 -- 2. Implements convert_quote_to_shipment RPC to generate shipments from quotes.
 
 BEGIN;
-
 --------------------------------------------------------------------------------
 -- 1. Update create_invoice_from_shipment to use shipment_items
 --------------------------------------------------------------------------------
@@ -167,8 +166,6 @@ BEGIN
   RETURN v_invoice_id;
 END;
 $$ LANGUAGE plpgsql;
-
-
 --------------------------------------------------------------------------------
 -- 2. Convert Quote to Shipment RPC
 --------------------------------------------------------------------------------
@@ -330,8 +327,6 @@ BEGIN
   RETURN v_shipment_id;
 END;
 $$ LANGUAGE plpgsql;
-
 -- Grant Access
 GRANT EXECUTE ON FUNCTION public.convert_quote_to_shipment(UUID, UUID) TO authenticated;
-
 COMMIT;

@@ -14,10 +14,8 @@ CREATE TABLE IF NOT EXISTS public.mapping_audit_logs (
     metadata JSONB DEFAULT '{}'::jsonb, -- IP, User Agent
     created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
-
 -- RLS for Audit Logs
 ALTER TABLE public.mapping_audit_logs ENABLE ROW LEVEL SECURITY;
-
 CREATE POLICY "Tenant admins can view audit logs" ON public.mapping_audit_logs
     FOR SELECT
     USING (
@@ -32,13 +30,11 @@ CREATE POLICY "Tenant admins can view audit logs" ON public.mapping_audit_logs
              -- Add more granular permissions if needed
         )
     );
-
 CREATE POLICY "Users can insert audit logs" ON public.mapping_audit_logs
     FOR INSERT
     WITH CHECK (
         auth.uid() = user_id
     );
-
 -- 2. Validation RPC
 CREATE OR REPLACE FUNCTION public.validate_quote_for_booking(
     p_quote_id UUID

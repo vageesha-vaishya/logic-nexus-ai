@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { Meta, StoryObj } from '@storybook/react';
+import type { Meta, StoryObj } from '@storybook/react-vite';
 import { FormStepper } from '@/components/system/FormStepper';
 import { FormGrid, FormItem } from '@/components/forms/FormLayout';
 import { Input } from '@/components/ui/input';

@@ -1,4 +1,3 @@
-
 -- Migration to seed default Logistics Quotation Templates
 -- Templates: FCL, LCL, Air Freight, Multimodal, Express
 
@@ -17,7 +16,6 @@ CREATE TABLE IF NOT EXISTS "public"."quote_templates" (
     "created_at" timestamp with time zone DEFAULT now(),
     "updated_at" timestamp with time zone DEFAULT now()
 );
-
 -- Insert FCL Template
 INSERT INTO "public"."quote_templates" ("name", "description", "category", "content", "is_active", "version")
 VALUES (
@@ -61,7 +59,6 @@ VALUES (
   true,
   1
 );
-
 -- Insert LCL Template
 INSERT INTO "public"."quote_templates" ("name", "description", "category", "content", "is_active", "version")
 VALUES (
@@ -98,7 +95,6 @@ VALUES (
   true,
   1
 );
-
 -- Insert Air Freight Template
 INSERT INTO "public"."quote_templates" ("name", "description", "category", "content", "is_active", "version")
 VALUES (
@@ -135,7 +131,6 @@ VALUES (
   true,
   1
 );
-
 -- Insert Multimodal Template
 INSERT INTO "public"."quote_templates" ("name", "description", "category", "content", "is_active", "version")
 VALUES (
@@ -172,7 +167,6 @@ VALUES (
   true,
   1
 );
-
 -- Insert Express Template
 INSERT INTO "public"."quote_templates" ("name", "description", "category", "content", "is_active", "version")
 VALUES (

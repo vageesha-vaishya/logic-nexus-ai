@@ -1,11 +1,12 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
-import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Filter, RefreshCw, Plus, Download } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { ArrowLeft } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { KanbanBoard, ColumnType } from '@/components/kanban/KanbanBoard';
 import { KanbanItem } from '@/components/kanban/KanbanCard';
@@ -13,21 +14,42 @@ import { KanbanFunnel } from '@/components/kanban/KanbanFunnel';
 import { KanbanFilters } from '@/components/kanban/KanbanFilters';
 import { PipelineAnalytics } from '@/components/analytics/PipelineAnalytics';
 import { toast } from 'sonner';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { LayoutGrid, BarChart3 } from "lucide-react";
+import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { Lead, LeadStatus, stages, statusConfig } from './leads-data';
 import { usePerformanceMonitor } from '@/hooks/usePerformanceMonitor';
-import { THEME_PRESETS } from '@/theme/themes';
 import { themeStyleFromPreset } from '@/lib/theme-utils';
-import { Palette } from 'lucide-react';
-import { ViewToggle } from '@/components/ui/view-toggle';
 import { DashboardOverview, ContactsSection, TasksSection, DashboardStats, CreateTaskDialog } from '@/components/crm/LeadsPipelineComponents';
 import { Task } from '@/components/crm/TaskScheduler';
-import { useLeadsViewState } from '@/hooks/useLeadsViewState';
+import { useLeadsViewState, LeadsPrimaryView } from '@/hooks/useLeadsViewState';
 import { logger } from '@/lib/logger';
 import * as Sentry from '@sentry/react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PipelineService } from '@/services/pipeline-service';
+import { CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
+
+const stageBarColor: Record<LeadStatus, string> = {
+  new: 'bg-red-500/80',
+  contacted: 'bg-red-500/80',
+  qualified: 'bg-red-500/80',
+  proposal: 'bg-red-500/80',
+  negotiation: 'bg-red-500/80',
+  won: 'bg-red-500/80',
+  lost: 'bg-red-500/80',
+  converted: 'bg-red-500/80',
+};
+
+export function parseSelectedPipelineStages(statusParam: string | null): LeadStatus[] {
+  if (!statusParam) return [];
+  return statusParam
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter((entry): entry is LeadStatus => stages.includes(entry as LeadStatus));
+}
+
+export function getVisiblePipelineStages(selected: LeadStatus[]): LeadStatus[] {
+  if (selected.length === 0) return stages;
+  return stages.filter((stage) => selected.includes(stage));
+}
 
 // Loading skeleton for the pipeline
 function PipelineSkeleton() {
@@ -35,11 +57,22 @@ function PipelineSkeleton() {
     <div className="flex h-full gap-3 pb-4 overflow-x-auto">
       {[1, 2, 3, 4].map((i) => (
         <div key={i} className="w-[300px] flex-shrink-0 flex flex-col gap-2">
-          <Skeleton className="h-12 w-full rounded-lg" />
-          <div className="flex-1 space-y-2">
+          <div className="rounded-md border border-[#e4e8f0] bg-white p-2.5">
+            <div className="mb-2 flex items-center justify-between">
+              <Skeleton className="h-4 w-16 rounded-sm" />
+              <Skeleton className="h-4 w-6 rounded-sm" />
+            </div>
+            <div className="h-0.5 w-full rounded-full bg-red-500/80" />
+          </div>
+          <div className="rounded-md border border-[#edf1f7] bg-white p-1.5">
+            <div className="flex-1 space-y-2">
             {[1, 2, 3].map((j) => (
-              <Skeleton key={j} className="h-28 w-full rounded-lg" />
+                <div key={j} className="relative pl-4">
+                  <span className="absolute left-1.5 top-0 h-full w-[3px] rounded-full bg-[#e5e7eb]" />
+                  <Skeleton className="h-28 w-full rounded-md border border-[#e7ebf2]" />
+                </div>
             ))}
+            </div>
           </div>
         </div>
       ))}
@@ -56,6 +89,7 @@ export default function LeadsPipeline() {
   const { state: viewState, setTheme, setView, setPipeline, setWorkspace } = useLeadsViewState();
   const currentTheme = viewState.theme;
   const isNavigatingAwayFromPipeline = useRef(false);
+  const hasRestoredPipelineFiltersRef = useRef(false);
 
   const [leads, setLeads] = useState<Lead[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -63,51 +97,41 @@ export default function LeadsPipeline() {
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const [isCreateTaskOpen, setIsCreateTaskOpen] = useState(false);
   const [isSavingTask, setIsSavingTask] = useState(false);
-  const [isSavingDefault, setIsSavingDefault] = useState(false);
 
   // URL State - memoized to prevent recalculation
   const searchQuery = searchParams.get('q') || '';
-  const selectedStages = useMemo(() => {
-    const s = searchParams.get('status');
-    return s ? (s.split(',') as LeadStatus[]).filter(x => stages.includes(x)) : [];
+  const selectedStages = useMemo(
+    () => parseSelectedPipelineStages(searchParams.get('status')),
+    [searchParams]
+  );
+  const selectedSources = useMemo(() => {
+    const value = searchParams.get('source');
+    if (!value) return [];
+    return value.split(',').map((entry) => decodeURIComponent(entry)).filter(Boolean);
   }, [searchParams]);
+  const selectedCustomFieldTokens = useMemo(() => {
+    const value = searchParams.get('custom');
+    if (!value) return [];
+    return value.split(',').map((entry) => decodeURIComponent(entry)).filter(Boolean);
+  }, [searchParams]);
+  const fromDate = searchParams.get('from') || '';
+  const toDate = searchParams.get('to') || '';
   const currentView = searchParams.get('view') || 'board';
+  const selectedCustomFieldPairs = useMemo(() => {
+    return selectedCustomFieldTokens
+      .map((token) => {
+        const separatorIndex = token.indexOf('::');
+        if (separatorIndex <= 0) return null;
+        const key = token.slice(0, separatorIndex).trim();
+        const value = token.slice(separatorIndex + 2).trim();
+        if (!key || !value) return null;
+        return { key, value };
+      })
+      .filter((item): item is { key: string; value: string } => Boolean(item));
+  }, [selectedCustomFieldTokens]);
 
   // Stable context check
   const isContextReady = Boolean(context?.tenantId || context?.isPlatformAdmin);
-
-  const handleSetDefaultView = useCallback(async () => {
-    if (!context) return;
-    try {
-      setIsSavingDefault(true);
-      try {
-        localStorage.setItem('leadsViewMode', 'pipeline');
-        localStorage.setItem('leadsTheme', viewState.theme);
-      } catch {
-        void 0;
-      }
-      if (context.userId) {
-        const userViewKey = `user:${context.userId}:leads.default_view`;
-        const userThemeKey = `user:${context.userId}:leads.default_theme`;
-        const [{ error: vErr }, { error: tErr }] = await Promise.all([
-          scopedDb.setSystemSetting(userViewKey, 'pipeline'),
-          scopedDb.setSystemSetting(userThemeKey, viewState.theme),
-        ]);
-        if (vErr || tErr) throw (vErr || tErr);
-      }
-      toast.success(t('leads.messages.defaultSet', 'Default saved'));
-    } catch (error) {
-      logger.error('Failed to set pipeline as default view', {
-        view: 'pipeline',
-        theme: viewState.theme,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      Sentry.captureException(error);
-      toast.error(t('leads.messages.defaultSetFailed', 'Failed to save default'));
-    } finally {
-      setIsSavingDefault(false);
-    }
-  }, [context, supabase, viewState.theme, t]);
 
   // Load theme default - only once after hydration
   useEffect(() => {
@@ -153,6 +177,48 @@ export default function LeadsPipeline() {
     setPipeline({ q: searchQuery, status: selectedStages, tab });
   }, [currentView, searchQuery, selectedStages.join(','), viewState.hydrated]);
 
+  useEffect(() => {
+    if (!viewState.hydrated) return;
+    if (hasRestoredPipelineFiltersRef.current) return;
+    if (
+      searchQuery ||
+      selectedStages.length > 0 ||
+      selectedSources.length > 0 ||
+      selectedCustomFieldTokens.length > 0 ||
+      fromDate ||
+      toDate
+    ) {
+      hasRestoredPipelineFiltersRef.current = true;
+      return;
+    }
+    const persistedQuery = viewState.pipeline.q?.trim() || '';
+    const persistedStatuses = (viewState.pipeline.status || []).filter((entry) => stages.includes(entry as LeadStatus));
+    if (!persistedQuery && persistedStatuses.length === 0) {
+      hasRestoredPipelineFiltersRef.current = true;
+      return;
+    }
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (!next.get('q') && persistedQuery) next.set('q', persistedQuery);
+      if (!next.get('status') && persistedStatuses.length > 0) next.set('status', persistedStatuses.join(','));
+      if (!next.get('view') && viewState.pipeline.tab) next.set('view', viewState.pipeline.tab);
+      return next;
+    }, { replace: true });
+    hasRestoredPipelineFiltersRef.current = true;
+  }, [
+    viewState.hydrated,
+    viewState.pipeline.q,
+    viewState.pipeline.status.join(','),
+    viewState.pipeline.tab,
+    searchQuery,
+    selectedStages.length,
+    selectedSources.length,
+    selectedCustomFieldTokens.length,
+    fromDate,
+    toDate,
+    setSearchParams
+  ]);
+
   const handleSearchChange = useCallback((val: string) => {
     setSearchParams(prev => {
       const newParams = new URLSearchParams(prev);
@@ -179,30 +245,94 @@ export default function LeadsPipeline() {
     });
   }, [setSearchParams]);
 
+  const handleSourceFilterChange = useCallback((values: string[]) => {
+    setSearchParams(prev => {
+      const newParams = new URLSearchParams(prev);
+      if (values.length > 0) {
+        newParams.set('source', values.map((value) => encodeURIComponent(value)).join(','));
+      } else {
+        newParams.delete('source');
+      }
+      return newParams;
+    });
+  }, [setSearchParams]);
+
+  const handleCustomFieldFilterChange = useCallback((values: string[]) => {
+    setSearchParams(prev => {
+      const newParams = new URLSearchParams(prev);
+      if (values.length > 0) {
+        newParams.set('custom', values.map((value) => encodeURIComponent(value)).join(','));
+      } else {
+        newParams.delete('custom');
+      }
+      return newParams;
+    });
+  }, [setSearchParams]);
+
+  const handleDateFilterChange = useCallback((key: 'from' | 'to', value: string) => {
+    setSearchParams(prev => {
+      const newParams = new URLSearchParams(prev);
+      if (value) {
+        newParams.set(key, value);
+      } else {
+        newParams.delete(key);
+      }
+      return newParams;
+    }, { replace: true });
+  }, [setSearchParams]);
+
+  const handleResetFilters = useCallback(() => {
+    setSearchParams(prev => {
+      const newParams = new URLSearchParams(prev);
+      newParams.delete('q');
+      newParams.delete('status');
+      newParams.delete('source');
+      newParams.delete('custom');
+      newParams.delete('from');
+      newParams.delete('to');
+      newParams.delete('franchise');
+      return newParams;
+    }, { replace: true });
+  }, [setSearchParams]);
+
+  const currencySymbol = t('leads.pipeline.currencySymbol', ' €');
+
   // Stable fetch function - no dependencies on filter state
   const fetchLeads = useCallback(async () => {
     if (!isContextReady) return;
     
     setLoading(true);
     try {
-      const fromDate = searchParams.get('from');
-      const toDate = searchParams.get('to');
-      const franchiseId = searchParams.get('franchise');
-      const statusParam = searchParams.get('status');
-      const statuses = statusParam
-        ? (statusParam.split(',').filter((s): s is LeadStatus => stages.includes(s as LeadStatus)))
-        : [];
-
       const { data } = await PipelineService.listLeads(scopedDb, {
         page: 1,
         pageSize: 2000,
+        search: searchQuery || undefined,
         fromDate: fromDate || undefined,
         toDate: toDate || undefined,
-        franchiseId: franchiseId || undefined,
-        statuses,
+        statuses: selectedStages,
+        sources: selectedSources,
+        customFieldFilters: selectedCustomFieldPairs,
       });
       
-      const safeLeads = ((data as any[]) || []).map(d => ({
+      const incomingLeads = (data as any[]) || [];
+      const invalidStatusCounts = incomingLeads.reduce<Record<string, number>>((acc, lead) => {
+        const status = String(lead?.status ?? '');
+        if (!stages.includes(status as LeadStatus)) {
+          acc[status || '(empty)'] = (acc[status || '(empty)'] || 0) + 1;
+        }
+        return acc;
+      }, {});
+
+      if (Object.keys(invalidStatusCounts).length > 0) {
+        logger.warn('Invalid lead statuses detected in pipeline payload; remapping to new', {
+          invalidStatusCounts,
+          tenantId: context?.tenantId ?? null,
+          franchiseId: context?.franchiseId ?? null,
+          isPlatformAdmin: context?.isPlatformAdmin ?? false,
+        });
+      }
+
+      const safeLeads = incomingLeads.map(d => ({
         ...d,
         status: stages.includes(d.status as LeadStatus) ? (d.status as LeadStatus) : 'new'
       })) as Lead[];
@@ -218,7 +348,19 @@ export default function LeadsPipeline() {
       setLoading(false);
       setInitialLoadComplete(true);
     }
-  }, [scopedDb, isContextReady]);
+  }, [
+    scopedDb,
+    isContextReady,
+    context?.tenantId,
+    context?.franchiseId,
+    context?.isPlatformAdmin,
+    searchQuery,
+    fromDate,
+    toDate,
+    selectedStages.join(','),
+    selectedSources.join(','),
+    selectedCustomFieldTokens.join(','),
+  ]);
 
   const fetchTasks = useCallback(async () => {
     if (!isContextReady) return;
@@ -426,6 +568,9 @@ export default function LeadsPipeline() {
   }, [leads, isContextReady, scopedDb, fetchLeads]);
 
   const handleItemUpdate = useCallback(async (id: string, updates: Partial<KanbanItem>) => {
+    const previousLead = leads.find((lead) => lead.id === id);
+    if (!previousLead) return;
+
     const leadUpdates: Partial<Lead> = {};
     
     if (updates.title) {
@@ -440,21 +585,62 @@ export default function LeadsPipeline() {
       leadUpdates.estimated_value = updates.value;
     }
 
-    setLeads(prev => prev.map(l => l.id === id ? { ...l, ...leadUpdates } : l));
+    const optimisticLead = { ...previousLead, ...leadUpdates };
+    setLeads(prev => prev.map(l => l.id === id ? optimisticLead : l));
+
+    if (!isContextReady) return;
 
     try {
-      const { error } = await (scopedDb.from('leads') as any)
-        .update(leadUpdates)
-        .eq('id', id);
+      const result = await PipelineService.updateLead(scopedDb, {
+        id,
+        input: {
+          first_name: optimisticLead.first_name,
+          last_name: optimisticLead.last_name,
+          company: optimisticLead.company,
+          title: optimisticLead.title,
+          email: optimisticLead.email,
+          phone: optimisticLead.phone,
+          status: optimisticLead.status,
+          source: optimisticLead.source,
+          estimated_value: optimisticLead.estimated_value,
+          expected_close_date: optimisticLead.expected_close_date,
+          description: optimisticLead.description,
+          notes: optimisticLead.notes,
+          tenant_id: optimisticLead.tenant_id,
+          franchise_id: optimisticLead.franchise_id,
+          custom_fields: optimisticLead.custom_fields,
+        },
+        expectedUpdatedAt: previousLead.updated_at,
+      });
 
-      if (error) throw error;
+      if (result.ok === false) {
+        if (result.code === 'conflict') {
+          if (result.current) {
+            setLeads((prev) => prev.map((lead) => (lead.id === id ? result.current! : lead)));
+          } else {
+            fetchLeads();
+          }
+          toast.error('Lead was updated by another user. Board has been refreshed.');
+          return;
+        }
+
+        if (result.code === 'duplicate') {
+          setLeads((prev) => prev.map((lead) => (lead.id === id ? previousLead : lead)));
+          toast.error(result.message);
+          return;
+        }
+
+        throw new Error(result.message);
+      }
+
+      setLeads((prev) => prev.map((lead) => (lead.id === id ? result.data : lead)));
       toast.success("Lead updated");
     } catch (error) {
       console.error('Error updating lead:', error);
       toast.error('Failed to update lead');
       fetchLeads();
     }
-  }, [supabase, fetchLeads]);
+  }, [leads, isContextReady, scopedDb, fetchLeads]);
 
   const onDragEnd = useCallback((activeId: string, overId: string, newStatus: string) => {
     if (stages.includes(newStatus as LeadStatus)) {
@@ -464,17 +650,41 @@ export default function LeadsPipeline() {
 
   // Filter logic - memoized
   const filteredLeads = useMemo(() => {
+    const parseBoundary = (value: string, boundary: 'start' | 'end') => {
+      if (!value) return null;
+      const parsed = new Date(`${value}${boundary === 'start' ? 'T00:00:00.000' : 'T23:59:59.999'}`);
+      if (Number.isNaN(parsed.getTime())) return null;
+      return parsed;
+    };
+    const fromBoundary = parseBoundary(fromDate, 'start');
+    const toBoundary = parseBoundary(toDate, 'end');
     return leads.filter(lead => {
       const matchesSearch = 
         searchQuery === '' || 
         `${lead.first_name} ${lead.last_name}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (lead.company || '').toLowerCase().includes(searchQuery.toLowerCase());
+        (lead.company || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (lead.email || '').toLowerCase().includes(searchQuery.toLowerCase());
       
       const matchesStage = selectedStages.length === 0 || selectedStages.includes(lead.status);
+      const matchesSource = selectedSources.length === 0 || selectedSources.includes(lead.source);
+      const createdAt = new Date(lead.created_at);
+      const matchesFromDate = !fromBoundary || createdAt >= fromBoundary;
+      const matchesToDate = !toBoundary || createdAt <= toBoundary;
+      const customFieldEntries = lead.custom_fields && typeof lead.custom_fields === 'object'
+        ? lead.custom_fields
+        : {};
+      const matchesCustomFields = selectedCustomFieldPairs.length === 0 || selectedCustomFieldPairs.every(({ key, value }) => {
+        const rawValue = (customFieldEntries as Record<string, unknown>)[key];
+        if (Array.isArray(rawValue)) {
+          return rawValue.some((item) => String(item).toLowerCase() === value.toLowerCase());
+        }
+        if (rawValue === null || rawValue === undefined) return false;
+        return String(rawValue).toLowerCase() === value.toLowerCase();
+      });
 
-      return matchesSearch && matchesStage;
+      return matchesSearch && matchesStage && matchesSource && matchesFromDate && matchesToDate && matchesCustomFields;
     });
-  }, [leads, searchQuery, selectedStages]);
+  }, [leads, searchQuery, selectedStages, selectedSources, fromDate, toDate, selectedCustomFieldPairs]);
 
   // Funnel Data - memoized
   const funnelData = useMemo(() => {
@@ -494,15 +704,19 @@ export default function LeadsPipeline() {
     return { labelMap, colorMap, counts };
   }, [leads]);
 
+  const visibleStages = useMemo(
+    () => getVisiblePipelineStages(selectedStages),
+    [selectedStages.join(',')]
+  );
+
   // Kanban columns - memoized
   const columns: ColumnType[] = useMemo(() => {
-    const visibleStages = selectedStages.length > 0 ? selectedStages : stages;
     return visibleStages.map(stage => ({
       id: stage,
       title: statusConfig[stage].label,
-      color: statusConfig[stage].color,
+      color: 'bg-red-500',
     }));
-  }, [selectedStages]);
+  }, [visibleStages.join(',')]);
 
   // Kanban items - memoized
   const items: KanbanItem[] = useMemo(() => {
@@ -511,15 +725,68 @@ export default function LeadsPipeline() {
       title: `${lead.first_name} ${lead.last_name}`,
       subtitle: lead.company || undefined,
       status: lead.status,
-      priority: (lead.lead_score || 0) >= 70 ? 'high' : (lead.lead_score || 0) < 40 ? 'low' : 'medium',
+      priority: (lead.lead_score || 0) >= 70 ? 'high' : (lead.lead_score || 0) < 30 ? 'low' : 'medium',
+      probability: Math.min(100, Math.max(0, lead.lead_score || 0)),
       value: lead.estimated_value || undefined,
+      currency: currencySymbol,
       updatedAt: lead.created_at,
       assignee: lead.owner_id ? { name: "User" } : undefined,
       tags: [lead.email].filter(Boolean) as string[],
     }));
-  }, [filteredLeads]);
+  }, [filteredLeads, currencySymbol]);
 
-  const handleNavigateAway = useCallback((mode: string) => {
+  const sourceFilterOptions = useMemo(() => {
+    const uniqueSources = Array.from(
+      new Set(
+        leads
+          .map((lead) => (lead.source || '').trim())
+          .filter((source) => source.length > 0)
+      )
+    ).sort((a, b) => a.localeCompare(b));
+
+    return uniqueSources.map((source) => ({
+      label: source,
+      value: source,
+    }));
+  }, [leads]);
+
+  const customFieldFilterOptions = useMemo(() => {
+    const optionMap = new Map<string, { label: string; value: string }>();
+
+    leads.forEach((lead) => {
+      const customFields = lead.custom_fields;
+      if (!customFields || typeof customFields !== 'object') return;
+      Object.entries(customFields).forEach(([key, rawValue]) => {
+        if (Array.isArray(rawValue)) {
+          rawValue.forEach((item) => {
+            if (item === null || item === undefined || typeof item === 'object') return;
+            const normalizedValue = String(item).trim();
+            if (!normalizedValue) return;
+            const token = `${key}::${normalizedValue}`;
+            if (!optionMap.has(token)) {
+              optionMap.set(token, { label: `${key}: ${normalizedValue}`, value: token });
+            }
+          });
+          return;
+        }
+        if (rawValue === null || rawValue === undefined || typeof rawValue === 'object') return;
+        const normalizedValue = String(rawValue).trim();
+        if (!normalizedValue) return;
+        const token = `${key}::${normalizedValue}`;
+        if (!optionMap.has(token)) {
+          optionMap.set(token, { label: `${key}: ${normalizedValue}`, value: token });
+        }
+      });
+    });
+
+    return Array.from(optionMap.values()).sort((a, b) => a.label.localeCompare(b.label)).slice(0, 50);
+  }, [leads]);
+
+  const handleNavigateAway = useCallback((mode: LeadsPrimaryView) => {
+    if (mode === 'pipeline') {
+      handleViewChange('board');
+      return;
+    }
     if (mode !== 'pipeline') {
       isNavigatingAwayFromPipeline.current = true;
       try {
@@ -534,7 +801,7 @@ export default function LeadsPipeline() {
       });
       navigate('/dashboard/leads');
     }
-  }, [setView, setWorkspace, searchQuery, selectedStages, navigate]);
+  }, [handleViewChange, navigate, searchQuery, selectedStages, setView, setWorkspace]);
 
   // Show skeleton while waiting for context or initial load
   if (!isContextReady || !initialLoadComplete) {
@@ -566,97 +833,40 @@ export default function LeadsPipeline() {
         <div className="flex-none">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h1 className="text-3xl font-bold tracking-tight">{t('leads.title', 'Leads Pipeline')}</h1>
-              <p className="text-muted-foreground">{t('leads.subtitle', 'Manage and track your lead progression')}</p>
+              <h1 className="text-3xl font-bold tracking-tight">{t('leads.title', 'Leads Workspace')}</h1>
             </div>
-            <div className="flex items-center gap-2">
-              <Select value={currentTheme} onValueChange={handleThemeChange}>
-                <SelectTrigger className="w-[140px] h-8 text-xs">
-                  <Palette className="mr-2 h-3 w-3" />
-                  <SelectValue placeholder="Theme" />
-                </SelectTrigger>
-                <SelectContent>
-                  {THEME_PRESETS.map(theme => (
-                    <SelectItem key={theme.name} value={theme.name}>
-                      {theme.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button variant="outline" size="sm" onClick={fetchLeads} disabled={loading}>
-                <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-                {t('leads.actions.refresh', 'Refresh')}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  const params = new URLSearchParams();
-                  if (searchQuery) params.set('q', searchQuery);
-                  if (selectedStages.length > 0) params.set('status', selectedStages.join(','));
-                  params.set('from', 'pipeline');
-                  navigate(`/dashboard/leads/import-export?${params.toString()}`);
-                }}
-              >
-                <Download className="h-4 w-4 mr-2" />
-                {t('leads.actions.importExport', 'Import/Export')}
-              </Button>
-              <ViewToggle
-                value="pipeline"
-                modes={['pipeline', 'card', 'grid', 'list']}
-                onChange={handleNavigateAway}
-              />
-              {context?.isPlatformAdmin && (
-                <Button variant="outline" size="sm" onClick={handleSetDefaultView} disabled={isSavingDefault}>
-                  {t('leads.actions.setDefault', 'Set as Default')}
-                </Button>
-              )}
-              <Button asChild size="sm">
-                <Link to="/dashboard/leads/new">
-                  <Plus className="mr-2 h-4 w-4" />
-                  {t('leads.actions.newLead', 'New Lead')}
-                </Link>
-              </Button>
-            </div>
-          </div>
-
-          {/* Funnel */}
-          <div className={currentView === 'analytics' ? 'hidden' : 'block'}>
-            <KanbanFunnel
-              stages={stages}
-              labels={funnelData.labelMap}
-              colors={funnelData.colorMap}
-              counts={funnelData.counts}
-              total={leads.length}
-              activeStages={selectedStages}
-              onStageClick={(s) => {
-                const exists = selectedStages.includes(s as LeadStatus);
-                const nextSel = exists 
-                  ? selectedStages.filter((x) => x !== s) 
-                  : [...selectedStages, s as LeadStatus];
-                handleStageFilterChange(nextSel);
+            <CRMModuleHeaderNavigation
+              moduleLabel="Leads"
+              viewMode="pipeline"
+              theme={currentTheme}
+              onViewModeChange={(mode) => handleNavigateAway(mode as LeadsPrimaryView)}
+              analyticsLabel={t('leads.tabs.analytics', 'Analytics')}
+              analyticsActive={currentView === 'analytics'}
+              onAnalyticsClick={() => handleViewChange('analytics')}
+              controlSequence={['pipeline', 'list', 'create', 'card', 'grid', 'refresh', 'analytics', 'importExport', 'theme']}
+              onThemeChange={handleThemeChange}
+              onCreate={() => navigate('/dashboard/leads/new')}
+              createLabel="New Lead"
+              iconOnly
+              onRefresh={fetchLeads}
+              onImportExport={() => {
+                const params = new URLSearchParams();
+                if (searchQuery) params.set('q', searchQuery);
+                if (selectedStages.length > 0) params.set('status', selectedStages.join(','));
+                if (selectedSources.length > 0) params.set('source', selectedSources.map((value) => encodeURIComponent(value)).join(','));
+                if (selectedCustomFieldTokens.length > 0) params.set('custom', selectedCustomFieldTokens.map((value) => encodeURIComponent(value)).join(','));
+                if (fromDate) params.set('from', fromDate);
+                if (toDate) params.set('to', toDate);
+                params.set('origin', 'pipeline');
+                navigate(`/dashboard/leads/import-export?${params.toString()}`);
               }}
-              onClearStage={() => handleStageFilterChange([])}
             />
           </div>
+
         </div>
 
-        {/* View Toggle */}
-        <div className="flex-none px-1">
-          <Tabs value={currentView} onValueChange={handleViewChange} className="w-full">
-            <div className="flex items-center justify-between mb-2">
-              <TabsList>
-                <TabsTrigger value="board" className="flex items-center gap-2">
-                  <LayoutGrid className="h-4 w-4" />
-                  {t('leads.tabs.board', 'Board')}
-                </TabsTrigger>
-                <TabsTrigger value="analytics" className="flex items-center gap-2">
-                  <BarChart3 className="h-4 w-4" />
-                  {t('leads.tabs.analytics', 'Analytics')}
-                </TabsTrigger>
-              </TabsList>
-            </div>
-            
+        <div className="flex-1 px-1 min-h-0">
+          <Tabs value={currentView} onValueChange={handleViewChange} className="w-full h-full">
             {/* Analytics Content */}
             <TabsContent value="analytics" className="mt-0">
               <PipelineAnalytics leads={filteredLeads} />
@@ -664,10 +874,6 @@ export default function LeadsPipeline() {
 
             {/* Board Content */}
             <TabsContent value="board" className="mt-0 flex flex-col gap-6 h-full">
-              <div className="flex-none">
-                <DashboardOverview stats={stats} />
-              </div>
-
               <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 flex-1 min-h-0">
                 <div className="lg:col-span-3 flex flex-col gap-4 h-full min-h-0">
                   {/* Filters */}
@@ -677,10 +883,37 @@ export default function LeadsPipeline() {
                         <KanbanFilters
                           searchQuery={searchQuery}
                           onSearchChange={handleSearchChange}
-                          filters={{ status: selectedStages }}
+                          leadingContent={(
+                            <>
+                              <Input
+                                type="date"
+                                className="h-9 w-[170px]"
+                                value={fromDate}
+                                onChange={(event) => handleDateFilterChange('from', event.target.value)}
+                                aria-label={t('leads.filters.fromDate', 'Start date')}
+                                title={t('leads.filters.fromDateFormat', 'Start date (dd/mm/yyyy)')}
+                              />
+                              <Input
+                                type="date"
+                                className="h-9 w-[170px]"
+                                value={toDate}
+                                onChange={(event) => handleDateFilterChange('to', event.target.value)}
+                                aria-label={t('leads.filters.toDate', 'End date')}
+                                title={t('leads.filters.toDateFormat', 'End date (dd/mm/yyyy)')}
+                              />
+                            </>
+                          )}
+                          filters={{
+                            status: selectedStages,
+                            source: selectedSources,
+                            custom: selectedCustomFieldTokens,
+                          }}
                           onFilterChange={(key, values) => {
                             if (key === 'status') handleStageFilterChange(values);
+                            if (key === 'source') handleSourceFilterChange(values);
+                            if (key === 'custom') handleCustomFieldFilterChange(values);
                           }}
+                          onReset={handleResetFilters}
                           availableFilters={[
                             {
                               id: 'status',
@@ -689,21 +922,51 @@ export default function LeadsPipeline() {
                                 label: t(`leads.filters.statusOptions.${s}`, statusConfig[s].label),
                                 value: s,
                               }))
+                            },
+                            {
+                              id: 'source',
+                              label: t('leads.filters.source', 'Source'),
+                              options: sourceFilterOptions,
+                            },
+                            {
+                              id: 'custom',
+                              label: t('leads.filters.customFields', 'Custom Fields'),
+                              options: customFieldFilterOptions,
                             }
                           ]}
                         />
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground px-2 pb-1">
-                          <Filter className="h-3 w-3" />
-                          <span>{filteredLeads.length} {t('leads.pipeline.leadsFound', 'leads found')}</span>
-                        </div>
+                        {selectedStages.length > 0 && (
+                          <div className="flex flex-wrap items-center gap-2 px-2 pb-1">
+                            <span className="text-xs text-muted-foreground">
+                              {t('leads.filters.visibleStatuses', 'Visible statuses')}
+                            </span>
+                            {selectedStages.map((stage) => (
+                              <Badge
+                                key={`visible-stage-${stage}`}
+                                variant="default"
+                                className="text-[10px] tracking-wide uppercase"
+                              >
+                                {statusConfig[stage].label}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
                       </CardContent>
                     </Card>
                   </div>
 
                   {/* Kanban Board */}
-                  <div className="flex-1 min-h-[500px] overflow-hidden bg-muted/20 rounded-lg border">
+                  <div className="flex-1 min-h-[420px] max-h-[calc(100vh-260px)] overflow-hidden bg-white rounded-lg border border-[#e5eaf2] p-2">
                     {loading && items.length === 0 ? (
                       <PipelineSkeleton />
+                    ) : columns.length === 0 ? (
+                      <div className="flex h-full items-center justify-center p-8 text-sm text-muted-foreground">
+                        {t('leads.pipeline.noStatusesVisible', 'No status columns selected')}
+                      </div>
+                    ) : items.length === 0 ? (
+                      <div className="flex h-full items-center justify-center p-8 text-sm text-muted-foreground">
+                        {t('leads.pipeline.noMatchingLeads', 'No leads match the current filters')}
+                      </div>
                     ) : (
                       <KanbanBoard 
                         columns={columns} 
@@ -711,6 +974,9 @@ export default function LeadsPipeline() {
                         onDragEnd={onDragEnd} 
                         onItemUpdate={handleItemUpdate}
                         onItemClick={(id) => navigate(`/dashboard/leads/${id}`)}
+                        className="h-full"
+                        scrollPersistenceKey="leads-pipeline-board"
+                        themeVariant="reference"
                       />
                     )}
                   </div>
@@ -724,6 +990,31 @@ export default function LeadsPipeline() {
                     onAddTask={handleAddTask}
                   />
                 </div>
+              </div>
+
+              <div className="flex-none">
+                <DashboardOverview stats={stats} />
+              </div>
+
+              <div className="flex-none">
+                <KanbanFunnel
+                  stages={stages}
+                  labels={funnelData.labelMap}
+                  colors={funnelData.colorMap}
+                  indicatorColors={stageBarColor}
+                  counts={funnelData.counts}
+                  total={leads.length}
+                  activeStages={selectedStages}
+                  layout="single-line"
+                  onStageClick={(s) => {
+                    const exists = selectedStages.includes(s as LeadStatus);
+                    const nextSel = exists
+                      ? selectedStages.filter((x) => x !== s)
+                      : [...selectedStages, s as LeadStatus];
+                    handleStageFilterChange(nextSel);
+                  }}
+                  onClearStage={() => handleStageFilterChange([])}
+                />
               </div>
             </TabsContent>
           </Tabs>

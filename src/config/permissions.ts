@@ -1,4 +1,7 @@
 // Permission slugs modeled after Salesforce-style modules and actions
+export type AppRole = 'platform_admin' | 'tenant_admin' | 'franchise_admin' | 'user';
+export const PLATFORM_ADMIN_ROLE: AppRole = 'platform_admin';
+
 export type Permission =
   | '*'
   | 'leads.view'
@@ -57,6 +60,9 @@ export type Permission =
   | 'admin.lead_routing.manage'
   | 'admin.lead_assignment.manage'
   | 'admin.settings.manage'
+  | 'domains.assign'
+  | 'domains.revoke'
+  | 'domains.audit.view'
   | 'shipments.view' | 'shipments.create' | 'shipments.edit' | 'shipments.delete'
   | 'shipments.approvals.view' | 'shipments.approvals.manage'
   | 'shipments.reports.view' | 'shipments.reports.manage'
@@ -75,7 +81,7 @@ export type Permission =
 
 
 export const ROLE_PERMISSIONS: Record<
-  'platform_admin' | 'tenant_admin' | 'franchise_admin' | 'user',
+  AppRole,
   Permission[]
 > = {
   platform_admin: [
@@ -97,6 +103,7 @@ export const ROLE_PERMISSIONS: Record<
     'calendar.view','calendar.manage',
     'email.manage',
     'admin.tenants.manage','admin.franchises.manage','admin.users.manage','admin.lead_routing.manage','admin.lead_assignment.manage','admin.settings.manage',
+    'domains.assign','domains.revoke','domains.audit.view',
     'shipments.view','shipments.create','shipments.edit','shipments.delete',
     'vendors.view','vendors.create','vendors.edit','vendors.delete',
     'warehouses.view','warehouses.create','warehouses.edit','warehouses.delete',
@@ -123,6 +130,7 @@ export const ROLE_PERMISSIONS: Record<
     'calendar.view','calendar.manage',
     'email.manage',
     'admin.franchises.manage','admin.users.manage','admin.lead_routing.manage','admin.lead_assignment.manage','admin.settings.manage',
+    'domains.audit.view',
     'shipments.view','shipments.create','shipments.edit','shipments.delete',
     'vendors.view','vendors.create','vendors.edit','vendors.delete',
     'shipments.approvals.view','shipments.approvals.manage',

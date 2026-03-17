@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pipelines, ArrowRight } from 'lucide-react';
+import { GitBranch, ArrowRight } from 'lucide-react';
 
 export function PipelineView() {
   const pipelineData = {
@@ -23,7 +23,7 @@ export function PipelineView() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Pipelines className="h-5 w-5 text-purple-600" />
+          <GitBranch className="h-5 w-5 text-purple-600" />
           <h4 className="font-semibold text-gray-900">Pipeline View</h4>
         </div>
         <span className="text-sm font-semibold text-gray-700">${(pipelineData.total / 1000000).toFixed(2)}M</span>

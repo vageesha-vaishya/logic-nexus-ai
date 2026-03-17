@@ -1,4 +1,3 @@
-
 ALTER TABLE "public"."quote_option_legs" ADD COLUMN IF NOT EXISTS "transport_mode" text;
 ALTER TABLE "public"."quote_option_legs" ADD COLUMN IF NOT EXISTS "sequence_number" integer;
 ALTER TABLE "public"."quote_option_legs" ADD COLUMN IF NOT EXISTS "origin_location_id" uuid REFERENCES public.ports_locations(id);

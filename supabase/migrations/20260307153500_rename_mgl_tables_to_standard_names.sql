@@ -28,7 +28,6 @@ BEGIN
     EXECUTE 'ALTER TABLE public.mgl_quotation_audit_logs RENAME TO quotation_audit_logs';
   END IF;
 END $$;
-
 DO $$
 BEGIN
   IF to_regclass('public.mgl_rate_matrix_view') IS NOT NULL AND to_regclass('public.rate_matrix_view') IS NULL THEN
@@ -39,7 +38,6 @@ BEGIN
     EXECUTE 'ALTER VIEW public.quotation_version_options_mgl_compat RENAME TO quotation_version_options_compat';
   END IF;
 END $$;
-
 DO $$
 DECLARE
   fn_signature regprocedure;

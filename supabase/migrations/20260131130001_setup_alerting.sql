@@ -28,10 +28,8 @@ BEGIN
     RETURN NEW;
 END;
 $$;
-
 -- 2. Create the trigger
 DROP TRIGGER IF EXISTS trg_critical_log_alert ON public.system_logs;
-
 CREATE TRIGGER trg_critical_log_alert
     AFTER INSERT ON public.system_logs
     FOR EACH ROW

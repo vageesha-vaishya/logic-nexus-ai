@@ -11,7 +11,6 @@ BEGIN
         ALTER TABLE public.emails ADD COLUMN metadata JSONB DEFAULT '{}'::jsonb;
     END IF;
 END $$;
-
 -- 2. Update Routing Trigger
 CREATE OR REPLACE FUNCTION public.process_email_queue_assignment()
 RETURNS TRIGGER

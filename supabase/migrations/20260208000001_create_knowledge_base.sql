@@ -1,5 +1,4 @@
 CREATE EXTENSION IF NOT EXISTS vector;
-
 CREATE TABLE IF NOT EXISTS public.knowledge_base (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   tenant_id uuid REFERENCES public.tenants(id),
@@ -10,9 +9,7 @@ CREATE TABLE IF NOT EXISTS public.knowledge_base (
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now()
 );
-
 ALTER TABLE public.knowledge_base ENABLE ROW LEVEL SECURITY;
-
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -29,7 +26,6 @@ BEGIN
       USING (tenant_id IS NULL OR tenant_id = get_user_tenant_id(auth.uid()));
   END IF;
 END $$;
-
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -46,7 +42,6 @@ BEGIN
       WITH CHECK (tenant_id = get_user_tenant_id(auth.uid()) OR tenant_id IS NULL);
   END IF;
 END $$;
-
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -65,6 +60,5 @@ BEGIN
       WITH CHECK (tenant_id = get_user_tenant_id(auth.uid()));
   END IF;
 END $$;
-
 CREATE INDEX IF NOT EXISTS idx_knowledge_base_embedding ON public.knowledge_base USING hnsw (embedding vector_cosine_ops);
 CREATE INDEX IF NOT EXISTS idx_knowledge_base_tenant ON public.knowledge_base (tenant_id);

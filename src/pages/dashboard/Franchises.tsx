@@ -1,11 +1,10 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Store, FileDown, FileUp } from 'lucide-react';
+import { Store } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useCRM } from '@/hooks/useCRM';
@@ -15,6 +14,7 @@ import { FirstScreenTemplate } from '@/components/system/FirstScreenTemplate';
 import { EmptyState } from '@/components/system/EmptyState';
 import { ViewMode } from '@/components/ui/view-toggle';
 import { EntityCard } from '@/components/system/EntityCard';
+import { logger } from '@/lib/logger';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TenantFranchiseMappingList } from "@/components/franchise/TenantFranchiseMappingList";
@@ -29,26 +29,81 @@ export default function Franchises() {
   const [viewMode, setViewMode] = useState<ViewMode>('list');
 
   const fetchFranchises = useCallback(async () => {
-    try {
-      const { data, error } = await scopedDb
-        .from('franchises')
-        // Disambiguate embed: direct FK franchises.tenant_id -> tenants.id
-        // Avoid PostgREST error: more than one relationship between franchises and tenants
-        .select('*, tenants:tenants!franchises_tenant_id_fkey(name)')
-        .order('created_at', { ascending: false });
+    const parsePayload = async (response: Response): Promise<{ json: any | null; text: string; isJson: boolean }> => {
+      const text = await response.text();
+      const contentType = String(response.headers.get('content-type') || '').toLowerCase();
+      const isJson = contentType.includes('application/json');
+      if (isJson) {
+        try {
+          return { json: JSON.parse(text), text, isJson: true };
+        } catch {
+          return { json: null, text, isJson: true };
+        }
+      }
+      return { json: null, text, isJson: false };
+    };
 
+    const loadScopedFranchises = async (): Promise<any[]> => {
+      let query = scopedDb
+        .from('franchises')
+        .select('id, name, code, tenant_id, is_active, created_at, address, tenants:tenants!franchises_tenant_id_fkey(name)')
+        .order('created_at', { ascending: false });
+      if (!context.isPlatformAdmin && context.tenantId) {
+        query = query.eq('tenant_id', context.tenantId);
+      }
+      const { data, error } = await query;
       if (error) throw error;
-      setFranchises(data || []);
+      return Array.isArray(data) ? data : [];
+    };
+
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData?.session?.access_token || '';
+      const response = await fetch('/api/v1/franchises', {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+          ...(!context.isPlatformAdmin && context.tenantId ? { 'x-tenant-id': context.tenantId } : {}),
+        },
+      });
+
+      const payload = await parsePayload(response);
+      if (!payload.isJson) {
+        logger.warn('Franchises API returned non-JSON response; falling back to scoped database query', {
+          component: 'Franchises',
+          status: response.status,
+          tenantId: context.tenantId || null,
+          isPlatformAdmin: context.isPlatformAdmin,
+          preview: payload.text.slice(0, 120),
+        });
+        const fallbackRows = await loadScopedFranchises();
+        setFranchises(fallbackRows);
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(payload.json?.error || 'Failed to load franchises');
+      }
+
+      setFranchises(Array.isArray(payload.json?.data) ? payload.json.data : []);
     } catch (error: any) {
+      logger.error('Failed to fetch franchises', {
+        component: 'Franchises',
+        tenantId: context.tenantId || null,
+        isPlatformAdmin: context.isPlatformAdmin,
+        message: error?.message || String(error),
+      });
       toast({
         title: 'Error',
-        description: error.message,
+        description: error?.message || 'Failed to load franchises',
         variant: 'destructive',
       });
     } finally {
       setLoading(false);
     }
-  }, [scopedDb, toast]);
+  }, [context.isPlatformAdmin, context.tenantId, scopedDb, toast]);
 
   useEffect(() => {
     fetchFranchises();

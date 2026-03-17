@@ -10,7 +10,6 @@ INSERT INTO public.service_types (name, description, is_active) VALUES
 ('Freight Forwarding', 'Multi-modal logistics coordination', true),
 ('Moving Services', 'Residential and commercial moving', true)
 ON CONFLICT (name) DO NOTHING;
-
 -- Seed services with different shipment types
 DO $$
 DECLARE

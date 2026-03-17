@@ -2,25 +2,17 @@
 -- Adds support for 3-Tier Rate Engine and enhanced Quote details
 
 BEGIN;
-
 -- 1. Enhance 'quotes' table
 ALTER TABLE public.quotes 
   ADD COLUMN IF NOT EXISTS incoterms TEXT,
   ADD COLUMN IF NOT EXISTS ready_date DATE,
   ADD COLUMN IF NOT EXISTS service_level TEXT, -- e.g., 'Standard', 'Express', 'Saver'
   ADD COLUMN IF NOT EXISTS is_hazmat BOOLEAN DEFAULT false;
-
 -- 2. Enhance 'quote_items' table
-DO $$
-BEGIN
-    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'quote_items' AND table_type = 'BASE TABLE') THEN
-        ALTER TABLE public.quote_items 
-          ADD COLUMN IF NOT EXISTS hazmat_class TEXT,
-          ADD COLUMN IF NOT EXISTS un_number TEXT; -- United Nations number for hazmat
-    ELSE
-        RAISE NOTICE 'quote_items is not a base table, skipping column addition.';
-    END IF;
-END $$;
+ALTER TABLE public.quote_items 
+  ADD COLUMN IF NOT EXISTS hazmat_class TEXT,
+  ADD COLUMN IF NOT EXISTS un_number TEXT;
+-- United Nations number for hazmat
 
 -- 3. Enhance 'carrier_rates' to support 3-Tier Rate Engine
 -- Tier 1: Contract (Customer specific)
@@ -70,11 +62,9 @@ BEGIN
     ALTER TABLE public.carrier_rates ADD COLUMN valid_to DATE;
   END IF;
 END $$;
-
 -- 4. Create indexes for performance
 CREATE INDEX IF NOT EXISTS idx_carrier_rates_tier ON public.carrier_rates(tier);
 CREATE INDEX IF NOT EXISTS idx_carrier_rates_customer ON public.carrier_rates(customer_id);
 CREATE INDEX IF NOT EXISTS idx_carrier_rates_validity ON public.carrier_rates(valid_from, valid_to);
 CREATE INDEX IF NOT EXISTS idx_quotes_ready_date ON public.quotes(ready_date);
-
 COMMIT;

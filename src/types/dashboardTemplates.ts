@@ -1,4 +1,6 @@
 export type UserRole =
+  | 'enterprise_operations'
+  | 'enterprise_executive'
   // CRM Roles
   | 'crm_sales_rep'
   | 'crm_sales_manager'

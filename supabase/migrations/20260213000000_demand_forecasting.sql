@@ -1,4 +1,3 @@
-
 -- Demand Forecasting Schema
 -- Implements 'demand_predictions' for Intelligent Demand Forecasting (Phase 3)
 
@@ -15,10 +14,8 @@ CREATE TABLE IF NOT EXISTS public.demand_predictions (
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
-
 -- RLS
 ALTER TABLE public.demand_predictions ENABLE ROW LEVEL SECURITY;
-
 -- Read policy
 DO $$ 
 BEGIN
@@ -34,7 +31,6 @@ BEGIN
         );
   END IF;
 END $$;
-
 -- Write policy (Service Role or Admin)
 DO $$ 
 BEGIN
@@ -51,11 +47,9 @@ BEGIN
         );
   END IF;
 END $$;
-
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_demand_predictions_tenant_hs ON public.demand_predictions(tenant_id, hs_code);
 CREATE INDEX IF NOT EXISTS idx_demand_predictions_forecast_date ON public.demand_predictions(forecast_date);
-
 -- Trigger for updated_at
 DROP TRIGGER IF EXISTS update_demand_predictions_modtime ON public.demand_predictions;
 CREATE TRIGGER update_demand_predictions_modtime

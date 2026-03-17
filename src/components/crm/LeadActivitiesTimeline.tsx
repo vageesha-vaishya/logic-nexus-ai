@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -7,6 +7,8 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { Plus, Phone, Mail, Calendar, Clock, Pencil, Trash2, MousePointerClick, Eye, FileText, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { logger } from '@/lib/logger';
+import * as Sentry from '@sentry/react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,6 +20,14 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import type { LeadWorkspaceEventBus } from '@/components/crm/lead-workspace-bus';
+import {
+  classifyFetchFailure,
+  describeFetchFailure,
+  runWithRetry,
+  DEFAULT_RETRY_POLICY,
+} from '@/lib/fetch-resilience';
 
 interface Activity {
   id: string;
@@ -36,10 +46,13 @@ interface Activity {
 
 interface LeadActivitiesTimelineProps {
   leadId: string;
+  eventBus?: LeadWorkspaceEventBus;
 }
 
-export function LeadActivitiesTimeline({ leadId }: LeadActivitiesTimelineProps) {
-  const { supabase } = useCRM();
+type DateRangeGroup = 'all' | 'today' | 'this_week' | 'this_month' | 'custom';
+
+export function LeadActivitiesTimeline({ leadId, eventBus }: LeadActivitiesTimelineProps) {
+  const { supabase, scopedDb } = useCRM();
   const navigate = useNavigate();
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,6 +65,14 @@ export function LeadActivitiesTimeline({ leadId }: LeadActivitiesTimelineProps) 
   const pageSize = 10;
   const [hasMore, setHasMore] = useState(false);
   const [filterType, setFilterType] = useState<string>('all');
+  const [groupByMode, setGroupByMode] = useState<'none' | 'type'>('type');
+  const [dateRangeGroup, setDateRangeGroup] = useState<DateRangeGroup>('all');
+  const [customRangeStart, setCustomRangeStart] = useState('');
+  const [customRangeEnd, setCustomRangeEnd] = useState('');
+  const [collapsedPrimaryGroups, setCollapsedPrimaryGroups] = useState<Set<string>>(new Set());
+  const [collapsedDateGroups, setCollapsedDateGroups] = useState<Set<string>>(new Set());
+  const activitiesCacheRef = useRef<Record<string, Activity[]>>({});
+  const fetchSequenceRef = useRef(0);
   
   // Edit State
   const toggleExpanded = (activityId: string) => {
@@ -64,42 +85,61 @@ export function LeadActivitiesTimeline({ leadId }: LeadActivitiesTimelineProps) 
   };
 
   const fetchActivities = useCallback(async () => {
+    const requestId = ++fetchSequenceRef.current;
     try {
-      setLoading(true);
+      if (requestId === fetchSequenceRef.current) {
+        setLoading(true);
+      }
       
       // Calculate pagination
       const from = (page - 1) * pageSize;
       const to = from + pageSize - 1;
+      const { manualData, automatedActivitiesData } = await runWithRetry(
+        async () => {
+          let query = scopedDb
+            .from('activities')
+            .select('*')
+            .eq('lead_id', leadId)
+            .order('created_at', { ascending: false })
+            .range(from, to);
 
-      // Base query for manual activities
-      let query = supabase
-        .from('activities')
-        .select('*')
-        .eq('lead_id', leadId)
-        .order('created_at', { ascending: false })
-        .range(from, to);
+          if (filterType !== 'all' && filterType !== 'automated') {
+            query = query.eq('activity_type', filterType as any);
+          }
 
-      if (filterType !== 'all' && filterType !== 'automated') {
-        query = query.eq('activity_type', filterType as any);
-      }
+          const { data: nextManualData, error: manualError } = await query;
+          if (manualError) throw manualError;
 
-      const { data: manualData, error: manualError } = await query;
+          let nextAutomatedData: any[] = [];
+          if (filterType === 'all' || filterType === 'automated') {
+            const { data, error } = await scopedDb
+              .from('lead_activities' as any)
+              .select('*')
+              .eq('lead_id', leadId)
+              .order('created_at', { ascending: false })
+              .range(from, to);
 
-      if (manualError) throw manualError;
+            if (error) throw error;
+            nextAutomatedData = data || [];
+          }
 
-      // Base query for automated activities
-      let automatedActivitiesData: any[] = [];
-      if (filterType === 'all' || filterType === 'automated') {
-         const { data, error } = await supabase
-          .from('lead_activities' as any)
-          .select('*')
-          .eq('lead_id', leadId)
-          .order('created_at', { ascending: false })
-          .range(from, to);
-         
-         if (error) throw error;
-         automatedActivitiesData = data || [];
-      }
+          return {
+            manualData: nextManualData || [],
+            automatedActivitiesData: nextAutomatedData,
+          };
+        },
+        DEFAULT_RETRY_POLICY,
+        (attempt, meta) => {
+          logger.warn('Lead timeline fetch retry', {
+            component: 'LeadActivitiesTimeline',
+            leadId,
+            attempt,
+            reason: meta.kind,
+            statusCode: meta.statusCode,
+          });
+        },
+      );
+      if (requestId !== fetchSequenceRef.current) return;
 
       const formattedManual = (manualData || []).map(a => ({
         ...a,
@@ -124,19 +164,63 @@ export function LeadActivitiesTimeline({ leadId }: LeadActivitiesTimelineProps) 
       );
 
       setActivities(combined);
+      activitiesCacheRef.current[`${leadId}:${filterType}:${page}`] = combined;
       setHasMore(manualData?.length === pageSize || automatedActivitiesData?.length === pageSize);
 
     } catch (error: any) {
-      toast.error('Failed to load activities');
-      console.error('Error:', error);
+      if (requestId !== fetchSequenceRef.current) return;
+      const meta = classifyFetchFailure(error);
+      logger.error('Failed to load lead timeline activities', {
+        component: 'LeadActivitiesTimeline',
+        leadId,
+        reason: meta.kind,
+        statusCode: meta.statusCode,
+        error: meta.message,
+      });
+      Sentry.captureException(error);
+      const cacheKey = `${leadId}:${filterType}:${page}`;
+      const cached = activitiesCacheRef.current[cacheKey];
+      if (cached && cached.length > 0) {
+        setActivities(cached);
+        toast.warning('Showing cached activities while connection recovers', {
+          description: describeFetchFailure(meta),
+        });
+      } else {
+        toast.error('Failed to load activities', { description: describeFetchFailure(meta) });
+      }
     } finally {
-      setLoading(false);
+      if (requestId === fetchSequenceRef.current) {
+        setLoading(false);
+      }
     }
-  }, [filterType, leadId, page, supabase]);
+  }, [filterType, leadId, page, scopedDb]);
 
   useEffect(() => {
     fetchActivities();
   }, [fetchActivities]);
+
+  useEffect(() => {
+    if (!eventBus) return;
+    const unsubscribeFilter = eventBus.on('activities:filter', ({ type }) => {
+      const next = type === 'call' || type === 'email' || type === 'meeting' || type === 'task' || type === 'note' || type === 'automated' || type === 'all'
+        ? type
+        : 'all';
+      setFilterType(next);
+      setPage(1);
+    });
+    const unsubscribeRefresh = eventBus.on('activities:refresh', () => {
+      fetchActivities();
+    });
+    return () => {
+      unsubscribeFilter();
+      unsubscribeRefresh();
+    };
+  }, [eventBus, fetchActivities]);
+
+  useEffect(() => {
+    setCollapsedPrimaryGroups(new Set());
+    setCollapsedDateGroups(new Set());
+  }, [groupByMode, dateRangeGroup, page, filterType]);
 
   useEffect(() => {
     const channel = supabase
@@ -211,6 +295,93 @@ export function LeadActivitiesTimeline({ leadId }: LeadActivitiesTimelineProps) 
     }
   };
 
+  const togglePrimaryGroup = (groupName: string) => {
+    setCollapsedPrimaryGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupName)) next.delete(groupName);
+      else next.add(groupName);
+      return next;
+    });
+  };
+
+  const toggleDateGroup = (groupName: string, bucketName: string) => {
+    const key = `${groupName}:${bucketName}`;
+    setCollapsedDateGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const groupedActivities = useMemo(() => {
+    const typeLabel = (type: string, isAutomated?: boolean) => {
+      if (isAutomated) return 'Automated';
+      if (type === 'call') return 'Calls';
+      if (type === 'email') return 'Emails';
+      if (type === 'meeting') return 'Meetings';
+      if (type === 'task') return 'Tasks';
+      if (type === 'note') return 'Notes';
+      return 'Other';
+    };
+
+    const bucketLabel = (dateValue: string) => {
+      const activityDate = new Date(dateValue);
+      if (Number.isNaN(activityDate.getTime())) return 'Unknown Date';
+      const now = new Date();
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const weekStart = new Date(todayStart);
+      weekStart.setDate(todayStart.getDate() - todayStart.getDay());
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      if (activityDate >= todayStart) return 'Today';
+      if (activityDate >= weekStart) return 'This Week';
+      if (activityDate >= monthStart) return 'This Month';
+      return 'Older';
+    };
+
+    const inSelectedDateRange = (createdAt: string) => {
+      const activityDate = new Date(createdAt);
+      if (Number.isNaN(activityDate.getTime())) return dateRangeGroup === 'all';
+      if (dateRangeGroup === 'all') return true;
+      if (dateRangeGroup === 'today') return bucketLabel(createdAt) === 'Today';
+      if (dateRangeGroup === 'this_week') return bucketLabel(createdAt) === 'This Week' || bucketLabel(createdAt) === 'Today';
+      if (dateRangeGroup === 'this_month') {
+        const bucket = bucketLabel(createdAt);
+        return bucket === 'This Month' || bucket === 'This Week' || bucket === 'Today';
+      }
+      if (dateRangeGroup === 'custom') {
+        if (!customRangeStart || !customRangeEnd) return true;
+        const start = new Date(customRangeStart);
+        const end = new Date(customRangeEnd);
+        end.setHours(23, 59, 59, 999);
+        return activityDate >= start && activityDate <= end;
+      }
+      return true;
+    };
+
+    const groupedMap = new Map<string, Map<string, Activity[]>>();
+    activities
+      .filter((activity) => inSelectedDateRange(activity.created_at))
+      .forEach((activity) => {
+        const primaryGroup = groupByMode === 'type' ? typeLabel(activity.activity_type, activity.is_automated) : 'All Activities';
+        const secondaryGroup = dateRangeGroup === 'custom' ? 'Custom Range' : bucketLabel(activity.created_at);
+        if (!groupedMap.has(primaryGroup)) groupedMap.set(primaryGroup, new Map());
+        const secondMap = groupedMap.get(primaryGroup)!;
+        if (!secondMap.has(secondaryGroup)) secondMap.set(secondaryGroup, []);
+        secondMap.get(secondaryGroup)!.push(activity);
+      });
+
+    return Array.from(groupedMap.entries()).map(([groupName, dateBuckets]) => ({
+      groupName,
+      total: Array.from(dateBuckets.values()).reduce((sum, arr) => sum + arr.length, 0),
+      dateBuckets: Array.from(dateBuckets.entries()).map(([bucket, items]) => ({
+        bucket,
+        count: items.length,
+        items: [...items].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()),
+      })),
+    }));
+  }, [activities, customRangeEnd, customRangeStart, dateRangeGroup, groupByMode]);
+
   return (
     <Card className="border-none shadow-none">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-6 px-0">
@@ -219,6 +390,45 @@ export function LeadActivitiesTimeline({ leadId }: LeadActivitiesTimelineProps) 
           <CardDescription>History of interactions and automated events</CardDescription>
         </div>
         <div className="flex items-center gap-2">
+          <Select value={groupByMode} onValueChange={(val: 'none' | 'type') => setGroupByMode(val)}>
+            <SelectTrigger className="h-9 w-[130px] bg-background" aria-label="Group activities">
+              <SelectValue placeholder="Group By" />
+            </SelectTrigger>
+            <SelectContent align="end">
+              <SelectItem value="type">Group by Type</SelectItem>
+              <SelectItem value="none">No Grouping</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={dateRangeGroup} onValueChange={(val: DateRangeGroup) => setDateRangeGroup(val)}>
+            <SelectTrigger className="h-9 w-[160px] bg-background" aria-label="Group by date range">
+              <SelectValue placeholder="Date Range" />
+            </SelectTrigger>
+            <SelectContent align="end">
+              <SelectItem value="all">All Dates</SelectItem>
+              <SelectItem value="today">Today</SelectItem>
+              <SelectItem value="this_week">This Week</SelectItem>
+              <SelectItem value="this_month">This Month</SelectItem>
+              <SelectItem value="custom">Custom Range</SelectItem>
+            </SelectContent>
+          </Select>
+          {dateRangeGroup === 'custom' && (
+            <div className="flex items-center gap-2">
+              <Input
+                type="date"
+                value={customRangeStart}
+                onChange={(event) => setCustomRangeStart(event.target.value)}
+                className="h-9 w-[150px]"
+                aria-label="Custom start date"
+              />
+              <Input
+                type="date"
+                value={customRangeEnd}
+                onChange={(event) => setCustomRangeEnd(event.target.value)}
+                className="h-9 w-[150px]"
+                aria-label="Custom end date"
+              />
+            </div>
+          )}
           <Select
             value={filterType}
             onValueChange={(val) => {
@@ -263,9 +473,39 @@ export function LeadActivitiesTimeline({ leadId }: LeadActivitiesTimelineProps) 
             </Button>
           </div>
         ) : (
-          <div className="relative space-y-0 before:absolute before:inset-0 before:ml-6 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-border before:to-transparent">
-            {activities.map((activity, index) => (
-              <div key={activity.id} className="relative flex gap-6 pb-8 last:pb-0 group">
+          <div className="space-y-6">
+            {groupedActivities.map((group) => (
+              <div key={group.groupName} className="space-y-3">
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between rounded-lg border bg-muted/30 px-3 py-2 text-left"
+                  onClick={() => togglePrimaryGroup(group.groupName)}
+                  aria-expanded={!collapsedPrimaryGroups.has(group.groupName)}
+                >
+                  <p className="inline-flex items-center gap-2 text-sm font-semibold">
+                    {collapsedPrimaryGroups.has(group.groupName) ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                    {group.groupName}
+                  </p>
+                  <Badge variant="secondary">{group.total}</Badge>
+                </button>
+                {!collapsedPrimaryGroups.has(group.groupName) && group.dateBuckets.map((bucketGroup) => (
+                  <div key={`${group.groupName}-${bucketGroup.bucket}`} className="space-y-3">
+                    <button
+                      type="button"
+                      className="flex w-full items-center justify-between px-1 text-left"
+                      onClick={() => toggleDateGroup(group.groupName, bucketGroup.bucket)}
+                      aria-expanded={!collapsedDateGroups.has(`${group.groupName}:${bucketGroup.bucket}`)}
+                    >
+                      <p className="inline-flex items-center gap-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                        {collapsedDateGroups.has(`${group.groupName}:${bucketGroup.bucket}`) ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                        {bucketGroup.bucket}
+                      </p>
+                      <span className="text-xs text-muted-foreground">{bucketGroup.count}</span>
+                    </button>
+                    {!collapsedDateGroups.has(`${group.groupName}:${bucketGroup.bucket}`) && (
+                      <div className="relative space-y-0 before:absolute before:inset-0 before:ml-6 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-border before:to-transparent">
+                      {bucketGroup.items.map((activity) => (
+                        <div key={activity.id} className="relative flex gap-6 pb-8 last:pb-0 group">
                 <div className="absolute left-6 -translate-x-1/2 mt-1.5 h-3 w-3 rounded-full border-2 border-background bg-muted-foreground ring-4 ring-background group-hover:bg-primary transition-colors" />
                 
                 <div className="flex-1 rounded-xl border bg-card p-4 shadow-sm transition-all hover:shadow-md ml-6">
@@ -373,6 +613,12 @@ export function LeadActivitiesTimeline({ leadId }: LeadActivitiesTimelineProps) 
                     )}
                   </div>
                 </div>
+                        </div>
+                      ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             ))}
           </div>

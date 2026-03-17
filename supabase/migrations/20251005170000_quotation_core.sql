@@ -17,7 +17,6 @@ BEGIN
     END LOOP;
   END IF;
 END $$;
-
 DO $$
 DECLARE lbl text;
 BEGIN
@@ -37,7 +36,6 @@ BEGIN
     END LOOP;
   END IF;
 END $$;
-
 DO $$
 DECLARE lbl text;
 BEGIN
@@ -57,7 +55,6 @@ BEGIN
     END LOOP;
   END IF;
 END $$;
-
 DO $$
 DECLARE lbl text;
 BEGIN
@@ -77,7 +74,6 @@ BEGIN
     END LOOP;
   END IF;
 END $$;
-
 DO $$
 DECLARE lbl text;
 BEGIN
@@ -97,7 +93,6 @@ BEGIN
     END LOOP;
   END IF;
 END $$;
-
 -- Carriers
 CREATE TABLE public.carriers (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -112,7 +107,6 @@ CREATE TABLE public.carriers (
   updated_at timestamptz DEFAULT now()
 );
 ALTER TABLE public.carriers ENABLE ROW LEVEL SECURITY;
-
 -- Services
 CREATE TABLE IF NOT EXISTS public.services (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -127,7 +121,6 @@ CREATE TABLE IF NOT EXISTS public.services (
   updated_at timestamptz DEFAULT now()
 );
 ALTER TABLE public.services ENABLE ROW LEVEL SECURITY;
-
 -- Service Details (mode-specific attributes)
 CREATE TABLE public.service_details (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -137,7 +130,6 @@ CREATE TABLE public.service_details (
   created_at timestamptz DEFAULT now()
 );
 ALTER TABLE public.service_details ENABLE ROW LEVEL SECURITY;
-
 -- Rates
 CREATE TABLE public.rates (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -159,7 +151,6 @@ CREATE TABLE public.rates (
 CREATE INDEX rates_lane_idx ON public.rates (mode, origin, destination);
 CREATE INDEX rates_validity_idx ON public.rates (validity_start, validity_end);
 ALTER TABLE public.rates ENABLE ROW LEVEL SECURITY;
-
 -- Rate Components (surcharges/accessorials)
 CREATE TABLE public.rate_components (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -175,7 +166,6 @@ CREATE TABLE public.rate_components (
   created_at timestamptz DEFAULT now()
 );
 ALTER TABLE public.rate_components ENABLE ROW LEVEL SECURITY;
-
 -- Quotes
 CREATE TABLE IF NOT EXISTS public.quotes (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -201,7 +191,6 @@ DO $$ BEGIN
   END IF;
 END $$;
 ALTER TABLE public.quotes ENABLE ROW LEVEL SECURITY;
-
 -- Quote Items
 CREATE TABLE IF NOT EXISTS public.quote_items (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -223,7 +212,6 @@ CREATE TABLE IF NOT EXISTS public.quote_items (
 );
 CREATE INDEX quote_items_quote_idx ON public.quote_items (quote_id);
 ALTER TABLE public.quote_items ENABLE ROW LEVEL SECURITY;
-
 -- Quote Versions (snapshot)
 CREATE TABLE public.quote_versions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -236,7 +224,6 @@ CREATE TABLE public.quote_versions (
 );
 CREATE UNIQUE INDEX quote_versions_unique ON public.quote_versions (quote_id, version_number);
 ALTER TABLE public.quote_versions ENABLE ROW LEVEL SECURITY;
-
 -- Quote Events (audit)
 CREATE TABLE public.quote_events (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -249,7 +236,6 @@ CREATE TABLE public.quote_events (
 );
 CREATE INDEX quote_events_quote_idx ON public.quote_events (quote_id);
 ALTER TABLE public.quote_events ENABLE ROW LEVEL SECURITY;
-
 -- Compliance Checks
 CREATE TABLE IF NOT EXISTS public.compliance_checks (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -262,7 +248,6 @@ CREATE TABLE IF NOT EXISTS public.compliance_checks (
   created_at timestamptz DEFAULT now()
 );
 ALTER TABLE public.compliance_checks ENABLE ROW LEVEL SECURITY;
-
 -- Documents
 CREATE TABLE public.documents (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -274,5 +259,4 @@ CREATE TABLE public.documents (
   created_at timestamptz DEFAULT now()
 );
 ALTER TABLE public.documents ENABLE ROW LEVEL SECURITY;
-
--- Note: RLS policies will be added in a subsequent migration to match tenant scoping.
+-- Note: RLS policies will be added in a subsequent migration to match tenant scoping.;

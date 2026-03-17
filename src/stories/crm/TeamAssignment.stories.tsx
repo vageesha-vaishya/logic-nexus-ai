@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react';
+import type { Meta, StoryObj } from '@storybook/react-vite';
 import { TeamAssignment, TeamMember } from '../../components/crm/TeamAssignment';
 import { mockUsers } from './mock-data';
 import { EmptyState, emptyStates } from '@/components/ui/empty-state';

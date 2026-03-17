@@ -18,7 +18,6 @@ BEGIN
     END LOOP;
   END IF;
 END $$;
-
 DO $$
 DECLARE lbl text;
 BEGIN
@@ -38,7 +37,6 @@ BEGIN
     END LOOP;
   END IF;
 END $$;
-
 DO $$
 DECLARE lbl text;
 BEGIN
@@ -58,7 +56,6 @@ BEGIN
     END LOOP;
   END IF;
 END $$;
-
 DO $$
 DECLARE lbl text;
 BEGIN
@@ -78,7 +75,6 @@ BEGIN
     END LOOP;
   END IF;
 END $$;
-
 DO $$
 DECLARE lbl text;
 BEGIN
@@ -98,7 +94,6 @@ BEGIN
     END LOOP;
   END IF;
 END $$;
-
 DO $$
 DECLARE lbl text;
 BEGIN
@@ -118,7 +113,6 @@ BEGIN
     END LOOP;
   END IF;
 END $$;
-
 DO $$
 DECLARE lbl text;
 BEGIN
@@ -138,7 +132,6 @@ BEGIN
     END LOOP;
   END IF;
 END $$;
-
 -- Accounts table (Companies/Organizations)
 CREATE TABLE public.accounts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -161,7 +154,6 @@ CREATE TABLE public.accounts (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
-
 -- Contacts table (People)
 CREATE TABLE public.contacts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -183,7 +175,6 @@ CREATE TABLE public.contacts (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
-
 -- Leads table (Potential customers)
 CREATE TABLE public.leads (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -209,7 +200,6 @@ CREATE TABLE public.leads (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
-
 -- Activities table (Tasks, Calls, Meetings, Emails)
 CREATE TABLE public.activities (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -230,157 +220,127 @@ CREATE TABLE public.activities (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
-
 -- Enable RLS on all CRM tables
 ALTER TABLE public.accounts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.contacts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.leads ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.activities ENABLE ROW LEVEL SECURITY;
-
 -- RLS Policies for Accounts
 CREATE POLICY "Platform admins can manage all accounts"
   ON public.accounts FOR ALL
   USING (public.is_platform_admin(auth.uid()));
-
 CREATE POLICY "Tenant admins can manage tenant accounts"
   ON public.accounts FOR ALL
   USING (
     public.has_role(auth.uid(), 'tenant_admin') AND
     tenant_id = public.get_user_tenant_id(auth.uid())
   );
-
 CREATE POLICY "Franchise admins can manage franchise accounts"
   ON public.accounts FOR ALL
   USING (
     public.has_role(auth.uid(), 'franchise_admin') AND
     franchise_id = public.get_user_franchise_id(auth.uid())
   );
-
 CREATE POLICY "Users can view franchise accounts"
   ON public.accounts FOR SELECT
   USING (franchise_id = public.get_user_franchise_id(auth.uid()));
-
 CREATE POLICY "Users can create franchise accounts"
   ON public.accounts FOR INSERT
   WITH CHECK (franchise_id = public.get_user_franchise_id(auth.uid()));
-
 -- RLS Policies for Contacts
 CREATE POLICY "Platform admins can manage all contacts"
   ON public.contacts FOR ALL
   USING (public.is_platform_admin(auth.uid()));
-
 CREATE POLICY "Tenant admins can manage tenant contacts"
   ON public.contacts FOR ALL
   USING (
     public.has_role(auth.uid(), 'tenant_admin') AND
     tenant_id = public.get_user_tenant_id(auth.uid())
   );
-
 CREATE POLICY "Franchise admins can manage franchise contacts"
   ON public.contacts FOR ALL
   USING (
     public.has_role(auth.uid(), 'franchise_admin') AND
     franchise_id = public.get_user_franchise_id(auth.uid())
   );
-
 CREATE POLICY "Users can view franchise contacts"
   ON public.contacts FOR SELECT
   USING (franchise_id = public.get_user_franchise_id(auth.uid()));
-
 CREATE POLICY "Users can create franchise contacts"
   ON public.contacts FOR INSERT
   WITH CHECK (franchise_id = public.get_user_franchise_id(auth.uid()));
-
 -- RLS Policies for Leads
 CREATE POLICY "Platform admins can manage all leads"
   ON public.leads FOR ALL
   USING (public.is_platform_admin(auth.uid()));
-
 CREATE POLICY "Tenant admins can manage tenant leads"
   ON public.leads FOR ALL
   USING (
     public.has_role(auth.uid(), 'tenant_admin') AND
     tenant_id = public.get_user_tenant_id(auth.uid())
   );
-
 CREATE POLICY "Franchise admins can manage franchise leads"
   ON public.leads FOR ALL
   USING (
     public.has_role(auth.uid(), 'franchise_admin') AND
     franchise_id = public.get_user_franchise_id(auth.uid())
   );
-
 CREATE POLICY "Users can view franchise leads"
   ON public.leads FOR SELECT
   USING (franchise_id = public.get_user_franchise_id(auth.uid()));
-
 CREATE POLICY "Users can create franchise leads"
   ON public.leads FOR INSERT
   WITH CHECK (franchise_id = public.get_user_franchise_id(auth.uid()));
-
 -- RLS Policies for Activities
 CREATE POLICY "Platform admins can manage all activities"
   ON public.activities FOR ALL
   USING (public.is_platform_admin(auth.uid()));
-
 CREATE POLICY "Tenant admins can manage tenant activities"
   ON public.activities FOR ALL
   USING (
     public.has_role(auth.uid(), 'tenant_admin') AND
     tenant_id = public.get_user_tenant_id(auth.uid())
   );
-
 CREATE POLICY "Franchise admins can manage franchise activities"
   ON public.activities FOR ALL
   USING (
     public.has_role(auth.uid(), 'franchise_admin') AND
     franchise_id = public.get_user_franchise_id(auth.uid())
   );
-
 CREATE POLICY "Users can view assigned activities"
   ON public.activities FOR SELECT
   USING (
     assigned_to = auth.uid() OR
     franchise_id = public.get_user_franchise_id(auth.uid())
   );
-
 CREATE POLICY "Users can create activities"
   ON public.activities FOR INSERT
   WITH CHECK (franchise_id = public.get_user_franchise_id(auth.uid()));
-
 CREATE POLICY "Users can update own activities"
   ON public.activities FOR UPDATE
   USING (assigned_to = auth.uid());
-
 -- Triggers for updated_at
 CREATE TRIGGER update_accounts_updated_at BEFORE UPDATE ON public.accounts
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
-
 CREATE TRIGGER update_contacts_updated_at BEFORE UPDATE ON public.contacts
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
-
 CREATE TRIGGER update_leads_updated_at BEFORE UPDATE ON public.leads
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
-
 CREATE TRIGGER update_activities_updated_at BEFORE UPDATE ON public.activities
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
-
 -- Indexes for performance
 CREATE INDEX idx_accounts_tenant_id ON public.accounts(tenant_id);
 CREATE INDEX idx_accounts_franchise_id ON public.accounts(franchise_id);
 CREATE INDEX idx_accounts_owner_id ON public.accounts(owner_id);
 CREATE INDEX idx_accounts_status ON public.accounts(status);
-
 CREATE INDEX idx_contacts_tenant_id ON public.contacts(tenant_id);
 CREATE INDEX idx_contacts_franchise_id ON public.contacts(franchise_id);
 CREATE INDEX idx_contacts_account_id ON public.contacts(account_id);
 CREATE INDEX idx_contacts_owner_id ON public.contacts(owner_id);
-
 CREATE INDEX idx_leads_tenant_id ON public.leads(tenant_id);
 CREATE INDEX idx_leads_franchise_id ON public.leads(franchise_id);
 CREATE INDEX idx_leads_owner_id ON public.leads(owner_id);
 CREATE INDEX idx_leads_status ON public.leads(status);
-
 CREATE INDEX idx_activities_tenant_id ON public.activities(tenant_id);
 CREATE INDEX idx_activities_franchise_id ON public.activities(franchise_id);
 CREATE INDEX idx_activities_assigned_to ON public.activities(assigned_to);

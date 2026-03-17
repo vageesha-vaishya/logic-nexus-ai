@@ -5,17 +5,20 @@ import { CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, C
 import { useNavigate } from "react-router-dom";
 import { useCRM } from "@/hooks/useCRM";
 import { cn } from "@/lib/utils";
+import { APP_MENU } from "@/config/navigation";
 
 interface SearchResult {
   id: string;
   title: string;
   subtitle?: string;
-  type: "lead" | "account" | "contact" | "quote" | "opportunity";
+  type: "lead" | "account" | "contact" | "quote" | "opportunity" | "module";
   path: string;
 }
 
 const PER_ENTITY_LIMIT = 5;
 const TOTAL_RESULTS_LIMIT = 20;
+const SEARCH_HISTORY_KEY = "shell:global-search-history";
+const SEARCH_HISTORY_LIMIT = 8;
 
 export function GlobalSearch() {
   const [open, setOpen] = useState(false);
@@ -23,32 +26,76 @@ export function GlobalSearch() {
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasMoreResults, setHasMoreResults] = useState(false);
+  const [searchHistory, setSearchHistory] = useState<string[]>([]);
   const navigate = useNavigate();
   const { scopedDb } = useCRM();
 
+  const buildModuleResults = useCallback((searchQuery: string) => {
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+    return APP_MENU.flatMap((section) => section.items)
+      .filter((item) => {
+        if (!normalizedQuery) return true;
+        const name = item.name.toLowerCase();
+        const description = (item.description || "").toLowerCase();
+        return name.includes(normalizedQuery) || description.includes(normalizedQuery);
+      })
+      .slice(0, PER_ENTITY_LIMIT)
+      .map((item) => ({
+        id: `module-${item.path}`,
+        title: item.name,
+        subtitle: item.description,
+        type: "module" as const,
+        path: item.path,
+      }));
+  }, []);
+
   useEffect(() => {
+    const savedHistory = localStorage.getItem(SEARCH_HISTORY_KEY);
+    if (savedHistory) {
+      try {
+        const parsed = JSON.parse(savedHistory);
+        if (Array.isArray(parsed)) {
+          setSearchHistory(parsed.filter((item) => typeof item === "string"));
+        }
+      } catch {
+        setSearchHistory([]);
+      }
+    }
+
     const down = (e: KeyboardEvent) => {
       if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         setOpen((open) => !open);
       }
     };
+    const openSearch = () => setOpen(true);
     document.addEventListener("keydown", down);
-    return () => document.removeEventListener("keydown", down);
+    window.addEventListener("shell:open-global-search", openSearch);
+    return () => {
+      document.removeEventListener("keydown", down);
+      window.removeEventListener("shell:open-global-search", openSearch);
+    };
   }, []);
 
   const performSearch = useCallback(async (searchQuery: string) => {
+    const moduleResults = buildModuleResults(searchQuery);
+
     if (!searchQuery.trim()) {
-      setResults([]);
-      setHasMoreResults(false);
+      setResults(moduleResults);
+      setHasMoreResults(APP_MENU.flatMap((section) => section.items).length > moduleResults.length);
+      return;
+    }
+
+    if (!scopedDb || typeof scopedDb.from !== "function") {
+      setResults(moduleResults);
+      setHasMoreResults(APP_MENU.flatMap((section) => section.items).length > moduleResults.length);
       return;
     }
 
     setLoading(true);
     try {
       const searchPattern = `%${searchQuery}%`;
-
-      const [leads, accounts, contacts, quotes, opportunities] = await Promise.all([
+      const dbResults = await Promise.allSettled([
         scopedDb
           .from("leads")
           .select("id, first_name, last_name, company, email", { count: "exact" })
@@ -76,7 +123,18 @@ export function GlobalSearch() {
           .range(0, PER_ENTITY_LIMIT - 1),
       ]);
 
+      const [leads, accounts, contacts, quotes, opportunities] = dbResults.map((result) => {
+        if (result.status !== "fulfilled" || result.value.error) {
+          return { data: [], count: 0 };
+        }
+        return {
+          data: result.value.data || [],
+          count: result.value.count ?? (result.value.data || []).length,
+        };
+      });
+
       const searchResults = [
+        ...moduleResults,
         ...(leads.data || []).map((l) => ({
           id: l.id,
           title: l.company || `${l.first_name} ${l.last_name}`.trim() || "Unnamed Lead",
@@ -113,23 +171,24 @@ export function GlobalSearch() {
       ];
 
       const totalMatched =
-        (leads.count ?? (leads.data || []).length) +
-        (accounts.count ?? (accounts.data || []).length) +
-        (contacts.count ?? (contacts.data || []).length) +
-        (quotes.count ?? (quotes.data || []).length) +
-        (opportunities.count ?? (opportunities.data || []).length);
+        moduleResults.length +
+        leads.count +
+        accounts.count +
+        contacts.count +
+        quotes.count +
+        opportunities.count;
 
       const limitedResults = searchResults.slice(0, TOTAL_RESULTS_LIMIT);
       setResults(limitedResults);
       setHasMoreResults(totalMatched > limitedResults.length);
     } catch (error) {
       console.error("Search error:", error);
-      setResults([]);
-      setHasMoreResults(false);
+      setResults(moduleResults);
+      setHasMoreResults(APP_MENU.flatMap((section) => section.items).length > moduleResults.length);
     } finally {
       setLoading(false);
     }
-  }, [scopedDb]);
+  }, [buildModuleResults, scopedDb]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -139,6 +198,12 @@ export function GlobalSearch() {
   }, [query, performSearch]);
 
   const handleSelect = (result: SearchResult) => {
+    const normalizedQuery = query.trim();
+    if (normalizedQuery) {
+      const nextHistory = [normalizedQuery, ...searchHistory.filter((item) => item !== normalizedQuery)].slice(0, SEARCH_HISTORY_LIMIT);
+      setSearchHistory(nextHistory);
+      localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(nextHistory));
+    }
     navigate(result.path);
     setOpen(false);
     setQuery("");
@@ -151,6 +216,7 @@ export function GlobalSearch() {
       case "contact": return Users;
       case "quote": return Package;
       case "opportunity": return FileText;
+      case "module": return Search;
     }
   };
 
@@ -159,25 +225,37 @@ export function GlobalSearch() {
       <button
         onClick={() => setOpen(true)}
         className={cn(
-          "flex items-center gap-2 px-3 py-1.5 text-sm text-muted-foreground",
-          "border border-input rounded-md bg-background hover:bg-accent transition-colors",
-          "w-64"
+          "flex items-center gap-2 px-3 py-1.5 text-sm text-foreground",
+          "border border-input rounded-md bg-background hover:bg-accent transition-colors shadow-sm",
+          "w-44 sm:w-56 lg:w-64"
         )}
+        aria-label="Open global search"
+        title="Open global search"
       >
-        <Search className="h-4 w-4" />
+        <Search className="h-5 w-5 text-primary" />
         <span>Search...</span>
-        <kbd className="ml-auto pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100">
+        <kbd className="ml-auto pointer-events-none hidden h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100 sm:inline-flex">
           <span className="text-xs">⌘</span>K
         </kbd>
       </button>
 
-      <CommandDialog open={open} onOpenChange={setOpen}>
+      <CommandDialog open={open} onOpenChange={setOpen} commandProps={{ shouldFilter: false }}>
         <CommandInput
           placeholder="Search leads, accounts, contacts, quotes..."
           value={query}
           onValueChange={setQuery}
         />
         <CommandList>
+          {!loading && !query.trim() && searchHistory.length > 0 && (
+            <CommandGroup heading="Recent Searches">
+              {searchHistory.map((item) => (
+                <CommandItem key={item} value={`recent ${item}`.toLowerCase()} onSelect={() => setQuery(item)} className="cursor-pointer">
+                  <Search className="mr-2 h-4 w-4" />
+                  <span>{item}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          )}
           {loading && (
             <div className="flex items-center justify-center py-6">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -188,7 +266,7 @@ export function GlobalSearch() {
           )}
           {!loading && results.length > 0 && (
             <>
-              {["lead", "account", "contact", "quote", "opportunity"].map((type) => {
+              {["module", "lead", "account", "contact", "quote", "opportunity"].map((type) => {
                 const typeResults = results.filter((r) => r.type === type);
                 if (typeResults.length === 0) return null;
                 return (
@@ -198,6 +276,7 @@ export function GlobalSearch() {
                       return (
                         <CommandItem
                           key={result.id}
+                          value={`${result.type} ${result.title} ${result.subtitle || ""}`.toLowerCase()}
                           onSelect={() => handleSelect(result)}
                           className="cursor-pointer"
                         >

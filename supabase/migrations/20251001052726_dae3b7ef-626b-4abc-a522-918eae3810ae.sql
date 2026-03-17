@@ -55,7 +55,6 @@ BEGIN
   RETURN total_score;
 END;
 $$;
-
 CREATE OR REPLACE FUNCTION public.update_lead_score()
 RETURNS TRIGGER
 LANGUAGE plpgsql

@@ -3,11 +3,9 @@
 -- 1) Add service_type_id column to service_type_mappings
 ALTER TABLE public.service_type_mappings 
 ADD COLUMN IF NOT EXISTS service_type_id uuid REFERENCES public.service_types(id);
-
 -- 2) Create index for lookups
 CREATE INDEX IF NOT EXISTS service_type_mappings_service_type_id_idx 
 ON public.service_type_mappings(service_type_id);
-
 -- 3) Populate service_type_id based on existing service_type text values
 DO $$
 BEGIN
@@ -30,10 +28,9 @@ BEGIN
     $sql$;
   END IF;
 END $$;
-
 -- 4) Create mappings for ocean sub-services using INSERT with NOT EXISTS checks
 
--- LCL → match service name first (priority 0)
+-- LCL ÔåÆ match service name first (priority 0)
 INSERT INTO public.service_type_mappings (tenant_id, service_type_id, service_id, is_default, priority, is_active)
 SELECT s.tenant_id, st.id, s.id, false, 0, true
 FROM public.services s
@@ -47,8 +44,7 @@ WHERE s.tenant_id IS NOT NULL
       AND m.service_type_id = st.id 
       AND m.service_id = s.id
   );
-
--- LCL → fallback to generic ocean services (priority 10)
+-- LCL ÔåÆ fallback to generic ocean services (priority 10)
 INSERT INTO public.service_type_mappings (tenant_id, service_type_id, service_id, is_default, priority, is_active)
 SELECT DISTINCT s.tenant_id, st.id, s.id, false, 10, true
 FROM public.services s
@@ -61,8 +57,7 @@ WHERE s.tenant_id IS NOT NULL
       AND m.service_type_id = st.id 
       AND m.service_id = s.id
   );
-
--- RORO → match service name first (priority 0)
+-- RORO ÔåÆ match service name first (priority 0)
 INSERT INTO public.service_type_mappings (tenant_id, service_type_id, service_id, is_default, priority, is_active)
 SELECT s.tenant_id, st.id, s.id, false, 0, true
 FROM public.services s
@@ -77,8 +72,7 @@ WHERE s.tenant_id IS NOT NULL
       AND m.service_type_id = st.id 
       AND m.service_id = s.id
   );
-
--- RORO → fallback to generic ocean services (priority 10)
+-- RORO ÔåÆ fallback to generic ocean services (priority 10)
 INSERT INTO public.service_type_mappings (tenant_id, service_type_id, service_id, is_default, priority, is_active)
 SELECT DISTINCT s.tenant_id, st.id, s.id, false, 10, true
 FROM public.services s
@@ -91,8 +85,7 @@ WHERE s.tenant_id IS NOT NULL
       AND m.service_type_id = st.id 
       AND m.service_id = s.id
   );
-
--- Break Bulk → match service name first (priority 0)
+-- Break Bulk ÔåÆ match service name first (priority 0)
 INSERT INTO public.service_type_mappings (tenant_id, service_type_id, service_id, is_default, priority, is_active)
 SELECT s.tenant_id, st.id, s.id, false, 0, true
 FROM public.services s
@@ -107,8 +100,7 @@ WHERE s.tenant_id IS NOT NULL
       AND m.service_type_id = st.id 
       AND m.service_id = s.id
   );
-
--- Break Bulk → fallback to generic ocean services (priority 10)
+-- Break Bulk ÔåÆ fallback to generic ocean services (priority 10)
 INSERT INTO public.service_type_mappings (tenant_id, service_type_id, service_id, is_default, priority, is_active)
 SELECT DISTINCT s.tenant_id, st.id, s.id, false, 10, true
 FROM public.services s

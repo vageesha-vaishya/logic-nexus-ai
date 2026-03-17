@@ -1,5 +1,5 @@
 import { type LucideIcon, Home, TrendingUp, UserPlus, CheckSquare, FileText, Building2, Users, Megaphone, BarChart3, PieChart, MessageSquare, UsersRound, CalendarDays, MoreHorizontal, Package, Warehouse, Truck, CreditCard, DollarSign, FileCheck, Ship, MapPin, Users2, Box, Ruler, PackageCheck, Globe, Cog, Palette, GitBranch, Database, ArrowRightLeft, Anchor, LineChart, Landmark, BookOpen, ShieldAlert, Mail } from 'lucide-react';
-import type { Permission } from '@/config/permissions';
+import type { AppRole, Permission } from '@/config/permissions';
 
 export type MenuScreen = {
   name: string;
@@ -13,7 +13,7 @@ export type MenuItem = {
   icon: LucideIcon;
   description?: string;
   screens?: MenuScreen[];
-  roles?: Array<'platform_admin' | 'tenant_admin' | 'franchise_admin' | 'user'>;
+  roles?: AppRole[];
   permissions?: Permission[];
 };
 
@@ -124,23 +124,24 @@ export const APP_MENU: MenuModule[] = [
   {
     label: 'Settings',
     items: [
-      { name: 'System Settings', path: '/dashboard/settings', icon: Cog, description: 'Account and app settings' },
-      { name: 'Channel Integrations', path: '/dashboard/settings/channel-integrations', icon: Cog, description: 'Manage WhatsApp, X, Telegram, LinkedIn, Web', permissions: ['admin.settings.manage'] },
+      { name: 'System Settings', path: '/dashboard/settings', icon: Cog, description: 'Account and app settings', roles: ['platform_admin'] },
+      { name: 'Channel Integrations', path: '/dashboard/settings/channel-integrations', icon: Cog, description: 'Manage WhatsApp, X, Telegram, LinkedIn, Web', roles: ['platform_admin'], permissions: ['admin.settings.manage'] },
       { name: 'Communications Hub', path: '/dashboard/communications-hub', icon: Mail, description: 'Unified messages across channels', permissions: ['email.manage'] },
       { name: 'Email Management', path: '/dashboard/email-management', icon: Mail, description: 'Manage emails', permissions: ['email.manage'] },
-      { name: 'Roles & Permissions', path: '/dashboard/settings/permissions', icon: Cog, description: 'Configure access control', permissions: ['admin.settings.manage'] },
-      { name: 'Theme Management', path: '/dashboard/themes', icon: Palette, description: 'Customize theme' },
-      { name: 'Subscription', path: '/dashboard/settings/subscription', icon: CreditCard, description: 'Manage plan and usage' },
-      { name: 'Data Management', path: '/dashboard/settings/data-management', icon: Cog, description: 'Database options and quote numbering' },
-      { name: 'Database Export', path: '/dashboard/settings/database-export', icon: Database, description: 'Export tables and backups' },
-      { name: 'Master Data (Geography)', path: '/dashboard/settings/master-data', icon: Globe, description: 'Continents, countries, states, cities' },
-      { name: 'Master Data (Subscription Plans)', path: '/dashboard/settings/master-data-subscription-plans', icon: DollarSign, description: 'Subscription plan catalog and metadata' },
-      { name: 'Master Data (HTS Codes)', path: '/dashboard/settings/master-data-hts', icon: FileText, description: 'HTS/Schedule B codes manager' },
-      { name: 'Quote Numbering', path: '/dashboard/settings/quote-numbers', icon: FileCheck, description: 'Prefixes and reset policy' },
-      { name: 'Quotation Engine', path: '/dashboard/settings/quotations', icon: FileCheck, description: 'Configure default module & smart mode' },
+      { name: 'Roles & Permissions', path: '/dashboard/settings/permissions', icon: Cog, description: 'Configure access control', roles: ['platform_admin'], permissions: ['admin.settings.manage'] },
+      { name: 'Tenant Branding', path: '/dashboard/tenant-branding', icon: Palette, description: 'Configure your tenant branding', roles: ['tenant_admin', 'franchise_admin', 'user'] },
+      { name: 'Theme Management', path: '/dashboard/themes', icon: Palette, description: 'Customize theme', roles: ['platform_admin'] },
+      { name: 'Subscription', path: '/dashboard/settings/subscription', icon: CreditCard, description: 'Manage plan and usage', roles: ['platform_admin'] },
+      { name: 'Data Management', path: '/dashboard/settings/data-management', icon: Cog, description: 'Database options and quote numbering', roles: ['platform_admin'] },
+      { name: 'Database Export', path: '/dashboard/settings/database-export', icon: Database, description: 'Export tables and backups', roles: ['platform_admin'] },
+      { name: 'Master Data (Geography)', path: '/dashboard/settings/master-data', icon: Globe, description: 'Continents, countries, states, cities', roles: ['platform_admin'] },
+      { name: 'Master Data (Subscription Plans)', path: '/dashboard/settings/master-data-subscription-plans', icon: DollarSign, description: 'Subscription plan catalog and metadata', roles: ['platform_admin'] },
+      { name: 'Master Data (HTS Codes)', path: '/dashboard/settings/master-data-hts', icon: FileText, description: 'HTS/Schedule B codes manager', roles: ['platform_admin'] },
+      { name: 'Quote Numbering', path: '/dashboard/settings/quote-numbers', icon: FileCheck, description: 'Prefixes and reset policy', roles: ['platform_admin'] },
+      { name: 'Quotation Engine', path: '/dashboard/settings/quotations', icon: FileCheck, description: 'Configure default module & smart mode', roles: ['platform_admin'] },
       { name: 'Audit Logs', path: '/dashboard/audit-logs', icon: FileText, description: 'View system audit logs', roles: ['platform_admin', 'tenant_admin'] },
-      { name: 'UI Forms Demo', path: '/dashboard/ui-forms-demo', icon: FileText, description: 'Phase 1–2 form patterns' },
-      { name: 'UI Advanced Demo', path: '/dashboard/ui-advanced-demo', icon: FileCheck, description: 'Phase 3–5 advanced fields' },
+      { name: 'UI Forms Demo', path: '/dashboard/ui-forms-demo', icon: FileText, description: 'Phase 1–2 form patterns', roles: ['platform_admin'] },
+      { name: 'UI Advanced Demo', path: '/dashboard/ui-advanced-demo', icon: FileCheck, description: 'Phase 3–5 advanced fields', roles: ['platform_admin'] },
     ],
   },
 ];

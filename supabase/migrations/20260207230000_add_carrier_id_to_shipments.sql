@@ -1,10 +1,8 @@
 -- Add carrier_id column to shipments table
 ALTER TABLE public.shipments 
 ADD COLUMN IF NOT EXISTS carrier_id UUID REFERENCES public.carriers(id);
-
 -- Create index for performance
 CREATE INDEX IF NOT EXISTS idx_shipments_carrier_id ON public.shipments(carrier_id);
-
 -- Update get_carrier_volume to use LEFT JOIN to include shipments even if carrier is missing? 
 -- No, we want volume BY carrier, so inner join is appropriate. 
 -- However, we might want to see "Unknown" carrier.

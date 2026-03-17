@@ -15,7 +15,6 @@ BEGIN
       ADD COLUMN IF NOT EXISTS social_profiles JSONB DEFAULT '{}'::jsonb;
   END IF;
 END $$;
-
 DO $$
 BEGIN
   IF EXISTS (
@@ -35,7 +34,6 @@ BEGIN
       ADD COLUMN IF NOT EXISTS social_profiles JSONB DEFAULT '{}'::jsonb;
   END IF;
 END $$;
-
 DO $$
 BEGIN
   IF EXISTS (

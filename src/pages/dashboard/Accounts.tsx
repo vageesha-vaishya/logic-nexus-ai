@@ -1,19 +1,21 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Plus, Search, Building2, Phone, Mail, Globe, Download } from 'lucide-react';
+import { Search, Building2, Phone, Mail, Globe } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHeader, TableRow, SortableHead } from '@/components/ui/table';
 import { useSort } from '@/hooks/useSort';
-import { ViewToggle, ViewMode } from '@/components/ui/view-toggle';
 import { useCRM } from '@/hooks/useCRM';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { FirstScreenTemplate } from '@/components/system/FirstScreenTemplate';
 import { EntityCard } from '@/components/system/EntityCard';
 import { EmptyState } from '@/components/system/EmptyState';
+import { useTheme } from '@/hooks/useTheme';
+import { useCRMModuleNavigationState } from '@/hooks/useCRMModuleNavigationState';
+import { CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
 
 interface Account {
   id: string;
@@ -28,11 +30,19 @@ interface Account {
 }
 
 export default function Accounts() {
+  const navigate = useNavigate();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [viewMode, setViewMode] = useState<ViewMode>('card');
   const { context, scopedDb } = useCRM();
+  const { setActive } = useTheme();
+  const {
+    viewMode: moduleViewMode,
+    theme,
+    hydrated,
+    setViewMode,
+    setTheme,
+  } = useCRMModuleNavigationState('accounts', { viewMode: 'pipeline', theme: 'Azure Sky' });
 
   useEffect(() => {
     if (process.env.NODE_ENV === 'development') {
@@ -68,6 +78,11 @@ export default function Accounts() {
   useEffect(() => {
     fetchAccounts();
   }, [fetchAccounts]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    setActive(theme);
+  }, [hydrated, setActive, theme]);
 
   const filteredAccounts = accounts.filter(account =>
     account.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -166,21 +181,26 @@ export default function Accounts() {
         title="Accounts"
         description="Manage your company accounts"
         breadcrumbs={[{ label: 'Dashboard', to: '/dashboard' }, { label: 'Accounts' }]}
-        viewMode={viewMode}
-        availableModes={['card', 'grid', 'list']}
-        onViewModeChange={setViewMode}
-        onCreate={() => (window.location.href = '/dashboard/accounts/new')}
+        onCreate={() => navigate('/dashboard/accounts/new')}
         actionsRight={
           <>
-            <Button variant="outline" asChild className="mr-2">
-              <Link to="/dashboard/accounts/import-export">
-                <Download className="mr-2 h-4 w-4" />
-                Import/Export
-              </Link>
-            </Button>
-            <Button variant="outline" asChild>
-              <Link to="/dashboard/accounts/pipeline">Pipeline View</Link>
-            </Button>
+            <CRMModuleHeaderNavigation
+              moduleLabel="Accounts"
+              viewMode={moduleViewMode}
+              theme={theme}
+              onViewModeChange={(mode) => {
+                if (mode === 'pipeline') {
+                  navigate('/dashboard/accounts/pipeline');
+                  return;
+                }
+                setViewMode(mode);
+              }}
+              onThemeChange={setTheme}
+              onCreate={() => navigate('/dashboard/accounts/new')}
+              createLabel="New Account"
+              onRefresh={fetchAccounts}
+              onImportExport={() => navigate('/dashboard/accounts/import-export')}
+            />
             <Button variant={hasDuplicates ? 'default' : 'outline'} className="ml-2" onClick={onMergeDuplicates}>
               {hasDuplicates ? `DeDup (${duplicateGroups.length})` : 'Find Duplicates'}
             </Button>
@@ -209,9 +229,9 @@ export default function Accounts() {
             title="No accounts found"
             description={searchQuery ? 'Try adjusting your search' : 'Get started by creating your first account'}
             actionLabel={!searchQuery ? 'Create Account' : undefined}
-            onAction={!searchQuery ? () => (window.location.href = '/dashboard/accounts/new') : undefined}
+            onAction={!searchQuery ? () => navigate('/dashboard/accounts/new') : undefined}
           />
-        ) : viewMode === 'list' ? (
+        ) : moduleViewMode === 'list' ? (
           <Card>
             <CardHeader className="pb-2">
               <CardTitle>All Accounts</CardTitle>
@@ -246,7 +266,7 @@ export default function Accounts() {
                     <TableRow
                       key={account.id}
                       className="cursor-pointer"
-                      onClick={() => (window.location.href = `/dashboard/accounts/${account.id}`)}
+                      onClick={() => navigate(`/dashboard/accounts/${account.id}`)}
                     >
                       <TableCell className="font-medium">{account.name}</TableCell>
                       <TableCell>{account.account_type}</TableCell>
@@ -262,7 +282,7 @@ export default function Accounts() {
               </Table>
             </CardContent>
           </Card>
-        ) : viewMode === 'grid' ? (
+        ) : moduleViewMode === 'grid' ? (
           <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
             {filteredAccounts.map((account) => (
               <EntityCard

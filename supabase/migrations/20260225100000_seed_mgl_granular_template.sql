@@ -8,7 +8,7 @@ WITH payload AS (
     'MGL FCL Quote with granular rate breakdown (Ocean, Trucking, etc.) per leg/mode.'::text AS description,
     'FCL'::text AS category,
     '{
-      "layout": "granular",
+      "layout": "mgl_granular",
       "header": {
         "show_logo": true,
         "show_address": true,
@@ -47,14 +47,13 @@ INSERT INTO public.quote_templates (tenant_id, name, description, category, cont
 SELECT NULL, p.name, p.description, p.category, p.content, true, 1
 FROM payload p
 WHERE NOT EXISTS (SELECT 1 FROM public.quote_templates qt WHERE qt.name = p.name);
-
 WITH payload AS (
   SELECT 
     'MGL Granular Quote'::text AS name,
     'MGL FCL Quote with granular rate breakdown (Ocean, Trucking, etc.) per leg/mode.'::text AS description,
     'FCL'::text AS category,
     '{
-      "layout": "granular",
+      "layout": "mgl_granular",
       "header": {
         "show_logo": true,
         "show_address": true,

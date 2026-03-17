@@ -5,6 +5,8 @@ import { logger } from '@/lib/logger';
 export interface DataAccessContext {
   tenantId?: string | null;
   franchiseId?: string | null;
+  ownedTenantId?: string | null;
+  ownedFranchiseId?: string | null;
   isPlatformAdmin: boolean;
   isTenantAdmin: boolean;
   isFranchiseAdmin: boolean;
@@ -142,6 +144,7 @@ export class ScopedDataAccess {
    */
   from(table: TableName, isGlobal: boolean = false) {
     const baseQuery = this.supabase.from(table);
+    const skipScope = isGlobal && table !== 'tenants' && table !== 'franchises';
     const ctx = this.context;
     const logAudit = this.logAudit.bind(this);
     const injectScope = (v: any) => this.injectScope(v, table);
@@ -150,17 +153,15 @@ export class ScopedDataAccess {
     return {
       select: (columns = '*', options?: { count?: 'exact' | 'planned' | 'estimated'; head?: boolean }) => {
         const selectQuery = baseQuery.select(columns, options as any) as any;
-        // Apply scope filters unless it's a global table
-        if (!isGlobal) {
+        if (!skipScope) {
           return applyScopeFilter(selectQuery);
         }
         return selectQuery;
       },
       
       insert: (values: any) => {
-        // Auto-inject tenant_id/franchise_id if missing and not global
         let finalValues = values;
-        if (!isGlobal) {
+        if (!skipScope) {
           finalValues = Array.isArray(values) 
             ? values.map(v => injectScope(v)) 
             : injectScope(values);
@@ -173,8 +174,7 @@ export class ScopedDataAccess {
       update: (values: any) => {
         const updateQuery = baseQuery.update(values) as any;
         logAudit('UPDATE', table as string, { values });
-        // Apply scope filters unless it's a global table
-        if (!isGlobal) {
+        if (!skipScope) {
           return applyScopeFilter(updateQuery);
         }
         return updateQuery;
@@ -182,7 +182,7 @@ export class ScopedDataAccess {
 
       upsert: (values: any, options?: { onConflict?: string; ignoreDuplicates?: boolean; count?: 'exact' | 'planned' | 'estimated'; defaultToNull?: boolean }) => {
         let finalValues = values;
-        if (!isGlobal) {
+        if (!skipScope) {
           finalValues = Array.isArray(values) 
             ? values.map(v => injectScope(v)) 
             : injectScope(values);
@@ -190,8 +190,7 @@ export class ScopedDataAccess {
 
         logAudit('UPSERT', table as string, { count: Array.isArray(values) ? values.length : 1 });
         const upsertQuery = baseQuery.upsert(finalValues, options) as any;
-        // Apply scope filters unless it's a global table
-        if (!isGlobal) {
+        if (!skipScope) {
           return applyScopeFilter(upsertQuery);
         }
         return upsertQuery;
@@ -200,8 +199,7 @@ export class ScopedDataAccess {
       delete: () => {
         const deleteQuery = baseQuery.delete() as any;
         logAudit('DELETE', table as string, {});
-        // Apply scope filters unless it's a global table
-        if (!isGlobal) {
+        if (!skipScope) {
           return applyScopeFilter(deleteQuery);
         }
         return deleteQuery;
@@ -223,6 +221,13 @@ export class ScopedDataAccess {
 
     // Ports/Locations are a global shared resource, never scoped
     if (table === 'ports_locations') {
+      return query;
+    }
+
+    if (table === 'tenants' as TableName) {
+      if (ctx.tenantId) {
+        query = query.eq('id', ctx.tenantId);
+      }
       return query;
     }
 
@@ -274,16 +279,11 @@ export class ScopedDataAccess {
     if (ctx.isTenantAdmin && ctx.tenantId) {
       query = query.eq('tenant_id', ctx.tenantId);
       
-      if (ctx.franchiseId) {
+      if (ctx.franchiseId && table !== 'franchises') {
         if (typeof import.meta !== 'undefined' && import.meta.env?.DEV) {
           console.debug(`[ScopedDataAccess] Applying franchise filter for Tenant Admin: ${ctx.franchiseId}`);
         }
-        // Special-case: franchises table uses 'id' not 'franchise_id'
-        if (table === 'franchises') {
-          query = query.eq('id', ctx.franchiseId);
-        } else {
-          query = query.eq('franchise_id', ctx.franchiseId);
-        }
+        query = query.eq('franchise_id', ctx.franchiseId);
       }
     }
     
@@ -326,14 +326,14 @@ export class ScopedDataAccess {
 
     if (shouldInject) {
       // Ports/Locations are global, do not inject scope
-      if (table === 'ports_locations') {
+      if (table === 'ports_locations' || table === 'tenants') {
         return newValue;
       }
 
-      if (this.context.tenantId && !newValue.tenant_id) {
+      if (this.context.tenantId) {
         newValue.tenant_id = this.context.tenantId;
       }
-      if (this.context.franchiseId && !newValue.franchise_id) {
+      if (this.context.franchiseId) {
         // Special-case: franchises table does not have franchise_id
         if (
           table !== 'franchises' &&
@@ -355,10 +355,25 @@ export class ScopedDataAccess {
     this.logAudit('VIEW_CHANGE', resourceType, { viewMode });
   }
 
+  private createPlatformAdminAccessError() {
+    return {
+      message: 'Access denied - Platform admin privileges required',
+      code: 'platform_admin_required',
+      status: 403,
+    };
+  }
+
   /**
    * Retrieves a system setting by key.
    */
   public async getSystemSetting(key: string): Promise<{ data: { setting_value: any } | null, error: any }> {
+    if (!this.context.isPlatformAdmin) {
+      return {
+        data: null,
+        error: this.createPlatformAdminAccessError(),
+      };
+    }
+
     const result = await (this.supabase as any)
       .from('system_settings')
       .select('setting_value')
@@ -371,6 +386,13 @@ export class ScopedDataAccess {
    * Sets or updates a system setting.
    */
   public async setSystemSetting(key: string, value: any) {
+    if (!this.context.isPlatformAdmin) {
+      return {
+        data: null,
+        error: this.createPlatformAdminAccessError(),
+      };
+    }
+
     const payload = {
       setting_key: key,
       setting_value: value,

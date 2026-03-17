@@ -7,13 +7,11 @@
 
 -- 1. Create Logistics Schema
 CREATE SCHEMA IF NOT EXISTS "logistics";
-
 -- Grant usage on new schema
 GRANT USAGE ON SCHEMA "logistics" TO "postgres";
 GRANT USAGE ON SCHEMA "logistics" TO "anon";
 GRANT USAGE ON SCHEMA "logistics" TO "authenticated";
 GRANT USAGE ON SCHEMA "logistics" TO "service_role";
-
 -- 2. Rename Legacy Table (Idempotent)
 DO $$
 BEGIN
@@ -25,7 +23,6 @@ BEGIN
         ALTER TABLE "public"."quote_items" RENAME TO "quote_items_legacy";
     END IF;
 END $$;
-
 -- 3. Create Core Table
 CREATE TABLE IF NOT EXISTS "public"."quote_items_core" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL PRIMARY KEY,
@@ -43,7 +40,6 @@ CREATE TABLE IF NOT EXISTS "public"."quote_items_core" (
     "created_at" timestamp with time zone DEFAULT "now"(),
     "updated_at" timestamp with time zone DEFAULT "now"()
 );
-
 -- 4. Create Extension Table
 CREATE TABLE IF NOT EXISTS "logistics"."quote_items_extension" (
     "quote_item_id" "uuid" NOT NULL PRIMARY KEY,
@@ -56,7 +52,6 @@ CREATE TABLE IF NOT EXISTS "logistics"."quote_items_extension" (
     "service_type_id" "uuid",
     CONSTRAINT fk_quote_item FOREIGN KEY ("quote_item_id") REFERENCES "public"."quote_items_core"("id") ON DELETE CASCADE
 );
-
 -- 5. Data Migration (Idempotent)
 DO $$
 BEGIN
@@ -84,7 +79,6 @@ BEGIN
         WHERE id NOT IN (SELECT quote_item_id FROM "logistics"."quote_items_extension");
     END IF;
 END $$;
-
 -- 6. Create View for Backward Compatibility
 CREATE OR REPLACE VIEW "public"."quote_items" AS
 SELECT
@@ -111,7 +105,6 @@ SELECT
     e.service_type_id
 FROM "public"."quote_items_core" c
 LEFT JOIN "logistics"."quote_items_extension" e ON c.id = e.quote_item_id;
-
 -- 7. Create Trigger to Handle Inserts into View
 CREATE OR REPLACE FUNCTION public.fn_quote_items_view_handler()
 RETURNS TRIGGER AS $$
@@ -188,7 +181,6 @@ BEGIN
     RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
-
 CREATE TRIGGER trg_quote_items_view_handler
 INSTEAD OF INSERT OR UPDATE OR DELETE ON "public"."quote_items"
 FOR EACH ROW EXECUTE FUNCTION public.fn_quote_items_view_handler();

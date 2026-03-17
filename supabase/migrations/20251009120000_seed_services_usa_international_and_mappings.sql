@@ -1,17 +1,14 @@
 -- Seed USA and International services and map to service types per tenant
 BEGIN;
-
 -- Ensure base services have scope metadata (idempotent updates)
 UPDATE public.services s
 SET metadata = COALESCE(s.metadata, '{}'::jsonb) || '{"scope":"international","region":"global"}'::jsonb
 WHERE s.service_code IN ('OCEAN_STD','AIR_EXP')
   AND (s.metadata IS NULL OR NOT (s.metadata ? 'scope'));
-
 UPDATE public.services s
 SET metadata = COALESCE(s.metadata, '{}'::jsonb) || '{"scope":"domestic","country":"US"}'::jsonb
 WHERE s.service_code IN ('TRUCK_LTL','COURIER_STD','MOVE_PACK','RAIL_STD')
   AND (s.metadata IS NULL OR NOT (s.metadata ? 'scope'));
-
 -- Insert additional USA/International service variants per tenant (idempotent)
 WITH tenants AS (
   SELECT id AS tenant_id FROM public.tenants
@@ -30,7 +27,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.services s
   WHERE s.tenant_id = t.tenant_id AND s.service_code = 'COURIER_US_STD'
 );
-
 -- International Courier
 WITH tenants AS (
   SELECT id AS tenant_id FROM public.tenants
@@ -48,7 +44,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.services s
   WHERE s.tenant_id = t.tenant_id AND s.service_code = 'COURIER_INT_STD'
 );
-
 -- USA Domestic Trucking (explicit)
 WITH tenants AS (
   SELECT id AS tenant_id FROM public.tenants
@@ -66,7 +61,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.services s
   WHERE s.tenant_id = t.tenant_id AND s.service_code = 'TRUCK_US_LTL'
 );
-
 -- International Trucking (Cross-border NA)
 WITH tenants AS (
   SELECT id AS tenant_id FROM public.tenants
@@ -84,7 +78,6 @@ WHERE NOT EXISTS (
   SELECT 1 FROM public.services s
   WHERE s.tenant_id = t.tenant_id AND s.service_code = 'TRUCK_INT_XB'
 );
-
 -- Map service types to services with USA/International rules (idempotent)
 -- Ocean: default International
 WITH svc AS (
@@ -102,7 +95,6 @@ WHERE NOT EXISTS (
   WHERE m.tenant_id = svc.tenant_id AND m.service_type = 'ocean' AND m.is_default = true
 )
 ON CONFLICT (tenant_id, service_type, service_id) DO NOTHING;
-
 -- Air: default International
 WITH svc AS (
   SELECT s.tenant_id, s.id
@@ -119,7 +111,6 @@ WHERE NOT EXISTS (
   WHERE m.tenant_id = svc.tenant_id AND m.service_type = 'air' AND m.is_default = true
 )
 ON CONFLICT (tenant_id, service_type, service_id) DO NOTHING;
-
 -- Trucking: default USA Domestic, plus International non-default
 WITH us AS (
   SELECT s.tenant_id, s.id
@@ -136,7 +127,6 @@ WHERE NOT EXISTS (
   WHERE m.tenant_id = us.tenant_id AND m.service_type = 'trucking' AND m.is_default = true
 )
 ON CONFLICT (tenant_id, service_type, service_id) DO NOTHING;
-
 WITH intl AS (
   SELECT s.tenant_id, s.id
   FROM public.services s
@@ -148,7 +138,6 @@ INSERT INTO public.service_type_mappings (
 SELECT intl.tenant_id, 'trucking', intl.id, false, 50, '{"scope":"international","region":"North America"}'::jsonb, true
 FROM intl
 ON CONFLICT (tenant_id, service_type, service_id) DO NOTHING;
-
 -- Courier: default USA Domestic, plus International non-default
 WITH us AS (
   SELECT s.tenant_id, s.id
@@ -165,7 +154,6 @@ WHERE NOT EXISTS (
   WHERE m.tenant_id = us.tenant_id AND m.service_type = 'courier' AND m.is_default = true
 )
 ON CONFLICT (tenant_id, service_type, service_id) DO NOTHING;
-
 WITH intl AS (
   SELECT s.tenant_id, s.id
   FROM public.services s
@@ -177,7 +165,6 @@ INSERT INTO public.service_type_mappings (
 SELECT intl.tenant_id, 'courier', intl.id, false, 50, '{"scope":"international"}'::jsonb, true
 FROM intl
 ON CONFLICT (tenant_id, service_type, service_id) DO NOTHING;
-
 -- Moving: default USA Domestic
 WITH svc AS (
   SELECT s.tenant_id, s.id
@@ -194,7 +181,6 @@ WHERE NOT EXISTS (
   WHERE m.tenant_id = svc.tenant_id AND m.service_type = 'moving' AND m.is_default = true
 )
 ON CONFLICT (tenant_id, service_type, service_id) DO NOTHING;
-
 -- Railways: default USA Domestic
 WITH svc AS (
   SELECT s.tenant_id, s.id
@@ -211,5 +197,4 @@ WHERE NOT EXISTS (
   WHERE m.tenant_id = svc.tenant_id AND m.service_type = 'railway_transport' AND m.is_default = true
 )
 ON CONFLICT (tenant_id, service_type, service_id) DO NOTHING;
-
 COMMIT;

@@ -1,8 +1,9 @@
 import { useState } from "react";
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/react-vite";
 import { FirstScreenTemplate } from "./FirstScreenTemplate";
 import { EntityCard } from "./EntityCard";
 import { Button } from "@/components/ui/button";
+import { CRMModuleHeaderNavigation } from "@/components/crm/CRMModuleHeaderNavigation";
 
 const meta: Meta<typeof FirstScreenTemplate> = {
   title: "System/FirstScreenTemplate",
@@ -40,7 +41,7 @@ const sample = Array.from({ length: 6 }).map((_, i) => ({
   tags: ["Active", i % 2 === 0 ? "Tier 1" : "Tier 2"],
 }));
 
-function Content({ mode }: { mode: 'pipeline' | 'card' | 'grid' | 'list' | 'board' }) {
+function Content({ mode }: { mode: 'pipeline' | 'card' | 'grid' | 'list' | 'board' | 'analytics' }) {
   if (mode === "list") {
     return (
       <div className="space-y-2">
@@ -53,6 +54,13 @@ function Content({ mode }: { mode: 'pipeline' | 'card' | 'grid' | 'list' | 'boar
             <Button size="sm">Open</Button>
           </div>
         ))}
+      </div>
+    );
+  }
+  if (mode === 'analytics') {
+    return (
+      <div className="border rounded-md p-4">
+        Analytics content placeholder
       </div>
     );
   }
@@ -112,5 +120,51 @@ export const GridView: Story = {
   args: {
     ...ListView.args,
     viewMode: "grid",
+  },
+};
+
+export const LeadsHeaderControls: Story = {
+  name: "Leads Header Controls",
+  render: () => {
+    const LeadsHeaderControlsStory = () => {
+      const [viewMode, setViewMode] = useState<'pipeline' | 'card' | 'grid' | 'list'>('list');
+      const [theme, setTheme] = useState('Azure Sky');
+      const [analyticsActive, setAnalyticsActive] = useState(false);
+
+      return (
+        <div className="p-4">
+          <FirstScreenTemplate
+            title="Leads Workspace With Long Title For Wrapping Validation"
+            description="Validates that all 9 header controls remain visible without horizontal scrolling."
+            breadcrumbs={[{ label: "Dashboard", to: "/" }, { label: "Leads" }]}
+            actionsRight={
+              <CRMModuleHeaderNavigation
+                moduleLabel="Leads"
+                viewMode={viewMode}
+                theme={theme}
+                onViewModeChange={(mode) => {
+                  setAnalyticsActive(false);
+                  setViewMode(mode);
+                }}
+                analyticsLabel="Analytics"
+                analyticsActive={analyticsActive}
+                onAnalyticsClick={() => setAnalyticsActive(true)}
+                controlSequence={['pipeline', 'list', 'create', 'card', 'grid', 'refresh', 'analytics', 'importExport', 'theme']}
+                onThemeChange={setTheme}
+                onCreate={() => {}}
+                createLabel="New Lead"
+                iconOnly
+                onRefresh={() => {}}
+                onImportExport={() => {}}
+              />
+            }
+          >
+            <Content mode="list" />
+          </FirstScreenTemplate>
+        </div>
+      );
+    };
+
+    return <LeadsHeaderControlsStory />;
   },
 };
