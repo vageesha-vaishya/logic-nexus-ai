@@ -164,6 +164,7 @@ export default function SelfServiceOnboarding() {
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const [requestId, setRequestId] = useState<string | null>(null)
   const [verificationCode, setVerificationCode] = useState('')
+  const [fallbackVerificationCode, setFallbackVerificationCode] = useState<string | null>(null)
   const [status, setStatus] = useState<'form' | 'verification' | 'completed'>('form')
   const [tenantId, setTenantId] = useState<string | null>(null)
   const [turnstileScriptReady, setTurnstileScriptReady] = useState(false)
@@ -780,10 +781,14 @@ export default function SelfServiceOnboarding() {
     }
 
     setSubmitting(true)
+    setFallbackVerificationCode(null)
     try {
       const response = await invokeAnonymous<{
         success: boolean
         request_id?: string
+        email_delivery_status?: 'sent' | 'fallback_manual'
+        email_delivery_message?: string | null
+        verification_code?: string
         error?: string
       }>('self-service-onboarding', {
         action: 'start_registration',
@@ -821,8 +826,16 @@ export default function SelfServiceOnboarding() {
       }
 
       setRequestId(response.request_id)
+      setFallbackVerificationCode(response.verification_code || null)
+      if (response.verification_code) {
+        setVerificationCode(response.verification_code)
+      }
       setStatus('verification')
-      toast.success('Verification code sent to admin email')
+      if (response.email_delivery_status === 'fallback_manual' && response.verification_code) {
+        toast.warning(response.email_delivery_message || 'Email delivery failed. Using fallback verification code.')
+      } else {
+        toast.success('Verification code sent to admin email')
+      }
     } catch (error: any) {
       const message = error?.message || 'Unable to start onboarding'
       if (String(message).toLowerCase().includes('captcha service is not configured')) {
@@ -914,9 +927,18 @@ export default function SelfServiceOnboarding() {
         <Card className="w-full max-w-lg">
           <CardHeader>
             <CardTitle>Verify admin email</CardTitle>
-            <CardDescription>Enter the 6-digit code sent to {form.admin_email}</CardDescription>
+            <CardDescription>
+              {fallbackVerificationCode
+                ? `Email delivery failed. Use the fallback code below to continue for ${form.admin_email}.`
+                : `Enter the 6-digit code sent to ${form.admin_email}`}
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {fallbackVerificationCode && (
+              <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                Fallback verification code: <span className="font-semibold tracking-wider">{fallbackVerificationCode}</span>
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="verificationCode">Verification Code</Label>
               <Input

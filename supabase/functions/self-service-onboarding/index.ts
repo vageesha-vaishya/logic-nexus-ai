@@ -594,18 +594,6 @@ serveWithLogger(async (req, logger, supabase) => {
       })
     }
 
-    const resendApiKey = Deno.env.get('RESEND_API_KEY') || ''
-    if (!resendApiKey) {
-      await logger.error('Email provider secret is missing for onboarding verification', {
-        missingSecret: 'RESEND_API_KEY'
-      })
-      return json(503, {
-        success: false,
-        error: 'Email service is not configured',
-        error_code: 'email_config_missing'
-      })
-    }
-
     const existingPending = await supabase
       .from('self_service_onboarding_requests')
       .select('id, status, verification_expires_at')
@@ -770,61 +758,34 @@ serveWithLogger(async (req, logger, supabase) => {
       return json(500, { success: false, error: 'Unable to create onboarding request' })
     }
 
+    let emailDeliveryStatus: 'sent' | 'fallback_manual'
+    let emailDeliveryMessage: string | null = null
+
     try {
       await sendVerificationEmail(supabase, sanitizedEmail, verificationCode, sanitizedOrganization)
+      emailDeliveryStatus = 'sent'
     } catch (error: any) {
       const errorMessage = String(error?.message || 'Email dispatch failed')
       await supabase
         .from('self_service_onboarding_requests')
-        .update({ status: 'failed', failure_reason: errorMessage })
+        .update({ failure_reason: `verification_email_failed:${errorMessage}` })
         .eq('id', createdRequest.id)
-      await logger.error('Failed sending verification email', { requestId: createdRequest.id, error: errorMessage })
-
-      const normalizedEmailError = errorMessage.toLowerCase()
-      if (
-        normalizedEmailError.includes('missing resend_api_key') ||
-        normalizedEmailError.includes('smtp settings incomplete') ||
-        normalizedEmailError.includes('email account not found') ||
-        normalizedEmailError.includes('invalid request: provide accountid') ||
-        normalizedEmailError.includes('domain is not verified') ||
-        normalizedEmailError.includes('unauthorized')
-      ) {
-        return json(503, {
-          success: false,
-          error: 'Email service is not configured',
-          error_code: 'email_config_missing'
-        })
-      }
-
-      if (
-        normalizedEmailError.includes('retryable') ||
-        normalizedEmailError.includes('429') ||
-        normalizedEmailError.includes('500') ||
-        normalizedEmailError.includes('502') ||
-        normalizedEmailError.includes('503') ||
-        normalizedEmailError.includes('fetch failed') ||
-        normalizedEmailError.includes('network') ||
-        normalizedEmailError.includes('non-2xx status code')
-      ) {
-        return json(502, {
-          success: false,
-          error: 'Email service unavailable',
-          error_code: 'email_provider_unavailable'
-        })
-      }
-
-      return json(500, {
-        success: false,
-        error: 'Unable to send verification code',
-        error_code: 'email_send_failed'
+      await logger.error('Verification email dispatch failed, enabling manual fallback code', {
+        requestId: createdRequest.id,
+        error: errorMessage
       })
+      emailDeliveryStatus = 'fallback_manual'
+      emailDeliveryMessage = 'Email delivery failed. Use the fallback verification code.'
     }
 
     return json(200, {
       success: true,
       request_id: createdRequest.id,
       status: 'pending_verification',
-      expires_in_minutes: 15
+      expires_in_minutes: 15,
+      email_delivery_status: emailDeliveryStatus,
+      email_delivery_message: emailDeliveryMessage,
+      verification_code: emailDeliveryStatus === 'fallback_manual' ? verificationCode : undefined
     })
   }
 
