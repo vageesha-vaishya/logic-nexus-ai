@@ -1,3 +1,5 @@
+// eslint-disable-next-line @typescript-eslint/triple-slash-reference
+/// <reference path="../types.d.ts" />
 import { serveWithLogger } from '../_shared/logger.ts'
 import { corsHeaders } from '../_shared/cors.ts'
 import { z } from 'zod'
@@ -267,9 +269,6 @@ const verifyCaptcha = async (
   if (normalizedProviderHint === 'turnstile') {
     const turnstileResult = await verifyTurnstile()
     if (turnstileResult.success) return turnstileResult
-    if (turnstileResult.reason === 'provider_request_failed' && recaptchaSecret) {
-      return verifyRecaptcha()
-    }
     return turnstileResult
   }
 
@@ -294,30 +293,19 @@ const verifyCaptcha = async (
     return { success: false, provider: 'dev_bypass', reason: 'invalid_bypass' }
   }
 
-  if (turnstileSecret) {
-    const turnstileResult = await verifyTurnstile()
-    if (turnstileResult.success) {
-      return turnstileResult
-    }
-    if (recaptchaSecret && turnstileResult.reason !== 'provider_request_failed') {
-      const recaptchaResult = await verifyRecaptcha()
-      if (recaptchaResult.success) {
-        return recaptchaResult
-      }
+  if (recaptchaSecret) {
+    const recaptchaResult = await verifyRecaptcha()
+    if (recaptchaResult.success) {
       return recaptchaResult
     }
-    if (recaptchaSecret && turnstileResult.reason === 'provider_request_failed') {
-      const recaptchaResult = await verifyRecaptcha()
-      if (recaptchaResult.success) {
-        return recaptchaResult
-      }
-      return recaptchaResult.reason === 'provider_request_failed' ? turnstileResult : recaptchaResult
+    if (recaptchaResult.reason === 'provider_request_failed' && turnstileSecret) {
+      return verifyTurnstile()
     }
-    return turnstileResult
+    return recaptchaResult
   }
 
-  if (recaptchaSecret) {
-    return verifyRecaptcha()
+  if (turnstileSecret) {
+    return verifyTurnstile()
   }
 
   return { success: false, provider: 'none', reason: 'config_missing' }

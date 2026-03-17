@@ -144,7 +144,8 @@ type FieldErrors = Partial<Record<FieldErrorKey, string>>
 const stepIds = ['package', 'organization', 'admin', 'compliance', 'verify'] as const
 
 export default function SelfServiceOnboarding() {
-  const preferredCaptchaProvider = turnstileSiteKey ? 'turnstile' : recaptchaSiteKey ? 'recaptcha' : 'none'
+  const preferredCaptchaProvider = recaptchaSiteKey ? 'recaptcha' : turnstileSiteKey ? 'turnstile' : 'none'
+  const hasBothCaptchaProviders = Boolean(recaptchaSiteKey && turnstileSiteKey)
   const turnstileWidgetIdRef = useRef<string | null>(null)
   const recaptchaWidgetIdRef = useRef<number | null>(null)
   const [stepIndex, setStepIndex] = useState(0)
@@ -228,6 +229,37 @@ export default function SelfServiceOnboarding() {
     setForm((prev) => ({ ...prev, [key]: value }))
   }
 
+  const getCaptchaProviderLabel = (provider: 'turnstile' | 'recaptcha' | 'none') => {
+    if (provider === 'recaptcha') return 'Google reCAPTCHA'
+    if (provider === 'turnstile') return 'Cloudflare Turnstile'
+    return 'None'
+  }
+
+  const clearCaptchaWidgets = () => {
+    if (turnstileWidgetIdRef.current && window.turnstile) {
+      window.turnstile.remove(turnstileWidgetIdRef.current)
+      turnstileWidgetIdRef.current = null
+    }
+    if (recaptchaWidgetIdRef.current !== null && window.grecaptcha) {
+      window.grecaptcha.reset(recaptchaWidgetIdRef.current)
+      recaptchaWidgetIdRef.current = null
+    }
+    const container = document.getElementById(captchaContainerId)
+    if (container) {
+      container.innerHTML = ''
+    }
+  }
+
+  const switchCaptchaProvider = (targetProvider: 'turnstile' | 'recaptcha', message?: string) => {
+    if (targetProvider === 'recaptcha' && !recaptchaSiteKey) return
+    if (targetProvider === 'turnstile' && !turnstileSiteKey) return
+    clearCaptchaWidgets()
+    setActiveCaptchaProvider(targetProvider)
+    updateField('captcha_provider', targetProvider)
+    updateField('captcha_token', '')
+    setCaptchaWidgetError(message || null)
+  }
+
   useEffect(() => {
     if (!turnstileSiteKey) return
     if (window.turnstile) {
@@ -238,17 +270,7 @@ export default function SelfServiceOnboarding() {
     const existingScript = document.getElementById('turnstile-api-script') as HTMLScriptElement | null
     if (existingScript) {
       const handleLoad = () => setTurnstileScriptReady(true)
-      const handleError = () => {
-        if (recaptchaSiteKey) {
-          setActiveCaptchaProvider('recaptcha')
-          updateField('captcha_provider', 'recaptcha')
-          setCaptchaWidgetError('Primary CAPTCHA unavailable. Switched to backup verification.')
-        } else {
-          setActiveCaptchaProvider('none')
-          updateField('captcha_provider', allowDevCaptchaBypass ? 'dev_bypass' : 'none')
-          setCaptchaWidgetError('Unable to load CAPTCHA widget')
-        }
-      }
+      const handleError = () => setCaptchaWidgetError('Unable to load Cloudflare Turnstile widget')
       existingScript.addEventListener('load', handleLoad)
       existingScript.addEventListener('error', handleError)
       return () => {
@@ -263,17 +285,7 @@ export default function SelfServiceOnboarding() {
     script.async = true
     script.defer = true
     script.onload = () => setTurnstileScriptReady(true)
-    script.onerror = () => {
-      if (recaptchaSiteKey) {
-        setActiveCaptchaProvider('recaptcha')
-        updateField('captcha_provider', 'recaptcha')
-        setCaptchaWidgetError('Primary CAPTCHA unavailable. Switched to backup verification.')
-      } else {
-        setActiveCaptchaProvider('none')
-        updateField('captcha_provider', allowDevCaptchaBypass ? 'dev_bypass' : 'none')
-        setCaptchaWidgetError('Unable to load CAPTCHA widget')
-      }
-    }
+    script.onerror = () => setCaptchaWidgetError('Unable to load Cloudflare Turnstile widget')
     document.head.appendChild(script)
   }, [])
 
@@ -288,7 +300,15 @@ export default function SelfServiceOnboarding() {
     const existingScript = document.getElementById('recaptcha-api-script') as HTMLScriptElement | null
     if (existingScript) {
       const handleLoad = () => setRecaptchaScriptReady(true)
-      const handleError = () => setCaptchaWidgetError('Backup CAPTCHA failed to load. Please retry.')
+      const handleError = () => {
+        if (turnstileSiteKey) {
+          switchCaptchaProvider('turnstile', 'Google reCAPTCHA unavailable. Switched to Cloudflare Turnstile backup.')
+        } else {
+          setActiveCaptchaProvider('none')
+          updateField('captcha_provider', allowDevCaptchaBypass ? 'dev_bypass' : 'none')
+          setCaptchaWidgetError('Google reCAPTCHA failed to load. Please retry.')
+        }
+      }
       existingScript.addEventListener('load', handleLoad)
       existingScript.addEventListener('error', handleError)
       return () => {
@@ -303,22 +323,44 @@ export default function SelfServiceOnboarding() {
     script.async = true
     script.defer = true
     script.onload = () => setRecaptchaScriptReady(true)
-    script.onerror = () => setCaptchaWidgetError('Backup CAPTCHA failed to load. Please retry.')
+    script.onerror = () => {
+      if (turnstileSiteKey) {
+        switchCaptchaProvider('turnstile', 'Google reCAPTCHA unavailable. Switched to Cloudflare Turnstile backup.')
+      } else {
+        setActiveCaptchaProvider('none')
+        updateField('captcha_provider', allowDevCaptchaBypass ? 'dev_bypass' : 'none')
+        setCaptchaWidgetError('Google reCAPTCHA failed to load. Please retry.')
+      }
+    }
     document.head.appendChild(script)
   }, [activeCaptchaProvider])
 
   useEffect(() => {
-    if (!turnstileSiteKey) return
     if (!recaptchaSiteKey) return
+    if (stepIds[stepIndex] !== 'verify') return
+    if (activeCaptchaProvider !== 'recaptcha') return
+    if (recaptchaScriptReady) return
+
+    const timeoutId = window.setTimeout(() => {
+      if (turnstileSiteKey) {
+        switchCaptchaProvider('turnstile', 'Google reCAPTCHA timed out. Switched to Cloudflare Turnstile backup.')
+      } else {
+        setCaptchaWidgetError('CAPTCHA initialization timed out. Please refresh and retry.')
+      }
+    }, captchaInitTimeoutMs)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [stepIndex, activeCaptchaProvider, recaptchaScriptReady])
+
+  useEffect(() => {
+    if (!turnstileSiteKey) return
     if (stepIds[stepIndex] !== 'verify') return
     if (activeCaptchaProvider !== 'turnstile') return
     if (turnstileScriptReady) return
 
     const timeoutId = window.setTimeout(() => {
-      setActiveCaptchaProvider('recaptcha')
-      updateField('captcha_provider', 'recaptcha')
       updateField('captcha_token', '')
-      setCaptchaWidgetError('Primary CAPTCHA timed out. Switched to backup verification.')
+      setCaptchaWidgetError('Backup CAPTCHA timed out. Please refresh and retry.')
     }, captchaInitTimeoutMs)
 
     return () => window.clearTimeout(timeoutId)
@@ -347,27 +389,17 @@ export default function SelfServiceOnboarding() {
           setFieldErrors((prev) => ({ ...prev, captcha_token: 'Captcha expired. Please verify again.' }))
         },
         'error-callback': () => {
+          updateField('captcha_provider', 'turnstile')
           updateField('captcha_token', '')
-          if (recaptchaSiteKey) {
-            setActiveCaptchaProvider('recaptcha')
-            updateField('captcha_provider', 'recaptcha')
-            setCaptchaWidgetError('Primary CAPTCHA encountered an error. Switched to backup verification.')
-          } else {
-            setCaptchaWidgetError('Captcha verification encountered an error. Please retry.')
-          }
+          setCaptchaWidgetError('Cloudflare Turnstile backup encountered an error. Please retry.')
         },
         theme: 'light'
       })
       turnstileWidgetIdRef.current = widgetId
     } catch {
+      updateField('captcha_provider', 'turnstile')
       updateField('captcha_token', '')
-      if (recaptchaSiteKey) {
-        setActiveCaptchaProvider('recaptcha')
-        updateField('captcha_provider', 'recaptcha')
-        setCaptchaWidgetError('Primary CAPTCHA unavailable. Switched to backup verification.')
-      } else {
-        setCaptchaWidgetError('Unable to initialize CAPTCHA widget')
-      }
+      setCaptchaWidgetError('Unable to initialize Cloudflare Turnstile backup widget')
     }
 
     return () => {
@@ -401,16 +433,24 @@ export default function SelfServiceOnboarding() {
           setFieldErrors((prev) => ({ ...prev, captcha_token: 'Captcha expired. Please verify again.' }))
         },
         'error-callback': () => {
-          updateField('captcha_provider', 'recaptcha')
-          updateField('captcha_token', '')
-          setCaptchaWidgetError('Backup CAPTCHA encountered an error. Please retry.')
+          if (turnstileSiteKey) {
+            switchCaptchaProvider('turnstile', 'Google reCAPTCHA encountered an error. Switched to Cloudflare Turnstile backup.')
+          } else {
+            updateField('captcha_provider', 'recaptcha')
+            updateField('captcha_token', '')
+            setCaptchaWidgetError('Google reCAPTCHA encountered an error. Please retry.')
+          }
         },
         theme: 'light'
       })
       recaptchaWidgetIdRef.current = widgetId
     } catch {
-      updateField('captcha_token', '')
-      setCaptchaWidgetError('Unable to initialize backup CAPTCHA widget')
+      if (turnstileSiteKey) {
+        switchCaptchaProvider('turnstile', 'Google reCAPTCHA unavailable. Switched to Cloudflare Turnstile backup.')
+      } else {
+        updateField('captcha_token', '')
+        setCaptchaWidgetError('Unable to initialize Google reCAPTCHA widget')
+      }
     }
 
     return () => {
@@ -1262,8 +1302,26 @@ export default function SelfServiceOnboarding() {
                       <div className="space-y-2">
                         <div id={captchaContainerId} className={fieldErrors.captcha_token ? 'rounded-md border border-destructive p-2' : ''} />
                         <p className="text-xs text-muted-foreground">
-                          Active CAPTCHA provider: {activeCaptchaProvider === 'turnstile' ? 'Cloudflare Turnstile' : activeCaptchaProvider === 'recaptcha' ? 'Google reCAPTCHA' : 'None'}
+                          Active CAPTCHA provider: {getCaptchaProviderLabel(activeCaptchaProvider)}
                         </p>
+                        {hasBothCaptchaProviders && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              switchCaptchaProvider(
+                                activeCaptchaProvider === 'recaptcha' ? 'turnstile' : 'recaptcha',
+                                activeCaptchaProvider === 'recaptcha'
+                                  ? 'Switched to Cloudflare Turnstile backup.'
+                                  : 'Switched to Google reCAPTCHA primary.'
+                              )
+                            }
+                            disabled={submitting || verifying}
+                          >
+                            {activeCaptchaProvider === 'recaptcha' ? 'Switch to Cloudflare Turnstile' : 'Switch to Google reCAPTCHA'}
+                          </Button>
+                        )}
                         {captchaWidgetError && <p className="text-xs text-destructive">{captchaWidgetError}</p>}
                         {!captchaWidgetError && !form.captcha_token && <p className="text-xs text-muted-foreground">Complete CAPTCHA challenge to continue.</p>}
                       </div>
