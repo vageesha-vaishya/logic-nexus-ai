@@ -840,6 +840,18 @@ export default function SelfServiceOnboarding() {
       const message = error?.message || 'Unable to start onboarding'
       if (String(message).toLowerCase().includes('captcha service is not configured')) {
         toast.error('Captcha service is not configured. Please set Turnstile or reCAPTCHA secrets on the backend.')
+      } else if (String(message).toLowerCase().includes('onboarding request already pending with status')) {
+        setFieldErrors((prev) => ({
+          ...prev,
+          admin_email: message
+        }))
+        toast.error(message)
+      } else if (String(message).toLowerCase().includes('admin email is already registered with an existing user account')) {
+        setFieldErrors((prev) => ({
+          ...prev,
+          admin_email: message
+        }))
+        toast.error(message)
       } else {
         toast.error(message)
       }
