@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { useCRM } from '@/hooks/useCRM';
+import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -113,6 +114,7 @@ const requestStatusVariant: Record<OnboardingRequestStatus, 'default' | 'destruc
 
 export default function OnboardingOperations() {
   const { scopedDb, context } = useCRM();
+  const { hasRole } = useAuth();
   const { toast } = useToast();
   const [supportLoading, setSupportLoading] = useState(true);
   const [sessions, setSessions] = useState<OnboardingSession[]>([]);
@@ -152,8 +154,10 @@ export default function OnboardingOperations() {
     return data;
   };
 
+  const canAccessRequests = context.isPlatformAdmin || hasRole('platform_admin');
+
   const fetchRequests = async () => {
-    if (!context.isPlatformAdmin) {
+    if (!canAccessRequests) {
       setRequests([]);
       setRequestsLoading(false);
       return;
@@ -269,7 +273,7 @@ export default function OnboardingOperations() {
 
   useEffect(() => {
     fetchRequests();
-  }, [context.isPlatformAdmin, requestStatusFilter, requestSearch, fromDate, toDate]);
+  }, [canAccessRequests, requestStatusFilter, requestSearch, fromDate, toDate]);
 
   useEffect(() => {
     fetchSessions();
@@ -281,12 +285,12 @@ export default function OnboardingOperations() {
   }, [selectedRequestId]);
 
   useEffect(() => {
-    if (!context.isPlatformAdmin) return;
+    if (!canAccessRequests) return;
     const timer = window.setInterval(() => {
       fetchRequests();
     }, 30000);
     return () => window.clearInterval(timer);
-  }, [context.isPlatformAdmin, requestStatusFilter, requestSearch, fromDate, toDate]);
+  }, [canAccessRequests, requestStatusFilter, requestSearch, fromDate, toDate]);
 
   const filteredSessions = useMemo(() => {
     const query = search.trim().toLowerCase();

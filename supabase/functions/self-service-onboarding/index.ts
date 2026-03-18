@@ -652,10 +652,14 @@ const requirePlatformOwner = async (req: Request, logger: any, supabase: Supabas
     }
   }
 
-  const { data: isAdmin, error: adminCheckError } = await supabase.rpc('is_platform_admin', {
-    check_user_id: auth.user.id
-  })
-  if (adminCheckError || !isAdmin) {
+  const { data: roleData, error: roleError } = await supabase
+    .from('user_roles')
+    .select('role')
+    .eq('user_id', auth.user.id)
+    .eq('role', 'platform_admin')
+    .maybeSingle()
+
+  if (roleError || !roleData) {
     return {
       authorized: false,
       response: json(403, { success: false, error: 'Forbidden. Platform Owner role is required' })
