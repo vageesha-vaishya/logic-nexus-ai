@@ -7,7 +7,7 @@ import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 import { logger } from '@/lib/logger';
 import * as Sentry from '@sentry/react';
-import { CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
+import { CRM_HEADER_PRIMARY_CONTROL_SEQUENCE, CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
 import { themeStyleFromPreset } from '@/lib/theme-utils';
 import { useLeadsViewState, LeadsPrimaryView } from '@/hooks/useLeadsViewState';
 import { FEATURE_FLAGS, useAppFeatureFlag } from '@/lib/feature-flags';
@@ -148,7 +148,7 @@ export default function LeadNew() {
             }}
             analyticsActive={false}
             onImportExport={() => navigate('/dashboard/leads/import-export')}
-            controlSequence={['pipeline', 'list', 'create', 'card', 'grid', 'refresh', 'analytics', 'importExport', 'theme']}
+            controlSequence={CRM_HEADER_PRIMARY_CONTROL_SEQUENCE}
             iconOnly
             layout="compact"
           />

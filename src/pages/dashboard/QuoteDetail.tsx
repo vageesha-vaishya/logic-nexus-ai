@@ -23,7 +23,7 @@ import { logger } from '@/lib/logger';
 import { useAuth } from '@/hooks/useAuth';
 import { FEATURE_FLAGS, useAppFeatureFlag } from '@/lib/feature-flags';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
+import { CRM_HEADER_PRIMARY_CONTROL_SEQUENCE, CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
 import { useCRMModuleNavigationState } from '@/hooks/useCRMModuleNavigationState';
 
 const RETRY_DELAYS_MS = [0, 500, 1200];
@@ -1005,7 +1005,7 @@ export default function QuoteDetail() {
                 createLabel="New Quote"
                 onRefresh={handleRetry}
                 onImportExport={() => navigate('/dashboard/quotes/import-export')}
-                controlSequence={['pipeline', 'card', 'grid', 'list', 'create', 'refresh', 'importExport', 'theme']}
+                controlSequence={CRM_HEADER_PRIMARY_CONTROL_SEQUENCE}
                 iconOnly
                 layout="compact"
               />

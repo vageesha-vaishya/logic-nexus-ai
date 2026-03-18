@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { 
   DndContext, 
   DragOverlay, 
@@ -48,6 +48,13 @@ export function QuotesKanbanBoard({
   showFields
 }: QuotesKanbanBoardProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+  const [topScrollContentWidth, setTopScrollContentWidth] = useState(0);
+  const [columnWidth, setColumnWidth] = useState(320);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const topScrollRef = useRef<HTMLDivElement | null>(null);
+  const isSyncingScrollRef = useRef(false);
 
   // Group quotes by status
   const columns = useMemo(() => {
@@ -66,11 +73,70 @@ export function QuotesKanbanBoard({
   }, [quotes]);
 
   const displayedStages = visibleStages && visibleStages.length > 0 ? visibleStages : stages;
-  
-  // Calculate split point for two rows (roughly half)
-  const splitIndex = Math.ceil(displayedStages.length / 2);
-  const row1Stages = displayedStages.slice(0, splitIndex);
-  const row2Stages = displayedStages.slice(splitIndex);
+
+  const updateScrollIndicators = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const maxLeft = container.scrollWidth - container.clientWidth;
+    setCanScrollLeft(container.scrollLeft > 8);
+    setCanScrollRight(container.scrollLeft < maxLeft - 8);
+    setTopScrollContentWidth(container.scrollWidth);
+  }, []);
+
+  const updateColumnWidth = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const viewportWidth = container.clientWidth;
+    const visibleColumnCount = Math.max(1, Math.min(displayedStages.length, 4));
+    const calculated = Math.round(viewportWidth / visibleColumnCount) - 12;
+    const constrained = Math.max(280, Math.min(380, calculated));
+    setColumnWidth(constrained);
+  }, [displayedStages.length]);
+
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const resizeObserver = new ResizeObserver(() => {
+      updateColumnWidth();
+      updateScrollIndicators();
+    });
+    resizeObserver.observe(container);
+    updateColumnWidth();
+    updateScrollIndicators();
+    return () => resizeObserver.disconnect();
+  }, [updateColumnWidth, updateScrollIndicators]);
+
+  useEffect(() => {
+    updateColumnWidth();
+    updateScrollIndicators();
+  }, [quotes, displayedStages, updateColumnWidth, updateScrollIndicators]);
+
+  useEffect(() => {
+    const main = scrollContainerRef.current;
+    const top = topScrollRef.current;
+    if (!main || !top) return;
+    const syncTop = () => {
+      if (isSyncingScrollRef.current) return;
+      isSyncingScrollRef.current = true;
+      top.scrollLeft = main.scrollLeft;
+      isSyncingScrollRef.current = false;
+      updateScrollIndicators();
+    };
+    const syncMain = () => {
+      if (isSyncingScrollRef.current) return;
+      isSyncingScrollRef.current = true;
+      main.scrollLeft = top.scrollLeft;
+      isSyncingScrollRef.current = false;
+      updateScrollIndicators();
+    };
+    main.addEventListener('scroll', syncTop, { passive: true });
+    top.addEventListener('scroll', syncMain, { passive: true });
+    top.scrollLeft = main.scrollLeft;
+    return () => {
+      main.removeEventListener('scroll', syncTop);
+      top.removeEventListener('scroll', syncMain);
+    };
+  }, [updateScrollIndicators]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -123,17 +189,6 @@ export function QuotesKanbanBoard({
 
   const activeQuote = activeId ? quotes.find(q => q.id === activeId) : null;
 
-  const getGridClass = (count: number) => {
-    const map: Record<number, string> = {
-      1: 'lg:grid-cols-1',
-      2: 'lg:grid-cols-2',
-      3: 'lg:grid-cols-3',
-      4: 'lg:grid-cols-4',
-      5: 'lg:grid-cols-5',
-    };
-    return map[count] || 'lg:grid-cols-5';
-  };
-
   return (
     <DndContext
       sensors={sensors}
@@ -142,30 +197,21 @@ export function QuotesKanbanBoard({
       onDragOver={onDragOver}
       onDragEnd={onDragEnd}
     >
-      <div className={className || "flex flex-col gap-8 h-full"}>
-        {/* Row 1 */}
-        <div className={`grid grid-cols-1 gap-4 h-[calc(50%-1rem)] ${getGridClass(row1Stages.length)}`}>
-          {row1Stages.map((stage) => (
-            <KanbanColumn
-              key={stage}
-              id={stage}
-              title={statusConfig[stage]?.label || stage}
-              color={statusConfig[stage]?.color || 'bg-gray-100'}
-              quotes={columns[stage]}
-              wipLimit={wipLimits?.[stage]}
-              bulkMode={bulkMode}
-              selectedQuotes={selectedQuotes}
-              onToggleSelection={onToggleSelection}
-              onQuoteClick={onQuoteClick}
-              showFields={showFields}
-            />
-          ))}
+      <div className={`relative h-full ${className || ''}`}>
+        <div
+          ref={topScrollRef}
+          className="mb-2 h-4 overflow-x-auto overflow-y-hidden rounded-md border border-[#e4e8f0] bg-white [scrollbar-gutter:stable] touch-pan-x"
+          tabIndex={0}
+        >
+          <div style={{ width: `${Math.max(topScrollContentWidth, 1)}px` }} className="h-px" aria-hidden="true" />
         </div>
-
-        {/* Row 2 */}
-        {row2Stages.length > 0 && (
-          <div className={`grid grid-cols-1 gap-4 h-[calc(50%-1rem)] ${getGridClass(row2Stages.length)}`}>
-            {row2Stages.map((stage) => (
+        <div
+          ref={scrollContainerRef}
+          onScroll={updateScrollIndicators}
+          className="h-[calc(100%-1.5rem)] overflow-x-auto overflow-y-hidden scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 [scrollbar-gutter:stable] touch-pan-x"
+        >
+          <div className="flex gap-3 h-full min-w-max pr-1">
+            {displayedStages.map((stage) => (
               <KanbanColumn
                 key={stage}
                 id={stage}
@@ -178,8 +224,22 @@ export function QuotesKanbanBoard({
                 onToggleSelection={onToggleSelection}
                 onQuoteClick={onQuoteClick}
                 showFields={showFields}
+                columnWidth={columnWidth}
               />
             ))}
+          </div>
+        </div>
+        {canScrollLeft && (
+          <div className="pointer-events-none absolute inset-y-0 left-0 w-5 bg-gradient-to-r from-background to-transparent" />
+        )}
+        {canScrollRight && (
+          <div className="pointer-events-none absolute inset-y-0 right-0 w-5 bg-gradient-to-l from-background to-transparent" />
+        )}
+        {(canScrollLeft || canScrollRight) && (
+          <div className="pointer-events-none absolute right-2 top-2 rounded-md bg-background/90 px-2 py-0.5 text-[11px] text-muted-foreground border">
+            {canScrollLeft ? "←" : ""}
+            {canScrollLeft && canScrollRight ? " " : ""}
+            {canScrollRight ? "→" : ""}
           </div>
         )}
       </div>

@@ -25,7 +25,7 @@ import { logger } from '@/lib/logger';
 import * as Sentry from '@sentry/react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PipelineService } from '@/services/pipeline-service';
-import { CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
+import { CRM_HEADER_PRIMARY_CONTROL_SEQUENCE, CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
 
 const stageBarColor: Record<LeadStatus, string> = {
   new: 'bg-red-500/80',
@@ -843,7 +843,7 @@ export default function LeadsPipeline() {
               analyticsLabel={t('leads.tabs.analytics', 'Analytics')}
               analyticsActive={currentView === 'analytics'}
               onAnalyticsClick={() => handleViewChange('analytics')}
-              controlSequence={['pipeline', 'list', 'create', 'card', 'grid', 'refresh', 'analytics', 'importExport', 'theme']}
+              controlSequence={CRM_HEADER_PRIMARY_CONTROL_SEQUENCE}
               onThemeChange={handleThemeChange}
               onCreate={() => navigate('/dashboard/leads/new')}
               createLabel="New Lead"

@@ -1,3 +1,4 @@
+import React from 'react';
 import { Lead, statusConfig } from '@/pages/dashboard/leads-data';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -20,20 +21,23 @@ interface LeadCardProps {
   onDoubleClick?: () => void;
   onEdit?: (e: React.MouseEvent) => void;
   onDelete?: (e: React.MouseEvent) => void;
+  highlighted?: boolean;
+  activeMatch?: boolean;
   className?: string;
 }
 
-export function LeadCard({ 
-  lead, 
-  selected, 
-  onSelect, 
-  onClick, 
+export const LeadCard = React.forwardRef<HTMLDivElement, LeadCardProps>(function LeadCard({
+  lead,
+  selected,
+  onSelect,
+  onClick,
   onDoubleClick,
-  onEdit, 
+  onEdit,
   onDelete,
-  className 
-}: LeadCardProps) {
-  
+  highlighted,
+  activeMatch,
+  className
+}, ref) {
   const handleAction = (e: React.MouseEvent, action?: (e: React.MouseEvent) => void) => {
     e.stopPropagation();
     action?.(e);
@@ -48,9 +52,14 @@ export function LeadCard({
 
   return (
     <Card 
+      ref={ref}
+      tabIndex={-1}
+      data-lead-id={lead.id}
       className={cn(
         "group relative flex flex-col overflow-hidden transition-all hover:shadow-md border-muted",
         selected && "ring-2 ring-primary border-primary",
+        highlighted && "border-primary/40 bg-primary/5",
+        activeMatch && "ring-2 ring-amber-500/80 border-amber-500 bg-amber-500/10",
         className
       )}
       onClick={onClick}
@@ -189,4 +198,4 @@ export function LeadCard({
       </div>
     </Card>
   );
-}
+});

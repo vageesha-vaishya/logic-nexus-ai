@@ -18,7 +18,7 @@ import { UserCapacity } from '@/components/assignment/UserCapacity';
 import { AssignmentQueue } from '@/components/assignment/AssignmentQueue';
 import { AssignmentHistory } from '@/components/assignment/AssignmentHistory';
 import { AssignmentAnalytics } from '@/components/assignment/AssignmentAnalytics';
-import { CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
+import { CRM_HEADER_PRIMARY_CONTROL_SEQUENCE, CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
 import { themeStyleFromPreset } from '@/lib/theme-utils';
 import { LeadsPrimaryView, useLeadsViewState } from '@/hooks/useLeadsViewState';
 
@@ -200,7 +200,7 @@ export default function LeadAssignment() {
                 navigate('/dashboard/leads/pipeline?view=analytics');
               }}
               onImportExport={() => navigate('/dashboard/leads/import-export')}
-              controlSequence={['pipeline', 'list', 'create', 'card', 'grid', 'refresh', 'analytics', 'importExport', 'theme']}
+              controlSequence={CRM_HEADER_PRIMARY_CONTROL_SEQUENCE}
               iconOnly
               layout="compact"
             />

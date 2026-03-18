@@ -1,7 +1,7 @@
 import DataImportExport, { DataField, ExportTemplate } from '@/components/system/DataImportExport';
 import * as z from 'zod';
 import { useNavigate } from 'react-router-dom';
-import { CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
+import { CRM_HEADER_PRIMARY_CONTROL_SEQUENCE, CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
 import { LeadsPrimaryView, useLeadsViewState } from '@/hooks/useLeadsViewState';
 import { themeStyleFromPreset } from '@/lib/theme-utils';
 
@@ -128,7 +128,7 @@ export default function LeadsImportExport() {
             navigate('/dashboard/leads/pipeline?view=analytics');
           }}
           onImportExport={() => navigate('/dashboard/leads/import-export')}
-          controlSequence={['pipeline', 'list', 'create', 'card', 'grid', 'refresh', 'analytics', 'importExport', 'theme']}
+          controlSequence={CRM_HEADER_PRIMARY_CONTROL_SEQUENCE}
           iconOnly
           layout="compact"
         />

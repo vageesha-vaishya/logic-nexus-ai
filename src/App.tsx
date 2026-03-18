@@ -562,6 +562,14 @@ const App = () => (
                 </ProtectedRoute>
               } 
             />
+            <Route
+              path="/dashboard/quotes/analytics"
+              element={
+                <ProtectedRoute requiredPermissions={["quotes.analytics"]}>
+                  <QuotesPipeline />
+                </ProtectedRoute>
+              }
+            />
             <Route 
               path="/dashboard/quotes/templates" 
               element={

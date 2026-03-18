@@ -25,7 +25,8 @@ import { FEATURE_FLAGS, useAppFeatureFlag } from '@/lib/feature-flags';
 import { QuotationDeleteService } from '@/services/quotation/QuotationDeleteService';
 import { useTheme } from '@/hooks/useTheme';
 import { useCRMModuleNavigationState } from '@/hooks/useCRMModuleNavigationState';
-import { CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
+import { CRM_HEADER_PRIMARY_CONTROL_SEQUENCE, CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
+import { QuoteCard } from '@/components/sales/QuoteCard';
 
 interface QuoteWithRelations extends Quote {
   accounts?: { id: string; name: string };
@@ -89,7 +90,7 @@ export default function Quotes() {
     setViewMode,
     setTheme,
   } = useCRMModuleNavigationState('quotes', { viewMode: 'pipeline', theme: 'Azure Sky' });
-  const quoteViewMode = viewMode === 'grid' || viewMode === 'card' ? 'grid' : 'table';
+  const quoteViewMode = viewMode === 'list' ? 'table' : 'grid';
   const [error, setError] = useState<Error | null>(null);
   const [selectedQuoteIds, setSelectedQuoteIds] = useState<string[]>([]);
   const [deleteInProgress, setDeleteInProgress] = useState(false);
@@ -696,20 +697,14 @@ export default function Quotes() {
             onThemeChange={setTheme}
             onCreate={() => navigate('/dashboard/quotes/new')}
             createLabel="New Quote"
+            iconOnly
+            layout="compact"
             onRefresh={fetchQuotes}
             onImportExport={() => navigate('/dashboard/quotes/import-export')}
+            controlSequence={CRM_HEADER_PRIMARY_CONTROL_SEQUENCE}
           />
         }
       >
-        <div className="space-y-6 mb-8">
-          <QuoteMetrics quotes={quotes} loading={loading} />
-          {!loading && !error && quotes.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <QuoteStatusChart quotes={quotes} />
-            </div>
-          )}
-        </div>
-        
         <div className="flex justify-end mb-4">
           <AdvancedSearchFilter 
             activeFilters={activeFilters}
@@ -844,10 +839,61 @@ export default function Quotes() {
               }
               viewMode={quoteViewMode}
               mobileTitleKey="quote_number"
-              mobileSubtitleKey="account_id"
+              mobileSubtitleKey="title"
+              renderGridCard={(quote, context) => (
+                <QuoteCard
+                  ref={context.registerRef}
+                  key={context.rowId}
+                  quote={quote}
+                  selected={context.isSelected}
+                  highlighted={context.isMatched}
+                  activeMatch={context.isActiveMatch}
+                  onSelect={() => {
+                    const rowId = context.rowId;
+                    setSelectedQuoteIds((current) => (
+                      current.includes(rowId)
+                        ? current.filter((id) => id !== rowId)
+                        : [...current, rowId]
+                    ));
+                  }}
+                  onClick={() => navigate(`/dashboard/quotes/${quote.id}`)}
+                  onDuplicate={(event) => {
+                    event.stopPropagation();
+                    handleDuplicate(quote.id);
+                  }}
+                  onDelete={(event) => {
+                    event.stopPropagation();
+                    handleDelete(quote.id);
+                  }}
+                />
+              )}
+              searchNavigation={{
+                enabled: true,
+                getRowId: (row) => String(row.id),
+                getRowSearchText: (row) => [
+                  row.quote_number,
+                  row.title,
+                  row.accounts?.name,
+                  row.opportunities?.name,
+                  row.contacts ? `${row.contacts.first_name || ''} ${row.contacts.last_name || ''}`.trim() : '',
+                  row.carriers?.carrier_name,
+                  row.status,
+                ]
+                  .filter(Boolean)
+                  .join(' '),
+              }}
             />
           </CardContent>
         </Card>
+
+        <div className="space-y-6 mt-8">
+          <QuoteMetrics quotes={quotes} loading={loading} />
+          {!loading && !error && quotes.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <QuoteStatusChart quotes={quotes} />
+            </div>
+          )}
+        </div>
       </FirstScreenTemplate>
     </DashboardLayout>
   );

@@ -1,115 +1,139 @@
 import React, { useMemo } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Plane, Ship, Truck, Info } from 'lucide-react';
+import { Info, MapPin, Plane, Ship, Train, Truck } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
+type QuoteMapLegMode = 'ocean' | 'air' | 'road' | 'rail' | 'other';
+
+interface QuoteMapLegInput {
+  from?: string | null;
+  to?: string | null;
+  origin?: string | null;
+  destination?: string | null;
+  mode?: string | null;
+  transit_time?: string | number | null;
+  border_crossing?: boolean | null;
+  carrier?: string | null;
+}
+
 interface QuoteMapVisualizerProps {
-    origin: string;
-    destination: string;
-    legs: any[];
+  origin: string;
+  destination: string;
+  legs: QuoteMapLegInput[];
 }
 
 export function QuoteMapVisualizer({ origin, destination, legs }: QuoteMapVisualizerProps) {
-    // Helper to normalize leg data
-    const normalizedLegs = legs.map(leg => ({
-        ...leg,
-        from: leg.from || leg.origin,
-        to: leg.to || leg.destination,
-        mode: (leg.mode || 'road').toLowerCase()
+  const normalizedLegs = useMemo(() => {
+    const toMode = (rawMode: string | null | undefined): QuoteMapLegMode => {
+      const value = String(rawMode || '').toLowerCase();
+      if (value.includes('ocean') || value.includes('sea')) return 'ocean';
+      if (value.includes('air')) return 'air';
+      if (value.includes('rail')) return 'rail';
+      if (value.includes('road') || value.includes('truck')) return 'road';
+      return 'other';
+    };
+
+    return legs.map((leg) => ({
+      from: String(leg.from || leg.origin || 'Origin'),
+      to: String(leg.to || leg.destination || 'Destination'),
+      mode: toMode(leg.mode),
+      transitTime: leg.transit_time ? String(leg.transit_time) : 'N/A',
+      borderCrossing: Boolean(leg.border_crossing),
+      carrier: leg.carrier ? String(leg.carrier) : 'N/A',
     }));
+  }, [legs]);
 
-    // Simplified World Map SVG Path (Mercator-ish)
-    // This is a very rough approximation for visual context
-    const worldMapPath = "M50,50 L100,50 L100,100 L50,100 Z"; // Placeholder if I can't find a good path string quickly. 
-    // Actually, let's use a schematic approach instead of a real geo-map if we don't have tiles.
-    // Or we can use a static image background if we had one.
-    
-    // Better approach: "Schematic Route Map" 
-    // We will draw a connection line with nodes on a canvas/SVG that looks like a transit map.
-
-    return (
-        <Card className="w-full h-[300px] bg-slate-50 relative overflow-hidden border-2 border-muted">
-            <div className="absolute inset-0 bg-[url('https://upload.wikimedia.org/wikipedia/commons/8/80/World_map_-_low_resolution.svg')] bg-cover bg-center opacity-10 pointer-events-none" />
-            
-            <div className="absolute top-4 left-4 z-10 bg-white/90 p-2 rounded shadow-sm backdrop-blur-sm border">
-                <h4 className="text-xs font-bold flex items-center gap-2">
-                    <MapPin className="w-3 h-3 text-red-500"/> Route Visualization
-                </h4>
-                <div className="text-[10px] text-muted-foreground mt-1">
-                    {origin} ➔ {destination}
-                </div>
-                <div className="flex gap-2 mt-2">
-                    <Badge variant="outline" className="text-[10px] h-5 bg-blue-50 text-blue-700 border-blue-200">
-                        {normalizedLegs.filter(l => l.mode.includes('ocean')).length} Ocean
-                    </Badge>
-                    <Badge variant="outline" className="text-[10px] h-5 bg-sky-50 text-sky-700 border-sky-200">
-                        {normalizedLegs.filter(l => l.mode.includes('air')).length} Air
-                    </Badge>
-                    <Badge variant="outline" className="text-[10px] h-5 bg-amber-50 text-amber-700 border-amber-200">
-                        {normalizedLegs.filter(l => l.mode.includes('road')).length} Road
-                    </Badge>
-                </div>
-            </div>
-
-            {/* Visualization Layer */}
-            <div className="w-full h-full flex items-center justify-center p-12">
-                <div className="relative w-full max-w-3xl flex items-center justify-between">
-                    {/* Connecting Line */}
-                    <div className="absolute top-1/2 left-0 w-full h-1 bg-gray-200 -translate-y-1/2 z-0" />
-                    
-                    {/* Origin Node */}
-                    <div className="relative z-10 flex flex-col items-center">
-                        <div className="w-4 h-4 rounded-full bg-white border-4 border-green-500 shadow-sm" />
-                        <div className="absolute top-6 text-xs font-bold whitespace-nowrap bg-white/80 px-1 rounded">{origin}</div>
-                    </div>
-
-                    {/* Legs Nodes */}
-                    {normalizedLegs.map((leg, i) => (
-                        <div key={i} className="relative z-10 flex flex-col items-center group" style={{ left: `${((i + 1) / (normalizedLegs.length + 1)) * 100}%`, position: 'absolute' }}>
-                            <TooltipProvider>
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <div className="w-8 h-8 rounded-full bg-white border-2 border-primary flex items-center justify-center shadow-sm cursor-pointer hover:scale-110 transition-transform">
-                                            {leg.mode.includes('ocean') && <Ship className="w-4 h-4 text-blue-600" />}
-                                            {leg.mode.includes('air') && <Plane className="w-4 h-4 text-sky-600" />}
-                                            {leg.mode.includes('road') && <Truck className="w-4 h-4 text-amber-600" />}
-                                            {leg.mode.includes('rail') && <Train className="w-4 h-4 text-orange-600" />}
-                                        </div>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                        <div className="text-xs">
-                                            <p className="font-semibold">{leg.mode.toUpperCase()} Leg</p>
-                                            <p>From: {leg.from}</p>
-                                            <p>To: {leg.to}</p>
-                                            <p>Duration: {leg.transit_time}</p>
-                                            {leg.border_crossing && <Badge variant="destructive" className="text-[9px] h-4 mt-1">Customs Check</Badge>}
-                                        </div>
-                                    </TooltipContent>
-                                </Tooltip>
-                            </TooltipProvider>
-                            
-                            {/* Border Crossing Indicator on the line */}
-                            {leg.border_crossing && (
-                                <div className="absolute -top-6 bg-red-100 text-red-600 text-[9px] px-1 rounded border border-red-200 font-bold whitespace-nowrap">
-                                    BORDER
-                                </div>
-                            )}
-                        </div>
-                    ))}
-
-                    {/* Destination Node */}
-                    <div className="relative z-10 flex flex-col items-center">
-                        <div className="w-4 h-4 rounded-full bg-white border-4 border-red-500 shadow-sm" />
-                        <div className="absolute top-6 text-xs font-bold whitespace-nowrap bg-white/80 px-1 rounded">{destination}</div>
-                    </div>
-                </div>
-            </div>
-
-            <div className="absolute bottom-2 right-2 text-[10px] text-muted-foreground flex items-center gap-1 bg-white/80 px-2 py-1 rounded">
-                <Info className="w-3 h-3" />
-                Schematic View • Not to scale
-            </div>
-        </Card>
+  const modeCounts = useMemo(() => {
+    return normalizedLegs.reduce(
+      (acc, leg) => {
+        if (leg.mode === 'ocean') acc.ocean += 1;
+        if (leg.mode === 'air') acc.air += 1;
+        if (leg.mode === 'road') acc.road += 1;
+        if (leg.mode === 'rail') acc.rail += 1;
+        return acc;
+      },
+      { ocean: 0, air: 0, road: 0, rail: 0 },
     );
+  }, [normalizedLegs]);
+
+  const iconForMode = (mode: QuoteMapLegMode) => {
+    if (mode === 'ocean') return <Ship className="h-4 w-4 text-primary" />;
+    if (mode === 'air') return <Plane className="h-4 w-4 text-primary" />;
+    if (mode === 'rail') return <Train className="h-4 w-4 text-primary" />;
+    return <Truck className="h-4 w-4 text-primary" />;
+  };
+
+  return (
+    <Card className="w-full min-h-[300px] border-border bg-card">
+      <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+        <div className="space-y-1">
+          <h4 className="flex items-center gap-2 text-xs font-semibold">
+            <MapPin className="h-3 w-3 text-primary" />
+            Route Visualization
+          </h4>
+          <p className="text-[10px] text-muted-foreground">
+            {origin} → {destination}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant="outline" className="h-5 text-[10px]">{modeCounts.ocean} Ocean</Badge>
+          <Badge variant="outline" className="h-5 text-[10px]">{modeCounts.air} Air</Badge>
+          <Badge variant="outline" className="h-5 text-[10px]">{modeCounts.road} Road</Badge>
+          <Badge variant="outline" className="h-5 text-[10px]">{modeCounts.rail} Rail</Badge>
+        </div>
+      </div>
+
+      <div className="p-4">
+        <div className="flex items-center overflow-x-auto rounded-md border border-border bg-muted/20 px-3 py-6">
+          <div className="flex items-center gap-3">
+            <div className="flex min-w-[120px] flex-col items-center gap-1">
+              <div className="h-4 w-4 rounded-full border-2 border-primary bg-background" />
+              <span className="max-w-[120px] truncate text-xs font-medium">{origin}</span>
+            </div>
+            {normalizedLegs.map((leg, index) => (
+              <React.Fragment key={`${leg.from}-${leg.to}-${index}`}>
+                <div className="h-px w-8 bg-border" />
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="flex min-w-[140px] cursor-default flex-col items-center gap-1 rounded-md border border-border bg-background px-3 py-2">
+                        <span className="text-[10px] text-muted-foreground">{leg.from} → {leg.to}</span>
+                        <span className="flex items-center gap-1 text-xs font-medium">
+                          {iconForMode(leg.mode)}
+                          {leg.mode.toUpperCase()}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">{leg.transitTime}</span>
+                        {leg.borderCrossing ? (
+                          <Badge variant="destructive" className="h-4 px-1 text-[9px]">Customs</Badge>
+                        ) : null}
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <div className="space-y-1 text-xs">
+                        <p><span className="text-muted-foreground">From:</span> {leg.from}</p>
+                        <p><span className="text-muted-foreground">To:</span> {leg.to}</p>
+                        <p><span className="text-muted-foreground">Carrier:</span> {leg.carrier}</p>
+                        <p><span className="text-muted-foreground">Transit:</span> {leg.transitTime}</p>
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </React.Fragment>
+            ))}
+            <div className="h-px w-8 bg-border" />
+            <div className="flex min-w-[120px] flex-col items-center gap-1">
+              <div className="h-4 w-4 rounded-full border-2 border-primary bg-background" />
+              <span className="max-w-[120px] truncate text-xs font-medium">{destination}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-end gap-1 px-4 pb-3 text-[10px] text-muted-foreground">
+        <Info className="h-3 w-3" />
+        Schematic View • Not to scale
+      </div>
+    </Card>
+  );
 }

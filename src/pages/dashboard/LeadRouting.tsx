@@ -12,7 +12,7 @@ import { Plus, Trash2, ArrowUpDown, Info, Users, List, PlayCircle } from 'lucide
 import { useNavigate } from 'react-router-dom';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
-import { CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
+import { CRM_HEADER_PRIMARY_CONTROL_SEQUENCE, CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
 import { themeStyleFromPreset } from '@/lib/theme-utils';
 import { LeadsPrimaryView, useLeadsViewState } from '@/hooks/useLeadsViewState';
 
@@ -283,7 +283,7 @@ export default function LeadRouting() {
               navigate('/dashboard/leads/pipeline?view=analytics');
             }}
             onImportExport={() => navigate('/dashboard/leads/import-export')}
-            controlSequence={['pipeline', 'list', 'create', 'card', 'grid', 'refresh', 'analytics', 'importExport', 'theme']}
+            controlSequence={CRM_HEADER_PRIMARY_CONTROL_SEQUENCE}
             iconOnly
             layout="compact"
           />

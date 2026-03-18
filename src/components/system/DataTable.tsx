@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Table,
   TableBody,
@@ -101,6 +101,18 @@ interface DataTableProps<T> {
 
   // View Mode
   viewMode?: 'table' | 'grid';
+  renderGridCard?: (row: T, context: {
+    rowId: string;
+    isSelected: boolean;
+    isMatched: boolean;
+    isActiveMatch: boolean;
+    registerRef: (element: HTMLElement | null) => void;
+  }) => React.ReactNode;
+  searchNavigation?: {
+    enabled?: boolean;
+    getRowId?: (row: T, index: number) => string;
+    getRowSearchText?: (row: T) => string;
+  };
 }
 
 export function DataTable<T extends { id?: string | number }>({
@@ -118,11 +130,36 @@ export function DataTable<T extends { id?: string | number }>({
   mobileTitleKey,
   mobileSubtitleKey,
   viewMode = 'table',
+  renderGridCard,
+  searchNavigation,
 }: DataTableProps<T>) {
   const [localSearch, setLocalSearch] = useState(search?.query || '');
+  const [activeMatchIndex, setActiveMatchIndex] = useState(0);
   const isMobile = useIsMobile();
   const showGrid = isMobile || viewMode === 'grid';
   const debouncedSearch = useDebounce(localSearch, 300);
+  const rowRefs = useRef(new Map<string, HTMLElement>());
+
+  const getPrimitiveText = (value: unknown): string => {
+    if (value == null) return '';
+    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+      return String(value);
+    }
+    if (Array.isArray(value)) {
+      return value.map(getPrimitiveText).join(' ');
+    }
+    if (typeof value === 'object') {
+      return Object.values(value as Record<string, unknown>).map(getPrimitiveText).join(' ');
+    }
+    return '';
+  };
+
+  const resolveRowId = (row: T, rowIndex: number) => {
+    if (searchNavigation?.getRowId) return searchNavigation.getRowId(row, rowIndex);
+    if (selection) return selection.rowId(row);
+    if ((row as { id?: string | number }).id != null) return String((row as { id?: string | number }).id);
+    return String(rowIndex);
+  };
 
   // Sync local search with external query changes (e.g. clear button)
   React.useEffect(() => {
@@ -140,6 +177,65 @@ export function DataTable<T extends { id?: string | number }>({
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setLocalSearch(e.target.value);
+  };
+
+  const searchNavigationEnabled = (searchNavigation?.enabled ?? false) && Boolean(search);
+  const normalizedSearchTerm = searchNavigationEnabled ? (search?.query || '').trim().toLowerCase() : '';
+
+  const matchedRowIds = useMemo(() => {
+    if (!normalizedSearchTerm) return [];
+    return data
+      .map((row, index) => {
+        const searchText = searchNavigation?.getRowSearchText
+          ? searchNavigation.getRowSearchText(row)
+          : getPrimitiveText(row);
+        if (!searchText.toLowerCase().includes(normalizedSearchTerm)) return null;
+        return resolveRowId(row, index);
+      })
+      .filter((rowId): rowId is string => Boolean(rowId));
+  }, [data, normalizedSearchTerm, searchNavigation, selection]);
+
+  useEffect(() => {
+    if (!normalizedSearchTerm || matchedRowIds.length === 0) {
+      setActiveMatchIndex(0);
+      return;
+    }
+    setActiveMatchIndex((current) => {
+      if (current < 0 || current >= matchedRowIds.length) return 0;
+      return current;
+    });
+  }, [matchedRowIds, normalizedSearchTerm]);
+
+  const activeMatchedRowId = matchedRowIds.length > 0 ? matchedRowIds[activeMatchIndex] : null;
+
+  useEffect(() => {
+    if (!activeMatchedRowId) return;
+    const rowElement = rowRefs.current.get(activeMatchedRowId);
+    if (!rowElement) return;
+    rowElement.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+    if (typeof rowElement.focus === 'function') {
+      rowElement.focus({ preventScroll: true });
+    }
+  }, [activeMatchedRowId]);
+
+  const handleNavigateMatches = (direction: 'next' | 'prev') => {
+    if (matchedRowIds.length === 0) return;
+    setActiveMatchIndex((current) => {
+      const delta = direction === 'next' ? 1 : -1;
+      return (current + delta + matchedRowIds.length) % matchedRowIds.length;
+    });
+  };
+
+  const handleSearchKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!searchNavigationEnabled) return;
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      handleNavigateMatches('next');
+    }
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      handleNavigateMatches('prev');
+    }
   };
 
   const totalPages = pagination ? Math.ceil(pagination.totalCount / pagination.pageSize) : 0;
@@ -180,8 +276,14 @@ export function DataTable<T extends { id?: string | number }>({
                   placeholder={search.placeholder || "Search..."}
                   value={localSearch}
                   onChange={handleSearchChange}
+                  onKeyDown={handleSearchKeyDown}
                   className="pl-8"
                 />
+              </div>
+            )}
+            {searchNavigationEnabled && normalizedSearchTerm && (
+              <div className="text-xs text-muted-foreground whitespace-nowrap">
+                {matchedRowIds.length > 0 ? `${activeMatchIndex + 1} / ${matchedRowIds.length} matches` : '0 matches'}
               </div>
             )}
             
@@ -237,19 +339,43 @@ export function DataTable<T extends { id?: string | number }>({
             <div className="p-12 text-center text-muted-foreground">No results found.</div>
           ) : (
             data.map((row, rowIndex) => {
-              const rowId = selection ? selection.rowId(row) : String(rowIndex);
+              const rowId = resolveRowId(row, rowIndex);
               const isSelected = selection ? selection.selectedIds.includes(rowId) : false;
+              const isMatched = matchedRowIds.includes(rowId);
+              const isActiveMatch = activeMatchedRowId === rowId;
+              const registerRef = (element: HTMLElement | null) => {
+                if (element) {
+                  rowRefs.current.set(rowId, element);
+                } else {
+                  rowRefs.current.delete(rowId);
+                }
+              };
+
+              if (renderGridCard) {
+                return renderGridCard(row, {
+                  rowId,
+                  isSelected,
+                  isMatched,
+                  isActiveMatch,
+                  registerRef,
+                });
+              }
               
               const title = mobileTitleKey ? (row as any)[mobileTitleKey] : (row as any)[columns[0].key];
               const subtitle = mobileSubtitleKey ? (row as any)[mobileSubtitleKey] : (row as any)[columns[1]?.key];
 
               return (
                 <Card 
+                  ref={registerRef as React.Ref<HTMLDivElement>}
                   key={rowId} 
+                  tabIndex={-1}
+                  data-row-id={rowId}
                   className={cn(
                     "transition-colors",
                     onRowClick ? "cursor-pointer active:bg-muted" : "",
-                    isSelected ? "border-primary bg-primary/5" : ""
+                    isSelected ? "border-primary bg-primary/5" : "",
+                    isMatched ? "border-primary/40 bg-primary/5" : "",
+                    isActiveMatch ? "ring-2 ring-amber-500/80 border-amber-500 bg-amber-500/10" : ""
                   )}
                   onClick={() => onRowClick && onRowClick(row)}
                 >
@@ -368,13 +494,28 @@ export function DataTable<T extends { id?: string | number }>({
                 </TableRow>
               ) : (
                 data.map((row, rowIndex) => {
-                  const rowId = selection ? selection.rowId(row) : String(rowIndex);
+                  const rowId = resolveRowId(row, rowIndex);
                   const isSelected = selection ? selection.selectedIds.includes(rowId) : false;
+                  const isMatched = matchedRowIds.includes(rowId);
+                  const isActiveMatch = activeMatchedRowId === rowId;
 
                   return (
                     <TableRow 
+                      ref={(element) => {
+                        if (element) {
+                          rowRefs.current.set(rowId, element);
+                        } else {
+                          rowRefs.current.delete(rowId);
+                        }
+                      }}
                       key={rowId} 
-                      className={cn(onRowClick ? "cursor-pointer" : "")}
+                      tabIndex={-1}
+                      data-row-id={rowId}
+                      className={cn(
+                        onRowClick ? "cursor-pointer" : "",
+                        isMatched ? "bg-primary/5" : "",
+                        isActiveMatch ? "ring-2 ring-inset ring-amber-500/80 bg-amber-500/10" : ""
+                      )}
                       onClick={() => onRowClick && onRowClick(row)}
                       data-state={isSelected ? "selected" : undefined}
                     >

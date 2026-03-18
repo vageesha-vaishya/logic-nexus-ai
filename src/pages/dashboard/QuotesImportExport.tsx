@@ -1,10 +1,13 @@
 import DataImportExport, { DataField, ExportTemplate } from '@/components/system/DataImportExport';
 import { useMemo } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { z } from 'zod';
 import * as XLSX from 'xlsx';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
+import { CRM_HEADER_PRIMARY_CONTROL_SEQUENCE, CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
+import { useCRMModuleNavigationState } from '@/hooks/useCRMModuleNavigationState';
+import { themeStyleFromPreset } from '@/lib/theme-utils';
 
 const quoteFields: DataField[] = [
   { key: 'quote_number', label: 'Quote Number', required: true, aliases: ['quote no', 'quote id'] },
@@ -355,8 +358,13 @@ export const buildFullQuoteExportSheets = (
 };
 
 export default function QuotesImportExport() {
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { scopedDb } = useCRM();
+  const { viewMode, theme, setViewMode, setTheme } = useCRMModuleNavigationState('quotes', {
+    viewMode: 'pipeline',
+    theme: 'Azure Sky',
+  });
   const mode = searchParams.get('mode');
   const scope = searchParams.get('scope');
   const quoteId = searchParams.get('quoteId');
@@ -373,6 +381,16 @@ export default function QuotesImportExport() {
     ? formatParam
     : undefined;
   const initialTemplateName = scope === 'section' ? sectionTemplate.name : defaultTemplate.name;
+
+  const handleHeaderViewModeChange = (mode: 'pipeline' | 'card' | 'grid' | 'list') => {
+    if (mode === 'pipeline') {
+      setViewMode('pipeline');
+      navigate('/dashboard/quotes/pipeline');
+      return;
+    }
+    setViewMode(mode);
+    navigate('/dashboard/quotes');
+  };
 
   const applyQuoteExportScope = (query: any) => {
     if (scope === 'single' && quoteId) {
@@ -516,6 +534,8 @@ export default function QuotesImportExport() {
       defaultExportTemplate={defaultTemplate}
       additionalExportTemplates={[sectionTemplate]}
       listPath="/dashboard/quotes"
+      showBackToListButton={false}
+      containerStyle={themeStyleFromPreset(theme)}
       onTransformRecord={transformQuoteRecord}
       onPrepareImportBatch={prepareQuoteImportBatch}
       onExportFilterApply={applyQuoteExportScope}
@@ -528,6 +548,22 @@ export default function QuotesImportExport() {
         { value: 'name', label: 'Title' },
         { value: 'custom', label: 'None (Allow all)' },
       ]}
+      headerActions={
+        <CRMModuleHeaderNavigation
+          moduleLabel="Quotes"
+          viewMode={viewMode}
+          theme={theme}
+          onViewModeChange={handleHeaderViewModeChange}
+          onThemeChange={setTheme}
+          onCreate={() => navigate('/dashboard/quotes/new')}
+          createLabel="New Quote"
+          onRefresh={() => navigate(0)}
+          onImportExport={() => navigate('/dashboard/quotes/import-export')}
+          controlSequence={CRM_HEADER_PRIMARY_CONTROL_SEQUENCE}
+          iconOnly
+          layout="compact"
+        />
+      }
     />
   );
 }

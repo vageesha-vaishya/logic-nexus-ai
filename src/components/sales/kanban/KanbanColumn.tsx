@@ -23,6 +23,7 @@ interface KanbanColumnProps {
     validUntil: boolean;
     status: boolean;
   };
+  columnWidth?: number;
 }
 
 export function KanbanColumn({ 
@@ -35,7 +36,8 @@ export function KanbanColumn({
   selectedQuotes,
   onToggleSelection,
   onQuoteClick,
-  showFields
+  showFields,
+  columnWidth
 }: KanbanColumnProps) {
   const { setNodeRef } = useDroppable({
     id: id,
@@ -46,10 +48,11 @@ export function KanbanColumn({
   return (
     <div
       ref={setNodeRef}
-      className="flex flex-col w-full min-w-[200px] rounded-lg h-full max-h-full bg-slate-50/50 dark:bg-slate-900/50 border border-border/50"
+      style={columnWidth ? { width: `${columnWidth}px`, minWidth: `${columnWidth}px`, maxWidth: `${columnWidth}px` } : undefined}
+      className="flex flex-col w-full min-w-[280px] rounded-lg h-full max-h-full bg-slate-50/50 dark:bg-slate-900/50 border border-border/50 flex-shrink-0"
     >
       {/* Column Header */}
-      <div className="flex flex-col gap-2 p-3 border-b bg-background/50 rounded-t-lg backdrop-blur-sm">
+      <div className="flex flex-col gap-2 p-3 border-b bg-background/95 rounded-t-lg backdrop-blur-sm">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <h3 className="font-semibold text-sm text-foreground">
@@ -84,7 +87,7 @@ export function KanbanColumn({
       </div>
 
       {/* Cards Container */}
-      <div className="flex-1 overflow-y-auto p-2 space-y-3 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600">
+      <div className="flex-1 overflow-y-auto p-2 space-y-3 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 touch-pan-y">
         <SortableContext
           items={quotes.map(q => q.id)}
           strategy={verticalListSortingStrategy}

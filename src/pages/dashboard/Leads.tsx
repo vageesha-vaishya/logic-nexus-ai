@@ -30,7 +30,7 @@ import { FirstScreenTemplate } from '@/components/system/FirstScreenTemplate';
 import { EmptyState } from '@/components/system/EmptyState';
 import { TableSkeleton } from '@/components/system/TableSkeleton';
 import { LeadCard } from '@/components/crm/LeadCard';
-import { CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
+import { CRM_HEADER_PRIMARY_CONTROL_SEQUENCE, CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
 import { themeStyleFromPreset } from '@/lib/theme-utils';
 import { Lead } from './leads-data';
 import { usePerformanceMonitor } from '@/hooks/usePerformanceMonitor';
@@ -183,6 +183,8 @@ export default function Leads() {
   const [activeResizeColumn, setActiveResizeColumn] = useState<ListTableColumnKey | null>(null);
   const resizeMetaRef = useRef<{ key: ListTableColumnKey; startX: number; startWidth: number } | null>(null);
   const leadClickTimeoutRef = useRef<number | null>(null);
+  const leadListRowRefs = useRef<Map<string, HTMLTableRowElement>>(new Map());
+  const leadCardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   // Local state for debounced search
   const [localSearch, setLocalSearch] = useState(searchQuery);
@@ -698,6 +700,63 @@ export default function Leads() {
     () => leads.find((lead) => lead.id === focusedLeadId) || leads[0] || null,
     [leads, focusedLeadId]
   );
+  const normalizedSearchTerm = localSearch.trim().toLowerCase();
+  const matchedLeadIds = useMemo(() => {
+    if (!normalizedSearchTerm) return [];
+    return leads
+      .filter((lead) => {
+        const searchText = [
+          lead.first_name,
+          lead.last_name,
+          lead.company,
+          lead.email,
+          lead.phone,
+          lead.source,
+          lead.status,
+          lead.title,
+          lead.description,
+          lead.notes,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
+        return searchText.includes(normalizedSearchTerm);
+      })
+      .map((lead) => lead.id);
+  }, [leads, normalizedSearchTerm]);
+  const hasActiveSearch = normalizedSearchTerm.length > 0;
+  const activeMatchedLeadId = hasActiveSearch
+    ? (matchedLeadIds.includes(focusedLeadId || '') ? focusedLeadId : matchedLeadIds[0]) || null
+    : null;
+
+  const navigateMatchedLeads = useCallback((direction: 'next' | 'prev') => {
+    if (!hasActiveSearch || matchedLeadIds.length === 0) return;
+    const currentIndex = activeMatchedLeadId ? matchedLeadIds.indexOf(activeMatchedLeadId) : -1;
+    const delta = direction === 'next' ? 1 : -1;
+    const nextIndex = currentIndex < 0
+      ? 0
+      : (currentIndex + delta + matchedLeadIds.length) % matchedLeadIds.length;
+    setFocusedLeadId(matchedLeadIds[nextIndex]);
+  }, [activeMatchedLeadId, hasActiveSearch, matchedLeadIds]);
+
+  useEffect(() => {
+    if (!hasActiveSearch || matchedLeadIds.length === 0) return;
+    if (!focusedLeadId || !matchedLeadIds.includes(focusedLeadId)) {
+      setFocusedLeadId(matchedLeadIds[0]);
+    }
+  }, [focusedLeadId, hasActiveSearch, matchedLeadIds]);
+
+  useEffect(() => {
+    if (!activeMatchedLeadId) return;
+    const activeElement =
+      leadListRowRefs.current.get(activeMatchedLeadId) ||
+      leadCardRefs.current.get(activeMatchedLeadId);
+    if (!activeElement) return;
+    activeElement.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+    if (typeof activeElement.focus === 'function') {
+      activeElement.focus({ preventScroll: true });
+    }
+  }, [activeMatchedLeadId, viewMode]);
 
   const fetchLeadActivities = useCallback(async (leadId: string) => {
     const requestId = ++activitiesRequestSequenceRef.current;
@@ -1424,7 +1483,7 @@ export default function Leads() {
                 setPipeline({ q: '', status: [] });
                 navigate('/dashboard/leads/pipeline?view=analytics');
               }}
-              controlSequence={['pipeline', 'list', 'create', 'card', 'grid', 'refresh', 'analytics', 'importExport', 'theme']}
+              controlSequence={CRM_HEADER_PRIMARY_CONTROL_SEQUENCE}
               onThemeChange={handleThemeChange}
               onCreate={() => navigate('/dashboard/leads/new')}
               createLabel="New Lead"
@@ -1457,9 +1516,27 @@ export default function Leads() {
                 placeholder={t('leads.filters.searchPlaceholder', 'Search by name, company, or email')}
                 value={localSearch}
                 onChange={(e) => setLocalSearch(e.target.value)}
+                onKeyDown={(event) => {
+                  if (!hasActiveSearch) return;
+                  if (event.key === 'ArrowDown') {
+                    event.preventDefault();
+                    navigateMatchedLeads('next');
+                  }
+                  if (event.key === 'ArrowUp') {
+                    event.preventDefault();
+                    navigateMatchedLeads('prev');
+                  }
+                }}
                 className="h-7 pl-8.5 bg-background"
               />
               </div>
+              {hasActiveSearch && (
+                <span className="text-xs text-muted-foreground px-1">
+                  {matchedLeadIds.length > 0
+                    ? `${Math.max(1, matchedLeadIds.indexOf(activeMatchedLeadId || '') + 1)} / ${matchedLeadIds.length}`
+                    : '0 / 0'}
+                </span>
+              )}
 
               <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="h-7 w-[160px] shrink-0 bg-background px-1">
@@ -1723,8 +1800,16 @@ export default function Leads() {
                       )}
                       {!collapsedGroups.has(group.key) && group.leads.map((lead) => (
                         <TableRow
+                          ref={(element) => {
+                            if (element) {
+                              leadListRowRefs.current.set(lead.id, element);
+                            } else {
+                              leadListRowRefs.current.delete(lead.id);
+                            }
+                          }}
                           key={lead.id}
-                          className={`h-8 hover:bg-slate-50/50 cursor-pointer ${focusedLead?.id === lead.id ? 'bg-slate-100/70' : ''}`}
+                          tabIndex={-1}
+                          className={`h-8 hover:bg-slate-50/50 cursor-pointer ${focusedLead?.id === lead.id ? 'bg-slate-100/70' : ''} ${matchedLeadIds.includes(lead.id) ? 'border-l-2 border-l-primary/60 bg-primary/5' : ''} ${activeMatchedLeadId === lead.id ? 'ring-2 ring-inset ring-amber-500/80 bg-amber-500/10' : ''}`}
                           onClick={() => handleLeadSingleClick(lead)}
                           onDoubleClick={() => handleLeadDoubleClick(lead)}
                         >
@@ -2089,11 +2174,20 @@ export default function Leads() {
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             {leads.map((lead) => (
               <LeadCard
+                ref={(element) => {
+                  if (element) {
+                    leadCardRefs.current.set(lead.id, element);
+                  } else {
+                    leadCardRefs.current.delete(lead.id);
+                  }
+                }}
                 key={lead.id}
                 lead={lead}
                 onClick={() => handleLeadSingleClick(lead)}
                 onDoubleClick={() => handleLeadDoubleClick(lead)}
                 selected={focusedLead?.id === lead.id}
+                highlighted={matchedLeadIds.includes(lead.id)}
+                activeMatch={activeMatchedLeadId === lead.id}
                 onSelect={() => toggleSelection(lead.id)}
                 onDelete={() => handleDelete(lead.id)}
                 onEdit={() => navigateToLeadEdit(lead)}
@@ -2104,11 +2198,20 @@ export default function Leads() {
           <div className="flex flex-col gap-3">
             {leads.map((lead) => (
               <LeadCard
+                ref={(element) => {
+                  if (element) {
+                    leadCardRefs.current.set(lead.id, element);
+                  } else {
+                    leadCardRefs.current.delete(lead.id);
+                  }
+                }}
                 key={lead.id}
                 lead={lead}
                 onClick={() => handleLeadSingleClick(lead)}
                 onDoubleClick={() => handleLeadDoubleClick(lead)}
                 selected={focusedLead?.id === lead.id}
+                highlighted={matchedLeadIds.includes(lead.id)}
+                activeMatch={activeMatchedLeadId === lead.id}
                 onSelect={() => toggleSelection(lead.id)}
                 onDelete={() => handleDelete(lead.id)}
                 onEdit={() => navigateToLeadEdit(lead)}

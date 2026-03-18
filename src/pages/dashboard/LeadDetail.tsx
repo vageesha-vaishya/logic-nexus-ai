@@ -27,7 +27,7 @@ import { Lead, statusConfig } from './leads-data';
 import { exportCsv, exportExcel } from '@/lib/import-export';
 import { getScoreGrade } from '@/utils/leadScoring';
 import { DetailScreenTemplate } from '@/components/system/DetailScreenTemplate';
-import { CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
+import { CRM_HEADER_PRIMARY_CONTROL_SEQUENCE, CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
 import { themeStyleFromPreset } from '@/lib/theme-utils';
 import { useLeadsViewState, LeadsPrimaryView } from '@/hooks/useLeadsViewState';
 import { useStickyActions } from '@/components/layout/StickyActionsContext';
@@ -871,7 +871,7 @@ export default function LeadDetail() {
                   navigate('/dashboard/leads/pipeline?view=analytics');
                 }}
                 onImportExport={() => navigate('/dashboard/leads/import-export')}
-                controlSequence={['pipeline', 'list', 'create', 'card', 'grid', 'refresh', 'analytics', 'importExport', 'theme']}
+                controlSequence={CRM_HEADER_PRIMARY_CONTROL_SEQUENCE}
                 iconOnly
                 layout="compact"
               />

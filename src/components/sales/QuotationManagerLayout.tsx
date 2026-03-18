@@ -55,11 +55,18 @@ import { useDomain } from '@/contexts/DomainContext';
 import { toast } from 'sonner';
 import { QuotationSidebar } from './QuotationSidebar';
 import { DomainSwitcher } from '@/components/navigation/DomainSwitcher';
+import { CRM_HEADER_PRIMARY_CONTROL_SEQUENCE, CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
+import { CRMModuleViewMode } from '@/hooks/useCRMModuleNavigationState';
 
 interface QuotationManagerLayoutProps {
   children: ReactNode;
-  viewMode: ViewMode;
-  onViewModeChange: (mode: ViewMode) => void;
+  viewMode: CRMModuleViewMode;
+  theme: string;
+  onThemeChange: (theme: string) => void;
+  onViewModeChange: (mode: CRMModuleViewMode) => void;
+  onCreate: () => void;
+  onRefresh: () => void;
+  onImportExport: () => void;
   searchQuery: string;
   onSearchChange: (query: string) => void;
   activeFilters: FilterCriterion[];
@@ -76,7 +83,12 @@ interface QuotationManagerLayoutProps {
 export function QuotationManagerLayout({
   children,
   viewMode,
+  theme,
+  onThemeChange,
   onViewModeChange,
+  onCreate,
+  onRefresh,
+  onImportExport,
   searchQuery,
   onSearchChange,
   activeFilters,
@@ -409,41 +421,15 @@ export function QuotationManagerLayout({
         <QuotationSidebar />
         <div className="flex flex-col flex-1 overflow-hidden min-w-0">
           {/* --- Sub-Header Strip (Control Panel) --- */}
-          <div className="h-16 bg-white border-b flex items-center justify-between px-4 shrink-0 gap-4 shadow-sm z-40">
+      <div className="h-16 bg-white border-b flex items-center justify-between px-4 shrink-0 gap-4 shadow-sm z-40">
         {/* Left: Actions */}
         <div className="flex items-center gap-3">
-          <Button 
-            className="bg-[#714B67] hover:bg-[#5e3d55] text-white gap-2 shadow-sm"
-            onClick={() => handleNavigation('/dashboard/quotes/new')}
-          >
-            <Plus className="h-4 w-4" />
-            New
-          </Button>
-          
           <h1 className="text-xl font-semibold text-gray-800 ml-2 hidden md:block">Quotations</h1>
           {currentDomain?.code && (
             <Badge variant="secondary" className="hidden lg:inline-flex">
               {currentDomain.code}
             </Badge>
           )}
-          
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="text-gray-500">
-                <Settings2 className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              <DropdownMenuItem onClick={() => handleAction('import')}>
-                <Upload className="mr-2 h-4 w-4" />
-                Import Records
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleAction('export')}>
-                <Download className="mr-2 h-4 w-4" />
-                Export All
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
         </div>
 
         {/* Middle: Search & Filter */}
@@ -494,38 +480,20 @@ export function QuotationManagerLayout({
             </Button>
           </div>
 
-          <div className="flex bg-gray-100 p-1 rounded-lg gap-0.5">
-            <Button 
-              variant={viewMode === 'list' ? 'secondary' : 'ghost'} 
-              size="icon" 
-              className={`h-8 w-8 ${viewMode === 'list' ? 'shadow-sm text-[#714B67]' : 'text-gray-500 hover:text-gray-700'}`}
-              onClick={() => onViewModeChange('list')}
-              title="List View"
-            >
-              <List className="h-4 w-4" />
-            </Button>
-            <Button 
-              variant={viewMode === 'board' ? 'secondary' : 'ghost'} 
-              size="icon" 
-              className={`h-8 w-8 ${viewMode === 'board' ? 'shadow-sm text-[#714B67]' : 'text-gray-500 hover:text-gray-700'}`}
-              onClick={() => onViewModeChange('board')}
-              title="Kanban View"
-            >
-              <Kanban className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-gray-600 hidden sm:flex" title="Calendar View">
-              <Calendar className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-gray-600 hidden sm:flex" title="Pivot View">
-              <Table className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-gray-600 hidden sm:flex" title="Graph View">
-              <BarChart2 className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-gray-600 hidden sm:flex" title="Activity View">
-              <Activity className="h-4 w-4" />
-            </Button>
-          </div>
+          <CRMModuleHeaderNavigation
+            moduleLabel="Quotes"
+            viewMode={viewMode}
+            theme={theme}
+            onViewModeChange={onViewModeChange}
+            onThemeChange={onThemeChange}
+            onCreate={onCreate}
+            createLabel="New Quote"
+            onRefresh={onRefresh}
+            onImportExport={onImportExport}
+            controlSequence={CRM_HEADER_PRIMARY_CONTROL_SEQUENCE}
+            iconOnly
+            layout="compact"
+          />
         </div>
       </div>
 

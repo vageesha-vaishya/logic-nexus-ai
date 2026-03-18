@@ -6,7 +6,19 @@ import { BarChart3, CreditCard, Download, GitBranch, LayoutGrid, List, Palette, 
 import { CRMModuleViewMode } from '@/hooks/useCRMModuleNavigationState';
 import { THEME_PRESETS } from '@/theme/themes';
 
+type CRMHeaderControl = CRMModuleViewMode | 'analytics' | 'create' | 'refresh' | 'importExport' | 'theme';
+
 const VIEW_MODE_SEQUENCE: CRMModuleViewMode[] = ['pipeline', 'card', 'grid', 'list'];
+export const CRM_HEADER_PRIMARY_CONTROL_SEQUENCE: CRMHeaderControl[] = [
+  'pipeline',
+  'card',
+  'grid',
+  'list',
+  'create',
+  'refresh',
+  'importExport',
+  'theme',
+];
 
 function toLabel(mode: CRMModuleViewMode): string {
   return mode.charAt(0).toUpperCase() + mode.slice(1);
@@ -18,8 +30,6 @@ function modeIcon(mode: CRMModuleViewMode) {
   if (mode === 'grid') return LayoutGrid;
   return List;
 }
-
-type CRMHeaderControl = CRMModuleViewMode | 'analytics' | 'create' | 'refresh' | 'importExport' | 'theme';
 
 interface CRMModuleHeaderNavigationProps {
   moduleLabel: string;
@@ -86,9 +96,6 @@ export function CRMModuleHeaderNavigation({
 
     viewModeSequence.forEach((mode) => {
       pushMode(mode);
-      if (mode === 'pipeline' && onAnalyticsClick) {
-        pushAnalytics();
-      }
     });
     return items;
   }, [controlSequence, onAnalyticsClick, viewModeSequence]);
@@ -96,17 +103,12 @@ export function CRMModuleHeaderNavigation({
   const effectiveControlSequence = useMemo(() => {
     if (controlSequence) return controlSequence;
     const sequence: CRMHeaderControl[] = [...viewModeSequence];
-    if (onAnalyticsClick) {
-      const pipelineIndex = sequence.indexOf('pipeline');
-      if (pipelineIndex >= 0) {
-        sequence.splice(pipelineIndex + 1, 0, 'analytics');
-      } else {
-        sequence.unshift('analytics');
-      }
-    }
     sequence.push('create', 'refresh', 'importExport', 'theme');
     return sequence;
-  }, [controlSequence, onAnalyticsClick, viewModeSequence]);
+  }, [controlSequence, viewModeSequence]);
+
+  const shouldRenderSecondaryAnalytics =
+    Boolean(onAnalyticsClick) && !effectiveControlSequence.includes('analytics');
 
   const handleViewKeyboard = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
     if (!['ArrowRight', 'ArrowLeft', 'Home', 'End'].includes(event.key)) {
@@ -277,6 +279,27 @@ export function CRMModuleHeaderNavigation({
             </Button>
           );
         })}
+        {shouldRenderSecondaryAnalytics && onAnalyticsClick ? (
+          <Button
+            key="analytics-secondary"
+            type="button"
+            variant={analyticsActive ? 'secondary' : 'outline'}
+            className={cn('h-11', iconOnly ? 'w-11 px-0' : 'min-w-20 px-4')}
+            aria-label={`${moduleLabel} ${analyticsLabel} view`}
+            aria-pressed={analyticsActive}
+            onClick={onAnalyticsClick}
+            title={analyticsLabel}
+          >
+            {iconOnly ? (
+              <>
+                <BarChart3 className="h-4 w-4" />
+                <span className="sr-only">{analyticsLabel}</span>
+              </>
+            ) : (
+              analyticsLabel
+            )}
+          </Button>
+        ) : null}
       </div>
     </nav>
   );

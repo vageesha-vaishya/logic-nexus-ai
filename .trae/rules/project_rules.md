@@ -10,6 +10,18 @@
 - Keep view and theme persistence in browser storage and reuse on remount.
 - Use `ScopedDataAccess` for all data refresh callbacks used by header controls.
 
+## CRM Remediation Rules
+- Enforce one shared constant for CRM header control order and reuse it across all Lead/Quote module pages.
+- Keep analytics outside the required fixed primary action order (secondary control, not interleaved with core sequence).
+- Wrap Quotes import/export in the same module header/navigation shell pattern used by Leads import/export.
+- Refactor QuoteMapVisualizer to tokenized utility classes, strict leg typing, and valid icon imports only.
+
+## Platform Navigation and Pipeline Layout Rules
+- Use `DashboardLayout` as the required shell for every CRM pipeline page to inherit universal banner, breadcrumb, and default main sidebar behaviors.
+- Disallow module-specific replacement side menus on pipeline pages; only extend navigation through existing platform menu configuration and module sub-routes.
+- Standardize pipeline page structure as three sections: header controls, kanban workspace with detail panel, and bottom statistics summary.
+- Require pipeline analytics view to include KPI cards, date-range filters, export actions, and permission-aware access checks.
+
 ## Database Table Creation Governance
 - Require schema-and-code overlap analysis before any new table migration.
 - Require written extension assessment for candidate existing tables.

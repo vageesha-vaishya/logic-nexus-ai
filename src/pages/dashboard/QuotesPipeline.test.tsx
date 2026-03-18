@@ -131,7 +131,7 @@ describe('QuotesPipeline', () => {
       </BrowserRouter>
     );
 
-    expect(await screen.findByText('New')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /quotes new quote/i })).toBeInTheDocument();
   });
 
   it('fetches quotes on mount', async () => {

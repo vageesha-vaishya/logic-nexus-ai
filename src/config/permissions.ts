@@ -28,6 +28,7 @@ export type Permission =
   | 'quotes.edit'
   | 'quotes.delete'
   | 'quotes.import_export'
+  | 'quotes.analytics'
   | 'quotes.export_sensitive'
   | 'quotes.templates.manage'
   | 'import_quotation'
@@ -91,7 +92,7 @@ export const ROLE_PERMISSIONS: Record<
     'accounts.view','accounts.create','accounts.edit','accounts.delete',
     'contacts.view','contacts.create','contacts.edit','contacts.delete',
     'opportunities.view','opportunities.create','opportunities.edit','opportunities.delete',
-    'quotes.view','quotes.create','quotes.edit','quotes.delete','quotes.import_export','quotes.export_sensitive','quotes.templates.manage','import_quotation','export_quotation','export_quotation_sensitive',
+    'quotes.view','quotes.create','quotes.edit','quotes.delete','quotes.import_export','quotes.analytics','quotes.export_sensitive','quotes.templates.manage','import_quotation','export_quotation','export_quotation_sensitive',
     'transfers.view', 'transfers.create', 'transfers.approve', 'transfers.reject',
     'activities.view','activities.create','activities.edit','activities.delete','activities.complete',
     'campaigns.view','campaigns.manage',
@@ -118,7 +119,7 @@ export const ROLE_PERMISSIONS: Record<
     'accounts.view','accounts.create','accounts.edit','accounts.delete',
     'contacts.view','contacts.create','contacts.edit','contacts.delete',
     'opportunities.view','opportunities.create','opportunities.edit','opportunities.delete',
-    'quotes.view','quotes.create','quotes.edit','quotes.delete','quotes.import_export','quotes.export_sensitive','quotes.templates.manage','import_quotation','export_quotation',
+    'quotes.view','quotes.create','quotes.edit','quotes.delete','quotes.import_export','quotes.analytics','quotes.export_sensitive','quotes.templates.manage','import_quotation','export_quotation',
     'transfers.view', 'transfers.create', 'transfers.approve', 'transfers.reject',
     'activities.view','activities.create','activities.edit','activities.delete','activities.complete',
     'campaigns.view','campaigns.manage',
@@ -144,7 +145,7 @@ export const ROLE_PERMISSIONS: Record<
     'accounts.view','accounts.create','accounts.edit',
     'contacts.view','contacts.create','contacts.edit',
     'opportunities.view','opportunities.create','opportunities.edit',
-    'quotes.view','quotes.create','quotes.edit','quotes.import_export','import_quotation','export_quotation',
+    'quotes.view','quotes.create','quotes.edit','quotes.import_export','quotes.analytics','import_quotation','export_quotation',
     'activities.view','activities.create','activities.edit','activities.complete',
     'campaigns.view',
     'files.view',
@@ -165,7 +166,7 @@ export const ROLE_PERMISSIONS: Record<
     'accounts.view','accounts.create',
     'contacts.view','contacts.create',
     'opportunities.view','opportunities.create',
-    'quotes.view','quotes.create','quotes.import_export','import_quotation','export_quotation',
+    'quotes.view','quotes.create','quotes.import_export','quotes.analytics','import_quotation','export_quotation',
     'activities.view','activities.create','activities.complete',
     'campaigns.view',
     'files.view',
