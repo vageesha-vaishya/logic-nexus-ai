@@ -917,6 +917,68 @@ serveWithLogger(async (req, logger, supabase) => {
       return json(422, { success: false, error: 'Organization name and preferred domain are required' })
     }
 
+    const baseOrganizationSlug = slugifyOrganizationName(sanitizedOrganizationName)
+
+    const existingTenantRequest = await supabase
+      .from('self_service_onboarding_requests')
+      .select('id, status, created_at, updated_at')
+      .ilike('organization_name', sanitizedOrganizationName)
+      .in('status', [...tenantDuplicateRequestStatuses])
+      .order('updated_at', { ascending: false, nullsFirst: false })
+      .order('created_at', { ascending: false })
+      .limit(1)
+
+    if (existingTenantRequest.error) {
+      await logger.error('Failed checking onboarding request uniqueness by organization name', { error: existingTenantRequest.error.message })
+      return json(500, { success: false, error: 'Unable to validate organization uniqueness' })
+    }
+
+    if (existingTenantRequest.data && existingTenantRequest.data.length > 0) {
+      const activeRequest = existingTenantRequest.data[0]
+      return json(200, {
+        success: true,
+        is_unique: false,
+        reason: 'tenant_request_exists',
+        message: tenantRequestAlreadyExistsMessage,
+        existing_request_id: activeRequest.id,
+        existing_request_status: activeRequest.status
+      })
+    }
+
+    const [{ data: existingTenantByName, error: existingTenantByNameError }, { data: existingTenantBySlug, error: existingTenantBySlugError }] =
+      await Promise.all([
+        supabase
+          .from('tenants')
+          .select('id, name, slug')
+          .ilike('name', sanitizedOrganizationName)
+          .maybeSingle(),
+        supabase
+          .from('tenants')
+          .select('id, name, slug')
+          .eq('slug', baseOrganizationSlug)
+          .maybeSingle()
+      ])
+
+    if (existingTenantByNameError || existingTenantBySlugError) {
+      await logger.error('Failed checking tenant uniqueness by organization name', {
+        error: existingTenantByNameError?.message || existingTenantBySlugError?.message
+      })
+      return json(500, { success: false, error: 'Unable to validate organization uniqueness' })
+    }
+
+    const existingTenant = existingTenantByName || existingTenantBySlug
+    if (existingTenant?.id) {
+      return json(200, {
+        success: true,
+        is_unique: false,
+        reason: 'tenant_exists',
+        message: tenantAlreadyPresentMessage,
+        existing_tenant_id: existingTenant.id,
+        existing_tenant_name: sanitizeText(existingTenant.name || sanitizedOrganizationName, 120),
+        existing_tenant_slug: sanitizeText(existingTenant.slug || baseOrganizationSlug, 120)
+      })
+    }
+
     const { data: existingRequests, error: existingRequestsError } = await supabase
       .from('self_service_onboarding_requests')
       .select('id')
@@ -930,9 +992,18 @@ serveWithLogger(async (req, logger, supabase) => {
     }
 
     const isUnique = !existingRequests || existingRequests.length === 0
+    if (!isUnique) {
+      return json(200, {
+        success: true,
+        is_unique: false,
+        reason: 'org_domain_exists',
+        message: 'This Organization Name and Preferred Domain combination already exists. Please use a different combination.'
+      })
+    }
+
     return json(200, {
       success: true,
-      is_unique: isUnique
+      is_unique: true
     })
   }
 

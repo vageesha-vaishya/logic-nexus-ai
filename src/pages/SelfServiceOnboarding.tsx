@@ -620,6 +620,8 @@ export default function SelfServiceOnboarding() {
         const response = await invokeAnonymous<{
           success: boolean
           is_unique?: boolean
+          reason?: 'tenant_request_exists' | 'tenant_exists' | 'org_domain_exists'
+          message?: string
           error?: string
         }>('self-service-onboarding', {
           action: 'check_org_domain_uniqueness',
@@ -632,7 +634,16 @@ export default function SelfServiceOnboarding() {
         }
 
         if (response.is_unique === false) {
-          const duplicateMessage = 'This Organization Name and Preferred Domain combination already exists. Please use a different combination.'
+          const duplicateMessage = response.message || 'This Organization Name and Preferred Domain combination already exists. Please use a different combination.'
+          if (response.reason === 'tenant_exists' || response.reason === 'tenant_request_exists') {
+            setFieldErrors((prev) => ({
+              ...prev,
+              organization_name: duplicateMessage
+            }))
+            toast.error(duplicateMessage)
+            return false
+          }
+
           setFieldErrors({
             organization_name: duplicateMessage,
             domain: duplicateMessage,
