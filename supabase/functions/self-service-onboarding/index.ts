@@ -122,6 +122,11 @@ const checkOrgDomainUniquenessSchema = z.object({
   domain: z.string().min(1).max(120)
 })
 
+const checkAdminEmailUniquenessSchema = z.object({
+  action: z.literal('check_admin_email_uniqueness'),
+  admin_email: z.string().email().max(160)
+})
+
 const removeControlCharacters = (value: string): string =>
   value
     .split('')
@@ -999,6 +1004,88 @@ serveWithLogger(async (req, logger, supabase) => {
         reason: 'org_domain_exists',
         message: 'This Organization Name and Preferred Domain combination already exists. Please use a different combination.'
       })
+    }
+
+    return json(200, {
+      success: true,
+      is_unique: true
+    })
+  }
+
+  if (action === 'check_admin_email_uniqueness') {
+    const parsed = checkAdminEmailUniquenessSchema.safeParse(payload)
+    if (!parsed.success) {
+      return json(422, { success: false, error: 'Validation failed', issues: parsed.error.issues })
+    }
+
+    const sanitizedEmail = sanitizeEmail(parsed.data.admin_email)
+    if (!sanitizedEmail) {
+      return json(422, { success: false, error: 'Admin email is required' })
+    }
+
+    const existingPending = await supabase
+      .from('self_service_onboarding_requests')
+      .select('id, status, created_at, updated_at')
+      .ilike('admin_email', sanitizedEmail)
+      .in('status', [...pendingOnboardingStatuses])
+      .order('updated_at', { ascending: false, nullsFirst: false })
+      .order('created_at', { ascending: false })
+      .limit(1)
+
+    if (existingPending.error) {
+      await logger.error('Failed checking onboarding request by admin email', { error: existingPending.error.message })
+      return json(500, { success: false, error: 'Unable to validate admin email' })
+    }
+
+    if (existingPending.data && existingPending.data.length > 0) {
+      const activeRequest = existingPending.data[0]
+      return json(200, {
+        success: true,
+        is_unique: false,
+        reason: 'admin_request_exists',
+        message: duplicateOnboardingMessage(activeRequest.status),
+        existing_request_id: activeRequest.id,
+        existing_request_status: activeRequest.status
+      })
+    }
+
+    const { data: existingProfile, error: existingProfileError } = await supabase
+      .from('profiles')
+      .select('id, email')
+      .ilike('email', sanitizedEmail)
+      .maybeSingle()
+
+    if (existingProfileError) {
+      await logger.error('Failed checking existing profile by admin email', { error: existingProfileError.message })
+      return json(500, { success: false, error: 'Unable to validate admin email' })
+    }
+
+    if (existingProfile?.id) {
+      return json(200, {
+        success: true,
+        is_unique: false,
+        reason: 'admin_user_exists',
+        message: existingUserMessage,
+        existing_user_id: existingProfile.id,
+        existing_user_email: sanitizeEmail(existingProfile.email || sanitizedEmail)
+      })
+    }
+
+    try {
+      const existingAuthUser = await findAuthUserByEmail(supabase, sanitizedEmail)
+      if (existingAuthUser?.id) {
+        return json(200, {
+          success: true,
+          is_unique: false,
+          reason: 'admin_user_exists',
+          message: existingUserMessage,
+          existing_user_id: existingAuthUser.id,
+          existing_user_email: sanitizeEmail(existingAuthUser.email || sanitizedEmail)
+        })
+      }
+    } catch (error: any) {
+      await logger.error('Failed checking auth users by admin email', { error: String(error?.message || error) })
+      return json(500, { success: false, error: 'Unable to validate admin email' })
     }
 
     return json(200, {

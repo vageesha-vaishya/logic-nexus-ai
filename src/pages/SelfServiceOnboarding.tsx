@@ -152,6 +152,7 @@ export default function SelfServiceOnboarding() {
   const [submitting, setSubmitting] = useState(false)
   const [verifying, setVerifying] = useState(false)
   const [validatingOrgDomain, setValidatingOrgDomain] = useState(false)
+  const [validatingAdminEmail, setValidatingAdminEmail] = useState(false)
   const [domainsLoading, setDomainsLoading] = useState(true)
   const [domainsError, setDomainsError] = useState<string | null>(null)
   const [domainOptions, setDomainOptions] = useState<DomainOption[]>([])
@@ -700,6 +701,44 @@ export default function SelfServiceOnboarding() {
         return false
       }
 
+      setValidatingAdminEmail(true)
+      try {
+        const response = await invokeAnonymous<{
+          success: boolean
+          is_unique?: boolean
+          reason?: 'admin_request_exists' | 'admin_user_exists'
+          message?: string
+          error?: string
+        }>('self-service-onboarding', {
+          action: 'check_admin_email_uniqueness',
+          admin_email: form.admin_email.trim()
+        })
+
+        if (!response?.success) {
+          throw new Error(response?.error || 'Unable to validate admin email')
+        }
+
+        if (response.is_unique === false) {
+          const duplicateMessage = response.message || 'Admin email is already registered. Please use a different admin email.'
+          setFieldErrors((prev) => ({
+            ...prev,
+            admin_email: duplicateMessage
+          }))
+          toast.error(duplicateMessage)
+          return false
+        }
+      } catch (error: any) {
+        const message = error?.message || 'Unable to validate admin email'
+        setFieldErrors((prev) => ({
+          ...prev,
+          admin_email: message
+        }))
+        toast.error(message)
+        return false
+      } finally {
+        setValidatingAdminEmail(false)
+      }
+
       setFieldErrors((prev) => ({
         ...prev,
         admin_first_name: undefined,
@@ -1178,6 +1217,7 @@ export default function SelfServiceOnboarding() {
                       type="email"
                       value={form.admin_email}
                       onChange={(e) => updateField('admin_email', e.target.value)}
+                      autoComplete="off"
                       className={fieldErrors.admin_email ? 'border-destructive focus-visible:ring-destructive/30' : ''}
                     />
                     {fieldErrors.admin_email && <p className="text-xs text-destructive">{fieldErrors.admin_email}</p>}
@@ -1190,6 +1230,7 @@ export default function SelfServiceOnboarding() {
                         type={showAdminPassword ? 'text' : 'password'}
                         value={form.admin_password}
                         onChange={(e) => updateField('admin_password', e.target.value)}
+                        autoComplete="new-password"
                         className={[
                           'pr-10',
                           fieldErrors.admin_password ? 'border-destructive focus-visible:ring-destructive/30' : ''
@@ -1220,6 +1261,7 @@ export default function SelfServiceOnboarding() {
                         type={showAdminPasswordConfirm ? 'text' : 'password'}
                         value={form.admin_password_confirm}
                         onChange={(e) => updateField('admin_password_confirm', e.target.value)}
+                        autoComplete="new-password"
                         className={[
                           'pr-10',
                           fieldErrors.admin_password_confirm ? 'border-destructive focus-visible:ring-destructive/30' : ''
@@ -1410,8 +1452,8 @@ export default function SelfServiceOnboarding() {
                     {submitting ? 'Submitting...' : 'Start Onboarding'}
                   </Button>
                 ) : (
-                  <Button onClick={nextStep} disabled={validatingOrgDomain}>
-                    {validatingOrgDomain ? 'Validating...' : 'Continue'}
+                  <Button onClick={nextStep} disabled={validatingOrgDomain || validatingAdminEmail}>
+                    {validatingOrgDomain || validatingAdminEmail ? 'Validating...' : 'Continue'}
                   </Button>
                 )}
               </div>
