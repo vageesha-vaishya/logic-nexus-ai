@@ -731,7 +731,6 @@ const performProvisioningForRequest = async (
       subscription_tier: requestRow.plan_tier,
       max_users: requestRow.requested_user_count,
       max_franchises: requestRow.requested_franchise_count,
-      country: resolvedCountryCode || resolvedCountryName,
       status: isPaidPlan ? 'pending' : 'active',
       settings: {
         onboarding_source: 'self_service',
