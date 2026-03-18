@@ -722,6 +722,17 @@ const performProvisioningForRequest = async (
     resolvedCurrencyCode = sanitizeText(currencyRef.code || resolvedCurrencyCode, 3).toUpperCase()
   }
 
+  const requestedUserCount = Number.parseInt(String(requestRow.requested_user_count ?? ''), 10)
+  const requestedFranchiseCount = Number.parseInt(String(requestRow.requested_franchise_count ?? ''), 10)
+
+  if (!Number.isFinite(requestedUserCount) || !Number.isInteger(requestedUserCount) || requestedUserCount < 1) {
+    throw new Error('Requested user count must be at least 1')
+  }
+
+  if (!Number.isFinite(requestedFranchiseCount) || !Number.isInteger(requestedFranchiseCount) || requestedFranchiseCount < 0) {
+    throw new Error('Requested franchise count cannot be negative')
+  }
+
   const orgSlug = await buildUniqueSlug(supabase, requestRow.organization_slug || requestRow.organization_name)
   const { data: tenant, error: tenantError } = await supabase
     .from('tenants')
@@ -729,8 +740,8 @@ const performProvisioningForRequest = async (
       name: requestRow.organization_name,
       slug: orgSlug,
       subscription_tier: requestRow.plan_tier,
-      max_users: requestRow.requested_user_count,
-      max_franchises: requestRow.requested_franchise_count,
+      max_users: requestedUserCount,
+      max_franchises: requestedFranchiseCount,
       status: isPaidPlan ? 'pending' : 'active',
       settings: {
         onboarding_source: 'self_service',
@@ -827,8 +838,8 @@ const performProvisioningForRequest = async (
       trial_end: trialEnd,
       metadata: {
         source: 'self_service_onboarding',
-        requested_user_count: requestRow.requested_user_count,
-        requested_franchise_count: requestRow.requested_franchise_count,
+        requested_user_count: requestedUserCount,
+        requested_franchise_count: requestedFranchiseCount,
         billing_period: requestRow.billing_period
       }
     })

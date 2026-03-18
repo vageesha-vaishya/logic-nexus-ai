@@ -2,6 +2,78 @@ import { getCorsHeaders } from '../_shared/cors.ts';
 import { requireAuth } from '../_shared/auth.ts';
 import { serveWithLogger } from '../_shared/logger.ts';
 
+const parsePositiveInteger = (value: unknown) => {
+  const parsed = Number.parseInt(String(value ?? '').trim(), 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+};
+
+const resolveTenantMaxUsers = async (supabaseAdmin: any, tenantId: string) => {
+  const { data: tenant, error: tenantError } = await supabaseAdmin
+    .from('tenants')
+    .select('max_users')
+    .eq('id', tenantId)
+    .maybeSingle();
+  if (tenantError) throw tenantError;
+  const tenantMaxUsers = parsePositiveInteger(tenant?.max_users);
+
+  const { data: subscription, error } = await supabaseAdmin
+    .from('tenant_subscriptions')
+    .select('plan_id, metadata, status, created_at')
+    .eq('tenant_id', tenantId)
+    .in('status', ['active', 'trial'])
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+
+  const requestedUsers = parsePositiveInteger(subscription?.metadata?.requested_user_count);
+  let planMaxUsers: number | null = null;
+
+  if (subscription?.plan_id) {
+    const { data: plan, error: planError } = await supabaseAdmin
+      .from('subscription_plans')
+      .select('max_users, limits')
+      .eq('id', subscription.plan_id)
+      .maybeSingle();
+    if (planError) throw planError;
+    planMaxUsers = parsePositiveInteger(plan?.max_users ?? plan?.limits?.users);
+  }
+
+  const limits = [tenantMaxUsers, requestedUsers, planMaxUsers].filter(
+    (value): value is number => typeof value === 'number' && Number.isFinite(value) && value > 0
+  );
+  return limits.length ? Math.min(...limits) : null;
+};
+
+const resolveFranchiseUserLimit = async (supabaseAdmin: any, franchiseId: string) => {
+  const { data, error } = await supabaseAdmin
+    .from('franchises')
+    .select('user_limit')
+    .eq('id', franchiseId)
+    .maybeSingle();
+  if (error) throw error;
+  return parsePositiveInteger(data?.user_limit);
+};
+
+const countTenantUsers = async (supabaseAdmin: any, tenantId: string) => {
+  const { data, error } = await supabaseAdmin
+    .from('user_roles')
+    .select('user_id')
+    .eq('tenant_id', tenantId);
+  if (error) throw error;
+  return new Set((data || []).map((row: any) => row.user_id)).size;
+};
+
+const countFranchiseUsers = async (supabaseAdmin: any, franchiseId: string) => {
+  const { data, error } = await supabaseAdmin
+    .from('user_roles')
+    .select('user_id')
+    .eq('franchise_id', franchiseId);
+  if (error) throw error;
+  return new Set((data || []).map((row: any) => row.user_id)).size;
+};
+
 serveWithLogger(async (req, logger, supabaseAdmin) => {
   const headers = getCorsHeaders(req);
 
@@ -109,6 +181,26 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
 
       if (!franchiseScope || franchiseScope.tenant_id !== finalTenantId) {
         return new Response(JSON.stringify({ error: 'Invalid tenant/franchise relationship' }), { status: 400, headers: { ...headers, 'Content-Type': 'application/json' } });
+      }
+    }
+
+    if (finalTenantId && targetRole !== 'platform_admin') {
+      const tenantLimit = await resolveTenantMaxUsers(supabaseAdmin, finalTenantId);
+      if (tenantLimit) {
+        const existingCount = await countTenantUsers(supabaseAdmin, finalTenantId);
+        if (existingCount >= tenantLimit) {
+          return new Response(JSON.stringify({ error: `Tenant user limit reached (${tenantLimit})` }), { status: 400, headers: { ...headers, 'Content-Type': 'application/json' } });
+        }
+      }
+    }
+
+    if (finalFranchiseId) {
+      const franchiseLimit = await resolveFranchiseUserLimit(supabaseAdmin, finalFranchiseId);
+      if (franchiseLimit) {
+        const existingCount = await countFranchiseUsers(supabaseAdmin, finalFranchiseId);
+        if (existingCount >= franchiseLimit) {
+          return new Response(JSON.stringify({ error: `Franchise user limit reached (${franchiseLimit})` }), { status: 400, headers: { ...headers, 'Content-Type': 'application/json' } });
+        }
       }
     }
 

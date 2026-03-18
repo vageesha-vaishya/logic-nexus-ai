@@ -20,6 +20,11 @@ import { invokeFunction } from '@/lib/supabase-functions';
 import { calculateScaledPrice } from '@/utils/subscriptionScaling';
 import { THEME_PRESETS } from '@/theme/themes';
 
+const parsePositiveInteger = (value?: string | number | null) => {
+  const parsed = Number.parseInt(String(value ?? '').trim(), 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+};
+
 const tenantSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
   slug: z.string().min(2, 'Slug must be at least 2 characters').regex(/^[a-z0-9-]+$/, 'Slug must be lowercase alphanumeric with hyphens'),
@@ -75,6 +80,25 @@ const tenantSchema = z.object({
   welcome_kit_email: z.string().email('Invalid email').optional().or(z.literal('')),
   trigger_guided_tour: z.boolean().default(true),
   auto_create_onboarding_checklist: z.boolean().default(true),
+}).superRefine((data, ctx) => {
+  const hasPlan = Boolean((data.selected_plan_id || '').trim());
+  if (!hasPlan) return;
+  const requestedUsers = parsePositiveInteger(data.requested_user_count);
+  const requestedFranchises = parsePositiveInteger(data.requested_franchise_count);
+  if (!requestedUsers) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Requested users is required',
+      path: ['requested_user_count'],
+    });
+  }
+  if (!requestedFranchises) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Requested franchises is required',
+      path: ['requested_franchise_count'],
+    });
+  }
 });
 
 type TenantFormValues = z.infer<typeof tenantSchema>;
@@ -1040,7 +1064,15 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
       const dataResidencySettings = nextSettings?.data_residency || {};
       const supportSettings = nextSettings?.support || {};
 
-      const data = {
+      const shouldPersistMaxLimits = Boolean((values.selected_plan_id || '').trim());
+      const maxFranchises = shouldPersistMaxLimits
+        ? parsePositiveInteger(values.requested_franchise_count)
+        : null;
+      const maxUsers = shouldPersistMaxLimits
+        ? parsePositiveInteger(values.requested_user_count)
+        : null;
+
+      const data: any = {
         name: values.name,
         slug: values.slug,
         domain_id: values.domain_id,
@@ -1054,6 +1086,10 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
           onboarding_flags: onboardingFlags,
         },
       };
+      if (shouldPersistMaxLimits) {
+        data.max_franchises = maxFranchises;
+        data.max_users = maxUsers;
+      }
 
       const profileData = {
         legal_name: values.legal_name || null,
@@ -1604,7 +1640,7 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
               name="requested_user_count"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Requested Users</FormLabel>
+                  <FormLabel>Requested Users *</FormLabel>
                   <FormControl>
                     <Input type="number" min="0" placeholder="e.g. 25" {...field} />
                   </FormControl>
@@ -1617,7 +1653,7 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
               name="requested_franchise_count"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Requested Franchises</FormLabel>
+                  <FormLabel>Requested Franchises *</FormLabel>
                   <FormControl>
                     <Input type="number" min="0" placeholder="e.g. 5" {...field} />
                   </FormControl>

@@ -15,12 +15,19 @@ import { useCRM } from '@/hooks/useCRM';
 import { CrudFormLayout } from '@/components/system/CrudFormLayout';
 import { FormSection } from '@/components/system/FormSection';
 import { FormStepper } from '@/components/system/FormStepper';
+import { invokeFunction } from '@/lib/supabase-functions';
+
+const parsePositiveInteger = (value?: string | number | null) => {
+  const parsed = Number.parseInt(String(value ?? '').trim(), 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+};
 
 const franchiseSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
   code: z.string().min(2, 'Code must be at least 2 characters'),
   tenant_id: z.string().min(1, 'Tenant is required'),
   manager_id: z.string().optional(),
+  user_limit: z.string().optional().or(z.literal('')),
   is_active: z.boolean().default(true),
   address: z.object({
     street: z.string().optional(),
@@ -43,6 +50,16 @@ const franchiseSchema = z.object({
       revenue_range: z.string().optional(),
     }).optional(),
   }).optional(),
+}).superRefine((data, ctx) => {
+  if (!data.user_limit) return;
+  const parsed = parsePositiveInteger(data.user_limit);
+  if (!parsed) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'User limit must be greater than 0',
+      path: ['user_limit'],
+    });
+  }
 });
 
 type FranchiseFormValues = z.infer<typeof franchiseSchema>;
@@ -68,6 +85,7 @@ export function FranchiseForm({ franchise, onSuccess }: FranchiseFormProps) {
       code: franchise?.code || '',
       tenant_id: franchise?.tenant_id || context.tenantId || '',
       manager_id: franchise?.manager_id || '',
+      user_limit: franchise?.user_limit != null ? String(franchise.user_limit) : '',
       is_active: franchise?.is_active ?? true,
       address: typeof franchise?.address === 'string' 
         ? JSON.parse(franchise.address) 
@@ -100,6 +118,54 @@ export function FranchiseForm({ franchise, onSuccess }: FranchiseFormProps) {
       setManagers([]);
     }
   }, [selectedTenantId]);
+
+  const resolveTenantMaxUsers = async (tenantId: string) => {
+    const { data: tenant, error: tenantError } = await scopedDb
+      .from('tenants', true)
+      .select('max_users')
+      .eq('id', tenantId)
+      .maybeSingle();
+    if (tenantError) throw tenantError;
+    const tenantMaxUsers = parsePositiveInteger((tenant as any)?.max_users);
+
+    const { data: subscription, error } = await scopedDb
+      .from('tenant_subscriptions')
+      .select('plan_id, metadata, status, created_at')
+      .eq('tenant_id', tenantId)
+      .in('status', ['active', 'trial'])
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw error;
+
+    const requestedUsers = parsePositiveInteger((subscription?.metadata as any)?.requested_user_count);
+    let planMaxUsers: number | null = null;
+    if (subscription?.plan_id) {
+      const { data: plan, error: planError } = await scopedDb
+        .from('subscription_plans', true)
+        .select('max_users, limits')
+        .eq('id', subscription.plan_id)
+        .maybeSingle();
+      if (planError) throw planError;
+      planMaxUsers = parsePositiveInteger((plan as any)?.max_users ?? (plan as any)?.limits?.users);
+    }
+
+    const limits = [tenantMaxUsers, requestedUsers, planMaxUsers].filter(
+      (value): value is number => typeof value === 'number' && Number.isFinite(value) && value > 0
+    );
+    return limits.length ? Math.min(...limits) : null;
+  };
+
+  const resolveTenantMaxFranchises = async (tenantId: string) => {
+    const { data, error } = await scopedDb
+      .from('tenants', true)
+      .select('max_franchises')
+      .eq('id', tenantId)
+      .maybeSingle();
+    if (error) throw error;
+    return parsePositiveInteger((data as any)?.max_franchises);
+  };
 
   const fetchTenants = async () => {
     // If not platform admin, we don't need to fetch tenants as we use the context one
@@ -169,11 +235,33 @@ export function FranchiseForm({ franchise, onSuccess }: FranchiseFormProps) {
       if (!context.isPlatformAdmin && context.tenantId && values.tenant_id !== context.tenantId) {
         throw new Error('Forbidden');
       }
+      const userLimit = parsePositiveInteger(values.user_limit);
+      if (userLimit) {
+        const maxUsers = await resolveTenantMaxUsers(values.tenant_id);
+        if (maxUsers && userLimit > maxUsers) {
+          throw new Error(`User limit cannot exceed tenant max users (${maxUsers})`);
+        }
+      }
+      if (!franchise) {
+        const maxFranchises = await resolveTenantMaxFranchises(values.tenant_id);
+        if (maxFranchises) {
+          const { count, error: countError } = await scopedDb
+            .from('franchises')
+            .select('id', { count: 'exact', head: true })
+            .eq('tenant_id', values.tenant_id);
+          if (countError) throw countError;
+          const existingCount = count ?? 0;
+          if (existingCount >= maxFranchises) {
+            throw new Error(`Tenant franchise limit reached (${maxFranchises})`);
+          }
+        }
+      }
       const data = {
         name: values.name,
         code: values.code,
         tenant_id: values.tenant_id,
         manager_id: values.manager_id || null,
+        user_limit: userLimit ?? 0,
         is_active: values.is_active,
         address: values.address,
       };
@@ -192,11 +280,16 @@ export function FranchiseForm({ franchise, onSuccess }: FranchiseFormProps) {
         });
         onSuccess?.();
       } else {
-        const { error } = await scopedDb
-          .from('franchises')
-          .insert([data]);
-
-        if (error) throw error;
+        const { data: created, error } = await invokeFunction<{ franchise: { id: string } }>('create-franchise', {
+          body: data,
+        });
+        if (error) {
+          const message = error?.message || error?.error || 'Unable to create franchise';
+          throw new Error(message);
+        }
+        if (!created?.franchise?.id) {
+          throw new Error('Franchise creation failed');
+        }
 
         toast({
           title: 'Success',
@@ -309,6 +402,20 @@ export function FranchiseForm({ franchise, onSuccess }: FranchiseFormProps) {
                   ))}
                 </SelectContent>
               </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="user_limit"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>User Limit</FormLabel>
+              <FormControl>
+                <Input type="number" min="1" placeholder="e.g. 25" {...field} />
+              </FormControl>
               <FormMessage />
             </FormItem>
           )}

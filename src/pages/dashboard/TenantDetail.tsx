@@ -70,6 +70,30 @@ export default function TenantDetail() {
   const [useLLMRefine, setUseLLMRefine] = useState(true);
   const [importErrors, setImportErrors] = useState<Array<{ row: number; message: string }>>([]);
   const [brandingSaving, setBrandingSaving] = useState(false);
+  const [quotaMetrics, setQuotaMetrics] = useState<{
+    maxUsers: number | null;
+    maxFranchises: number | null;
+    userCount: number;
+    franchiseCount: number;
+    requestedUsers: number | null;
+    requestedFranchises: number | null;
+    planName: string;
+    planTier: string;
+  }>({
+    maxUsers: null,
+    maxFranchises: null,
+    userCount: 0,
+    franchiseCount: 0,
+    requestedUsers: null,
+    requestedFranchises: null,
+    planName: '',
+    planTier: '',
+  });
+
+  const parsePositiveInteger = (value: unknown) => {
+    const parsed = Number.parseInt(String(value ?? '').trim(), 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  };
 
   useEffect(() => {
     if (isRestrictedBrandingView) {
@@ -82,6 +106,10 @@ export default function TenantDetail() {
   useEffect(() => {
     fetchTenant();
   }, [effectiveTenantId, id, isPlatformAdmin]);
+
+  useEffect(() => {
+    fetchQuotaMetrics();
+  }, [effectiveTenantId, tenant?.max_franchises]);
 
   const fetchTenant = async () => {
     try {
@@ -115,6 +143,92 @@ export default function TenantDetail() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchQuotaMetrics = async () => {
+    try {
+      if (!effectiveTenantId) {
+        setQuotaMetrics((current) => ({
+          ...current,
+          maxUsers: null,
+          maxFranchises: null,
+          userCount: 0,
+          franchiseCount: 0,
+          requestedUsers: null,
+          requestedFranchises: null,
+          planName: '',
+          planTier: '',
+        }));
+        return;
+      }
+
+      const { data: subscription, error: subscriptionError } = await scopedDb
+        .from('tenant_subscriptions')
+        .select('plan_id, metadata, status, created_at')
+        .eq('tenant_id', effectiveTenantId)
+        .in('status', ['active', 'trial'])
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (subscriptionError) throw subscriptionError;
+
+      let planName = '';
+      let planTier = '';
+      let planMaxUsers: number | null = null;
+      if (subscription?.plan_id) {
+        const { data: plan, error: planError } = await scopedDb
+          .from('subscription_plans', true)
+          .select('name, tier, max_users, limits')
+          .eq('id', subscription.plan_id)
+          .maybeSingle();
+        if (planError) throw planError;
+        planName = plan?.name || '';
+        planTier = plan?.tier || '';
+        planMaxUsers = parsePositiveInteger(plan?.max_users ?? plan?.limits?.users);
+      }
+
+      const requestedUsers = parsePositiveInteger(subscription?.metadata?.requested_user_count);
+      const requestedFranchises = parsePositiveInteger(subscription?.metadata?.requested_franchise_count);
+
+      const { data: userRoles, error: userRolesError } = await scopedDb
+        .from('user_roles')
+        .select('user_id')
+        .eq('tenant_id', effectiveTenantId);
+      if (userRolesError) throw userRolesError;
+
+      const userCount = new Set((userRoles || []).map((row: any) => row.user_id)).size;
+
+      const { count: franchiseCount, error: franchiseError } = await scopedDb
+        .from('franchises')
+        .select('id', { count: 'exact', head: true })
+        .eq('tenant_id', effectiveTenantId);
+      if (franchiseError) throw franchiseError;
+
+      const maxFranchises = parsePositiveInteger(tenant?.max_franchises);
+      const tenantMaxUsers = parsePositiveInteger(tenant?.max_users);
+      const userLimits = [tenantMaxUsers, requestedUsers, planMaxUsers].filter(
+        (value): value is number => typeof value === 'number' && Number.isFinite(value) && value > 0
+      );
+      const maxUsers = userLimits.length ? Math.min(...userLimits) : null;
+
+      setQuotaMetrics({
+        maxUsers,
+        maxFranchises,
+        userCount,
+        franchiseCount: franchiseCount ?? 0,
+        requestedUsers,
+        requestedFranchises,
+        planName,
+        planTier,
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Quota metrics unavailable',
+        description: error?.message || 'Unable to load quota metrics',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -379,6 +493,14 @@ export default function TenantDetail() {
       domain: tenant.domain,
       subscription_tier: tenant.subscription_tier,
       is_active: tenant.is_active,
+      max_users: quotaMetrics.maxUsers,
+      max_franchises: quotaMetrics.maxFranchises,
+      user_count: quotaMetrics.userCount,
+      franchise_count: quotaMetrics.franchiseCount,
+      requested_user_count: quotaMetrics.requestedUsers,
+      requested_franchise_count: quotaMetrics.requestedFranchises,
+      plan_name: quotaMetrics.planName,
+      plan_tier: quotaMetrics.planTier,
       settings: tenant.settings || {},
     };
     try {
@@ -397,6 +519,14 @@ export default function TenantDetail() {
           { key: 'slug', value: data.slug },
           { key: 'domain', value: data.domain || '' },
           { key: 'subscription_tier', value: data.subscription_tier || '' },
+          { key: 'max_users', value: data.max_users ?? '' },
+          { key: 'max_franchises', value: data.max_franchises ?? '' },
+          { key: 'user_count', value: data.user_count ?? '' },
+          { key: 'franchise_count', value: data.franchise_count ?? '' },
+          { key: 'requested_user_count', value: data.requested_user_count ?? '' },
+          { key: 'requested_franchise_count', value: data.requested_franchise_count ?? '' },
+          { key: 'plan_name', value: data.plan_name || '' },
+          { key: 'plan_tier', value: data.plan_tier || '' },
           { key: 'is_active', value: String(data.is_active) },
           { key: 'settings', value: JSON.stringify(data.settings) },
         ];
@@ -415,6 +545,14 @@ export default function TenantDetail() {
           ['slug', data.slug],
           ['domain', data.domain || ''],
           ['subscription_tier', data.subscription_tier || ''],
+          ['max_users', data.max_users ?? ''],
+          ['max_franchises', data.max_franchises ?? ''],
+          ['user_count', data.user_count ?? ''],
+          ['franchise_count', data.franchise_count ?? ''],
+          ['requested_user_count', data.requested_user_count ?? ''],
+          ['requested_franchise_count', data.requested_franchise_count ?? ''],
+          ['plan_name', data.plan_name || ''],
+          ['plan_tier', data.plan_tier || ''],
           ['is_active', data.is_active ? 'true' : 'false'],
           ['settings', JSON.stringify(data.settings)],
         ];
@@ -506,6 +644,18 @@ export default function TenantDetail() {
       setImporting(false);
     }
   };
+
+  const userUsageLabel = quotaMetrics.maxUsers
+    ? `${quotaMetrics.userCount}/${quotaMetrics.maxUsers}`
+    : `${quotaMetrics.userCount}`;
+  const franchiseUsageLabel = quotaMetrics.maxFranchises
+    ? `${quotaMetrics.franchiseCount}/${quotaMetrics.maxFranchises}`
+    : `${quotaMetrics.franchiseCount}`;
+  const requestedUsersLabel = quotaMetrics.requestedUsers ?? '—';
+  const requestedFranchisesLabel = quotaMetrics.requestedFranchises ?? '—';
+  const planLabel = quotaMetrics.planName
+    ? `${quotaMetrics.planName}${quotaMetrics.planTier ? ` (${quotaMetrics.planTier})` : ''}`
+    : '—';
 
   if (loading) {
     return (
@@ -881,17 +1031,16 @@ export default function TenantDetail() {
             <Card>
               <CardHeader>
                 <CardTitle>Reporting & Metrics</CardTitle>
-                <CardDescription>Key metrics to monitor tenant activity</CardDescription>
+                <CardDescription>Quota usage and tenant health indicators</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <StatCard label="Franchises" value={tenant?.franchise_count ?? '—'} />
-                  <StatCard label="Users" value={tenant?.user_count ?? '—'} />
-                  <StatCard label="Activities (30d)" value={tenant?.activity_30d ?? '—'} />
+                  <StatCard label="Users (usage)" value={userUsageLabel} />
+                  <StatCard label="Franchises (usage)" value={franchiseUsageLabel} />
+                  <StatCard label="Requested Users" value={requestedUsersLabel} />
+                  <StatCard label="Requested Franchises" value={requestedFranchisesLabel} />
+                  <StatCard label="Plan" value={planLabel} />
                   <StatCard label="Documents" value={(settings?.documents || []).length ?? 0} />
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  Metrics are illustrative; connect to reporting endpoints for live values.
                 </div>
               </CardContent>
             </Card>
