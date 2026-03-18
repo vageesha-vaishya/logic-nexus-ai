@@ -143,6 +143,44 @@ const sanitizeEmail = (value: string): string =>
 const sanitizeDomain = (value: string): string =>
   sanitizeText(value, 120).toLowerCase().replace(/[^a-z0-9.-]/g, '')
 
+const pendingOnboardingStatuses = ['pending_verification', 'email_verified', 'approved', 'in_progress', 'provisioning'] as const
+
+const formatOnboardingStatus = (status: string): string =>
+  sanitizeText(status, 80).replace(/_/g, ' ')
+
+const duplicateOnboardingMessage = (status: string): string =>
+  `Onboarding request already pending with status: ${formatOnboardingStatus(status)}`
+
+const existingUserMessage = 'Admin email is already registered with an existing user account. Please use a different admin email.'
+
+const findAuthUserByEmail = async (
+  supabase: SupabaseClient,
+  email: string
+): Promise<{ id: string; email: string | null } | null> => {
+  const targetEmail = sanitizeEmail(email)
+  let page = 1
+  const perPage = 100
+
+  while (page <= 20) {
+    const { data, error } = await supabase.auth.admin.listUsers({ page, perPage })
+    if (error) {
+      throw error
+    }
+
+    const matchedUser = (data?.users || []).find((user) => sanitizeEmail(user.email || '') === targetEmail)
+    if (matchedUser) {
+      return { id: matchedUser.id, email: matchedUser.email || null }
+    }
+
+    if (!data?.users || data.users.length < perPage) {
+      break
+    }
+    page += 1
+  }
+
+  return null
+}
+
 const json = (status: number, payload: Record<string, unknown>) =>
   new Response(JSON.stringify(payload), {
     status,
@@ -1369,9 +1407,10 @@ serveWithLogger(async (req, logger, supabase) => {
 
     const existingPending = await supabase
       .from('self_service_onboarding_requests')
-      .select('id, status, verification_expires_at')
+      .select('id, status, verification_expires_at, created_at, updated_at')
       .eq('admin_email', sanitizedEmail)
-      .in('status', ['pending_verification', 'email_verified', 'provisioning'])
+      .in('status', [...pendingOnboardingStatuses])
+      .order('updated_at', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false })
       .limit(1)
 
@@ -1382,15 +1421,47 @@ serveWithLogger(async (req, logger, supabase) => {
 
     if (existingPending.data && existingPending.data.length > 0) {
       const activeRequest = existingPending.data[0]
-      const notExpired = new Date(activeRequest.verification_expires_at) > new Date()
-      if (activeRequest.status === 'pending_verification' && notExpired) {
-        return json(200, {
-          success: true,
-          request_id: activeRequest.id,
-          status: 'pending_verification',
-          message: 'Verification code already sent'
+      return json(409, {
+        success: false,
+        error: duplicateOnboardingMessage(activeRequest.status),
+        existing_request_id: activeRequest.id,
+        existing_request_status: activeRequest.status
+      })
+    }
+
+    const { data: existingProfile, error: existingProfileError } = await supabase
+      .from('profiles')
+      .select('id, email')
+      .eq('email', sanitizedEmail)
+      .maybeSingle()
+
+    if (existingProfileError) {
+      await logger.error('Failed checking existing profile by onboarding admin email', { error: existingProfileError.message })
+      return json(500, { success: false, error: 'Unable to process request' })
+    }
+
+    if (existingProfile?.id) {
+      return json(409, {
+        success: false,
+        error: existingUserMessage,
+        existing_user_id: existingProfile.id,
+        existing_user_email: sanitizeEmail(existingProfile.email || sanitizedEmail)
+      })
+    }
+
+    try {
+      const existingAuthUser = await findAuthUserByEmail(supabase, sanitizedEmail)
+      if (existingAuthUser?.id) {
+        return json(409, {
+          success: false,
+          error: existingUserMessage,
+          existing_user_id: existingAuthUser.id,
+          existing_user_email: sanitizeEmail(existingAuthUser.email || sanitizedEmail)
         })
       }
+    } catch (error: any) {
+      await logger.error('Failed checking existing auth user by onboarding admin email', { error: String(error?.message || error) })
+      return json(500, { success: false, error: 'Unable to process request' })
     }
 
     const verificationCode = generateVerificationCode()
@@ -1527,6 +1598,24 @@ serveWithLogger(async (req, logger, supabase) => {
       .single()
 
     if (createError || !createdRequest) {
+      if (createError?.code === '23505') {
+        const { data: duplicateRequest } = await supabase
+          .from('self_service_onboarding_requests')
+          .select('id, status')
+          .eq('admin_email', sanitizedEmail)
+          .order('updated_at', { ascending: false, nullsFirst: false })
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
+        const duplicateStatus = duplicateRequest?.status || 'pending_verification'
+        return json(409, {
+          success: false,
+          error: duplicateOnboardingMessage(duplicateStatus),
+          existing_request_id: duplicateRequest?.id || null,
+          existing_request_status: duplicateStatus
+        })
+      }
       await logger.error('Failed creating self-service onboarding request', { error: createError?.message })
       return json(500, { success: false, error: 'Unable to create onboarding request' })
     }
