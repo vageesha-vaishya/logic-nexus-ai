@@ -1,4 +1,4 @@
-import { KeyboardEvent, useMemo, useRef } from 'react';
+import { KeyboardEvent, ReactNode, useMemo, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
@@ -6,7 +6,7 @@ import { BarChart3, CreditCard, Download, GitBranch, LayoutGrid, List, Palette, 
 import { CRMModuleViewMode } from '@/hooks/useCRMModuleNavigationState';
 import { THEME_PRESETS } from '@/theme/themes';
 
-type CRMHeaderControl = CRMModuleViewMode | 'analytics' | 'create' | 'refresh' | 'importExport' | 'theme';
+export type CRMHeaderControl = CRMModuleViewMode | 'analytics' | 'create' | 'refresh' | 'importExport' | 'theme';
 
 const VIEW_MODE_SEQUENCE: CRMModuleViewMode[] = ['pipeline', 'card', 'grid', 'list'];
 export const CRM_HEADER_PRIMARY_CONTROL_SEQUENCE: CRMHeaderControl[] = [
@@ -50,6 +50,7 @@ interface CRMModuleHeaderNavigationProps {
   createLabel?: string;
   layout?: 'full' | 'compact';
   className?: string;
+  iconOverrides?: Partial<Record<CRMHeaderControl, ReactNode>>;
 }
 
 export function CRMModuleHeaderNavigation({
@@ -71,6 +72,7 @@ export function CRMModuleHeaderNavigation({
   createLabel = 'New',
   layout = 'full',
   className,
+  iconOverrides,
 }: CRMModuleHeaderNavigationProps) {
   const viewButtonRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const themeOptions = useMemo(() => THEME_PRESETS.map((preset) => preset.name), []);
@@ -184,7 +186,7 @@ export function CRMModuleHeaderNavigation({
                 onClick={onCreate}
                 title={createLabel}
               >
-                <Plus className={cn('h-4 w-4', !iconOnly && 'mr-2')} />
+                {iconOverrides?.create ?? <Plus className={cn('h-4 w-4', !iconOnly && 'mr-2')} />}
                 {iconOnly ? (showSecondaryLabels ? createLabel : <span className="sr-only">{createLabel}</span>) : createLabel}
               </Button>
             );
@@ -201,7 +203,7 @@ export function CRMModuleHeaderNavigation({
                 onClick={onRefresh}
                 title="Refresh"
               >
-                <RefreshCcw className={cn('h-4 w-4', !iconOnly && 'mr-2')} />
+                {iconOverrides?.refresh ?? <RefreshCcw className={cn('h-4 w-4', !iconOnly && 'mr-2')} />}
                 {iconOnly ? (showSecondaryLabels ? 'Refresh' : <span className="sr-only">Refresh</span>) : 'Refresh'}
               </Button>
             );
@@ -218,7 +220,7 @@ export function CRMModuleHeaderNavigation({
                 onClick={onImportExport}
                 title="Import/Export"
               >
-                <Download className={cn('h-4 w-4', !iconOnly && 'mr-2')} />
+                {iconOverrides?.importExport ?? <Download className={cn('h-4 w-4', !iconOnly && 'mr-2')} />}
                 {iconOnly ? (showSecondaryLabels ? 'Import/Export' : <span className="sr-only">Import/Export</span>) : 'Import/Export'}
               </Button>
             );
@@ -233,7 +235,7 @@ export function CRMModuleHeaderNavigation({
                   title={theme}
                 >
                   <div className="flex items-center gap-2">
-                    <Palette className="h-4 w-4" />
+                    {iconOverrides?.theme ?? <Palette className="h-4 w-4" />}
                     {iconOnly ? (showSecondaryLabels ? <SelectValue placeholder="Azure Sky" /> : <span className="sr-only">{theme}</span>) : <SelectValue placeholder="Azure Sky" />}
                   </div>
                 </SelectTrigger>
@@ -270,7 +272,7 @@ export function CRMModuleHeaderNavigation({
             >
               {iconOnly ? (
                 <>
-                  <Icon className="h-4 w-4" />
+                  {iconOverrides?.[control] ?? <Icon className="h-4 w-4" />}
                   <span className="sr-only">{label}</span>
                 </>
               ) : (

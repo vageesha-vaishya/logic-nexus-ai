@@ -13,6 +13,8 @@ interface DetailScreenTemplateProps {
   children: ReactNode;
   className?: string;
   headerClassName?: string;
+  headerRowClassName?: string;
+  actionContainerClassName?: string;
 }
 
 export function DetailScreenTemplate({
@@ -23,6 +25,8 @@ export function DetailScreenTemplate({
   children,
   className,
   headerClassName,
+  headerRowClassName,
+  actionContainerClassName,
 }: DetailScreenTemplateProps) {
   return (
     <div className={cn("space-y-6", className)}>
@@ -46,7 +50,7 @@ export function DetailScreenTemplate({
           </Breadcrumb>
         )}
 
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className={cn("flex flex-col sm:flex-row sm:items-center justify-between gap-4", headerRowClassName)}>
           <div className="space-y-1">
             <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
             {subtitle && (
@@ -56,7 +60,7 @@ export function DetailScreenTemplate({
             )}
           </div>
           {actions && (
-            <div className="flex items-center gap-2">
+            <div className={cn("flex items-center gap-2", actionContainerClassName)}>
               {actions}
             </div>
           )}

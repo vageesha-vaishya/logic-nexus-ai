@@ -3,11 +3,12 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Share2, Copy, Trash2, RefreshCw, Globe, ExternalLink } from 'lucide-react';
+import { Copy, Trash2, RefreshCw, Globe, ExternalLink } from 'lucide-react';
 import { useQuotePortal, PortalToken } from '@/hooks/useQuotePortal';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { QuoteActionIcon } from '@/components/sales/QuoteActionIcon';
 
 interface ShareQuoteDialogProps {
   quoteId: string;
@@ -63,8 +64,12 @@ export function ShareQuoteDialog({ quoteId, quoteNumber }: ShareQuoteDialogProps
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" className="gap-2">
-          <Share2 className="h-4 w-4" />
+        <Button
+          variant="outline"
+          className="h-11 gap-2 transition-colors hover:bg-foreground/10 active:bg-foreground/20"
+          title="Share Quote"
+        >
+          <QuoteActionIcon name="shareQuote" label="Share Quote" />
           Share Quote
         </Button>
       </DialogTrigger>

@@ -9,7 +9,7 @@ import { DataTable } from '@/components/system/DataTable';
 import { ColumnDef } from '@/components/system/DataTable';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Copy, Trash2, FileText, Download, AlertCircle, RefreshCcw, ExternalLink } from 'lucide-react';
+import { Copy, Trash2, FileText, Download, AlertCircle, RefreshCcw } from 'lucide-react';
 import { format } from 'date-fns';
 import { statusConfig } from '@/config/statusConfig';
 import { QuoteMetrics } from '@/components/sales/QuoteMetrics';
@@ -578,43 +578,61 @@ export default function Quotes() {
     [fetchQuotes, hasPermission, quotationDeleteService],
   );
 
+  const formatDateSafe = useCallback((value?: string | null) => {
+    if (!value) return '-';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return '-';
+    return format(parsed, 'MMM d, yyyy');
+  }, []);
+
   const columns: ColumnDef<Quote>[] = [
-    { 
-      key: 'quote_number', 
-      header: 'Quote #', 
-      className: 'font-mono font-medium',
+    {
+      key: 'quote_number',
+      header: 'Quote',
+      className: 'min-w-[230px]',
+      render: (q) => (
+        <div className="flex flex-col leading-tight">
+          <span className="font-mono text-sm font-medium">{q.quote_number || '-'}</span>
+          <span className="truncate text-xs text-muted-foreground">{q.title || 'Untitled Quote'}</span>
+        </div>
+      ),
       sortable: true
     },
-    { 
-      key: 'account', 
-      header: 'Account', 
-      render: (q) => q.accounts?.name || '-' 
+    {
+      key: 'account',
+      header: 'Client',
+      className: 'min-w-[190px]',
+      render: (q) => (
+        <div className="flex flex-col leading-tight">
+          <span className="truncate text-sm font-medium">{q.accounts?.name || 'No Account'}</span>
+          <span className="truncate text-xs text-muted-foreground">
+            {q.contacts ? `${q.contacts.first_name || ''} ${q.contacts.last_name || ''}`.trim() || 'No Contact' : 'No Contact'}
+          </span>
+        </div>
+      )
     },
-    { 
-      key: 'opportunity', 
-      header: 'Opportunity', 
+    {
+      key: 'opportunity',
+      header: 'Opportunity',
+      className: 'min-w-[180px]',
       render: (q) => q.opportunities ? (
-        <Button 
-          variant="link" 
+        <Button
+          variant="link"
           className="p-0 h-auto font-normal text-primary hover:underline"
           onClick={(e) => {
             e.stopPropagation();
             navigate(`/dashboard/opportunities/${q.opportunity_id}`);
           }}
+          aria-label={`Open opportunity ${q.opportunities.name}`}
         >
           {q.opportunities.name}
         </Button>
-      ) : '-' 
+      ) : 'No Opportunity'
     },
-    { 
-      key: 'sell_price', 
-      header: 'Total Price', 
-      render: (q) => q.sell_price ? `$${q.sell_price.toLocaleString()}` : '-',
-      sortable: true
-    },
-    { 
-      key: 'status', 
-      header: 'Status', 
+    {
+      key: 'status',
+      header: 'Status',
+      className: 'min-w-[150px]',
       render: (q) => {
         const config = statusConfig[q.status];
         return (
@@ -625,27 +643,54 @@ export default function Quotes() {
       },
       sortable: true
     },
-    { 
-      key: 'created_at', 
-      header: 'Created', 
-      render: (q) => format(new Date(q.created_at), 'MMM d, yyyy'),
+    {
+      key: 'sell_price',
+      header: 'Amount',
+      className: 'min-w-[120px] text-right font-medium',
+      render: (q) => (
+        <span className="block text-right">{q.sell_price != null ? `$${q.sell_price.toLocaleString()}` : '-'}</span>
+      ),
       sortable: true
     },
-    { 
-      key: 'updated_at', 
-      header: 'Last Modified', 
-      render: (q) => q.updated_at ? format(new Date(q.updated_at), 'MMM d, yyyy') : '-',
+    {
+      key: 'margin_percentage',
+      header: 'Margin',
+      className: 'min-w-[110px] text-right',
+      render: (q) => (
+        <span className="block text-right">{q.margin_percentage != null ? `${q.margin_percentage.toFixed(1)}%` : '-'}</span>
+      )
+    },
+    {
+      key: 'valid_until',
+      header: 'Valid Until',
+      className: 'min-w-[125px]',
+      render: (q) => formatDateSafe(q.valid_until)
+    },
+    {
+      key: 'updated_at',
+      header: 'Last Activity',
+      className: 'min-w-[125px]',
+      render: (q) => formatDateSafe(q.updated_at || q.created_at),
+      sortable: true
+    },
+    {
+      key: 'created_at',
+      header: 'Created',
+      className: 'min-w-[120px]',
+      render: (q) => formatDateSafe(q.created_at),
       sortable: true
     },
     {
       key: 'actions',
       header: '',
+      className: 'w-[110px]',
       render: (q) => (
         <div className="flex items-center gap-1">
-          <Button 
-            variant="ghost" 
-            size="icon" 
+          <Button
+            variant="ghost"
+            size="icon"
             title="Duplicate Quote"
+            aria-label={`Duplicate ${q.quote_number}`}
             onClick={(e) => {
               e.stopPropagation();
               handleDuplicate(q.id);
@@ -658,6 +703,7 @@ export default function Quotes() {
             size="icon" 
             className="text-destructive hover:text-destructive hover:bg-destructive/10"
             disabled={!hasPermission('quotes.delete') || deleteInProgress}
+            aria-label={`Delete ${q.quote_number}`}
             onClick={(e) => {
               e.stopPropagation();
               handleDelete(q.id);
@@ -736,7 +782,7 @@ export default function Quotes() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
-              All Quotes
+              All Quotes ({totalCount})
             </CardTitle>
           </CardHeader>
           <CardContent>

@@ -25,6 +25,7 @@ import { FEATURE_FLAGS, useAppFeatureFlag } from '@/lib/feature-flags';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { CRM_HEADER_PRIMARY_CONTROL_SEQUENCE, CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
 import { useCRMModuleNavigationState } from '@/hooks/useCRMModuleNavigationState';
+import { QuoteActionIcon } from '@/components/sales/QuoteActionIcon';
 
 const RETRY_DELAYS_MS = [0, 500, 1200];
 const DEFAULT_RANKING_CRITERIA = { cost: 0.4, transit_time: 0.3, reliability: 0.3 };
@@ -987,6 +988,8 @@ export default function QuoteDetail() {
     <DashboardLayout>
       <DetailScreenTemplate
         title={`Edit Quote: ${quoteNumber ?? id}`}
+        headerRowClassName="sm:items-baseline"
+        actionContainerClassName="sm:items-baseline"
         breadcrumbs={[
           { label: 'Dashboard', to: '/dashboard' },
           { label: 'Quotes', to: '/dashboard/quotes' },
@@ -994,7 +997,7 @@ export default function QuoteDetail() {
         ]}
         actions={
           resolvedId && (
-            <div className="flex flex-wrap items-center justify-end gap-2">
+            <div className="flex w-full flex-wrap items-baseline justify-end gap-4">
               <CRMModuleHeaderNavigation
                 moduleLabel="Quotes"
                 viewMode={viewMode}
@@ -1008,32 +1011,55 @@ export default function QuoteDetail() {
                 controlSequence={CRM_HEADER_PRIMARY_CONTROL_SEQUENCE}
                 iconOnly
                 layout="compact"
+                className="!ml-0 !flex-none"
+                iconOverrides={{
+                  create: <QuoteActionIcon name="newQuote" label="New Quote" />,
+                  refresh: <QuoteActionIcon name="refresh" label="Refresh" />,
+                  importExport: <QuoteActionIcon name="importExport" label="Import/Export" />,
+                  theme: <QuoteActionIcon name="defaultSimple" label="Default Simple" />,
+                }}
               />
-              <Button 
-                  variant="outline" 
+              <Button
+                  variant="outline"
                   onClick={() => setShowSaveVersion(true)}
+                  className="h-11 gap-2 transition-colors hover:bg-foreground/10 active:bg-foreground/20"
+                  title="Save Version"
               >
+                  <QuoteActionIcon name="saveVersion" label="Save Version" />
                   Save Version
               </Button>
               {canUseQuoteImportExport && (
                 <Button
                   variant="outline"
                   onClick={() => navigate(`/dashboard/quotes/import-export?mode=import&quoteId=${resolvedId}`)}
+                  className="h-11 gap-2 transition-colors hover:bg-foreground/10 active:bg-foreground/20"
+                  title="Import Update"
                 >
+                  <QuoteActionIcon name="importUpdate" label="Import Update" />
                   Import Update
                 </Button>
               )}
-              <Button 
-                  variant="outline" 
+              <Button
+                  variant="outline"
                   onClick={() => navigate(`/dashboard/bookings/new?quoteId=${resolvedId}`)}
                   data-testid="convert-booking-btn"
+                  className="h-11 gap-2 transition-colors hover:bg-foreground/10 active:bg-foreground/20"
+                  title="Convert to Booking"
               >
+                  <QuoteActionIcon name="convertToBooking" label="Convert to Booking" />
                   Convert to Booking
               </Button>
               {canUseQuoteImportExport && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="outline">Export This Quote</Button>
+                    <Button
+                      variant="outline"
+                      className="h-11 gap-2 transition-colors hover:bg-foreground/10 active:bg-foreground/20"
+                      title="Export This Quote"
+                    >
+                      <QuoteActionIcon name="exportThisQuote" label="Export This Quote" />
+                      Export This Quote
+                    </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     <DropdownMenuItem onSelect={() => navigate(`/dashboard/quotes/import-export?mode=export&scope=single&quoteId=${resolvedId}&format=csv`)}>

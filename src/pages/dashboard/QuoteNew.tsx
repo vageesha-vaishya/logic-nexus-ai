@@ -1,6 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList } from '@/components/ui/breadcrumb';
 import { useCRM } from '@/hooks/useCRM';
 import { useAuth } from '@/hooks/useAuth';
 import { Loader2 } from 'lucide-react';
@@ -9,6 +8,11 @@ import { logger } from '@/lib/logger';
 import { useBenchmark } from '@/lib/benchmark';
 import { UnifiedQuoteComposer } from '@/components/sales/unified-composer/UnifiedQuoteComposer';
 import { QuotationConfigurationService } from '@/services/quotation/QuotationConfigurationService';
+import { DetailScreenTemplate } from '@/components/system/DetailScreenTemplate';
+import { CRM_HEADER_PRIMARY_CONTROL_SEQUENCE, CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
+import { useCRMModuleNavigationState } from '@/hooks/useCRMModuleNavigationState';
+import { QuoteActionIcon } from '@/components/sales/QuoteActionIcon';
+import { Button } from '@/components/ui/button';
 
 function QuoteNewInner() {
   useBenchmark('QuoteNew');
@@ -23,6 +27,7 @@ function QuoteNewInner() {
   const [, setTenantId] = useState<string | null>(null);
   const [initializing, setInitializing] = useState(true);
   const initializedRef = useRef(false);
+  const { viewMode, theme, setTheme } = useCRMModuleNavigationState('quotes', { viewMode: 'pipeline' });
 
   // Check default module configuration
   useEffect(() => {
@@ -161,6 +166,10 @@ function QuoteNewInner() {
     }
   };
 
+  const handleRefresh = () => {
+    window.location.reload();
+  };
+
   // Build initialData from location.state (QuickQuoteHistory pre-population)
   const initialData = location.state
     ? {
@@ -172,23 +181,51 @@ function QuoteNewInner() {
 
   return (
     <DashboardLayout>
-      <div className="max-w-6xl mx-auto space-y-6">
-        <div className="space-y-2">
-          <Breadcrumb>
-            <BreadcrumbList>
-              <BreadcrumbItem>
-                <BreadcrumbLink href="/dashboard">Dashboard</BreadcrumbLink>
-              </BreadcrumbItem>
-              <BreadcrumbItem>
-                <BreadcrumbLink href="/dashboard/quotes">Quotes</BreadcrumbLink>
-              </BreadcrumbItem>
-              <BreadcrumbItem>
-                <BreadcrumbLink>{createdQuoteNumber || 'New Quote'}</BreadcrumbLink>
-              </BreadcrumbItem>
-            </BreadcrumbList>
-          </Breadcrumb>
-          <h1 className="text-3xl font-bold">{createdQuoteNumber ? `Create Quote ${createdQuoteNumber}` : 'Create Quote'}</h1>
-        </div>
+      <DetailScreenTemplate
+        className="max-w-6xl mx-auto"
+        title={createdQuoteNumber ? `Create Quote ${createdQuoteNumber}` : 'Create Quote'}
+        headerRowClassName="sm:items-baseline"
+        actionContainerClassName="sm:items-baseline"
+        breadcrumbs={[
+          { label: 'Dashboard', to: '/dashboard' },
+          { label: 'Quotes', to: '/dashboard/quotes' },
+          { label: createdQuoteNumber || 'New Quote' },
+        ]}
+        actions={
+          <div className="flex w-full flex-wrap items-baseline justify-end gap-4">
+            <CRMModuleHeaderNavigation
+              moduleLabel="Quotes"
+              viewMode={viewMode}
+              theme={theme}
+              onViewModeChange={() => undefined}
+              onThemeChange={setTheme}
+              onCreate={() => navigate('/dashboard/quotes/new')}
+              createLabel="New Quote"
+              onRefresh={handleRefresh}
+              onImportExport={() => navigate('/dashboard/quotes/import-export')}
+              controlSequence={CRM_HEADER_PRIMARY_CONTROL_SEQUENCE}
+              iconOnly
+              layout="compact"
+              className="!ml-0 !flex-none"
+              iconOverrides={{
+                create: <QuoteActionIcon name="newQuote" label="New Quote" />,
+                refresh: <QuoteActionIcon name="refresh" label="Refresh" />,
+                importExport: <QuoteActionIcon name="importExport" label="Import/Export" />,
+                theme: <QuoteActionIcon name="defaultSimple" label="Default Simple" />,
+              }}
+            />
+            <Button
+              variant="outline"
+              className="h-11 gap-2 transition-colors hover:bg-foreground/10 active:bg-foreground/20"
+              onClick={() => navigate('/dashboard/quotes')}
+              title="Cancel"
+            >
+              <QuoteActionIcon name="cancel" label="Cancel" />
+              Cancel
+            </Button>
+          </div>
+        }
+      >
 
         {initializing ? (
           <div className="flex items-center justify-center py-24">
@@ -202,7 +239,7 @@ function QuoteNewInner() {
             initialData={initialData}
           />
         )}
-      </div>
+      </DetailScreenTemplate>
     </DashboardLayout>
   );
 }

@@ -12,12 +12,13 @@ import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
-import { Save, FileText, Plus, ChevronDown, ChevronUp, Ship, Plane, Truck, TrainFront, Package, BarChart3, ArrowRight, Pencil, Check, X, AlertTriangle } from 'lucide-react';
+import { FileText, Plus, ChevronDown, ChevronUp, Ship, Plane, Truck, TrainFront, Package, BarChart3, ArrowRight, Pencil, Check, X, AlertTriangle } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { RateOption, TransportLeg, Charge } from '@/types/quote-breakdown';
 import { ChargesAnalysisGraph } from '@/components/sales/common/ChargesAnalysisGraph';
 import { ChargeBreakdown } from '@/components/sales/common/ChargeBreakdown';
 import { useChargesManager, ManagedCharge, UseChargesManagerParams } from '@/hooks/useChargesManager';
+import { QuoteActionIcon } from '@/components/sales/QuoteActionIcon';
 
 // ---------------------------------------------------------------------------
 // Props
@@ -558,14 +559,21 @@ export const FinalizeSection = memo(function FinalizeSection({
           <div className="flex gap-3 pt-2">
             <Button onClick={handleSave} className="flex-1" disabled={saving} data-testid="save-quote-btn">
               {saving ? (
-                <><Save className="w-4 h-4 mr-2 animate-spin" /> Saving...</>
+                <><QuoteActionIcon name="saveQuote" label="Save Quote" className="mr-2 animate-spin" /> Saving...</>
               ) : (
-                <><Save className="w-4 h-4 mr-2" /> Save Quote</>
+                <><QuoteActionIcon name="saveQuote" label="Save Quote" className="mr-2" /> Save Quote</>
               )}
             </Button>
             {onGeneratePdf && (
-              <Button type="button" variant="outline" onClick={onGeneratePdf} disabled={saving}>
-                <FileText className="w-4 h-4 mr-1" /> Generate PDF
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onGeneratePdf}
+                disabled={saving}
+                className="h-11 gap-2 transition-colors hover:bg-foreground/10 active:bg-foreground/20"
+                title="Preview PDF"
+              >
+                <QuoteActionIcon name="previewPdf" label="Preview PDF" /> Generate PDF
               </Button>
             )}
           </div>

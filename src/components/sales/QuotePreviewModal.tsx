@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Eye, Loader2, Download, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Loader2, Download, RefreshCw, AlertTriangle } from 'lucide-react';
 import { invokeFunction, emitEvent } from '@/lib/supabase-functions';
 import { startSpan } from '@/lib/otel-lite';
 import { toast } from 'sonner';
 import { EmitEventSchema } from '@/lib/schemas/events';
 import { TemplateSelector } from './quotation-versions/TemplateSelector';
 import { useCRM } from '@/hooks/useCRM';
+import { QuoteActionIcon } from '@/components/sales/QuoteActionIcon';
 
 interface QuotePreviewModalProps {
   quoteId: string;
@@ -120,8 +121,13 @@ export function QuotePreviewModal({ quoteId, quoteNumber, versionId, disabled }:
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" className="gap-2" disabled={disabled}>
-          <Eye className="h-4 w-4" />
+        <Button
+          variant="outline"
+          className="h-11 gap-2 transition-colors hover:bg-foreground/10 active:bg-foreground/20"
+          disabled={disabled}
+          title="Preview PDF"
+        >
+          <QuoteActionIcon name="previewPdf" label="Preview PDF" />
           Preview PDF
         </Button>
       </DialogTrigger>
