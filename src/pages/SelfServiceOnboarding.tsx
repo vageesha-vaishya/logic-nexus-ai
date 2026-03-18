@@ -846,6 +846,18 @@ export default function SelfServiceOnboarding() {
           admin_email: message
         }))
         toast.error(message)
+      } else if (String(message).toLowerCase().includes('request already exist')) {
+        setFieldErrors((prev) => ({
+          ...prev,
+          organization_name: message
+        }))
+        toast.error(message)
+      } else if (String(message).toLowerCase().includes('tenant already present')) {
+        setFieldErrors((prev) => ({
+          ...prev,
+          organization_name: message
+        }))
+        toast.error(message)
       } else if (String(message).toLowerCase().includes('admin email is already registered with an existing user account')) {
         setFieldErrors((prev) => ({
           ...prev,
