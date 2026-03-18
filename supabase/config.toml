@@ -413,6 +413,9 @@ verify_jwt = false
 [functions.send-whatsapp]
 verify_jwt = false
 
+[functions.self-service-onboarding]
+verify_jwt = false
+
 [functions.smart-reply]
 verify_jwt = false
 

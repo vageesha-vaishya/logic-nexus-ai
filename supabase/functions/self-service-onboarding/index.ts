@@ -122,6 +122,11 @@ const checkOrgDomainUniquenessSchema = z.object({
   domain: z.string().min(1).max(120)
 })
 
+const checkAdminEmailUniquenessSchema = z.object({
+  action: z.literal('check_admin_email_uniqueness'),
+  admin_email: z.string().email().max(160)
+})
+
 const removeControlCharacters = (value: string): string =>
   value
     .split('')
@@ -152,6 +157,19 @@ const duplicateOnboardingMessage = (status: string): string =>
   `Onboarding request already pending with status: ${formatOnboardingStatus(status)}`
 
 const existingUserMessage = 'Admin email is already registered with an existing user account. Please use a different admin email.'
+
+const tenantRequestAlreadyExistsMessage = 'Request already exist.'
+
+const tenantAlreadyPresentMessage = 'Tenant already present.'
+
+const tenantDuplicateRequestStatuses = [
+  'pending_verification',
+  'email_verified',
+  'approved',
+  'in_progress',
+  'provisioning',
+  'completed'
+] as const
 
 const findAuthUserByEmail = async (
   supabase: SupabaseClient,
@@ -204,6 +222,13 @@ const generateVerificationCode = (): string =>
 
 const addMinutes = (date: Date, minutes: number): string =>
   new Date(date.getTime() + minutes * 60 * 1000).toISOString()
+
+const slugifyOrganizationName = (organizationName: string): string =>
+  sanitizeText(organizationName, 80)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 50)
 
 const buildUniqueSlug = async (supabase: SupabaseClient, organizationName: string): Promise<string> => {
   const base = sanitizeText(organizationName, 80)
@@ -627,10 +652,14 @@ const requirePlatformOwner = async (req: Request, logger: any, supabase: Supabas
     }
   }
 
-  const { data: isAdmin, error: adminCheckError } = await supabase.rpc('is_platform_admin', {
-    check_user_id: auth.user.id
-  })
-  if (adminCheckError || !isAdmin) {
+  const { data: roleData, error: roleError } = await supabase
+    .from('user_roles')
+    .select('role')
+    .eq('user_id', auth.user.id)
+    .eq('role', 'platform_admin')
+    .maybeSingle()
+
+  if (roleError || !roleData) {
     return {
       authorized: false,
       response: json(403, { success: false, error: 'Forbidden. Platform Owner role is required' })
@@ -702,7 +731,6 @@ const performProvisioningForRequest = async (
       subscription_tier: requestRow.plan_tier,
       max_users: requestRow.requested_user_count,
       max_franchises: requestRow.requested_franchise_count,
-      country: resolvedCountryCode || resolvedCountryName,
       status: isPaidPlan ? 'pending' : 'active',
       settings: {
         onboarding_source: 'self_service',
@@ -897,6 +925,68 @@ serveWithLogger(async (req, logger, supabase) => {
       return json(422, { success: false, error: 'Organization name and preferred domain are required' })
     }
 
+    const baseOrganizationSlug = slugifyOrganizationName(sanitizedOrganizationName)
+
+    const existingTenantRequest = await supabase
+      .from('self_service_onboarding_requests')
+      .select('id, status, created_at, updated_at')
+      .ilike('organization_name', sanitizedOrganizationName)
+      .in('status', [...tenantDuplicateRequestStatuses])
+      .order('updated_at', { ascending: false, nullsFirst: false })
+      .order('created_at', { ascending: false })
+      .limit(1)
+
+    if (existingTenantRequest.error) {
+      await logger.error('Failed checking onboarding request uniqueness by organization name', { error: existingTenantRequest.error.message })
+      return json(500, { success: false, error: 'Unable to validate organization uniqueness' })
+    }
+
+    if (existingTenantRequest.data && existingTenantRequest.data.length > 0) {
+      const activeRequest = existingTenantRequest.data[0]
+      return json(200, {
+        success: true,
+        is_unique: false,
+        reason: 'tenant_request_exists',
+        message: tenantRequestAlreadyExistsMessage,
+        existing_request_id: activeRequest.id,
+        existing_request_status: activeRequest.status
+      })
+    }
+
+    const [{ data: existingTenantByName, error: existingTenantByNameError }, { data: existingTenantBySlug, error: existingTenantBySlugError }] =
+      await Promise.all([
+        supabase
+          .from('tenants')
+          .select('id, name, slug')
+          .ilike('name', sanitizedOrganizationName)
+          .maybeSingle(),
+        supabase
+          .from('tenants')
+          .select('id, name, slug')
+          .eq('slug', baseOrganizationSlug)
+          .maybeSingle()
+      ])
+
+    if (existingTenantByNameError || existingTenantBySlugError) {
+      await logger.error('Failed checking tenant uniqueness by organization name', {
+        error: existingTenantByNameError?.message || existingTenantBySlugError?.message
+      })
+      return json(500, { success: false, error: 'Unable to validate organization uniqueness' })
+    }
+
+    const existingTenant = existingTenantByName || existingTenantBySlug
+    if (existingTenant?.id) {
+      return json(200, {
+        success: true,
+        is_unique: false,
+        reason: 'tenant_exists',
+        message: tenantAlreadyPresentMessage,
+        existing_tenant_id: existingTenant.id,
+        existing_tenant_name: sanitizeText(existingTenant.name || sanitizedOrganizationName, 120),
+        existing_tenant_slug: sanitizeText(existingTenant.slug || baseOrganizationSlug, 120)
+      })
+    }
+
     const { data: existingRequests, error: existingRequestsError } = await supabase
       .from('self_service_onboarding_requests')
       .select('id')
@@ -910,9 +1000,100 @@ serveWithLogger(async (req, logger, supabase) => {
     }
 
     const isUnique = !existingRequests || existingRequests.length === 0
+    if (!isUnique) {
+      return json(200, {
+        success: true,
+        is_unique: false,
+        reason: 'org_domain_exists',
+        message: 'This Organization Name and Preferred Domain combination already exists. Please use a different combination.'
+      })
+    }
+
     return json(200, {
       success: true,
-      is_unique: isUnique
+      is_unique: true
+    })
+  }
+
+  if (action === 'check_admin_email_uniqueness') {
+    const parsed = checkAdminEmailUniquenessSchema.safeParse(payload)
+    if (!parsed.success) {
+      return json(422, { success: false, error: 'Validation failed', issues: parsed.error.issues })
+    }
+
+    const sanitizedEmail = sanitizeEmail(parsed.data.admin_email)
+    if (!sanitizedEmail) {
+      return json(422, { success: false, error: 'Admin email is required' })
+    }
+
+    const existingPending = await supabase
+      .from('self_service_onboarding_requests')
+      .select('id, status, created_at, updated_at')
+      .ilike('admin_email', sanitizedEmail)
+      .in('status', [...pendingOnboardingStatuses])
+      .order('updated_at', { ascending: false, nullsFirst: false })
+      .order('created_at', { ascending: false })
+      .limit(1)
+
+    if (existingPending.error) {
+      await logger.error('Failed checking onboarding request by admin email', { error: existingPending.error.message })
+      return json(500, { success: false, error: 'Unable to validate admin email' })
+    }
+
+    if (existingPending.data && existingPending.data.length > 0) {
+      const activeRequest = existingPending.data[0]
+      return json(200, {
+        success: true,
+        is_unique: false,
+        reason: 'admin_request_exists',
+        message: duplicateOnboardingMessage(activeRequest.status),
+        existing_request_id: activeRequest.id,
+        existing_request_status: activeRequest.status
+      })
+    }
+
+    const { data: existingProfile, error: existingProfileError } = await supabase
+      .from('profiles')
+      .select('id, email')
+      .ilike('email', sanitizedEmail)
+      .maybeSingle()
+
+    if (existingProfileError) {
+      await logger.error('Failed checking existing profile by admin email', { error: existingProfileError.message })
+      return json(500, { success: false, error: 'Unable to validate admin email' })
+    }
+
+    if (existingProfile?.id) {
+      return json(200, {
+        success: true,
+        is_unique: false,
+        reason: 'admin_user_exists',
+        message: existingUserMessage,
+        existing_user_id: existingProfile.id,
+        existing_user_email: sanitizeEmail(existingProfile.email || sanitizedEmail)
+      })
+    }
+
+    try {
+      const existingAuthUser = await findAuthUserByEmail(supabase, sanitizedEmail)
+      if (existingAuthUser?.id) {
+        return json(200, {
+          success: true,
+          is_unique: false,
+          reason: 'admin_user_exists',
+          message: existingUserMessage,
+          existing_user_id: existingAuthUser.id,
+          existing_user_email: sanitizeEmail(existingAuthUser.email || sanitizedEmail)
+        })
+      }
+    } catch (error: any) {
+      await logger.error('Failed checking auth users by admin email', { error: String(error?.message || error) })
+      return json(500, { success: false, error: 'Unable to validate admin email' })
+    }
+
+    return json(200, {
+      success: true,
+      is_unique: true
     })
   }
 
@@ -1402,6 +1583,64 @@ serveWithLogger(async (req, logger, supabase) => {
         success: false,
         error: 'Captcha verification failed',
         error_code: 'captcha_validation_failed'
+      })
+    }
+
+    const baseOrganizationSlug = slugifyOrganizationName(sanitizedOrganization)
+
+    const existingTenantRequest = await supabase
+      .from('self_service_onboarding_requests')
+      .select('id, status, organization_name, organization_slug, created_at, updated_at')
+      .ilike('organization_name', sanitizedOrganization)
+      .in('status', [...tenantDuplicateRequestStatuses])
+      .order('updated_at', { ascending: false, nullsFirst: false })
+      .order('created_at', { ascending: false })
+      .limit(1)
+
+    if (existingTenantRequest.error) {
+      await logger.error('Failed checking existing tenant onboarding request', { error: existingTenantRequest.error.message })
+      return json(500, { success: false, error: 'Unable to process request' })
+    }
+
+    if (existingTenantRequest.data && existingTenantRequest.data.length > 0) {
+      const activeTenantRequest = existingTenantRequest.data[0]
+      return json(409, {
+        success: false,
+        error: tenantRequestAlreadyExistsMessage,
+        existing_request_id: activeTenantRequest.id,
+        existing_request_status: activeTenantRequest.status
+      })
+    }
+
+    const [{ data: existingTenantByName, error: existingTenantByNameError }, { data: existingTenantBySlug, error: existingTenantBySlugError }] =
+      await Promise.all([
+        supabase
+          .from('tenants')
+          .select('id, name, slug')
+          .ilike('name', sanitizedOrganization)
+          .maybeSingle(),
+        supabase
+          .from('tenants')
+          .select('id, name, slug')
+          .eq('slug', baseOrganizationSlug)
+          .maybeSingle()
+      ])
+
+    if (existingTenantByNameError || existingTenantBySlugError) {
+      await logger.error('Failed checking existing tenant by onboarding organization name', {
+        error: existingTenantByNameError?.message || existingTenantBySlugError?.message
+      })
+      return json(500, { success: false, error: 'Unable to process request' })
+    }
+
+    const existingTenant = existingTenantByName || existingTenantBySlug
+    if (existingTenant?.id) {
+      return json(409, {
+        success: false,
+        error: tenantAlreadyPresentMessage,
+        existing_tenant_id: existingTenant.id,
+        existing_tenant_name: sanitizeText(existingTenant.name || sanitizedOrganization, 120),
+        existing_tenant_slug: sanitizeText(existingTenant.slug || baseOrganizationSlug, 120)
       })
     }
 
