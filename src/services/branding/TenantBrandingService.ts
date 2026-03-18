@@ -5,6 +5,37 @@ import type { BrandingSettings } from '@/services/quotation/QuotationConfigurati
 const BRANDING_API_PATH = '/api/v1/tenant-branding';
 type TenantBrandingRequestQuery = TenantBrandingQuery & { tenantId?: string };
 
+async function updateBrandingDirectly(brandingSettings: BrandingSettings, tenantId: string): Promise<BrandingSettings> {
+  const { data: existingTenant, error: readError } = await supabase
+    .from('tenants')
+    .select('id, settings')
+    .eq('id', tenantId)
+    .limit(1)
+    .maybeSingle();
+
+  if (readError) throw readError;
+  if (!existingTenant) throw new Error('Tenant not found');
+
+  const mergedSettings = {
+    ...((existingTenant as any).settings || {}),
+    branding_settings: brandingSettings,
+  };
+
+  const { data: updated, error: updateError } = await supabase
+    .from('tenants')
+    .update({
+      branding_settings: brandingSettings,
+      settings: mergedSettings,
+    })
+    .eq('id', tenantId)
+    .select('branding_settings')
+    .limit(1)
+    .maybeSingle();
+
+  if (updateError) throw updateError;
+  return ((updated as any)?.branding_settings || brandingSettings) as BrandingSettings;
+}
+
 export const TenantBrandingService = {
   async getResolvedBranding(query: TenantBrandingRequestQuery = {}): Promise<ResolvedTenantBranding> {
     const { data: sessionData } = await supabase.auth.getSession();
@@ -40,25 +71,42 @@ export const TenantBrandingService = {
     const search = new URLSearchParams();
     if (tenantId) search.set('tenant_id', tenantId);
     const suffix = search.toString() ? `?${search.toString()}` : '';
-    const response = await fetch(`${BRANDING_API_PATH}${suffix}`, {
-      method: 'PUT',
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-      },
-      body: JSON.stringify({ brandingSettings }),
-    });
+    const request = async () =>
+      fetch(`${BRANDING_API_PATH}${suffix}`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        },
+        body: JSON.stringify({ brandingSettings }),
+      });
 
-    if (!response.ok) {
-      const payload = await response.json().catch(() => null);
-      const message = typeof payload?.error === 'string' ? payload.error : 'Failed to update tenant branding';
-      const correlationId = typeof payload?.correlationId === 'string' ? payload.correlationId : '';
-      if (correlationId) throw new Error(`${message} (ref: ${correlationId})`);
-      throw new Error(message);
+    try {
+      const response = await request();
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        const fallbackEligible =
+          Boolean(tenantId) &&
+          (response.status === 404 ||
+            response.status === 405 ||
+            (typeof payload?.error !== 'string' && typeof payload?.correlationId !== 'string'));
+        if (fallbackEligible && tenantId) {
+          return await updateBrandingDirectly(brandingSettings, tenantId);
+        }
+        const message = typeof payload?.error === 'string' ? payload.error : 'Failed to update tenant branding';
+        const correlationId = typeof payload?.correlationId === 'string' ? payload.correlationId : '';
+        if (correlationId) throw new Error(`${message} (ref: ${correlationId})`);
+        throw new Error(message);
+      }
+
+      const payload = await response.json();
+      return (payload?.data?.brandingSettings || {}) as BrandingSettings;
+    } catch (error) {
+      if (tenantId) {
+        return await updateBrandingDirectly(brandingSettings, tenantId);
+      }
+      throw error;
     }
-
-    const payload = await response.json();
-    return (payload?.data?.brandingSettings || {}) as BrandingSettings;
   },
 };

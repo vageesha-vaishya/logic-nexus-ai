@@ -23,6 +23,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from "@/lib/utils";
 import { useDebug } from '@/hooks/useDebug';
+import { useAuth } from '@/hooks/useAuth';
 
 const domainSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
@@ -57,7 +58,9 @@ export default function PlatformDomainDetail() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const debug = useDebug('Platform', 'DomainAudit');
+  const { isPlatformAdmin, hasPermission } = useAuth();
   const isNew = !id || id === 'new';
+  const canManageDomains = isPlatformAdmin() || hasPermission('admin.settings.manage');
   const [loading, setLoading] = useState(!isNew);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   
@@ -81,6 +84,8 @@ export default function PlatformDomainDetail() {
 
   const form = useForm<DomainFormValues>({
     resolver: zodResolver(domainSchema),
+    mode: 'onChange',
+    reValidateMode: 'onChange',
     defaultValues: {
       name: '',
       code: '',
@@ -310,6 +315,10 @@ export default function PlatformDomainDetail() {
   };
 
   const onSubmit = async (values: DomainFormValues) => {
+    if (!canManageDomains) {
+      toast({ title: 'Access denied', description: 'Only platform administrators can manage platform domains.', variant: 'destructive' });
+      return;
+    }
     try {
       if (isNew) {
         // Zod schema ensures values are strings, but we need to explicitly type them for createDomain
@@ -413,7 +422,7 @@ export default function PlatformDomainDetail() {
             Delete
           </Button>
         )}
-        saveDisabled={!form.formState.isValid || !form.formState.isDirty}
+        saveDisabled={!canManageDomains || !form.formState.isValid || !form.formState.isDirty}
       >
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
@@ -426,7 +435,7 @@ export default function PlatformDomainDetail() {
                     <FormItem>
                       <FormLabel>Name *</FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g. Logistics & Freight" {...field} />
+                        <Input placeholder="e.g. Logistics & Freight" {...field} disabled={!canManageDomains} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -440,7 +449,7 @@ export default function PlatformDomainDetail() {
                     <FormItem>
                       <FormLabel>Code *</FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g. logistics" {...field} disabled={!isNew} />
+                        <Input placeholder="e.g. logistics" {...field} disabled={!isNew || !canManageDomains} />
                       </FormControl>
                       <FormDescription>Unique identifier used in system logic (cannot be changed later)</FormDescription>
                       <FormMessage />
@@ -456,7 +465,7 @@ export default function PlatformDomainDetail() {
                       <FormItem>
                         <FormLabel>Description</FormLabel>
                         <FormControl>
-                          <Textarea placeholder="Describe the purpose of this domain..." {...field} />
+                          <Textarea placeholder="Describe the purpose of this domain..." {...field} disabled={!canManageDomains} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -479,6 +488,7 @@ export default function PlatformDomainDetail() {
                         <Switch
                           checked={field.value}
                           onCheckedChange={field.onChange}
+                          disabled={!canManageDomains}
                         />
                       </FormControl>
                     </FormItem>

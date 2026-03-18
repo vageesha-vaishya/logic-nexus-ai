@@ -293,6 +293,59 @@ describe('GET /api/v1/tenant-branding', () => {
     expect(updateEq).toHaveBeenCalledWith('id', 'tenant-1');
   });
 
+  it('allows platform admin tenant override when access context enforcement blocks global scope', async () => {
+    vi.mocked(authenticateRequest).mockResolvedValue({
+      userId: 'platform-user-1',
+      role: 'platform_admin',
+    } as any);
+    vi.mocked(resolveAndApplyAccessContext).mockRejectedValue(new Error('Forbidden'));
+
+    const tenantMaybeSingle = vi.fn().mockResolvedValue({
+      data: { id: 'tenant-2', settings: {} },
+      error: null,
+    });
+    const updateEq = vi.fn().mockResolvedValue({ error: null });
+    vi.mocked(getSupabaseAdminClient).mockReturnValue({
+      from: vi.fn(() => ({
+        update: vi.fn().mockReturnValue({ eq: updateEq }),
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockReturnThis(),
+        maybeSingle: tenantMaybeSingle,
+      })),
+    } as any);
+
+    const req: ApiRequest = {
+      method: 'PUT',
+      query: { tenant_id: 'tenant-2' },
+      headers: { host: 'portal.acme.com:443' },
+      body: {
+        brandingSettings: {
+          primary_color: '#1D4ED8',
+        },
+      },
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.jsonBody).toEqual(
+      expect.objectContaining({
+        data: expect.objectContaining({ tenantId: 'tenant-2' }),
+      })
+    );
+    expect(updateEq).toHaveBeenCalledWith('id', 'tenant-2');
+    expect(logApiEvent).toHaveBeenCalledWith(
+      'warn',
+      '[TenantBrandingAPI] fallback scope applied',
+      expect.objectContaining({
+        tenantId: 'tenant-2',
+        reason: 'Forbidden',
+      })
+    );
+  });
+
   it('blocks tenant override attempts for non-platform users', async () => {
     const req: ApiRequest = {
       method: 'GET',

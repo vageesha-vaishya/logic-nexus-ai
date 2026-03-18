@@ -80,7 +80,30 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     const auth = await authenticateRequest(req);
     ctx.userId = auth.userId;
     ctx.role = auth.role;
-    const access = await resolveAndApplyAccessContext(req, ctx);
+    let access: { isPlatformAdmin: boolean; tenantId: string | null };
+    try {
+      access = await resolveAndApplyAccessContext(req, ctx);
+    } catch (accessError) {
+      const requestedTenantId = sanitizeQueryId(req.query.tenant_id, 'tenant_id');
+      const normalizedRole = String(ctx.role || '').trim().toLowerCase();
+      const canFallbackPlatformScope = normalizedRole === 'platform_admin' && !!requestedTenantId;
+      if (!canFallbackPlatformScope) {
+        throw accessError;
+      }
+      access = {
+        isPlatformAdmin: true,
+        tenantId: requestedTenantId,
+      };
+      ctx.tenantId = requestedTenantId;
+      ctx.isPlatformAdmin = true;
+      logApiEvent('warn', '[TenantBrandingAPI] fallback scope applied', {
+        correlationId: ctx.correlationId,
+        userId: ctx.userId,
+        role: ctx.role,
+        tenantId: requestedTenantId,
+        reason: accessError instanceof Error ? accessError.message : 'unknown',
+      });
+    }
     const targetTenantId = resolveTargetTenantId(req, access);
     enforceRateLimit(req, targetTenantId);
 
