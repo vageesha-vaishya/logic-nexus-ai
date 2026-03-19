@@ -40,6 +40,7 @@ interface SubscriptionPlan {
   user_scaling_factor: number;
   min_users: number;
   max_users: number | null;
+  max_franchise: number | null;
 }
 
 const emptyPlanForm: Partial<SubscriptionPlan> = {
@@ -64,6 +65,7 @@ const emptyPlanForm: Partial<SubscriptionPlan> = {
   user_scaling_factor: 0,
   min_users: 0,
   max_users: null,
+  max_franchise: null,
 };
 
 export default function MasterDataSubscriptionPlans() {
@@ -120,6 +122,7 @@ export default function MasterDataSubscriptionPlans() {
       user_scaling_factor: plan.user_scaling_factor || 0,
       min_users: plan.min_users || 0,
       max_users: plan.max_users || null,
+      max_franchise: plan.max_franchise || null,
     });
     setShowEdit(true);
   };
@@ -154,6 +157,7 @@ export default function MasterDataSubscriptionPlans() {
       user_scaling_factor: Number(planForm.user_scaling_factor || 0),
       min_users: Number(planForm.min_users || 0),
       max_users: planForm.max_users != null && String(planForm.max_users) !== '' ? Number(planForm.max_users) : null,
+      max_franchise: planForm.max_franchise != null && String(planForm.max_franchise) !== '' ? Number(planForm.max_franchise) : null,
     };
 
     setSaving(true);
@@ -643,6 +647,23 @@ export default function MasterDataSubscriptionPlans() {
                     setPlanForm({
                       ...planForm,
                       max_users: e.target.value === '' ? null : Number(e.target.value),
+                    })
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium" htmlFor="plan-max-franchise">
+                  Maximum Franchises (Optional)
+                </label>
+                <Input
+                  id="plan-max-franchise"
+                  type="number"
+                  placeholder="Unlimited"
+                  value={planForm.max_franchise ?? ''}
+                  onChange={(e) =>
+                    setPlanForm({
+                      ...planForm,
+                      max_franchise: e.target.value === '' ? null : Number(e.target.value),
                     })
                   }
                 />
