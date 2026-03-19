@@ -6,6 +6,7 @@
 import dotenv from 'dotenv';
 import app from './app';
 import { logger } from './utils/logger';
+import { amroEventsProducer } from './events/amro-events.producer';
 
 // Load environment variables
 dotenv.config();
@@ -13,28 +14,44 @@ dotenv.config();
 const PORT = process.env.PORT || 3001;
 const NODE_ENV = process.env.NODE_ENV || 'development';
 
-// Start server
-const server = app.listen(PORT, () => {
-  logger.info(`AMRO API Server running on port ${PORT} (${NODE_ENV})`);
-  logger.info(`http://localhost:${PORT}`);
-});
+// Initialize Kafka producer and start server
+async function startServer() {
+  try {
+    // Initialize Kafka producer
+    await amroEventsProducer.initialize();
+    logger.info('Kafka producer initialized');
 
-// Handle graceful shutdown
-process.on('SIGTERM', () => {
-  logger.warn('SIGTERM received, shutting down gracefully...');
-  server.close(() => {
-    logger.info('Server closed');
-    process.exit(0);
-  });
-});
+    // Start Express server
+    const server = app.listen(PORT, () => {
+      logger.info(`AMRO API Server running on port ${PORT} (${NODE_ENV})`);
+      logger.info(`http://localhost:${PORT}`);
+    });
 
-process.on('SIGINT', () => {
-  logger.warn('SIGINT received, shutting down gracefully...');
-  server.close(() => {
-    logger.info('Server closed');
-    process.exit(0);
-  });
-});
+    // Handle graceful shutdown
+    process.on('SIGTERM', () => {
+      logger.warn('SIGTERM received, shutting down gracefully...');
+      server.close(() => {
+        logger.info('Server closed');
+        process.exit(0);
+      });
+    });
+
+    process.on('SIGINT', () => {
+      logger.warn('SIGINT received, shutting down gracefully...');
+      server.close(() => {
+        logger.info('Server closed');
+        process.exit(0);
+      });
+    });
+
+    return server;
+  } catch (error) {
+    logger.error('Failed to start server:', error);
+    process.exit(1);
+  }
+}
+
+const server = startServer();
 
 // Handle uncaught exceptions
 process.on('uncaughtException', (err) => {
@@ -43,8 +60,8 @@ process.on('uncaughtException', (err) => {
 });
 
 // Handle unhandled rejections
-process.on('unhandledRejection', (reason, promise) => {
-  logger.error('Unhandled rejection at:', promise, 'reason:', reason);
+process.on('unhandledRejection', (reason: any) => {
+  logger.error('Unhandled rejection:', reason);
   process.exit(1);
 });
 

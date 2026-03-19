@@ -77,7 +77,7 @@ describe('AmroEventsProducer', () => {
       jest.clearAllMocks();
     });
 
-    it('should publish work order created event', (done) => {
+    it('should publish work order created event', async () => {
       const producer = AmroEventsProducer.getInstance();
 
       producer.publishWorkOrderEvent(
@@ -96,26 +96,25 @@ describe('AmroEventsProducer', () => {
         },
       );
 
-      // Give fire-and-forget async operation time to execute
-      setTimeout(() => {
-        expect(mockProducer.send).toHaveBeenCalledWith(
-          expect.objectContaining({
-            topic: 'amro.work-orders',
-            messages: expect.arrayContaining([
-              expect.objectContaining({
-                key: 'tenant-123',
-                headers: expect.objectContaining({
-                  'event_type': 'amro.work_order.created',
-                }),
+      // Let promises settle
+      await new Promise(resolve => setImmediate(resolve));
+
+      expect(mockProducer.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          topic: 'amro.work-orders',
+          messages: expect.arrayContaining([
+            expect.objectContaining({
+              key: 'tenant-123',
+              headers: expect.objectContaining({
+                'event_type': 'amro.work_order.created',
               }),
-            ]),
-          }),
-        );
-        done();
-      }, 100);
+            }),
+          ]),
+        }),
+      );
     });
 
-    it('should publish work order updated event', (done) => {
+    it('should publish work order updated event', async () => {
       const producer = AmroEventsProducer.getInstance();
 
       producer.publishWorkOrderEvent(
@@ -133,24 +132,24 @@ describe('AmroEventsProducer', () => {
         },
       );
 
-      setTimeout(() => {
-        expect(mockProducer.send).toHaveBeenCalledWith(
-          expect.objectContaining({
-            topic: 'amro.work-orders',
-            messages: expect.arrayContaining([
-              expect.objectContaining({
-                headers: expect.objectContaining({
-                  'event_type': 'amro.work_order.updated',
-                }),
+      // Let promises settle
+      await new Promise(resolve => setImmediate(resolve));
+
+      expect(mockProducer.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          topic: 'amro.work-orders',
+          messages: expect.arrayContaining([
+            expect.objectContaining({
+              headers: expect.objectContaining({
+                'event_type': 'amro.work_order.updated',
               }),
-            ]),
-          }),
-        );
-        done();
-      }, 100);
+            }),
+          ]),
+        }),
+      );
     });
 
-    it('should publish work order deleted event', (done) => {
+    it('should publish work order deleted event', async () => {
       const producer = AmroEventsProducer.getInstance();
 
       producer.publishWorkOrderEvent(
@@ -166,21 +165,21 @@ describe('AmroEventsProducer', () => {
         },
       );
 
-      setTimeout(() => {
-        expect(mockProducer.send).toHaveBeenCalledWith(
-          expect.objectContaining({
-            topic: 'amro.work-orders',
-            messages: expect.arrayContaining([
-              expect.objectContaining({
-                headers: expect.objectContaining({
-                  'event_type': 'amro.work_order.deleted',
-                }),
+      // Let promises settle
+      await new Promise(resolve => setImmediate(resolve));
+
+      expect(mockProducer.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          topic: 'amro.work-orders',
+          messages: expect.arrayContaining([
+            expect.objectContaining({
+              headers: expect.objectContaining({
+                'event_type': 'amro.work_order.deleted',
               }),
-            ]),
-          }),
-        );
-        done();
-      }, 100);
+            }),
+          ]),
+        }),
+      );
     });
   });
 
@@ -191,7 +190,7 @@ describe('AmroEventsProducer', () => {
       jest.clearAllMocks();
     });
 
-    it('should publish task created event', (done) => {
+    it('should publish task created event', async () => {
       const producer = AmroEventsProducer.getInstance();
 
       producer.publishTaskEvent(
@@ -209,25 +208,25 @@ describe('AmroEventsProducer', () => {
         },
       );
 
-      setTimeout(() => {
-        expect(mockProducer.send).toHaveBeenCalledWith(
-          expect.objectContaining({
-            topic: 'amro.tasks',
-            messages: expect.arrayContaining([
-              expect.objectContaining({
-                key: 'tenant-123',
-                headers: expect.objectContaining({
-                  'event_type': 'amro.task.created',
-                }),
+      // Let promises settle
+      await new Promise(resolve => setImmediate(resolve));
+
+      expect(mockProducer.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          topic: 'amro.tasks',
+          messages: expect.arrayContaining([
+            expect.objectContaining({
+              key: 'tenant-123',
+              headers: expect.objectContaining({
+                'event_type': 'amro.task.created',
               }),
-            ]),
-          }),
-        );
-        done();
-      }, 100);
+            }),
+          ]),
+        }),
+      );
     });
 
-    it('should publish task updated event', (done) => {
+    it('should publish task updated event', async () => {
       const producer = AmroEventsProducer.getInstance();
 
       producer.publishTaskEvent(
@@ -245,24 +244,24 @@ describe('AmroEventsProducer', () => {
         },
       );
 
-      setTimeout(() => {
-        expect(mockProducer.send).toHaveBeenCalledWith(
-          expect.objectContaining({
-            topic: 'amro.tasks',
-            messages: expect.arrayContaining([
-              expect.objectContaining({
-                headers: expect.objectContaining({
-                  'event_type': 'amro.task.updated',
-                }),
+      // Let promises settle
+      await new Promise(resolve => setImmediate(resolve));
+
+      expect(mockProducer.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          topic: 'amro.tasks',
+          messages: expect.arrayContaining([
+            expect.objectContaining({
+              headers: expect.objectContaining({
+                'event_type': 'amro.task.updated',
               }),
-            ]),
-          }),
-        );
-        done();
-      }, 100);
+            }),
+          ]),
+        }),
+      );
     });
 
-    it('should publish task deleted event', (done) => {
+    it('should publish task deleted event', async () => {
       const producer = AmroEventsProducer.getInstance();
 
       producer.publishTaskEvent(
@@ -278,24 +277,24 @@ describe('AmroEventsProducer', () => {
         },
       );
 
-      setTimeout(() => {
-        expect(mockProducer.send).toHaveBeenCalledWith(
-          expect.objectContaining({
-            topic: 'amro.tasks',
-            messages: expect.arrayContaining([
-              expect.objectContaining({
-                headers: expect.objectContaining({
-                  'event_type': 'amro.task.deleted',
-                }),
+      // Let promises settle
+      await new Promise(resolve => setImmediate(resolve));
+
+      expect(mockProducer.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          topic: 'amro.tasks',
+          messages: expect.arrayContaining([
+            expect.objectContaining({
+              headers: expect.objectContaining({
+                'event_type': 'amro.task.deleted',
               }),
-            ]),
-          }),
-        );
-        done();
-      }, 100);
+            }),
+          ]),
+        }),
+      );
     });
 
-    it('should publish task started event', (done) => {
+    it('should publish task started event', async () => {
       const producer = AmroEventsProducer.getInstance();
 
       producer.publishTaskEvent(
@@ -314,25 +313,25 @@ describe('AmroEventsProducer', () => {
         },
       );
 
-      setTimeout(() => {
-        expect(mockProducer.send).toHaveBeenCalledWith(
-          expect.objectContaining({
-            topic: 'amro.tasks',
-            messages: expect.arrayContaining([
-              expect.objectContaining({
-                key: 'tenant-123',
-                headers: expect.objectContaining({
-                  'event_type': 'amro.task.started',
-                }),
+      // Let promises settle
+      await new Promise(resolve => setImmediate(resolve));
+
+      expect(mockProducer.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          topic: 'amro.tasks',
+          messages: expect.arrayContaining([
+            expect.objectContaining({
+              key: 'tenant-123',
+              headers: expect.objectContaining({
+                'event_type': 'amro.task.started',
               }),
-            ]),
-          }),
-        );
-        done();
-      }, 100);
+            }),
+          ]),
+        }),
+      );
     });
 
-    it('should publish task completed event', (done) => {
+    it('should publish task completed event', async () => {
       const producer = AmroEventsProducer.getInstance();
 
       producer.publishTaskEvent(
@@ -351,21 +350,21 @@ describe('AmroEventsProducer', () => {
         },
       );
 
-      setTimeout(() => {
-        expect(mockProducer.send).toHaveBeenCalledWith(
-          expect.objectContaining({
-            topic: 'amro.tasks',
-            messages: expect.arrayContaining([
-              expect.objectContaining({
-                headers: expect.objectContaining({
-                  'event_type': 'amro.task.completed',
-                }),
+      // Let promises settle
+      await new Promise(resolve => setImmediate(resolve));
+
+      expect(mockProducer.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          topic: 'amro.tasks',
+          messages: expect.arrayContaining([
+            expect.objectContaining({
+              headers: expect.objectContaining({
+                'event_type': 'amro.task.completed',
               }),
-            ]),
-          }),
-        );
-        done();
-      }, 100);
+            }),
+          ]),
+        }),
+      );
     });
   });
 
@@ -376,7 +375,7 @@ describe('AmroEventsProducer', () => {
       jest.clearAllMocks();
     });
 
-    it('should include idempotency key in headers', (done) => {
+    it('should include idempotency key in headers', async () => {
       const producer = AmroEventsProducer.getInstance();
 
       producer.publishWorkOrderEvent(
@@ -392,15 +391,15 @@ describe('AmroEventsProducer', () => {
         },
       );
 
-      setTimeout(() => {
-        const call = mockProducer.send.mock.calls[0][0];
-        expect(call.messages[0].headers).toHaveProperty('idempotency_key');
-        expect(call.messages[0].headers?.idempotency_key).toMatch(/^tenant-123-/);
-        done();
-      }, 100);
+      // Let promises settle
+      await new Promise(resolve => setImmediate(resolve));
+
+      const call = mockProducer.send.mock.calls[0][0];
+      expect(call.messages[0].headers).toHaveProperty('idempotency_key');
+      expect(call.messages[0].headers?.idempotency_key).toMatch(/^tenant-123-/);
     });
 
-    it('should partition by tenant ID', (done) => {
+    it('should partition by tenant ID', async () => {
       const producer = AmroEventsProducer.getInstance();
 
       producer.publishWorkOrderEvent(
@@ -416,14 +415,14 @@ describe('AmroEventsProducer', () => {
         },
       );
 
-      setTimeout(() => {
-        const call = mockProducer.send.mock.calls[0][0];
-        expect(call.messages[0].key).toBe('tenant-abc');
-        done();
-      }, 100);
+      // Let promises settle
+      await new Promise(resolve => setImmediate(resolve));
+
+      const call = mockProducer.send.mock.calls[0][0];
+      expect(call.messages[0].key).toBe('tenant-abc');
     });
 
-    it('should serialize event data to JSON', (done) => {
+    it('should serialize event data to JSON', async () => {
       const producer = AmroEventsProducer.getInstance();
 
       producer.publishWorkOrderEvent(
@@ -439,20 +438,20 @@ describe('AmroEventsProducer', () => {
         },
       );
 
-      setTimeout(() => {
-        const call = mockProducer.send.mock.calls[0][0];
-        const message = call.messages[0];
-        const payload = JSON.parse(message.value as string);
+      // Let promises settle
+      await new Promise(resolve => setImmediate(resolve));
 
-        expect(payload.event_type).toMatch(/^amro\./);
-        expect(payload.event_id).toBeDefined();
-        expect(payload.timestamp).toBeDefined();
-        expect(payload.tenant_id).toBe('tenant-123');
-        expect(payload.user_id).toBe('user-456');
-        expect(payload.idempotency_key).toBeDefined();
-        expect(payload.data).toBeDefined();
-        done();
-      }, 100);
+      const call = mockProducer.send.mock.calls[0][0];
+      const message = call.messages[0];
+      const payload = JSON.parse(message.value as string);
+
+      expect(payload.event_type).toMatch(/^amro\./);
+      expect(payload.event_id).toBeDefined();
+      expect(payload.timestamp).toBeDefined();
+      expect(payload.tenant_id).toBe('tenant-123');
+      expect(payload.user_id).toBe('user-456');
+      expect(payload.idempotency_key).toBeDefined();
+      expect(payload.data).toBeDefined();
     });
   });
 
@@ -463,7 +462,7 @@ describe('AmroEventsProducer', () => {
       jest.clearAllMocks();
     });
 
-    it('should publish maintenance event recorded event', (done) => {
+    it('should publish maintenance event recorded event', async () => {
       const producer = AmroEventsProducer.getInstance();
 
       producer.publishMaintenanceEvent(
@@ -483,25 +482,25 @@ describe('AmroEventsProducer', () => {
         },
       );
 
-      setTimeout(() => {
-        expect(mockProducer.send).toHaveBeenCalledWith(
-          expect.objectContaining({
-            topic: 'amro.maintenance-events',
-            messages: expect.arrayContaining([
-              expect.objectContaining({
-                key: 'tenant-123',
-                headers: expect.objectContaining({
-                  'event_type': 'amro.maintenance_event.recorded',
-                }),
+      // Let promises settle
+      await new Promise(resolve => setImmediate(resolve));
+
+      expect(mockProducer.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          topic: 'amro.maintenance-events',
+          messages: expect.arrayContaining([
+            expect.objectContaining({
+              key: 'tenant-123',
+              headers: expect.objectContaining({
+                'event_type': 'amro.maintenance_event.recorded',
               }),
-            ]),
-          }),
-        );
-        done();
-      }, 100);
+            }),
+          ]),
+        }),
+      );
     });
 
-    it('should include task and execution details in maintenance event', (done) => {
+    it('should include task and execution details in maintenance event', async () => {
       const producer = AmroEventsProducer.getInstance();
 
       producer.publishMaintenanceEvent(
@@ -521,19 +520,19 @@ describe('AmroEventsProducer', () => {
         },
       );
 
-      setTimeout(() => {
-        const call = mockProducer.send.mock.calls[0][0];
-        const message = call.messages[0];
-        const payload = JSON.parse(message.value as string);
+      // Let promises settle
+      await new Promise(resolve => setImmediate(resolve));
 
-        expect(payload.event_type).toBe('amro.maintenance_event.recorded');
-        expect(payload.data.task_id).toBe('task-789');
-        expect(payload.data.task_number).toBe('TASK-001');
-        expect(payload.data.executed_by).toBe('mechanic-123');
-        expect(payload.data.evidence_captured).toBe(true);
-        expect(payload.data.event_type).toBe('sign_off');
-        done();
-      }, 100);
+      const call = mockProducer.send.mock.calls[0][0];
+      const message = call.messages[0];
+      const payload = JSON.parse(message.value as string);
+
+      expect(payload.event_type).toBe('amro.maintenance_event.recorded');
+      expect(payload.data.task_id).toBe('task-789');
+      expect(payload.data.task_number).toBe('TASK-001');
+      expect(payload.data.executed_by).toBe('mechanic-123');
+      expect(payload.data.evidence_captured).toBe(true);
+      expect(payload.data.event_type).toBe('sign_off');
     });
   });
 

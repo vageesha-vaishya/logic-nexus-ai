@@ -16,6 +16,13 @@ import {
 import { amroEventsProducer } from '../events/amro-events.producer';
 import { AmroEventType } from '../events/amro-events.types';
 
+// Simple logger utility (use your actual logger if available)
+const logger = {
+  error: (message: string, context?: Record<string, any>) => {
+    console.error(`[ERROR] ${message}`, context || '');
+  },
+};
+
 export class WorkOrdersService {
   private supabase: SupabaseClient;
 
@@ -28,6 +35,16 @@ export class WorkOrdersService {
     }
 
     this.supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Validate that service role key is available (fail fast at startup)
+    // ⚠️ SECURITY: Service role key has full database access.
+    // Never log, expose in errors, or share this key.
+    if (!supabaseServiceKey) {
+      throw new Error(
+        'SUPABASE_SERVICE_ROLE_KEY environment variable is required. ' +
+        'This key must be kept secret and never logged or exposed.'
+      );
+    }
   }
 
   // ============================================================================
@@ -476,7 +493,7 @@ export class WorkOrdersService {
     // Verify task belongs to tenant
     const task = await this.getTask(tenantId, taskId);
 
-    // Publish maintenance event recorded event (fire-and-forget)
+    // Publish maintenance event recorded event (fire-and-forget with error logging)
     amroEventsProducer.publishMaintenanceEvent(
       tenantId,
       userId,
@@ -492,7 +509,13 @@ export class WorkOrdersService {
         notes: eventData.notes,
         recorded_at: new Date().toISOString(),
       },
-    );
+    ).catch(err => {
+      logger.error('Failed to publish maintenance event', {
+        error: err.message,
+        taskId,
+        tenantId,
+      });
+    });
   }
 
   // ============================================================================

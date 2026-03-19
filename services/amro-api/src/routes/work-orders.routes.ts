@@ -14,7 +14,6 @@ import {
   ErrorResponse,
 } from '../types/amro.types';
 import { asyncHandler } from '../utils/asyncHandler';
-import { logger } from '../utils/logger';
 
 const router = Router();
 const workOrdersService = new WorkOrdersService();
@@ -29,14 +28,15 @@ const workOrdersService = new WorkOrdersService();
  */
 router.get(
   '/work-packages',
-  asyncHandler(async (req: AuthRequest, res) => {
+  asyncHandler(async (req: AuthRequest, res): Promise<void> => {
     const tenantId = req.tenantId;
     if (!tenantId) {
-      return res.status(401).json({
+      res.status(401).json({
         error: 'Missing tenant context',
         code: 'MISSING_TENANT',
         statusCode: 401,
       } as ErrorResponse);
+      return;
     }
 
     const workPackages = await workOrdersService.getWorkPackages(tenantId);
@@ -44,6 +44,7 @@ router.get(
       data: workPackages,
       count: workPackages.length,
     });
+    return;
   }),
 );
 
@@ -53,20 +54,22 @@ router.get(
  */
 router.get(
   '/work-packages/:id',
-  asyncHandler(async (req: AuthRequest, res) => {
+  asyncHandler(async (req: AuthRequest, res): Promise<void> => {
     const tenantId = req.tenantId;
     const { id } = req.params;
 
     if (!tenantId) {
-      return res.status(401).json({
+      res.status(401).json({
         error: 'Missing tenant context',
         code: 'MISSING_TENANT',
         statusCode: 401,
       } as ErrorResponse);
+      return;
     }
 
     const workPackage = await workOrdersService.getWorkPackage(tenantId, id);
     res.json({ data: workPackage });
+    return;
   }),
 );
 
@@ -76,30 +79,33 @@ router.get(
  */
 router.post(
   '/work-packages',
-  asyncHandler(async (req: AuthRequest, res) => {
+  asyncHandler(async (req: AuthRequest, res): Promise<void> => {
     const tenantId = req.tenantId;
     const userId = req.userId;
 
     if (!tenantId || !userId) {
-      return res.status(401).json({
+      res.status(401).json({
         error: 'Missing tenant or user context',
         code: 'MISSING_CONTEXT',
         statusCode: 401,
       } as ErrorResponse);
+      return;
     }
 
     const request: CreateWorkPackageRequest = req.body;
 
     if (!request.aircraft_id || !request.title || !request.maintenance_type) {
-      return res.status(400).json({
+      res.status(400).json({
         error: 'Missing required fields: aircraft_id, title, maintenance_type',
         code: 'VALIDATION_ERROR',
         statusCode: 400,
       } as ErrorResponse);
+      return;
     }
 
     const workPackage = await workOrdersService.createWorkPackage(tenantId, userId, request);
     res.status(201).json({ data: workPackage });
+    return;
   }),
 );
 
@@ -109,22 +115,24 @@ router.post(
  */
 router.patch(
   '/work-packages/:id',
-  asyncHandler(async (req: AuthRequest, res) => {
+  asyncHandler(async (req: AuthRequest, res): Promise<void> => {
     const tenantId = req.tenantId;
     const userId = req.userId;
     const { id } = req.params;
 
     if (!tenantId || !userId) {
-      return res.status(401).json({
+      res.status(401).json({
         error: 'Missing tenant or user context',
         code: 'MISSING_CONTEXT',
         statusCode: 401,
       } as ErrorResponse);
+      return;
     }
 
     const request: UpdateWorkPackageRequest = req.body;
     const workPackage = await workOrdersService.updateWorkPackage(tenantId, id, userId, request);
     res.json({ data: workPackage });
+    return;
   }),
 );
 
@@ -134,20 +142,23 @@ router.patch(
  */
 router.delete(
   '/work-packages/:id',
-  asyncHandler(async (req: AuthRequest, res) => {
+  asyncHandler(async (req: AuthRequest, res): Promise<void> => {
     const tenantId = req.tenantId;
+    const userId = req.userId;
     const { id } = req.params;
 
-    if (!tenantId) {
-      return res.status(401).json({
-        error: 'Missing tenant context',
-        code: 'MISSING_TENANT',
+    if (!tenantId || !userId) {
+      res.status(401).json({
+        error: 'Missing tenant or user context',
+        code: 'MISSING_CONTEXT',
         statusCode: 401,
       } as ErrorResponse);
+      return;
     }
 
-    await workOrdersService.deleteWorkPackage(tenantId, id);
+    await workOrdersService.deleteWorkPackage(tenantId, id, userId);
     res.status(204).send();
+    return;
   }),
 );
 
@@ -161,16 +172,17 @@ router.delete(
  */
 router.get(
   '/work-packages/:workPackageId/tasks',
-  asyncHandler(async (req: AuthRequest, res) => {
+  asyncHandler(async (req: AuthRequest, res): Promise<void> => {
     const tenantId = req.tenantId;
     const { workPackageId } = req.params;
 
     if (!tenantId) {
-      return res.status(401).json({
+      res.status(401).json({
         error: 'Missing tenant context',
         code: 'MISSING_TENANT',
         statusCode: 401,
       } as ErrorResponse);
+      return;
     }
 
     const tasks = await workOrdersService.getTasks(tenantId, workPackageId);
@@ -178,6 +190,7 @@ router.get(
       data: tasks,
       count: tasks.length,
     });
+    return;
   }),
 );
 
@@ -187,20 +200,22 @@ router.get(
  */
 router.get(
   '/tasks/:id',
-  asyncHandler(async (req: AuthRequest, res) => {
+  asyncHandler(async (req: AuthRequest, res): Promise<void> => {
     const tenantId = req.tenantId;
     const { id } = req.params;
 
     if (!tenantId) {
-      return res.status(401).json({
+      res.status(401).json({
         error: 'Missing tenant context',
         code: 'MISSING_TENANT',
         statusCode: 401,
       } as ErrorResponse);
+      return;
     }
 
     const task = await workOrdersService.getTask(tenantId, id);
     res.json({ data: task });
+    return;
   }),
 );
 
@@ -210,30 +225,33 @@ router.get(
  */
 router.post(
   '/work-packages/:workPackageId/tasks',
-  asyncHandler(async (req: AuthRequest, res) => {
+  asyncHandler(async (req: AuthRequest, res): Promise<void> => {
     const tenantId = req.tenantId;
     const userId = req.userId;
 
     if (!tenantId || !userId) {
-      return res.status(401).json({
+      res.status(401).json({
         error: 'Missing tenant or user context',
         code: 'MISSING_CONTEXT',
         statusCode: 401,
       } as ErrorResponse);
+      return;
     }
 
     const request: CreateTaskRequest = req.body;
 
     if (!request.title || request.sequence_number === undefined) {
-      return res.status(400).json({
+      res.status(400).json({
         error: 'Missing required fields: title, sequence_number',
         code: 'VALIDATION_ERROR',
         statusCode: 400,
       } as ErrorResponse);
+      return;
     }
 
     const task = await workOrdersService.createTask(tenantId, userId, request);
     res.status(201).json({ data: task });
+    return;
   }),
 );
 
@@ -243,22 +261,24 @@ router.post(
  */
 router.patch(
   '/tasks/:id',
-  asyncHandler(async (req: AuthRequest, res) => {
+  asyncHandler(async (req: AuthRequest, res): Promise<void> => {
     const tenantId = req.tenantId;
     const userId = req.userId;
     const { id } = req.params;
 
     if (!tenantId || !userId) {
-      return res.status(401).json({
+      res.status(401).json({
         error: 'Missing tenant or user context',
         code: 'MISSING_CONTEXT',
         statusCode: 401,
       } as ErrorResponse);
+      return;
     }
 
     const request: UpdateTaskRequest = req.body;
     const task = await workOrdersService.updateTask(tenantId, id, userId, request);
     res.json({ data: task });
+    return;
   }),
 );
 
@@ -268,20 +288,23 @@ router.patch(
  */
 router.delete(
   '/tasks/:id',
-  asyncHandler(async (req: AuthRequest, res) => {
+  asyncHandler(async (req: AuthRequest, res): Promise<void> => {
     const tenantId = req.tenantId;
+    const userId = req.userId;
     const { id } = req.params;
 
-    if (!tenantId) {
-      return res.status(401).json({
-        error: 'Missing tenant context',
-        code: 'MISSING_TENANT',
+    if (!tenantId || !userId) {
+      res.status(401).json({
+        error: 'Missing tenant or user context',
+        code: 'MISSING_CONTEXT',
         statusCode: 401,
       } as ErrorResponse);
+      return;
     }
 
-    await workOrdersService.deleteTask(tenantId, id);
+    await workOrdersService.deleteTask(tenantId, id, userId);
     res.status(204).send();
+    return;
   }),
 );
 

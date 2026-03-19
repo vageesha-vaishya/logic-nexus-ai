@@ -9,6 +9,7 @@ import { authMiddleware } from './middleware/auth.middleware';
 import workOrdersRoutes from './routes/work-orders.routes';
 import { ErrorResponse } from './types/amro.types';
 import { logger } from './utils/logger';
+import { amroEventsProducer } from './events/amro-events.producer';
 
 const app: Express = express();
 
@@ -31,7 +32,7 @@ app.use(
 );
 
 // Request logging middleware
-app.use((req: Request, res: Response, next: NextFunction) => {
+app.use((req: Request, _res: Response, next: NextFunction) => {
   logger.info(`${req.method} ${req.path}`);
   next();
 });
@@ -44,7 +45,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
  * GET /health
  * Service health check endpoint
  */
-app.get('/health', (req: Request, res: Response) => {
+app.get('/health', (_req: Request, res: Response) => {
   res.json({
     status: 'ok',
     service: 'amro-api',
@@ -56,7 +57,7 @@ app.get('/health', (req: Request, res: Response) => {
  * GET /
  * Root endpoint
  */
-app.get('/', (req: Request, res: Response) => {
+app.get('/', (_req: Request, res: Response) => {
   res.json({
     name: 'AMRO API Service',
     version: '0.1.0',
@@ -93,7 +94,7 @@ app.use((req: Request, res: Response) => {
 /**
  * Global Error Handler
  */
-app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   logger.error('Unhandled error:', err);
 
   const statusCode = err.statusCode || 500;
@@ -105,6 +106,25 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
     code,
     statusCode,
   } as ErrorResponse);
+});
+
+// ============================================================================
+// GRACEFUL SHUTDOWN
+// ============================================================================
+
+/**
+ * Setup graceful shutdown to disconnect Kafka producer
+ */
+process.on('SIGTERM', async () => {
+  logger.info('SIGTERM signal received: closing HTTP server');
+  await amroEventsProducer.shutdown();
+  process.exit(0);
+});
+
+process.on('SIGINT', async () => {
+  logger.info('SIGINT signal received: closing HTTP server');
+  await amroEventsProducer.shutdown();
+  process.exit(0);
 });
 
 export default app;
