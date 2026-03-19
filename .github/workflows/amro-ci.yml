@@ -1,0 +1,86 @@
+name: AMRO Module CI
+
+on:
+  push:
+    branches: [feat/amro-plugin-phase-a]
+    paths:
+      - 'src/modules/amro/**'
+      - 'services/amro-api/**'
+      - 'supabase/migrations/2026031*_*amro*.sql'
+      - 'tests/integration/amro*.test.ts'
+      - '.github/workflows/amro-ci.yml'
+      - 'vitest.config.amro.ts'
+      - 'package.json'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'src/modules/amro/**'
+      - 'services/amro-api/**'
+      - 'supabase/migrations/2026031*_*amro*.sql'
+      - 'tests/integration/amro*.test.ts'
+      - '.github/workflows/amro-ci.yml'
+      - 'vitest.config.amro.ts'
+      - 'package.json'
+
+jobs:
+  amro-tests:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_DB: test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Create test database schema
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -d test_db -f supabase/migrations/20260319_001_create_amro_schema.sql
+          psql -h localhost -U postgres -d test_db -f supabase/migrations/20260319_002_create_amro_audit_schema.sql
+
+      - name: Run AMRO unit tests
+        run: npm run test:amro:unit
+
+      - name: Run AMRO integration tests
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+        run: npm run test:amro:integration
+
+      - name: Generate AMRO coverage report
+        run: npm run test:amro:coverage || true
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage/amro.coverage.json
+          flags: amro
+          name: amro-coverage
+        continue-on-error: true
