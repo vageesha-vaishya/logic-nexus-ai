@@ -15,6 +15,7 @@ import {
 } from '../types/amro.types';
 import { amroEventsProducer } from '../events/amro-events.producer';
 import { AmroEventType } from '../events/amro-events.types';
+import { withSpan, withChildSpan } from '../instrumentation/amro-tracing';
 
 // Simple logger utility (use your actual logger if available)
 const logger = {
@@ -95,61 +96,73 @@ export class WorkOrdersService {
   /**
    * Create a new work package
    * Explicitly sets tenant_id
+   * Wrapped with distributed tracing
    */
   async createWorkPackage(
     tenantId: string,
     userId: string,
     request: CreateWorkPackageRequest,
   ): Promise<WorkPackage> {
-    // Generate work package number (could be enhanced with sequence tables)
-    const workPackageNumber = `WP-${Date.now()}`;
+    return withSpan(
+      'work_package.create',
+      async () => {
+        // Generate work package number (could be enhanced with sequence tables)
+        const workPackageNumber = `WP-${Date.now()}`;
 
-    const { data, error } = await this.supabase
-      .from('work_packages')
-      .insert({
-        tenant_id: tenantId,
-        aircraft_id: request.aircraft_id,
-        work_package_number: workPackageNumber,
-        title: request.title,
-        description: request.description,
-        maintenance_type: request.maintenance_type,
-        status: 'planning',
-        planned_start_date: request.planned_start_date,
-        planned_completion_date: request.planned_completion_date,
-        estimated_labor_hours: request.estimated_labor_hours,
-        estimated_cost: request.estimated_cost,
-        created_by: userId,
-        updated_by: userId,
-      })
-      .select()
-      .single();
+        const { data, error } = await this.supabase
+          .from('work_packages')
+          .insert({
+            tenant_id: tenantId,
+            aircraft_id: request.aircraft_id,
+            work_package_number: workPackageNumber,
+            title: request.title,
+            description: request.description,
+            maintenance_type: request.maintenance_type,
+            status: 'planning',
+            planned_start_date: request.planned_start_date,
+            planned_completion_date: request.planned_completion_date,
+            estimated_labor_hours: request.estimated_labor_hours,
+            estimated_cost: request.estimated_cost,
+            created_by: userId,
+            updated_by: userId,
+          })
+          .select()
+          .single();
 
-    if (error) {
-      throw new Error(`Failed to create work package: ${error.message}`);
-    }
+        if (error) {
+          throw new Error(`Failed to create work package: ${error.message}`);
+        }
 
-    const workPackage = data as WorkPackage;
+        const workPackage = data as WorkPackage;
 
-    // Publish work order created event (fire-and-forget)
-    amroEventsProducer.publishWorkOrderEvent(
-      tenantId,
-      userId,
-      AmroEventType.WORK_ORDER_CREATED,
+        // Publish work order created event (fire-and-forget)
+        amroEventsProducer.publishWorkOrderEvent(
+          tenantId,
+          userId,
+          AmroEventType.WORK_ORDER_CREATED,
+          {
+            id: workPackage.id,
+            work_package_id: workPackage.id,
+            work_package_number: workPackage.work_package_number,
+            aircraft_id: workPackage.aircraft_id,
+            title: workPackage.title,
+            description: workPackage.description,
+            maintenance_type: workPackage.maintenance_type,
+            status: workPackage.status,
+            estimated_cost: workPackage.estimated_cost,
+            estimated_labor_hours: workPackage.estimated_labor_hours,
+          },
+        );
+
+        return workPackage;
+      },
       {
-        id: workPackage.id,
-        work_package_id: workPackage.id,
-        work_package_number: workPackage.work_package_number,
-        aircraft_id: workPackage.aircraft_id,
-        title: workPackage.title,
-        description: workPackage.description,
-        maintenance_type: workPackage.maintenance_type,
-        status: workPackage.status,
-        estimated_cost: workPackage.estimated_cost,
-        estimated_labor_hours: workPackage.estimated_labor_hours,
+        tenant_id: tenantId,
+        user_id: userId,
+        aircraft_id: request.aircraft_id,
+        maintenance_type: request.maintenance_type,
       },
     );
-
-    return workPackage;
   }
 
   /**
@@ -291,59 +304,71 @@ export class WorkOrdersService {
   /**
    * Create a new task
    * Explicitly sets tenant_id
+   * Wrapped with distributed tracing
    */
   async createTask(
     tenantId: string,
     userId: string,
     request: CreateTaskRequest,
   ): Promise<Task> {
-    // Generate task number
-    const taskNumber = `TASK-${Date.now()}`;
+    return withSpan(
+      'task.create',
+      async () => {
+        // Generate task number
+        const taskNumber = `TASK-${Date.now()}`;
 
-    const { data, error } = await this.supabase
-      .from('tasks')
-      .insert({
-        tenant_id: tenantId,
-        work_package_id: request.work_package_id,
-        task_number: taskNumber,
-        title: request.title,
-        description: request.description,
-        status: 'pending',
-        sequence_number: request.sequence_number,
-        planned_start_date: request.planned_start_date,
-        planned_completion_date: request.planned_completion_date,
-        required_qualification: request.required_qualification,
-        created_by: userId,
-        updated_by: userId,
-      })
-      .select()
-      .single();
+        const { data, error } = await this.supabase
+          .from('tasks')
+          .insert({
+            tenant_id: tenantId,
+            work_package_id: request.work_package_id,
+            task_number: taskNumber,
+            title: request.title,
+            description: request.description,
+            status: 'pending',
+            sequence_number: request.sequence_number,
+            planned_start_date: request.planned_start_date,
+            planned_completion_date: request.planned_completion_date,
+            required_qualification: request.required_qualification,
+            created_by: userId,
+            updated_by: userId,
+          })
+          .select()
+          .single();
 
-    if (error) {
-      throw new Error(`Failed to create task: ${error.message}`);
-    }
+        if (error) {
+          throw new Error(`Failed to create task: ${error.message}`);
+        }
 
-    const task = data as Task;
+        const task = data as Task;
 
-    // Publish task created event (fire-and-forget)
-    amroEventsProducer.publishTaskEvent(
-      tenantId,
-      userId,
-      AmroEventType.TASK_CREATED,
+        // Publish task created event (fire-and-forget)
+        amroEventsProducer.publishTaskEvent(
+          tenantId,
+          userId,
+          AmroEventType.TASK_CREATED,
+          {
+            id: task.id,
+            task_id: task.id,
+            task_number: task.task_number,
+            work_package_id: task.work_package_id,
+            title: task.title,
+            description: task.description,
+            status: task.status,
+            sequence_number: task.sequence_number,
+            required_qualification: task.required_qualification,
+          },
+        );
+
+        return task;
+      },
       {
-        id: task.id,
-        task_id: task.id,
-        task_number: task.task_number,
-        work_package_id: task.work_package_id,
-        title: task.title,
-        description: task.description,
-        status: task.status,
-        sequence_number: task.sequence_number,
-        required_qualification: task.required_qualification,
+        tenant_id: tenantId,
+        user_id: userId,
+        work_package_id: request.work_package_id,
+        sequence_number: request.sequence_number,
       },
     );
-
-    return task;
   }
 
   /**
@@ -494,28 +519,30 @@ export class WorkOrdersService {
     const task = await this.getTask(tenantId, taskId);
 
     // Publish maintenance event recorded event (fire-and-forget with error logging)
-    amroEventsProducer.publishMaintenanceEvent(
-      tenantId,
-      userId,
-      {
-        id: `maint-${Date.now()}`,
-        task_id: task.id,
-        task_number: task.task_number,
-        work_package_id: task.work_package_id,
-        executed_by: eventData.executed_by,
-        evidence_captured: eventData.evidence_captured,
-        event_type: eventData.event_type || 'execution',
-        sign_off_date: eventData.sign_off_date || new Date().toISOString(),
-        notes: eventData.notes,
-        recorded_at: new Date().toISOString(),
-      },
-    ).catch(err => {
+    try {
+      amroEventsProducer.publishMaintenanceEvent(
+        tenantId,
+        userId,
+        {
+          id: `maint-${Date.now()}`,
+          task_id: task.id,
+          task_number: task.task_number,
+          work_package_id: task.work_package_id,
+          executed_by: eventData.executed_by,
+          evidence_captured: eventData.evidence_captured,
+          event_type: eventData.event_type || 'execution',
+          sign_off_date: eventData.sign_off_date || new Date().toISOString(),
+          notes: eventData.notes,
+          recorded_at: new Date().toISOString(),
+        },
+      );
+    } catch (err) {
       logger.error('Failed to publish maintenance event', {
-        error: err.message,
+        error: err instanceof Error ? err.message : String(err),
         taskId,
         tenantId,
       });
-    });
+    }
   }
 
   // ============================================================================

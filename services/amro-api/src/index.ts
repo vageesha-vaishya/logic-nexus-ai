@@ -4,6 +4,7 @@
  */
 
 import dotenv from 'dotenv';
+import { initializeTracing } from './instrumentation/tracer-provider';
 import app from './app';
 import { logger } from './utils/logger';
 import { amroEventsProducer } from './events/amro-events.producer';
@@ -17,6 +18,10 @@ const NODE_ENV = process.env.NODE_ENV || 'development';
 // Initialize Kafka producer and start server
 async function startServer() {
   try {
+    // Initialize OpenTelemetry tracing
+    await initializeTracing();
+    logger.info('OpenTelemetry tracing initialized');
+
     // Initialize Kafka producer
     await amroEventsProducer.initialize();
     logger.info('Kafka producer initialized');
