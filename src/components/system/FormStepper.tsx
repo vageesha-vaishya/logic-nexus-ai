@@ -47,23 +47,51 @@ interface FormStepperProps {
    * Optional element to render on the right side of the stepper.
    */
   right?: ReactNode;
+  onStepClick?: (stepId: string) => void;
+  linkSteps?: boolean;
 }
 
-export function FormStepper({ steps, activeId, onPrev, onNext, className, right }: FormStepperProps) {
+export function FormStepper({ steps, activeId, onPrev, onNext, className, right, onStepClick, linkSteps }: FormStepperProps) {
   return (
     <div className={cn("flex items-center justify-between border rounded-md p-2 bg-muted/30", className)}>
       <div className="flex items-center gap-2">
         {steps.map((s) => (
-          <div
-            key={s.id}
-            className={cn(
-              "px-3 py-1 rounded-md text-sm",
-              s.id === activeId ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
-            )}
-            aria-current={s.id === activeId ? "step" : undefined}
-          >
-            {s.label}
-          </div>
+          linkSteps ? (
+            <a
+              key={s.id}
+              href={`#${s.id}`}
+              onClick={(event) => {
+                event.preventDefault();
+                onStepClick?.(s.id);
+                const target = document.getElementById(s.id);
+                if (target) {
+                  target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  if (window.location.hash !== `#${s.id}`) {
+                    window.history.replaceState(null, '', `#${s.id}`);
+                  }
+                }
+              }}
+              className={cn(
+                "px-3 py-1 rounded-md text-sm transition-colors",
+                s.id === activeId ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground",
+                "hover:text-foreground"
+              )}
+              aria-current={s.id === activeId ? "step" : undefined}
+            >
+              {s.label}
+            </a>
+          ) : (
+            <div
+              key={s.id}
+              className={cn(
+                "px-3 py-1 rounded-md text-sm",
+                s.id === activeId ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+              )}
+              aria-current={s.id === activeId ? "step" : undefined}
+            >
+              {s.label}
+            </div>
+          )
         ))}
       </div>
       <div className="flex items-center gap-2">

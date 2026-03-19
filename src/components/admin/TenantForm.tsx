@@ -1319,9 +1319,11 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
               { id: 'status', label: 'Status' },
             ]}
             activeId="details"
+            linkSteps
           />
 
           <div className="space-y-6">
+            <div id="details" className="scroll-mt-24" />
             <FormField
           control={form.control}
           name="name"
@@ -1403,7 +1405,7 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
           )}
         />
 
-        <FormSection title="Legal & Tax Identity">
+        <FormSection title="Legal & Tax Identity" id="legal-tax" className="scroll-mt-24">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField control={form.control} name="legal_name" render={({ field }) => (
               <FormItem>
@@ -1514,7 +1516,7 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
           </div>
         </FormSection>
         <Separator />
-        <FormSection title="Data Residency and Support">
+        <FormSection title="Data Residency and Support" id="residency" className="scroll-mt-24">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <FormField control={form.control} name="data_residency_region" render={({ field }) => (
               <FormItem>
@@ -1608,151 +1610,151 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
           />
         </FormSection>
         <Separator />
-        <FormSection title="Plan and Payment">
-          <div className="grid grid-cols-1 md:grid-cols-8 gap-3">
-            <FormField
-              control={form.control}
-              name="selected_plan_id"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Subscription Plan</FormLabel>
-                  <Select
-                    onValueChange={(value) => field.onChange(value === '__none__' ? '' : value)}
-                    value={field.value || '__none__'}
-                  >
+        <FormSection title="Plan and Payment" id="plan-payment" className="scroll-mt-24">
+          <div className="space-y-3 md:col-span-2">
+            <div className="grid grid-cols-1 md:grid-cols-8 gap-3">
+              <FormField
+                control={form.control}
+                name="selected_plan_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Subscription Plan</FormLabel>
+                    <Select
+                      onValueChange={(value) => field.onChange(value === '__none__' ? '' : value)}
+                      value={field.value || '__none__'}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a plan" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="__none__">Select Plan</SelectItem>
+                        {availablePlans.map((plan) => (
+                          <SelectItem key={plan.id} value={plan.id}>
+                            {plan.name} ({(plan.currency || 'USD').toUpperCase()} {plan.price_monthly}/month)
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>Required to continue onboarding beyond Phase 1</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="plan_status"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Plan Status</FormLabel>
                     <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a plan" />
-                      </SelectTrigger>
+                      <Input readOnly disabled placeholder="Not available" {...field} />
                     </FormControl>
-                    <SelectContent>
-                      <SelectItem value="__none__">Select Plan</SelectItem>
-                      {availablePlans.map((plan) => (
-                        <SelectItem key={plan.id} value={plan.id}>
-                          {plan.name} ({(plan.currency || 'USD').toUpperCase()} {plan.price_monthly}/month)
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormDescription>Required to continue onboarding beyond Phase 1</FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="plan_status"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Plan Status</FormLabel>
-                  <FormControl>
-                    <Input readOnly disabled placeholder="Not available" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="selected_billing_period"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Billing Period</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value || 'monthly'} disabled>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="selected_billing_period"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Billing Period</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || 'monthly'} disabled>
+                      <FormControl>
+                        <SelectTrigger disabled>
+                          <SelectValue placeholder="Select billing period" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="monthly">Monthly</SelectItem>
+                        <SelectItem value="annual">Annual</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="plan_max_user"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Plan Max User</FormLabel>
                     <FormControl>
-                      <SelectTrigger disabled>
-                        <SelectValue placeholder="Select billing period" />
-                      </SelectTrigger>
+                      <Input readOnly disabled placeholder="Unlimited" {...field} />
                     </FormControl>
-                    <SelectContent>
-                      <SelectItem value="monthly">Monthly</SelectItem>
-                      <SelectItem value="annual">Annual</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="plan_max_user"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Plan Max User</FormLabel>
-                  <FormControl>
-                    <Input readOnly disabled placeholder="Unlimited" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="requested_user_count"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Actual Max User *</FormLabel>
-                  <FormControl>
-                    <Input type="number" min="0" placeholder="e.g. 25" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="requested_franchise_count"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Actual Max Franchise *</FormLabel>
-                  <FormControl>
-                    <Input type="number" min="0" placeholder="e.g. 5" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="plan_max_franchise"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Plan Max Franchise</FormLabel>
-                  <FormControl>
-                    <Input readOnly disabled placeholder="Unlimited" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="payment_provider"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Payment Provider</FormLabel>
-                  <Select
-                    onValueChange={(value) => field.onChange(value === '__none__' ? '' : value)}
-                    value={field.value || '__none__'}
-                  >
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="requested_user_count"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Actual Max User *</FormLabel>
                     <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select provider" />
-                      </SelectTrigger>
+                      <Input type="number" min="0" placeholder="e.g. 25" {...field} />
                     </FormControl>
-                    <SelectContent>
-                      <SelectItem value="__none__">Select Provider</SelectItem>
-                      <SelectItem value="mock">Mock Gateway</SelectItem>
-                      <SelectItem value="stripe">Stripe</SelectItem>
-                      <SelectItem value="razorpay">Razorpay</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
-          <div className="grid grid-cols-1 gap-3 mt-3">
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="plan_max_franchise"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Plan Max Franchise</FormLabel>
+                    <FormControl>
+                      <Input readOnly disabled placeholder="Unlimited" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="requested_franchise_count"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Actual Max Franchise *</FormLabel>
+                    <FormControl>
+                      <Input type="number" min="0" placeholder="e.g. 5" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="payment_provider"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Payment Provider</FormLabel>
+                    <Select
+                      onValueChange={(value) => field.onChange(value === '__none__' ? '' : value)}
+                      value={field.value || '__none__'}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select provider" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="__none__">Select Provider</SelectItem>
+                        <SelectItem value="mock">Mock Gateway</SelectItem>
+                        <SelectItem value="stripe">Stripe</SelectItem>
+                        <SelectItem value="razorpay">Razorpay</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
             {selectedPlanForPreview && (
               <div className="rounded-lg border p-4 text-sm">
                 <div className="font-medium">{selectedPlanForPreview.name}</div>
@@ -1764,15 +1766,15 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
                 )}
               </div>
             )}
+            {activeSubscription?.status === 'active' && (
+              <div className="text-xs text-muted-foreground">
+                Existing active subscription detected and will be replaced after confirmation.
+              </div>
+            )}
           </div>
-          {activeSubscription?.status === 'active' && (
-            <div className="text-xs text-muted-foreground">
-              Existing active subscription detected and will be replaced after confirmation.
-            </div>
-          )}
         </FormSection>
         <Separator />
-        <FormSection title="Domain, Personalization, and Welcome">
+        <FormSection title="Domain, Personalization, and Welcome" id="domain-personalization-welcome" className="scroll-mt-24">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField
               control={form.control}
@@ -1889,7 +1891,7 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
           />
         </FormSection>
         <Separator />
-        <FormSection title="Demographics">
+        <FormSection title="Demographics" id="demographics" className="scroll-mt-24">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <FormField control={form.control} name="demographics_age_group" render={({ field }) => (
                 <FormItem>
@@ -1931,7 +1933,7 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
           </div>
         </FormSection>
         <Separator />
-        <FormSection title="Primary Contacts">
+        <FormSection title="Primary Contacts" id="contacts" className="scroll-mt-24">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <FormField control={form.control} name="contact_primary_name" render={({ field }) => (
                 <FormItem>
@@ -1998,7 +2000,7 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
           </div>
         </FormSection>
         <Separator />
-        <FormSection title="Communication Channels">
+        <FormSection title="Communication Channels" id="channels" className="scroll-mt-24">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField control={form.control} name="channels_email" render={({ field }) => (
                 <FormItem>
@@ -2060,7 +2062,7 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
           )}
         />
 
-        <FormSection title="Status">
+        <FormSection title="Status" id="status" className="scroll-mt-24">
           <FormField
           control={form.control}
           name="is_active"
