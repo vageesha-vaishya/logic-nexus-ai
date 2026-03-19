@@ -757,16 +757,73 @@ const performProvisioningForRequest = async (
     throw new Error('Requested franchise count cannot be negative')
   }
 
+  const preferredDomain = sanitizeDomain(initialConfig.domain || '')
+  let resolvedDomainId: string | null = null
+  const { data: activeDomains, error: platformDomainsError } = await supabase
+    .from('platform_domains')
+    .select('*')
+    .eq('is_active', true)
+
+  if (platformDomainsError) throw new Error(platformDomainsError.message || 'Unable to resolve platform domains')
+
+  let platformDomains = activeDomains || []
+  if (platformDomains.length === 0) {
+    const { data: anyDomains, error: anyDomainsError } = await supabase
+      .from('platform_domains')
+      .select('*')
+    if (anyDomainsError) throw new Error(anyDomainsError.message || 'Unable to resolve platform domains')
+    platformDomains = anyDomains || []
+  }
+
+  if (platformDomains.length === 0) {
+    const { data: createdDomain, error: createDomainError } = await supabase
+      .from('platform_domains')
+      .upsert(
+        {
+          code: 'logistics',
+          name: 'Logistics',
+          description: 'Default logistics domain',
+          is_active: true
+        },
+        { onConflict: 'code' }
+      )
+      .select('*')
+      .single()
+    if (createDomainError || !createdDomain) {
+      throw new Error(createDomainError?.message || 'Unable to create default platform domain')
+    }
+    platformDomains = [createdDomain]
+  }
+
+  const preferredDomainRow = preferredDomain
+    ? platformDomains.find((domain: any) => {
+        const candidates = [domain.key, domain.code, domain.name]
+          .map((value: string | null | undefined) => sanitizeDomain(value || ''))
+          .filter((value: string) => value.length > 0)
+        return candidates.includes(preferredDomain)
+      })
+    : null
+  const fallbackDomainRow =
+    platformDomains.find((domain: any) => sanitizeDomain(domain.code || domain.name || domain.key || '') === 'logistics') ||
+    platformDomains[0]
+
+  resolvedDomainId = preferredDomainRow?.id || fallbackDomainRow?.id || null
+
+  if (!resolvedDomainId) {
+    throw new Error('Unable to resolve platform domain for tenant provisioning')
+  }
+
   const orgSlug = await buildUniqueSlug(supabase, requestRow.organization_slug || requestRow.organization_name)
   const { data: tenant, error: tenantError } = await supabase
     .from('tenants')
     .insert({
       name: requestRow.organization_name,
       slug: orgSlug,
+      domain_id: resolvedDomainId,
       subscription_tier: normalizedPlanTier,
       max_users: requestedUserCount,
       max_franchises: requestedFranchiseCount,
-      status: isPaidPlan ? 'pending' : 'active',
+      is_active: true,
       settings: {
         onboarding_source: 'self_service',
         onboarding_status: isPaidPlan ? 'payment_pending' : 'active',
