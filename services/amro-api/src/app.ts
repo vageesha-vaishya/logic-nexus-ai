@@ -8,6 +8,7 @@ import cors from 'cors';
 import { authMiddleware } from './middleware/auth.middleware';
 import workOrdersRoutes from './routes/work-orders.routes';
 import { ErrorResponse } from './types/amro.types';
+import { logger } from './utils/logger';
 
 const app: Express = express();
 
@@ -31,7 +32,7 @@ app.use(
 
 // Request logging middleware
 app.use((req: Request, res: Response, next: NextFunction) => {
-  console.log(`${req.method} ${req.path}`);
+  logger.info(`${req.method} ${req.path}`);
   next();
 });
 
@@ -93,7 +94,7 @@ app.use((req: Request, res: Response) => {
  * Global Error Handler
  */
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
-  console.error('Unhandled error:', err);
+  logger.error('Unhandled error:', err);
 
   const statusCode = err.statusCode || 500;
   const code = err.code || 'INTERNAL_SERVER_ERROR';

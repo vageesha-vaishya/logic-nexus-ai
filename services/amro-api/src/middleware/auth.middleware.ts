@@ -5,6 +5,7 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { createClient } from '@supabase/supabase-js';
+import { logger } from '../utils/logger';
 
 interface AuthRequest extends Request {
   tenantId?: string;
@@ -89,7 +90,7 @@ export async function authMiddleware(
     req.tenantId = userRoles.tenant_id;
     next();
   } catch (err) {
-    console.error('Auth middleware error:', err);
+    logger.error('Auth middleware error:', err);
     res.status(500).json({
       error: 'Internal server error during authentication',
       code: 'AUTH_ERROR',

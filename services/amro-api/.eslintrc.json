@@ -21,6 +21,11 @@
         "argsIgnorePattern": "^_"
       }
     ],
-    "no-console": "off"
+    "no-console": [
+      "warn",
+      {
+        "allow": ["warn", "error"]
+      }
+    ]
   }
 }
