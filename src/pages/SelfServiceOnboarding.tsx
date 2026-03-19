@@ -99,7 +99,7 @@ const schema = z.object({
     .max(128, 'Password must be at most 128 characters')
     .regex(passwordPolicy, 'Password must include uppercase, lowercase, number, and special character'),
   admin_password_confirm: z.string().min(1, 'Confirm Password is required'),
-  plan_tier: z.string().min(1, 'Package selection is required'),
+  plan_id: z.string().min(1, 'Package selection is required'),
   billing_period: z.enum(['monthly', 'annual']),
   requested_user_count: z.number().int().min(1).max(10000),
   requested_franchise_count: z.number().int().min(0).max(10000),
@@ -120,7 +120,7 @@ const schema = z.object({
 
 type FormState = z.infer<typeof schema>
 type FieldErrorKey =
-  | 'plan_tier'
+  | 'plan_id'
   | 'organization_name'
   | 'country'
   | 'domain'
@@ -185,7 +185,7 @@ export default function SelfServiceOnboarding() {
     admin_email: '',
     admin_password: '',
     admin_password_confirm: '',
-    plan_tier: '',
+    plan_id: '',
     billing_period: 'monthly',
     requested_user_count: 2,
     requested_franchise_count: 1,
@@ -205,15 +205,15 @@ export default function SelfServiceOnboarding() {
   })
 
   const selectedPlan = useMemo(
-    () => availablePlans.find((p) => p.tier === form.plan_tier),
-    [availablePlans, form.plan_tier]
+    () => availablePlans.find((p) => p.id === form.plan_id),
+    [availablePlans, form.plan_id]
   )
   const progress = ((stepIndex + 1) / stepIds.length) * 100
 
   const updateField = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setFieldErrors((prev) => ({
       ...prev,
-      plan_tier: key === 'plan_tier' ? undefined : prev.plan_tier,
+      plan_id: key === 'plan_id' ? undefined : prev.plan_id,
       organization_name: key === 'organization_name' ? undefined : prev.organization_name,
       country: key === 'country' ? undefined : prev.country,
       domain: key === 'domain' ? undefined : prev.domain,
@@ -499,10 +499,10 @@ export default function SelfServiceOnboarding() {
         setAvailablePlans(normalized)
         if (normalized.length > 0) {
           setForm((prev) => {
-            if (normalized.find((plan) => plan.tier === prev.plan_tier)) {
+            if (normalized.find((plan) => plan.id === prev.plan_id)) {
               return prev
             }
-            return { ...prev, plan_tier: normalized[0].tier }
+            return { ...prev, plan_id: normalized[0].id }
           })
         }
       } catch (error: any) {
@@ -632,12 +632,12 @@ export default function SelfServiceOnboarding() {
 
   const validateCurrentStep = async (): Promise<boolean> => {
     if (stepIds[stepIndex] === 'package') {
-      if (!form.plan_tier) {
-        setFieldErrors((prev) => ({ ...prev, plan_tier: 'Package selection is required' }))
+      if (!form.plan_id) {
+        setFieldErrors((prev) => ({ ...prev, plan_id: 'Package selection is required' }))
         toast.error('Select a package to continue')
         return false
       }
-      setFieldErrors((prev) => ({ ...prev, plan_tier: undefined }))
+      setFieldErrors((prev) => ({ ...prev, plan_id: undefined }))
       return true
     }
     if (stepIds[stepIndex] === 'organization') {
@@ -898,7 +898,7 @@ export default function SelfServiceOnboarding() {
         action: 'start_registration',
         organization_name: form.organization_name,
         country: form.country,
-        plan_tier: form.plan_tier,
+        plan_id: form.plan_id,
         billing_period: form.billing_period,
         requested_user_count: form.requested_user_count,
         requested_franchise_count: form.requested_franchise_count,
@@ -1147,7 +1147,7 @@ export default function SelfServiceOnboarding() {
               {stepIds[stepIndex] === 'package' && (
                 <div className="space-y-2">
                   <Label>Package <span className="text-destructive">*</span></Label>
-                  <div className={`grid md:grid-cols-3 gap-4 ${fieldErrors.plan_tier ? 'border border-destructive rounded-lg p-3' : ''}`}>
+                  <div className={`grid md:grid-cols-3 gap-4 ${fieldErrors.plan_id ? 'border border-destructive rounded-lg p-3' : ''}`}>
                     {plansLoading && (
                       <div className="text-sm text-muted-foreground">Loading packages...</div>
                     )}
@@ -1160,8 +1160,8 @@ export default function SelfServiceOnboarding() {
                       <button
                         key={plan.id}
                         type="button"
-                        className={`text-left border rounded-lg p-4 transition-all ${form.plan_tier === plan.tier ? 'border-primary ring-2 ring-primary/30' : 'border-border hover:border-primary/50'}`}
-                        onClick={() => updateField('plan_tier', plan.tier)}
+                        className={`text-left border rounded-lg p-4 transition-all ${form.plan_id === plan.id ? 'border-primary ring-2 ring-primary/30' : 'border-border hover:border-primary/50'}`}
+                        onClick={() => updateField('plan_id', plan.id)}
                       >
                         <div className="font-semibold">{plan.name}</div>
                         <div className="text-sm text-muted-foreground mt-1">{plan.description || 'Plan details'}</div>
@@ -1177,7 +1177,7 @@ export default function SelfServiceOnboarding() {
                       </button>
                     ))}
                   </div>
-                  {fieldErrors.plan_tier && <p className="text-xs text-destructive">{fieldErrors.plan_tier}</p>}
+                  {fieldErrors.plan_id && <p className="text-xs text-destructive">{fieldErrors.plan_id}</p>}
                 </div>
               )}
 
