@@ -511,6 +511,7 @@ this.eventsProducer.publishEvent(event)
   });
 ```
 
+
 **Security:** Service role key safeguarded with validation + comment
 
 ## Testing
@@ -524,33 +525,62 @@ this.eventsProducer.publishEvent(event)
 
 ---
 
-# M0 Implementation Summary
+# M0 Status Report (Audit Snapshot)
 
-## Metrics
-- **Tasks Completed:** 4 of 7 (57%)
-- **Commits:** 14+
-- **Tests Created:** 112+
-- **Spec Compliance:** 100%
-- **Code Quality:** 100%
-- **Git Branches:** feat/amro-plugin-phase-a
-- **Worktree:** .worktrees/feat-amro-plugin-phase-a
+**Snapshot Date:** 2026-03-19  
+**Milestone:** M0 Foundation (Weeks 1-2)  
+**Branch:** `feat/amro-plugin-phase-a`  
+**Worktree:** `.worktrees/feat-amro-plugin-phase-a`
 
-## Key Technologies
-- **Database:** Supabase (PostgreSQL)
-- **Backend:** Express.js (Node.js)
-- **Events:** Kafka (idempotent producer)
-- **Logging:** Structured logger wrapper
-- **Testing:** Jest + Supertest
-- **Auth:** Supabase JWT + user_roles lookup
+## Executive Status
+- **Completion:** 6/7 tasks complete (**85.7%**)
+- **Overall Assessment:** M0 is mostly complete with one critical gap in mobile offline framework delivery
+- **Production Readiness:** Not yet ready for M1a sign-off until M0-6 is implemented and validated
 
-## Design Patterns Established
-1. **Multi-Tenant Isolation:** Explicit tenant_id filtering on all queries
-2. **Fire-and-Forget Events:** Async publishing without blocking API
-3. **Structured Logging:** Logger wrapper, no console.log
-4. **Async Handlers:** Middleware wrapper eliminates try/catch
-5. **Graceful Errors:** Proper JSON error format with status codes
-6. **Immutable Records:** Database-level trigger enforcement
-7. **RLS Policies:** Row-level security for multi-tenant data access
+## Milestone Progress
 
-## Ready for Next Phase
-All M0 Foundation tasks are complete with full documentation, testing, and quality approval. Architecture is ready for M0-5 (OpenTelemetry Tracing) and subsequent phases.
+| Task | Planned Outcome | Implementation Status | Evidence |
+|---|---|---|---|
+| **M0-1** | Operational AMRO schema | ✅ Complete | `supabase/migrations/20260319_001_create_amro_schema.sql`, `tests/integration/amro-schema.test.ts` |
+| **M0-2** | Immutable audit schema | ✅ Complete | `supabase/migrations/20260319_002_create_amro_audit_schema.sql`, `tests/integration/amro-audit-schema.test.ts` |
+| **M0-3** | API scaffolding and CRUD endpoints | ✅ Complete | `services/amro-api/src/app.ts`, `services/amro-api/src/routes/work-orders.routes.ts`, `services/amro-api/src/services/work-orders.service.ts` |
+| **M0-4** | Kafka event stream integration | ✅ Complete | `services/amro-api/src/events/amro-events.types.ts`, `services/amro-api/src/events/amro-events.producer.ts`, `services/amro-api/tests/amro-events.test.ts` |
+| **M0-5** | OpenTelemetry tracing integration | ✅ Complete | `services/amro-api/src/instrumentation/amro-tracing.ts`, `services/amro-api/src/instrumentation/tracer-provider.ts`, `services/amro-api/tests/amro-tracing.test.ts` |
+| **M0-6** | Mobile offline-first framework | ❌ Gap | No `mobile/` implementation files present in worktree |
+| **M0-7** | AMRO CI/CD pipeline | ✅ Complete | `.github/workflows/amro-ci.yml`, `vitest.config.amro.ts`, `package.json` scripts |
+
+## Requirement-to-Code Traceability (M0)
+
+| Requirement Area | Requirement Intent | Code Implementation |
+|---|---|---|
+| Multi-tenant isolation | Enforce tenant-scoped access for AMRO records | RLS in `20260319_001_create_amro_schema.sql`; explicit `tenant_id` filtering in `work-orders.service.ts` |
+| Immutable compliance records | Prevent audit tampering | Append-only triggers in `20260319_002_create_amro_audit_schema.sql` |
+| AMRO API service foundation | Isolated AMRO backend with auth and CRUD | `app.ts`, `auth.middleware.ts`, `work-orders.routes.ts`, `work-orders.service.ts` |
+| Event-driven integration | Publish non-blocking AMRO domain events | `amro-events.producer.ts`, `amro-events.types.ts` |
+| Observability | Trace critical operations end-to-end | `amro-tracing.ts`, `tracer-provider.ts`, tracing test coverage |
+| Delivery automation | Automated CI validation for AMRO scope | `.github/workflows/amro-ci.yml`, `vitest.config.amro.ts`, AMRO test scripts |
+
+## Gap Analysis Matrix (Appendix A)
+
+| Gap ID | Area | Severity | Impact | Current State | Required Closure |
+|---|---|---|---|---|---|
+| **GAP-M0-001** | M0-6 Mobile Offline Framework | High | Blocks planned offline execution and conflict-resolution foundation for M1a | `mobile/src/services/offline-cache.ts`, `mobile/src/types/offline.types.ts`, and `mobile/src/stores/work-order.store.ts` are absent | Implement mobile offline files and tests, then rerun AMRO lint/typecheck/test gates |
+
+## Git Traceability Summary
+
+- `53f9544c`, `cb0fa5cd`, `f4c33cda`: M0-1 schema foundation and spec alignment
+- `93f4aede`, `8a6b8594`: M0-2 immutable audit schema and quality fixes
+- `ffa3a1b6`, `6ebb87b1`: M0-3 API service and integration hardening
+- `3de5ab5d`, `55e15c27`: M0-4 event coverage and reliability fixes
+- `5df2be0f`: M0-5 tracing integration
+- `c6142de4`: M0-7 CI pipeline setup
+
+## Exit-Criteria Assessment
+
+- ✅ Operational schema established and tested
+- ✅ Immutable audit schema established and tested
+- ✅ API scaffolding and event infrastructure complete
+- ✅ Tracing and CI pipelines integrated
+- ❌ Mobile offline-first framework incomplete
+
+**Conclusion:** M0 is at **85.7% completion** and requires M0-6 closure before milestone sign-off.

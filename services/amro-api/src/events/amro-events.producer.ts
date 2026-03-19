@@ -225,28 +225,22 @@ export class AmroEventsProducer {
     if (!this.producer) {
       throw new Error('Producer not initialized');
     }
-
-    try {
-      await this.producer.send({
-        topic,
-        messages: [
-          {
-            key: event.tenant_id, // Partition by tenant for ordering
-            value: JSON.stringify(event),
-            headers: {
-              'event_type': event.event_type,
-              'event_id': event.event_id,
-              'idempotency_key': event.idempotency_key,
-              'timestamp': event.timestamp,
-            },
+    await this.producer.send({
+      topic,
+      messages: [
+        {
+          key: event.tenant_id, // Partition by tenant for ordering
+          value: JSON.stringify(event),
+          headers: {
+            'event_type': event.event_type,
+            'event_id': event.event_id,
+            'idempotency_key': event.idempotency_key,
+            'timestamp': event.timestamp,
           },
-        ],
-        timeout: KAFKA_PRODUCER_TIMEOUT,
-      });
-    } catch (error) {
-      // Re-throw to be caught by caller's fire-and-forget handler
-      throw error;
-    }
+        },
+      ],
+      timeout: KAFKA_PRODUCER_TIMEOUT,
+    });
   }
 
   /**

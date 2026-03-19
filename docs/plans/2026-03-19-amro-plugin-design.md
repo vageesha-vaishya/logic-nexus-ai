@@ -1,514 +1,462 @@
-# AMRO Plugin Module Design
-## Logic Nexus-AI Aviation MRO Implementation
+# AMRO Domain Master Design Reference
+## Logic Nexus-AI Platform Integrated UI/UX and Implementation Blueprint
 
-**Document ID:** DESIGN-AMRO-001
-**Version:** 1.0.0
-**Date:** 2026-03-19
-**Status:** Approved for Implementation
-**Target Timeline:** 13 weeks (Full Phase A)
-**Lead Architect:** AI-Assisted Design Session
-
----
-
-## Executive Summary
-
-This document outlines the design for integrating an **AMRO (Asset Maintenance, Repair, and Overhaul) plugin module** into Logic Nexus-AI to target the aviation MRO market segment. The design balances rapid deployment with regulatory compliance, leveraging Nexus-AI's existing multi-tenant infrastructure while introducing purpose-built aviation domain models.
-
-**Success Metrics:**
-- Complete Phase A requirements from AMRO specification v1.1
-- Achieve 99.99% availability with < 5-minute RTO/RPO
-- Support 10,000 concurrent users at 5,000 TPS
-- Enable certifiable maintenance workflows for regulated aviation operations
-- Deliver within 13 weeks with 4.5 FTE
+**Document ID:** DESIGN-AMRO-001  
+**Version:** 2.0.0  
+**Date:** 2026-03-19  
+**Status:** Draft for Stakeholder Review and Approval Gate  
+**Owner:** AMRO Architecture Working Group  
+**Scope:** Complete AMRO domain design reference for current and future development
 
 ---
 
-## 1. Architecture & Integration Approach
+## 1. Purpose and Source Baseline
 
-### 1.1 Architectural Model: Hybrid Domain Module
+This document is the single master reference for AMRO domain design in Logic Nexus-AI. It consolidates architecture, UI/UX specifications, traceability, phased implementation planning, delivery status, and governance controls.
 
-The AMRO plugin operates as a **loosely-coupled domain module** within Logic Nexus-AI, reusing the multi-tenant foundation while owning isolated workflows, services, and data layers.
+**Source baseline**
+- AMRO requirements specification: `artifacts/mro/analysis/amro-plugin-requirements-spec-v1.0.md`
+- AMRO implementation reference: `docs/plans/2026-03-19-amro-plugin-implementation-reference.md`
+- AMRO implementation plan: `docs/plans/2026-03-19-amro-plugin-implementation.md`
+- Current AMRO migrations and backend services in this repository
 
-**Integration Points:**
+**Primary objectives**
+- Keep design and implementation aligned with platform multi-tenancy, security, and compliance rules
+- Define precise UI/UX behavior and reusable component patterns
+- Provide requirement-to-design-to-validation traceability for every AMRO UI/UX component
+- Govern implementation with approval gates, version control, and change protocols
 
-| Component | Reused from Nexus-AI | AMRO-Owned | Interaction |
+---
+
+## 2. Current Platform Architecture for AMRO
+
+### 2.1 Integration Model
+
+AMRO runs as a platform-integrated domain module:
+- Reuses platform tenancy, auth, RBAC/ABAC, eventing, and observability
+- Owns AMRO workflows, API surfaces, schema objects, and compliance logic
+- Preserves backward compatibility using additive evolution and versioned endpoints
+
+### 2.2 Architecture Layers
+
+| Layer | Existing Platform Capability | AMRO Domain Extension | Current State |
 |---|---|---|---|
-| **Tenancy & Auth** | ✅ Tenant model, RBAC/ABAC | — | Inherited; scope AMRO contexts |
-| **Multi-org support** | ✅ Tenant isolation, RLS | — | Inherited; apply to AMRO tables |
-| **Event bus** | ✅ Kafka, MQTT choreography | — | AMRO publishes work-order events |
-| **Mobile framework** | ✅ React Native/Flutter base | ✅ Task card UI, offline cache | Leverage existing; extend |
-| **API gateway** | ✅ REST/GraphQL scaffold | ✅ AMRO-specific endpoints | Add SemVer-versioned routes |
-| **Observability** | ✅ OpenTelemetry, Prometheus | ✅ Maintenance-critical flow traces | Extend tracing for audit flows |
-| **Work order** | ⚠️ CRM work order exists | ✅ MRO-specific work package | Parallel models; adapters bridge |
-| **Asset registry** | ✅ Logistics assets exist | ✅ Aircraft/component hierarchy | New; linked via asset_id |
+| Presentation | Dashboard layout, shared UI primitives | AMRO workspace pages, mobile task execution UX | Partial |
+| API | REST/GraphQL gateway, auth middleware | `/api/v1/work-packages`, `/api/v1/tasks`, AMRO event endpoints | Active |
+| Domain Services | Shared service framework | Work package orchestration, qualification checks, audit recording | Partial |
+| Data | PostgreSQL + Supabase, RLS model | AMRO operational tables + immutable `mro_audit` schema | Active |
+| Eventing | Kafka backbone | Work package and task lifecycle topics | Active |
+| Governance | CI/CD, quality gates | AMRO-specific traceability, approval, and release controls | In progress |
 
-### 1.2 Service Topology
+### 2.3 Data and Security Fundamentals
 
-```
-┌──────────────────────────────────────────────────────────────┐
-│                    Nexus-AI Core Platform                    │
-│  (Tenancy, Auth, API Gateway, Event Bus, Observability)     │
-└────────┬─────────────────────────────────┬──────────────────┘
-         │                                 │
-    ┌────▼────────────────────────┐  ┌────▼──────────────────┐
-    │   AMRO Domain Microservice   │  │  CRM / Logistics Core │
-    │ (Work Orders, Scheduling,    │  │  (Existing Features)  │
-    │  Execution, Compliance)      │  │                       │
-    │                              │  │                       │
-    │ ┌──────────────────────────┐ │  │                       │
-    │ │ Workflow Engine          │ │  │                       │
-    │ │ (Orchestrate execution)  │ │  │                       │
-    │ ├──────────────────────────┤ │  │                       │
-    │ │ Scheduling Engine        │ │  │                       │
-    │ │ (Constraints, dispatch)  │ │  │                       │
-    │ ├──────────────────────────┤ │  │                       │
-    │ │ Compliance Registry      │ │  │                       │
-    │ │ (Policies, rules)        │ │  │                       │
-    │ ├──────────────────────────┤ │  │                       │
-    │ │ Mobile Sync Service      │ │  │                       │
-    │ │ (Offline, conflict res)  │ │  │                       │
-    │ └──────────────────────────┘ │  │                       │
-    │                              │  │                       │
-    └────┬───────────────────────┬──┘  └────┬──────────────────┘
-         │                       │           │
-         │ REST/GraphQL (SemVer) │           │
-         │ Kafka Events          │           │ Async Adapters
-         │ (work-order.*)        │           │
-         │                       │           │
-    ┌────▼───────────────────────▼──┐      │
-    │  External Integrations         │◄─────┘
-    │  (SAP, Maximo, AD/SB feeds)    │
-    └────────────────────────────────┘
-```
-
-### 1.3 API Versioning & Backward Compatibility
-
-- **REST endpoints:** `/api/amro/v1/work-orders`, `/api/amro/v1/tasks`, etc.
-- **GraphQL:** Namespaced as `query { amro { workOrders { ... } } }`
-- **Event topics:** `amro.work-order.created`, `amro.task.executed`, `amro.maintenance.closed`
-- **SemVer contract:** Maintain compatibility for current + previous 2 versions (N, N-1, N-2)
+- Multi-tenancy enforced with `tenant_id` across AMRO tables
+- Row-level security required for all AMRO entities
+- Audit records and trails implemented as append-only with immutability triggers
+- Domain types constrain status and workflow state values
+- API contracts remain additive and semantically versioned
 
 ---
 
-## 2. Hybrid Schema Strategy & Data Model
+## 3. UI/UX Master Specification
 
-### 2.1 Schema Architecture
+### 3.1 UX Principles
 
-**Operational Schema (shared Nexus-AI schema):**
-Core MRO tables live alongside existing Nexus-AI tables, enabling tight queries and simple pilot rollout.
+- Safety-first interaction for compliance-sensitive actions
+- Role-aware visibility and action enablement
+- Progressive disclosure for technical detail and audit evidence
+- High-speed operator workflows with minimal context switching
+- Deterministic and auditable state transitions
 
-```sql
--- Aircraft & Component Registry
-CREATE TABLE aircraft (
-  id UUID PRIMARY KEY,
-  tenant_id UUID REFERENCES tenants(id),
-  tail_number VARCHAR UNIQUE NOT NULL,
-  aircraft_model VARCHAR NOT NULL,
-  owner_id UUID REFERENCES organizations(id),
-  status VARCHAR CHECK (status IN ('active', 'maintenance', 'grounded', 'retired')),
-  created_at TIMESTAMP, updated_at TIMESTAMP
-);
+### 3.2 Information Architecture
 
-CREATE TABLE components (
-  id UUID PRIMARY KEY,
-  tenant_id UUID REFERENCES tenants(id),
-  aircraft_id UUID REFERENCES aircraft(id),
-  part_number VARCHAR NOT NULL,
-  serial_number VARCHAR UNIQUE NOT NULL,
-  component_type VARCHAR (e.g., 'engine', 'avionics', 'hydraulic'),
-  ata_chapter VARCHAR (e.g., '70' for hydraulic),
-  llp_hours DECIMAL,            -- Life-limited part threshold
-  llp_cycles DECIMAL,
-  llp_calendar_days DECIMAL,
-  current_hours DECIMAL,        -- Current usage tracking
-  current_cycles DECIMAL,
-  status VARCHAR CHECK (status IN ('serviceable', 'unserviceable', 'reserved')),
-  installed_at TIMESTAMP,
-  removed_at TIMESTAMP,
-  created_at TIMESTAMP, updated_at TIMESTAMP
-);
+| AMRO Area | Primary User Roles | Primary Outcomes |
+|---|---|---|
+| AMRO Overview | Maintenance Manager, Planner | Monitor active workload and compliance risk |
+| Work Packages | Planner, Supervisor | Create, assign, schedule, and track work packages |
+| Task Execution | Technician, Inspector | Execute procedures and capture evidence |
+| Materials | Planner, Store Control | Allocate parts and track shortages |
+| Qualifications | Compliance Officer, Supervisor | Verify certifying authority and currency |
+| Audit and Compliance | Compliance Officer, Auditor | Replay and validate maintenance history |
 
--- Work Orders & Maintenance Planning
-CREATE TABLE work_packages (
-  id UUID PRIMARY KEY,
-  tenant_id UUID REFERENCES tenants(id),
-  aircraft_id UUID REFERENCES aircraft(id),
-  work_type VARCHAR CHECK (work_type IN ('corrective', 'preventive', 'regulatory')),
-  source VARCHAR (e.g., 'defect_report', 'scheduled_check', 'AD', 'MEL'),
-  source_id VARCHAR,            -- Defect ID, AD number, MEL code, etc.
-  title VARCHAR NOT NULL,
-  description TEXT,
-  priority VARCHAR CHECK (priority IN ('critical', 'high', 'medium', 'low')),
-  status VARCHAR CHECK (status IN ('open', 'planning', 'scheduled', 'in_execution', 'closed', 'deferred')),
-  created_by UUID REFERENCES users(id),
-  assigned_to UUID REFERENCES users(id),
-  estimated_labor_hours DECIMAL,
-  estimated_downtime_minutes INT,
-  maintenance_type VARCHAR CHECK (maintenance_type IN ('line', 'base')), -- Regulatory segregation
-  created_at TIMESTAMP, updated_at TIMESTAMP
-);
+### 3.3 Screen-Level Wireframes
 
-CREATE TABLE tasks (
-  id UUID PRIMARY KEY,
-  tenant_id UUID REFERENCES tenants(id),
-  work_package_id UUID REFERENCES work_packages(id),
-  sequence INT,
-  task_type VARCHAR (e.g., 'inspection', 'repair', 'component_replace'),
-  description TEXT,
-  procedure_reference VARCHAR,   -- S1000D, ATA Spec 100 reference
-  steps JSONB,                   -- Structured step definitions
-  assigned_technician_id UUID REFERENCES users(id),
-  required_qualifications JSONB, -- {rating: 'A&P', scope: 'powerplant', currency_days: 24}
-  status VARCHAR CHECK (status IN ('pending', 'assigned', 'in_progress', 'completed', 'deferred')),
-  evidence_fields JSONB,         -- {'photos': true, 'inspection_checklist': true}
-  created_at TIMESTAMP, updated_at TIMESTAMP
-);
+#### AMRO Overview Dashboard
 
--- Execution & Evidence
-CREATE TABLE maintenance_events (
-  id UUID PRIMARY KEY,
-  tenant_id UUID REFERENCES tenants(id),
-  task_id UUID REFERENCES tasks(id),
-  executed_by UUID REFERENCES users(id),
-  execution_start TIMESTAMP,
-  execution_end TIMESTAMP,
-  event_type VARCHAR (e.g., 'task_start', 'evidence_captured', 'task_complete', 'sign_off'),
-  evidence JSONB,               -- {photos: [...], checklist: {...}, notes: '...'}
-  signed_at TIMESTAMP,
-  signed_by UUID REFERENCES users(id),
-  signature_method VARCHAR (e.g., 'digital', 'pin', 'biometric'),
-  created_at TIMESTAMP
-);
-
--- Staff Qualifications & Certifying Authority
-CREATE TABLE staff_qualifications (
-  id UUID PRIMARY KEY,
-  tenant_id UUID REFERENCES tenants(id),
-  technician_id UUID REFERENCES users(id),
-  rating VARCHAR NOT NULL (e.g., 'A&P', 'Powerplant', 'Avionics'),
-  scope VARCHAR NOT NULL,       -- Module/system scope
-  issued_date DATE,
-  expiration_date DATE,
-  issuing_authority VARCHAR (e.g., 'FAA', 'EASA'),
-  certification_number VARCHAR,
-  can_certify_release BOOLEAN,  -- Can sign off on maintenance release
-  can_defer BOOLEAN,            -- Can approve deferrals
-  created_at TIMESTAMP, updated_at TIMESTAMP
-);
-
--- Work Package Materials & Parts Planning
-CREATE TABLE work_package_materials (
-  id UUID PRIMARY KEY,
-  tenant_id UUID REFERENCES tenants(id),
-  work_package_id UUID REFERENCES work_packages(id),
-  component_id UUID REFERENCES components(id),
-  action VARCHAR CHECK (action IN ('install', 'remove', 'inspect', 'repair')),
-  required_quantity INT,
-  allocated_quantity INT,
-  status VARCHAR CHECK (status IN ('pending', 'allocated', 'reserved', 'installed', 'deferred')),
-  warehouse_location VARCHAR,   -- Location in inventory
-  supplier_id UUID,             -- If on order
-  supplier_eta TIMESTAMP,
-  created_at TIMESTAMP, updated_at TIMESTAMP
-);
-
-CREATE INDEX idx_aircraft_tenant ON aircraft(tenant_id);
-CREATE INDEX idx_work_packages_tenant_status ON work_packages(tenant_id, status);
-CREATE INDEX idx_tasks_work_package ON tasks(work_package_id);
-CREATE INDEX idx_components_aircraft ON components(aircraft_id);
-CREATE INDEX idx_staff_qualifications_technician ON staff_qualifications(technician_id, expiration_date);
+```text
+┌───────────────────────────────────────────────────────────────────────────────┐
+│ AMRO > Overview        [Date Range] [Filters] [Export] [Refresh]            │
+├───────────────────────────────────────────────────────────────────────────────┤
+│ KPI: Open WP | In Progress Tasks | Deferred Items | Compliance Alerts        │
+├─────────────────────────────────────┬─────────────────────────────────────────┤
+│ Work Package Pipeline (Kanban)      │ Risk and Compliance Panel              │
+│ [Planning][Scheduled][In Progress]  │ - Expiring certifications              │
+│ [On Hold][Completed][Closed]        │ - Audit anomalies                      │
+├─────────────────────────────────────┴─────────────────────────────────────────┤
+│ Bottom Summary: Throughput | SLA Breaches | Mean Downtime                    │
+└───────────────────────────────────────────────────────────────────────────────┘
 ```
 
-**Compliance/Audit Layer (dedicated immutable namespace):**
-Separate `mro_audit_*` schema for tamper-evident records.
+#### Work Package List and Filters
 
-```sql
--- Immutable Audit Records
-CREATE TABLE mro_audit_records (
-  id UUID PRIMARY KEY,
-  tenant_id UUID REFERENCES tenants(id),
-  record_type VARCHAR (e.g., 'work_package_signed', 'release_authorized', 'override_approved'),
-  related_entity_id UUID,       -- work_package_id, task_id, etc.
-  related_entity_type VARCHAR,
-  actor_id UUID REFERENCES users(id),
-  actor_role VARCHAR,
-  action VARCHAR,
-  context JSONB,               -- Full state snapshot
-  signature BYTEA,             -- Cryptographic signature (future)
-  previous_hash BYTEA,         -- Chain-of-custody hash (future)
-  created_at TIMESTAMP NOT NULL,
-  -- NO update_at or update columns (append-only)
-  CONSTRAINT audit_immutable CHECK (created_at IS NOT NULL)
-);
-
-CREATE TABLE mro_audit_trails (
-  id UUID PRIMARY KEY,
-  tenant_id UUID REFERENCES tenants(id),
-  event_type VARCHAR (e.g., 'access', 'modification', 'override', 'approval'),
-  entity_type VARCHAR,
-  entity_id UUID,
-  user_id UUID,
-  user_email VARCHAR,
-  timestamp TIMESTAMP NOT NULL,
-  action_description TEXT,
-  regulatory_context JSONB,    -- {standard: 'FAA 14 CFR Part 121', reason: '...'}
-  created_at TIMESTAMP NOT NULL
-);
-
-CREATE INDEX idx_mro_audit_records_entity ON mro_audit_records(related_entity_id, created_at DESC);
-CREATE INDEX idx_mro_audit_trails_tenant_timestamp ON mro_audit_trails(tenant_id, created_at DESC);
+```text
+┌───────────────────────────────────────────────────────────────────────────────┐
+│ AMRO > Work Packages   [Search] [Filters] [Group] [Saved Views] [New]        │
+├───────────────────────────────────────────────────────────────────────────────┤
+│ Table: WO# | Aircraft | Type | Priority | Status | Due | Assignee | Actions  │
+│ Row click -> Work Package Detail                                               │
+└───────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 2.2 Tenant Isolation & Row-Level Security
+#### Work Package Detail
 
-- All AMRO tables include `tenant_id` column
-- Postgres RLS policies enforce tenant isolation:
-  ```sql
-  ALTER TABLE work_packages ENABLE ROW LEVEL SECURITY;
-  CREATE POLICY tenant_isolation ON work_packages
-    USING (tenant_id = current_setting('app.current_tenant_id')::uuid);
-  ```
-- RLS applies to all AMRO tables (aircraft, components, work_packages, tasks, staff_qualifications, audit records)
-
----
-
-## 3. Phase A MVP: Complete Scope & Phased Delivery
-
-### 3.1 Full Phase A Feature Set (13 Weeks)
-
-**Tier 1: Core Workflows (Weeks 1-8)**
-
-| Requirement | Description | Week | Owner |
-|---|---|---|---|
-| **FR-AMRO-001** | Create work orders from defects, checks, regulatory sources | 3-4 | Backend |
-| **FR-AMRO-002** | Plan labor, materials, downtime; link to staff qualifications | 4-5 | Backend |
-| **FR-AMRO-003** | Schedule work packages with bay/slot constraints, shift availability | 6-8 | Backend (Optimization) |
-| **FR-AMRO-004** | Execute digital task cards with step-by-step guidance, e-signatures, evidence | 4-6 | Mobile + Backend |
-| **FR-AMRO-005** | Enforce closure gate: parts reconciliation, deferred-item checks, release readiness | 5-6 | Backend |
-| **FR-AMRO-011** | Support encrypted offline execution cache (30 days) with signed local events | 5-8 | Mobile + Backend |
-| **FR-AMRO-012** | Resolve offline conflicts deterministically using certifying authority hierarchy + timestamps | 7-8 | Backend |
-| **FR-AMRO-018** | Enforce certifying staff privilege checks (rating, scope, currency) | 4-5 | Backend |
-| **FR-AMRO-019** | Maintain serialized component traceability (install/remove, LLP, time-controlled parts) | 3-4 | Backend |
-| **FR-AMRO-020** | Separate line and base maintenance templates and quality gates | 5-6 | Backend |
-| **FR-AMRO-026** | Persist immutable maintenance records with append-only audit chain | 3-4 | Backend |
-
-**Tier 2: Regulatory & Compliance (Weeks 6-10)**
-
-| Requirement | Description | Week | Owner |
-|---|---|---|---|
-| **FR-AMRO-016** | Support AD/SB ingestion, applicability evaluation, compliance closure evidence | 6-8 | Backend |
-| **FR-AMRO-017** | Apply MEL/CDL dispatch constraints and controlled deferral rules | 7-9 | Backend |
-| **NFR-AMRO-004** | Enforce OWASP Top-10, SOC-2 Type II controls, AES-256 encryption | 1-13 | Security |
-| **NFR-AMRO-005** | Implement RBAC + ABAC authorization (contextual aviation operations) | 2-5 | Backend |
-| **NFR-AMRO-006** | Implement OpenTelemetry tracing, 60-day retention, anomaly alerts | 3-13 | DevOps |
-| **NFR-AMRO-007** | Provide jurisdiction-aware compliance controls (FAA/EASA/ICAO contexts) | 8-10 | Backend |
-| **NFR-AMRO-008** | Enforce dual-control for safety-critical override actions | 5-7 | Backend |
-| **NFR-AMRO-009** | Maintain immutable audit record retention for 10 years + replay capability | 3-13 | Backend + DevOps |
-
-**Tier 3: Performance, Scale, & Integration (Weeks 7-13)**
-
-| Requirement | Description | Week | Owner |
-|---|---|---|---|
-| **NFR-AMRO-001** | Support 10,000 concurrent users, 5,000 TPS, p99 latency ≤ 1s | 7-12 | DevOps/SRE |
-| **NFR-AMRO-002** | Autoscale from 10 to 500 nodes within 3 minutes | 9-12 | DevOps/SRE |
-| **NFR-AMRO-003** | Ensure 99.99% availability, RPO ≤ 1 min, RTO ≤ 5 min | 8-12 | DevOps/SRE |
-| **IR-AMRO-001** | Version REST/GraphQL APIs with SemVer, maintain N, N-1, N-2 compatibility | 3-13 | Backend |
-| **IR-AMRO-002** | Use Kafka/MQTT choreography with idempotent consumers | 2-5 | Backend |
-| **IR-AMRO-003** | Provide adapter pattern for SAP PM, IBM Maximo, Oracle EAM | 10-13 | Integration Architect |
-| **IR-AMRO-004** | Support ATA Spec 100 legacy / iSpec 2200 import/export mappings | 10-13 | Integration |
-
-### 3.2 Timeline Roadmap
-
-```
-Week 1-2:   M0 - Foundation
-├─ Schema setup (hybrid operational + audit)
-├─ API scaffolding, CI/CD pipeline
-├─ Event bus and mobile framework
-└─ Exit Criteria: Core data model validated, pipelines working
-
-Week 3-6:   M1a - Core Workflows
-├─ Work order CRUD + status flow
-├─ Planning engine (labor + materials)
-├─ Task execution with e-signatures
-├─ Component traceability
-├─ Offline sync foundation
-└─ Exit Criteria: End-to-end workflow functional
-
-Week 6-8:   M1b - Compliance & Scheduling
-├─ Certifying staff matrix enforcement
-├─ Immutable audit records
-├─ Constrained scheduling engine
-├─ AD/SB workflow
-├─ MEL/CDL dispatch rules
-└─ Exit Criteria: Regulatory controls tested, scheduling optimized
-
-Week 7-10:  M2 - Performance & Resilience
-├─ Load testing (10K users, 5K TPS)
-├─ Autoscaling setup
-├─ Disaster recovery setup
-├─ Offline conflict resolution
-├─ Observability + alerting
-└─ Exit Criteria: 99.99% HA achieved, DR RTO < 5 min
-
-Week 10-12: M3 - Integration & Hardening
-├─ SAP/Maximo/Oracle adapters
-├─ Compliance-as-code policy framework
-├─ Mobile optimization
-├─ Security audit
-└─ Exit Criteria: APIs stable, external integrations tested
-
-Week 12-13: Testing & Release Prep
-├─ Full regression suite
-├─ Aviation scenario tests
-├─ Compliance validation
-├─ Operations runbooks
-└─ Exit Criteria: 90%+ tests pass, zero critical failures, ready for early customers
+```text
+┌───────────────────────────────────────────────────────────────────────────────┐
+│ WO-2026-00091 [Status Chip] [Assign] [Schedule] [Close Package]              │
+├───────────────────────────────────────────┬───────────────────────────────────┤
+│ Left: Overview, Tasks, Materials, Notes   │ Right: Activity and Audit Feed    │
+│ - Aircraft and source references           │ - Sign-offs                        │
+│ - Labor and downtime plan                  │ - Overrides                         │
+│ - Qualification gate checks                │ - Evidence timeline                 │
+└───────────────────────────────────────────┴───────────────────────────────────┘
 ```
 
-### 3.3 Competitive Differentiation
+#### Mobile Task Execution Card
 
-**vs. AMOS:**
-- ✅ Modern UX + mobile-first (AMOS legacy)
-- ✅ Logistics integration (AMOS EAM-focused)
-- ⚠️ Compliance depth comparable
+```text
+┌──────────────────────────────┐
+│ Task 12/40  [In Progress]    │
+├──────────────────────────────┤
+│ Procedure Ref: ATA 27-30-01  │
+│ Step checklist               │
+│ [ ] Step A                   │
+│ [ ] Step B                   │
+│ Evidence                     │
+│ [Add Photo] [Add Note]       │
+│ Sign-off                     │
+│ [PIN] [Digital Signature]    │
+│ [Save Offline] [Submit]      │
+└──────────────────────────────┘
+```
 
-**vs. Maintenix:**
-- ✅ Cloud-native from day 1 (Maintenix heavy)
-- ✅ Mobile offline execution (Maintenix connectivity-dependent)
-- ✅ Parts visibility + ETA (Maintenix planning-focused)
+### 3.4 Interaction Flows
 
-**vs. Ramco:**
-- ✅ Logistics integration (Ramco flight-focused)
-- ✅ Compliance-as-code (Ramco hardcoded)
-- ⚠️ Mobile execution comparable
+#### Work Package Lifecycle Flow
 
-**Nexus-AI Unique:**
-- ✅ **Integrated supply chain** — Work order triggers parts reservation, shows supplier ETA, suggests alternatives
-- ✅ **Offline-first mobile** — Full task execution offline; deterministic conflict resolution on sync
-- ✅ **Compliance-as-code** — Rules in JSON/YAML; audit teams update without engineer help
-- ✅ **Event-driven integration** — ERP, legacy systems, external feeds all consume/produce events
+```mermaid
+flowchart LR
+  A[Create Work Package] --> B[Plan Labor and Materials]
+  B --> C[Assign and Schedule]
+  C --> D[Task Execution]
+  D --> E[Quality and Certifying Checks]
+  E --> F[Close Package]
+  F --> G[Immutable Audit Record]
+```
 
----
+#### Offline Task Execution and Sync
 
-## 4. Risk Assessment & Mitigation
+```mermaid
+flowchart LR
+  A[Open Task Card] --> B[Capture Steps and Evidence Offline]
+  B --> C[Local Signed Event Queue]
+  C --> D[Reconnect]
+  D --> E[Conflict Resolver]
+  E --> F[Persist Canonical State]
+  F --> G[Append Audit Trail]
+```
 
-### 4.1 Critical Risks
+### 3.5 Design Patterns and Component Library
 
-| Risk | Probability | Impact | Mitigation |
-|---|---|---|---|
-| **Offline conflict resolution complexity** | Medium | High | Prototype week 1-2; use Lamport clocks + event timestamps; if too complex, defer full offline to Phase B (ship online-first) |
-| **Scheduling optimization performance** | Medium | High | Use CPLEX or OR-Tools library; test with 1000+ aircraft; have greedy fallback if optimization too slow |
-| **AD/SB feed integration delays** | Medium | Medium | Mock FAA feed in week 5; real feed optional for pilot (Phase B hardening) |
-| **Performance bottleneck under load** | Medium | High | Load test weekly starting week 7; have caching strategy (Redis, CDN) ready |
-| **Regulatory approval timeline** | Low | Critical | Start compliance documentation week 1; engage legal/compliance early (week 4) |
-| **Resource unavailability** | Low | High | Keep 10% schedule buffer; cross-train team members |
+| Pattern | Purpose | AMRO Usage |
+|---|---|---|
+| Control Panel Pattern | Unified module actions and filtering | AMRO list, board, and analytics pages |
+| Sheet + Activity Feed Pattern | Dense form plus timeline context | Work package detail page |
+| Kanban Card Pattern | Pipeline visualization with drag transitions | Work package status board |
+| Step Wizard Pattern | Procedure execution with verification | Mobile and desktop task execution |
+| Evidence Capture Pattern | File, note, and checklist provenance | Task completion and closure gates |
+| Compliance Gate Pattern | Hard stop validations before release | Work package close workflow |
 
-### 4.2 Contingency Actions
-
-**If any critical gap slips (by week 10):**
-1. Defer **FR-AMRO-028 (AR-assisted procedures)** to Phase B
-2. Defer **advanced analytics** to Phase B
-3. Reduce **MEL/CDL complexity** to basic constraint checks (full logic in Phase B)
-4. Ship **constrained scheduling as greedy heuristic** (full optimization in Phase B)
-
----
-
-## 5. Success Criteria & Acceptance
-
-### 5.1 Pilot Exit Criteria (Week 13)
-
-**Functional:**
-- ✅ Technician can create, plan, execute, and close a maintenance work order end-to-end
-- ✅ Task execution with e-signature and evidence capture works on mobile (online and offline)
-- ✅ Component traceability shows install/remove history and LLP status
-- ✅ Certifying staff checks enforce role/scope correctly
-- ✅ Audit trail captures all sign-offs and overrides
-- ✅ Scheduling algorithm produces bay/slot assignments without conflicts
-
-**Compliance:**
-- ✅ Immutable records pass tamper-evident test (no updates possible)
-- ✅ Offline sync resolves conflicts without data loss or duplicate side effects
-- ✅ AD/SB workflows capture applicability and compliance evidence
-- ✅ MEL/CDL rules enforce dispatch constraints (with auditable deferrals)
-
-**Performance:**
-- ✅ p99 latency ≤ 1s under 10K concurrent users, 5K TPS
-- ✅ Autoscaling from 10 to 500 nodes completes in < 3 minutes
-- ✅ 99.99% uptime SLO met during 4-week pilot run
-- ✅ DR failover completes in < 5 minutes (automated)
-
-**Quality:**
-- ✅ ≥ 90% test pass rate (unit + integration + compliance scenarios)
-- ✅ Zero critical security findings (OWASP Top-10 validated)
-- ✅ Zero critical compliance failures (audit trail, role enforcement validated)
-
-**Integration:**
-- ✅ REST/GraphQL APIs versioned and backward-compatible
-- ✅ Kafka event stream producing work-order events with deduplication
-- ✅ SAP/Maximo adapter stub in place (full implementation Phase B)
+| Component Group | Base Components | AMRO Extensions |
+|---|---|---|
+| Layout | `DashboardLayout` | AMRO module containers and route shell |
+| Navigation | Header actions, search, filters | AMRO-specific action sets and saved views |
+| Data Display | Table, cards, badges, tabs | Work package list, kanban, task cards |
+| Forms | Inputs, selects, date-time controls | Qualification checks and sign-off forms |
+| Timeline | Activity feed components | Audit replay and evidence timeline |
+| Feedback | Toasts, inline validation, skeletons | Compliance gate failures and sync states |
 
 ---
 
-## 6. Resource Plan
+## 4. Comprehensive Traceability Matrix
 
-### 6.1 Team Structure (13 weeks)
+### 4.1 Requirement and Source Index
 
-**Backend Team (2 engineers + 1 architect):**
-- Week 1-2: Schema design, API scaffolding, event setup
-- Week 3-8: Core workflows (work order, planning, execution, offline sync)
-- Week 6-10: Regulatory workflows (AD/SB, MEL/CDL, scheduling)
-- Week 10-13: Integration, hardening, testing
+| Requirement ID | Requirement Summary | Source Document |
+|---|---|---|
+| FR-AMRO-001 | Create work orders from defects/checks/regulatory sources | AMRO Requirements v1.0 |
+| FR-AMRO-002 | Plan labor, materials, and downtime | AMRO Requirements v1.0 |
+| FR-AMRO-003 | Schedule work packages with constraints | AMRO Requirements v1.0 |
+| FR-AMRO-004 | Execute digital task cards with e-signature and evidence | AMRO Requirements v1.0 |
+| FR-AMRO-005 | Closure gate before release | AMRO Requirements v1.0 |
+| FR-AMRO-011 | Offline cache and secure local execution | AMRO Requirements v1.0 |
+| FR-AMRO-012 | Deterministic offline conflict resolution | AMRO Requirements v1.0 |
+| FR-AMRO-016 | AD/SB ingestion and compliance closure | AMRO Requirements v1.0 |
+| FR-AMRO-017 | MEL/CDL deferral control | AMRO Requirements v1.0 |
+| FR-AMRO-018 | Certifying privilege checks | AMRO Requirements v1.0 |
+| FR-AMRO-019 | Component traceability and LLP tracking | AMRO Requirements v1.0 |
+| FR-AMRO-020 | Line/base maintenance separation | AMRO Requirements v1.0 |
+| FR-AMRO-026 | Immutable maintenance records | AMRO Requirements v1.0 |
+| NFR-AMRO-001 | Scale and latency targets | AMRO Requirements v1.0 |
+| NFR-AMRO-003 | Availability and recovery objectives | AMRO Requirements v1.0 |
+| NFR-AMRO-004 | Security and encryption controls | AMRO Requirements v1.0 |
+| NFR-AMRO-005 | RBAC + ABAC policy model | AMRO Requirements v1.0 |
+| NFR-AMRO-009 | 10-year immutable retention and replay | AMRO Requirements v1.0 |
+| IR-AMRO-001 | API versioning and backward compatibility | AMRO Requirements v1.0 |
+| IR-AMRO-003 | ERP adapter pattern | AMRO Requirements v1.0 |
 
-**Mobile Team (1 engineer):**
-- Week 1-2: Mobile framework setup, offline storage design
-- Week 3-8: Task card UI, e-signature integration, evidence capture
-- Week 5-9: Offline sync, conflict resolution
-- Week 10-13: Mobile optimization, responsive design
+### 4.2 UI/UX Component Traceability Matrix
 
-**DevOps/SRE Team (1 SRE + 1 QA):**
-- Week 1-2: CI/CD pipeline, test scaffolding
-- Week 3-8: Infrastructure setup, monitoring, alerting
-- Week 7-12: Load testing, autoscaling, DR runbooks
-- Week 10-13: Security audit, compliance verification
-
-**Blended Cost Estimate:**
-- 4.5 FTE × 40 hrs/week × 13 weeks × $150/hr blended = **~$351K all-in**
+| UI/UX Element ID | Design Element | Requirement IDs | Technical Spec Linkage | Source Document | Implementation Status | Validation Criteria |
+|---|---|---|---|---|---|---|
+| UX-AMRO-001 | AMRO overview KPI header | FR-AMRO-001, NFR-AMRO-001 | Dashboard shell + AMRO metrics API | Design + Requirements | Pending | KPI load <1s and role-filtered values |
+| UX-AMRO-002 | Work package kanban board | FR-AMRO-003, FR-AMRO-005 | Kanban card and drag transition events | Design + Implementation Plan | Pending | Status transition rules and audit entry per move |
+| UX-AMRO-003 | Work package list grid | FR-AMRO-001, FR-AMRO-002 | Table with scoped filtering and pagination | Design + Requirements | Pending | Filter accuracy, saved views, keyboard support |
+| UX-AMRO-004 | Work package creation drawer | FR-AMRO-001, FR-AMRO-020 | Form schema, validation, source mapping | Design + Requirements | Pending | Required fields, defaults, tenant-scoped create |
+| UX-AMRO-005 | Work package detail sheet | FR-AMRO-002, FR-AMRO-005 | Sheet layout + tab routing | Design + Implementation Plan | Pending | Tab persistence and no unsaved data loss |
+| UX-AMRO-006 | Task list in work package detail | FR-AMRO-004 | Task table and inline status updates | Design + API Spec | Pending | Step ordering and assignment integrity |
+| UX-AMRO-007 | Mobile task execution card | FR-AMRO-004, FR-AMRO-011 | Offline-safe form state and sync queue | Design + Requirements | Pending | Offline submit and later sync reconciliation |
+| UX-AMRO-008 | E-signature capture modal | FR-AMRO-004, NFR-AMRO-004 | Signature method domain + auth challenge | Design + Security Spec | Pending | Signature required for closure actions |
+| UX-AMRO-009 | Evidence upload and notes | FR-AMRO-004, FR-AMRO-026 | Media attachment and evidence metadata model | Design + API Spec | Pending | Evidence timestamping and actor attribution |
+| UX-AMRO-010 | Compliance gate dialog | FR-AMRO-005, FR-AMRO-018 | Blocking policy engine integration | Design + Requirements | Pending | Blocks closure when qualifications invalid |
+| UX-AMRO-011 | Materials allocation panel | FR-AMRO-002, FR-AMRO-019 | Work package materials APIs | Design + Requirements | Pending | Allocation totals and shortage indicators |
+| UX-AMRO-012 | Qualification status chips | FR-AMRO-018 | Qualification query + status rules | Design + Requirements | Pending | Expiry warning thresholds and action gating |
+| UX-AMRO-013 | Audit timeline viewer | FR-AMRO-026, NFR-AMRO-009 | `mro_audit` query model and timeline UI | Design + Implementation Reference | In progress | Strict chronological replay and immutable markers |
+| UX-AMRO-014 | Compliance replay filters | FR-AMRO-016, FR-AMRO-017 | Filter presets and export actions | Design + Requirements | Pending | Filter reproducibility and export consistency |
+| UX-AMRO-015 | Offline sync status banner | FR-AMRO-011, FR-AMRO-012 | Sync engine state and conflict outcomes | Design + Mobile Spec | Pending | Accurate queue count and conflict state visibility |
+| UX-AMRO-016 | API/UX error fallback states | NFR-AMRO-003, NFR-AMRO-004 | Error boundaries + toast strategy | Design + Platform Standards | In progress | User-safe retries and no sensitive data exposure |
+| UX-AMRO-017 | Role-aware action menu | NFR-AMRO-005 | Permission matrix in client and API | Design + Security Spec | Pending | Hidden/disabled actions by role context |
+| UX-AMRO-018 | Export and reporting controls | FR-AMRO-016, IR-AMRO-001 | Report jobs and versioned export formats | Design + Requirements | Pending | Format validity and scoped data exports |
+| UX-AMRO-019 | Scheduler board workspace | FR-AMRO-003 | Constraint visuals and slot assignments | Design + Implementation Plan | Pending | No overlapping slot assignments |
+| UX-AMRO-020 | Future ERP integration panel | IR-AMRO-003 | Adapter status view and retry controls | Design + Integration Plan | Pending | Adapter state accuracy and resilient retries |
 
 ---
 
-## 7. Next Steps
+## 5. Phase-Wise Implementation Plan
 
-1. **Approval & Stakeholder Sign-Off** — This design requires approval from:
-   - Engineering Lead (architecture + integration)
-   - Product Owner (scope + timeline)
-   - Compliance Officer (regulatory coverage)
-   - Operations Lead (infrastructure + support)
+### Phase 1: Core UI Components and Basic User Flows
 
-2. **Detailed Implementation Plan** — Create sprint-level breakdown with:
-   - API contract definitions
-   - Data migration strategy
-   - Testing matrix (unit + integration + compliance scenarios)
-   - Feature flag rollout plan
+**Scope**
+- AMRO route shell, overview dashboard, work package list and detail baseline
+- Core task listing and basic status transitions
+- Initial role-aware action visibility
 
-3. **Repository & Tooling Setup** — Prepare:
-   - Git branch/worktree for AMRO development
-   - CI/CD pipeline for AMRO services
-   - Test environment setup (staging with realistic data)
+**Primary deliverables**
+- UX-AMRO-001 to UX-AMRO-006
+- Base AMRO module navigation and layout
+- End-to-end create-plan-view work package flow
 
-4. **Kick-Off & Team Mobilization** — Schedule:
-   - Architecture review (Week 0)
-   - Team onboarding (Week 1)
-   - Sprint planning (Week 1-2)
+**Exit criteria**
+- Users can create and manage work packages with tenant isolation
+- Basic UI test suite and API integration checks pass
+
+### Phase 2: Advanced Features and Complex Interactions
+
+**Scope**
+- Mobile task execution, offline queueing, e-signature, evidence capture
+- Compliance gates, materials planning panel, qualification checks
+- Scheduler board and advanced interaction states
+
+**Primary deliverables**
+- UX-AMRO-007 to UX-AMRO-015 and UX-AMRO-019
+- Offline sync flow with conflict resolution UI
+- Closure gate with blocking validations
+
+**Exit criteria**
+- Offline-to-online execution flow validated
+- Compliance blocks enforce certifying and material prerequisites
+
+### Phase 3: Optimization, Accessibility, and Performance Enhancements
+
+**Scope**
+- Accessibility remediation, keyboard-first interactions, focus order, contrast hardening
+- Performance tuning for board and list rendering at high volume
+- Error recovery and retry patterns
+
+**Primary deliverables**
+- UX-AMRO-016, UX-AMRO-017, targeted optimizations across all prior elements
+- WCAG-focused test coverage and UI performance baselines
+
+**Exit criteria**
+- Accessibility validation passed for critical workflows
+- p95/p99 UI interaction performance targets achieved in staging
+
+### Phase 4: Future Enhancements and Scalability Considerations
+
+**Scope**
+- ERP adapter UX, advanced reporting, predictive maintenance surfaces
+- Cross-module interoperability with logistics and finance
+- Scalable extension points and feature-flagged rollout architecture
+
+**Primary deliverables**
+- UX-AMRO-018 and UX-AMRO-020
+- Extensibility hooks for integrations and analytics
+
+**Exit criteria**
+- Adapter control plane available
+- Documented and tested extension APIs for future AMRO capabilities
 
 ---
 
-## Document Control
+## 6. Implementation Status Tracking
 
-| Version | Date | Author | Status |
-|---|---|---|---|
-| 1.0.0 | 2026-03-19 | AI-Assisted Brainstorm | Approved for Implementation |
+### 6.1 Completed Implementations
 
-**Sign-Off:**
+| Element | Version | Deployment Date | Evidence | Notes |
+|---|---|---|---|---|
+| AMRO operational schema foundation | v0.1.0-db | 2026-03-19 | Migration `20260319143000` | Core tables, domain types, RLS policies |
+| Immutable audit schema foundation | v0.1.1-db | 2026-03-19 | Migration `20260319143100` | Append-only audit records and trails |
+| AMRO API service scaffold | v0.2.0-api | 2026-03-19 | Implementation reference M0-3 | Work package and task CRUD endpoints |
+| AMRO event stream baseline | v0.2.1-api | 2026-03-19 | Implementation reference M0-4 | Kafka event publication for AMRO lifecycle |
+
+### 6.2 Work in Progress
+
+| Element | Current Status | Owner Group | Blockers | Next Milestone |
+|---|---|---|---|---|
+| Audit timeline viewer (UX-AMRO-013) | Backend and UI binding in progress | Backend + Frontend | Timeline pagination and replay filtering | Phase 2 completion |
+| Error fallback states (UX-AMRO-016) | Standardized error envelope active; UI fallback alignment pending | Frontend | Consistent UX mapping per API code | Phase 3 completion |
+
+### 6.3 Pending Implementations
+
+| Element ID | Priority | Estimated Effort | Dependencies | Planned Phase |
+|---|---|---|---|---|
+| UX-AMRO-001 | High | 3 engineer-days | Metrics endpoint readiness | Phase 1 |
+| UX-AMRO-002 | High | 6 engineer-days | Status policy service, drag API | Phase 1 |
+| UX-AMRO-004 | High | 4 engineer-days | Work package create endpoint hardening | Phase 1 |
+| UX-AMRO-007 | High | 8 engineer-days | Mobile offline storage and sync APIs | Phase 2 |
+| UX-AMRO-008 | High | 5 engineer-days | Signature provider and auth challenge flow | Phase 2 |
+| UX-AMRO-010 | High | 4 engineer-days | Compliance gate service integration | Phase 2 |
+| UX-AMRO-015 | Medium | 4 engineer-days | Conflict resolution API events | Phase 2 |
+| UX-AMRO-019 | High | 7 engineer-days | Scheduling engine output contract | Phase 2 |
+| UX-AMRO-018 | Medium | 5 engineer-days | Reporting jobs and export formats | Phase 4 |
+| UX-AMRO-020 | Medium | 6 engineer-days | ERP adapter orchestration service | Phase 4 |
+
+---
+
+## 7. Step-by-Step Implementation Instructions
+
+### 7.1 Standard Engineering Checklist for Every UI/UX Component
+
+1. Confirm traceability mapping entry (UI element ID, requirement IDs, validation criteria).  
+2. Define API contract and state model changes using additive compatibility rules.  
+3. Implement UI component with role-aware controls and tenant-safe data access.  
+4. Integrate with existing platform shell and AMRO route conventions.  
+5. Add automated tests for rendering, behavior, access control, and failure states.  
+6. Run lint, typecheck, and module-specific tests before merge.  
+7. Prepare deployment with feature flag and rollback script path.  
+8. Update this document with version, status, and validation evidence.
+
+### 7.2 Technical Specifications and Coding Standards
+
+- Use existing platform component primitives and naming conventions
+- Preserve strict tenant and franchise scoping behavior in all data operations
+- Enforce typed contracts across UI, API clients, and backend responses
+- Use explicit loading, empty, error, and retry states on all AMRO screens
+- Keep audit-significant actions deterministic and idempotent
+
+### 7.3 Integration Requirements with Existing Platform
+
+- Use platform dashboard shell and route hierarchy
+- Reuse platform auth context and role permissions
+- Integrate with versioned AMRO API endpoints only
+- Publish UI-significant lifecycle changes to AMRO event topics when required
+- Respect existing backward compatibility policies for APIs and schema changes
+
+### 7.4 Testing Procedures and Acceptance Criteria
+
+- Unit tests for component rendering and interaction state transitions
+- Integration tests for API binding, role constraints, and data scope filters
+- End-to-end tests for critical flows: create-plan-execute-close and audit replay
+- Accessibility checks on keyboard navigation, focus order, and contrast
+- Acceptance criteria pass only when traceability validation criteria are met
+
+### 7.5 Deployment Procedures and Rollback Plans
+
+- Deploy behind feature flag for nontrivial UI behavior
+- Verify migration and API compatibility in staging before production rollout
+- Promote in controlled waves by tenant cohort where required
+- Rollback path: disable feature flag, revert UI bundle, preserve additive DB state
+- Post-deploy: validate KPIs, error budgets, and audit integrity checks
+
+---
+
+## 8. Future Development Guidelines
+
+### 8.1 Extensibility and Modular Design
+
+- Implement AMRO features as modular route-level packages with explicit boundaries
+- Keep domain UI components independent of logistics/CRM specifics
+- Prefer composition over inheritance for reusable AMRO widgets
+- Expose extension points through typed configuration and event contracts
+
+### 8.2 Technology Roadmap and Upgrade Paths
+
+| Horizon | Upgrade Focus | Outcome |
+|---|---|---|
+| Near-term | Scheduler UX, mobile offline hardening, compliance replay | Phase 2 completion |
+| Mid-term | Performance optimization and accessibility certification | Phase 3 completion |
+| Long-term | ERP control plane, predictive insights, cross-domain analytics | Phase 4 and beyond |
+
+### 8.3 Design System Maintenance Procedures
+
+- Maintain AMRO component catalog with semantic versioning
+- Track visual and interaction changes through changelog entries
+- Run regression visual tests for shared components before release
+- Review reusable patterns quarterly with design and engineering
+
+### 8.4 Version Control and Documentation Update Protocol
+
+- Every AMRO implementation change must include:
+  - Updated traceability row(s)
+  - Updated status row(s) with version and date
+  - Validation evidence reference
+- Documentation updates are required in the same pull request as feature changes
+- Breaking behavior proposals require architecture review before implementation
+
+---
+
+## 9. Governance, Review, and Approval Workflow
+
+### 9.1 Mandatory Approval Gate
+
+No AMRO phase implementation begins until this document version is reviewed and approved by all required stakeholders.
+
+### 9.2 Stakeholder Review Matrix
+
+| Stakeholder | Responsibility | Review Status | Approval Status | Date |
+|---|---|---|---|---|
+| Engineering Lead | Architecture and technical feasibility | Pending | Pending | — |
+| Product Owner | Scope and UX priorities | Pending | Pending | — |
+| Compliance Officer | Regulatory and audit requirements | Pending | Pending | — |
+| Operations Lead | Release, observability, and rollback readiness | Pending | Pending | — |
+
+### 9.3 Review Checklist
+
+- Architecture consistency with platform constraints
+- UI/UX consistency with design system and accessibility goals
+- Requirement coverage and traceability completeness
+- Validation criteria testability
+- Deployment and rollback readiness
+
+---
+
+## 10. Document Control
+
+| Version | Date | Author | Change Summary | Status |
+|---|---|---|---|---|
+| 1.0.0 | 2026-03-19 | AI-Assisted Design Session | Initial AMRO plugin design baseline | Superseded |
+| 2.0.0 | 2026-03-19 | AMRO Architecture Working Group | Master design reference with full UI/UX, traceability, phased plan, status tracking, and governance | Draft for Review |
+
+**Sign-Off**
 - [ ] Engineering Lead
 - [ ] Product Owner
 - [ ] Compliance Officer

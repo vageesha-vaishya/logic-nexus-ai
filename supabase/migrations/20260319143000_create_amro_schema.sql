@@ -11,29 +11,89 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- ============================================================================
 -- DOMAIN TYPES - Reusable enums to prevent hardcoded magic values
 -- ============================================================================
--- Aircraft operational status
-CREATE DOMAIN IF NOT EXISTS aircraft_status AS text CHECK (VALUE IN ('active', 'maintenance', 'grounded', 'retired', 'storage'));
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_type t
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'aircraft_status'
+      AND n.nspname = 'public'
+  ) THEN
+    CREATE DOMAIN public.aircraft_status AS text CHECK (VALUE IN ('active', 'maintenance', 'grounded', 'retired', 'storage'));
+  END IF;
 
--- Component lifecycle status
-CREATE DOMAIN IF NOT EXISTS component_status AS text CHECK (VALUE IN ('installed', 'removed', 'repair_queue', 'under_repair', 'awaiting_installation', 'condemned', 'obsolete'));
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_type t
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'component_status'
+      AND n.nspname = 'public'
+  ) THEN
+    CREATE DOMAIN public.component_status AS text CHECK (VALUE IN ('installed', 'removed', 'repair_queue', 'under_repair', 'awaiting_installation', 'condemned', 'obsolete'));
+  END IF;
 
--- Work package classification types
-CREATE DOMAIN IF NOT EXISTS maintenance_type AS text CHECK (VALUE IN ('line', 'base', 'component', 'inspection', 'overhaul', 'repair', 'upgrade', 'modification'));
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_type t
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'maintenance_type'
+      AND n.nspname = 'public'
+  ) THEN
+    CREATE DOMAIN public.maintenance_type AS text CHECK (VALUE IN ('line', 'base', 'component', 'inspection', 'overhaul', 'repair', 'upgrade', 'modification'));
+  END IF;
 
--- Work package status tracking
-CREATE DOMAIN IF NOT EXISTS work_package_status AS text CHECK (VALUE IN ('planning', 'approved', 'scheduled', 'in_progress', 'on_hold', 'completed', 'closed', 'cancelled'));
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_type t
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'work_package_status'
+      AND n.nspname = 'public'
+  ) THEN
+    CREATE DOMAIN public.work_package_status AS text CHECK (VALUE IN ('planning', 'approved', 'scheduled', 'in_progress', 'on_hold', 'completed', 'closed', 'cancelled'));
+  END IF;
 
--- Individual task status within work packages
-CREATE DOMAIN IF NOT EXISTS task_status AS text CHECK (VALUE IN ('pending', 'not_started', 'in_progress', 'on_hold', 'completed', 'rework_required', 'cancelled'));
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_type t
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'task_status'
+      AND n.nspname = 'public'
+  ) THEN
+    CREATE DOMAIN public.task_status AS text CHECK (VALUE IN ('pending', 'not_started', 'in_progress', 'on_hold', 'completed', 'rework_required', 'cancelled'));
+  END IF;
 
--- Material/part status in work packages
-CREATE DOMAIN IF NOT EXISTS material_status AS text CHECK (VALUE IN ('pending', 'ordered', 'received', 'installed', 'cancelled', 'returned'));
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_type t
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'material_status'
+      AND n.nspname = 'public'
+  ) THEN
+    CREATE DOMAIN public.material_status AS text CHECK (VALUE IN ('pending', 'ordered', 'received', 'installed', 'cancelled', 'returned'));
+  END IF;
 
--- Material action types
-CREATE DOMAIN IF NOT EXISTS material_action AS text CHECK (VALUE IN ('install', 'remove', 'inspect', 'repair'));
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_type t
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'material_action'
+      AND n.nspname = 'public'
+  ) THEN
+    CREATE DOMAIN public.material_action AS text CHECK (VALUE IN ('install', 'remove', 'inspect', 'repair'));
+  END IF;
 
--- Digital signature methods
-CREATE DOMAIN IF NOT EXISTS signature_method AS text CHECK (VALUE IN ('digital', 'pin', 'biometric'));
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_type t
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'signature_method'
+      AND n.nspname = 'public'
+  ) THEN
+    CREATE DOMAIN public.signature_method AS text CHECK (VALUE IN ('digital', 'pin', 'biometric'));
+  END IF;
+END
+$$;
 
 -- ============================================================================
 -- RLS POLICY HELPER PATTERN DOCUMENTATION
@@ -139,7 +199,7 @@ CREATE TABLE IF NOT EXISTS public.components (
 
   -- Current location and assignment
   location text,
-  work_package_id uuid REFERENCES public.work_packages(id) ON DELETE SET NULL,
+  work_package_id uuid,
 
   -- Timestamps and audit
   created_at timestamptz NOT NULL DEFAULT now(),
@@ -214,6 +274,13 @@ CREATE INDEX IF NOT EXISTS idx_work_packages_work_order_number ON public.work_pa
 CREATE INDEX IF NOT EXISTS idx_work_packages_status ON public.work_packages(status);
 CREATE INDEX IF NOT EXISTS idx_work_packages_assigned_to ON public.work_packages(assigned_to);
 CREATE INDEX IF NOT EXISTS idx_work_packages_maintenance_type ON public.work_packages(maintenance_type);
+
+ALTER TABLE public.components
+  DROP CONSTRAINT IF EXISTS components_work_package_id_fkey;
+
+ALTER TABLE public.components
+  ADD CONSTRAINT components_work_package_id_fkey
+  FOREIGN KEY (work_package_id) REFERENCES public.work_packages(id) ON DELETE SET NULL;
 
 -- ============================================================================
 -- 4. TASKS TABLE - Individual maintenance tasks within work packages

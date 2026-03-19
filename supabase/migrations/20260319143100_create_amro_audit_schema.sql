@@ -9,72 +9,104 @@
 -- DOMAIN TYPES FOR AUDIT SCHEMA
 -- ============================================================================
 
--- Record type classification (what audit event type)
-CREATE DOMAIN IF NOT EXISTS audit_record_type AS text CHECK (VALUE IN (
-  'aircraft_registration',
-  'aircraft_status_change',
-  'component_installation',
-  'component_removal',
-  'component_repair',
-  'maintenance_completion',
-  'maintenance_sign_off',
-  'work_package_approval',
-  'task_assignment',
-  'task_completion',
-  'quality_inspection',
-  'deviation_logged',
-  'maintenance_release',
-  'system_action'
-));
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_type t
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'audit_record_type'
+      AND n.nspname = 'public'
+  ) THEN
+    CREATE DOMAIN public.audit_record_type AS text CHECK (VALUE IN (
+      'aircraft_registration',
+      'aircraft_status_change',
+      'component_installation',
+      'component_removal',
+      'component_repair',
+      'maintenance_completion',
+      'maintenance_sign_off',
+      'work_package_approval',
+      'task_assignment',
+      'task_completion',
+      'quality_inspection',
+      'deviation_logged',
+      'maintenance_release',
+      'system_action'
+    ));
+  END IF;
 
--- Event type for compliance trails
-CREATE DOMAIN IF NOT EXISTS audit_event_type AS text CHECK (VALUE IN (
-  'aircraft_registered',
-  'aircraft_grounded',
-  'aircraft_released',
-  'component_replaced',
-  'component_repaired',
-  'component_inspected',
-  'work_package_created',
-  'work_package_scheduled',
-  'work_package_completed',
-  'maintenance_approved',
-  'maintenance_signed_off',
-  'quality_checked',
-  'defect_logged',
-  'maintenance_released',
-  'compliance_check',
-  'audit_event',
-  'system_event'
-));
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_type t
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'audit_event_type'
+      AND n.nspname = 'public'
+  ) THEN
+    CREATE DOMAIN public.audit_event_type AS text CHECK (VALUE IN (
+      'aircraft_registered',
+      'aircraft_grounded',
+      'aircraft_released',
+      'component_replaced',
+      'component_repaired',
+      'component_inspected',
+      'work_package_created',
+      'work_package_scheduled',
+      'work_package_completed',
+      'maintenance_approved',
+      'maintenance_signed_off',
+      'quality_checked',
+      'defect_logged',
+      'maintenance_released',
+      'compliance_check',
+      'audit_event',
+      'system_event'
+    ));
+  END IF;
 
--- Actor role classification
-CREATE DOMAIN IF NOT EXISTS audit_actor_role AS text CHECK (VALUE IN (
-  'technician',
-  'mechanic',
-  'inspector',
-  'quality_assurance',
-  'supervisor',
-  'maintenance_manager',
-  'operations_manager',
-  'system',
-  'api',
-  'scheduler',
-  'scheduler_system'
-));
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_type t
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'audit_actor_role'
+      AND n.nspname = 'public'
+  ) THEN
+    CREATE DOMAIN public.audit_actor_role AS text CHECK (VALUE IN (
+      'technician',
+      'mechanic',
+      'inspector',
+      'quality_assurance',
+      'supervisor',
+      'maintenance_manager',
+      'operations_manager',
+      'system',
+      'api',
+      'scheduler',
+      'scheduler_system'
+    ));
+  END IF;
 
--- Entity type for audit trail
-CREATE DOMAIN IF NOT EXISTS audit_entity_type AS text CHECK (VALUE IN (
-  'aircraft',
-  'component',
-  'work_package',
-  'task',
-  'staff_qualification',
-  'maintenance_event',
-  'system_config',
-  'user_action',
-  'batch_operation'
-));
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_type t
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE t.typname = 'audit_entity_type'
+      AND n.nspname = 'public'
+  ) THEN
+    CREATE DOMAIN public.audit_entity_type AS text CHECK (VALUE IN (
+      'aircraft',
+      'component',
+      'work_package',
+      'task',
+      'staff_qualification',
+      'maintenance_event',
+      'system_config',
+      'user_action',
+      'batch_operation'
+    ));
+  END IF;
+END
+$$;
 
 -- ============================================================================
 -- CREATE AUDIT SCHEMA
