@@ -71,6 +71,9 @@ const tenantSchema = z.object({
   support_escalation_level: z.string().optional(),
   selected_plan_id: z.string().optional(),
   selected_billing_period: z.string().optional(),
+  plan_status: z.string().optional(),
+  plan_max_user: z.string().optional(),
+  plan_max_franchise: z.string().optional(),
   requested_user_count: z.string().optional(),
   requested_franchise_count: z.string().optional(),
   payment_provider: z.string().optional(),
@@ -88,14 +91,14 @@ const tenantSchema = z.object({
   if (!requestedUsers) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      message: 'Requested users is required',
+      message: 'Actual max user is required',
       path: ['requested_user_count'],
     });
   }
   if (!requestedFranchises) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      message: 'Requested franchises is required',
+      message: 'Actual max franchise is required',
       path: ['requested_franchise_count'],
     });
   }
@@ -122,6 +125,7 @@ interface SubscriptionPlan {
   user_scaling_factor?: number | null;
   min_users?: number | null;
   max_users?: number | null;
+  max_franchise?: number | null;
 }
 
 interface ActiveSubscription {
@@ -264,23 +268,27 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
 
     const { data: createdSubscription, error: subscriptionError } = await scopedDb
       .from('tenant_subscriptions')
-      .insert({
-        tenant_id: tenantId,
-        plan_id: selectedPlan.id,
-        status: isFreePlan ? 'active' : 'trial',
-        current_period_start: nowIso,
-        current_period_end: periodEndIso,
-        metadata: {
-          source: 'tenant_onboarding_phase2',
-          billing_period: billingPeriod,
-          payment_provider: paymentProvider,
-          payment_status: isFreePlan ? 'not_required' : 'pending',
-          requested_user_count: requestedUserCount,
-          requested_franchise_count: requestedFranchiseCount,
-          plan_slug: selectedPlan.slug,
-          plan_tier: selectedPlan.tier,
+      .upsert(
+        {
+          tenant_id: tenantId,
+          plan_id: selectedPlan.id,
+          status: isFreePlan ? 'active' : 'trial',
+          current_period_start: nowIso,
+          current_period_end: periodEndIso,
+          canceled_at: null,
+          metadata: {
+            source: 'tenant_onboarding_phase2',
+            billing_period: billingPeriod,
+            payment_provider: paymentProvider,
+            payment_status: isFreePlan ? 'not_required' : 'pending',
+            requested_user_count: requestedUserCount,
+            requested_franchise_count: requestedFranchiseCount,
+            plan_slug: selectedPlan.slug,
+            plan_tier: selectedPlan.tier,
+          },
         },
-      })
+        { onConflict: 'tenant_id,plan_id,status' }
+      )
       .select('id')
       .single();
 
@@ -822,7 +830,7 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
       try {
         const { data, error } = await scopedDb
           .from('subscription_plans', true)
-          .select('id, name, slug, description, tier, price_monthly, price_annual, currency, billing_period, is_active, user_scaling_factor, min_users, max_users')
+          .select('id, name, slug, description, tier, price_monthly, price_annual, currency, billing_period, is_active, user_scaling_factor, min_users, max_users, max_franchise')
           .eq('is_active', true)
           .eq('plan_type', 'crm_base')
           .order('price_monthly');
@@ -840,14 +848,13 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
   }, [scopedDb, toast]);
 
   useEffect(() => {
-    const loadActiveSubscription = async () => {
+    const loadLatestSubscription = async () => {
       if (!tenant?.id) return;
       try {
         const { data, error } = await scopedDb
           .from('tenant_subscriptions')
           .select('id, plan_id, status, metadata')
           .eq('tenant_id', tenant.id)
-          .eq('status', 'active')
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle();
@@ -856,10 +863,8 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
           const normalized = data as ActiveSubscription;
           setActiveSubscription(normalized);
           form.setValue('selected_plan_id', normalized.plan_id || '');
-          form.setValue('selected_billing_period', String((normalized.metadata as any)?.billing_period || 'monthly'));
+          form.setValue('plan_status', normalized.status || '');
           form.setValue('payment_provider', String((normalized.metadata as any)?.payment_provider || 'mock'));
-          form.setValue('requested_user_count', String((normalized.metadata as any)?.requested_user_count || ''));
-          form.setValue('requested_franchise_count', String((normalized.metadata as any)?.requested_franchise_count || ''));
         }
       } catch (error: any) {
         toast({
@@ -869,7 +874,7 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
         });
       }
     };
-    loadActiveSubscription();
+    loadLatestSubscription();
   }, [tenant?.id, scopedDb, toast]);
 
   const form = useForm<TenantFormValues>({
@@ -920,8 +925,11 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
       support_escalation_level: tenant?.settings?.support?.escalation_level || '',
       selected_plan_id: '',
       selected_billing_period: 'monthly',
-      requested_user_count: '',
-      requested_franchise_count: '',
+      plan_status: '',
+      plan_max_user: '',
+      plan_max_franchise: '',
+      requested_user_count: tenant?.max_users != null ? String(tenant.max_users) : '',
+      requested_franchise_count: tenant?.max_franchises != null ? String(tenant.max_franchises) : '',
       payment_provider: 'mock',
       verify_domain_immediately: true,
       login_template_name: 'Default Simple',
@@ -950,6 +958,21 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
         return selectedBillingPeriod === 'annual' ? scaled.annual_price : scaled.monthly_price;
       })()
     : null;
+
+  useEffect(() => {
+    if (!selectedPlanForPreview) {
+      form.setValue('plan_max_user', '');
+      form.setValue('plan_max_franchise', '');
+      return;
+    }
+    form.setValue('selected_billing_period', selectedPlanForPreview.billing_period || 'monthly');
+    const planMaxUser =
+      selectedPlanForPreview.max_users == null ? 'Unlimited' : String(selectedPlanForPreview.max_users);
+    const planMaxFranchise =
+      selectedPlanForPreview.max_franchise == null ? 'Unlimited' : String(selectedPlanForPreview.max_franchise);
+    form.setValue('plan_max_user', planMaxUser);
+    form.setValue('plan_max_franchise', planMaxFranchise);
+  }, [form, selectedPlanForPreview]);
 
   useEffect(() => {
     if (!tenantProfile) return;
@@ -1586,7 +1609,7 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
         </FormSection>
         <Separator />
         <FormSection title="Plan and Payment">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <FormField
               control={form.control}
               name="selected_plan_id"
@@ -1614,13 +1637,26 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
             />
             <FormField
               control={form.control}
+              name="plan_status"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Plan Status</FormLabel>
+                  <FormControl>
+                    <Input readOnly disabled placeholder="Not available" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
               name="selected_billing_period"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Billing Period</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value || 'monthly'}>
+                  <Select onValueChange={field.onChange} value={field.value || 'monthly'} disabled>
                     <FormControl>
-                      <SelectTrigger>
+                      <SelectTrigger disabled>
                         <SelectValue placeholder="Select billing period" />
                       </SelectTrigger>
                     </FormControl>
@@ -1640,7 +1676,7 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
               name="requested_user_count"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Requested Users *</FormLabel>
+                  <FormLabel>Actual Max User *</FormLabel>
                   <FormControl>
                     <Input type="number" min="0" placeholder="e.g. 25" {...field} />
                   </FormControl>
@@ -1653,7 +1689,7 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
               name="requested_franchise_count"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Requested Franchises *</FormLabel>
+                  <FormLabel>Actual Max Franchise *</FormLabel>
                   <FormControl>
                     <Input type="number" min="0" placeholder="e.g. 5" {...field} />
                   </FormControl>
@@ -1684,6 +1720,34 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
               )}
             />
           </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField
+              control={form.control}
+              name="plan_max_user"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Plan Max User</FormLabel>
+                  <FormControl>
+                    <Input readOnly disabled placeholder="Unlimited" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="plan_max_franchise"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Plan Max Franchise</FormLabel>
+                  <FormControl>
+                    <Input readOnly disabled placeholder="Unlimited" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
           {selectedPlanForPreview && (
             <div className="rounded-lg border p-4 text-sm">
               <div className="font-medium">{selectedPlanForPreview.name}</div>
@@ -1695,7 +1759,7 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
               )}
             </div>
           )}
-          {activeSubscription && (
+          {activeSubscription?.status === 'active' && (
             <div className="text-xs text-muted-foreground">
               Existing active subscription detected and will be replaced after confirmation.
             </div>
