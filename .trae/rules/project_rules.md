@@ -38,3 +38,10 @@
 - Require deprecation documentation with migration paths for every superseded method or endpoint.
 - Treat as breaking changes: removed/renamed API fields, destructive schema updates, incompatible UI workflow changes, or integration contract drift.
 - Require architecture review board sign-off, customer communication plan, and deprecation timeline for approved breaking changes.
+
+## MRO Artifact Governance
+- Use `artifacts/mro/` as the single root directory for all MRO project outputs.
+- Store crawler outputs under `artifacts/mro/crawler/` including JSON reports, summaries, screenshots, and storage states.
+- Store analysis and benchmark documents under `artifacts/mro/analysis/`.
+- Store exported inventories and derived datasets under `artifacts/mro/exports/`.
+- Do not create new MRO artifact directories outside `artifacts/mro/` unless explicitly approved.

@@ -1,0 +1,174 @@
+{
+  "runLabel": "mro-ui-crawler",
+  "auth": {
+    "baseUrl": "https://bytzsoft.in",
+    "loginPath": "/FlyPalDeccan/index.aspx",
+    "username": "dcplcamo-hyd",
+    "password": "Pass1234",
+    "tenantContext": "dcplcamo-hyd",
+    "usernameEnv": "MRO_USERNAME",
+    "passwordEnv": "MRO_PASSWORD",
+    "tenantEnv": "MRO_TENANT_CONTEXT",
+    "baseUrlEnv": "MRO_BASE_URL"
+  },
+  "timeouts": {
+    "navigationMs": 60000,
+    "actionMs": 25000,
+    "ajaxWaitMs": 5000,
+    "popupWaitMs": 4000
+  },
+  "retries": {
+    "maxAttempts": 3,
+    "initialDelayMs": 300,
+    "backoffMultiplier": 2
+  },
+  "limits": {
+    "maxDepth": 8,
+    "maxNodes": 800,
+    "maxActionsPerNode": 40,
+    "maxFailures": 120
+  },
+  "output": {
+    "directory": "artifacts/mro/crawler",
+    "captureScreenshotsOnFailure": true
+  },
+  "discovery": {
+    "seedPaths": [
+      "/FlyPalDeccan/wfAboutFlyPal.aspx",
+      "/FlyPalDeccan/wfDashBoard.aspx",
+      "/FlyPalDeccan/wfDefault.aspx",
+      "/FlyPalDeccan/wfFlightSearch.aspx",
+      "/FlyPalDeccan/wfReports.aspx",
+      "/FlyPalDeccan/wfManageBookings.aspx"
+    ],
+    "collectFromNetwork": true
+  },
+  "session": {
+    "reauthenticateOnLoginRedirect": true,
+    "maxReauthAttempts": 2
+  },
+  "rateLimit": {
+    "actionDelayMs": 300,
+    "jitterMs": 200
+  },
+  "verbosity": "info",
+  "selectors": {
+    "usernameInputs": [
+      "#txtUserName",
+      "input[name*='user' i]",
+      "input[id*='user' i]",
+      "input[type='text']"
+    ],
+    "tenantInputs": [
+      "input[name*='tenant' i]",
+      "input[id*='tenant' i]",
+      "#txtOTPUserName"
+    ],
+    "usernameNextButtons": [
+      "#lnkArrow",
+      "a[id*='arrow' i]",
+      "button:has-text('Next')",
+      "a:has-text('Next')"
+    ],
+    "passwordInputs": [
+      "#txtPassword",
+      "input[id*='password' i]:not([id*='otp' i])",
+      "input[name*='password' i]:not([name*='otp' i])",
+      "input[type='password']:not([id*='otp' i]):not([name*='otp' i])"
+    ],
+    "submitButtons": [
+      "#btnLogin",
+      "#btnDummyGenerateOTP",
+      "a[href*='btnLogin']",
+      "a:has-text('')",
+      "button:has-text('Login')",
+      "button:has-text('Sign In')",
+      "input[type='submit']",
+      "button[type='submit']"
+    ],
+    "navCandidates": [
+      "nav a",
+      "aside a",
+      "header a",
+      "main a",
+      "li > a",
+      "a.nav-link",
+      "a[role='menuitem']",
+      "[role='menuitem']",
+      "[role='menu'] [role='button']",
+      "[role='treeitem']",
+      "[role='link']",
+      "[aria-haspopup='menu']",
+      "[aria-haspopup='true']",
+      "[aria-controls]",
+      "button[aria-expanded]",
+      "[data-bs-toggle='dropdown']",
+      "[data-toggle='dropdown']",
+      ".menu a",
+      ".navbar a",
+      ".sidebar a",
+      ".dropdown-menu a",
+      ".dropdown-toggle",
+      ".hamburger",
+      ".mega-menu a",
+      ".context-menu a"
+    ],
+    "tabCandidates": [
+      "[role='tab']",
+      ".tab",
+      ".tabs [data-tab]",
+      ".nav-tabs a"
+    ],
+    "accordionCandidates": [
+      ".accordion button",
+      ".accordion [aria-controls]",
+      "[data-bs-toggle='collapse']",
+      "[aria-expanded]"
+    ],
+    "modalTriggers": [
+      "[data-bs-toggle='modal']",
+      "[aria-haspopup='dialog']",
+      "button:has-text('Open')",
+      "button:has-text('Add')",
+      "button:has-text('Create')"
+    ],
+    "modalCloseCandidates": [
+      "[data-bs-dismiss='modal']",
+      "button[aria-label='Close']",
+      ".modal .close",
+      ".dialog button:has-text('Close')",
+      ".dialog button:has-text('Cancel')"
+    ],
+    "expandCandidates": [
+      ".hamburger",
+      "[aria-label*='menu' i]",
+      "[class*='menu-toggle' i]",
+      "[data-bs-toggle='dropdown']",
+      "[data-bs-toggle='collapse']",
+      "[aria-expanded='false']",
+      ".collapsed",
+      "summary"
+    ],
+    "recoveryCandidates": [
+      "[aria-label='Close']",
+      "[data-bs-dismiss='modal']",
+      ".btn-close",
+      "button:has-text('Cancel')",
+      "a:has-text('Cancel')",
+      "button:has-text('Close')",
+      "a:has-text('Close')",
+      "button:has-text('Back')"
+    ],
+    "formContainerCandidates": [
+      "form",
+      "[role='form']",
+      ".form",
+      ".modal",
+      "[role='dialog']",
+      ".accordion",
+      "[role='tabpanel']",
+      ".wizard",
+      ".stepper"
+    ]
+  }
+}
