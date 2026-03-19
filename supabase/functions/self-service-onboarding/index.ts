@@ -20,7 +20,8 @@ const startRegistrationSchema = z.object({
   action: z.literal('start_registration'),
   organization_name: z.string().min(2).max(120),
   country: z.string().min(2).max(80),
-  plan_tier: z.enum(['free', 'professional', 'enterprise']),
+  plan_id: z.string().uuid(),
+  plan_tier: z.string().min(1).max(80).optional(),
   billing_period: z.enum(['monthly', 'annual']).default('monthly'),
   requested_user_count: z.number().int().min(1).max(10000).default(2),
   requested_franchise_count: z.number().int().min(0).max(10000).default(1),
@@ -549,12 +550,28 @@ const sendVerificationEmail = async (
   }
 }
 
-const getMatchingPlan = async (supabase: SupabaseClient, tier: 'free' | 'professional' | 'enterprise') => {
+const getPlanById = async (supabase: SupabaseClient, planId: string) => {
+  const normalizedId = sanitizeText(planId, 80)
+  if (!normalizedId) return null
+  const { data, error } = await supabase
+    .from('subscription_plans')
+    .select('id, name, tier, price_monthly, price_annual')
+    .eq('id', normalizedId)
+    .eq('is_active', true)
+    .maybeSingle()
+  if (error) throw error
+  if (!data) return null
+  return data
+}
+
+const getMatchingPlan = async (supabase: SupabaseClient, tier: string) => {
+  const normalizedTier = sanitizeText(tier, 80).toLowerCase()
+  if (!normalizedTier) return null
   const { data, error } = await supabase
     .from('subscription_plans')
     .select('id, name, tier, price_monthly, price_annual')
     .eq('is_active', true)
-    .eq('tier', tier)
+    .eq('tier', normalizedTier)
     .order('price_monthly', { ascending: true })
     .limit(1)
 
@@ -692,7 +709,14 @@ const performProvisioningForRequest = async (
 
   const requestPayload = requestRow.request_payload || {}
   const initialConfig = requestPayload.initial_config || {}
-  const isPaidPlan = requestRow.plan_tier !== 'free'
+  const resolvedPlan = requestRow.plan_id
+    ? await getPlanById(supabase, requestRow.plan_id)
+    : await getMatchingPlan(supabase, requestRow.plan_tier)
+  const normalizedPlanTier = sanitizeText(resolvedPlan?.tier || requestRow.plan_tier || '', 80).toLowerCase()
+  if (!normalizedPlanTier) {
+    throw new Error('Subscription plan tier is missing for this onboarding request')
+  }
+  const isPaidPlan = normalizedPlanTier !== 'free'
   let resolvedCountryCode = sanitizeText(requestRow.country || '', 80).toUpperCase()
   let resolvedCountryName = sanitizeText(requestRow.country || '', 120)
   let resolvedCurrencyCode = sanitizeText(requestRow.currency || initialConfig.currency || 'USD', 3).toUpperCase()
@@ -733,16 +757,73 @@ const performProvisioningForRequest = async (
     throw new Error('Requested franchise count cannot be negative')
   }
 
+  const preferredDomain = sanitizeDomain(initialConfig.domain || '')
+  let resolvedDomainId: string | null = null
+  const { data: activeDomains, error: platformDomainsError } = await supabase
+    .from('platform_domains')
+    .select('*')
+    .eq('is_active', true)
+
+  if (platformDomainsError) throw new Error(platformDomainsError.message || 'Unable to resolve platform domains')
+
+  let platformDomains = activeDomains || []
+  if (platformDomains.length === 0) {
+    const { data: anyDomains, error: anyDomainsError } = await supabase
+      .from('platform_domains')
+      .select('*')
+    if (anyDomainsError) throw new Error(anyDomainsError.message || 'Unable to resolve platform domains')
+    platformDomains = anyDomains || []
+  }
+
+  if (platformDomains.length === 0) {
+    const { data: createdDomain, error: createDomainError } = await supabase
+      .from('platform_domains')
+      .upsert(
+        {
+          code: 'logistics',
+          name: 'Logistics',
+          description: 'Default logistics domain',
+          is_active: true
+        },
+        { onConflict: 'code' }
+      )
+      .select('*')
+      .single()
+    if (createDomainError || !createdDomain) {
+      throw new Error(createDomainError?.message || 'Unable to create default platform domain')
+    }
+    platformDomains = [createdDomain]
+  }
+
+  const preferredDomainRow = preferredDomain
+    ? platformDomains.find((domain: any) => {
+        const candidates = [domain.key, domain.code, domain.name]
+          .map((value: string | null | undefined) => sanitizeDomain(value || ''))
+          .filter((value: string) => value.length > 0)
+        return candidates.includes(preferredDomain)
+      })
+    : null
+  const fallbackDomainRow =
+    platformDomains.find((domain: any) => sanitizeDomain(domain.code || domain.name || domain.key || '') === 'logistics') ||
+    platformDomains[0]
+
+  resolvedDomainId = preferredDomainRow?.id || fallbackDomainRow?.id || null
+
+  if (!resolvedDomainId) {
+    throw new Error('Unable to resolve platform domain for tenant provisioning')
+  }
+
   const orgSlug = await buildUniqueSlug(supabase, requestRow.organization_slug || requestRow.organization_name)
   const { data: tenant, error: tenantError } = await supabase
     .from('tenants')
     .insert({
       name: requestRow.organization_name,
       slug: orgSlug,
-      subscription_tier: requestRow.plan_tier,
+      domain_id: resolvedDomainId,
+      subscription_tier: normalizedPlanTier,
       max_users: requestedUserCount,
       max_franchises: requestedFranchiseCount,
-      status: isPaidPlan ? 'pending' : 'active',
+      is_active: true,
       settings: {
         onboarding_source: 'self_service',
         onboarding_status: isPaidPlan ? 'payment_pending' : 'active',
@@ -822,28 +903,28 @@ const performProvisioningForRequest = async (
     .single()
   if (sessionError || !onboardingSession) throw new Error(sessionError?.message || 'Onboarding session creation failed')
 
-  const plan = await getMatchingPlan(supabase, requestRow.plan_tier)
-  if (plan) {
-    const now = new Date()
-    const trialEnd = isPaidPlan ? addMinutes(now, 7 * 24 * 60) : null
-    const nextPeriodEnd = requestRow.billing_period === 'annual'
-      ? new Date(now.getFullYear() + 1, now.getMonth(), now.getDate()).toISOString()
-      : new Date(now.getFullYear(), now.getMonth() + 1, now.getDate()).toISOString()
-    await supabase.from('tenant_subscriptions').insert({
-      tenant_id: tenant.id,
-      plan_id: plan.id,
-      status: isPaidPlan ? 'trial' : 'active',
-      current_period_start: now.toISOString(),
-      current_period_end: nextPeriodEnd,
-      trial_end: trialEnd,
-      metadata: {
-        source: 'self_service_onboarding',
-        requested_user_count: requestedUserCount,
-        requested_franchise_count: requestedFranchiseCount,
-        billing_period: requestRow.billing_period
-      }
-    })
+  if (!resolvedPlan) {
+    throw new Error('Unable to resolve subscription plan for this onboarding request')
   }
+  const now = new Date()
+  const trialEnd = isPaidPlan ? addMinutes(now, 7 * 24 * 60) : null
+  const nextPeriodEnd = requestRow.billing_period === 'annual'
+    ? new Date(now.getFullYear() + 1, now.getMonth(), now.getDate()).toISOString()
+    : new Date(now.getFullYear(), now.getMonth() + 1, now.getDate()).toISOString()
+  await supabase.from('tenant_subscriptions').insert({
+    tenant_id: tenant.id,
+    plan_id: resolvedPlan.id,
+    status: isPaidPlan ? 'trial' : 'active',
+    current_period_start: now.toISOString(),
+    current_period_end: nextPeriodEnd,
+    trial_end: trialEnd,
+    metadata: {
+      source: 'self_service_onboarding',
+      requested_user_count: requestedUserCount,
+      requested_franchise_count: requestedFranchiseCount,
+      billing_period: requestRow.billing_period
+    }
+  })
 
   try {
     await sendEmailNotification(
@@ -1553,7 +1634,18 @@ serveWithLogger(async (req, logger, supabase) => {
     const input = parsed.data
     const sanitizedEmail = sanitizeEmail(input.admin.email)
     const sanitizedOrganization = sanitizeText(input.organization_name, 120)
-
+    const requestedPlanId = sanitizeText(input.plan_id, 80)
+    if (!requestedPlanId) {
+      return json(422, { success: false, error: 'Plan selection is required' })
+    }
+    const resolvedPlan = await getPlanById(supabase, requestedPlanId)
+    if (!resolvedPlan) {
+      return json(422, { success: false, error: 'Selected plan is no longer available' })
+    }
+    const normalizedPlanTier = sanitizeText(resolvedPlan.tier || '', 80).toLowerCase()
+    if (!normalizedPlanTier) {
+      return json(422, { success: false, error: 'Selected plan tier is invalid' })
+    }
     const ipRate = await applyRateLimit(supabase, 'ip', ipAddress, 10, 15, 30)
     if (!ipRate.allowed) {
       return json(429, { success: false, error: 'Too many requests', retry_after_seconds: ipRate.retry_after_seconds })
@@ -1824,7 +1916,8 @@ serveWithLogger(async (req, logger, supabase) => {
       admin_last_name: sanitizeText(input.admin.last_name, 80),
       country: matchedCountry.code_iso2 || normalizedCountryCode || matchedCountry.name,
       country_id: matchedCountry.id,
-      plan_tier: input.plan_tier,
+      plan_id: resolvedPlan.id,
+      plan_tier: normalizedPlanTier,
       billing_period: input.billing_period,
       currency: matchedCurrency.code || requestPayload.initial_config.currency,
       currency_id: matchedCurrency.id,

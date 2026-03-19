@@ -28,6 +28,7 @@
 - Require documented reason existing tables cannot be extended.
 - Require database architecture team approval before merging new table migrations.
 - Require migration files with `CREATE TABLE` to include `DB-VERIFICATION:` and `DB-ARCH-APPROVAL:` metadata lines.
+- Use JWT Signing Key and do not use Legacy JWT Secret 
 
 ## Backward Compatibility Governance
 - Require every enhancement to preserve existing APIs, database schemas, UI flows, and third-party integrations.
