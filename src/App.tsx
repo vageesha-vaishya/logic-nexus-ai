@@ -180,6 +180,7 @@ const DebugConsole = lazy(() => import("./pages/dashboard/DebugConsole"));
 const Commodities = lazy(() => import("./pages/dashboard/Commodities"));
 const SalesPlaceholder = lazy(() => import("./pages/dashboard/SalesPlaceholder"));
 const SalesCommandCenter = lazy(() => import("./pages/dashboard/SalesCommandCenter"));
+const AmroChangesPreview = lazy(() => import("./pages/dashboard/AmroChangesPreview"));
 
 // Initialize plugins at startup
 try {
@@ -821,6 +822,7 @@ const App = () => (
             <Route path="/dashboard/tenant-subscriptions" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><TenantSubscription /></ProtectedRoute>} />
             <Route path="/dashboard/log-test" element={<ProtectedRoute><LogTestPage /></ProtectedRoute>} />
             <Route path="/dashboard/debug-console" element={<ProtectedRoute><DebugConsole /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/changes" element={<ProtectedRoute><AmroChangesPreview /></ProtectedRoute>} />
             
             {/* Sales Dashboard Routes */}
             <Route path="/dashboard/sales/command-center" element={<ProtectedRoute><SalesCommandCenter /></ProtectedRoute>} />
