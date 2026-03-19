@@ -9,6 +9,53 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- ============================================================================
+-- DOMAIN TYPES - Reusable enums to prevent hardcoded magic values
+-- ============================================================================
+-- Aircraft operational status
+CREATE DOMAIN IF NOT EXISTS aircraft_status AS text CHECK (VALUE IN ('active', 'maintenance', 'grounded', 'retired', 'storage'));
+
+-- Component lifecycle status
+CREATE DOMAIN IF NOT EXISTS component_status AS text CHECK (VALUE IN ('installed', 'removed', 'repair_queue', 'under_repair', 'awaiting_installation', 'condemned', 'obsolete'));
+
+-- Work package classification types
+CREATE DOMAIN IF NOT EXISTS maintenance_type AS text CHECK (VALUE IN ('line', 'base', 'component', 'inspection', 'overhaul', 'repair', 'upgrade', 'modification'));
+
+-- Work package status tracking
+CREATE DOMAIN IF NOT EXISTS work_package_status AS text CHECK (VALUE IN ('planning', 'approved', 'scheduled', 'in_progress', 'on_hold', 'completed', 'closed', 'cancelled'));
+
+-- Individual task status within work packages
+CREATE DOMAIN IF NOT EXISTS task_status AS text CHECK (VALUE IN ('pending', 'not_started', 'in_progress', 'on_hold', 'completed', 'rework_required', 'cancelled'));
+
+-- Material/part status in work packages
+CREATE DOMAIN IF NOT EXISTS material_status AS text CHECK (VALUE IN ('pending', 'ordered', 'received', 'installed', 'cancelled', 'returned'));
+
+-- Material action types
+CREATE DOMAIN IF NOT EXISTS material_action AS text CHECK (VALUE IN ('install', 'remove', 'inspect', 'repair'));
+
+-- Digital signature methods
+CREATE DOMAIN IF NOT EXISTS signature_method AS text CHECK (VALUE IN ('digital', 'pin', 'biometric'));
+
+-- ============================================================================
+-- RLS POLICY HELPER PATTERN DOCUMENTATION
+-- ============================================================================
+-- All AMRO tables follow a standardized two-policy RLS pattern:
+-- 1. Platform Admin Policy: Grants full access to users with 'platform_admin' role
+-- 2. Tenant Isolation Policy: Restricts access to data matching user's tenant_id via user_roles
+--
+-- This pattern ensures:
+-- - Multi-tenant data isolation at the database level
+-- - Platform admins can audit and manage all tenant data
+-- - Regular users can only access their tenant's data
+-- - All policies use auth.uid() for security and user_roles junction table for authorization
+--
+-- To apply this pattern to a new table:
+-- 1. Ensure table has tenant_id column (uuid, NOT NULL, references public.tenants(id))
+-- 2. Enable RLS: ALTER TABLE public.table_name ENABLE ROW LEVEL SECURITY;
+-- 3. Create two policies following the template above (see Aircraft policies below for exact syntax)
+-- 4. Add indexes on tenant_id and any frequently filtered columns
+-- ============================================================================
+
+-- ============================================================================
 -- 1. AIRCRAFT TABLE - Core asset registry
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS public.aircraft (
@@ -35,7 +82,7 @@ CREATE TABLE IF NOT EXISTS public.aircraft (
   owner_id uuid REFERENCES auth.users(id) ON DELETE SET NULL,
 
   -- Status and metadata
-  status text NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'maintenance', 'grounded', 'retired', 'storage')),
+  status aircraft_status NOT NULL DEFAULT 'active'::aircraft_status,
   operator_code text,
   base_location text,
   home_base uuid REFERENCES public.aircraft(id) ON DELETE SET NULL,
@@ -81,7 +128,7 @@ CREATE TABLE IF NOT EXISTS public.components (
   llp_calendar_days integer,
 
   -- Condition tracking
-  status text NOT NULL DEFAULT 'installed' CHECK (status IN ('installed', 'removed', 'repair_queue', 'under_repair', 'awaiting_installation', 'condemned', 'obsolete')),
+  status component_status NOT NULL DEFAULT 'installed'::component_status,
   condition_code text, -- GOOD, FAIR, POOR, UNSERVICEABLE, etc.
 
   -- Lifecycle tracking
@@ -125,7 +172,7 @@ CREATE TABLE IF NOT EXISTS public.work_packages (
 
   -- Classification
   work_type text NOT NULL,
-  maintenance_type text NOT NULL CHECK (maintenance_type IN ('line', 'base', 'component', 'inspection', 'overhaul', 'repair', 'upgrade', 'modification')),
+  maintenance_type maintenance_type NOT NULL,
   priority integer DEFAULT 3 CHECK (priority >= 1 AND priority <= 5),
   source varchar(100), -- Where requirement came from
 
@@ -142,7 +189,7 @@ CREATE TABLE IF NOT EXISTS public.work_packages (
   actual_cost decimal(15, 2),
 
   -- Status tracking
-  status text NOT NULL DEFAULT 'planning' CHECK (status IN ('planning', 'approved', 'scheduled', 'in_progress', 'on_hold', 'completed', 'closed', 'cancelled')),
+  status work_package_status NOT NULL DEFAULT 'planning'::work_package_status,
 
   -- Assignments
   assigned_to uuid REFERENCES auth.users(id) ON DELETE SET NULL,
@@ -199,7 +246,7 @@ CREATE TABLE IF NOT EXISTS public.tasks (
   actual_end_date timestamptz,
 
   -- Status and progress
-  status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'not_started', 'in_progress', 'on_hold', 'completed', 'rework_required', 'cancelled')),
+  status task_status NOT NULL DEFAULT 'pending'::task_status,
   progress_percentage integer DEFAULT 0 CHECK (progress_percentage >= 0 AND progress_percentage <= 100),
 
   -- Assignment
@@ -226,6 +273,51 @@ CREATE INDEX IF NOT EXISTS idx_tasks_work_package_id ON public.tasks(work_packag
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON public.tasks(status);
 CREATE INDEX IF NOT EXISTS idx_tasks_assigned_to ON public.tasks(assigned_to);
 CREATE INDEX IF NOT EXISTS idx_tasks_task_category ON public.tasks(task_category);
+
+-- Column documentation for JSONB fields
+COMMENT ON COLUMN public.tasks.steps IS 'JSON array of procedural steps for task execution. Expected schema:
+[
+  {
+    "step_number": integer,
+    "description": string,
+    "duration_minutes": integer,
+    "required_tool_ids": [string],
+    "safety_notes": string
+  },
+  ...
+]';
+
+COMMENT ON COLUMN public.tasks.qualifications IS 'JSON object of required qualifications for task assignment. Expected schema:
+{
+  "rating": "A&P" | "Powerplant" | "Avionics" | string,
+  "scope": string,
+  "currency_days": integer,
+  "specific_types": [string]
+}';
+
+COMMENT ON COLUMN public.tasks.evidence_fields IS 'JSON array of required evidence types for task completion. Expected schema:
+[
+  {
+    "field_type": "photo" | "inspection_checklist" | "measurement" | "signature",
+    "required": boolean,
+    "field_name": string,
+    "description": string
+  },
+  ...
+]';
+
+COMMENT ON COLUMN public.tasks.checklist IS 'JSON object tracking task completion checklist items. Expected schema:
+{
+  "items": [
+    {
+      "id": string,
+      "name": string,
+      "completed": boolean,
+      "completed_by": uuid,
+      "completed_at": timestamptz
+    }
+  ]
+}';
 
 -- ============================================================================
 -- 5. STAFF_QUALIFICATIONS TABLE - Maintenance technician certifications
@@ -313,7 +405,7 @@ CREATE TABLE IF NOT EXISTS public.maintenance_events (
   -- Digital signature and evidence
   signature text,
   signature_timestamp timestamptz,
-  signature_method varchar(50), -- e.g., 'digital', 'pin', 'biometric'
+  signature_method signature_method,
   evidence_hash text,
 
   -- Compliance tracking
@@ -335,6 +427,23 @@ CREATE INDEX IF NOT EXISTS idx_maintenance_events_event_type ON public.maintenan
 CREATE INDEX IF NOT EXISTS idx_maintenance_events_event_timestamp ON public.maintenance_events(event_timestamp);
 CREATE INDEX IF NOT EXISTS idx_maintenance_events_performed_by ON public.maintenance_events(performed_by);
 
+-- Column documentation for JSONB fields
+COMMENT ON COLUMN public.maintenance_events.data IS 'JSON object containing event-specific data payload. Structure varies by event_type.
+Examples:
+- For maintenance completion: {"maintenance_hours": number, "defects_found": number}
+- For component replacement: {"old_part_id": uuid, "new_part_id": uuid, "reason": string}
+- For quality check: {"inspector_notes": string, "defects": array}';
+
+COMMENT ON COLUMN public.maintenance_events.metadata IS 'JSON object containing event metadata. Expected schema:
+{
+  "source_system": string,
+  "source_ip": string,
+  "user_agent": string,
+  "api_version": string,
+  "request_id": string,
+  "tags": [string]
+}';
+
 -- ============================================================================
 -- 7. WORK_PACKAGE_MATERIALS TABLE - Parts and materials required for work
 -- ============================================================================
@@ -349,7 +458,7 @@ CREATE TABLE IF NOT EXISTS public.work_package_materials (
   description text NOT NULL,
   manufacturer text,
   component_id uuid REFERENCES public.components(id) ON DELETE SET NULL,
-  action varchar(50) CHECK (action IN ('install', 'remove', 'inspect', 'repair')),
+  action material_action,
 
   -- Quantity and UOM
   quantity integer NOT NULL DEFAULT 1,
@@ -361,7 +470,7 @@ CREATE TABLE IF NOT EXISTS public.work_package_materials (
   currency text DEFAULT 'USD',
 
   -- Status and sourcing
-  status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'ordered', 'received', 'installed', 'cancelled', 'returned')),
+  status material_status NOT NULL DEFAULT 'pending'::material_status,
   supplier_id text,
   supplier_name text,
   purchase_order_number text,
