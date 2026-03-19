@@ -31,6 +31,9 @@ CREATE TABLE IF NOT EXISTS public.aircraft (
   current_flight_hours_since_new decimal(15, 2) DEFAULT 0,
   current_cycles_since_new integer DEFAULT 0,
 
+  -- Ownership
+  owner_id uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+
   -- Status and metadata
   status text NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'maintenance', 'grounded', 'retired', 'storage')),
   operator_code text,
@@ -69,6 +72,13 @@ CREATE TABLE IF NOT EXISTS public.components (
   category text NOT NULL,
   manufacturer text NOT NULL,
   model text NOT NULL,
+  ata_chapter varchar(10), -- ATA 100 classification (e.g., '70' for hydraulic)
+
+  -- LLP (Life Limit Part) tracking
+  is_llp_part boolean DEFAULT false,
+  llp_hours decimal(10, 2),
+  llp_cycles integer,
+  llp_calendar_days integer,
 
   -- Condition tracking
   status text NOT NULL DEFAULT 'installed' CHECK (status IN ('installed', 'removed', 'repair_queue', 'under_repair', 'awaiting_installation', 'condemned', 'obsolete')),
@@ -117,6 +127,7 @@ CREATE TABLE IF NOT EXISTS public.work_packages (
   work_type text NOT NULL,
   maintenance_type text NOT NULL CHECK (maintenance_type IN ('line', 'base', 'component', 'inspection', 'overhaul', 'repair', 'upgrade', 'modification')),
   priority integer DEFAULT 3 CHECK (priority >= 1 AND priority <= 5),
+  source varchar(100), -- Where requirement came from
 
   -- Scheduling and planning
   planned_start_date timestamptz,
@@ -175,6 +186,10 @@ CREATE TABLE IF NOT EXISTS public.tasks (
   task_category text NOT NULL,
   estimated_duration_hours decimal(10, 2),
   complexity_level integer DEFAULT 3 CHECK (complexity_level >= 1 AND complexity_level <= 5),
+  procedure_reference varchar(255), -- Maintenance manual reference
+  steps jsonb, -- Procedural steps
+  qualifications jsonb, -- Required qualifications (replaces required_skill_ids)
+  evidence_fields jsonb, -- Evidence fields required for task completion
 
   -- Scheduling
   sequence_order integer,
@@ -189,7 +204,6 @@ CREATE TABLE IF NOT EXISTS public.tasks (
 
   -- Assignment
   assigned_to uuid REFERENCES auth.users(id) ON DELETE SET NULL,
-  required_skill_ids uuid[] DEFAULT ARRAY[]::uuid[],
 
   -- Quality and sign-off
   qa_verified_by uuid REFERENCES auth.users(id) ON DELETE SET NULL,
@@ -239,9 +253,12 @@ CREATE TABLE IF NOT EXISTS public.staff_qualifications (
 
   -- Scope and limitations
   scope text,
+  rating varchar(100) NOT NULL, -- e.g., 'A&P', 'Powerplant'
   aircraft_types text[] DEFAULT ARRAY[]::text[],
   component_categories text[] DEFAULT ARRAY[]::text[],
   limitations text,
+  can_certify_release boolean DEFAULT false,
+  can_defer boolean DEFAULT false,
 
   -- Document storage
   document_url text,
@@ -296,6 +313,7 @@ CREATE TABLE IF NOT EXISTS public.maintenance_events (
   -- Digital signature and evidence
   signature text,
   signature_timestamp timestamptz,
+  signature_method varchar(50), -- e.g., 'digital', 'pin', 'biometric'
   evidence_hash text,
 
   -- Compliance tracking
@@ -330,6 +348,8 @@ CREATE TABLE IF NOT EXISTS public.work_package_materials (
   part_number text NOT NULL,
   description text NOT NULL,
   manufacturer text,
+  component_id uuid REFERENCES public.components(id) ON DELETE SET NULL,
+  action varchar(50) CHECK (action IN ('install', 'remove', 'inspect', 'repair')),
 
   -- Quantity and UOM
   quantity integer NOT NULL DEFAULT 1,
