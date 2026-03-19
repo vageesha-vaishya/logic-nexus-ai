@@ -13,18 +13,20 @@ import {
   CreateTaskRequest,
   UpdateTaskRequest,
 } from '../types/amro.types';
-
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-if (!supabaseUrl || !supabaseServiceKey) {
-  throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY environment variables');
-}
+import { amroEventsProducer } from '../events/amro-events.producer';
+import { AmroEventType } from '../events/amro-events.types';
 
 export class WorkOrdersService {
   private supabase: SupabaseClient;
 
   constructor() {
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+      throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY environment variables');
+    }
+
     this.supabase = createClient(supabaseUrl, supabaseServiceKey);
   }
 
@@ -109,7 +111,28 @@ export class WorkOrdersService {
       throw new Error(`Failed to create work package: ${error.message}`);
     }
 
-    return data as WorkPackage;
+    const workPackage = data as WorkPackage;
+
+    // Publish work order created event (fire-and-forget)
+    amroEventsProducer.publishWorkOrderEvent(
+      tenantId,
+      userId,
+      AmroEventType.WORK_ORDER_CREATED,
+      {
+        id: workPackage.id,
+        work_package_id: workPackage.id,
+        work_package_number: workPackage.work_package_number,
+        aircraft_id: workPackage.aircraft_id,
+        title: workPackage.title,
+        description: workPackage.description,
+        maintenance_type: workPackage.maintenance_type,
+        status: workPackage.status,
+        estimated_cost: workPackage.estimated_cost,
+        estimated_labor_hours: workPackage.estimated_labor_hours,
+      },
+    );
+
+    return workPackage;
   }
 
   /**
@@ -143,16 +166,39 @@ export class WorkOrdersService {
       throw new Error(`Failed to update work package: ${error.message}`);
     }
 
-    return data as WorkPackage;
+    const workPackage = data as WorkPackage;
+
+    // Publish work order updated event (fire-and-forget)
+    amroEventsProducer.publishWorkOrderEvent(
+      tenantId,
+      userId,
+      AmroEventType.WORK_ORDER_UPDATED,
+      {
+        id: workPackage.id,
+        work_package_id: workPackage.id,
+        work_package_number: workPackage.work_package_number,
+        aircraft_id: workPackage.aircraft_id,
+        title: workPackage.title,
+        description: workPackage.description,
+        maintenance_type: workPackage.maintenance_type,
+        status: workPackage.status,
+        estimated_cost: workPackage.estimated_cost,
+        estimated_labor_hours: workPackage.estimated_labor_hours,
+        actual_cost: workPackage.actual_cost,
+        actual_labor_hours: workPackage.actual_labor_hours,
+      },
+    );
+
+    return workPackage;
   }
 
   /**
    * Delete a work package
    * Explicitly filters by tenant_id
    */
-  async deleteWorkPackage(tenantId: string, id: string): Promise<void> {
-    // Verify work package belongs to tenant
-    await this.getWorkPackage(tenantId, id);
+  async deleteWorkPackage(tenantId: string, id: string, userId: string): Promise<void> {
+    // Verify work package belongs to tenant and get it for event data
+    const workPackage = await this.getWorkPackage(tenantId, id);
 
     const { error } = await this.supabase
       .from('work_packages')
@@ -163,6 +209,20 @@ export class WorkOrdersService {
     if (error) {
       throw new Error(`Failed to delete work package: ${error.message}`);
     }
+
+    // Publish work order deleted event (fire-and-forget)
+    amroEventsProducer.publishWorkOrderEvent(
+      tenantId,
+      userId,
+      AmroEventType.WORK_ORDER_DELETED,
+      {
+        id: workPackage.id,
+        work_package_id: workPackage.id,
+        work_package_number: workPackage.work_package_number,
+        aircraft_id: workPackage.aircraft_id,
+        title: workPackage.title,
+      },
+    );
   }
 
   // ============================================================================
@@ -246,7 +306,27 @@ export class WorkOrdersService {
       throw new Error(`Failed to create task: ${error.message}`);
     }
 
-    return data as Task;
+    const task = data as Task;
+
+    // Publish task created event (fire-and-forget)
+    amroEventsProducer.publishTaskEvent(
+      tenantId,
+      userId,
+      AmroEventType.TASK_CREATED,
+      {
+        id: task.id,
+        task_id: task.id,
+        task_number: task.task_number,
+        work_package_id: task.work_package_id,
+        title: task.title,
+        description: task.description,
+        status: task.status,
+        sequence_number: task.sequence_number,
+        required_qualification: task.required_qualification,
+      },
+    );
+
+    return task;
   }
 
   /**
@@ -259,8 +339,8 @@ export class WorkOrdersService {
     userId: string,
     request: UpdateTaskRequest,
   ): Promise<Task> {
-    // Verify task belongs to tenant
-    await this.getTask(tenantId, id);
+    // Verify task belongs to tenant and get current state
+    const previousTask = await this.getTask(tenantId, id);
 
     const updateData: Record<string, any> = {
       ...request,
@@ -280,16 +360,77 @@ export class WorkOrdersService {
       throw new Error(`Failed to update task: ${error.message}`);
     }
 
-    return data as Task;
+    const task = data as Task;
+
+    // Publish task updated event (fire-and-forget)
+    amroEventsProducer.publishTaskEvent(
+      tenantId,
+      userId,
+      AmroEventType.TASK_UPDATED,
+      {
+        id: task.id,
+        task_id: task.id,
+        task_number: task.task_number,
+        work_package_id: task.work_package_id,
+        title: task.title,
+        description: task.description,
+        status: task.status,
+        sequence_number: task.sequence_number,
+        assigned_to: task.assigned_to,
+        required_qualification: task.required_qualification,
+      },
+    );
+
+    // Publish TASK_STARTED event if status transitions to in_progress
+    if (request.status === 'in_progress' && previousTask.status !== 'in_progress') {
+      amroEventsProducer.publishTaskEvent(
+        tenantId,
+        userId,
+        AmroEventType.TASK_STARTED,
+        {
+          id: task.id,
+          task_id: task.id,
+          task_number: task.task_number,
+          work_package_id: task.work_package_id,
+          title: task.title,
+          description: task.description,
+          status: task.status,
+          assigned_to: task.assigned_to,
+          started_at: new Date().toISOString(),
+        },
+      );
+    }
+
+    // Publish TASK_COMPLETED event if status transitions to completed
+    if (request.status === 'completed' && previousTask.status !== 'completed') {
+      amroEventsProducer.publishTaskEvent(
+        tenantId,
+        userId,
+        AmroEventType.TASK_COMPLETED,
+        {
+          id: task.id,
+          task_id: task.id,
+          task_number: task.task_number,
+          work_package_id: task.work_package_id,
+          title: task.title,
+          description: task.description,
+          status: task.status,
+          assigned_to: task.assigned_to,
+          completed_at: new Date().toISOString(),
+        },
+      );
+    }
+
+    return task;
   }
 
   /**
    * Delete a task
    * Explicitly filters by tenant_id
    */
-  async deleteTask(tenantId: string, id: string): Promise<void> {
-    // Verify task belongs to tenant
-    await this.getTask(tenantId, id);
+  async deleteTask(tenantId: string, id: string, userId: string): Promise<void> {
+    // Verify task belongs to tenant and get it for event data
+    const task = await this.getTask(tenantId, id);
 
     const { error } = await this.supabase
       .from('tasks')
@@ -300,6 +441,58 @@ export class WorkOrdersService {
     if (error) {
       throw new Error(`Failed to delete task: ${error.message}`);
     }
+
+    // Publish task deleted event (fire-and-forget)
+    amroEventsProducer.publishTaskEvent(
+      tenantId,
+      userId,
+      AmroEventType.TASK_DELETED,
+      {
+        id: task.id,
+        task_id: task.id,
+        task_number: task.task_number,
+        work_package_id: task.work_package_id,
+        title: task.title,
+      },
+    );
+  }
+
+  /**
+   * Record a maintenance event (execution, sign-off, etc.)
+   * Publishes MAINTENANCE_EVENT_RECORDED event
+   */
+  async recordMaintenanceEvent(
+    tenantId: string,
+    userId: string,
+    taskId: string,
+    eventData: {
+      executed_by: string;
+      evidence_captured: boolean;
+      event_type?: string;
+      sign_off_date?: string;
+      notes?: string;
+    },
+  ): Promise<void> {
+    // Verify task belongs to tenant
+    const task = await this.getTask(tenantId, taskId);
+
+    // Publish maintenance event recorded event (fire-and-forget)
+    amroEventsProducer.publishMaintenanceEvent(
+      tenantId,
+      userId,
+      {
+        id: `maint-${Date.now()}`,
+        task_id: task.id,
+        task_number: task.task_number,
+        work_package_id: task.work_package_id,
+        executed_by: eventData.executed_by,
+        evidence_captured: eventData.evidence_captured,
+        event_type: eventData.event_type || 'execution',
+        sign_off_date: eventData.sign_off_date || new Date().toISOString(),
+        notes: eventData.notes,
+        recorded_at: new Date().toISOString(),
+      },
+    );
   }
 
   // ============================================================================
