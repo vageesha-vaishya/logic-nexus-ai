@@ -864,7 +864,7 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
           setActiveSubscription(normalized);
           form.setValue('selected_plan_id', normalized.plan_id || '');
           form.setValue('plan_status', normalized.status || '');
-          form.setValue('payment_provider', String((normalized.metadata as any)?.payment_provider || 'mock'));
+          form.setValue('payment_provider', String((normalized.metadata as any)?.payment_provider || ''));
         }
       } catch (error: any) {
         toast({
@@ -930,7 +930,7 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
       plan_max_franchise: '',
       requested_user_count: tenant?.max_users != null ? String(tenant.max_users) : '',
       requested_franchise_count: tenant?.max_franchises != null ? String(tenant.max_franchises) : '',
-      payment_provider: 'mock',
+      payment_provider: '',
       verify_domain_immediately: true,
       login_template_name: 'Default Simple',
       personalization_target: 'tenant',
@@ -1609,20 +1609,24 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
         </FormSection>
         <Separator />
         <FormSection title="Plan and Payment">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-8 gap-3">
             <FormField
               control={form.control}
               name="selected_plan_id"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Subscription Plan</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value || ''}>
+                  <Select
+                    onValueChange={(value) => field.onChange(value === '__none__' ? '' : value)}
+                    value={field.value || '__none__'}
+                  >
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select a plan" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
+                      <SelectItem value="__none__">Select Plan</SelectItem>
                       {availablePlans.map((plan) => (
                         <SelectItem key={plan.id} value={plan.id}>
                           {plan.name} ({(plan.currency || 'USD').toUpperCase()} {plan.price_monthly}/month)
@@ -1669,8 +1673,19 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
                 </FormItem>
               )}
             />
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <FormField
+              control={form.control}
+              name="plan_max_user"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Plan Max User</FormLabel>
+                  <FormControl>
+                    <Input readOnly disabled placeholder="Unlimited" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             <FormField
               control={form.control}
               name="requested_user_count"
@@ -1699,43 +1714,6 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
             />
             <FormField
               control={form.control}
-              name="payment_provider"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Payment Provider</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value || 'mock'}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select provider" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="mock">Mock Gateway</SelectItem>
-                      <SelectItem value="stripe">Stripe</SelectItem>
-                      <SelectItem value="razorpay">Razorpay</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <FormField
-              control={form.control}
-              name="plan_max_user"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Plan Max User</FormLabel>
-                  <FormControl>
-                    <Input readOnly disabled placeholder="Unlimited" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
               name="plan_max_franchise"
               render={({ field }) => (
                 <FormItem>
@@ -1747,18 +1725,46 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
                 </FormItem>
               )}
             />
-          </div>
-          {selectedPlanForPreview && (
-            <div className="rounded-lg border p-4 text-sm">
-              <div className="font-medium">{selectedPlanForPreview.name}</div>
-              <div className="text-muted-foreground">
-                {(selectedPlanForPreview.currency || 'USD').toUpperCase()} {Number(planPricingPreview || 0).toFixed(2)} /{selectedBillingPeriod === 'annual' ? 'year' : 'month'}
-              </div>
-              {selectedPlanForPreview.description && (
-                <div className="mt-2 text-muted-foreground">{selectedPlanForPreview.description}</div>
+            <FormField
+              control={form.control}
+              name="payment_provider"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Payment Provider</FormLabel>
+                  <Select
+                    onValueChange={(value) => field.onChange(value === '__none__' ? '' : value)}
+                    value={field.value || '__none__'}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select provider" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="__none__">Select Provider</SelectItem>
+                      <SelectItem value="mock">Mock Gateway</SelectItem>
+                      <SelectItem value="stripe">Stripe</SelectItem>
+                      <SelectItem value="razorpay">Razorpay</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
               )}
-            </div>
-          )}
+            />
+          </div>
+          <div className="grid grid-cols-1 gap-3 mt-3">
+            {selectedPlanForPreview && (
+              <div className="rounded-lg border p-4 text-sm">
+                <div className="font-medium">{selectedPlanForPreview.name}</div>
+                <div className="text-muted-foreground">
+                  {(selectedPlanForPreview.currency || 'USD').toUpperCase()} {Number(planPricingPreview || 0).toFixed(2)} /{selectedBillingPeriod === 'annual' ? 'year' : 'month'}
+                </div>
+                {selectedPlanForPreview.description && (
+                  <div className="mt-2 text-muted-foreground">{selectedPlanForPreview.description}</div>
+                )}
+              </div>
+            )}
+          </div>
           {activeSubscription?.status === 'active' && (
             <div className="text-xs text-muted-foreground">
               Existing active subscription detected and will be replaced after confirmation.

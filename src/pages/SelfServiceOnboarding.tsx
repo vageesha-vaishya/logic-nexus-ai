@@ -12,7 +12,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 
-type PlanTier = 'free' | 'professional' | 'enterprise'
 type BillingPeriod = 'monthly' | 'annual'
 type DomainOption = {
   value: string
@@ -26,6 +25,17 @@ type CountryOption = {
 type CurrencyOption = {
   value: string
   label: string
+}
+
+type SubscriptionPlan = {
+  id: string
+  name: string
+  description: string | null
+  tier: string
+  price_monthly: number
+  currency: string
+  max_users: number | null
+  max_franchise: number | null
 }
 
 type TurnstileApi = {
@@ -63,18 +73,6 @@ declare global {
   }
 }
 
-const plans: Array<{
-  tier: PlanTier
-  title: string
-  subtitle: string
-  users: string
-  franchises: string
-}> = [
-  { tier: 'free', title: 'Free', subtitle: 'Start quickly', users: '2 users', franchises: '1 franchise' },
-  { tier: 'professional', title: 'Professional', subtitle: 'Scale operations', users: '25+ users', franchises: '10+ franchises' },
-  { tier: 'enterprise', title: 'Enterprise', subtitle: 'Global compliance and scale', users: 'Custom users', franchises: 'Custom franchises' }
-]
-
 const features = [
   'Lead capture across email, WhatsApp, Telegram, X, and webhooks',
   'Opportunity, account, contract, and quotation lifecycle',
@@ -101,7 +99,7 @@ const schema = z.object({
     .max(128, 'Password must be at most 128 characters')
     .regex(passwordPolicy, 'Password must include uppercase, lowercase, number, and special character'),
   admin_password_confirm: z.string().min(1, 'Confirm Password is required'),
-  plan_tier: z.enum(['free', 'professional', 'enterprise']),
+  plan_tier: z.string().min(1, 'Package selection is required'),
   billing_period: z.enum(['monthly', 'annual']),
   requested_user_count: z.number().int().min(1).max(10000),
   requested_franchise_count: z.number().int().min(0).max(10000),
@@ -162,6 +160,9 @@ export default function SelfServiceOnboarding() {
   const [currenciesLoading, setCurrenciesLoading] = useState(true)
   const [currenciesError, setCurrenciesError] = useState<string | null>(null)
   const [currencyOptions, setCurrencyOptions] = useState<CurrencyOption[]>([])
+  const [plansLoading, setPlansLoading] = useState(true)
+  const [plansError, setPlansError] = useState<string | null>(null)
+  const [availablePlans, setAvailablePlans] = useState<SubscriptionPlan[]>([])
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const [requestId, setRequestId] = useState<string | null>(null)
   const [verificationCode, setVerificationCode] = useState('')
@@ -184,7 +185,7 @@ export default function SelfServiceOnboarding() {
     admin_email: '',
     admin_password: '',
     admin_password_confirm: '',
-    plan_tier: 'free',
+    plan_tier: '',
     billing_period: 'monthly',
     requested_user_count: 2,
     requested_franchise_count: 1,
@@ -203,7 +204,10 @@ export default function SelfServiceOnboarding() {
     captcha_token: import.meta.env.DEV ? 'dev-captcha-pass' : ''
   })
 
-  const selectedPlan = useMemo(() => plans.find((p) => p.tier === form.plan_tier), [form.plan_tier])
+  const selectedPlan = useMemo(
+    () => availablePlans.find((p) => p.tier === form.plan_tier),
+    [availablePlans, form.plan_tier]
+  )
   const progress = ((stepIndex + 1) / stepIds.length) * 100
 
   const updateField = <K extends keyof FormState>(key: K, value: FormState[K]) => {
@@ -462,6 +466,56 @@ export default function SelfServiceOnboarding() {
       }
     }
   }, [stepIndex, activeCaptchaProvider, recaptchaScriptReady])
+
+  useEffect(() => {
+    const loadSubscriptionPlans = async () => {
+      setPlansLoading(true)
+      setPlansError(null)
+      try {
+        const { data, error } = await supabase
+          .from('subscription_plans')
+          .select('id, name, description, tier, price_monthly, currency, max_users, max_franchise, sort_order')
+          .eq('is_active', true)
+          .order('sort_order', { ascending: true })
+          .order('price_monthly', { ascending: true })
+
+        if (error) {
+          throw new Error(error.message || 'Failed to load subscription plans')
+        }
+
+        const normalized = (data || [])
+          .map((plan) => ({
+            id: plan.id,
+            name: plan.name,
+            description: plan.description ?? null,
+            tier: String(plan.tier || '').toLowerCase(),
+            price_monthly: Number(plan.price_monthly || 0),
+            currency: plan.currency || 'USD',
+            max_users: plan.max_users == null ? null : Number(plan.max_users),
+            max_franchise: plan.max_franchise == null ? null : Number(plan.max_franchise)
+          }))
+          .filter((plan) => plan.tier.length > 0)
+
+        setAvailablePlans(normalized)
+        if (normalized.length > 0) {
+          setForm((prev) => {
+            if (normalized.find((plan) => plan.tier === prev.plan_tier)) {
+              return prev
+            }
+            return { ...prev, plan_tier: normalized[0].tier }
+          })
+        }
+      } catch (error: any) {
+        setAvailablePlans([])
+        setPlansError(error?.message || 'Unable to load packages')
+        toast.error(error?.message || 'Unable to load packages')
+      } finally {
+        setPlansLoading(false)
+      }
+    }
+
+    void loadSubscriptionPlans()
+  }, [])
 
   useEffect(() => {
     const loadDomainOptions = async () => {
@@ -1094,17 +1148,32 @@ export default function SelfServiceOnboarding() {
                 <div className="space-y-2">
                   <Label>Package <span className="text-destructive">*</span></Label>
                   <div className={`grid md:grid-cols-3 gap-4 ${fieldErrors.plan_tier ? 'border border-destructive rounded-lg p-3' : ''}`}>
-                    {plans.map((plan) => (
+                    {plansLoading && (
+                      <div className="text-sm text-muted-foreground">Loading packages...</div>
+                    )}
+                    {!plansLoading && availablePlans.length === 0 && (
+                      <div className="text-sm text-muted-foreground">
+                        {plansError || 'No packages available.'}
+                      </div>
+                    )}
+                    {!plansLoading && availablePlans.map((plan) => (
                       <button
-                        key={plan.tier}
+                        key={plan.id}
                         type="button"
                         className={`text-left border rounded-lg p-4 transition-all ${form.plan_tier === plan.tier ? 'border-primary ring-2 ring-primary/30' : 'border-border hover:border-primary/50'}`}
                         onClick={() => updateField('plan_tier', plan.tier)}
                       >
-                        <div className="font-semibold">{plan.title}</div>
-                        <div className="text-sm text-muted-foreground mt-1">{plan.subtitle}</div>
-                        <div className="mt-3 text-xs text-muted-foreground">{plan.users}</div>
-                        <div className="text-xs text-muted-foreground">{plan.franchises}</div>
+                        <div className="font-semibold">{plan.name}</div>
+                        <div className="text-sm text-muted-foreground mt-1">{plan.description || 'Plan details'}</div>
+                        <div className="mt-3 text-xs text-muted-foreground">
+                          {plan.max_users && plan.max_users > 0 ? `${plan.max_users} users` : 'Unlimited users'}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {plan.max_franchise && plan.max_franchise > 0 ? `${plan.max_franchise} franchises` : 'Unlimited franchises'}
+                        </div>
+                        <div className="mt-2 text-xs text-muted-foreground">
+                          {(plan.currency || 'USD').toUpperCase()} {plan.price_monthly}/month
+                        </div>
                       </button>
                     ))}
                   </div>
@@ -1390,7 +1459,7 @@ export default function SelfServiceOnboarding() {
                 <div className="space-y-4">
                   <Card className="bg-muted/40">
                     <CardContent className="pt-6 space-y-2">
-                      <div className="text-sm">Selected Package: <span className="font-semibold">{selectedPlan?.title}</span></div>
+                      <div className="text-sm">Selected Package: <span className="font-semibold">{selectedPlan?.name}</span></div>
                       <div className="text-sm">Admin Email: <span className="font-semibold">{form.admin_email}</span></div>
                       <div className="text-sm">Organization: <span className="font-semibold">{form.organization_name}</span></div>
                     </CardContent>
