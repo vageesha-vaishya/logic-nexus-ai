@@ -22,13 +22,18 @@ describe('AMRO Audit Schema', () => {
 
   beforeAll(async () => {
     const supabaseUrl = process.env.SUPABASE_URL || 'http://localhost:54321';
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc19zdXBlcmFkbWluIjp0cnVlfQ.rGL32GQBYaO69BIkD_K1t-nxrngilvpVVPreh74XUkQ';
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!supabaseServiceKey) {
+      throw new Error('SUPABASE_SERVICE_ROLE_KEY environment variable is required for tests');
+    }
 
     supabase = createClient(supabaseUrl, supabaseServiceKey);
   });
 
   afterAll(async () => {
-    // Cleanup test data if needed
+    // Clean up test data
+    await supabase.from('records').delete().eq('tenant_id', testTenantId).schema('mro_audit');
+    await supabase.from('trails').delete().eq('tenant_id', testTenantId).schema('mro_audit');
   });
 
   describe('mro_audit.records table', () => {
@@ -303,11 +308,11 @@ describe('AMRO Audit Schema', () => {
         .from('records')
         .insert({
           tenant_id: testTenantId,
-          record_type: 'immutability_test',
+          record_type: 'maintenance_completion',
           related_entity_id: 'test-entity',
-          related_entity_type: 'test',
+          related_entity_type: 'task',
           actor_id: testActorId,
-          actor_role: 'tester',
+          actor_role: 'supervisor',
           action: 'test_action',
           context: { test: true },
           signature: new Uint8Array([1, 1, 1, 1, 1]),
@@ -333,11 +338,11 @@ describe('AMRO Audit Schema', () => {
           .from('records')
           .insert({
             tenant_id: testTenantId,
-            record_type: `append_test_${i}`,
+            record_type: 'task_completion',
             related_entity_id: `entity-${i}`,
-            related_entity_type: 'test',
+            related_entity_type: 'task',
             actor_id: testActorId,
-            actor_role: 'tester',
+            actor_role: 'mechanic',
             action: 'appended',
             context: { sequence: i },
             signature: new Uint8Array([i, i, i, i, i]),
@@ -373,11 +378,11 @@ describe('AMRO Audit Schema', () => {
         .from('records')
         .insert({
           tenant_id: testTenantId,
-          record_type: 'rls_test',
+          record_type: 'maintenance_sign_off',
           related_entity_id: 'rls-entity',
-          related_entity_type: 'test',
+          related_entity_type: 'task',
           actor_id: testActorId,
-          actor_role: 'tester',
+          actor_role: 'inspector',
           action: 'test',
           context: { rls: true },
           signature: new Uint8Array([7, 7, 7, 7, 7]),
@@ -416,11 +421,11 @@ describe('AMRO Audit Schema', () => {
         .from('records')
         .insert({
           tenant_id: testTenantId,
-          record_type: 'timestamp_test',
+          record_type: 'aircraft_registration',
           related_entity_id: 'ts-entity',
-          related_entity_type: 'test',
+          related_entity_type: 'aircraft',
           actor_id: testActorId,
-          actor_role: 'tester',
+          actor_role: 'scheduler',
           action: 'timestamp_test',
           context: {},
           signature: new Uint8Array([8, 8, 8, 8, 8]),

@@ -194,14 +194,14 @@ BEGIN
   IF TG_OP = 'UPDATE' THEN
     RAISE EXCEPTION 'Audit records are immutable. Cannot update audit record % in table %',
       OLD.id, TG_TABLE_SCHEMA || '.' || TG_TABLE_NAME
-      USING ERRCODE = 'INTEGRITY_VIOLATION';
+      USING ERRCODE = '55005';
   END IF;
 
   -- Prevent DELETE on audit tables
   IF TG_OP = 'DELETE' THEN
     RAISE EXCEPTION 'Audit records are immutable. Cannot delete audit record % in table %',
       OLD.id, TG_TABLE_SCHEMA || '.' || TG_TABLE_NAME
-      USING ERRCODE = 'INTEGRITY_VIOLATION';
+      USING ERRCODE = '55005';
   END IF;
 
   -- Allow INSERT (append-only pattern)
@@ -235,7 +235,11 @@ ALTER TABLE mro_audit.trails ENABLE ROW LEVEL SECURITY;
 -- Audit Records RLS Policies
 -- ============================================================================
 DROP POLICY IF EXISTS "Audit records: platform admin full access" ON mro_audit.records;
-CREATE POLICY "Audit records: platform admin full access"
+DROP POLICY IF EXISTS "Audit records: platform admin insert" ON mro_audit.records;
+DROP POLICY IF EXISTS "Audit records: tenant users select own tenant data" ON mro_audit.records;
+DROP POLICY IF EXISTS "Audit records: tenant users insert own tenant data" ON mro_audit.records;
+
+CREATE POLICY "Audit records: platform admin access (all)"
   ON mro_audit.records
   FOR ALL
   TO authenticated
@@ -256,24 +260,9 @@ CREATE POLICY "Audit records: platform admin full access"
     )
   );
 
-DROP POLICY IF EXISTS "Audit records: platform admin insert" ON mro_audit.records;
-CREATE POLICY "Audit records: platform admin insert"
+CREATE POLICY "Audit records: tenant users own tenant data (all)"
   ON mro_audit.records
-  FOR INSERT
-  TO authenticated
-  WITH CHECK (
-    EXISTS (
-      SELECT 1
-      FROM public.user_roles ur
-      WHERE ur.user_id = auth.uid()
-        AND ur.role = 'platform_admin'
-    )
-  );
-
-DROP POLICY IF EXISTS "Audit records: tenant users select own tenant data" ON mro_audit.records;
-CREATE POLICY "Audit records: tenant users select own tenant data"
-  ON mro_audit.records
-  FOR SELECT
+  FOR ALL
   TO authenticated
   USING (
     tenant_id IN (
@@ -282,13 +271,7 @@ CREATE POLICY "Audit records: tenant users select own tenant data"
       WHERE ur.user_id = auth.uid()
         AND ur.tenant_id IS NOT NULL
     )
-  );
-
-DROP POLICY IF EXISTS "Audit records: tenant users insert own tenant data" ON mro_audit.records;
-CREATE POLICY "Audit records: tenant users insert own tenant data"
-  ON mro_audit.records
-  FOR INSERT
-  TO authenticated
+  )
   WITH CHECK (
     tenant_id IN (
       SELECT ur.tenant_id
@@ -302,7 +285,11 @@ CREATE POLICY "Audit records: tenant users insert own tenant data"
 -- Audit Trails RLS Policies
 -- ============================================================================
 DROP POLICY IF EXISTS "Audit trails: platform admin full access" ON mro_audit.trails;
-CREATE POLICY "Audit trails: platform admin full access"
+DROP POLICY IF EXISTS "Audit trails: platform admin insert" ON mro_audit.trails;
+DROP POLICY IF EXISTS "Audit trails: tenant users select own tenant data" ON mro_audit.trails;
+DROP POLICY IF EXISTS "Audit trails: tenant users insert own tenant data" ON mro_audit.trails;
+
+CREATE POLICY "Audit trails: platform admin access (all)"
   ON mro_audit.trails
   FOR ALL
   TO authenticated
@@ -323,24 +310,9 @@ CREATE POLICY "Audit trails: platform admin full access"
     )
   );
 
-DROP POLICY IF EXISTS "Audit trails: platform admin insert" ON mro_audit.trails;
-CREATE POLICY "Audit trails: platform admin insert"
+CREATE POLICY "Audit trails: tenant users own tenant data (all)"
   ON mro_audit.trails
-  FOR INSERT
-  TO authenticated
-  WITH CHECK (
-    EXISTS (
-      SELECT 1
-      FROM public.user_roles ur
-      WHERE ur.user_id = auth.uid()
-        AND ur.role = 'platform_admin'
-    )
-  );
-
-DROP POLICY IF EXISTS "Audit trails: tenant users select own tenant data" ON mro_audit.trails;
-CREATE POLICY "Audit trails: tenant users select own tenant data"
-  ON mro_audit.trails
-  FOR SELECT
+  FOR ALL
   TO authenticated
   USING (
     tenant_id IN (
@@ -349,13 +321,7 @@ CREATE POLICY "Audit trails: tenant users select own tenant data"
       WHERE ur.user_id = auth.uid()
         AND ur.tenant_id IS NOT NULL
     )
-  );
-
-DROP POLICY IF EXISTS "Audit trails: tenant users insert own tenant data" ON mro_audit.trails;
-CREATE POLICY "Audit trails: tenant users insert own tenant data"
-  ON mro_audit.trails
-  FOR INSERT
-  TO authenticated
+  )
   WITH CHECK (
     tenant_id IN (
       SELECT ur.tenant_id
