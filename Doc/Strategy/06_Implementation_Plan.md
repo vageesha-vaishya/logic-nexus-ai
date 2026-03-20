@@ -913,3 +913,354 @@ Each ADR packet must include:
 | W6-T2 | Enable observability instrumentation with tenant/franchise tags | Platform Engineering Representative | W6-T1 | In Progress | Instrumentation validation report |
 | W6-T3 | Execute alert routing and incident escalation drill | Security Officer | W6-T2 | Not Started | Escalation drill report |
 | W6-T4 | Close Week 6 reliability readiness sign-off | PMO Lead | W6-T3 | Not Started | Reliability readiness sign-off memo |
+
+### 10.23 Week 7 Security and Compliance Hardening Pack
+
+#### A. Security Control Hardening Matrix
+
+| Control ID | Control Domain | Objective | Owner | Enforcement Layer | Verification Method |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| SEC-01 | Identity and access | Enforce OAuth2.1/OIDC token policy with strict claim validation | IAM Architect | API gateway + IAM service | Token policy conformance tests |
+| SEC-02 | Tenant and franchise isolation | Block cross-tenant/franchise data access in service boundaries | Data Architect | Scoped data access + policy engine | Isolation regression suite |
+| SEC-03 | Secrets management | Rotate keys and restrict runtime secret exposure | Security Officer | CI/CD secrets + runtime config | Secret rotation report and access audit |
+| SEC-04 | Transport security | Enforce mTLS and secure service-to-service communication | Platform Engineering Representative | Service mesh / gateway policies | mTLS policy compliance scan |
+| SEC-05 | Runtime protection | Apply WAF/rate-limit/bot protection for external interfaces | Security Officer | Edge ingress controls | Traffic policy and abuse simulation report |
+
+#### B. Compliance Evidence and Audit Readiness Matrix
+
+| Compliance ID | Requirement Area | Required Evidence | Collection Owner | Review Cadence | Approval Role |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| CMP-01 | Access governance | Role map, permission matrix, admin access logs | Security Officer | Weekly | Enterprise Architecture Lead |
+| CMP-02 | Data protection | Tenant/franchise isolation test outputs and policy logs | Data Architect | Weekly | Security Officer |
+| CMP-03 | Change governance | ADR approvals, release approvals, gate sign-off artifacts | PMO Lead | Weekly | Product Owner |
+| CMP-04 | Vulnerability management | Vulnerability scan history and remediation SLA report | Security Officer | Weekly | Security Officer |
+| CMP-05 | Incident governance | Incident response logs and postmortem actions | SRE Lead | Per incident | Steering Committee |
+
+#### C. Security Test and Validation Suite
+
+| Test ID | Test Scenario | Owner | Entry Criteria | Exit Criteria | Block Condition |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| ST-01 | Privilege escalation attempt against IAM/CRM APIs | Security Officer | Week 6 observability baseline active | No escalation path exploitable | Any unauthorized admin path detected |
+| ST-02 | Cross-tenant and cross-franchise access attempts | Data Architect | Isolation policies enabled in extracted services | All isolation checks pass | Data leakage across scope boundaries |
+| ST-03 | Token replay and expired token handling | IAM Architect | Token policy updates deployed | Replay blocked and expired tokens rejected | Token replay succeeds |
+| ST-04 | mTLS and certificate policy enforcement check | Platform Engineering Representative | Gateway and mesh policies active | All service links pass mTLS verification | Any plaintext service-to-service path |
+| ST-05 | Dependency and runtime vulnerability retest | Security Officer | CI security scans configured | No unresolved critical findings | Critical vulnerability remains unresolved |
+
+#### D. Compliance Gate and Escalation Rules
+
+| Gate ID | Rule | Required Evidence | Escalation Owner | SLA | Release Impact |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| G7-1 | All security controls SEC-01 to SEC-05 must pass verification | Security hardening matrix + validation outputs | Security Officer | 1 business day | Block release if any control fails |
+| G7-2 | Compliance evidence CMP-01 to CMP-05 must be current | Compliance evidence pack | PMO Lead | 1 business day | Block governance sign-off if incomplete |
+| G7-3 | Security test suite ST-01 to ST-05 must pass | Security test results and defect closure notes | Security Officer | 24 hours | Block release for unresolved critical issues |
+| G7-4 | Incident response and rollback runbook must be approved | Incident drill record + rollback readiness memo | SRE Lead | 1 business day | No production cutover allowed |
+
+#### E. Week 7 Delivery Tracking Snapshot
+
+| ID | Task | Owner | Dependency | Status | Evidence Required |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| W7-T1 | Complete security control hardening across IAM/CRM/extraction paths | Security Officer | W6-T4 | In Progress | Security control verification report |
+| W7-T2 | Execute compliance evidence refresh and audit traceability pack | PMO Lead | W7-T1 | In Progress | Compliance evidence matrix |
+| W7-T3 | Run security validation suite and close critical defects | Security Officer / Data Architect | W7-T1 | Not Started | Security test results with defect closure |
+| W7-T4 | Publish Week 7 security and compliance gate sign-off | PMO Lead / Security Officer | W7-T2, W7-T3 | Not Started | Signed security and compliance gate memo |
+
+### 10.24 Week 8 Consumer Migration and Backward Compatibility Pack
+
+#### A. Consumer Migration Wave Plan
+
+| Wave ID | Consumer Segment | Current Contract | Target Contract | Migration Owner | Rollout Strategy | Success Criteria |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| MW-01 | Internal web modules | Legacy monolith endpoints | `/iam/v1`, `/crm/v1` | Platform Engineering Representative | Feature-flag routing with progressive enablement | >=95% internal traffic on new contracts |
+| MW-02 | Tenant integrations | Legacy REST contracts | Versioned REST contracts with compatibility adapters | API Architect | Tenant-by-tenant migration with canary validation | No tenant-critical incident during migration |
+| MW-03 | Franchisee operations workflows | Mixed module calls | CRM scoped APIs with strict tenancy controls | CRM Domain Lead | Franchise cohort rollout by geography/business unit | No cross-franchise leakage and workflow parity met |
+| MW-04 | Plugin consumers | Direct runtime hooks | Plugin adapter contracts and event APIs | Platform Engineering Representative | Adapter-first onboarding with dual-path fallback | Plugin execution parity >=99% with stable retries |
+
+#### B. Compatibility and Versioning Control Matrix
+
+| Control ID | Policy | Owner | Enforcement | Verification | Release Block |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| COMP-01 | No breaking API/event change without versioned path | API Architect | Contract governance gate | OpenAPI/protobuf/AsyncAPI diff checks | Yes |
+| COMP-02 | Additive-only schema migration for active contracts | Data Architect | Migration review gate | Migration script review and rollback test | Yes |
+| COMP-03 | Deprecation requires migration path and timeline | PMO Lead | Governance approval gate | Deprecation notice and consumer acknowledgement log | Yes |
+| COMP-04 | Legacy fallback path required during migration window | SRE Lead | Deploy and canary gates | Fallback rehearsal and rollback simulation | Yes |
+| COMP-05 | Tenant/franchise behavior parity required pre-cutover | CRM Domain Lead | UAT gate | Tenant/franchise parity validation report | Yes |
+
+#### C. Deprecation and Communication Matrix
+
+| Notice ID | Deprecated Interface | Replacement Interface | Audience | Notice Owner | Timeline | Evidence |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| DEP-01 | Legacy IAM auth endpoints | `/iam/v1` auth and token contracts | Internal platform teams and tenant admins | IAM Architect | 2 release cycles | Published deprecation bulletin + migration guide |
+| DEP-02 | Legacy CRM account/contact/lead endpoints | `/crm/v1` entity contracts | CRM consumers and integration partners | CRM Domain Lead | 2 release cycles | Consumer readiness acknowledgements |
+| DEP-03 | Direct plugin runtime hooks | Plugin adapter contract APIs | Plugin developers and partner teams | Platform Engineering Representative | 1 release cycle | Adapter onboarding checklist and sign-offs |
+
+#### D. Migration Evidence and Sign-Off Matrix
+
+| Evidence ID | Artifact | Owner | Verification Method | Sign-Off Role |
+| :--- | :--- | :--- | :--- | :--- |
+| W8-E1 | Consumer inventory and migration wave mapping | PMO Lead | Verify all active consumers mapped to MW-01..MW-04 | Enterprise Architecture Lead |
+| W8-E2 | Contract compatibility and version report | API Architect | Validate no unversioned breaking changes | Security Officer |
+| W8-E3 | Tenant/franchise parity UAT report | CRM Domain Lead | Confirm no behavior regression across scope tiers | Product Owner |
+| W8-E4 | Fallback/rollback rehearsal report | SRE Lead | Confirm fallback activation and recovery targets | PMO Lead |
+| W8-E5 | Deprecation communication evidence pack | PMO Lead | Confirm notice delivery and acknowledgement coverage | Steering Committee |
+
+#### E. Week 8 Delivery Tracking Snapshot
+
+| ID | Task | Owner | Dependency | Status | Evidence Required |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| W8-T1 | Publish consumer migration wave map and owner assignments | PMO Lead | W7-T4 | In Progress | Migration wave mapping report |
+| W8-T2 | Complete compatibility and versioning gate validation | API Architect | W8-T1 | In Progress | Contract compatibility report |
+| W8-T3 | Execute tenant/franchise parity UAT and fallback rehearsal | CRM Domain Lead / SRE Lead | W8-T2 | Not Started | UAT parity report + fallback rehearsal report |
+| W8-T4 | Publish Week 8 migration readiness and deprecation sign-off | PMO Lead | W8-T3 | Not Started | Signed migration readiness memo |
+
+### 10.25 Week 9 Production Cutover and Hypercare Pack
+
+#### A. Cutover Stage and Ownership Matrix
+
+| Stage ID | Cutover Stage | Scope | Primary Owner | Secondary Owner | Entry Criteria | Exit Criteria |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| CO-01 | Final pre-cutover readiness review | IAM, CRM, plugin and integration landscape | PMO Lead | Enterprise Architecture Lead | Week 8 sign-off completed | Go/no-go decision recorded |
+| CO-02 | Controlled production traffic shift | Internal modules, tenant APIs, plugin adapters | SRE Lead | Platform Engineering Representative | Rollback path validated and monitoring green | >=90% target traffic on new services |
+| CO-03 | Full contract and routing switch | Legacy routes retired from primary path | API Architect | CRM Domain Lead | CO-02 stable for 24h | 100% production path on versioned services |
+| CO-04 | Post-switch stabilization | Service health and tenant/franchise parity | SRE Lead | Security Officer | CO-03 completed | No P0/P1 incident for 48h |
+
+#### B. Go/No-Go Decision Gate Matrix
+
+| Gate ID | Decision Rule | Required Evidence | Accountable Owner | Decision Window | Release Impact |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| G9-1 | SLO and burn-rate status must be within limits | Week 6 dashboard export + alert status | SRE Lead | T-24h | No-go if active SLO breach |
+| G9-2 | Security and compliance gates must be fully closed | Week 7 gate memo + security test evidence | Security Officer | T-24h | No-go if unresolved critical control gap |
+| G9-3 | Consumer migration readiness must be accepted | Week 8 readiness memo + deprecation acknowledgements | PMO Lead | T-24h | No-go if major consumer unready |
+| G9-4 | Rollback and fallback activation must pass rehearsal | Rollback rehearsal report and RTO/RPO validation | SRE Lead | T-12h | No-go if rollback objectives missed |
+| G9-5 | Tier isolation checks must pass in production-like run | Tenant/franchise isolation validation report | Data Architect | T-12h | No-go if any cross-scope leakage detected |
+
+#### C. Hypercare Operational Coverage Matrix
+
+| Hypercare ID | Coverage Area | SLA Target | Owner | Monitoring Signal | Escalation Path |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| HC-01 | IAM authentication and authorization | MTTR <=30 minutes | IAM Architect | Auth success rate, token failure, latency | Security Officer -> Steering Committee |
+| HC-02 | CRM command/query reliability | MTTR <=45 minutes | CRM Domain Lead | API error rate, p95 latency, throughput | SRE Lead -> Product Owner |
+| HC-03 | Tenant/franchise isolation integrity | Immediate containment | Data Architect | Isolation audit events and policy failures | Security Officer -> Enterprise Architecture Lead |
+| HC-04 | Integration and event delivery stability | MTTR <=60 minutes | Platform Engineering Representative | Event lag, dead-letter volume, retry rates | SRE Lead -> PMO Lead |
+| HC-05 | Customer-impacting incident communication | Update every 30 minutes | PMO Lead | Incident bridge updates and status timeline | PMO Lead -> Steering Committee |
+
+#### D. Cutover Evidence and Closure Matrix
+
+| Evidence ID | Artifact | Owner | Verification Method | Closure Role |
+| :--- | :--- | :--- | :--- | :--- |
+| W9-E1 | Go/no-go decision record and approvals | PMO Lead | Validate signatures for G9-1..G9-5 | Steering Committee |
+| W9-E2 | Traffic-shift observability report | SRE Lead | Confirm staged shift met error and latency thresholds | Enterprise Architecture Lead |
+| W9-E3 | Production isolation assurance report | Data Architect | Confirm no tenant/franchise leakage during cutover | Security Officer |
+| W9-E4 | Hypercare incident summary and action tracker | PMO Lead | Validate incident handling and closure actions | Product Owner |
+| W9-E5 | Final cutover completion and legacy deactivation memo | API Architect | Verify legacy path retirement with rollback archive | Steering Committee |
+
+#### E. Week 9 Delivery Tracking Snapshot
+
+| ID | Task | Owner | Dependency | Status | Evidence Required |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| W9-T1 | Conduct go/no-go review and publish cutover decision | PMO Lead | W8-T4 | In Progress | Go/no-go approval record |
+| W9-T2 | Execute staged production traffic shift with guardrails | SRE Lead | W9-T1 | In Progress | Traffic-shift observability report |
+| W9-T3 | Run hypercare coverage and close critical incidents | SRE Lead / PMO Lead | W9-T2 | Not Started | Hypercare incident summary |
+| W9-T4 | Publish Week 9 production cutover closure memo | PMO Lead | W9-T3 | Not Started | Signed cutover closure memo |
+
+### 10.26 Week 10 Optimization and Governance Closure Pack
+
+#### A. Post-Cutover Optimization Matrix
+
+| Optimization ID | Optimization Area | Objective | Owner | Baseline Input | Target Outcome | Verification |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| OPT-01 | API latency and throughput tuning | Reduce p95 latency for IAM/CRM critical routes | SRE Lead | Week 9 hypercare metrics | >=15% p95 latency improvement | Performance regression and load test reports |
+| OPT-02 | Query and data-scope efficiency | Improve ScopedDataAccess query efficiency and reduce retries | Data Architect | Query profile and isolation logs | >=20% reduction in slow scoped queries | Query benchmark and isolation safety checks |
+| OPT-03 | Event and integration resilience | Reduce retry storms and dead-letter queue volume | Platform Engineering Representative | Week 9 event lag and retry telemetry | >=30% reduction in DLQ volume | Event replay and resilience validation report |
+| OPT-04 | Cost and capacity optimization | Align service autoscaling and runtime footprint | Platform Engineering Representative | Runtime utilization and spend baseline | <=10% cost reduction without SLO regression | Capacity and cost optimization report |
+| OPT-05 | Tenant/franchise UX reliability | Stabilize user-facing workflows after migration | CRM Domain Lead | Tenant/franchise support tickets and UAT findings | <=2% critical workflow failure rate | Tenant/franchise workflow parity validation |
+
+#### B. Governance Closure and Compliance Continuity Matrix
+
+| Closure ID | Governance Requirement | Evidence Artifact | Owner | Cadence After Closure | Approval Role |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| GOV-01 | ADR and architecture decision continuity | Final ADR register with disposition and follow-up actions | Enterprise Architecture Lead | Monthly | Steering Committee |
+| GOV-02 | Security and compliance continuity | Security and compliance control continuity plan | Security Officer | Monthly | Security Officer |
+| GOV-03 | Backward compatibility continuity | Versioning/deprecation calendar and consumer support plan | API Architect | Per release | Product Owner |
+| GOV-04 | Multi-tenant isolation continuity | Tenant/franchise isolation audit schedule and checkpoints | Data Architect | Weekly | Enterprise Architecture Lead |
+| GOV-05 | Incident and reliability governance continuity | Post-cutover reliability governance charter | SRE Lead | Weekly | PMO Lead |
+
+#### C. KPI and Business Outcome Validation Matrix
+
+| KPI ID | Business KPI | Baseline | Target | Owner | Validation Window | Block Condition |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| KPI-01 | Quote-to-shipment conversion | Week 8 baseline | >=5% improvement | Product Owner | 30 days | No measurable conversion improvement |
+| KPI-02 | Tenant onboarding cycle time | Pre-extraction baseline | >=20% reduction | Platform Engineering Representative | 30 days | Onboarding time regression persists |
+| KPI-03 | Critical incident volume | Week 9 baseline | <=50% reduction | SRE Lead | 30 days | Critical incidents remain above baseline |
+| KPI-04 | Franchise workflow completion success | Week 8 parity baseline | >=98% completion success | CRM Domain Lead | 30 days | Workflow completion below threshold |
+| KPI-05 | Compliance evidence freshness | Week 7 and 8 evidence set | 100% within cadence | PMO Lead | 30 days | Any overdue compliance evidence |
+
+#### D. Final Program Sign-Off Matrix
+
+| Sign-Off ID | Sign-Off Scope | Required Inputs | Accountable Owner | Approver | Release Impact |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| FS-01 | Technical closure sign-off | OPT-01..OPT-05 verification and KPI status | SRE Lead | Enterprise Architecture Lead | Blocks final closure if incomplete |
+| FS-02 | Security and compliance closure sign-off | GOV-02, GOV-04 continuity artifacts and latest audits | Security Officer | Steering Committee | Blocks closure if unresolved control risks |
+| FS-03 | Product and customer readiness closure sign-off | KPI-01, KPI-04 outcomes and customer impact summary | Product Owner | PMO Lead | Blocks closure if customer risk remains high |
+| FS-04 | Program governance closure sign-off | GOV-01..GOV-05 evidence and closure report | PMO Lead | Steering Committee | Required for final program completion |
+
+#### E. Week 10 Delivery Tracking Snapshot
+
+| ID | Task | Owner | Dependency | Status | Evidence Required |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| W10-T1 | Publish post-cutover optimization backlog and target baselines | SRE Lead / Data Architect | W9-T4 | In Progress | Optimization baseline report |
+| W10-T2 | Execute governance continuity handoff and compliance calendar | PMO Lead / Security Officer | W10-T1 | In Progress | Governance continuity artifact set |
+| W10-T3 | Validate KPI outcomes and finalize closure evidence | Product Owner / PMO Lead | W10-T2 | Not Started | KPI validation pack and closure report |
+| W10-T4 | Publish Week 10 final program sign-off memo | PMO Lead | W10-T3 | Not Started | Signed final program closure memo |
+
+### 10.27 Week 11 Operations Transition and Continuous Improvement Pack
+
+#### A. Operations Transition Ownership Matrix
+
+| Transition ID | Operations Area | Transition Objective | Primary Owner | Secondary Owner | Handover Input | Acceptance Criteria |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| OPS-01 | Platform operations command model | Move from project war-room to steady-state operations cadence | PMO Lead | SRE Lead | Week 10 closure memo | Weekly operational cadence accepted |
+| OPS-02 | IAM and security run operations | Establish BAU security operations for auth and policy controls | Security Officer | IAM Architect | Security continuity artifacts | Security SLA adherence for 4 consecutive weeks |
+| OPS-03 | CRM and franchise workflow operations | Institutionalize tenant/franchise workflow support playbooks | CRM Domain Lead | Product Owner | KPI validation pack | >=98% workflow completion maintained |
+| OPS-04 | Data isolation and compliance operations | Operationalize recurring isolation audit execution | Data Architect | Security Officer | Isolation audit schedule | Zero critical isolation control gaps open |
+| OPS-05 | Integration and plugin runtime operations | Transition adapter/integration support to BAU ownership | Platform Engineering Representative | API Architect | Integration resilience reports | No unresolved P1 integration defects |
+
+#### B. Continuous Improvement Backlog Governance Matrix
+
+| CI ID | Improvement Category | Intake Source | Prioritization Owner | SLA | Delivery Cadence | Evidence |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| CI-01 | Reliability enhancements | Hypercare incidents and SLO burn reports | SRE Lead | Triage within 3 business days | Bi-weekly | Reliability improvement backlog board |
+| CI-02 | Security/compliance enhancements | Audit findings and control gap reviews | Security Officer | Triage within 2 business days | Bi-weekly | Security improvement register |
+| CI-03 | Tenant/franchise UX enhancements | Support tickets and UAT feedback | CRM Domain Lead | Triage within 5 business days | Sprint cadence | UX improvement plan with acceptance tests |
+| CI-04 | Integration and contract optimizations | Consumer feedback and compatibility telemetry | API Architect | Triage within 5 business days | Sprint cadence | Contract optimization backlog |
+| CI-05 | Cost and capacity efficiencies | Runtime spend and utilization telemetry | Platform Engineering Representative | Triage within 5 business days | Monthly | Capacity optimization report |
+
+#### C. Operations KPI Sustainment Matrix
+
+| Sustainment KPI ID | KPI | Target | Owner | Review Cadence | Escalation Trigger |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| SKPI-01 | SLO compliance for IAM/CRM/event services | >=99.9% composite compliance | SRE Lead | Weekly | Any 7-day breach of target |
+| SKPI-02 | Tenant/franchise isolation pass rate | 100% pass rate | Data Architect | Weekly | Any failed isolation check |
+| SKPI-03 | Security control and compliance freshness | 100% on-time evidence refresh | Security Officer | Weekly | Any overdue compliance artifact |
+| SKPI-04 | Customer-impacting critical incident rate | <=50% of Week 9 baseline | PMO Lead | Monthly | Upward trend for 2 consecutive weeks |
+| SKPI-05 | Consumer compatibility defect rate | <=1% migration-related defects | API Architect | Weekly | Defect rate above threshold |
+
+#### D. BAU Governance Gate Matrix
+
+| Gate ID | BAU Rule | Required Evidence | Accountable Owner | Escalation Owner | Impact |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| G11-1 | Operations transition checklist must be fully accepted | OPS-01..OPS-05 handover confirmations | PMO Lead | Steering Committee | Blocks program transition to BAU |
+| G11-2 | Continuous improvement backlog must be active and governed | CI-01..CI-05 prioritized backlog snapshots | SRE Lead | Enterprise Architecture Lead | Blocks closure if backlog governance absent |
+| G11-3 | Sustainment KPIs must be in target for stabilization window | SKPI-01..SKPI-05 weekly reports | PMO Lead | Product Owner | Escalates to stabilization extension |
+| G11-4 | Tenant/franchise isolation and security controls must remain green | Isolation audit report + security status summary | Security Officer | Steering Committee | Immediate escalation and corrective action required |
+
+#### E. Week 11 Delivery Tracking Snapshot
+
+| ID | Task | Owner | Dependency | Status | Evidence Required |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| W11-T1 | Complete operations ownership handover and BAU checklist | PMO Lead | W10-T4 | In Progress | Handover acceptance checklist |
+| W11-T2 | Activate continuous improvement governance backlog | SRE Lead / Security Officer | W11-T1 | In Progress | Backlog governance register |
+| W11-T3 | Validate sustainment KPI window and publish stabilization summary | PMO Lead / Product Owner | W11-T2 | Not Started | KPI sustainment summary |
+| W11-T4 | Publish Week 11 BAU transition completion memo | PMO Lead | W11-T3 | Not Started | Signed BAU transition memo |
+
+This document outlines a high-level Enterprise Architecture Transformation designed to move a legacy monolith into a modern, resilient microservices ecosystem. It is structured to serve as a master blueprint for architects, developers, and stakeholders.
+
+🏛️ Phase 1: The Three-Tier Architecture
+The new system is organized into three distinct layers to ensure separation of concerns and scalability.
+Tier 1: Core Infrastructure Modules
+Foundation services shared across the entire enterprise.
+	•	Identity: OAuth 2.1, OIDC, SAML, MFA, RBAC, and ABAC.
+	•	Security: Secrets vault, WAF, encryption-at-rest/transit, and GDPR adapters.
+	•	Data Persistence: Polyglot ORM, CQRS, Event Sourcing, and Change Data Capture (CDC).
+	•	Common Services: Logging, rate-limiting, notifications, and CRM as a shared service.
+	•	DevOps: Container orchestration, Service Mesh, GitOps, and Canary pipelines.
+Tier 2: Domain-Specific Modules
+The "Brain" of the business, exposing REST and gRPC contracts.
+	•	Vertical Domains: Order Management, Inventory, Billing, Supply Chain, and HR.
+	•	Horizontal Domains: Workflow engines, Rules engines, and AI/ML Feature Stores.
+	•	Data Sovereignty: Each domain owns its data store and publishes events to Kafka/Pulsar.
+Tier 3: Business Plugins & Integration
+Extensibility layer for third-party and custom logic.
+	•	SDKs: TypeScript, Java, and Go with lifecycle hooks.
+	•	Connectors: Salesforce, SAP, Shopify, and Payment Gateways.
+	•	Frontend: Micro-frontend shell with iframe sandboxing and CSP.
+	•	Feature Management: A/B testing framework with real-time segmentation.
+
+🛠️ Execution Roadmap & Deliverables
+The transition is executed through a 10-step systematic process.
+1. Audit & Opportunity Assessment
+	•	Current-State: Inventory all repos, dependencies, and performance p95 baselines.
+	•	Gap Analysis: Quantify tight coupling, single points of failure, and tech debt.
+2. Domain-Driven Design (DDD)
+	•	Define Bounded Contexts, Aggregate Roots, and Ubiquitous Language.
+	•	Publish OpenAPI 3.1 and Protobuf contracts using SemVer.
+3. Zero-Downtime Migration (Strangler-Fig)
+Phase
+Focus
+Exit Criteria
+Phase 0
+Stabilize CI/CD & Observability
+Unit Test ≥ 90%
+Phase 1
+Extract Auth & Common Services
+Zero Critical CVEs
+Phase 2
+Decompose Domains & Event Bus
+API Coverage ≥ 95%
+Phase 3
+Roll out Plugins & Decommission Legacy
+Rollback window ≤ 5 min
+
+📈 Quality & Performance Gates
+To ensure the new architecture remains "resilient," the following metrics are enforced:
+	•	Latency: Read APIs ≤ 100ms; Write APIs ≤ 300ms (at 10k RPS).
+	•	Scalability: Horizontal Pod Autoscaling (HPA) from 1 to 100 replicas within 60s.
+	•	Security: Zero-trust mTLS, OPA policy-as-code, and 30-day secret rotation.
+	•	Observability: Full stack traces via Prometheus, Grafana, Loki, and Tempo.
+
+📇 CRM Core Service Specification
+The CRM module acts as a critical shared service with the following sub-modules:
+	•	Entities: Account, Contact, Lead, Opportunity, Activity, Case, Territory, Quotation.
+	•	Relationship Logic: 1 Account → Many Contacts → Many Leads → Many Opportunities.
+	•	Stack: PostgreSQL cluster for persistence, Elasticsearch for read-model replication, and a GraphQL Gateway for frontend consumption.
+
+📜 Governance & Documentation
+Every deliverable must be documented using the C4 Model and validated through a formal Architecture Decision Record (ADR) review board.
+Final Note: No implementation begins without sign-off from Enterprise Architects, Security Officers, and Product Owners.
+
+### Addendum: Logic Nexus-AI Mandatory Controls
+
+#### 1) Platform Hierarchy and Access Boundaries
+
+- Enforce the operating hierarchy `Platform -> Admin -> Multi-Tenant -> Multi-Franchisee` across all modules.
+- Validate permissions at each layer with auditable controls for platform, admin, tenant, and franchise roles.
+- Block release if hierarchy-scoped authorization checks are missing for new or modified flows.
+
+#### 2) Tenant and Franchise Data Isolation
+
+- Require `tenant_id` and `franchise_id` scoping for all domain services and persistence paths.
+- Enforce Row Level Security policies and isolation tests for read/write paths before cutover.
+- Use `ScopedDataAccess` for all database access paths and prohibit unscoped direct data calls.
+
+#### 3) Backward Compatibility and Contract Safety
+
+- Require versioned API/event contracts for any behavior or response change.
+- Permit only additive schema migrations with rollback-safe scripts during migration windows.
+- Require fallback compatibility paths and consumer deprecation timelines before legacy endpoint retirement.
+
+#### 4) Security and Key Management Controls
+
+- Use JWT Signing Key for token validation and signing workflows; do not use Legacy JWT Secret.
+- Enforce mTLS for service-to-service traffic and rotate secrets on a fixed compliance cadence.
+- Require unresolved critical vulnerabilities to block release gates.
+
+#### 5) CI/CD and Evidence Governance
+
+- Keep release gates tied to security, isolation, observability, and rollback-readiness evidence.
+- Require objective artifacts for approval decisions: gate reports, test outputs, runbooks, and sign-off memos.
+- Enforce architecture, security, and product approval checkpoints before production transitions.
+
+#### 6) Operations Continuity Minimums
+
+- Maintain weekly sustainment reviews for SLOs, isolation pass rate, compliance freshness, and incident trends.
+- Keep a governed continuous-improvement backlog with triage SLAs and assigned owners.
+- Treat repeated KPI degradation as a stabilization failure and trigger corrective governance actions.
