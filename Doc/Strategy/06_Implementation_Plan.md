@@ -1162,105 +1162,138 @@ Each ADR packet must include:
 | W11-T3 | Validate sustainment KPI window and publish stabilization summary | PMO Lead / Product Owner | W11-T2 | Not Started | KPI sustainment summary |
 | W11-T4 | Publish Week 11 BAU transition completion memo | PMO Lead | W11-T3 | Not Started | Signed BAU transition memo |
 
-This document outlines a high-level Enterprise Architecture Transformation designed to move a legacy monolith into a modern, resilient microservices ecosystem. It is structured to serve as a master blueprint for architects, developers, and stakeholders.
+### Enterprise Architecture Transformation: Developer Low-Level Blueprint
 
-🏛️ Phase 1: The Three-Tier Architecture
-The new system is organized into three distinct layers to ensure separation of concerns and scalability.
-Tier 1: Core Infrastructure Modules
-Foundation services shared across the entire enterprise.
-	•	Identity: OAuth 2.1, OIDC, SAML, MFA, RBAC, and ABAC.
-	•	Security: Secrets vault, WAF, encryption-at-rest/transit, and GDPR adapters.
-	•	Data Persistence: Polyglot ORM, CQRS, Event Sourcing, and Change Data Capture (CDC).
-	•	Common Services: Logging, rate-limiting, notifications, and CRM as a shared service.
-	•	DevOps: Container orchestration, Service Mesh, GitOps, and Canary pipelines.
-Tier 2: Domain-Specific Modules
-The "Brain" of the business, exposing REST and gRPC contracts.
-	•	Vertical Domains: Order Management, Inventory, Billing, Supply Chain, and HR.
-	•	Horizontal Domains: Workflow engines, Rules engines, and AI/ML Feature Stores.
-	•	Data Sovereignty: Each domain owns its data store and publishes events to Kafka/Pulsar.
-Tier 3: Business Plugins & Integration
-Extensibility layer for third-party and custom logic.
-	•	SDKs: TypeScript, Java, and Go with lifecycle hooks.
-	•	Connectors: Salesforce, SAP, Shopify, and Payment Gateways.
-	•	Frontend: Micro-frontend shell with iframe sandboxing and CSP.
-	•	Feature Management: A/B testing framework with real-time segmentation.
+This chapter defines the implementation blueprint for migrating the legacy monolith into a cloud-native microservices platform with strict multi-tenant and multi-franchise isolation.
 
-🛠️ Execution Roadmap & Deliverables
-The transition is executed through a 10-step systematic process.
-1. Audit & Opportunity Assessment
-	•	Current-State: Inventory all repos, dependencies, and performance p95 baselines.
-	•	Gap Analysis: Quantify tight coupling, single points of failure, and tech debt.
-2. Domain-Driven Design (DDD)
-	•	Define Bounded Contexts, Aggregate Roots, and Ubiquitous Language.
-	•	Publish OpenAPI 3.1 and Protobuf contracts using SemVer.
-3. Zero-Downtime Migration (Strangler-Fig)
-Phase
-Focus
-Exit Criteria
-Phase 0
-Stabilize CI/CD & Observability
-Unit Test ≥ 90%
-Phase 1
-Extract Auth & Common Services
-Zero Critical CVEs
-Phase 2
-Decompose Domains & Event Bus
-API Coverage ≥ 95%
-Phase 3
-Roll out Plugins & Decommission Legacy
-Rollback window ≤ 5 min
+#### 1. Non-Negotiable Engineering Controls
 
-📈 Quality & Performance Gates
-To ensure the new architecture remains "resilient," the following metrics are enforced:
-	•	Latency: Read APIs ≤ 100ms; Write APIs ≤ 300ms (at 10k RPS).
-	•	Scalability: Horizontal Pod Autoscaling (HPA) from 1 to 100 replicas within 60s.
-	•	Security: Zero-trust mTLS, OPA policy-as-code, and 30-day secret rotation.
-	•	Observability: Full stack traces via Prometheus, Grafana, Loki, and Tempo.
+| Control Area | Mandatory Rule | Implementation Requirement | Release Block Condition |
+| :--- | :--- | :--- | :--- |
+| Hierarchy | Enforce `Platform -> Admin -> Multi-Tenant -> Multi-Franchisee` | Authorization checks at each tier boundary | Any flow bypasses tier authorization |
+| Isolation | Enforce tenant/franchise scoped access | `tenant_id` + `franchise_id` in service, DB, and events | Any cross-tenant/franchise data leak |
+| Data Access | Use scoped data abstraction only | Use `ScopedDataAccess`; prohibit raw unscoped access | Unscoped data access in production path |
+| Compatibility | Preserve backward compatibility | Versioned APIs/events + additive migrations + fallback path | Breaking contract without versioning plan |
+| Security | Use modern key and transport controls | JWT Signing Key, mTLS, 30-day secret rotation | Legacy JWT secret or critical unresolved vulns |
 
-📇 CRM Core Service Specification
-The CRM module acts as a critical shared service with the following sub-modules:
-	•	Entities: Account, Contact, Lead, Opportunity, Activity, Case, Territory, Quotation.
-	•	Relationship Logic: 1 Account → Many Contacts → Many Leads → Many Opportunities.
-	•	Stack: PostgreSQL cluster for persistence, Elasticsearch for read-model replication, and a GraphQL Gateway for frontend consumption.
+#### 2. Target Runtime Topology
 
-📜 Governance & Documentation
-Every deliverable must be documented using the C4 Model and validated through a formal Architecture Decision Record (ADR) review board.
-Final Note: No implementation begins without sign-off from Enterprise Architects, Security Officers, and Product Owners.
+| Layer | Runtime Unit | Contract Type | Data Ownership | Event Interface |
+| :--- | :--- | :--- | :--- | :--- |
+| Edge | API Gateway + WAF | HTTPS REST + GraphQL | None | Emits request audit events |
+| Platform Core | Identity, Security, Common Services | REST + gRPC | Platform-owned config/policy stores | Publishes policy/auth/audit events |
+| Domain Services | Domain microservices | REST + gRPC + Async events | Each domain owns its own datastore | Publishes domain events to Kafka/Pulsar |
+| Integration Layer | Plugin runtime + connectors | SDK hooks + event contracts | Plugin metadata/config stores | Consumes/produces integration events |
+| Observability Plane | Metrics, tracing, logging, alerting | OpenTelemetry + Prometheus | Time-series/log stores | Alert and incident events |
 
-### Addendum: Logic Nexus-AI Mandatory Controls
+#### 3. Tier 1: Core Infrastructure Modules
 
-#### 1) Platform Hierarchy and Access Boundaries
+| Module | Service Components | Interfaces | Storage | Build Sequence |
+| :--- | :--- | :--- | :--- | :--- |
+| Identity | Auth service, token service, federation service | OAuth 2.1, OIDC, SAML, MFA, RBAC, ABAC | Identity DB + session cache | 1 |
+| Security | Secrets service, policy enforcement, GDPR service | mTLS, policy APIs, audit endpoints | Vault + policy/audit store | 1 |
+| Data Persistence | Query service, event store, CDC relay | ORM abstraction, CQRS APIs, CDC streams | PostgreSQL + event store + CDC sink | 2 |
+| Common Services | Logging, rate-limiting, notifications, CRM shared primitives | gRPC/REST utilities | Log store + queue + template store | 2 |
+| DevOps | GitOps controller, canary orchestrator, service mesh control | CI/CD policies, deployment APIs | Git state + deployment metadata | 0 and continuous |
 
-- Enforce the operating hierarchy `Platform -> Admin -> Multi-Tenant -> Multi-Franchisee` across all modules.
-- Validate permissions at each layer with auditable controls for platform, admin, tenant, and franchise roles.
-- Block release if hierarchy-scoped authorization checks are missing for new or modified flows.
+Tier 1 implementation rules:
+- Identity: implement claim model with `platform_role`, `admin_role`, `tenant_role`, `franchise_role`.
+- Security: run policy-as-code validation in CI and at runtime admission controls.
+- Persistence: separate write models and read models; publish CDC events for downstream indexing.
+- Common services: standardize correlation IDs and structured logging schema for all services.
+- DevOps: enforce canary progression gates with automated rollback on SLO burn-rate breaches.
 
-#### 2) Tenant and Franchise Data Isolation
+#### 4. Tier 2: Domain-Specific Modules
 
-- Require `tenant_id` and `franchise_id` scoping for all domain services and persistence paths.
-- Enforce Row Level Security policies and isolation tests for read/write paths before cutover.
-- Use `ScopedDataAccess` for all database access paths and prohibit unscoped direct data calls.
+| Domain Group | Domains | Required Contracts | Data Sovereignty Rule | Event Topics (Examples) |
+| :--- | :--- | :--- | :--- | :--- |
+| Vertical Domains | Order Management, Inventory, Billing, Supply Chain, HR | REST + gRPC per bounded context | Dedicated datastore per domain | `order.*`, `inventory.*`, `billing.*` |
+| Existing Platform Domains | Logistics, Freight Forwarding, AMRO, Banking, E-commerce | Versioned REST/gRPC + async command events | No cross-domain direct table access | `shipment.*`, `amro.*`, `banking.*`, `commerce.*` |
+| Horizontal Domains | Workflow Engine, Rules Engine, AI/ML Feature Store | gRPC for sync eval + async event ingestion | Own storage and reproducible feature snapshots | `workflow.*`, `rules.*`, `feature.*` |
 
-#### 3) Backward Compatibility and Contract Safety
+Tier 2 implementation rules:
+- Each service owns schema migrations for only its datastore.
+- Cross-domain interaction uses contracts/events, not shared tables.
+- Every command/query path carries `tenant_id` and `franchise_id`.
+- Each domain publishes domain events with versioned payload schemas.
 
-- Require versioned API/event contracts for any behavior or response change.
-- Permit only additive schema migrations with rollback-safe scripts during migration windows.
-- Require fallback compatibility paths and consumer deprecation timelines before legacy endpoint retirement.
+#### 5. Tier 3: Business Plugins and Integration
 
-#### 4) Security and Key Management Controls
+| Capability | Components | Developer Contract | Security Boundary | Runtime Rule |
+| :--- | :--- | :--- | :--- | :--- |
+| SDKs | TypeScript SDK, Java SDK, Go SDK | Lifecycle hooks (`onInstall`, `onEvent`, `onCommand`) | Signed plugin package + scoped token | Reject unsigned or unscoped plugin calls |
+| Connectors | Salesforce, SAP, Shopify, Payment Gateway adapters | Connector adapter interface + retry policy | Secret-per-connector + data mapping policy | Circuit breaker and DLQ required |
+| Frontend Extensibility | Micro-frontend shell + iframe sandbox | Plugin manifest + UI capability descriptors | CSP, sandbox attributes, origin allowlist | Block disallowed capabilities at runtime |
+| Feature Management | Flag service + segmentation engine | Typed feature flag contract + experiment API | Tenant/franchise scoped flag targeting | No global rollout without staged gates |
 
-- Use JWT Signing Key for token validation and signing workflows; do not use Legacy JWT Secret.
-- Enforce mTLS for service-to-service traffic and rotate secrets on a fixed compliance cadence.
-- Require unresolved critical vulnerabilities to block release gates.
+#### 6. Migration Execution Blueprint (Code-Ready)
 
-#### 5) CI/CD and Evidence Governance
+| Step | Action | Engineering Output | Verification |
+| :--- | :--- | :--- | :--- |
+| M1 | Baseline monolith capabilities | Endpoint map, dependency graph, performance baseline | Architecture and SRE review |
+| M2 | Define bounded contexts and contracts | OpenAPI 3.1, protobuf, AsyncAPI specs | Contract lint and compatibility diff |
+| M3 | Extract Tier 1 identity/security first | Independent deployable services + auth gateway routing | Auth parity tests and penetration tests |
+| M4 | Implement strangler routing | Gateway rules for old/new path split | Dual-path correctness and latency checks |
+| M5 | Extract Tier 2 domains incrementally | Domain services with isolated storage and events | Domain UAT and data isolation tests |
+| M6 | Stand up Tier 3 plugin/integration layer | SDK packages, adapter runtime, sandboxed UI shell | Plugin certification and connector test suite |
+| M7 | Decommission monolith endpoints | Endpoint retirement checklist + rollback archive | No active consumer on legacy endpoints |
 
-- Keep release gates tied to security, isolation, observability, and rollback-readiness evidence.
-- Require objective artifacts for approval decisions: gate reports, test outputs, runbooks, and sign-off memos.
-- Enforce architecture, security, and product approval checkpoints before production transitions.
+Strangler rollout algorithm:
+- Route read traffic first, then idempotent writes, then non-idempotent writes.
+- Keep dual-write/dual-read guards only during migration windows.
+- Remove dual-path logic immediately after parity and rollback windows are closed.
 
-#### 6) Operations Continuity Minimums
+#### 7. Quality and Performance Gates
 
-- Maintain weekly sustainment reviews for SLOs, isolation pass rate, compliance freshness, and incident trends.
-- Keep a governed continuous-improvement backlog with triage SLAs and assigned owners.
-- Treat repeated KPI degradation as a stabilization failure and trigger corrective governance actions.
+| Gate | Target | Measurement Window | Automated Enforcement |
+| :--- | :--- | :--- | :--- |
+| Latency | Read <=100ms p95, Write <=300ms p95 at target load | 30-minute rolling window | Canary promotion gate |
+| Scalability | HPA scale from 1 to 100 replicas <=60s | Load test window | Performance test gate |
+| Security | Zero-trust mTLS + policy checks + no critical vulns | Per build + daily runtime scan | Security gate |
+| Observability | End-to-end traces, logs, metrics for all critical flows | Continuous | Observability completeness gate |
+| Rollback | Rollback window <=5 minutes | Cutover rehearsal and production drills | Release gate |
+
+#### 8. CRM Core Service Low-Level Specification
+
+##### 8.1 Bounded Modules
+
+| Module | Core Entities | Primary API Surface | Key Events |
+| :--- | :--- | :--- | :--- |
+| Accounts | Account, Territory | `/crm/v1/accounts` + `AccountService` | `crm.account.created`, `crm.account.updated` |
+| Contacts | Contact | `/crm/v1/contacts` + `ContactService` | `crm.contact.created`, `crm.contact.updated` |
+| Leads | Lead | `/crm/v1/leads` + `LeadService` | `crm.lead.created`, `crm.lead.qualified` |
+| Opportunities | Opportunity, Quotation | `/crm/v1/opportunities`, `/crm/v1/quotes` | `crm.opportunity.stage_changed`, `crm.quote.created` |
+| Activities | Activity, Case | `/crm/v1/activities`, `/crm/v1/cases` | `crm.activity.logged`, `crm.case.opened` |
+
+##### 8.2 Relationship and Data Rules
+
+- Relationship model: `Account (1) -> Contacts (N) -> Leads (N) -> Opportunities (N)`.
+- Required columns for all CRM records: `tenant_id`, `franchise_id`, `created_at`, `updated_at`, `status`.
+- Enforce per-entity ownership and visibility policies through scoped access checks.
+- Persist write model in PostgreSQL cluster; replicate read model to Elasticsearch through CDC/events.
+
+##### 8.3 Interface and Read Model Pattern
+
+- Write path: REST/gRPC commands validate auth claims and scoped ownership, then persist in PostgreSQL.
+- Event path: publish versioned domain events after successful commits.
+- Read path: GraphQL gateway reads Elasticsearch projections for list/search analytics experiences.
+- Recovery path: replay CRM domain events to rebuild read models after projection failures.
+
+##### 8.4 CRM Service Acceptance Gates
+
+| Gate | Requirement | Evidence |
+| :--- | :--- | :--- |
+| CRM-G1 | Contract compatibility with prior consumers | API diff + integration tests |
+| CRM-G2 | Tenant/franchise isolation correctness | Isolation test suite + policy audit logs |
+| CRM-G3 | Read model freshness and projection health | CDC lag dashboard + replay test |
+| CRM-G4 | Performance SLO compliance | Load/perf report for account/lead/opportunity flows |
+
+#### 9. Governance and Delivery Artifacts
+
+| Artifact | Owner | Required For |
+| :--- | :--- | :--- |
+| C4 diagrams per tier and domain | Enterprise Architecture Lead | Design approval |
+| ADRs for boundary and contract decisions | Domain Leads | Implementation start |
+| Security and isolation verification reports | Security Officer + Data Architect | Release approval |
+| Migration runbooks and rollback procedures | SRE Lead | Cutover execution |
+| Consumer deprecation and communication pack | PMO Lead | Legacy endpoint retirement |
