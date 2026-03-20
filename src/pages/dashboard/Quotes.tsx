@@ -27,6 +27,8 @@ import { useTheme } from '@/hooks/useTheme';
 import { useCRMModuleNavigationState } from '@/hooks/useCRMModuleNavigationState';
 import { CRM_HEADER_PRIMARY_CONTROL_SEQUENCE, CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
 import { QuoteCard } from '@/components/sales/QuoteCard';
+import { useTranslation } from 'react-i18next';
+import { CrmFallbackReason, resolveCrmFallbackBannerCopy } from './leadsListUtils';
 
 interface QuoteWithRelations extends Quote {
   accounts?: { id: string; name: string };
@@ -74,6 +76,7 @@ const isRetryableError = (error: unknown): boolean => {
 };
 
 export default function Quotes() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { scopedDb, supabase } = useCRM();
   const { hasPermission } = useAuth();
@@ -94,6 +97,8 @@ export default function Quotes() {
   const [error, setError] = useState<Error | null>(null);
   const [selectedQuoteIds, setSelectedQuoteIds] = useState<string[]>([]);
   const [deleteInProgress, setDeleteInProgress] = useState(false);
+  const [isDbFallbackActive, setIsDbFallbackActive] = useState(false);
+  const [dbFallbackReason, setDbFallbackReason] = useState<CrmFallbackReason | null>(null);
 
   // Advanced Filters State
   const [activeFilters, setActiveFilters] = useState<FilterCriterion[]>([]);
@@ -115,6 +120,11 @@ export default function Quotes() {
     }
   }, [filters.sorts]);
 
+  const fallbackBannerText = useMemo(() => {
+    const copy = resolveCrmFallbackBannerCopy('quotes', dbFallbackReason);
+    return t(copy.key);
+  }, [dbFallbackReason, t]);
+
   useEffect(() => {
     if (!hydrated) return;
     setActive(theme);
@@ -123,12 +133,15 @@ export default function Quotes() {
   const fetchQuotes = useCallback(async () => {
     if (quotes.length === 0) setLoading(true);
     setError(null);
+    setIsDbFallbackActive(false);
+    setDbFallbackReason(null);
 
-    const fetchQuotesAttempt = async (attempt: number) => {
+    const fetchQuotesAttempt = async (attempt: number): Promise<CrmFallbackReason | null> => {
       const from = (Number(filters.page) - 1) * Number(filters.pageSize);
       const to = from + Number(filters.pageSize) - 1;
       const sortableQuoteFields = new Set(['quote_number', 'sell_price', 'status', 'created_at', 'updated_at', 'title']);
       const safeSorts = activeSorts.filter((s) => sortableQuoteFields.has(s.field));
+      let fallbackReason: CrmFallbackReason | null = null;
 
       // Determine if we need !inner join for account filtering
       const hasAccountFilter = activeFilters.some(f => f.field === 'account_name');
@@ -195,6 +208,7 @@ export default function Quotes() {
 
       const primaryResult = await query;
       if (primaryResult.error) {
+        fallbackReason = 'relations_query_failed';
         logger.warn('Primary quotes query with relations failed; using fallback query', {
           attempt,
           error: primaryResult.error,
@@ -260,7 +274,7 @@ export default function Quotes() {
           if (accountIds.length === 0) {
             setQuotes([]);
             setTotalCount(0);
-            return;
+            return fallbackReason;
           }
           fallbackQuery = fallbackQuery.in('account_id', accountIds);
         }
@@ -337,6 +351,7 @@ export default function Quotes() {
 
       setQuotes(quotesData);
       setTotalCount(count || 0);
+      return fallbackReason;
     };
 
     let lastError: unknown = null;
@@ -344,7 +359,9 @@ export default function Quotes() {
     for (let i = 0; i < RETRY_DELAYS_MS.length; i += 1) {
       const attempt = i + 1;
       try {
-        await fetchQuotesAttempt(attempt);
+        const fallbackReason = await fetchQuotesAttempt(attempt);
+        setIsDbFallbackActive(Boolean(fallbackReason));
+        setDbFallbackReason(fallbackReason);
         setLoading(false);
         return;
       } catch (error: any) {
@@ -384,6 +401,8 @@ export default function Quotes() {
       setQuotes((minimalRes.data || []) as QuoteWithRelations[]);
       setTotalCount(minimalRes.count || 0);
       setError(null);
+      setIsDbFallbackActive(true);
+      setDbFallbackReason('compatibility_mode');
       toast.error('Loaded quotes in compatibility mode');
       logger.warn('Quotes loaded in compatibility mode after retries failed', {
         error: lastError instanceof Error ? lastError.message : String(lastError || ''),
@@ -391,6 +410,8 @@ export default function Quotes() {
     } catch (minimalError: any) {
       const finalError = minimalError instanceof Error ? minimalError : new Error(minimalError?.message || 'Failed to load quotes');
       setError(finalError);
+      setIsDbFallbackActive(false);
+      setDbFallbackReason(null);
       logger.error('Quotes fetch failed in compatibility mode', {
         error: finalError.message,
         rootError: lastError instanceof Error ? lastError.message : String(lastError || ''),
@@ -758,6 +779,11 @@ export default function Quotes() {
             onRemoveFilter={handleRemoveFilter}
           />
         </div>
+        {isDbFallbackActive && (
+          <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+            {fallbackBannerText}
+          </div>
+        )}
 
         {error && (
           <Alert variant="destructive" className="mt-6 mb-6">

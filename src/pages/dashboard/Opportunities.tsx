@@ -17,12 +17,18 @@ import { Opportunity, OpportunityStage, stageColors, stageLabels } from './oppor
 import { useTheme } from '@/hooks/useTheme';
 import { useCRMModuleNavigationState } from '@/hooks/useCRMModuleNavigationState';
 import { CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
+import { PipelineService } from '@/services/pipeline-service';
+import { useTranslation } from 'react-i18next';
+import { resolveCrmFallbackBannerCopy } from './leadsListUtils';
 
 export default function Opportunities() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { supabase, context, scopedDb } = useCRM();
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isDbFallbackActive, setIsDbFallbackActive] = useState(false);
+  const [dbFallbackReason, setDbFallbackReason] = useState<'relations_query_failed' | null>(null);
   const { setActive } = useTheme();
   const {
     viewMode,
@@ -44,21 +50,22 @@ export default function Opportunities() {
   const [closeEnd, setCloseEnd] = useState<string>('');
   const [probMin, setProbMin] = useState<string>('');
   const [probMax, setProbMax] = useState<string>('');
+  const fallbackBannerText = resolveCrmFallbackBannerCopy('opportunities', dbFallbackReason).key;
 
   const fetchOpportunities = useCallback(async () => {
     try {
-      const { data, error } = await scopedDb
-        .from('opportunities')
-        .select(`
-          *,
-          accounts:account_id(name),
-          contacts:contact_id(first_name, last_name)
-        `)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
+      const { data, fallbackReason } = await PipelineService.listOpportunities(scopedDb, {
+        page: 1,
+        pageSize: 2000,
+        sortField: 'created_at',
+        sortDirection: 'desc',
+      });
+      setIsDbFallbackActive(Boolean(fallbackReason));
+      setDbFallbackReason(fallbackReason);
       setOpportunities(data as unknown as Opportunity[]);
     } catch (error: unknown) {
+      setIsDbFallbackActive(false);
+      setDbFallbackReason(null);
       const description = error instanceof Error ? error.message : String(error);
       toast.error('Failed to load opportunities', {
         description,
@@ -145,6 +152,11 @@ export default function Opportunities() {
             onImportExport={() => navigate('/dashboard/opportunities/import-export')}
           />
         </div>
+        {isDbFallbackActive && (
+          <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+            {t(fallbackBannerText)}
+          </div>
+        )}
 
         <div className="grid gap-4 md:grid-cols-3">
           <Card>

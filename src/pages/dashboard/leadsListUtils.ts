@@ -1,3 +1,5 @@
+import type { LeadApiFallbackReason } from '@/services/pipeline-service';
+
 export type LeadsListUrlState = {
   searchQuery: string;
   statusFilter: string;
@@ -65,6 +67,76 @@ type GroupableLead = {
 export const LEGACY_ALL_STATUSES_VALUE = 'allStatuses';
 export const NORMALIZED_ALL_STATUS_VALUE = 'all';
 export const LEADS_FILTER_MIGRATION_KEY = 'leads.filters.migration.v1';
+
+export type LeadsFallbackBannerCopy = {
+  key: string;
+};
+
+export type CrmFallbackReason = LeadApiFallbackReason | 'relations_query_failed' | 'compatibility_mode';
+
+export type CrmFallbackModule = 'leads' | 'quotes' | 'opportunities' | 'accounts' | 'contacts' | 'activities';
+
+export type CrmFallbackBannerCopy = {
+  key: string;
+};
+
+export function resolveCrmFallbackBannerCopy(
+  module: CrmFallbackModule,
+  reason: CrmFallbackReason | null | undefined
+): CrmFallbackBannerCopy {
+  if (reason === 'relations_query_failed') {
+    return {
+      key: `${module}.messages.relationsFallback`,
+    };
+  }
+  if (reason === 'compatibility_mode') {
+    return {
+      key: `${module}.messages.compatibilityModeFallback`,
+    };
+  }
+  if (!reason) {
+    return {
+      key: `${module}.messages.apiUnavailableFallback`,
+    };
+  }
+  if (reason === 'api_unauthorized') {
+    return {
+      key: `${module}.messages.apiUnauthorizedFallback`,
+    };
+  }
+  if (reason === 'forbidden_scope') {
+    return {
+      key: `${module}.messages.apiForbiddenScopeFallback`,
+    };
+  }
+  if (reason === 'api_unreachable') {
+    return {
+      key: `${module}.messages.apiNetworkFallback`,
+    };
+  }
+  if (reason === 'api_5xx') {
+    return {
+      key: `${module}.messages.apiServerFallback`,
+    };
+  }
+  if (reason === 'missing_token') {
+    return {
+      key: `${module}.messages.apiMissingTokenFallback`,
+    };
+  }
+  if (reason === 'missing_scope') {
+    return {
+      key: `${module}.messages.apiMissingScopeFallback`,
+    };
+  }
+  return {
+    key: `${module}.messages.apiUnavailableFallback`,
+  };
+}
+
+export function resolveLeadsFallbackBannerCopy(reason: LeadApiFallbackReason | null | undefined): LeadsFallbackBannerCopy {
+  return resolveCrmFallbackBannerCopy('leads', reason);
+}
 
 function escapeOrFilterValue(value: string): string {
   return value

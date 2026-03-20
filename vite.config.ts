@@ -9,6 +9,7 @@ const require = createRequire(import.meta.url);
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
+  const crmApiProxyTarget = env.VITE_CRM_API_PROXY_TARGET || 'http://localhost:3011';
   const enableDesignSystemFederation = env.VITE_ENABLE_DESIGN_SYSTEM_FEDERATION === 'true';
   const enableDesignSystemRemote = env.VITE_ENABLE_DESIGN_SYSTEM_REMOTE === 'true';
   let federationPlugin: PluginOption = false;
@@ -61,6 +62,11 @@ export default defineConfig(({ mode }) => {
       ].join("; "),
     },
     proxy: {
+      '/api/crm': {
+        target: crmApiProxyTarget,
+        changeOrigin: true,
+        secure: false,
+      },
       '/functions/v1': {
         target: env.VITE_SUPABASE_URL || 'https://gzhxgoigflftharcmdqj.supabase.co',
         changeOrigin: true,
@@ -71,6 +77,23 @@ export default defineConfig(({ mode }) => {
             proxyReq.removeHeader('Origin');
           });
         },
+      },
+    },
+  },
+  preview: {
+    host: "0.0.0.0",
+    port: 4173,
+    strictPort: true,
+    proxy: {
+      '/api/crm': {
+        target: crmApiProxyTarget,
+        changeOrigin: true,
+        secure: false,
+      },
+      '/functions/v1': {
+        target: env.VITE_SUPABASE_URL || 'https://gzhxgoigflftharcmdqj.supabase.co',
+        changeOrigin: true,
+        secure: false,
       },
     },
   },

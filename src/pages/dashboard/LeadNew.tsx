@@ -14,7 +14,7 @@ import { FEATURE_FLAGS, useAppFeatureFlag } from '@/lib/feature-flags';
 
 export default function LeadNew() {
   const navigate = useNavigate();
-  const { context, scopedDb } = useCRM();
+  const { context, scopedDb, supabase } = useCRM();
   const { state: viewState, setTheme, setView, setPipeline } = useLeadsViewState();
   const currentTheme = viewState.theme;
   const threeSectionLeadWorkspace = useAppFeatureFlag(FEATURE_FLAGS.LEAD_THREE_SECTION_LAYOUT);
@@ -79,15 +79,41 @@ export default function LeadNew() {
         ...(attachmentNames.length ? { attachments_names: attachmentNames } : {}),
       };
 
+      const payload = {
+        ...rest,
+        estimated_value: formData.estimated_value ? parseFloat(formData.estimated_value) : null,
+        expected_close_date: formData.expected_close_date || null,
+        custom_fields: Object.keys(customFields).length ? customFields : null,
+      };
+
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token || '';
+      const response = await fetch('/api/crm/v1/leads', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          'x-tenant-id': tenantId,
+          ...(formData.franchise_id || context.franchiseId ? { 'x-franchise-id': formData.franchise_id || context.franchiseId } : {}),
+          ...(context.userId ? { 'x-user-id': context.userId } : {}),
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (response.ok) {
+        const apiPayload = await response.json().catch(() => null);
+        if (apiPayload?.data) {
+          return apiPayload.data;
+        }
+      }
+
       const { data, error } = await scopedDb
         .from('leads')
         .insert({
-          ...rest,
+          ...payload,
           tenant_id: tenantId,
           franchise_id: formData.franchise_id || context.franchiseId,
-          estimated_value: formData.estimated_value ? parseFloat(formData.estimated_value) : null,
-          expected_close_date: formData.expected_close_date || null,
-          custom_fields: Object.keys(customFields).length ? customFields : null,
         })
         .select()
         .single();

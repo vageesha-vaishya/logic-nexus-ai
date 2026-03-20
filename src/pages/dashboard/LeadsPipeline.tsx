@@ -25,7 +25,9 @@ import { logger } from '@/lib/logger';
 import * as Sentry from '@sentry/react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PipelineService } from '@/services/pipeline-service';
+import type { LeadApiFallbackReason } from '@/services/pipeline-service';
 import { CRM_HEADER_PRIMARY_CONTROL_SEQUENCE, CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
+import { resolveLeadsFallbackBannerCopy } from './leadsListUtils';
 
 const stageBarColor: Record<LeadStatus, string> = {
   new: 'bg-red-500/80',
@@ -94,6 +96,8 @@ export default function LeadsPipeline() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isDbFallbackActive, setIsDbFallbackActive] = useState(false);
+  const [dbFallbackReason, setDbFallbackReason] = useState<LeadApiFallbackReason | null>(null);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const [isCreateTaskOpen, setIsCreateTaskOpen] = useState(false);
   const [isSavingTask, setIsSavingTask] = useState(false);
@@ -296,6 +300,19 @@ export default function LeadsPipeline() {
   }, [setSearchParams]);
 
   const currencySymbol = t('leads.pipeline.currencySymbol', ' €');
+  const resolveCrmApiContext = useCallback(async () => {
+    let { data: sessionData } = await supabase.auth.getSession();
+    if (!sessionData?.session?.access_token) {
+      const { data: refreshedSession } = await supabase.auth.refreshSession();
+      sessionData = refreshedSession;
+    }
+    return {
+      accessToken: sessionData?.session?.access_token || null,
+      tenantId: context?.tenantId || null,
+      franchiseId: context?.franchiseId || null,
+      userId: context?.userId || null,
+    };
+  }, [context?.franchiseId, context?.tenantId, context?.userId, supabase.auth]);
 
   // Stable fetch function - no dependencies on filter state
   const fetchLeads = useCallback(async () => {
@@ -303,7 +320,12 @@ export default function LeadsPipeline() {
     
     setLoading(true);
     try {
-      const { data } = await PipelineService.listLeads(scopedDb, {
+      const crmApiContext = await resolveCrmApiContext();
+      const shouldUseCrmApi = Boolean(
+        crmApiContext.accessToken &&
+        (crmApiContext.tenantId || !context?.isPlatformAdmin)
+      );
+      const { data, source, fallbackReason } = await PipelineService.listLeads(scopedDb, {
         page: 1,
         pageSize: 2000,
         search: searchQuery || undefined,
@@ -312,7 +334,10 @@ export default function LeadsPipeline() {
         statuses: selectedStages,
         sources: selectedSources,
         customFieldFilters: selectedCustomFieldPairs,
-      });
+      }, shouldUseCrmApi ? crmApiContext : undefined);
+      const showFallback = shouldUseCrmApi && source === 'scopedDb';
+      setIsDbFallbackActive(showFallback);
+      setDbFallbackReason(showFallback ? fallbackReason : null);
       
       const incomingLeads = (data as any[]) || [];
       const invalidStatusCounts = incomingLeads.reduce<Record<string, number>>((acc, lead) => {
@@ -339,6 +364,8 @@ export default function LeadsPipeline() {
 
       setLeads(safeLeads);
     } catch (error) {
+      setIsDbFallbackActive(false);
+      setDbFallbackReason(null);
       logger.error('Failed to fetch leads (pipeline)', {
         error: error instanceof Error ? error.message : String(error),
       });
@@ -360,7 +387,13 @@ export default function LeadsPipeline() {
     selectedStages.join(','),
     selectedSources.join(','),
     selectedCustomFieldTokens.join(','),
+    resolveCrmApiContext,
   ]);
+
+  const fallbackBannerText = useMemo(() => {
+    const copy = resolveLeadsFallbackBannerCopy(dbFallbackReason);
+    return t(copy.key);
+  }, [dbFallbackReason, t]);
 
   const fetchTasks = useCallback(async () => {
     if (!isContextReady) return;
@@ -538,11 +571,12 @@ export default function LeadsPipeline() {
     if (!isContextReady) return;
 
     try {
+      const crmApiContext = await resolveCrmApiContext();
       const result = await PipelineService.transitionLeadStage(scopedDb, {
         id: leadId,
         toStatus: newStatus,
         expectedUpdatedAt: previousLead.updated_at,
-      });
+      }, crmApiContext);
 
       if (result.ok === false) {
         if (result.code === 'conflict') {
@@ -565,7 +599,7 @@ export default function LeadsPipeline() {
       toast.error('Failed to update status');
       fetchLeads();
     }
-  }, [leads, isContextReady, scopedDb, fetchLeads]);
+  }, [leads, isContextReady, scopedDb, fetchLeads, resolveCrmApiContext]);
 
   const handleItemUpdate = useCallback(async (id: string, updates: Partial<KanbanItem>) => {
     const previousLead = leads.find((lead) => lead.id === id);
@@ -591,6 +625,7 @@ export default function LeadsPipeline() {
     if (!isContextReady) return;
 
     try {
+      const crmApiContext = await resolveCrmApiContext();
       const result = await PipelineService.updateLead(scopedDb, {
         id,
         input: {
@@ -611,7 +646,7 @@ export default function LeadsPipeline() {
           custom_fields: optimisticLead.custom_fields,
         },
         expectedUpdatedAt: previousLead.updated_at,
-      });
+      }, crmApiContext);
 
       if (result.ok === false) {
         if (result.code === 'conflict') {
@@ -640,13 +675,62 @@ export default function LeadsPipeline() {
       toast.error('Failed to update lead');
       fetchLeads();
     }
-  }, [leads, isContextReady, scopedDb, fetchLeads]);
+  }, [leads, isContextReady, scopedDb, fetchLeads, resolveCrmApiContext]);
 
   const onDragEnd = useCallback((activeId: string, overId: string, newStatus: string) => {
     if (stages.includes(newStatus as LeadStatus)) {
       handleStatusChange(activeId, newStatus as LeadStatus);
     }
   }, [handleStatusChange]);
+
+  const handleDeleteLead = useCallback(async (id: string) => {
+    const targetLead = leads.find((lead) => lead.id === id);
+    if (!targetLead) return;
+    const confirmed = window.confirm(t('leads.messages.deleteSingleConfirm', 'Delete this lead?'));
+    if (!confirmed) return;
+    const previousLeads = leads;
+    setLeads((prev) => prev.filter((lead) => lead.id !== id));
+    if (!isContextReady) return;
+    try {
+      const crmApiContext = await resolveCrmApiContext();
+      await PipelineService.deleteLead(scopedDb, id, crmApiContext);
+      toast.success(t('leads.messages.deleteSingleSuccess', 'Lead deleted'));
+    } catch (error) {
+      console.error('Error deleting lead:', error);
+      setLeads(previousLeads);
+      toast.error(t('leads.messages.deleteError', 'Failed to delete lead'));
+    }
+  }, [leads, isContextReady, resolveCrmApiContext, scopedDb, t]);
+
+  const handleDeleteColumnLeads = useCallback(async (columnId: string, itemIds: string[]) => {
+    if (itemIds.length === 0) return;
+    const columnLabel = statusConfig[columnId as LeadStatus]?.label || columnId;
+    const confirmed = window.confirm(
+      t('leads.messages.deleteColumnConfirm', {
+        count: itemIds.length,
+        column: columnLabel,
+        defaultValue: `Delete ${itemIds.length} leads from ${columnLabel}?`,
+      })
+    );
+    if (!confirmed) return;
+    const previousLeads = leads;
+    setLeads((prev) => prev.filter((lead) => !itemIds.includes(lead.id)));
+    if (!isContextReady) return;
+    try {
+      const crmApiContext = await resolveCrmApiContext();
+      const deletedCount = await PipelineService.deleteLeads(scopedDb, itemIds, crmApiContext);
+      toast.success(
+        t('leads.messages.deleteSuccess', {
+          count: deletedCount,
+          defaultValue: `${deletedCount} leads deleted`,
+        })
+      );
+    } catch (error) {
+      console.error('Error deleting leads:', error);
+      setLeads(previousLeads);
+      toast.error(t('leads.messages.deleteError', 'Failed to delete lead'));
+    }
+  }, [isContextReady, leads, resolveCrmApiContext, scopedDb, t]);
 
   // Filter logic - memoized
   const filteredLeads = useMemo(() => {
@@ -782,26 +866,20 @@ export default function LeadsPipeline() {
     return Array.from(optionMap.values()).sort((a, b) => a.label.localeCompare(b.label)).slice(0, 50);
   }, [leads]);
 
-  const handleNavigateAway = useCallback((mode: LeadsPrimaryView) => {
-    if (mode === 'pipeline') {
-      handleViewChange('board');
-      return;
+  const handleNavigateAway = useCallback((mode: Exclude<LeadsPrimaryView, 'pipeline'>) => {
+    isNavigatingAwayFromPipeline.current = true;
+    try {
+      localStorage.setItem('leadsViewMode', mode);
+    } catch {
+      void 0;
     }
-    if (mode !== 'pipeline') {
-      isNavigatingAwayFromPipeline.current = true;
-      try {
-        localStorage.setItem('leadsViewMode', mode);
-      } catch {
-        void 0;
-      }
-      setView(mode as any);
-      setWorkspace({
-        searchQuery,
-        statusFilter: selectedStages.length === 1 ? selectedStages[0] : 'all',
-      });
-      navigate('/dashboard/leads');
-    }
-  }, [handleViewChange, navigate, searchQuery, selectedStages, setView, setWorkspace]);
+    setView(mode as any);
+    setWorkspace({
+      searchQuery,
+      statusFilter: selectedStages.length === 1 ? selectedStages[0] : 'all',
+    });
+    navigate('/dashboard/leads');
+  }, [navigate, searchQuery, selectedStages, setView, setWorkspace]);
 
   // Show skeleton while waiting for context or initial load
   if (!isContextReady || !initialLoadComplete) {
@@ -839,7 +917,7 @@ export default function LeadsPipeline() {
               moduleLabel="Leads"
               viewMode="pipeline"
               theme={currentTheme}
-              onViewModeChange={(mode) => handleNavigateAway(mode as LeadsPrimaryView)}
+              onViewModeChange={(mode) => handleNavigateAway(mode as Exclude<LeadsPrimaryView, 'pipeline'>)}
               analyticsLabel={t('leads.tabs.analytics', 'Analytics')}
               analyticsActive={currentView === 'analytics'}
               onAnalyticsClick={() => handleViewChange('analytics')}
@@ -876,6 +954,11 @@ export default function LeadsPipeline() {
             <TabsContent value="board" className="mt-0 flex flex-col gap-6 h-full">
               <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 flex-1 min-h-0">
                 <div className="lg:col-span-3 flex flex-col gap-4 h-full min-h-0">
+                  {isDbFallbackActive && (
+                    <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                      {fallbackBannerText}
+                    </div>
+                  )}
                   {/* Filters */}
                   <div className="flex-none">
                     <Card className="rounded-md border-muted">
@@ -974,6 +1057,8 @@ export default function LeadsPipeline() {
                         onDragEnd={onDragEnd} 
                         onItemUpdate={handleItemUpdate}
                         onItemClick={(id) => navigate(`/dashboard/leads/${id}`)}
+                        onItemDelete={handleDeleteLead}
+                        onColumnDelete={handleDeleteColumnLeads}
                         className="h-full"
                         scrollPersistenceKey="leads-pipeline-board"
                         themeVariant="reference"

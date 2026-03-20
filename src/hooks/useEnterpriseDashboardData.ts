@@ -57,25 +57,46 @@ export function useEnterpriseDashboardData({ profile, emphasis }: UseEnterpriseD
 
     const run = async () => {
       const countRequest = async (table: string, status?: string) => {
-        let query = scopedDb.from(table).select('*', { count: 'exact', head: true });
-        if (status) {
-          query = query.eq('status', status);
+        try {
+          let query = scopedDb.from(table).select('*', { count: 'exact', head: true });
+          if (status) {
+            query = query.eq('status', status);
+          }
+          const { count, error } = await query;
+          if (error) {
+            return 0;
+          }
+          return count ?? 0;
+        } catch {
+          return 0;
         }
-        const { count } = await query;
-        return count ?? 0;
       };
 
-      const [shipmentsCount, leadsCount, opportunitiesCount, quotesCount, exceptionsCount, activitiesResult] = await Promise.all([
+      const activitiesRequest = async () => {
+        try {
+          const { data, error } = await scopedDb
+            .from('activities')
+            .select('subject, status')
+            .order('updated_at', { ascending: false })
+            .limit(4);
+
+          if (error) {
+            return [];
+          }
+
+          return data ?? [];
+        } catch {
+          return [];
+        }
+      };
+
+      const [shipmentsCount, leadsCount, opportunitiesCount, quotesCount, exceptionsCount, activities] = await Promise.all([
         countRequest('shipments'),
         countRequest('leads'),
         countRequest('opportunities'),
         countRequest('quotes'),
         countRequest('shipments', 'delayed'),
-        scopedDb
-          .from('activities')
-          .select('subject, status')
-          .order('updated_at', { ascending: false })
-          .limit(4),
+        activitiesRequest(),
       ]);
 
       if (!mounted) {
@@ -117,7 +138,7 @@ export function useEnterpriseDashboardData({ profile, emphasis }: UseEnterpriseD
             ];
 
       const activityRows: EnterpriseFeedRow[] =
-        activitiesResult.data?.map((row: { subject: string | null; status: string | null }, index: number) => ({
+        activities.map((row: { subject: string | null; status: string | null }, index: number) => ({
           account: `Account ${index + 1}`,
           event: row.subject || 'Activity update received',
           owner: 'Operations Desk',
@@ -134,10 +155,7 @@ export function useEnterpriseDashboardData({ profile, emphasis }: UseEnterpriseD
           activityRows.length > 0
             ? activityRows
             : [
-                { account: 'Atlas Industrial', event: 'Shipment ETD changed', owner: 'Ops Team A', status: 'Mitigating', eta: '12m' },
-                { account: 'Nordic Retail', event: 'Quote approved by finance', owner: 'Sales AM 03', status: 'Ready', eta: 'Now' },
-                { account: 'BluePeak Logistics', event: 'Customs hold released', owner: 'Broker Team', status: 'Resolved', eta: '5m' },
-                { account: 'Harbor Foods', event: 'Capacity request pending', owner: 'Procurement', status: 'Escalated', eta: '28m' },
+                { account: 'No records', event: 'No recent activity available', owner: 'System', status: 'In Progress', eta: 'N/A' },
               ],
       });
     };
@@ -149,16 +167,16 @@ export function useEnterpriseDashboardData({ profile, emphasis }: UseEnterpriseD
       const fallbackKpis =
         profile === 'operations'
           ? [
-              { label: 'Active Shipments', value: '1,284', delta: '+8.2%', tone: 'text-emerald-600' },
-              { label: 'On-Time Delivery', value: '96.4%', delta: '+1.5%', tone: 'text-emerald-600' },
-              { label: 'Open Exceptions', value: '23', delta: '-14.8%', tone: 'text-amber-600' },
-              { label: 'Avg Handling Time', value: '2h 18m', delta: '-11.3%', tone: 'text-emerald-600' },
+              { label: 'Active Shipments', value: '0', delta: 'No live data', tone: 'text-emerald-600' },
+              { label: 'On-Time Delivery', value: '0%', delta: 'No live data', tone: 'text-emerald-600' },
+              { label: 'Open Exceptions', value: '0', delta: 'No live data', tone: 'text-amber-600' },
+              { label: 'Avg Handling Time', value: '0m', delta: 'No live data', tone: 'text-emerald-600' },
             ]
           : [
-              { label: 'Revenue (MTD)', value: '$4.82M', delta: '+12.1%', tone: 'text-emerald-600' },
-              { label: 'Gross Margin', value: '24.7%', delta: '+1.9%', tone: 'text-emerald-600' },
-              { label: 'Quote Win Rate', value: '37.6%', delta: '+3.2%', tone: 'text-emerald-600' },
-              { label: 'Pipeline Coverage', value: '3.4x', delta: '+0.6x', tone: 'text-emerald-600' },
+              { label: 'Revenue (MTD)', value: '$0', delta: 'No live data', tone: 'text-emerald-600' },
+              { label: 'Gross Margin', value: '0%', delta: 'No live data', tone: 'text-emerald-600' },
+              { label: 'Quote Win Rate', value: '0%', delta: 'No live data', tone: 'text-emerald-600' },
+              { label: 'Pipeline Coverage', value: '0x', delta: 'No live data', tone: 'text-emerald-600' },
             ];
 
       setState({
@@ -168,22 +186,19 @@ export function useEnterpriseDashboardData({ profile, emphasis }: UseEnterpriseD
         lanes:
           emphasis === 'throughput'
             ? [
-                { name: 'Intake Queue', value: 132, progress: 72, badge: 'Needs Triage', badgeTone: 'secondary' },
-                { name: 'Dispatching', value: 89, progress: 64, badge: 'In Progress', badgeTone: 'default' },
-                { name: 'In Transit', value: 406, progress: 88, badge: 'Healthy', badgeTone: 'outline' },
-                { name: 'Proof of Delivery', value: 57, progress: 46, badge: 'Review', badgeTone: 'secondary' },
+                { name: 'Intake Queue', value: 0, progress: 12, badge: 'Needs Triage', badgeTone: 'secondary' },
+                { name: 'Dispatching', value: 0, progress: 12, badge: 'In Progress', badgeTone: 'default' },
+                { name: 'In Transit', value: 0, progress: 12, badge: 'Healthy', badgeTone: 'outline' },
+                { name: 'Proof of Delivery', value: 0, progress: 12, badge: 'Review', badgeTone: 'secondary' },
               ]
             : [
-                { name: 'High-Margin Opportunities', value: 41, progress: 81, badge: 'Growth', badgeTone: 'default' },
-                { name: 'Carrier Cost Variance', value: 18, progress: 58, badge: 'Watchlist', badgeTone: 'secondary' },
-                { name: 'Rate Expiry (7d)', value: 12, progress: 37, badge: 'Renew', badgeTone: 'outline' },
-                { name: 'Discount Exceptions', value: 9, progress: 24, badge: 'Approval', badgeTone: 'secondary' },
+                { name: 'High-Margin Opportunities', value: 0, progress: 12, badge: 'Growth', badgeTone: 'default' },
+                { name: 'Carrier Cost Variance', value: 0, progress: 12, badge: 'Watchlist', badgeTone: 'secondary' },
+                { name: 'Rate Expiry (7d)', value: 0, progress: 12, badge: 'Renew', badgeTone: 'outline' },
+                { name: 'Discount Exceptions', value: 0, progress: 12, badge: 'Approval', badgeTone: 'secondary' },
               ],
         activityRows: [
-          { account: 'Atlas Industrial', event: 'Shipment ETD changed', owner: 'Ops Team A', status: 'Mitigating', eta: '12m' },
-          { account: 'Nordic Retail', event: 'Quote approved by finance', owner: 'Sales AM 03', status: 'Ready', eta: 'Now' },
-          { account: 'BluePeak Logistics', event: 'Customs hold released', owner: 'Broker Team', status: 'Resolved', eta: '5m' },
-          { account: 'Harbor Foods', event: 'Capacity request pending', owner: 'Procurement', status: 'Escalated', eta: '28m' },
+          { account: 'No records', event: 'No recent activity available', owner: 'System', status: 'In Progress', eta: 'N/A' },
         ],
       });
     });

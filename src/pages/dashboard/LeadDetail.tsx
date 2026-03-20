@@ -115,6 +115,19 @@ export default function LeadDetail() {
     navigate('/dashboard/leads');
   }, [navigate, scopedDb, setPipeline, setView]);
 
+  const getCrmApiHeaders = useCallback(async () => {
+    const session = await supabase.auth.getSession();
+    const token = session.data.session?.access_token || '';
+    const tenantId = context.tenantId || '';
+    return {
+      'Content-Type': 'application/json',
+      ...(tenantId ? { 'x-tenant-id': tenantId } : {}),
+      ...(context.franchiseId ? { 'x-franchise-id': context.franchiseId } : {}),
+      ...(context.userId ? { 'x-user-id': context.userId } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    };
+  }, [context.franchiseId, context.tenantId, context.userId, supabase.auth]);
+
   useEffect(() => {
     if (location.state && (location.state as any).openComposer) {
       const state = location.state as any;
@@ -156,6 +169,20 @@ export default function LeadDetail() {
 
   const fetchLead = useCallback(async () => {
     try {
+      const headers = await getCrmApiHeaders();
+      const response = await fetch(`/api/crm/v1/leads/${encodeURIComponent(String(id || ''))}`, {
+        method: 'GET',
+        credentials: 'include',
+        headers,
+      });
+      if (response.ok) {
+        const payload = await response.json().catch(() => null);
+        if (payload?.data) {
+          setLead(payload.data as Lead);
+          return;
+        }
+      }
+
       const { data, error } = await scopedDb
         .from('leads')
         .select('*')
@@ -171,7 +198,7 @@ export default function LeadDetail() {
     } finally {
       setLoading(false);
     }
-  }, [id, scopedDb]);
+  }, [getCrmApiHeaders, id, scopedDb]);
 
   const upsertLeadDescription = useCallback(async (nextDescription: string) => {
     if (!id || !context.tenantId) return;
@@ -515,16 +542,27 @@ export default function LeadDetail() {
         ...(attachmentNames.length ? { attachments_names: attachmentNames } : {}),
       };
 
-      const { error } = await supabase
-        .from('leads')
-        .update({
-          ...payload,
-          estimated_value: formData.estimated_value ? parseFloat(formData.estimated_value) : null,
-          custom_fields: Object.keys(mergedCustomFields as Record<string, unknown>).length ? mergedCustomFields : null,
-        })
-        .eq('id', id);
+      const updatePayload = {
+        ...payload,
+        estimated_value: formData.estimated_value ? parseFloat(formData.estimated_value) : null,
+        custom_fields: Object.keys(mergedCustomFields as Record<string, unknown>).length ? mergedCustomFields : null,
+      };
 
-      if (error) throw error;
+      const headers = await getCrmApiHeaders();
+      const response = await fetch(`/api/crm/v1/leads/${encodeURIComponent(String(id || ''))}`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers,
+        body: JSON.stringify(updatePayload),
+      });
+
+      if (!response.ok) {
+        const { error } = await scopedDb
+          .from('leads')
+          .update(updatePayload)
+          .eq('id', id);
+        if (error) throw error;
+      }
 
       if (!options?.silent) {
         toast.success('Lead updated successfully');
@@ -557,12 +595,19 @@ export default function LeadDetail() {
 
   const handleDelete = async () => {
     try {
-      const { error } = await scopedDb
-        .from('leads')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
+      const headers = await getCrmApiHeaders();
+      const response = await fetch(`/api/crm/v1/leads/${encodeURIComponent(String(id || ''))}`, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers,
+      });
+      if (!response.ok) {
+        const { error } = await scopedDb
+          .from('leads')
+          .delete()
+          .eq('id', id);
+        if (error) throw error;
+      }
 
       toast.success('Lead deleted successfully');
       navigate('/dashboard/leads');

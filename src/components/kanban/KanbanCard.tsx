@@ -8,7 +8,8 @@ import { cn } from "@/lib/utils";
 import { motion, useMotionValue } from "framer-motion";
 import { memo } from "react";
 import { EditableText } from "@/components/ui/editable-text";
-import { ExternalLink, GripVertical } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { ExternalLink, MoreHorizontal, Trash2 } from "lucide-react";
 
 export interface KanbanItem {
   id: string;
@@ -36,10 +37,11 @@ interface KanbanCardProps {
   isOverlay?: boolean;
   onUpdate?: (id: string, updates: Partial<KanbanItem>) => Promise<void>;
   onView?: (id: string) => void;
+  onDelete?: (id: string) => Promise<void> | void;
   themeVariant?: "default" | "reference";
 }
 
-export const KanbanCard = memo(function KanbanCard({ item, isOverlay, onUpdate, onView, themeVariant = "default" }: KanbanCardProps) {
+export const KanbanCard = memo(function KanbanCard({ item, isOverlay, onUpdate, onView, onDelete, themeVariant = "default" }: KanbanCardProps) {
   const {
     setNodeRef,
     attributes,
@@ -143,20 +145,48 @@ export const KanbanCard = memo(function KanbanCard({ item, isOverlay, onUpdate, 
                 </div>
               </div>
               
-              {onView && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6 -mr-1 -mt-1 text-muted-foreground hover:text-foreground"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onView(item.id);
-                  }}
-                  onPointerDown={(e) => e.stopPropagation()}
-                >
-                  <ExternalLink className="h-3 w-3" />
-                </Button>
-              )}
+              <div className="flex items-center gap-1">
+                {onView && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 -mr-1 -mt-1 text-muted-foreground hover:text-foreground"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onView(item.id);
+                    }}
+                    onPointerDown={(e) => e.stopPropagation()}
+                  >
+                    <ExternalLink className="h-3 w-3" />
+                  </Button>
+                )}
+                {onDelete && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 -mr-1 -mt-1 text-muted-foreground hover:text-foreground"
+                        onPointerDown={(e) => e.stopPropagation()}
+                      >
+                        <MoreHorizontal className="h-3 w-3" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void onDelete(item.id);
+                        }}
+                      >
+                        <Trash2 className="mr-2 h-3.5 w-3.5" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+              </div>
             </div>
 
             {item.subtitle && (

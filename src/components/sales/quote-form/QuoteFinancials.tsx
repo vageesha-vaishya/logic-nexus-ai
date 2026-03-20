@@ -11,13 +11,14 @@ import { useCRM } from '@/hooks/useCRM';
 import { invokeFunction } from '@/lib/supabase-functions';
 import { toast } from 'sonner';
 import { PluginRegistry } from '@/services/plugins/PluginRegistry';
-import { LogisticsPlugin } from '@/plugins/logistics/LogisticsPlugin';
+import { useDomain } from '@/contexts/DomainContext';
 import { RequestContext, QuoteResult } from '@/services/quotation/types';
 import { PricingService } from '@/services/pricing.service';
 
 export function QuoteFinancials() {
   const { control, setValue } = useFormContext();
-  const { supabase } = useCRM();
+  const { supabase, context: crmContext } = useCRM();
+  const { currentDomain } = useDomain();
   
   const [isVerifying, setIsVerifying] = useState(false);
   const [isCalculating, setIsCalculating] = useState(false);
@@ -54,24 +55,35 @@ export function QuoteFinancials() {
 
   const hasItems = (formItems && formItems.length > 0) || (cargoConfigs && cargoConfigs.length > 0);
   const showZeroWarning = total === 0 && hasItems;
+  const calculationBreakdown = (calculationResult?.breakdown || {}) as Record<string, any>;
+  const freightAmount = Number(calculationBreakdown.freight || 0);
+  const marginAmount = Number(calculationBreakdown.margin_amount || 0);
+  const appliedRules = Array.isArray(calculationBreakdown.applied_rules) ? calculationBreakdown.applied_rules : [];
+  const surcharges =
+    calculationBreakdown.surcharges && typeof calculationBreakdown.surcharges === 'object'
+      ? (calculationBreakdown.surcharges as Record<string, unknown>)
+      : {};
 
   const handleCalculateEstimate = async () => {
     setIsCalculating(true);
     setCalculationResult(null);
     try {
-        const logisticsPlugin = PluginRegistry.getPlugin('plugin-logistics-core') as LogisticsPlugin;
-
-        if (!logisticsPlugin) {
-            throw new Error('Logistics plugin not initialized or not found');
+        const domainCode = String(currentDomain?.code || 'LOGISTICS').toUpperCase();
+        const plugin = PluginRegistry.getPluginByDomain(domainCode) || PluginRegistry.getPlugin('plugin-logistics-core');
+        if (!plugin) {
+            throw new Error(`Plugin not initialized for domain ${domainCode}`);
         }
+        if (!crmContext.tenantId) {
+            throw new Error('Missing tenant context');
+        }
+        const engine = plugin.getQuotationEngine();
 
-        const engine = logisticsPlugin.getQuotationEngine();
-
-        const context: RequestContext = {
-            tenantId: 'current-tenant', // Should come from auth context
-            domainId: 'logistics',
+        const requestContext: RequestContext = {
+            tenantId: crmContext.tenantId,
+            domainId: String(currentDomain?.id || domainCode).toLowerCase(),
             currency: 'USD',
             metadata: {
+                domainCode,
                 mode: formMode || 'ocean', // Default or map from service_type_id
                 incoterms: incoterms || 'EXW'
             }
@@ -115,7 +127,7 @@ export function QuoteFinancials() {
             return;
         }
 
-        let result = await engine.calculate(context, engineItems);
+        let result = await engine.calculate(requestContext, engineItems);
 
         // Apply Margin Rules via PricingService
         try {
@@ -158,7 +170,7 @@ export function QuoteFinancials() {
 
   const applyCalculation = () => {
       if (calculationResult) {
-          setValue('shipping_amount', calculationResult.breakdown.freight.toFixed(2));
+          setValue('shipping_amount', freightAmount.toFixed(2));
           // Could also set surcharges to notes or a breakdown field if available
           toast.success('Applied calculated freight to Shipping Amount');
       }
@@ -254,7 +266,7 @@ export function QuoteFinancials() {
                                 <div className="absolute z-10 top-8 right-0 w-64 p-3 bg-white border rounded-md shadow-lg animate-in fade-in slide-in-from-top-1">
                                     <div className="flex justify-between items-center mb-2">
                                         <span className="text-xs font-semibold">Est. Freight:</span>
-                                        <span className="text-sm font-bold text-green-600">${calculationResult.breakdown.freight.toFixed(2)}</span>
+                                        <span className="text-sm font-bold text-green-600">${freightAmount.toFixed(2)}</span>
                                     </div>
                                     <Button 
                                         type="button" 
@@ -334,20 +346,20 @@ export function QuoteFinancials() {
                           <div className="space-y-2 text-sm">
                               <div className="flex justify-between">
                                   <span className="text-muted-foreground">Base Freight:</span>
-                                  <span className="font-medium">${calculationResult.breakdown.freight?.toFixed(2) || '0.00'}</span>
+                                  <span className="font-medium">${freightAmount.toFixed(2)}</span>
                               </div>
-                              {calculationResult.breakdown.margin_amount > 0 && (
+                              {marginAmount > 0 && (
                                   <div className="flex justify-between text-green-600">
                                       <span className="text-muted-foreground">Margin:</span>
-                                      <span className="font-medium">+${Number(calculationResult.breakdown.margin_amount).toFixed(2)}</span>
+                                      <span className="font-medium">+${marginAmount.toFixed(2)}</span>
                                   </div>
                               )}
-                              {calculationResult.breakdown.applied_rules?.length > 0 && (
+                              {appliedRules.length > 0 && (
                                   <div className="text-xs text-muted-foreground italic">
-                                      Rules: {calculationResult.breakdown.applied_rules.join(', ')}
+                                      Rules: {appliedRules.join(', ')}
                                   </div>
                               )}
-                              {Object.entries(calculationResult.breakdown.surcharges || {}).map(([key, value]) => (
+                              {Object.entries(surcharges).map(([key, value]) => (
                                   <div key={key} className="flex justify-between text-xs">
                                       <span className="text-muted-foreground">{key}:</span>
                                       <span>${Number(value).toFixed(2)}</span>

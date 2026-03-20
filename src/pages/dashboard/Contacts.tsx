@@ -14,6 +14,9 @@ import { toast } from 'sonner';
 import { useTheme } from '@/hooks/useTheme';
 import { useCRMModuleNavigationState } from '@/hooks/useCRMModuleNavigationState';
 import { CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
+import { PipelineService } from '@/services/pipeline-service';
+import { useTranslation } from 'react-i18next';
+import { resolveCrmFallbackBannerCopy } from './leadsListUtils';
 
 interface Contact {
   id: string;
@@ -28,11 +31,14 @@ interface Contact {
 }
 
 export default function Contacts() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const { supabase, context, scopedDb } = useCRM();
+  const [isDbFallbackActive, setIsDbFallbackActive] = useState(false);
+  const [dbFallbackReason, setDbFallbackReason] = useState<'relations_query_failed' | null>(null);
+  const { context, scopedDb } = useCRM();
   const { setActive } = useTheme();
   const {
     viewMode,
@@ -52,27 +58,33 @@ export default function Contacts() {
   const fetchContacts = useCallback(async () => {
     try {
       console.log('Contacts: fetching with scopedDb', scopedDb.accessContext);
-      const { data, error } = await scopedDb
-        .from('contacts')
-        .select('*, accounts(name)')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
+      const { data, fallbackReason } = await PipelineService.listContacts(scopedDb, {
+        page: 1,
+        pageSize: 2000,
+        sortField: 'created_at',
+        sortDirection: 'desc',
+      });
+      setIsDbFallbackActive(Boolean(fallbackReason));
+      setDbFallbackReason(fallbackReason);
 
       console.log(`Contacts: fetched ${data?.length} records`);
       if (data && data.length > 0) {
         console.log('Contacts: first record tenant_id:', (data[0] as any).tenant_id);
       }
 
-      setContacts((data as unknown as Contact[]) || []);
+      setContacts((data as Contact[]) || []);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
+      setIsDbFallbackActive(false);
+      setDbFallbackReason(null);
       toast.error('Failed to load contacts');
       console.error('Error:', message);
     } finally {
       setLoading(false);
     }
   }, [scopedDb]);
+
+  const fallbackBannerText = t(resolveCrmFallbackBannerCopy('contacts', dbFallbackReason).key);
 
   useEffect(() => {
     fetchContacts();
@@ -136,6 +148,11 @@ export default function Contacts() {
           className="pl-10"
         />
       </div>
+      {isDbFallbackActive && (
+        <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          {fallbackBannerText}
+        </div>
+      )}
 
       {loading ? (
         <div className="text-center py-12">

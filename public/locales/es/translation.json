@@ -91,7 +91,14 @@
       "statusUpdate": "Lead movido a {{status}}",
       "leadUpdate": "Lead actualizado",
       "updateError": "Error al actualizar lead",
-      "statusError": "Error al actualizar estado"
+      "statusError": "Error al actualizar estado",
+      "apiUnavailableFallback": "API no disponible, mostrando respaldo de BD",
+      "apiUnauthorizedFallback": "Sesión expirada, mostrando respaldo de BD",
+      "apiForbiddenScopeFallback": "Ámbito de acceso no válido, mostrando respaldo de BD",
+      "apiNetworkFallback": "API de CRM inalcanzable, mostrando respaldo de BD",
+      "apiServerFallback": "Error del API de CRM, mostrando respaldo de BD",
+      "apiMissingTokenFallback": "Autenticación faltante, mostrando respaldo de BD",
+      "apiMissingScopeFallback": "Falta el ámbito de tenant, mostrando respaldo de BD"
     },
     "tabs": {
       "board": "Tablero Kanban",
@@ -104,6 +111,46 @@
     },
     "bulk": {
       "selected": "{{count}} seleccionados"
+    }
+  }
+  ,
+  "accounts": {
+    "messages": {
+      "apiUnavailableFallback": "API no disponible, mostrando respaldo de BD",
+      "apiUnauthorizedFallback": "Sesión expirada, mostrando respaldo de BD",
+      "apiForbiddenScopeFallback": "Ámbito de acceso no válido, mostrando respaldo de BD",
+      "apiNetworkFallback": "API de CRM inalcanzable, mostrando respaldo de BD",
+      "apiServerFallback": "Error del API de CRM, mostrando respaldo de BD",
+      "apiMissingTokenFallback": "Autenticación faltante, mostrando respaldo de BD",
+      "apiMissingScopeFallback": "Falta el ámbito de tenant, mostrando respaldo de BD",
+      "relationsFallback": "Datos de relación de cuentas no disponibles, mostrando registros base",
+      "compatibilityModeFallback": "Modo de compatibilidad activo, mostrando registros base"
+    }
+  },
+  "contacts": {
+    "messages": {
+      "apiUnavailableFallback": "API no disponible, mostrando respaldo de BD",
+      "apiUnauthorizedFallback": "Sesión expirada, mostrando respaldo de BD",
+      "apiForbiddenScopeFallback": "Ámbito de acceso no válido, mostrando respaldo de BD",
+      "apiNetworkFallback": "API de CRM inalcanzable, mostrando respaldo de BD",
+      "apiServerFallback": "Error del API de CRM, mostrando respaldo de BD",
+      "apiMissingTokenFallback": "Autenticación faltante, mostrando respaldo de BD",
+      "apiMissingScopeFallback": "Falta el ámbito de tenant, mostrando respaldo de BD",
+      "relationsFallback": "Datos de relación de contactos no disponibles, mostrando registros base",
+      "compatibilityModeFallback": "Modo de compatibilidad activo, mostrando registros base"
+    }
+  },
+  "activities": {
+    "messages": {
+      "apiUnavailableFallback": "API no disponible, mostrando respaldo de BD",
+      "apiUnauthorizedFallback": "Sesión expirada, mostrando respaldo de BD",
+      "apiForbiddenScopeFallback": "Ámbito de acceso no válido, mostrando respaldo de BD",
+      "apiNetworkFallback": "API de CRM inalcanzable, mostrando respaldo de BD",
+      "apiServerFallback": "Error del API de CRM, mostrando respaldo de BD",
+      "apiMissingTokenFallback": "Autenticación faltante, mostrando respaldo de BD",
+      "apiMissingScopeFallback": "Falta el ámbito de tenant, mostrando respaldo de BD",
+      "relationsFallback": "Datos de relación de actividades no disponibles, mostrando registros base",
+      "compatibilityModeFallback": "Modo de compatibilidad activo, mostrando registros base"
     }
   }
 }

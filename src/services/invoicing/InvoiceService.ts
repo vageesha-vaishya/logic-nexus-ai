@@ -2,6 +2,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { ScopedDataAccess } from '@/lib/db/access';
 import { Invoice, CreateInvoiceRequest, InvoiceLineItem } from './types';
+import { GLSyncService } from '../gl/GLSyncService';
 
 export const InvoiceService = {
   /**
@@ -134,5 +135,46 @@ export const InvoiceService = {
     if (updateError) throw updateError;
 
     return this.getInvoice(invoice.id, scopedDb) as Promise<Invoice>;
+  },
+
+  async finalizeInvoice(
+    id: string,
+    scopedDb: ScopedDataAccess
+  ): Promise<{
+    invoice: Invoice;
+    statusChanged: boolean;
+    glSync: { queued: true; mode: 'bullmq' | 'in_process'; jobId: string };
+  }> {
+    const invoice = await this.getInvoice(id, scopedDb);
+    if (!invoice) throw new Error('Invoice not found');
+
+    if (!invoice.tenant_id) throw new Error('Invoice tenant context is missing');
+
+    if (invoice.status === 'paid' || invoice.status === 'void' || invoice.status === 'cancelled') {
+      throw new Error(`Invoice cannot be finalized from status "${invoice.status}"`);
+    }
+
+    let statusChanged = false;
+    if (invoice.status === 'draft') {
+      const { error } = await scopedDb
+        .from('invoices')
+        .update({
+          status: 'issued',
+          issue_date: invoice.issue_date || new Date().toISOString().slice(0, 10),
+        })
+        .eq('id', id);
+      if (error) throw error;
+      statusChanged = true;
+    }
+
+    const glSync = await GLSyncService.enqueueTransactionSync(invoice.tenant_id, invoice.id, 'INVOICE');
+    const refreshed = await this.getInvoice(id, scopedDb);
+    if (!refreshed) throw new Error('Invoice not found after finalization');
+
+    return {
+      invoice: refreshed,
+      statusChanged,
+      glSync,
+    };
   }
 };

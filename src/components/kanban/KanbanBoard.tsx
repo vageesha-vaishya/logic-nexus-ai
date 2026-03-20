@@ -31,6 +31,8 @@ interface KanbanBoardProps {
   onDragEnd: (activeId: string, overId: string, newStatus: string) => void;
   onItemUpdate?: (id: string, updates: Partial<KanbanItem>) => Promise<void>;
   onItemClick?: (id: string) => void;
+  onItemDelete?: (id: string) => Promise<void> | void;
+  onColumnDelete?: (columnId: string, itemIds: string[]) => Promise<void> | void;
   className?: string;
   scrollPersistenceKey?: string;
   themeVariant?: "default" | "reference";
@@ -42,6 +44,8 @@ export function KanbanBoard({
   onDragEnd,
   onItemUpdate,
   onItemClick,
+  onItemDelete,
+  onColumnDelete,
   className,
   scrollPersistenceKey,
   themeVariant = "default",
@@ -425,6 +429,8 @@ export function KanbanBoard({
                   }}
                   onItemUpdate={onItemUpdate}
                   onItemView={onItemClick}
+                  onItemDelete={onItemDelete}
+                  onColumnDelete={onColumnDelete}
                   initialScrollTop={verticalScrollByColumnRef.current[col.id] ?? 0}
                   onScrollTopChange={handleColumnScrollTopChange}
                   themeVariant={themeVariant}

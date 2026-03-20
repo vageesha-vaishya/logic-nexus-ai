@@ -13,6 +13,9 @@ import { CRM_HEADER_PRIMARY_CONTROL_SEQUENCE, CRMModuleHeaderNavigation } from '
 import { useCRMModuleNavigationState } from '@/hooks/useCRMModuleNavigationState';
 import { QuoteActionIcon } from '@/components/sales/QuoteActionIcon';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { DynamicFormRenderer } from '@/components/common/DynamicFormRenderer';
+import { PluginRegistry } from '@/services/plugins/PluginRegistry';
 
 function QuoteNewInner() {
   useBenchmark('QuoteNew');
@@ -26,8 +29,12 @@ function QuoteNewInner() {
   const [versionId, setVersionId] = useState<string | null>(null);
   const [, setTenantId] = useState<string | null>(null);
   const [initializing, setInitializing] = useState(true);
+  const [domainFormValues, setDomainFormValues] = useState<Record<string, unknown>>({});
   const initializedRef = useRef(false);
   const { viewMode, theme, setTheme } = useCRMModuleNavigationState('quotes', { viewMode: 'pipeline' });
+  const domainCode =
+    String((location.state as { domainCode?: string } | null)?.domainCode || 'LOGISTICS').toUpperCase();
+  const domainFormConfig = PluginRegistry.getFormConfigByDomain(domainCode);
 
   // Check default module configuration
   useEffect(() => {
@@ -233,11 +240,29 @@ function QuoteNewInner() {
             <span className="ml-3 text-muted-foreground">Initializing...</span>
           </div>
         ) : (
-          <UnifiedQuoteComposer
-            quoteId={createdQuoteId || undefined}
-            versionId={versionId || undefined}
-            initialData={initialData}
-          />
+          <div className="space-y-6">
+            <UnifiedQuoteComposer
+              quoteId={createdQuoteId || undefined}
+              versionId={versionId || undefined}
+              initialData={initialData}
+            />
+            {domainFormConfig ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Domain Fields ({domainCode})</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <DynamicFormRenderer
+                    config={domainFormConfig}
+                    values={domainFormValues}
+                    onChange={(fieldId, value) => {
+                      setDomainFormValues((prev) => ({ ...prev, [fieldId]: value }));
+                    }}
+                  />
+                </CardContent>
+              </Card>
+            ) : null}
+          </div>
         )}
       </DetailScreenTemplate>
     </DashboardLayout>

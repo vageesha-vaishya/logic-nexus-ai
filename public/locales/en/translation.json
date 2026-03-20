@@ -64,6 +64,54 @@
     "empty": {
       "title": "No leads found",
       "description": "Try adjusting your filters or create a new lead."
+    },
+    "messages": {
+      "apiUnavailableFallback": "API unavailable, showing DB fallback",
+      "apiUnauthorizedFallback": "Session expired, showing DB fallback",
+      "apiForbiddenScopeFallback": "Access scope mismatch, showing DB fallback",
+      "apiNetworkFallback": "CRM API unreachable, showing DB fallback",
+      "apiServerFallback": "CRM API error, showing DB fallback",
+      "apiMissingTokenFallback": "Authentication missing, showing DB fallback",
+      "apiMissingScopeFallback": "Tenant scope missing, showing DB fallback"
+    }
+  },
+  "accounts": {
+    "messages": {
+      "apiUnavailableFallback": "API unavailable, showing DB fallback",
+      "apiUnauthorizedFallback": "Session expired, showing DB fallback",
+      "apiForbiddenScopeFallback": "Access scope mismatch, showing DB fallback",
+      "apiNetworkFallback": "CRM API unreachable, showing DB fallback",
+      "apiServerFallback": "CRM API error, showing DB fallback",
+      "apiMissingTokenFallback": "Authentication missing, showing DB fallback",
+      "apiMissingScopeFallback": "Tenant scope missing, showing DB fallback",
+      "relationsFallback": "Account relation data unavailable, showing base records",
+      "compatibilityModeFallback": "Compatibility mode active, showing base records"
+    }
+  },
+  "contacts": {
+    "messages": {
+      "apiUnavailableFallback": "API unavailable, showing DB fallback",
+      "apiUnauthorizedFallback": "Session expired, showing DB fallback",
+      "apiForbiddenScopeFallback": "Access scope mismatch, showing DB fallback",
+      "apiNetworkFallback": "CRM API unreachable, showing DB fallback",
+      "apiServerFallback": "CRM API error, showing DB fallback",
+      "apiMissingTokenFallback": "Authentication missing, showing DB fallback",
+      "apiMissingScopeFallback": "Tenant scope missing, showing DB fallback",
+      "relationsFallback": "Contact relation data unavailable, showing base records",
+      "compatibilityModeFallback": "Compatibility mode active, showing base records"
+    }
+  },
+  "activities": {
+    "messages": {
+      "apiUnavailableFallback": "API unavailable, showing DB fallback",
+      "apiUnauthorizedFallback": "Session expired, showing DB fallback",
+      "apiForbiddenScopeFallback": "Access scope mismatch, showing DB fallback",
+      "apiNetworkFallback": "CRM API unreachable, showing DB fallback",
+      "apiServerFallback": "CRM API error, showing DB fallback",
+      "apiMissingTokenFallback": "Authentication missing, showing DB fallback",
+      "apiMissingScopeFallback": "Tenant scope missing, showing DB fallback",
+      "relationsFallback": "Activity relation data unavailable, showing base records",
+      "compatibilityModeFallback": "Compatibility mode active, showing base records"
     }
   },
   "common": {

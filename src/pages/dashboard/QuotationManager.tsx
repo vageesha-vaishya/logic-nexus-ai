@@ -26,6 +26,8 @@ import { exportCsv, exportExcel } from "@/lib/import-export";
 import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis, BarChart, Bar, CartesianGrid, LineChart, Line } from "recharts";
 import { format } from "date-fns";
 import { FeatureErrorBoundary } from "@/components/FeatureErrorBoundary";
+import { useTranslation } from "react-i18next";
+import { CrmFallbackReason, resolveCrmFallbackBannerCopy } from "./leadsListUtils";
 
 type PipelineView = "board" | "analytics";
 
@@ -40,6 +42,7 @@ type AnalyticsSnapshot = {
 const ANALYTICS_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#8b5cf6", "#ef4444", "#06b6d4", "#14b8a6", "#f97316", "#6366f1"];
 
 export default function QuotationManager() {
+  const { t } = useTranslation();
   const { scopedDb } = useCRM();
   const { hasPermission } = useAuth();
   const { toast } = useToast();
@@ -56,6 +59,8 @@ export default function QuotationManager() {
   const [allQuotes, setAllQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isDbFallbackActive, setIsDbFallbackActive] = useState(false);
+  const [dbFallbackReason, setDbFallbackReason] = useState<CrmFallbackReason | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStatuses, setSelectedStatuses] = useState<QuoteStatus[]>([...stages]);
   const [pagination, setPagination] = useState({
@@ -75,6 +80,10 @@ export default function QuotationManager() {
   const analyticsCacheRef = useRef<Map<string, AnalyticsSnapshot>>(new Map());
   const canDeleteQuotes = hasPermission("quotes.delete");
   const canViewAnalytics = hasPermission("quotes.analytics") || hasPermission("reports.view") || hasPermission("dashboards.view");
+  const fallbackBannerText = useMemo(() => {
+    const copy = resolveCrmFallbackBannerCopy("quotes", dbFallbackReason);
+    return t(copy.key);
+  }, [dbFallbackReason, t]);
 
   const filteredQuotes = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
@@ -114,6 +123,8 @@ export default function QuotationManager() {
     try {
       setLoading(true);
       setError(null);
+      setIsDbFallbackActive(false);
+      setDbFallbackReason(null);
       if (currentDomain?.code) {
         try {
           domainIsolationService.ensurePluginIsolation(currentDomain.code);
@@ -128,6 +139,7 @@ export default function QuotationManager() {
         }
       }
 
+      let scopedQuoteIds: string[] | null = null;
       let query = scopedDb
         .from("quotes")
         .select(
@@ -141,7 +153,7 @@ export default function QuotationManager() {
         );
 
       if (currentDomain?.id) {
-        const scopedQuoteIds = await domainIsolationService.resolveQuoteIdsForDomain(scopedDb as any, currentDomain.id);
+        scopedQuoteIds = await domainIsolationService.resolveQuoteIdsForDomain(scopedDb as any, currentDomain.id);
         if (!scopedQuoteIds.length) {
           setAllQuotes([]);
           if (currentDomain.code && pluginHooksEnabled) {
@@ -157,8 +169,21 @@ export default function QuotationManager() {
 
       query = query.order("created_at", { ascending: false });
 
-      const { data, error: queryError } = await query;
-      if (queryError) throw queryError;
+      const { data: relationData, error: relationError } = await query;
+      let data = relationData;
+      if (relationError) {
+        logger.warn("Primary quotations query with relations failed; using fallback query", relationError);
+        let fallbackQuery = scopedDb.from("quotes").select("*", { count: "exact" });
+        if (scopedQuoteIds && scopedQuoteIds.length > 0) {
+          fallbackQuery = fallbackQuery.in("id", scopedQuoteIds);
+        }
+        fallbackQuery = fallbackQuery.order("created_at", { ascending: false });
+        const { data: fallbackData, error: fallbackError } = await fallbackQuery;
+        if (fallbackError) throw fallbackError;
+        data = fallbackData;
+        setIsDbFallbackActive(true);
+        setDbFallbackReason("relations_query_failed");
+      }
 
       const transformedData: Quote[] = (data || []).map((item: any) => ({
         ...item,
@@ -182,6 +207,8 @@ export default function QuotationManager() {
         });
       }
       logger.error("Failed to fetch quotes", fetchError);
+      setIsDbFallbackActive(false);
+      setDbFallbackReason(null);
       setError(fetchError.message || "Failed to load quotations. Please check your connection and try again.");
       toast({
         title: "Error fetching quotations",
@@ -472,6 +499,13 @@ export default function QuotationManager() {
                 </Button>
               </AlertDescription>
             </Alert>
+          </div>
+        )}
+        {isDbFallbackActive && (
+          <div className="flex-none">
+            <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              {fallbackBannerText}
+            </div>
           </div>
         )}
 

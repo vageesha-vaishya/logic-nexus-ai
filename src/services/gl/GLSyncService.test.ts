@@ -21,8 +21,8 @@ vi.mock('@/integrations/supabase/client', () => ({
 describe('GLSyncService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    GLSyncService.resetConnector();
 
-    // Setup mock chain
     mockSchema.mockReturnValue({ from: mockFrom });
     mockFrom.mockReturnValue({ 
       insert: mockInsert,
@@ -122,5 +122,83 @@ describe('GLSyncService', () => {
     expect(mockUpdate).toHaveBeenLastCalledWith(expect.objectContaining({
         sync_status: 'FAILED'
     }));
+  });
+
+  it('falls back to in-process async posting when queue is disabled', async () => {
+    const setTimeoutSpy = vi
+      .spyOn(global, 'setTimeout')
+      .mockImplementation(((fn: TimerHandler) => {
+        if (typeof fn === 'function') fn();
+        return 0 as unknown as ReturnType<typeof setTimeout>;
+      }) as typeof setTimeout);
+    const syncSpy = vi.spyOn(GLSyncService, 'syncTransaction').mockResolvedValue(undefined);
+
+    const previousFlag = process.env.GL_QUEUE_ENABLED;
+    const previousRedis = process.env.REDIS_URL;
+    process.env.GL_QUEUE_ENABLED = 'false';
+    process.env.REDIS_URL = '';
+
+    const result = await GLSyncService.enqueueTransactionSync('tenant-1', 'invoice-1', 'INVOICE');
+
+    expect(result.mode).toBe('in_process');
+    expect(result.queued).toBe(true);
+    expect(syncSpy).toHaveBeenCalledWith('tenant-1', 'invoice-1', 'INVOICE');
+
+    process.env.GL_QUEUE_ENABLED = previousFlag;
+    process.env.REDIS_URL = previousRedis;
+    syncSpy.mockRestore();
+    setTimeoutSpy.mockRestore();
+  });
+
+  it('applies configured connector during enqueue in in-process mode', async () => {
+    const setTimeoutSpy = vi
+      .spyOn(global, 'setTimeout')
+      .mockImplementation(((fn: TimerHandler) => {
+        if (typeof fn === 'function') fn();
+        return 0 as unknown as ReturnType<typeof setTimeout>;
+      }) as typeof setTimeout);
+
+    const previousFlag = process.env.GL_QUEUE_ENABLED;
+    const previousRedis = process.env.REDIS_URL;
+    process.env.GL_QUEUE_ENABLED = 'false';
+    process.env.REDIS_URL = '';
+
+    const mockEntry = {
+      id: 'entry-enqueue',
+      tenant_id: 'tenant-2',
+      reference_id: 'invoice-2',
+      sync_status: 'PENDING',
+    };
+    mockSingle.mockResolvedValueOnce({ data: mockEntry, error: null });
+    mockUpdate.mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) });
+
+    const connectorSpy = vi.fn().mockResolvedValue({
+      externalId: 'ERP-tenant-2-INVOICE-invoice-2-entry-enqueue',
+    });
+    GLSyncService.setConnector(connectorSpy);
+
+    const result = await GLSyncService.enqueueTransactionSync('tenant-2', 'invoice-2', 'INVOICE');
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(result.mode).toBe('in_process');
+    expect(result.queued).toBe(true);
+    expect(connectorSpy).toHaveBeenCalledWith({
+      journalEntryId: 'entry-enqueue',
+      tenantId: 'tenant-2',
+      referenceId: 'invoice-2',
+      type: 'INVOICE',
+    });
+    expect(mockUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sync_status: 'SYNCED',
+        external_id: 'ERP-tenant-2-INVOICE-invoice-2-entry-enqueue',
+      })
+    );
+
+    process.env.GL_QUEUE_ENABLED = previousFlag;
+    process.env.REDIS_URL = previousRedis;
+    GLSyncService.resetConnector();
+    setTimeoutSpy.mockRestore();
   });
 });

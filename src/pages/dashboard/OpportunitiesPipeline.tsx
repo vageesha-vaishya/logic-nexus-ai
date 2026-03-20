@@ -21,14 +21,19 @@ import { Separator } from "@/components/ui/separator";
 import { KanbanFunnel } from "@/components/kanban/KanbanFunnel";
 import { Opportunity, OpportunityStage as Stage, stageColors, stageLabels, stages } from "./opportunities-data";
 import { PipelineService } from "@/services/pipeline-service";
+import { useTranslation } from "react-i18next";
+import { resolveCrmFallbackBannerCopy } from "./leadsListUtils";
 type OpportunityStage = Stage;
 
 export default function OpportunitiesPipeline() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { toast } = useToast();
   const { scopedDb } = useCRM();
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isDbFallbackActive, setIsDbFallbackActive] = useState(false);
+  const [dbFallbackReason, setDbFallbackReason] = useState<'relations_query_failed' | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [accountFilter, setAccountFilter] = useState<string>("all");
   const [probabilityFilter, setProbabilityFilter] = useState<string>("all");
@@ -81,12 +86,16 @@ export default function OpportunitiesPipeline() {
   const fetchOpportunities = useCallback(async () => {
     try {
       setLoading(true);
-      const { data } = await PipelineService.listOpportunities(scopedDb, {
+      const { data, fallbackReason } = await PipelineService.listOpportunities(scopedDb, {
         page: 1,
         pageSize: 2000,
       });
+      setIsDbFallbackActive(Boolean(fallbackReason));
+      setDbFallbackReason(fallbackReason);
       setOpportunities((data as Opportunity[]) || []);
     } catch (error) {
+      setIsDbFallbackActive(false);
+      setDbFallbackReason(null);
       console.error("Error fetching opportunities:", error);
       toast({
         title: "Error",
@@ -97,6 +106,8 @@ export default function OpportunitiesPipeline() {
       setLoading(false);
     }
   }, [scopedDb]);
+
+  const fallbackBannerText = t(resolveCrmFallbackBannerCopy('opportunities', dbFallbackReason).key);
 
   const fetchAccounts = useCallback(async () => {
     try {
@@ -449,6 +460,11 @@ export default function OpportunitiesPipeline() {
         </div>
 
         <div className="space-y-4">
+          {isDbFallbackActive && (
+            <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              {fallbackBannerText}
+            </div>
+          )}
           {/* Filters */}
           <Card>
             <CardContent className="pt-6">

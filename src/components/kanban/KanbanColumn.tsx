@@ -4,9 +4,10 @@ import { useMemo, useEffect, useRef } from "react";
 import { KanbanCard, KanbanItem } from "./KanbanCard";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { MoreHorizontal, Plus } from "lucide-react";
+import { MoreHorizontal, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AnimatePresence, motion } from "framer-motion";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 interface KanbanColumnProps {
   column: {
@@ -17,6 +18,8 @@ interface KanbanColumnProps {
   };
   onItemUpdate?: (id: string, updates: Partial<KanbanItem>) => Promise<void>;
   onItemView?: (id: string) => void;
+  onItemDelete?: (id: string) => Promise<void> | void;
+  onColumnDelete?: (columnId: string, itemIds: string[]) => Promise<void> | void;
   initialScrollTop?: number;
   onScrollTopChange?: (columnId: string, scrollTop: number) => void;
   themeVariant?: "default" | "reference";
@@ -35,6 +38,7 @@ interface TimelineLeadEntryProps {
   themeVariant: "default" | "reference";
   onItemUpdate?: (id: string, updates: Partial<KanbanItem>) => Promise<void>;
   onItemView?: (id: string) => void;
+  onItemDelete?: (id: string) => Promise<void> | void;
 }
 
 function TimelineLeadEntry({
@@ -44,6 +48,7 @@ function TimelineLeadEntry({
   themeVariant,
   onItemUpdate,
   onItemView,
+  onItemDelete,
 }: TimelineLeadEntryProps) {
   return (
     <div
@@ -76,6 +81,7 @@ function TimelineLeadEntry({
         item={item}
         onUpdate={onItemUpdate}
         onView={onItemView}
+        onDelete={onItemDelete}
         themeVariant={themeVariant}
       />
     </div>
@@ -86,6 +92,8 @@ export function KanbanColumn({
   column,
   onItemUpdate,
   onItemView,
+  onItemDelete,
+  onColumnDelete,
   initialScrollTop,
   onScrollTopChange,
   themeVariant = "default",
@@ -212,9 +220,26 @@ export function KanbanColumn({
           <Button variant="ghost" size="icon" className="h-6 w-6">
             <Plus className="h-4 w-4 text-muted-foreground" />
           </Button>
-          <Button variant="ghost" size="icon" className="h-6 w-6">
-            <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-6 w-6">
+                <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                disabled={!onColumnDelete || column.items.length === 0}
+                className="text-destructive focus:text-destructive"
+                onClick={() => {
+                  if (!onColumnDelete) return;
+                  void onColumnDelete(column.id, column.items.map((item) => item.id));
+                }}
+              >
+                <Trash2 className="mr-2 h-3.5 w-3.5" />
+                Delete all
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -246,6 +271,7 @@ export function KanbanColumn({
                       themeVariant={themeVariant}
                       onItemUpdate={onItemUpdate}
                       onItemView={onItemView}
+                      onItemDelete={onItemDelete}
                     />
                   );
                 })}

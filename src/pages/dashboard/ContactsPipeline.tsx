@@ -16,6 +16,9 @@ import { SwimLane } from "@/components/kanban/SwimLane";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { PipelineService } from "@/services/pipeline-service";
+import { useTranslation } from "react-i18next";
+import { resolveCrmFallbackBannerCopy } from "./leadsListUtils";
 
 type ContactStage = 'new_contact' | 'verified' | 'key_decision_maker' | 'active' | 'inactive' | 'bounced_invalid';
 
@@ -58,6 +61,7 @@ const stageColors: Record<ContactStage, string> = {
 const stages: ContactStage[] = ['new_contact','verified','key_decision_maker','active','inactive','bounced_invalid'];
 
 export default function ContactsPipeline() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { toast } = useToast();
   const { context, scopedDb } = useCRM();
@@ -65,6 +69,8 @@ export default function ContactsPipeline() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isDbFallbackActive, setIsDbFallbackActive] = useState(false);
+  const [dbFallbackReason, setDbFallbackReason] = useState<'relations_query_failed' | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [groupBy, setGroupBy] = useState<'none' | 'account'>('none');
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -77,19 +83,21 @@ export default function ContactsPipeline() {
     try {
       setLoading(true);
       console.log('ContactsPipeline: fetching with scopedDb', scopedDb.accessContext);
-      
-      const { data: c, error: ce } = await scopedDb
-        .from('contacts')
-        .select('*')
-        .order('created_at', { ascending: false });
-      if (ce) throw ce;
+      const { data: c, fallbackReason } = await PipelineService.listContacts(scopedDb, {
+        page: 1,
+        pageSize: 2000,
+        sortField: 'created_at',
+        sortDirection: 'desc',
+      });
+      setIsDbFallbackActive(Boolean(fallbackReason));
+      setDbFallbackReason(fallbackReason);
       
       console.log(`ContactsPipeline: fetched ${c?.length} records`);
       if (c && c.length > 0) {
         console.log('ContactsPipeline: first record tenant_id:', (c[0] as any).tenant_id);
       }
 
-      setContacts((c || []) as Contact[]);
+      setContacts((c as Contact[]) || []);
       
       const { data: a, error: ae } = await scopedDb
         .from('activities')
@@ -99,11 +107,15 @@ export default function ContactsPipeline() {
       if (ae) throw ae;
       setActivities((a || []) as Activity[]);
     } catch (error) {
+      setIsDbFallbackActive(false);
+      setDbFallbackReason(null);
       toast({ title: 'Error', description: 'Failed to fetch contacts', variant: 'destructive' });
     } finally {
       setLoading(false);
     }
   }, [scopedDb]);
+
+  const fallbackBannerText = t(resolveCrmFallbackBannerCopy('contacts', dbFallbackReason).key);
 
   useEffect(() => {
     fetchData();
@@ -182,6 +194,11 @@ export default function ContactsPipeline() {
             </Button>
           </div>
         </div>
+        {isDbFallbackActive && (
+          <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+            {fallbackBannerText}
+          </div>
+        )}
 
         <Card>
           <CardContent className="pt-6">

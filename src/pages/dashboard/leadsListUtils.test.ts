@@ -1,4 +1,8 @@
 import { describe, expect, it, beforeEach } from 'vitest';
+import React from 'react';
+import { render, screen } from '@testing-library/react';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import {
   buildLeadsFilterPlan,
   LEADS_FILTER_MIGRATION_KEY,
@@ -6,9 +10,37 @@ import {
   groupLeadsForWorkspaceDetails,
   migrateLegacyLeadsFilterPayload,
   normalizeLeadsStatusFilterValue,
+  resolveCrmFallbackBannerCopy,
+  resolveLeadsFallbackBannerCopy,
   runOneTimeLeadsFilterMigration,
   serializeLeadsListUrlState,
 } from './leadsListUtils';
+
+const enTranslation = JSON.parse(
+  readFileSync(path.resolve(process.cwd(), 'public/locales/en/translation.json'), 'utf-8'),
+);
+const esTranslation = JSON.parse(
+  readFileSync(path.resolve(process.cwd(), 'public/locales/es/translation.json'), 'utf-8'),
+);
+
+function getTranslationValue(
+  language: 'en' | 'es',
+  key: string,
+): string {
+  const dictionary = language === 'en' ? enTranslation : esTranslation;
+  return key.split('.').reduce((acc, part) => acc?.[part], dictionary) as string;
+}
+
+function renderFallbackBanner(
+  language: 'en' | 'es',
+  module: 'accounts' | 'contacts' | 'activities',
+) {
+  const key = resolveCrmFallbackBannerCopy(module, 'relations_query_failed').key;
+  const text = getTranslationValue(language, key);
+  render(
+    React.createElement('span', null, text),
+  );
+}
 
 describe('leadsListUtils', () => {
   beforeEach(() => {
@@ -232,5 +264,77 @@ describe('leadsListUtils', () => {
       { column: 'estimated_value', value: 10 },
       { column: 'created_at', value: '2026-01-01T23:59:59.999Z' },
     ]));
+  });
+
+  it('returns standardized default fallback banner copy', () => {
+    expect(resolveLeadsFallbackBannerCopy(null)).toEqual({
+      key: 'leads.messages.apiUnavailableFallback',
+    });
+  });
+
+  it('returns standardized forbidden scope fallback banner copy', () => {
+    expect(resolveLeadsFallbackBannerCopy('forbidden_scope')).toEqual({
+      key: 'leads.messages.apiForbiddenScopeFallback',
+    });
+  });
+
+  it('returns module-scoped relation fallback key for quotes', () => {
+    expect(resolveCrmFallbackBannerCopy('quotes', 'relations_query_failed')).toEqual({
+      key: 'quotes.messages.relationsFallback',
+    });
+  });
+
+  it('returns module-scoped compatibility fallback key for opportunities', () => {
+    expect(resolveCrmFallbackBannerCopy('opportunities', 'compatibility_mode')).toEqual({
+      key: 'opportunities.messages.compatibilityModeFallback',
+    });
+  });
+
+  it('returns module-scoped relation fallback key for accounts', () => {
+    expect(resolveCrmFallbackBannerCopy('accounts', 'relations_query_failed')).toEqual({
+      key: 'accounts.messages.relationsFallback',
+    });
+  });
+
+  it('returns module-scoped relation fallback key for contacts', () => {
+    expect(resolveCrmFallbackBannerCopy('contacts', 'relations_query_failed')).toEqual({
+      key: 'contacts.messages.relationsFallback',
+    });
+  });
+
+  it('returns module-scoped relation fallback key for activities', () => {
+    expect(resolveCrmFallbackBannerCopy('activities', 'relations_query_failed')).toEqual({
+      key: 'activities.messages.relationsFallback',
+    });
+  });
+
+  it('renders localized EN fallback banner text for accounts', async () => {
+    renderFallbackBanner('en', 'accounts');
+    expect(screen.getByText('Account relation data unavailable, showing base records')).toBeInTheDocument();
+  });
+
+  it('renders localized EN fallback banner text for contacts', async () => {
+    renderFallbackBanner('en', 'contacts');
+    expect(screen.getByText('Contact relation data unavailable, showing base records')).toBeInTheDocument();
+  });
+
+  it('renders localized EN fallback banner text for activities', async () => {
+    renderFallbackBanner('en', 'activities');
+    expect(screen.getByText('Activity relation data unavailable, showing base records')).toBeInTheDocument();
+  });
+
+  it('renders localized ES fallback banner text for accounts', async () => {
+    renderFallbackBanner('es', 'accounts');
+    expect(screen.getByText('Datos de relación de cuentas no disponibles, mostrando registros base')).toBeInTheDocument();
+  });
+
+  it('renders localized ES fallback banner text for contacts', async () => {
+    renderFallbackBanner('es', 'contacts');
+    expect(screen.getByText('Datos de relación de contactos no disponibles, mostrando registros base')).toBeInTheDocument();
+  });
+
+  it('renders localized ES fallback banner text for activities', async () => {
+    renderFallbackBanner('es', 'activities');
+    expect(screen.getByText('Datos de relación de actividades no disponibles, mostrando registros base')).toBeInTheDocument();
   });
 });

@@ -146,3 +146,351 @@ describe('pipeline-service duplicate and concurrency safeguards', () => {
     expect(updateTable.update).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('pipeline-service CRM API model handling', () => {
+  it('uses CRM API when token and tenant context are present', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch' as any).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        data: [
+          {
+            id: 'lead-1',
+            first_name: 'Jane',
+            last_name: 'Doe',
+            company: 'Acme Logistics',
+            email: 'jane@example.com',
+            phone: '+15551112222',
+            status: 'new',
+            source: 'website',
+            estimated_value: 12000,
+            created_at: '2026-03-01T00:00:00.000Z',
+            updated_at: '2026-03-01T00:00:00.000Z',
+            tenant_id: 'tenant-1',
+            franchise_id: null,
+          },
+        ],
+        count: 1,
+      }),
+    } as any);
+
+    const result = await PipelineService.listLeadsFromCrmApi(
+      {
+        accessToken: 'token-1',
+        tenantId: 'tenant-1',
+      },
+      {}
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.source).toBe('api');
+      expect(result.totalCount).toBe(1);
+      expect(result.data).toHaveLength(1);
+    }
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('accepts totalCount alias from CRM API payload', async () => {
+    vi.spyOn(globalThis, 'fetch' as any).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        data: [],
+        totalCount: 7,
+      }),
+    } as any);
+
+    const result = await PipelineService.listLeadsFromCrmApi(
+      {
+        accessToken: 'token-1',
+        tenantId: 'tenant-1',
+      },
+      {}
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.source).toBe('api');
+      expect(result.totalCount).toBe(7);
+    }
+  });
+
+  it('returns missing token fallback reason when token is absent', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch' as any);
+
+    const result = await PipelineService.listLeadsFromCrmApi(
+      {
+        accessToken: null,
+        tenantId: 'tenant-1',
+      },
+      {}
+    );
+
+    expect(result).toEqual({ ok: false, reason: 'missing_token' });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('returns forbidden scope fallback reason for 403 response', async () => {
+    vi.spyOn(globalThis, 'fetch' as any).mockResolvedValue({
+      ok: false,
+      status: 403,
+    } as any);
+
+    const result = await PipelineService.listLeadsFromCrmApi(
+      {
+        accessToken: 'token-1',
+        tenantId: 'tenant-1',
+      },
+      {}
+    );
+
+    expect(result).toEqual({ ok: false, reason: 'forbidden_scope' });
+  });
+
+  it('returns unreachable fallback reason on fetch failure', async () => {
+    vi.spyOn(globalThis, 'fetch' as any).mockRejectedValue(new Error('Network failure'));
+
+    const result = await PipelineService.listLeadsFromCrmApi(
+      {
+        accessToken: 'token-1',
+        tenantId: 'tenant-1',
+      },
+      {}
+    );
+
+    expect(result).toEqual({ ok: false, reason: 'api_unreachable' });
+  });
+
+  it('propagates API fallback reason when listLeads falls back to scoped DB', async () => {
+    vi.spyOn(globalThis, 'fetch' as any).mockResolvedValue({
+      ok: false,
+      status: 401,
+    } as any);
+
+    const query = {
+      in: vi.fn().mockReturnThis(),
+      or: vi.fn().mockReturnThis(),
+      contains: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      gte: vi.fn().mockReturnThis(),
+      lte: vi.fn().mockReturnThis(),
+      order: vi.fn().mockReturnValue({
+        range: vi.fn().mockResolvedValue({
+          data: [],
+          count: 0,
+          error: null,
+        }),
+      }),
+    };
+    const scopedDb = {
+      from: vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnValue(query),
+      }),
+    } as any;
+
+    const result = await PipelineService.listLeads(
+      scopedDb,
+      {},
+      {
+        accessToken: 'token-1',
+        tenantId: 'tenant-1',
+      }
+    );
+
+    expect(result.source).toBe('scopedDb');
+    expect(result.fallbackReason).toBe('api_unauthorized');
+  });
+});
+
+describe('pipeline-service opportunities fallback handling', () => {
+  it('returns primary opportunities data with no fallback reason', async () => {
+    const relationQuery = {
+      in: vi.fn().mockReturnThis(),
+      ilike: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      gte: vi.fn().mockReturnThis(),
+      lte: vi.fn().mockReturnThis(),
+      order: vi.fn().mockReturnValue({
+        range: vi.fn().mockResolvedValue({
+          data: [{ id: 'opp-1', name: 'Opp A', stage: 'prospecting' }],
+          count: 1,
+          error: null,
+        }),
+      }),
+    };
+
+    const scopedDb = {
+      from: vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnValue(relationQuery),
+      }),
+    } as any;
+
+    const result = await PipelineService.listOpportunities(scopedDb, {});
+    expect(result.source).toBe('scopedDb');
+    expect(result.fallbackReason).toBeNull();
+    expect(result.totalCount).toBe(1);
+    expect(result.data).toHaveLength(1);
+  });
+
+  it('returns fallback reason when relations query fails and fallback succeeds', async () => {
+    const relationQuery = {
+      in: vi.fn().mockReturnThis(),
+      ilike: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      gte: vi.fn().mockReturnThis(),
+      lte: vi.fn().mockReturnThis(),
+      order: vi.fn().mockReturnValue({
+        range: vi.fn().mockResolvedValue({
+          data: null,
+          count: null,
+          error: new Error('relationship not found'),
+        }),
+      }),
+    };
+    const fallbackQuery = {
+      in: vi.fn().mockReturnThis(),
+      ilike: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      gte: vi.fn().mockReturnThis(),
+      lte: vi.fn().mockReturnThis(),
+      order: vi.fn().mockReturnValue({
+        range: vi.fn().mockResolvedValue({
+          data: [{ id: 'opp-2', name: 'Opp B', stage: 'proposal' }],
+          count: 1,
+          error: null,
+        }),
+      }),
+    };
+
+    const scopedDb = {
+      from: vi
+        .fn()
+        .mockReturnValueOnce({
+          select: vi.fn().mockReturnValue(relationQuery),
+        })
+        .mockReturnValueOnce({
+          select: vi.fn().mockReturnValue(fallbackQuery),
+        }),
+    } as any;
+
+    const result = await PipelineService.listOpportunities(scopedDb, {});
+    expect(result.source).toBe('scopedDb');
+    expect(result.fallbackReason).toBe('relations_query_failed');
+    expect(result.totalCount).toBe(1);
+    expect(result.data).toHaveLength(1);
+  });
+});
+
+describe('pipeline-service accounts contacts activities fallback handling', () => {
+  it('returns fallback reason when account relations query fails and fallback succeeds', async () => {
+    const relationQuery = {
+      or: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      order: vi.fn().mockReturnValue({
+        range: vi.fn().mockResolvedValue({
+          data: null,
+          count: null,
+          error: new Error('relationship not found'),
+        }),
+      }),
+    };
+    const fallbackQuery = {
+      or: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      order: vi.fn().mockReturnValue({
+        range: vi.fn().mockResolvedValue({
+          data: [{ id: 'acc-1', name: 'Acme' }],
+          count: 1,
+          error: null,
+        }),
+      }),
+    };
+
+    const scopedDb = {
+      from: vi
+        .fn()
+        .mockReturnValueOnce({ select: vi.fn().mockReturnValue(relationQuery) })
+        .mockReturnValueOnce({ select: vi.fn().mockReturnValue(fallbackQuery) }),
+    } as any;
+
+    const result = await PipelineService.listAccounts(scopedDb, {});
+    expect(result.fallbackReason).toBe('relations_query_failed');
+    expect(result.totalCount).toBe(1);
+    expect(result.data).toHaveLength(1);
+  });
+
+  it('returns fallback reason when contact relations query fails and fallback succeeds', async () => {
+    const relationQuery = {
+      or: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      order: vi.fn().mockReturnValue({
+        range: vi.fn().mockResolvedValue({
+          data: null,
+          count: null,
+          error: new Error('relationship not found'),
+        }),
+      }),
+    };
+    const fallbackQuery = {
+      or: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      order: vi.fn().mockReturnValue({
+        range: vi.fn().mockResolvedValue({
+          data: [{ id: 'contact-1', first_name: 'Jane', last_name: 'Doe' }],
+          count: 1,
+          error: null,
+        }),
+      }),
+    };
+
+    const scopedDb = {
+      from: vi
+        .fn()
+        .mockReturnValueOnce({ select: vi.fn().mockReturnValue(relationQuery) })
+        .mockReturnValueOnce({ select: vi.fn().mockReturnValue(fallbackQuery) }),
+    } as any;
+
+    const result = await PipelineService.listContacts(scopedDb, {});
+    expect(result.fallbackReason).toBe('relations_query_failed');
+    expect(result.totalCount).toBe(1);
+    expect(result.data).toHaveLength(1);
+  });
+
+  it('returns fallback reason when activity relations query fails and fallback succeeds', async () => {
+    const relationQuery = {
+      ilike: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      is: vi.fn().mockReturnThis(),
+      order: vi.fn().mockReturnValue({
+        range: vi.fn().mockResolvedValue({
+          data: null,
+          count: null,
+          error: new Error('relationship not found'),
+        }),
+      }),
+    };
+    const fallbackQuery = {
+      ilike: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      is: vi.fn().mockReturnThis(),
+      order: vi.fn().mockReturnValue({
+        range: vi.fn().mockResolvedValue({
+          data: [{ id: 'act-1', subject: 'Call follow-up' }],
+          count: 1,
+          error: null,
+        }),
+      }),
+    };
+
+    const scopedDb = {
+      from: vi
+        .fn()
+        .mockReturnValueOnce({ select: vi.fn().mockReturnValue(relationQuery) })
+        .mockReturnValueOnce({ select: vi.fn().mockReturnValue(fallbackQuery) }),
+    } as any;
+
+    const result = await PipelineService.listActivities(scopedDb, {});
+    expect(result.fallbackReason).toBe('relations_query_failed');
+    expect(result.totalCount).toBe(1);
+    expect(result.data).toHaveLength(1);
+  });
+});

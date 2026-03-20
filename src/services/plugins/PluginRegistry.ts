@@ -25,6 +25,18 @@ export class PluginRegistry {
   }
 
   static getPluginByDomain(domainCode: string): IPlugin | undefined {
-    return Array.from(this.plugins.values()).find(p => p.domainCode === domainCode);
+    const normalizedDomainCode = String(domainCode || '').trim().toUpperCase();
+    return Array.from(this.plugins.values()).find(
+      (plugin) => String(plugin.domainCode || '').trim().toUpperCase() === normalizedDomainCode,
+    );
+  }
+
+  static getFormConfigByDomain(domainCode: string) {
+    const plugin = this.getPluginByDomain(domainCode);
+    return plugin ? plugin.getFormConfig() : null;
+  }
+
+  static clear() {
+    this.plugins.clear();
   }
 }

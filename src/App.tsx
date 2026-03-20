@@ -222,7 +222,7 @@ const App = () => (
             <Route 
               path="/dashboard" 
               element={
-                <ProtectedRoute requiredPermissions={["dashboards.view"]}>
+                <ProtectedRoute requiredPermissions={["dashboards.view", "leads.view"]}>
                   <DashboardRouter />
                 </ProtectedRoute>
               } 
@@ -758,7 +758,7 @@ const App = () => (
             <Route path="/dashboard/groups" element={<ProtectedRoute requiredPermissions={["groups.view"]}><Groups /></ProtectedRoute>} />
             <Route path="/dashboard/calendar" element={<ProtectedRoute requiredPermissions={["calendar.view"]}><Calendar /></ProtectedRoute>} />
             <Route path="/dashboard/dashboards" element={<ProtectedRoute requiredPermissions={["dashboards.view"]}><Dashboards /></ProtectedRoute>} />
-            <Route path="/dashboard/crm-workspace" element={<ProtectedRoute requiredPermissions={["dashboards.view"]}><CRMWorkspace /></ProtectedRoute>} />
+            <Route path="/dashboard/crm-workspace" element={<ProtectedRoute requiredPermissions={["dashboards.view", "leads.view"]}><CRMWorkspace /></ProtectedRoute>} />
             <Route path="/dashboard/leads-workspace" element={<Navigate to="/dashboard/leads/pipeline" replace />} />
             <Route path="/dashboard/more" element={<ProtectedRoute><More /></ProtectedRoute>} />
             <Route path="/dashboard/settings/permissions" element={<ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required"><PermissionsMatrix /></ProtectedRoute>} />

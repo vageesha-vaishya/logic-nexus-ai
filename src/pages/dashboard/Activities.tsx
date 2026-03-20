@@ -23,6 +23,9 @@ import { matchText, TextOp } from '@/lib/utils';
 import { useTheme } from '@/hooks/useTheme';
 import { useCRMModuleNavigationState } from '@/hooks/useCRMModuleNavigationState';
 import { CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
+import { PipelineService } from '@/services/pipeline-service';
+import { useTranslation } from 'react-i18next';
+import { resolveCrmFallbackBannerCopy } from './leadsListUtils';
 
 interface Activity {
   id: string;
@@ -58,6 +61,7 @@ interface Activity {
 }
 
 export default function Activities() {
+  const { t } = useTranslation();
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -69,6 +73,8 @@ export default function Activities() {
   const [assignableUsers, setAssignableUsers] = useState<AssignableUser[]>([]);
   const [showHelp, setShowHelp] = useState(false);
   const [leadNamesById, setLeadNamesById] = useState<Record<string, string>>({});
+  const [isDbFallbackActive, setIsDbFallbackActive] = useState(false);
+  const [dbFallbackReason, setDbFallbackReason] = useState<'relations_query_failed' | null>(null);
   const navigate = useNavigate();
   const { setActive } = useTheme();
   const {
@@ -95,33 +101,14 @@ export default function Activities() {
     try {
       setLoading(true);
       console.log('Activities: fetching with scopedDb', scopedDb.accessContext);
-      
-      // Use scopedDb for proper tenant/franchise filtering
-      const { data, error } = await scopedDb
-        .from('activities')
-        .select(`
-          *,
-          leads (
-            id,
-            first_name,
-            last_name,
-            company,
-            status
-          ),
-          accounts (
-            id,
-            name,
-            account_type
-          ),
-          contacts (
-            id,
-            first_name,
-            last_name
-          )
-        `)
-        .order('due_date', { ascending: true, nullsFirst: false });
-
-      if (error) throw error;
+      const { data, fallbackReason } = await PipelineService.listActivities(scopedDb, {
+        page: 1,
+        pageSize: 2000,
+        sortField: 'due_date',
+        sortDirection: 'asc',
+      });
+      setIsDbFallbackActive(Boolean(fallbackReason));
+      setDbFallbackReason(fallbackReason);
       
       console.log(`Activities: fetched ${data?.length} records`);
       if (data && data.length > 0) {
@@ -155,6 +142,8 @@ export default function Activities() {
         setLeadNamesById({});
       }
     } catch (error: unknown) {
+      setIsDbFallbackActive(false);
+      setDbFallbackReason(null);
       const message = error instanceof Error ? error.message : String(error);
       toast.error('Failed to load activities', { description: message });
       console.error('Error:', error);
@@ -162,6 +151,8 @@ export default function Activities() {
       setLoading(false);
     }
   }, [scopedDb]);
+
+  const fallbackBannerText = t(resolveCrmFallbackBannerCopy('activities', dbFallbackReason).key);
 
   useEffect(() => {
     fetchActivities();
@@ -467,6 +458,11 @@ export default function Activities() {
           </Button>
         </div>
       </div>
+      {isDbFallbackActive && (
+        <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          {fallbackBannerText}
+        </div>
+      )}
 
       <Card>
         <CardHeader className="pb-3">

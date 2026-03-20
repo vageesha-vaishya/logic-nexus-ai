@@ -16,6 +16,9 @@ import { EmptyState } from '@/components/system/EmptyState';
 import { useTheme } from '@/hooks/useTheme';
 import { useCRMModuleNavigationState } from '@/hooks/useCRMModuleNavigationState';
 import { CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
+import { PipelineService } from '@/services/pipeline-service';
+import { useTranslation } from 'react-i18next';
+import { resolveCrmFallbackBannerCopy } from './leadsListUtils';
 
 interface Account {
   id: string;
@@ -30,10 +33,13 @@ interface Account {
 }
 
 export default function Accounts() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isDbFallbackActive, setIsDbFallbackActive] = useState(false);
+  const [dbFallbackReason, setDbFallbackReason] = useState<'relations_query_failed' | null>(null);
   const { context, scopedDb } = useCRM();
   const { setActive } = useTheme();
   const {
@@ -54,26 +60,32 @@ export default function Accounts() {
   const fetchAccounts = useCallback(async () => {
     try {
       console.log('Accounts: fetching with scopedDb', scopedDb.accessContext);
-      const { data, error } = await scopedDb
-        .from('accounts')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
+      const { data, fallbackReason } = await PipelineService.listAccounts(scopedDb, {
+        page: 1,
+        pageSize: 2000,
+        sortField: 'created_at',
+        sortDirection: 'desc',
+      });
+      setIsDbFallbackActive(Boolean(fallbackReason));
+      setDbFallbackReason(fallbackReason);
       
       console.log(`Accounts: fetched ${data?.length} records`);
       if (data && data.length > 0) {
         console.log('Accounts: first record tenant_id:', (data[0] as any).tenant_id);
       }
 
-      setAccounts(data as unknown as Account[]);
+      setAccounts(data as Account[]);
     } catch (error) {
       console.error('Accounts: fetch error', error);
+      setIsDbFallbackActive(false);
+      setDbFallbackReason(null);
       toast.error('Failed to load accounts');
     } finally {
       setLoading(false);
     }
   }, [scopedDb]);
+
+  const fallbackBannerText = t(resolveCrmFallbackBannerCopy('accounts', dbFallbackReason).key);
 
   useEffect(() => {
     fetchAccounts();
@@ -218,6 +230,11 @@ export default function Accounts() {
             />
           </div>
         </div>
+        {isDbFallbackActive && (
+          <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+            {fallbackBannerText}
+          </div>
+        )}
 
         {loading ? (
           <div className="text-center py-12">

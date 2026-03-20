@@ -5,7 +5,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { supabase } from "@/integrations/supabase/client";
 import { useCRM } from "@/hooks/useCRM";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { ArrowLeft, Search, Filter, Layers, Settings, CheckSquare, Square, AlertCircle, LayoutGrid, Download } from "lucide-react";
@@ -19,6 +18,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { KanbanFunnel } from "@/components/kanban/KanbanFunnel";
+import { PipelineService } from "@/services/pipeline-service";
+import { useTranslation } from "react-i18next";
+import { resolveCrmFallbackBannerCopy } from "./leadsListUtils";
 
 type AccountStage = 'new_account' | 'kyc_pending' | 'active' | 'vip' | 'payment_issues' | 'inactive' | 'blocked';
 type AccountType = 'prospect' | 'customer' | 'partner' | 'vendor';
@@ -59,11 +61,14 @@ const stageColors: Record<AccountStage, string> = {
 const stages: AccountStage[] = ['new_account','kyc_pending','active','vip','payment_issues','inactive','blocked'];
 
 export default function AccountsPipeline() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { toast } = useToast();
   const { context, scopedDb } = useCRM();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isDbFallbackActive, setIsDbFallbackActive] = useState(false);
+  const [dbFallbackReason, setDbFallbackReason] = useState<'relations_query_failed' | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -99,26 +104,31 @@ export default function AccountsPipeline() {
     try {
       setLoading(true);
       console.log('AccountsPipeline: fetching with scopedDb', scopedDb.accessContext);
-
-      const { data, error } = await scopedDb
-        .from("accounts")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
+      const { data, fallbackReason } = await PipelineService.listAccounts(scopedDb, {
+        page: 1,
+        pageSize: 2000,
+        sortField: 'created_at',
+        sortDirection: 'desc',
+      });
+      setIsDbFallbackActive(Boolean(fallbackReason));
+      setDbFallbackReason(fallbackReason);
 
       console.log(`AccountsPipeline: fetched ${data?.length} records`);
       if (data && data.length > 0) {
         console.log('AccountsPipeline: first record tenant_id:', (data[0] as any).tenant_id);
       }
 
-      setAccounts((data || []) as unknown as Account[]);
+      setAccounts((data || []) as Account[]);
     } catch (error) {
+      setIsDbFallbackActive(false);
+      setDbFallbackReason(null);
       toast({ title: "Error", description: "Failed to fetch accounts", variant: "destructive" });
     } finally {
       setLoading(false);
     }
   }, [scopedDb]);
+
+  const fallbackBannerText = t(resolveCrmFallbackBannerCopy('accounts', dbFallbackReason).key);
 
   useEffect(() => {
     fetchAccounts();
@@ -289,6 +299,11 @@ export default function AccountsPipeline() {
             Back to List
           </Button>
         </div>
+        {isDbFallbackActive && (
+          <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+            {fallbackBannerText}
+          </div>
+        )}
 
         <Card>
           <CardContent className="pt-6">

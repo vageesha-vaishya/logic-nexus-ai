@@ -43,6 +43,7 @@ import {
   deserializeLeadsListUrlState,
   groupLeadsForWorkspaceDetails,
   normalizeLeadsStatusFilterValue,
+  resolveLeadsFallbackBannerCopy,
   runOneTimeLeadsFilterMigration,
   serializeLeadsListUrlState,
   WorkspaceDetailsGroupBy,
@@ -132,6 +133,7 @@ export default function Leads() {
   const navigate = useNavigate();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isDbFallbackActive, setIsDbFallbackActive] = useState(false);
   const [detailsTab, setDetailsTab] = useState('activities');
   const [focusedLeadId, setFocusedLeadId] = useState<string | null>(null);
   const [leadActivities, setLeadActivities] = useState<WorkspaceActivity[]>([]);
@@ -300,6 +302,10 @@ export default function Leads() {
   const activitiesCacheRef = useRef<Record<string, WorkspaceActivity[]>>({});
   const statusDebounceRef = useRef<number | null>(null);
   const lastSerializedUrlRef = useRef('');
+  const dbFallbackBannerCopy = useMemo(
+    () => resolveLeadsFallbackBannerCopy(null),
+    []
+  );
 
   // Sync URL to view state on initial hydration only
   useEffect(() => {
@@ -487,13 +493,48 @@ export default function Leads() {
     }
   };
 
+  const matchesTextFilter = useCallback((value: unknown, query: string, op: TextOp) => {
+    const normalizedValue = String(value ?? '').toLowerCase();
+    const normalizedQuery = query.trim().toLowerCase();
+    if (!normalizedQuery) return true;
+    if (op === 'equals') return normalizedValue === normalizedQuery;
+    if (op === 'startsWith') return normalizedValue.startsWith(normalizedQuery);
+    if (op === 'endsWith') return normalizedValue.endsWith(normalizedQuery);
+    return normalizedValue.includes(normalizedQuery);
+  }, []);
+
+  const toComparableSortValue = useCallback((lead: Lead, field: string): string | number => {
+    const value = (lead as unknown as Record<string, unknown>)[field];
+    if (typeof value === 'number') return value;
+    if (typeof value === 'string') {
+      const timestamp = Date.parse(value);
+      if (!Number.isNaN(timestamp) && /(_at|_date)$/i.test(field)) return timestamp;
+      return value.toLowerCase();
+    }
+    if (value instanceof Date) return value.getTime();
+    return '';
+  }, []);
+
+  const getCrmApiHeaders = useCallback(async () => {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData?.session?.access_token || '';
+    const tenantId = context?.tenantId || '';
+    return {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(tenantId ? { 'x-tenant-id': tenantId } : {}),
+      ...(context?.franchiseId ? { 'x-franchise-id': context.franchiseId } : {}),
+      ...(context?.userId ? { 'x-user-id': context.userId } : {}),
+    };
+  }, [context?.franchiseId, context?.tenantId, context?.userId, supabase.auth]);
+
   const fetchLeads = useCallback(async () => {
     const requestId = ++leadsRequestSequenceRef.current;
     try {
       if (requestId === leadsRequestSequenceRef.current) {
         setLoading(true);
       }
-      const executeQuery = async () => {
+      const runScopedDbQuery = async () => {
         const from = (page - 1) * pageSize;
         const to = from + pageSize - 1;
         let query = scopedDb
@@ -544,9 +585,101 @@ export default function Leads() {
         });
         query = query.order(sortField, { ascending: sortDirection === 'asc' });
         query = query.range(from, to);
-        return query;
+        const { data, error, count } = await query;
+        if (error) throw error;
+        return {
+          data: (data || []) as Lead[],
+          count: count || 0,
+          source: 'scopedDb' as const,
+        };
       };
-      const { data, error, count } = await runWithRetry(
+      const executeQuery = async () => {
+        const headers = await getCrmApiHeaders();
+        const params = new URLSearchParams();
+        if (statusFilter !== 'all') params.set('status', statusFilter);
+        if (searchQuery.trim()) params.set('q', searchQuery.trim());
+        if (sourceQuery.trim() && sourceOp === 'equals') params.set('source', sourceQuery.trim());
+        if (createdStart) params.set('from', createdStart);
+        if (createdEnd) params.set('to', createdEnd);
+        if (context?.franchiseId) params.set('franchise_id', context.franchiseId);
+        const query = params.toString() ? `?${params.toString()}` : '';
+        const response = await fetch(`/api/crm/v1/leads${query}`, {
+          method: 'GET',
+          credentials: 'include',
+          headers,
+        });
+        if (!response.ok) {
+          return runScopedDbQuery();
+        }
+        const payload = await response.json().catch(() => null);
+        const rows = Array.isArray(payload?.data) ? (payload.data as Lead[]) : [];
+        const searchValue = searchQuery.trim().toLowerCase();
+        const scoreMinValue = scoreMin.trim() ? Number(scoreMin) : null;
+        const scoreMaxValue = scoreMax.trim() ? Number(scoreMax) : null;
+        const valueMinValue = valueMin.trim() ? Number(valueMin) : null;
+        const valueMaxValue = valueMax.trim() ? Number(valueMax) : null;
+        const createdStartTimestamp = createdStart ? new Date(`${createdStart}T00:00:00.000Z`).getTime() : null;
+        const createdEndTimestamp = createdEnd ? new Date(`${createdEnd}T23:59:59.999Z`).getTime() : null;
+
+        const filtered = rows.filter((lead) => {
+          if (statusFilter !== 'all' && lead.status !== statusFilter) return false;
+          if (ownerFilter === 'me' && context?.userId && lead.owner_id !== context.userId) return false;
+          if (ownerFilter === 'unassigned' && !!lead.owner_id) return false;
+
+          if (searchValue) {
+            const matchesSearch = [
+              lead.first_name,
+              lead.last_name,
+              lead.company,
+              lead.email,
+              lead.phone,
+            ].some((value) => String(value ?? '').toLowerCase().includes(searchValue));
+            if (!matchesSearch) return false;
+          }
+
+          const fullName = `${lead.first_name || ''} ${lead.last_name || ''}`.trim();
+          if (!matchesTextFilter(fullName, nameQuery, nameOp)) return false;
+          if (!matchesTextFilter(lead.company, companyQuery, companyOp)) return false;
+          if (!matchesTextFilter(lead.email, emailQuery, emailOp)) return false;
+          if (!matchesTextFilter(lead.phone, phoneQuery, phoneOp)) return false;
+          if (!matchesTextFilter(lead.source, sourceQuery, sourceOp)) return false;
+          if (!matchesTextFilter(lead.qualification_status, qualificationQuery, qualificationOp)) return false;
+
+          const score = typeof lead.lead_score === 'number' ? lead.lead_score : null;
+          if (scoreFilter === 'high' && (score === null || score < 70)) return false;
+          if (scoreFilter === 'medium' && (score === null || score < 40 || score > 69)) return false;
+          if (scoreFilter === 'low' && (score === null || score > 39)) return false;
+          if (scoreMinValue !== null && (score === null || score < scoreMinValue)) return false;
+          if (scoreMaxValue !== null && (score === null || score > scoreMaxValue)) return false;
+
+          const value = typeof lead.estimated_value === 'number' ? lead.estimated_value : null;
+          if (valueMinValue !== null && (value === null || value < valueMinValue)) return false;
+          if (valueMaxValue !== null && (value === null || value > valueMaxValue)) return false;
+
+          const createdTimestamp = lead.created_at ? new Date(lead.created_at).getTime() : null;
+          if (createdStartTimestamp !== null && (createdTimestamp === null || createdTimestamp < createdStartTimestamp)) return false;
+          if (createdEndTimestamp !== null && (createdTimestamp === null || createdTimestamp > createdEndTimestamp)) return false;
+
+          return true;
+        });
+
+        const sorted = [...filtered].sort((left, right) => {
+          const leftValue = toComparableSortValue(left, sortField);
+          const rightValue = toComparableSortValue(right, sortField);
+          if (leftValue < rightValue) return sortDirection === 'asc' ? -1 : 1;
+          if (leftValue > rightValue) return sortDirection === 'asc' ? 1 : -1;
+          return 0;
+        });
+
+        const from = (page - 1) * pageSize;
+        const to = from + pageSize;
+        return {
+          data: sorted.slice(from, to),
+          count: sorted.length,
+          source: 'api' as const,
+        };
+      };
+      const { data, count, source } = await runWithRetry(
         executeQuery,
         DEFAULT_RETRY_POLICY,
         (attempt, meta) => {
@@ -558,9 +691,9 @@ export default function Leads() {
           });
         },
       );
-      if (error) throw error;
       if (requestId !== leadsRequestSequenceRef.current) return;
       const nextRows = data || [];
+      setIsDbFallbackActive(source === 'scopedDb');
       setLeads(nextRows);
       setTotalCount(count || 0);
       leadsCacheRef.current = { items: nextRows, totalCount: count || 0 };
@@ -575,6 +708,7 @@ export default function Leads() {
       });
       Sentry.captureException(error);
       if (leadsCacheRef.current.items.length > 0) {
+        setIsDbFallbackActive(false);
         setLeads(leadsCacheRef.current.items);
         setTotalCount(leadsCacheRef.current.totalCount);
         toast.warning(t('leads.messages.fetchFallback', 'Showing cached leads while connection recovers'), {
@@ -591,7 +725,8 @@ export default function Leads() {
       }
     }
   }, [
-    scopedDb,
+    context?.franchiseId,
+    context?.userId,
     page,
     pageSize,
     sortField,
@@ -619,7 +754,12 @@ export default function Leads() {
     createdStart,
     createdEnd,
     context?.userId,
+    scopedDb,
+    buildLeadsFilterPlan,
+    getCrmApiHeaders,
+    matchesTextFilter,
     t,
+    toComparableSortValue,
   ]);
 
   const focusLeadInWorkspace = useCallback((lead: Lead) => {
@@ -1433,8 +1573,18 @@ export default function Leads() {
     if (!window.confirm(t('leads.messages.deleteConfirm', { count: selectedIds.size }))) return;
     
     try {
-      const { error } = await scopedDb.from('leads').delete().in('id', Array.from(selectedIds));
-      if (error) throw error;
+      const ids = Array.from(selectedIds);
+      const headers = await getCrmApiHeaders();
+      const response = await fetch('/api/crm/v1/leads', {
+        method: 'DELETE',
+        credentials: 'include',
+        headers,
+        body: JSON.stringify({ ids }),
+      });
+      if (!response.ok) {
+        const { error } = await scopedDb.from('leads').delete().in('id', ids);
+        if (error) throw error;
+      }
       
       toast.success(t('leads.messages.deleteSuccess', { count: selectedIds.size }));
       setSelectedIds([]);
@@ -1506,6 +1656,11 @@ export default function Leads() {
             />
           }
         >
+        {isDbFallbackActive && (
+          <div className="mb-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+            {t(dbFallbackBannerCopy.key)}
+          </div>
+        )}
         {/* Filters */}
         <div className="flex flex-col gap-0.5 mb-1.5">
           <div className="w-full overflow-x-auto">

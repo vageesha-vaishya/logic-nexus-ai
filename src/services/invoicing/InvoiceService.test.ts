@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { InvoiceService } from './InvoiceService';
 import { CreateInvoiceRequest } from './types';
 import type { ScopedDataAccess } from '@/lib/db/access';
+import { GLSyncService } from '../gl/GLSyncService';
 
 // Mock Supabase (still needed for auth.getUser)
 const mockUser = { id: 'user-123' };
@@ -18,6 +19,16 @@ vi.mock('@/integrations/supabase/client', () => ({
   }
 }));
 
+vi.mock('../gl/GLSyncService', () => ({
+  GLSyncService: {
+    enqueueTransactionSync: vi.fn().mockResolvedValue({
+      queued: true,
+      mode: 'in_process',
+      jobId: 'gl-sync:tenant-123:INVOICE:invoice-123',
+    }),
+  },
+}));
+
 // Create a mock ScopedDataAccess
 type MockScopedDb = Pick<ScopedDataAccess, 'from' | 'rpc' | 'accessContext' | 'client'> & {
   _mocks: {
@@ -30,8 +41,10 @@ type MockScopedDb = Pick<ScopedDataAccess, 'from' | 'rpc' | 'accessContext' | 'c
 };
 
 function createMockScopedDb(overrides: Partial<MockScopedDb> = {}): MockScopedDb {
+  const mockListRange = vi.fn().mockResolvedValue({ data: [mockInvoice], error: null, count: 1 });
+  const mockListOrder = vi.fn().mockReturnValue({ range: mockListRange });
   const mockSelect = vi.fn().mockReturnValue({
-    order: vi.fn().mockResolvedValue({ data: [mockInvoice], error: null }),
+    order: mockListOrder,
     eq: vi.fn().mockReturnValue({
       single: vi.fn().mockResolvedValue({ data: mockInvoice, error: null })
     })
@@ -87,7 +100,7 @@ describe('InvoiceService', () => {
     const result = await InvoiceService.listInvoices(scopedDb as unknown as ScopedDataAccess);
 
     expect(scopedDb.from).toHaveBeenCalledWith('invoices');
-    expect(result).toEqual([mockInvoice]);
+    expect(result).toEqual({ data: [mockInvoice], totalCount: 1 });
   });
 
   it('should get a single invoice by ID using scoped query', async () => {
@@ -167,5 +180,61 @@ describe('InvoiceService', () => {
     };
 
     await expect(InvoiceService.createInvoice(request, scopedDb as unknown as ScopedDataAccess)).rejects.toThrow('Tenant ID not found in scope context');
+  });
+
+  it('should finalize draft invoice and enqueue GL sync', async () => {
+    const mockUpdateEq = vi.fn().mockResolvedValue({ error: null });
+    const mockUpdate = vi.fn().mockReturnValue({ eq: mockUpdateEq });
+    const mockSelectSingle = vi
+      .fn()
+      .mockResolvedValueOnce({ data: { ...mockInvoice, status: 'draft', tenant_id: mockTenantId }, error: null })
+      .mockResolvedValueOnce({ data: { ...mockInvoice, status: 'issued', tenant_id: mockTenantId }, error: null });
+    const mockSelect = vi.fn().mockReturnValue({ eq: vi.fn().mockReturnValue({ single: mockSelectSingle }) });
+    const mockFrom = vi.fn().mockImplementation((table: string) => {
+      if (table === 'invoices') {
+        return {
+          select: mockSelect,
+          update: mockUpdate,
+        };
+      }
+      return {};
+    });
+    const scopedDb = createMockScopedDb({ from: mockFrom });
+
+    const result = await InvoiceService.finalizeInvoice('invoice-123', scopedDb as unknown as ScopedDataAccess);
+
+    expect(mockUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'issued',
+      })
+    );
+    expect(GLSyncService.enqueueTransactionSync).toHaveBeenCalledWith('tenant-123', 'invoice-123', 'INVOICE');
+    expect(result.invoice.status).toBe('issued');
+    expect(result.statusChanged).toBe(true);
+  });
+
+  it('should enqueue GL sync without status update when invoice already issued', async () => {
+    const mockSelectSingle = vi
+      .fn()
+      .mockResolvedValueOnce({ data: { ...mockInvoice, status: 'issued', tenant_id: mockTenantId }, error: null })
+      .mockResolvedValueOnce({ data: { ...mockInvoice, status: 'issued', tenant_id: mockTenantId }, error: null });
+    const mockSelect = vi.fn().mockReturnValue({ eq: vi.fn().mockReturnValue({ single: mockSelectSingle }) });
+    const mockUpdate = vi.fn();
+    const mockFrom = vi.fn().mockImplementation((table: string) => {
+      if (table === 'invoices') {
+        return {
+          select: mockSelect,
+          update: mockUpdate,
+        };
+      }
+      return {};
+    });
+    const scopedDb = createMockScopedDb({ from: mockFrom });
+
+    const result = await InvoiceService.finalizeInvoice('invoice-123', scopedDb as unknown as ScopedDataAccess);
+
+    expect(mockUpdate).not.toHaveBeenCalled();
+    expect(GLSyncService.enqueueTransactionSync).toHaveBeenCalledWith('tenant-123', 'invoice-123', 'INVOICE');
+    expect(result.statusChanged).toBe(false);
   });
 });

@@ -7,7 +7,7 @@ import * as z from 'zod';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Save, Plus, Trash2, Send } from 'lucide-react';
+import { ArrowLeft, Save, Plus, Trash2, Send, CheckCircle2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useCRM } from '@/hooks/useCRM';
 import { InvoiceService } from '@/services/invoicing/InvoiceService';
@@ -51,6 +51,7 @@ export default function InvoiceDetail() {
   const { scopedDb, supabase } = useCRM();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [finalizing, setFinalizing] = useState(false);
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const isNew = id === 'new';
 
@@ -156,6 +157,25 @@ export default function InvoiceDetail() {
     }
   };
 
+  const handleFinalizeInvoice = async () => {
+    if (!invoice?.id) return;
+    setFinalizing(true);
+    try {
+      const result = await InvoiceService.finalizeInvoice(invoice.id, scopedDb);
+      setInvoice(result.invoice);
+      toast({
+        title: 'Success',
+        description: result.statusChanged
+          ? 'Invoice finalized and GL sync queued'
+          : 'Invoice already finalized. GL sync queued',
+      });
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } finally {
+      setFinalizing(false);
+    }
+  };
+
   if (loading) return <div className="p-8 text-center">Loading...</div>;
 
   return (
@@ -177,10 +197,16 @@ export default function InvoiceDetail() {
           </div>
           <div className="flex items-center gap-2">
             {!isNew && (
-                <Button variant="outline">
+                <Button variant="outline" onClick={handleSendInvoice}>
                     <Send className="mr-2 h-4 w-4" />
                     Send Invoice
                 </Button>
+            )}
+            {!isNew && invoice?.status === 'draft' && (
+              <Button onClick={handleFinalizeInvoice} disabled={finalizing}>
+                <CheckCircle2 className="mr-2 h-4 w-4" />
+                {finalizing ? 'Finalizing...' : 'Finalize Invoice'}
+              </Button>
             )}
             <Button onClick={form.handleSubmit(onSubmit)} disabled={saving}>
               <Save className="mr-2 h-4 w-4" />
