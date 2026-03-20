@@ -4,11 +4,11 @@
 
 This design covers migration planning for legacy MGL lead data from:
 
-- `C:\Users\sarve\Downloads\MGL_Enquiry Data - Lead.xlsx`
-- `C:\Users\sarve\Downloads\MGL_Enquiry Data - LeadRemark.xlsx`
-- `C:\Users\sarve\Downloads\MGL_Enquiry Data - Opportunity.xlsx`
-- `C:\Users\sarve\Downloads\MGL_Enquiry Data - OpportunityRemarks.xlsx`
-- `C:\Users\sarve\Downloads\MGL_ContactList Account&Contact.xlsx`
+- `supabase/migrations/tempMGLData/MGL_Enquiry Data - Lead.csv`
+- `supabase/migrations/tempMGLData/MGL_Enquiry Data - LeadRemark.csv`
+- `supabase/migrations/tempMGLData/MGL_Enquiry Data - Opportunity.csv`
+- `supabase/migrations/tempMGLData/MGL_Enquiry Data - OpportunityRemarks.csv`
+- `supabase/migrations/tempMGLData/MGL_ContactList Account&Contact.csv`
 
 Target platform:
 
