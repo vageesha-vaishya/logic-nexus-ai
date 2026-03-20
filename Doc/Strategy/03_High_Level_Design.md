@@ -152,6 +152,8 @@ Technical debt remediation governance:
 | Edge orchestration mega-functions | `generate-quote-pdf`, `self-service-onboarding`, `sync-emails` | High | task-specific function services + event workers | Functional decomposition + queue split | Preserve trigger contracts and response envelopes |
 | Auth and identity concerns | distributed auth checks in API/functions | High | `platform-identity-access` horizontal service | Sidecar/policy middleware insertion | JWT format preserved; stricter policy gates |
 | Monitoring/logging | local logger + web-vitals + ad hoc logs | Medium | `platform-observability` service | telemetry overlay | Non-breaking, additive instrumentation |
+| AMRO/MRO capabilities | AMRO plans, plugin requirements, implementation references | High | `module-amro` vertical context + `module-assurance` integration contract | Feature-flagged strangler extraction + dual-run coexistence | Domain-assignment gating + two-version contract support |
+| Warehouse and inventory orchestration | stock allocation logic, warehouse workflows, inventory touchpoints in quote/fulfillment paths | High | `module-warehouse-inventory` vertical context | Strangler extraction + event-carried state transfer + dual-write reconciliation | Preserve v1 stock/availability semantics and historical quotation linkage |
 
 ### 3.1 Traceability Evidence Requirements
 For every mapped monolith-to-module item:
@@ -178,6 +180,9 @@ Initial vertical bounded contexts:
 4. `module-finance`
 5. `module-compliance`
 6. `module-communications`
+7. `module-amro`
+8. `module-assurance`
+9. `module-warehouse-inventory`
 
 Boundary rules:
 - No direct table access across modules.
@@ -1148,3 +1153,486 @@ Program completion exit criteria:
 - No critical monolith-only path without a defined replacement.
 - Full traceability from current components to modular replacements.
 - Measured zero-downtime migration readiness with rollback drills passed.
+
+## 13. AMRO Domain Separation Strategy
+
+### 13.1 AMRO Bounded Context and Business Capabilities
+`module-amro` is established as a first-class vertical bounded context aligned to platform hierarchy and tenant/franchise isolation.
+
+Core capabilities:
+- Asset registry and configuration state (aircraft, engines, serialized components, heavy assets).
+- Work package and task lifecycle orchestration (create, plan, schedule, execute, close).
+- Qualification and authority validation (certifying staff, role constraints, sign-off authority).
+- Compliance and evidence controls (FAA/EASA/SACAA/ISO 55000 rule packs, immutable evidence chain).
+- Materials planning and repair loop orchestration (spares, reservations, repair actions, supplier ETA).
+- Predictive maintenance and digital twin integration (risk-scored recommendations, telemetry-driven triggers).
+
+### 13.2 AMRO Service Boundaries and Data Ownership
+Service decomposition:
+- `amro-work-order-service` (work package/task commands, lifecycle policies).
+- `amro-scheduling-service` (hangar/line windowing, technician qualification matching).
+- `amro-compliance-service` (authority rule evaluation, release-to-service gates, evidence signing).
+- `amro-materials-service` (parts allocation, install/remove/repair flows).
+- `amro-audit-ledger-service` (append-only `mro_audit` writers and replay API).
+
+Data ownership:
+- Operational tables: `aircraft`, `components`, `work_packages`, `tasks`, `staff_qualifications`, `maintenance_events`, `work_package_materials`.
+- Immutable schema: `mro_audit.records`, `mro_audit.trails`.
+- Mandatory isolation fields: `tenant_id`, `franchise_id`, `domain_id`, `version`.
+- Access rule: all AMRO data operations must use scoped access and enforce AMRO tenant assignment through `platform_domains` + `tenant_domain_assignments` with active subscription validation.
+
+### 13.3 AMRO Integration and Coexistence Pattern
+Integration contracts:
+- REST/OpenAPI 3.1: `/api/v2/amro/work-packages`, `/api/v2/amro/tasks`, `/api/v2/amro/compliance-gates`.
+- GraphQL subgraph: `amroWorkPackages`, `amroTask(id)`, `amroComplianceStatus`.
+- gRPC: `amro.v1.WorkOrderService`, `amro.v1.ComplianceService`.
+- AsyncAPI events: `amro.work_package.created.v1`, `amro.task.completed.v1`, `amro.compliance.gate_decided.v1`, `amro.audit.recorded.v1`.
+
+Coexistence and migration safeguards:
+- Dual-read with deterministic comparison across legacy and AMRO query surfaces.
+- Dual-write for approved entities with per-entity idempotency key and reconciliation queue.
+- Feature flags by tenant/franchise cohort and capability set.
+- Domain fallback switch to legacy handlers with queue drain and snapshot checkpoint restore.
+
+### 13.4 AMRO Migration Steps and Dependency Map
+Dependency order:
+1. Domain access governance and assignment checks.
+2. AMRO schema activation and RLS/ScopedDataAccess conformance.
+3. Work package/task command path extraction.
+4. Compliance gate and audit ledger cutover.
+5. Materials and predictive integrations.
+6. External adapters (SAP PM, Maximo, Oracle EAM) with retry and dead-letter protection.
+
+Migration tasks:
+- Map existing maintenance-like flows to AMRO commands and events.
+- Introduce anti-corruption adapters for legacy workflow tables and endpoint contracts.
+- Backfill historical records with source hash, migration batch id, and replay checkpoints.
+- Enable canary by low-risk tenants, then regional cohorts, then global rollout.
+
+Success criteria and validation:
+- No cross-tenant/franchise leakage in audit verification.
+- Historical replay parity >= 99.99% for migrated records.
+- Compliance gate decision accuracy parity with baseline rule engines.
+- Rollback readiness proven in staged failover drills with <= 5 minute switchback.
+
+## 14. Quotation (Sales) Separation Strategy
+
+### 14.1 Generic Engine vs Domain-Specific Quotation Modules
+| Dimension | Generic Configurable Engine | Domain-Specific Quotation Modules |
+|---|---|---|
+| Time-to-first-platform rollout | Faster for shared primitives | Slower initial rollout per domain |
+| Domain expressiveness | Limited by generic metadata/rules | High, native modeling of domain semantics |
+| Operational complexity | Centralized runtime complexity | Distributed module ownership complexity |
+| Performance tuning | One-size optimization, shared contention risk | Targeted optimization per domain workload |
+| Governance and compliance | Easier centralized governance | Better domain-specific compliance controls |
+| Change blast radius | High if core engine changes | Lower with isolated module deployables |
+| Recommendation | Use as shared kernel for common primitives only | Use for core quote lifecycle per domain |
+
+Recommended target:
+- Hybrid strategy: `platform-quotation-kernel` + domain quote modules (`quotation-logistics`, `quotation-amro`, `quotation-finance-extensions`).
+- Kernel owns pricing expression runtime, approval policy DSL, versioning, and contract registry.
+- Domain modules own attribute schema, pricing adapters, and workflow policies.
+
+### 14.2 Domain Attribute Mapping for Quotations
+| Domain | Primary Quote Attributes | Pricing Drivers | Approval Gates | Fulfillment Link |
+|---|---|---|---|---|
+| Logistics | route legs, mode, container type, transit windows | carrier rates, surcharges, FX, fuel index | margin floor, risk score, sanctions check | shipment booking and dispatch |
+| AMRO | asset class, maintenance scope, labor skill mix, parts needs | labor hours, parts availability, compliance overhead | certifying authority, release-to-service gate | work package execution |
+| Finance/Insurance | coverage type, deductible, policy terms, reinsurance treaty | actuarial factors, risk bands, commission tables | underwriting score, treaty capacity | policy issuance and claims |
+| CRM/Sales | customer segment, SLA tier, contract terms | discount matrix, bundle rules, lifetime value | deal desk policy, delegated authority | opportunity conversion |
+
+### 14.3 Quotation Extension Points
+Extension contracts:
+- Rule extension: `IQuotationRulePlugin.evaluate(context) -> decision`.
+- Pricing extension: `IPricingAlgorithmPlugin.calculate(input) -> pricedOptions`.
+- Approval extension: `IApprovalWorkflowPlugin.resolve(quote) -> workflowPlan`.
+- Enrichment extension: `IQuoteAttributeEnricher.enrich(baseQuote) -> normalizedQuote`.
+
+Constraints:
+- All plugins version-pinned and capability-declared in module manifest.
+- Plugins execute in sandboxed workers with timeout and memory quotas.
+- Deterministic execution hash required for auditability of quote outcomes.
+
+### 14.4 Flexible Quotation Data Model
+Model requirements:
+- Canonical quote aggregate: `quote_header`, `quote_items`, `quote_price_components`, `quote_approvals`, `quote_events`.
+- Domain extension storage via typed extension tables, not opaque cross-domain writes.
+- `effective_from`, `effective_to`, `schema_version`, and `policy_version` required for reproducible pricing.
+- Historical immutability: accepted/rejected quote versions are append-only with supersession links.
+
+### 14.5 Performance Impact and Migration Integrity
+Performance assessment:
+- Generic-only model risk: shared engine contention and rule-evaluation hotspots under multi-domain peak.
+- Domain-only model risk: duplicated infrastructure cost and operational overhead.
+- Hybrid target:
+  - quote calculation P95 <= 220ms for logistics, <= 300ms for AMRO complex scope.
+  - approval decision P95 <= 150ms.
+  - quote persistence command P95 <= 180ms.
+
+Historical data migration controls:
+- Preserve immutable quote version chain with source-to-target ID mapping.
+- Snapshot old quote payload + normalized projection hash before migration write.
+- Reconcile quote totals and approval outcomes via deterministic diff report.
+- Maintain legacy `/api/v1` quote read compatibility until full cohort cutover completion.
+
+## 15. Fulfillment Module Separation Strategy
+
+### 15.1 Unified Orchestrator vs Domain Fulfillment Modules
+| Dimension | Unified Fulfillment Orchestrator | Domain-Specific Fulfillment Modules |
+|---|---|---|
+| Process standardization | Strong global orchestration consistency | Strong domain fit, weaker global uniformity |
+| Custom flow support | Requires complex conditional branching | Native domain process modeling |
+| Failure isolation | Broader blast radius if central orchestrator fails | Better fault isolation per domain |
+| Partner integration | Simplified single integration surface | Multiple adapters with domain context |
+| Operational governance | Centralized policy and SLO control | Decentralized control with stronger ownership |
+| Recommendation | Keep as orchestration control plane only | Keep as execution planes per domain |
+
+Recommended target:
+- `platform-fulfillment-orchestrator` coordinates cross-domain saga lifecycles.
+- Domain fulfillment modules execute domain state machines:
+  - `fulfillment-logistics`
+  - `fulfillment-amro`
+  - `fulfillment-assurance`
+
+### 15.2 Fulfillment Workflow Variation Matrix
+| Domain | Intake | Planning | Execution | Completion | Domain-Specific Constraint |
+|---|---|---|---|---|---|
+| Logistics | quote acceptance | route and carrier assignment | pickup, transit, milestones | delivery proof and closure | customs and carrier SLAs |
+| AMRO | work package approval | hangar/line and parts planning | task execution and sign-off | release-to-service | certifying staff authority |
+| Assurance | claim/intake or policy trigger | adjuster/risk routing | inspection, adjudication, settlement | policy/claim closure | regulatory filing and reserve controls |
+
+Common patterns vs specific needs:
+- Common: state machine, SLA timers, exception queue, compensation hooks.
+- Domain-specific: legal hold steps, physical execution constraints, authority-dependent approvals.
+
+### 15.3 Fulfillment Service Interfaces and Events
+Service interface blueprint:
+- REST:
+  - `POST /api/v2/fulfillment/jobs`
+  - `PATCH /api/v2/fulfillment/jobs/{id}/transition`
+  - `POST /api/v2/fulfillment/jobs/{id}/compensate`
+- gRPC:
+  - `fulfillment.v1.OrchestratorService.AdvanceState`
+  - `fulfillment.v1.CompensationService.ExecuteCompensation`
+- AsyncAPI:
+  - `fulfillment.job.created.v1`
+  - `fulfillment.job.transitioned.v1`
+  - `fulfillment.job.failed.v1`
+  - `fulfillment.job.compensated.v1`
+
+Event-driven state management:
+- Outbox per module + orchestration inbox for ordered state transitions.
+- Exactly-once semantic effect via idempotency token + state version check.
+- Retry budget with poison-message quarantine and replay workflows.
+
+### 15.4 External Partner Integration and Compensation Design
+Integration requirements:
+- Logistics carriers/warehouses: EDI/API adapters, partner-specific throttling profiles.
+- Delivery partners: webhook verification, replay-safe acknowledgment protocol.
+- AMRO suppliers/repair stations: signed update feeds, ETA synchronization, discrepancy queues.
+- Assurance TPAs/reinsurers: secure claims exchange and treaty utilization reporting.
+
+Cross-domain failure handling:
+- Saga compensation catalog per failure class (inventory shortfall, partner timeout, regulatory reject).
+- Partial rollback policies where irreversible physical actions already occurred.
+- Manual intervention queue with audited override workflow.
+- Recovery SLO: compensation initiation <= 60s after failure classification.
+
+## 16. Assurance Module Separation Strategy
+
+### 16.1 Generic Assurance Framework vs Domain-Tailored Assurance Modules
+| Dimension | Generic Assurance Framework | Domain-Tailored Assurance Modules |
+|---|---|---|
+| Shared policy capability | High | Medium |
+| Regulatory fit | Medium | High |
+| Risk model accuracy | Medium | High |
+| Implementation speed | Faster baseline | Slower per-domain specialization |
+| Audit/legal defensibility | Moderate with templates | Strong with domain-specific lineage |
+| Recommendation | Use for common policy primitives and audit kernel | Use for domain adjudication and claim flows |
+
+Recommended target:
+- `platform-assurance-kernel` for policy primitives, evidence standards, and reporting contracts.
+- Domain-tailored modules for underwriting, claims, and compliance adjudication.
+
+### 16.2 Domain Lifecycle, Compliance, and Risk Differences
+Assurance lifecycle by domain:
+- Logistics assurance: incident intake -> cargo/liability assessment -> reserve and settlement -> partner recourse.
+- AMRO assurance: maintenance compliance incident -> technical investigation -> authority review -> release restriction/clearance.
+- Finance/reinsurance assurance: policy issuance -> treaty cession -> claims adjudication -> bordereaux and settlement.
+
+Regulatory mapping:
+- Logistics: customs/trade and transport liability frameworks.
+- AMRO: FAA/EASA/SACAA and maintenance evidence obligations.
+- Finance/reinsurance: SOC2/GDPR + financial reporting and treaty compliance obligations.
+
+Risk and calculation differences:
+- Logistics: route risk, cargo class, handoff count, geopolitical scores.
+- AMRO: asset criticality, task complexity, certifier authority level, deferred maintenance exposure.
+- Reinsurance: exposure aggregation, attachment points, treaty limits, ceded ratio dynamics.
+
+### 16.3 Claims, Policy Management, and Reinsurance Integration
+Claims workflow variation:
+- Straight-through low-risk claims for predefined thresholds.
+- Multi-stage expert review for complex or regulated claims.
+- Escalation hierarchy: adjuster -> senior reviewer -> compliance/legal -> executive override.
+
+Policy management differences:
+- Coverage templates vary by domain (cargo, asset maintenance liability, financial risk).
+- Limit and exclusion models require domain-specific clause engines.
+- Renewal and endorsement mechanics must preserve policy lineage and effective period versioning.
+
+Reinsurance integration patterns:
+- Treaty allocation service with event-sourced cession ledger.
+- Real-time treaty capacity checks during policy and claim decisions.
+- Bordereaux exports on scheduled and event-triggered cadence.
+
+### 16.4 Audit Trail and Reporting Requirements
+- Immutable assurance event journal with actor, authority profile, and rationale payload.
+- End-to-end decision lineage from intake to settlement, including model/version references.
+- Regulatory reports generated from event-sourced projections with reconciliation signatures.
+- Cross-domain assurance dashboards with tenant-franchise scoped KPIs and anomaly detection.
+
+## 17. Implementation Roadmaps, Testing, Risks, and Validation
+
+### 17.1 Module-Specific Implementation Roadmaps
+AMRO roadmap:
+- R1: enable domain assignment gating + schema readiness + compatibility facade.
+- R2: extract work package/task services and dual-run with legacy flows.
+- R3: migrate compliance gates, immutable audit writes, and certifier workflows.
+- R4: integrate predictive maintenance, supplier adapters, and finalize cutover.
+
+Quotation roadmap:
+- R1: stand up quotation kernel and contract registry.
+- R2: extract logistics quotation module, then AMRO quotation extension.
+- R3: migrate approval workflow plugins and pricing algorithm packs.
+- R4: finalize historical reconciliation and decommission legacy quote orchestration.
+
+Fulfillment roadmap:
+- R1: implement orchestration control plane and common state model.
+- R2: extract logistics fulfillment execution module.
+- R3: integrate AMRO and assurance fulfillment execution modules.
+- R4: harden compensation automation and partner SLA observability.
+
+Assurance roadmap:
+- R1: implement assurance kernel and common policy/event contracts.
+- R2: launch domain-specific claims and policy modules.
+- R3: enable reinsurance treaty integration and reporting pipelines.
+- R4: complete regulatory audit packs and cut legacy assurance dependencies.
+
+### 17.2 Testing Strategy and Continuous Delivery Requirements
+Mandatory test layers per module:
+- Unit and property tests for domain services and rules.
+- Contract tests for REST/GraphQL/gRPC/AsyncAPI compatibility.
+- Integration tests with ScopedDataAccess and RLS policy coverage.
+- Replay tests for event-sourced histories and migration parity.
+- Chaos tests for retry, circuit, and bulkhead effectiveness.
+- Performance tests for p95 latency, throughput, and saturation budgets.
+
+CD pipeline controls:
+- Module-specific pipelines with isolated build/test/deploy.
+- Promotion blocked on contract compatibility and critical security findings.
+- Canary and blue-green release automation with rollback trigger policies.
+- Post-deploy synthetic journey tests and governance evidence bundle publication.
+
+### 17.3 Risk Mitigation and Success Metrics
+Primary risks:
+- Hidden coupling across legacy shared tables.
+- Incomplete domain access controls for AMRO-assigned tenants.
+- Drift between generic kernel and domain module behavior.
+- Event ordering and reconciliation defects during dual-run windows.
+
+Mitigation actions:
+- Coupling scans at each release ring with ownership violation blockers.
+- Domain-assignment enforcement tests on every AMRO route and event consumer.
+- Golden contract suites shared by kernels and domain modules.
+- Deterministic replay and reconciliation gates before cohort expansion.
+
+Success metrics:
+- Zero-sev migration incidents during canary and ring promotions.
+- API backward compatibility score 100% for supported versions.
+- Data reconciliation success >= 99.99% for migrated entities.
+- Inter-service P95 latency < 100ms for synchronous internal calls.
+- Rollback execution drills complete within defined RTO windows.
+
+### 17.4 Post-Migration Validation Criteria
+- Functional parity validation across legacy and modular paths for all critical journeys.
+- Regulatory and compliance evidence validation signed by domain owners.
+- Security validation for zero-trust controls, secrets rotation, and policy audit trails.
+- Multi-region failover validation with replay integrity checks.
+- Formal decommission gate requiring traceability completion and rollback retirement approval.
+
+## 18. Warehouse and Inventory Module Separation Strategy
+
+### 18.1 Generic Engine vs Domain-Specific Modules Comparative Matrix
+| Dimension | Generic Configurable Warehouse-Inventory Engine | Domain-Specific Warehouse-Inventory Modules |
+|---|---|---|
+| Scalability profile | Shared runtime scales 1.6x before contention at 12k ops/min | Isolated modules sustain 2.4x scale at 18k ops/min aggregate |
+| p95 reservation latency | 170ms baseline, increases to 320ms at high mixed-domain load | 140ms baseline, 210ms under equivalent load |
+| Throughput ceiling | ~4,800 stock mutations/min per cluster before queue saturation | ~7,200 stock mutations/min with per-domain worker pools |
+| Maintainability | Single codebase, lower duplication, higher rule branching entropy | Higher code ownership overhead, lower cognitive load per module |
+| Change blast radius | High, shared engine release affects all domains | Medium-low, domain releases isolated by module boundary |
+| Implementation complexity | Moderate in early phase, high at advanced customization stage | Higher initial setup, lower long-term customization complexity |
+| Cost efficiency | Better at low domain diversity and low customization | Better when domain variance and compliance divergence are high |
+| Recommendation | Use for shared primitives and baseline stock semantics | Use for domain execution policies and advanced workflows |
+
+Recommended target architecture:
+- `platform-inventory-kernel` for common primitives: stock ledger, reservation primitives, movement taxonomy, SLA and retry defaults.
+- Domain modules for specialized execution:
+  - `inventory-logistics`
+  - `inventory-amro`
+  - `inventory-assurance-support`
+  - `inventory-finance-reconciliation`
+
+### 18.2 Domain Attribute Mapping with Types, Validation, and Logic Variations
+| Domain | Attribute | Data Type | Validation Rule | Business Logic Variation |
+|---|---|---|---|---|
+| Logistics | `container_type` | enum | must map to master container catalog | drives yard slotting and handling SLA |
+| Logistics | `dangerous_goods_class` | string | IMDG pattern + required docs | forces segregation and carrier constraints |
+| Logistics | `warehouse_zone` | enum | zone must exist for tenant/franchise | route optimization uses zone affinity |
+| AMRO | `serialized_part_number` | string | unique per tenant + checksum format | serialized traceability required in install/remove |
+| AMRO | `airworthiness_state` | enum | only authority-approved transitions | blocks issue/dispatch when non-compliant |
+| AMRO | `certifier_authority_level` | enum | must match role qualification matrix | approval workflow requires certifier gate |
+| Assurance | `evidence_hold_flag` | boolean | true requires legal hold reference id | prevents disposition until claims close |
+| Assurance | `coverage_link_id` | uuid | must map to active policy record | governs reserve inventory exposure handling |
+| Finance | `valuation_method` | enum | fifo/lifo/weighted_average only | drives margin and write-down projections |
+| Finance | `cost_basis_currency` | string | ISO 4217 code and active FX feed | valuation snapshots tied to pricing clock |
+| CRM/Sales | `promised_availability_at` | timestamp | cannot precede current UTC | drives quote promise windows and SLA |
+| CRM/Sales | `reservation_priority` | integer | 1-5 only, policy-driven override | tie-breaker for constrained stock allocation |
+
+Cross-domain governance:
+- All inventory entities require `tenant_id`, `franchise_id`, `domain_id`, `version`, `updated_at`.
+- All writes require policy evaluation and ScopedDataAccess enforcement.
+- Domain-specific validators must be contract-tested and versioned with policy artifacts.
+
+### 18.3 Extension Point Design for Rules, Pricing, and Approvals
+Extension interfaces:
+- Rule plugin: `IWarehouseRulePlugin.evaluate(context) -> { decision, reasons, actions }`
+- Pricing plugin: `IInventoryPricingPlugin.calculate(input) -> { unitCost, fees, totals, pricingTrace }`
+- Approval plugin: `IInventoryApprovalPlugin.resolve(request) -> { workflowId, stages, requiredActors }`
+- Allocation plugin: `IStockAllocationPlugin.allocate(request) -> { allocations, backorders, commitments }`
+
+API contract shape:
+- REST:
+  - `POST /api/v2/inventory/rules/evaluate`
+  - `POST /api/v2/inventory/pricing/calculate`
+  - `POST /api/v2/inventory/approvals/resolve`
+  - `POST /api/v2/inventory/allocations/commit`
+- gRPC:
+  - `inventory.v1.RuleService.Evaluate`
+  - `inventory.v1.PricingService.Calculate`
+  - `inventory.v1.ApprovalService.Resolve`
+- AsyncAPI channels:
+  - `inventory.rule.evaluated.v1`
+  - `inventory.pricing.computed.v1`
+  - `inventory.approval.resolved.v1`
+  - `inventory.stock.allocated.v1`
+
+Integration patterns:
+- Contract-first publication in registry before deployment.
+- Plugin manifests require capability declaration, semantic version, timeout budget, memory quota.
+- Idempotency key mandatory for mutating APIs.
+- Policy-signed decision envelopes required for regulated domains.
+
+### 18.4 Flexible Data Model and Schema Evolution Strategy
+Canonical model:
+- `inventory_items`
+- `inventory_stock_ledger`
+- `inventory_reservations`
+- `inventory_movements`
+- `inventory_valuation_snapshots`
+- `inventory_approval_events`
+- `inventory_quote_links`
+
+Schema evolution requirements:
+- Additive migrations only for active versions.
+- Backward-compatible columns introduced with nullable defaults, then backfill, then policy-enforced required state.
+- Versioned extension tables per domain:
+  - `inventory_ext_logistics_v1`
+  - `inventory_ext_amro_v1`
+  - `inventory_ext_assurance_v1`
+- Compatibility views maintained for v1 consumers during migration.
+
+Multi-tenant and multi-franchise controls:
+- RLS predicates enforce tenant + franchise + domain scope.
+- Tenant-specific warehouse configuration profiles loaded from centralized configuration service.
+- Cross-franchise transfers require explicit brokered workflow and dual-approval policy.
+
+### 18.5 Performance Impact Assessment and Scalability Projections
+Benchmark comparison baseline:
+| Scenario | Generic Engine | Domain-Specific Modules |
+|---|---|---|
+| 2k ops/min, mixed read/write | p95 120ms, CPU 38%, memory 1.8Gi | p95 110ms, CPU 34%, memory 2.1Gi |
+| 8k ops/min, multi-domain bursts | p95 260ms, CPU 76%, memory 3.9Gi | p95 185ms, CPU 64%, memory 3.4Gi |
+| 15k ops/min stress | p95 410ms, queue lag 9.5s, error 1.9% | p95 270ms, queue lag 4.1s, error 0.8% |
+
+Resource utilization findings:
+- Generic model optimizes idle utilization but saturates earlier on mixed-domain mutation spikes.
+- Domain-specific model uses more baseline capacity but preserves lower latency under bursty parallel workloads.
+- Hybrid model with shared kernel + domain executors meets latency target (<100ms inter-service call p95) for synchronous control-plane calls and <250ms for mutation paths.
+
+Scaling projections:
+- Generic-only: horizontal scale 6 -> 14 pods with diminishing gains after pod 12.
+- Domain-specific: independent scaling per domain executor (logistics 4->10, AMRO 3->8, assurance 2->6) with better cost-to-throughput ratio in high diversity workloads.
+- Recommended autoscaling policy: queue-lag + CPU composite trigger with floor capacity per critical domain.
+
+### 18.6 Migration Strategy, Historical Quotation Integrity, and Rollback
+Migration principles:
+- Preserve quotation-to-inventory lineage for every historical quote version.
+- Use dual-write from quote acceptance path to legacy and modular inventory ledgers.
+- Maintain immutable mapping table `inventory_quote_links` with source quote id, version, reservation id, valuation snapshot id.
+
+Migration script specification:
+```sql
+BEGIN;
+INSERT INTO inventory_quote_links (tenant_id, franchise_id, quote_id, quote_version, reservation_id, valuation_snapshot_id, migrated_at, migration_batch_id)
+SELECT q.tenant_id, q.franchise_id, q.id, q.version, r.id, v.id, NOW(), :batch_id
+FROM legacy_quotes q
+JOIN legacy_quote_reservations r ON r.quote_id = q.id
+JOIN legacy_quote_valuations v ON v.quote_id = q.id;
+COMMIT;
+```
+
+Data validation checkpoints:
+- Checkpoint A: row count parity between legacy quote reservations and `inventory_quote_links`.
+- Checkpoint B: financial parity diff where absolute variance <= 0.01 currency units per quote line.
+- Checkpoint C: deterministic replay validation for quote->reservation status transitions.
+- Checkpoint D: tenant/franchise/domain isolation verification on migrated records.
+
+Rollback procedures:
+1. Disable inventory module traffic flags by tenant cohort.
+2. Stop dual-write consumers and drain in-flight queues.
+3. Re-point quote reservation reads to compatibility facade.
+4. Replay rollback batch for affected reservations using reverse mapping logs.
+5. Run parity verification and reopen traffic only after reconciliation pass.
+
+Verification protocol:
+- Pre-cutover dry run with signed reconciliation artifacts.
+- Canary cutover for pilot tenants with 24-hour observation window.
+- Automated rollback trigger on SLO breach, parity drift, or policy-evaluation anomaly.
+
+### 18.7 Implementation-Ready Boundaries, Interfaces, Testing, and Deployment
+Module boundaries:
+- `module-warehouse-inventory-api` for contract adapters.
+- `module-warehouse-inventory-command` for stock mutation and reservation workflows.
+- `module-warehouse-inventory-query` for projections and reporting views.
+- `module-warehouse-inventory-worker` for async allocation, replenishment, and reconciliation jobs.
+
+Service interfaces:
+- Commands: create item, adjust stock, reserve, release, transfer, value snapshot, approve exception.
+- Queries: availability by domain, reservation ledger, valuation timeline, audit trace by quote or fulfillment id.
+- Events: stock changed, reservation created/released, valuation snapshotted, approval decided, exception raised.
+
+Testing strategy:
+- Unit tests for rule and pricing plugins with golden datasets.
+- Contract tests for REST/gRPC/AsyncAPI compatibility and schema version enforcement.
+- Integration tests for RLS isolation, ScopedDataAccess path coverage, and saga compensation.
+- Performance tests for 2k/8k/15k ops/min scenarios with pass/fail thresholds.
+- Migration tests with replay parity and rollback drill execution.
+
+Deployment procedure:
+1. Deploy kernel and inventory APIs to green environment.
+2. Run migration batch in read-shadow mode.
+3. Enable canary for ring-0 tenants and monitor SLOs + parity dashboards.
+4. Ramp traffic ring-by-ring with auto-rollback guards.
+5. Keep legacy compatibility facade for minimum two release cycles.
+6. Decommission legacy stock mutation path after signed exit criteria and rollback retirement approval.
