@@ -228,6 +228,7 @@ router.post(
   asyncHandler(async (req: AuthRequest, res): Promise<void> => {
     const tenantId = req.tenantId;
     const userId = req.userId;
+    const { workPackageId } = req.params;
 
     if (!tenantId || !userId) {
       res.status(401).json({
@@ -238,11 +239,15 @@ router.post(
       return;
     }
 
-    const request: CreateTaskRequest = req.body;
+    const request: CreateTaskRequest = {
+      ...req.body,
+      work_package_id: req.body?.work_package_id || workPackageId,
+    };
+    const sequenceOrder = request.sequence_order ?? request.sequence_number;
 
-    if (!request.title || request.sequence_number === undefined) {
+    if (!request.title || sequenceOrder === undefined) {
       res.status(400).json({
-        error: 'Missing required fields: title, sequence_number',
+        error: 'Missing required fields: title, sequence_order',
         code: 'VALIDATION_ERROR',
         statusCode: 400,
       } as ErrorResponse);
@@ -304,6 +309,96 @@ router.delete(
 
     await workOrdersService.deleteTask(tenantId, id, userId);
     res.status(204).send();
+    return;
+  }),
+);
+
+router.get(
+  '/work-packages/:workPackageId/materials',
+  asyncHandler(async (req: AuthRequest, res): Promise<void> => {
+    const tenantId = req.tenantId;
+    const { workPackageId } = req.params;
+
+    if (!tenantId) {
+      res.status(401).json({
+        error: 'Missing tenant context',
+        code: 'MISSING_TENANT',
+        statusCode: 401,
+      } as ErrorResponse);
+      return;
+    }
+
+    const materials = await workOrdersService.getMaterials(tenantId, workPackageId);
+    res.json({
+      data: materials,
+      count: materials.length,
+    });
+    return;
+  }),
+);
+
+router.get(
+  '/materials/:id',
+  asyncHandler(async (req: AuthRequest, res): Promise<void> => {
+    const tenantId = req.tenantId;
+    const { id } = req.params;
+
+    if (!tenantId) {
+      res.status(401).json({
+        error: 'Missing tenant context',
+        code: 'MISSING_TENANT',
+        statusCode: 401,
+      } as ErrorResponse);
+      return;
+    }
+
+    const material = await workOrdersService.getMaterial(tenantId, id);
+    res.json({ data: material });
+    return;
+  }),
+);
+
+router.post(
+  '/tasks/:id/maintenance-events',
+  asyncHandler(async (req: AuthRequest, res): Promise<void> => {
+    const tenantId = req.tenantId;
+    const userId = req.userId;
+    const { id } = req.params;
+    const { executed_by, evidence_captured, event_type, sign_off_date, notes } = req.body ?? {};
+
+    if (!tenantId || !userId) {
+      res.status(401).json({
+        error: 'Missing tenant or user context',
+        code: 'MISSING_CONTEXT',
+        statusCode: 401,
+      } as ErrorResponse);
+      return;
+    }
+
+    if (!executed_by || evidence_captured === undefined) {
+      res.status(400).json({
+        error: 'Missing required fields: executed_by, evidence_captured',
+        code: 'VALIDATION_ERROR',
+        statusCode: 400,
+      } as ErrorResponse);
+      return;
+    }
+
+    await workOrdersService.recordMaintenanceEvent(tenantId, userId, id, {
+      executed_by,
+      evidence_captured,
+      event_type,
+      sign_off_date,
+      notes,
+    });
+
+    res.status(201).json({
+      data: {
+        task_id: id,
+        executed_by,
+        evidence_captured,
+      },
+    });
     return;
   }),
 );

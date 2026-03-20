@@ -4,12 +4,23 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import { ProtectedRoute } from './ProtectedRoute';
 import * as authHooks from '@/hooks/useAuth';
+import * as domainContext from '@/contexts/DomainContext';
 
 vi.mock('@/hooks/useAuth');
+vi.mock('@/contexts/DomainContext');
 
 describe('ProtectedRoute', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(domainContext.useDomain).mockReturnValue({
+      currentDomain: { id: 'domain-logistics', code: 'LOGISTICS', name: 'Logistics', description: null, is_active: true },
+      setDomain: vi.fn(),
+      availableDomains: [{ id: 'domain-logistics', code: 'LOGISTICS', name: 'Logistics', description: null, is_active: true }],
+      showDomainSelector: false,
+      tenantDomainCount: 1,
+      isPlatformAdmin: false,
+      isLoading: false,
+    });
   });
 
   const renderRoute = (element: ReactNode, options?: { initialEntry?: string; routePath?: string }) => {
@@ -261,6 +272,99 @@ describe('ProtectedRoute', () => {
     );
 
     expect(await screen.findByText('Channel Integrations')).toBeInTheDocument();
+    expect(screen.queryByText('Unauthorized Screen')).not.toBeInTheDocument();
+  });
+
+  it('allows route access when required domain is assigned', async () => {
+    vi.mocked(authHooks.useAuth).mockReturnValue({
+      user: { id: 'user-700' },
+      loading: false,
+      hasRole: vi.fn().mockReturnValue(true),
+      hasPermission: vi.fn().mockReturnValue(true),
+      isPlatformAdmin: vi.fn().mockReturnValue(false),
+      session: { user: { id: 'user-700' } },
+      signIn: vi.fn(),
+      signOut: vi.fn(),
+      role: 'tenant_admin',
+      permissions: ['dashboards.view'],
+      refreshUserRole: vi.fn(),
+    } as any);
+    vi.mocked(domainContext.useDomain).mockReturnValue({
+      currentDomain: { id: 'domain-amro', code: 'AMRO', name: 'AMRO', description: null, is_active: true },
+      setDomain: vi.fn(),
+      availableDomains: [{ id: 'domain-amro', code: 'AMRO', name: 'AMRO', description: null, is_active: true }],
+      showDomainSelector: false,
+      tenantDomainCount: 1,
+      isPlatformAdmin: false,
+      isLoading: false,
+    });
+
+    renderRoute(
+      <ProtectedRoute requiredDomainCode="AMRO">
+        <div>AMRO Workspace</div>
+      </ProtectedRoute>
+    );
+
+    expect(await screen.findByText('AMRO Workspace')).toBeInTheDocument();
+    expect(screen.queryByText('Unauthorized Screen')).not.toBeInTheDocument();
+  });
+
+  it('blocks route access when required domain is missing', async () => {
+    vi.mocked(authHooks.useAuth).mockReturnValue({
+      user: { id: 'user-701' },
+      loading: false,
+      hasRole: vi.fn().mockReturnValue(true),
+      hasPermission: vi.fn().mockReturnValue(true),
+      isPlatformAdmin: vi.fn().mockReturnValue(false),
+      session: { user: { id: 'user-701' } },
+      signIn: vi.fn(),
+      signOut: vi.fn(),
+      role: 'tenant_admin',
+      permissions: ['dashboards.view'],
+      refreshUserRole: vi.fn(),
+    } as any);
+
+    renderRoute(
+      <ProtectedRoute requiredDomainCode="AMRO">
+        <div>AMRO Workspace</div>
+      </ProtectedRoute>
+    );
+
+    expect(await screen.findByText('Unauthorized Screen')).toBeInTheDocument();
+    expect(screen.queryByText('AMRO Workspace')).not.toBeInTheDocument();
+  });
+
+  it('allows platform admins to access domain-gated routes without assignment list', async () => {
+    vi.mocked(authHooks.useAuth).mockReturnValue({
+      user: { id: 'user-702' },
+      loading: false,
+      hasRole: vi.fn().mockReturnValue(true),
+      hasPermission: vi.fn().mockReturnValue(true),
+      isPlatformAdmin: vi.fn().mockReturnValue(true),
+      session: { user: { id: 'user-702' } },
+      signIn: vi.fn(),
+      signOut: vi.fn(),
+      role: 'platform_admin',
+      permissions: ['*'],
+      refreshUserRole: vi.fn(),
+    } as any);
+    vi.mocked(domainContext.useDomain).mockReturnValue({
+      currentDomain: null,
+      setDomain: vi.fn(),
+      availableDomains: [],
+      showDomainSelector: true,
+      tenantDomainCount: 0,
+      isPlatformAdmin: true,
+      isLoading: false,
+    });
+
+    renderRoute(
+      <ProtectedRoute requiredDomainCode="AMRO">
+        <div>AMRO Workspace</div>
+      </ProtectedRoute>
+    );
+
+    expect(await screen.findByText('AMRO Workspace')).toBeInTheDocument();
     expect(screen.queryByText('Unauthorized Screen')).not.toBeInTheDocument();
   });
 });

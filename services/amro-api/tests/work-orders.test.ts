@@ -162,3 +162,28 @@ describe('Tasks Endpoints - Authentication Required', () => {
     expect(response.body.code).toBe('MISSING_TOKEN');
   });
 });
+
+describe('Materials and Maintenance Event Endpoints - Authentication Required', () => {
+  it('should require authentication for GET /api/v1/work-packages/:id/materials', async () => {
+    const response = await request(app).get('/api/v1/work-packages/wp-123/materials');
+    expect(response.status).toBe(401);
+    expect(response.body.code).toBe('MISSING_TOKEN');
+  });
+
+  it('should require authentication for GET /api/v1/materials/:id', async () => {
+    const response = await request(app).get('/api/v1/materials/material-123');
+    expect(response.status).toBe(401);
+    expect(response.body.code).toBe('MISSING_TOKEN');
+  });
+
+  it('should require authentication for POST /api/v1/tasks/:id/maintenance-events', async () => {
+    const response = await request(app)
+      .post('/api/v1/tasks/task-123/maintenance-events')
+      .send({
+        executed_by: 'user-123',
+        evidence_captured: true,
+      });
+    expect(response.status).toBe(401);
+    expect(response.body.code).toBe('MISSING_TOKEN');
+  });
+});

@@ -26,6 +26,7 @@ import { Input } from '@/components/ui/input';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { RoleGuard } from '@/components/auth/RoleGuard';
 import { cn } from '@/lib/utils';
+import { useDomain } from '@/contexts/DomainContext';
 
 interface MenuItem {
   title: string;
@@ -68,6 +69,8 @@ export function CommandCenterNav() {
   const location = useLocation();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
+  const { availableDomains, isPlatformAdmin } = useDomain();
+  const hasAmroDomain = isPlatformAdmin || availableDomains.some((domain) => String(domain.code || '').trim().toUpperCase() === 'AMRO');
   const prefetchedRoutes = useRef(new Set<string>());
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>(() => {
     try {
@@ -161,7 +164,7 @@ export function CommandCenterNav() {
       icon: i.icon,
       roles: (i as any).roles,
       permissions: (i as any).permissions,
-    }));
+    })).filter((item) => hasAmroDomain || item.url !== '/dashboard/amro/work-packages');
 
     // Financials (Finance + Billing)
     const financialItems = [
@@ -199,7 +202,7 @@ export function CommandCenterNav() {
       { id: 'logistics', label: 'Logistics', items: logisticsItems },
       { id: 'admin', label: 'Administration', items: adminItems },
     ];
-  }, []);
+  }, [hasAmroDomain]);
 
   // 2. Filter Logic
   const filteredGroups = useMemo(() => {

@@ -8,6 +8,52 @@ const RATE_LIMIT = 100;
 const WINDOW_MS = 60_000;
 const DEFAULT_EMERGENCY_BLOCKED_EMAILS = ['bahuguna.vimal001@gmail.com'];
 const ALLOW_GLOBAL_PLATFORM_SCOPE = String(process.env.ALLOW_GLOBAL_PLATFORM_SCOPE || '').trim().toLowerCase() === 'true';
+const AMRO_DOMAIN_CODE = 'AMRO';
+const AMRO_CACHE_TTL_MS = 15_000;
+const amroAccessCache = new Map<string, { expiresAt: number; result: AmroDomainAccessResult }>();
+
+async function writeAmroDomainAuditLog(
+  supabase: ReturnType<typeof getSupabaseAdminClient>,
+  params: {
+    userId: string;
+    tenantId: string;
+    correlationId?: string;
+    authorized: boolean;
+    source: 'database' | 'cache' | 'fallback';
+    subscriptionStatus: 'active' | 'grace_period' | 'inactive' | 'missing';
+    graceUntil: string | null;
+    deniedReason?: string | null;
+    allowGracePeriod: boolean;
+    validatedAt: string;
+  }
+) {
+  const payload: Record<string, unknown> = {
+    user_id: params.userId || null,
+    action: 'AMRO_DOMAIN_ACCESS_CHECK',
+    resource_type: 'amro_domain_access',
+    tenant_id: params.tenantId,
+    details: {
+      correlationId: params.correlationId || null,
+      authorized: params.authorized,
+      source: params.source,
+      subscriptionStatus: params.subscriptionStatus,
+      graceUntil: params.graceUntil,
+      deniedReason: params.deniedReason || null,
+      allowGracePeriod: params.allowGracePeriod,
+      validatedAt: params.validatedAt,
+    },
+  };
+
+  const { error } = await supabase.from('audit_logs').insert(payload);
+  if (error) {
+    logger.warn('[AmroDomainAccess] audit log write failed', {
+      tenantId: params.tenantId,
+      userId: params.userId || null,
+      correlationId: params.correlationId || null,
+      message: String(error.message || ''),
+    });
+  }
+}
 
 function parseEmergencyBlockedEmails(): string[] {
   const configured = String(process.env.EMERGENCY_BLOCKED_EMAILS || '').trim();
@@ -55,6 +101,14 @@ export type UserAccessProfile = {
   overrideFranchiseId: string | null;
 };
 
+export type AmroDomainAccessResult = {
+  isAuthorized: boolean;
+  subscriptionStatus: 'active' | 'grace_period' | 'inactive' | 'missing';
+  graceUntil: string | null;
+  validatedAt: string;
+  source: 'database' | 'cache' | 'fallback';
+};
+
 function normalizeDomainCodes(rows: any[]): string[] {
   const seen = new Set<string>();
   for (const row of rows || []) {
@@ -68,6 +122,12 @@ function isMissingRelationError(error: any): boolean {
   const code = String(error?.code || '').trim();
   const message = String(error?.message || '').toLowerCase();
   return code === '42P01' || message.includes('does not exist') || message.includes('undefined table');
+}
+
+function isMissingColumnError(error: any): boolean {
+  const code = String(error?.code || '').trim();
+  const message = String(error?.message || '').toLowerCase();
+  return code === '42703' || message.includes('column') || message.includes('does not exist');
 }
 
 async function resolveTenantPrimaryDomainCode(supabase: any, tenantId: string): Promise<string[]> {
@@ -538,6 +598,191 @@ export async function enforceDomainAccess(
     authorizedDomainCodes,
     tenantDomainCount: tenantDomainCodes.length,
   };
+}
+
+export async function enforceAmroDomainAccess(
+  access: UserAccessProfile,
+  options: { correlationId?: string; allowGracePeriod?: boolean; bypassCache?: boolean } = {}
+): Promise<AmroDomainAccessResult> {
+  const tenantId = String(access.tenantId || '').trim();
+  if (!tenantId) {
+    throw new Error('Forbidden: AMRO access requires tenant-scoped session');
+  }
+
+  const allowGracePeriod = options.allowGracePeriod !== false;
+  const cacheKey = `${tenantId}:${allowGracePeriod ? 'grace' : 'strict'}`;
+  const now = Date.now();
+  const validatedAt = new Date().toISOString();
+  if (!options.bypassCache) {
+    const cached = amroAccessCache.get(cacheKey);
+    if (cached && cached.expiresAt > now) {
+      const cachedResult: AmroDomainAccessResult = {
+        ...cached.result,
+        source: 'cache',
+      };
+      await writeAmroDomainAuditLog(getSupabaseAdminClient(), {
+        userId: access.userId,
+        tenantId,
+        correlationId: options.correlationId,
+        authorized: true,
+        source: 'cache',
+        subscriptionStatus: cachedResult.subscriptionStatus,
+        graceUntil: cachedResult.graceUntil,
+        allowGracePeriod,
+        validatedAt,
+      });
+      return {
+        ...cachedResult,
+      };
+    }
+    if (cached && cached.expiresAt <= now) {
+      amroAccessCache.delete(cacheKey);
+    }
+  }
+
+  const supabase = getSupabaseAdminClient();
+
+  const strictQuery = await supabase
+    .from('tenant_domain_assignments')
+    .select('id, tenant_id, is_active, subscription_status, grace_until, platform_domains!inner(code, is_active)')
+    .eq('tenant_id', tenantId)
+    .eq('is_active', true);
+
+  let assignmentRows: any[] | null = (strictQuery.data as any[] | null) || null;
+  let assignmentError: any = strictQuery.error;
+  let source: 'database' | 'fallback' = 'database';
+
+  if (assignmentError && isMissingColumnError(assignmentError)) {
+    const fallbackQuery = await supabase
+      .from('tenant_domain_assignments')
+      .select('id, tenant_id, is_active, platform_domains!inner(code, is_active)')
+      .eq('tenant_id', tenantId)
+      .eq('is_active', true);
+    assignmentRows = (fallbackQuery.data as any[] | null) || null;
+    assignmentError = fallbackQuery.error;
+    source = 'fallback';
+  }
+
+  if (assignmentError) {
+    if (!isMissingRelationError(assignmentError)) {
+      throw new Error(`Failed to validate AMRO subscription: ${assignmentError.message}`);
+    }
+    logger.warn('[AmroDomainAccess] tenant_domain_assignments table unavailable', {
+      tenantId,
+      correlationId: options.correlationId || null,
+      code: String(assignmentError.code || ''),
+      error: String(assignmentError.message || ''),
+    });
+    await writeAmroDomainAuditLog(supabase, {
+      userId: access.userId,
+      tenantId,
+      correlationId: options.correlationId,
+      authorized: false,
+      source,
+      subscriptionStatus: 'missing',
+      graceUntil: null,
+      deniedReason: 'assignment_table_unavailable',
+      allowGracePeriod,
+      validatedAt,
+    });
+    throw new Error('Forbidden: AMRO access requires active AMRO domain subscription');
+  }
+
+  const rows = Array.isArray(assignmentRows) ? assignmentRows : [];
+  const matched = rows.find((row: any) => {
+    const linkedDomain = Array.isArray(row?.platform_domains) ? row.platform_domains[0] : row?.platform_domains;
+    const code = String(linkedDomain?.code || '').trim().toUpperCase();
+    const domainIsActive = Boolean(linkedDomain?.is_active ?? true);
+    return code === AMRO_DOMAIN_CODE && domainIsActive;
+  });
+
+  if (!matched) {
+    logger.warn('[AmroDomainAccess] AMRO assignment missing', {
+      tenantId,
+      correlationId: options.correlationId || null,
+    });
+    await writeAmroDomainAuditLog(supabase, {
+      userId: access.userId,
+      tenantId,
+      correlationId: options.correlationId,
+      authorized: false,
+      source,
+      subscriptionStatus: 'missing',
+      graceUntil: null,
+      deniedReason: 'amro_assignment_missing',
+      allowGracePeriod,
+      validatedAt,
+    });
+    throw new Error('Forbidden: AMRO access requires active AMRO domain subscription');
+  }
+
+  const rawStatus = String((matched as any)?.subscription_status || 'active').trim().toLowerCase();
+  const normalizedStatus = rawStatus === 'grace_period' ? 'grace_period' : rawStatus === 'active' ? 'active' : 'inactive';
+  const graceUntilRaw = (matched as any)?.grace_until ? String((matched as any).grace_until) : null;
+  const graceUntilMs = graceUntilRaw ? Date.parse(graceUntilRaw) : Number.NaN;
+  const graceWindowOpen = Number.isFinite(graceUntilMs) && graceUntilMs > now;
+  const authorizedByStatus =
+    normalizedStatus === 'active' || (allowGracePeriod && normalizedStatus === 'grace_period' && graceWindowOpen);
+
+  if (!authorizedByStatus) {
+    const reason = normalizedStatus === 'grace_period'
+      ? 'Forbidden: AMRO grace period expired'
+      : 'Forbidden: AMRO subscription is inactive';
+    logger.warn('[AmroDomainAccess] subscription check failed', {
+      tenantId,
+      correlationId: options.correlationId || null,
+      status: normalizedStatus,
+      graceUntil: graceUntilRaw,
+      allowGracePeriod,
+    });
+    await writeAmroDomainAuditLog(supabase, {
+      userId: access.userId,
+      tenantId,
+      correlationId: options.correlationId,
+      authorized: false,
+      source,
+      subscriptionStatus: normalizedStatus,
+      graceUntil: graceUntilRaw,
+      deniedReason: reason,
+      allowGracePeriod,
+      validatedAt,
+    });
+    throw new Error(reason);
+  }
+
+  const result: AmroDomainAccessResult = {
+    isAuthorized: true,
+    subscriptionStatus: normalizedStatus === 'grace_period' ? 'grace_period' : 'active',
+    graceUntil: graceUntilRaw,
+    validatedAt,
+    source,
+  };
+
+  amroAccessCache.set(cacheKey, {
+    result,
+    expiresAt: now + AMRO_CACHE_TTL_MS,
+  });
+
+  logger.info('[AmroDomainAccess] tenant authorized', {
+    tenantId,
+    correlationId: options.correlationId || null,
+    status: result.subscriptionStatus,
+    graceUntil: result.graceUntil,
+    source: result.source,
+  });
+  await writeAmroDomainAuditLog(supabase, {
+    userId: access.userId,
+    tenantId,
+    correlationId: options.correlationId,
+    authorized: true,
+    source: result.source,
+    subscriptionStatus: result.subscriptionStatus,
+    graceUntil: result.graceUntil,
+    allowGracePeriod,
+    validatedAt,
+  });
+
+  return result;
 }
 
 export function enforceRoles(role: string, allowedRoles: string[]): void {

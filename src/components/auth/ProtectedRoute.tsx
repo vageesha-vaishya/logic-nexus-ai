@@ -3,6 +3,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Loader2 } from 'lucide-react';
 import { PLATFORM_ADMIN_ROLE, type AppRole, type Permission } from '@/config/permissions';
 import { logger } from '@/lib/logger';
+import { useDomain } from '@/contexts/DomainContext';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -10,6 +11,7 @@ interface ProtectedRouteProps {
   requireAuth?: boolean;
   requiredPermissions?: Permission[];
   accessDeniedMessage?: string;
+  requiredDomainCode?: string;
 }
 
 export function ProtectedRoute({ 
@@ -17,9 +19,11 @@ export function ProtectedRoute({
   requiredRole,
   requireAuth = true,
   requiredPermissions,
-  accessDeniedMessage
+  accessDeniedMessage,
+  requiredDomainCode
 }: ProtectedRouteProps) {
   const { user, loading, hasRole, hasPermission, isPlatformAdmin } = useAuth();
+  const { isLoading: loadingDomains, availableDomains } = useDomain();
   const location = useLocation();
   const isSettingsRoute =
     location.pathname === '/dashboard/settings' ||
@@ -40,6 +44,19 @@ export function ProtectedRoute({
 
   if (loading) {
     logger.debug('ProtectedRoute waiting for auth loading', { path: location.pathname, component: 'ProtectedRoute' });
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (requiredDomainCode && loadingDomains) {
+    logger.debug('ProtectedRoute waiting for domain loading', {
+      path: location.pathname,
+      requiredDomainCode,
+      component: 'ProtectedRoute',
+    });
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -101,6 +118,32 @@ export function ProtectedRoute({
             reason: 'missing_permissions',
             missingPermissions: requiredPermissions,
             from: location.pathname + location.search,
+          }}
+          replace
+        />
+      );
+    }
+  }
+
+  if (requiredDomainCode) {
+    if (isPlatformAdmin()) {
+      return <>{children}</>;
+    }
+    const normalizedRequiredDomainCode = requiredDomainCode.trim().toUpperCase();
+    const hasRequiredDomain = availableDomains.some((domain) => String(domain.code || '').trim().toUpperCase() === normalizedRequiredDomainCode);
+    if (!hasRequiredDomain) {
+      logger.warn(`Access denied. User missing required domain: ${normalizedRequiredDomainCode}`, {
+        userId: user?.id,
+        component: 'ProtectedRoute',
+      });
+      return (
+        <Navigate
+          to="/unauthorized"
+          state={{
+            reason: 'missing_domain',
+            requiredDomainCode: normalizedRequiredDomainCode,
+            from: location.pathname + location.search,
+            message: accessDeniedMessage || `Access denied - ${normalizedRequiredDomainCode} domain assignment required`,
           }}
           replace
         />

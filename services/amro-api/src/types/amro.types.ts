@@ -60,14 +60,18 @@ export interface WorkPackage {
   tenant_id: string;
   franchise_id?: string;
   aircraft_id: string;
-  work_package_number: string;
+  work_order_number: string;
+  work_package_number?: string;
   title: string;
   description?: string;
+  work_type?: string;
   maintenance_type: MaintenanceType;
   status: WorkPackageStatus;
   planned_start_date?: string;
+  planned_end_date?: string;
   planned_completion_date?: string;
   actual_start_date?: string;
+  actual_end_date?: string;
   actual_completion_date?: string;
   estimated_labor_hours?: number;
   actual_labor_hours?: number;
@@ -83,17 +87,23 @@ export interface WorkPackage {
 export interface Task {
   id: string;
   tenant_id: string;
+  franchise_id?: string;
   work_package_id: string;
   task_number: string;
   title: string;
   description?: string;
+  task_category?: string;
   status: TaskStatus;
-  sequence_number: number;
+  sequence_order?: number;
+  sequence_number?: number;
   planned_start_date?: string;
+  planned_end_date?: string;
   planned_completion_date?: string;
   actual_start_date?: string;
+  actual_end_date?: string;
   actual_completion_date?: string;
   assigned_to?: string;
+  qualifications?: Record<string, unknown> | null;
   required_qualification?: string;
   created_at: string;
   updated_at: string;
@@ -140,8 +150,10 @@ export interface CreateWorkPackageRequest {
   aircraft_id: string;
   title: string;
   description?: string;
+  work_type?: string;
   maintenance_type: MaintenanceType;
   planned_start_date?: string;
+  planned_end_date?: string;
   planned_completion_date?: string;
   estimated_labor_hours?: number;
   estimated_cost?: number;
@@ -150,10 +162,13 @@ export interface CreateWorkPackageRequest {
 export interface UpdateWorkPackageRequest {
   title?: string;
   description?: string;
+  work_type?: string;
   status?: WorkPackageStatus;
   planned_start_date?: string;
+  planned_end_date?: string;
   planned_completion_date?: string;
   actual_start_date?: string;
+  actual_end_date?: string;
   actual_completion_date?: string;
   estimated_labor_hours?: number;
   actual_labor_hours?: number;
@@ -163,25 +178,34 @@ export interface UpdateWorkPackageRequest {
 }
 
 export interface CreateTaskRequest {
-  work_package_id: string;
+  work_package_id?: string;
   title: string;
   description?: string;
-  sequence_number: number;
+  task_category?: string;
+  sequence_order?: number;
+  sequence_number?: number;
   planned_start_date?: string;
+  planned_end_date?: string;
   planned_completion_date?: string;
+  qualifications?: Record<string, unknown>;
   required_qualification?: string;
 }
 
 export interface UpdateTaskRequest {
   title?: string;
   description?: string;
+  task_category?: string;
   status?: TaskStatus;
+  sequence_order?: number;
   sequence_number?: number;
   planned_start_date?: string;
+  planned_end_date?: string;
   planned_completion_date?: string;
   actual_start_date?: string;
+  actual_end_date?: string;
   actual_completion_date?: string;
   assigned_to?: string;
+  qualifications?: Record<string, unknown> | null;
   required_qualification?: string;
 }
 

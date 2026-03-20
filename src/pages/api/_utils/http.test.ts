@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { authenticateRequest, enforceAdminOverrideScope, enforceDomainAccess, resolveAndApplyAccessContext, resolveUserAccessProfile, type UserAccessProfile } from './http';
+import { authenticateRequest, enforceAdminOverrideScope, enforceAmroDomainAccess, enforceDomainAccess, resolveAndApplyAccessContext, resolveUserAccessProfile, type UserAccessProfile } from './http';
 import { getSupabaseAdminClient } from './supabaseAdmin';
 
 vi.mock('./supabaseAdmin', () => ({
@@ -41,6 +41,12 @@ function createMaybeSingleChain(finalResult: any) {
     maybeSingle: vi.fn().mockResolvedValue(finalResult),
   };
   return chain;
+}
+
+function createInsertChain(finalResult: any) {
+  return {
+    insert: vi.fn().mockResolvedValue(finalResult),
+  };
 }
 
 function createMockRequest(headers: Record<string, string> = {}) {
@@ -401,5 +407,108 @@ describe('http domain and scope guards', () => {
         })
       )
     ).rejects.toThrow('Unauthorized');
+  });
+
+  it('authorizes AMRO tenant assignment and writes audit trail', async () => {
+    const assignmentQuery = createSelectEqChain(
+      {
+        data: [
+          {
+            id: 'tda-1',
+            tenant_id: 'tenant-1',
+            is_active: true,
+            subscription_status: 'active',
+            grace_until: null,
+            platform_domains: { code: 'AMRO', is_active: true },
+          },
+        ],
+        error: null,
+      },
+      2
+    );
+    const auditInsertQuery = createInsertChain({ error: null });
+
+    const supabaseMock = {
+      from: vi.fn((table: string) => {
+        if (table === 'tenant_domain_assignments') return assignmentQuery;
+        if (table === 'audit_logs') return auditInsertQuery;
+        throw new Error(`Unexpected table: ${table}`);
+      }),
+    } as any;
+
+    vi.mocked(getSupabaseAdminClient).mockReturnValue(supabaseMock);
+
+    const result = await enforceAmroDomainAccess(buildAccess(), { correlationId: 'corr-amro-1', bypassCache: true });
+    expect(result.isAuthorized).toBe(true);
+    expect(result.subscriptionStatus).toBe('active');
+    expect(auditInsertQuery.insert).toHaveBeenCalledTimes(1);
+  });
+
+  it('blocks AMRO access when grace period is expired', async () => {
+    const assignmentQuery = createSelectEqChain(
+      {
+        data: [
+          {
+            id: 'tda-2',
+            tenant_id: 'tenant-1',
+            is_active: true,
+            subscription_status: 'grace_period',
+            grace_until: '2020-01-01T00:00:00.000Z',
+            platform_domains: { code: 'AMRO', is_active: true },
+          },
+        ],
+        error: null,
+      },
+      2
+    );
+    const auditInsertQuery = createInsertChain({ error: null });
+
+    const supabaseMock = {
+      from: vi.fn((table: string) => {
+        if (table === 'tenant_domain_assignments') return assignmentQuery;
+        if (table === 'audit_logs') return auditInsertQuery;
+        throw new Error(`Unexpected table: ${table}`);
+      }),
+    } as any;
+    vi.mocked(getSupabaseAdminClient).mockReturnValue(supabaseMock);
+
+    await expect(enforceAmroDomainAccess(buildAccess(), { bypassCache: true })).rejects.toThrow('Forbidden: AMRO grace period expired');
+    expect(auditInsertQuery.insert).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses AMRO cache result and still writes audit trail', async () => {
+    const assignmentQuery = createSelectEqChain(
+      {
+        data: [
+          {
+            id: 'tda-3',
+            tenant_id: 'tenant-1',
+            is_active: true,
+            subscription_status: 'active',
+            grace_until: null,
+            platform_domains: { code: 'AMRO', is_active: true },
+          },
+        ],
+        error: null,
+      },
+      2
+    );
+    const auditInsertQuery = createInsertChain({ error: null });
+    const supabaseMock = {
+      from: vi.fn((table: string) => {
+        if (table === 'tenant_domain_assignments') return assignmentQuery;
+        if (table === 'audit_logs') return auditInsertQuery;
+        throw new Error(`Unexpected table: ${table}`);
+      }),
+    } as any;
+    vi.mocked(getSupabaseAdminClient).mockReturnValue(supabaseMock);
+
+    const first = await enforceAmroDomainAccess(buildAccess(), { correlationId: 'corr-amro-cache-1', bypassCache: true });
+    const second = await enforceAmroDomainAccess(buildAccess(), { correlationId: 'corr-amro-cache-2' });
+
+    expect(first.source).toBe('database');
+    expect(second.source).toBe('cache');
+    expect((assignmentQuery.eq as any).mock.calls.length).toBe(2);
+    expect(auditInsertQuery.insert).toHaveBeenCalledTimes(2);
   });
 });

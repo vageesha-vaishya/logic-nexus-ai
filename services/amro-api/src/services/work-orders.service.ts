@@ -15,7 +15,7 @@ import {
 } from '../types/amro.types';
 import { amroEventsProducer } from '../events/amro-events.producer';
 import { AmroEventType } from '../events/amro-events.types';
-import { withSpan, withChildSpan } from '../instrumentation/amro-tracing';
+import { withSpan } from '../instrumentation/amro-tracing';
 
 // Simple logger utility (use your actual logger if available)
 const logger = {
@@ -26,6 +26,22 @@ const logger = {
 
 export class WorkOrdersService {
   private supabase: SupabaseClient;
+
+  private getWorkPackageNumber(workPackage: WorkPackage): string {
+    return workPackage.work_order_number ?? workPackage.work_package_number ?? '';
+  }
+
+  private getTaskSequence(task: Task): number | undefined {
+    return task.sequence_order ?? task.sequence_number;
+  }
+
+  private getTaskRequiredQualification(task: Task): string | undefined {
+    if (task.required_qualification) {
+      return task.required_qualification;
+    }
+    const rating = task.qualifications?.rating;
+    return typeof rating === 'string' ? rating : undefined;
+  }
 
   constructor() {
     const supabaseUrl = process.env.SUPABASE_URL;
@@ -106,21 +122,22 @@ export class WorkOrdersService {
     return withSpan(
       'work_package.create',
       async () => {
-        // Generate work package number (could be enhanced with sequence tables)
-        const workPackageNumber = `WP-${Date.now()}`;
+        const workOrderNumber = `WP-${Date.now()}`;
+        const plannedEndDate = request.planned_end_date ?? request.planned_completion_date;
 
         const { data, error } = await this.supabase
           .from('work_packages')
           .insert({
             tenant_id: tenantId,
             aircraft_id: request.aircraft_id,
-            work_package_number: workPackageNumber,
+            work_order_number: workOrderNumber,
             title: request.title,
             description: request.description,
+            work_type: request.work_type ?? 'general',
             maintenance_type: request.maintenance_type,
             status: 'planning',
             planned_start_date: request.planned_start_date,
-            planned_completion_date: request.planned_completion_date,
+            planned_end_date: plannedEndDate,
             estimated_labor_hours: request.estimated_labor_hours,
             estimated_cost: request.estimated_cost,
             created_by: userId,
@@ -143,7 +160,7 @@ export class WorkOrdersService {
           {
             id: workPackage.id,
             work_package_id: workPackage.id,
-            work_package_number: workPackage.work_package_number,
+            work_package_number: this.getWorkPackageNumber(workPackage) || workOrderNumber,
             aircraft_id: workPackage.aircraft_id,
             title: workPackage.title,
             description: workPackage.description,
@@ -179,10 +196,30 @@ export class WorkOrdersService {
     await this.getWorkPackage(tenantId, id);
 
     const updateData: Record<string, any> = {
-      ...request,
       updated_by: userId,
       updated_at: new Date().toISOString(),
     };
+    if (request.title !== undefined) updateData.title = request.title;
+    if (request.description !== undefined) updateData.description = request.description;
+    if (request.status !== undefined) updateData.status = request.status;
+    if (request.work_type !== undefined) updateData.work_type = request.work_type;
+    if (request.planned_start_date !== undefined) {
+      updateData.planned_start_date = request.planned_start_date;
+    }
+    if (request.planned_end_date !== undefined || request.planned_completion_date !== undefined) {
+      updateData.planned_end_date = request.planned_end_date ?? request.planned_completion_date;
+    }
+    if (request.actual_start_date !== undefined) updateData.actual_start_date = request.actual_start_date;
+    if (request.actual_end_date !== undefined || request.actual_completion_date !== undefined) {
+      updateData.actual_end_date = request.actual_end_date ?? request.actual_completion_date;
+    }
+    if (request.estimated_labor_hours !== undefined) {
+      updateData.estimated_labor_hours = request.estimated_labor_hours;
+    }
+    if (request.actual_labor_hours !== undefined) updateData.actual_labor_hours = request.actual_labor_hours;
+    if (request.estimated_cost !== undefined) updateData.estimated_cost = request.estimated_cost;
+    if (request.actual_cost !== undefined) updateData.actual_cost = request.actual_cost;
+    if (request.assigned_to !== undefined) updateData.assigned_to = request.assigned_to;
 
     const { data, error } = await this.supabase
       .from('work_packages')
@@ -206,7 +243,7 @@ export class WorkOrdersService {
       {
         id: workPackage.id,
         work_package_id: workPackage.id,
-        work_package_number: workPackage.work_package_number,
+        work_package_number: this.getWorkPackageNumber(workPackage),
         aircraft_id: workPackage.aircraft_id,
         title: workPackage.title,
         description: workPackage.description,
@@ -248,7 +285,7 @@ export class WorkOrdersService {
       {
         id: workPackage.id,
         work_package_id: workPackage.id,
-        work_package_number: workPackage.work_package_number,
+        work_package_number: this.getWorkPackageNumber(workPackage),
         aircraft_id: workPackage.aircraft_id,
         title: workPackage.title,
       },
@@ -269,7 +306,7 @@ export class WorkOrdersService {
       .select('*')
       .eq('tenant_id', tenantId)
       .eq('work_package_id', workPackageId)
-      .order('sequence_number', { ascending: true });
+      .order('sequence_order', { ascending: true });
 
     if (error) {
       throw new Error(`Failed to fetch tasks: ${error.message}`);
@@ -314,22 +351,30 @@ export class WorkOrdersService {
     return withSpan(
       'task.create',
       async () => {
-        // Generate task number
         const taskNumber = `TASK-${Date.now()}`;
+        const sequenceOrder = request.sequence_order ?? request.sequence_number;
+        const plannedEndDate = request.planned_end_date ?? request.planned_completion_date;
+        const workPackageId = request.work_package_id;
+        if (!workPackageId) {
+          throw new Error('work_package_id is required');
+        }
+        const taskQualifications = request.qualifications
+          ?? (request.required_qualification ? { rating: request.required_qualification } : undefined);
 
         const { data, error } = await this.supabase
           .from('tasks')
           .insert({
             tenant_id: tenantId,
-            work_package_id: request.work_package_id,
+            work_package_id: workPackageId,
             task_number: taskNumber,
             title: request.title,
             description: request.description,
+            task_category: request.task_category ?? 'general',
             status: 'pending',
-            sequence_number: request.sequence_number,
+            sequence_order: sequenceOrder,
             planned_start_date: request.planned_start_date,
-            planned_completion_date: request.planned_completion_date,
-            required_qualification: request.required_qualification,
+            planned_end_date: plannedEndDate,
+            qualifications: taskQualifications,
             created_by: userId,
             updated_by: userId,
           })
@@ -355,8 +400,8 @@ export class WorkOrdersService {
             title: task.title,
             description: task.description,
             status: task.status,
-            sequence_number: task.sequence_number,
-            required_qualification: task.required_qualification,
+            sequence_number: this.getTaskSequence(task),
+            required_qualification: this.getTaskRequiredQualification(task),
           },
         );
 
@@ -366,7 +411,7 @@ export class WorkOrdersService {
         tenant_id: tenantId,
         user_id: userId,
         work_package_id: request.work_package_id,
-        sequence_number: request.sequence_number,
+        sequence_order: request.sequence_order ?? request.sequence_number,
       },
     );
   }
@@ -385,10 +430,31 @@ export class WorkOrdersService {
     const previousTask = await this.getTask(tenantId, id);
 
     const updateData: Record<string, any> = {
-      ...request,
       updated_by: userId,
       updated_at: new Date().toISOString(),
     };
+    if (request.title !== undefined) updateData.title = request.title;
+    if (request.description !== undefined) updateData.description = request.description;
+    if (request.status !== undefined) updateData.status = request.status;
+    if (request.task_category !== undefined) updateData.task_category = request.task_category;
+    if (request.sequence_order !== undefined || request.sequence_number !== undefined) {
+      updateData.sequence_order = request.sequence_order ?? request.sequence_number;
+    }
+    if (request.planned_start_date !== undefined) {
+      updateData.planned_start_date = request.planned_start_date;
+    }
+    if (request.planned_end_date !== undefined || request.planned_completion_date !== undefined) {
+      updateData.planned_end_date = request.planned_end_date ?? request.planned_completion_date;
+    }
+    if (request.actual_start_date !== undefined) updateData.actual_start_date = request.actual_start_date;
+    if (request.actual_end_date !== undefined || request.actual_completion_date !== undefined) {
+      updateData.actual_end_date = request.actual_end_date ?? request.actual_completion_date;
+    }
+    if (request.assigned_to !== undefined) updateData.assigned_to = request.assigned_to;
+    if (request.qualifications !== undefined || request.required_qualification !== undefined) {
+      updateData.qualifications = request.qualifications
+        ?? (request.required_qualification ? { rating: request.required_qualification } : null);
+    }
 
     const { data, error } = await this.supabase
       .from('tasks')
@@ -417,9 +483,9 @@ export class WorkOrdersService {
         title: task.title,
         description: task.description,
         status: task.status,
-        sequence_number: task.sequence_number,
+        sequence_number: this.getTaskSequence(task),
         assigned_to: task.assigned_to,
-        required_qualification: task.required_qualification,
+        required_qualification: this.getTaskRequiredQualification(task),
       },
     );
 

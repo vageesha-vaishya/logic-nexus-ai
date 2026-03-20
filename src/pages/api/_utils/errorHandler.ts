@@ -30,6 +30,10 @@ export function sendErrorResponse(res: ApiResponse, error: unknown, correlationI
     res.status(403).json({ error: message, correlationId });
     return;
   }
+  if (message.startsWith('Forbidden:')) {
+    res.status(403).json({ error: message, correlationId });
+    return;
+  }
   if (message === 'HTTPS required') {
     res.status(403).json({ error: message, correlationId });
     return;
