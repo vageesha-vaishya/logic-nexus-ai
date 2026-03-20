@@ -410,6 +410,48 @@ Contact fallback name rules:
 8. If validations pass, commit watermark advancement and publish run summary.
 9. If validations fail, freeze watermark advancement, publish failure report, and prepare replay plan.
 
+## Rollback Process for Migrated Data
+
+### Rollback Triggers
+
+- Trigger rollback workflow for any `P0` event, unresolved `P1` integrity failure, or business-rejected reconciliation result.
+- Trigger rollback workflow when tenant/franchise scope validation fails for any migrated entity.
+- Trigger rollback workflow when migration run is marked `failed` after retry policy exhaustion.
+
+### Rollback Scope Controls
+
+- Rollback always targets migration-tagged rows only, scoped by:
+  - `tenant_id = 9e2686ba-ef3c-42df-aea6-dcc880436b9f`
+  - lineage markers in `legacy_metadata` or `legacy_json`
+  - impacted `run_id` in migration artifacts
+- Rollback does not delete non-migration business rows and does not perform broad table truncation.
+- Rollback applies in reverse dependency order to protect FK integrity:
+  - `opportunity_probability_history` -> `opportunity_items` -> `opportunities` -> `activities` -> `contacts` -> `leads` -> `accounts`
+
+### Rollback Execution Procedure
+
+1. Freeze incremental watermark advancement and mark run as `rollback_in_progress`.
+2. Export pre-rollback snapshot counts by entity and franchise for audit evidence.
+3. Build rollback candidate set from `run_id` and lineage predicates.
+4. Perform dry-run rollback query with row counts and FK pre-checks.
+5. Execute transactional targeted delete per entity in reverse dependency order.
+6. Re-validate tenant/franchise isolation, FK integrity, and row counts after rollback.
+7. Publish rollback report with deleted row counts, preserved row counts, and unresolved exceptions.
+8. Reset run state to `ready_for_replay` and keep last successful watermark unchanged.
+
+### Rollback Validation Gates
+
+- Gate 1: post-rollback FK integrity must be `100%`.
+- Gate 2: cross-tenant and cross-franchise leakage incidents must be `0`.
+- Gate 3: row counts for unaffected entities must remain unchanged.
+- Gate 4: rollback report and approval evidence must be attached before replay authorization.
+
+### Replay After Rollback
+
+- Replay starts from last successful watermark baseline, not from failed watermark.
+- Replay requires corrected transformation rules or source fixes documented in corrective action register.
+- Replay run must produce clean reconciliation and clear all blocking `P0`/`P1` conditions before cutover continuation.
+
 ## Operational KPI Dashboard Checklist
 
 ### Run Health KPIs
@@ -740,6 +782,30 @@ Probability history orphan handling:
 - Define run manifest format, watermark format, and artifact naming conventions.
 - Prepare franchise master map for MGL and fallback handling.
 - Exit criteria: schema verified, controls documented, and dry-run config approved.
+
+Phase 1 execution started deliverables:
+
+- Schema migration artifact prepared for additive columns in:
+  - `public.leads.legacy_metadata`
+  - `public.accounts.legacy_json`
+  - `public.contacts.legacy_json`
+- Run manifest format for execution:
+  - `run_id`, `migration_version`, `mode`, `tenant_id`, `operator_id`, `started_at`, `finished_at`, `status`
+  - `source_files[]` with `file_name`, `sheet_name`, `checksum_sha256`, `row_count`
+  - `artifacts` pointers for metrics, errors, orphans, and validation reports
+- Watermark format for incremental control:
+  - `source_file`, `source_sheet`, `last_successful_watermark`, `last_processed_legacy_key`, `run_id`, `processed_row_count`, `updated_at`
+- MGL franchise master map baseline:
+  - `MUMBAI (MUM)` -> `MGL-MUMBAI-MUM`
+  - `Sales & Marketing` -> `MGL-SALES-MARKETING`
+  - `New Jersey (EWR)` -> `MGL-NEW-JERSEY-EWR`
+  - `Inside Sales Group` -> `MGL-INSIDE-SALES-GROUP`
+  - `CAM` -> `MGL-CAM`
+  - `Hamid Hussaini` -> `MGL-HAMID-HUSSAINI`
+  - `CAIRO (CAI)` -> `MGL-CAIRO-CAI`
+  - `BHOPAL (BHO)` -> `MGL-BHOPAL-BHO`
+  - `Toronto` -> `MGL-TORONTO`
+  - fallback -> `MGL-SALES-MARKETING`
 
 ### Phase 2: Profiling and Data Quality Baseline
 
