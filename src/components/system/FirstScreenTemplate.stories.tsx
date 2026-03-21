@@ -75,7 +75,6 @@ function Content({ mode }: { mode: 'pipeline' | 'card' | 'grid' | 'list' | 'boar
 }
 
 export const ListView: Story = {
-  name: "List View",
   render: (args) => {
     const ListViewComponent = (props: React.ComponentProps<typeof FirstScreenTemplate>) => {
       const [mode, setMode] = useState(props.viewMode ?? "list");
@@ -106,7 +105,6 @@ export const ListView: Story = {
 };
 
 export const CardView: Story = {
-  name: "Card View",
   ...ListView,
   args: {
     ...ListView.args,
@@ -115,7 +113,6 @@ export const CardView: Story = {
 };
 
 export const GridView: Story = {
-  name: "Grid View",
   ...ListView,
   args: {
     ...ListView.args,
@@ -124,7 +121,6 @@ export const GridView: Story = {
 };
 
 export const LeadsHeaderControls: Story = {
-  name: "Leads Header Controls",
   render: () => {
     const LeadsHeaderControlsStory = () => {
       const [viewMode, setViewMode] = useState<'pipeline' | 'card' | 'grid' | 'list'>('list');

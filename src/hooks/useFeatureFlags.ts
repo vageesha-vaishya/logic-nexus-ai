@@ -21,11 +21,15 @@ export function useFeatureFlags(keys?: string[]) {
       setError(null);
 
       try {
+        const normalizedKeys = Array.isArray(keys)
+          ? Array.from(new Set(keys.map((key) => String(key || '').trim()).filter(Boolean)))
+          : [];
         const query = scopedDb
           .from('app_feature_flags', true)
           .select('flag_key, is_enabled, description');
+        const scopedQuery = normalizedKeys.length > 0 ? query.in('flag_key', normalizedKeys) : query;
 
-        const { data, error: queryError } = await query;
+        const { data, error: queryError } = await scopedQuery;
 
         if (queryError) {
           throw queryError;
@@ -58,7 +62,7 @@ export function useFeatureFlags(keys?: string[]) {
     return () => {
       isMounted = false;
     };
-  }, [scopedDb]);
+  }, [keys, scopedDb]);
 
   const isEnabled = (key: string, defaultValue: boolean = false) => {
     if (keys && !keys.includes(key)) return defaultValue;
@@ -74,4 +78,3 @@ export function useFeatureFlags(keys?: string[]) {
     isEnabled,
   };
 }
-

@@ -1,0 +1,19 @@
+{
+  "generatedAt": "2026-03-20T15:15:24.656Z",
+  "featureFlag": {
+    "key": "ROUTE_INVENTORY_DASHBOARD_V1",
+    "enabled": false
+  },
+  "web": {
+    "appRoutes": [],
+    "menuRoutes": []
+  },
+  "api": {
+    "routes": []
+  },
+  "counts": {
+    "appRoutes": 0,
+    "menuRoutes": 0,
+    "apiRoutes": 0
+  }
+}

@@ -13,6 +13,7 @@ import {
 import { sendErrorResponse } from '../_utils/errorHandler';
 import { getSupabaseAdminClient } from '../_utils/supabaseAdmin';
 import { getCachedJson, setCachedJson } from '../_utils/redisCache';
+import { applyCompatibilityResponseHeaders, resolveGatewayCompatibility } from '../_utils/compatibility-facade';
 
 type AuthorizedDomainsPayload = {
   domains: any[];
@@ -26,7 +27,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
   if (handlePreflight(req, res)) return;
 
   const ctx = buildApiContext(req);
-  res.setHeader('x-correlation-id', ctx.correlationId);
+  const initialDecision = resolveGatewayCompatibility(req);
+  applyCompatibilityResponseHeaders(res, initialDecision, ctx.correlationId);
 
   try {
     if (req.method !== 'GET') {
@@ -41,6 +43,20 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     ctx.role = auth.role;
 
     const access = await resolveAndApplyAccessContext(req, ctx);
+    const compatDecision = resolveGatewayCompatibility(req, {
+      tenantId: access.tenantId,
+      franchiseId: access.franchiseId,
+    });
+    applyCompatibilityResponseHeaders(res, compatDecision, ctx.correlationId);
+    logApiEvent('info', '[GatewayFacade] route decision', {
+      correlationId: ctx.correlationId,
+      route: '/api/v1/platform-domains',
+      method: req.method || 'GET',
+      tenantId: access.tenantId || null,
+      franchiseId: access.franchiseId || null,
+      apiVersion: compatDecision.apiVersion,
+      compatMode: compatDecision.compatMode,
+    });
     enforceRateLimit(req, access.tenantId || '');
     const requestedDomainCode = typeof req.query.domain_code === 'string' ? req.query.domain_code : null;
     const domainAccess = await enforceDomainAccess(access, requestedDomainCode);

@@ -2,7 +2,7 @@
 // /// <reference types="https://esm.sh/@supabase/functions@1.3.1/types.ts" />
 import { serveWithLogger } from "../_shared/logger.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
-import { isServiceRoleAuthorizationHeader, requireAuth } from "../_shared/auth.ts";
+import { requireServiceRoleOrAdmin } from "../_shared/auth.ts";
 
 declare const Deno: any;
 
@@ -12,14 +12,12 @@ serveWithLogger(async (req, logger, supabase) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Auth: verify service role key or authenticated user (admin manually triggering)
-  const authHeaderCheck = req.headers.get('Authorization');
-  const serviceKeyCheck = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-  if (!isServiceRoleAuthorizationHeader(authHeaderCheck, serviceKeyCheck)) {
-    const { user, error: authError } = await requireAuth(req);
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
+  const access = await requireServiceRoleOrAdmin(req, supabase, logger);
+  if (!access.authorized) {
+    return new Response(JSON.stringify({ error: access.error || 'Unauthorized' }), {
+      status: access.status,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
 
   try {
@@ -69,7 +67,9 @@ serveWithLogger(async (req, logger, supabase) => {
     if (error) throw error;
 
     const syncUrl = `${baseUrl}/functions/v1/sync-emails-v2`;
-    const authHeader = req.headers.get("Authorization") || `Bearer ${serviceKey}`;
+    const authHeader = access.isServiceRole
+      ? (req.headers.get("Authorization") || `Bearer ${serviceKey}`)
+      : `Bearer ${serviceKey}`;
 
     let synced = 0;
     for (const acc of accounts || []) {

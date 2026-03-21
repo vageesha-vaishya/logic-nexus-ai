@@ -80,4 +80,17 @@ describe('DashboardLayout breadcrumb resolution', () => {
 
     expect(routePattern.test(appSource)).toBe(true);
   });
+
+  it('surfaces migration baseline route in menu and app routing', () => {
+    const migrationItem = APP_MENU.flatMap((module) => module.items).find(
+      (item) => item.path === '/dashboard/migration-baseline'
+    );
+    const appFile = resolve(process.cwd(), 'src/App.tsx');
+    const appSource = readFileSync(appFile, 'utf8');
+    const routePattern = /path="\/dashboard\/migration-baseline"[\s\S]*?MigrationBaselineDashboard/;
+
+    expect(migrationItem).toBeDefined();
+    expect(migrationItem?.permissions).toContain('dashboards.view');
+    expect(routePattern.test(appSource)).toBe(true);
+  });
 });

@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { Loader2, Shield, Eye, EyeOff, Copy, Check } from 'lucide-react';
-import { invokeFunction } from '@/lib/supabase-functions';
+import { invokeAnonymous } from '@/lib/supabase-functions';
 
 export default function SetupAdmin() {
   const [loading, setLoading] = useState(false);
@@ -11,7 +11,7 @@ export default function SetupAdmin() {
   const [showPassword, setShowPassword] = useState(false);
   const [copied, setCopied] = useState(false);
   
-  const ADMIN_EMAIL = 'Bahuguna.vimal@gmail.com';
+  const ADMIN_EMAIL = 'bahuguna.vimal@gmail.com';
   const ADMIN_PASS = 'Vimal@1234';
 
   const copyPassword = () => {
@@ -25,14 +25,10 @@ export default function SetupAdmin() {
     setLoading(true);
 
     try {
-      const { data, error } = await invokeFunction('seed-platform-admin', {
-        body: {
-          email: ADMIN_EMAIL,
-          password: ADMIN_PASS
-        }
+      const data = await invokeAnonymous<{ success?: boolean; error?: string }>('seed-platform-admin', {
+        email: ADMIN_EMAIL,
+        password: ADMIN_PASS
       });
-
-      if (error) throw error;
 
       if (data?.success) {
         toast.success('Platform admin created successfully!');

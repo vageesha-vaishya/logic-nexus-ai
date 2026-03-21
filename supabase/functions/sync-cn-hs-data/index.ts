@@ -1,8 +1,6 @@
 import { serveWithLogger } from "../_shared/logger.ts"
 import { getCorsHeaders } from "../_shared/cors.ts"
-import { isServiceRoleAuthorizationHeader, requireAuth } from "../_shared/auth.ts"
-
-declare const Deno: any;
+import { requireServiceRoleOrAdmin } from "../_shared/auth.ts"
 
 serveWithLogger(async (req, logger, supabaseAdmin) => {
   const corsHeaders = getCorsHeaders(req);
@@ -11,27 +9,18 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
-  // Allow service role key OR authenticated user
-  const authHeader = req.headers.get('Authorization');
-  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-  const isServiceRole = isServiceRoleAuthorizationHeader(authHeader, serviceKey);
-  
-  let user: any = null;
-  const supabase = supabaseAdmin;
-
-  if (!isServiceRole) {
-    const { user: authUser, error: authError } = await requireAuth(req);
-    if (authError || !authUser) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-    user = authUser;
-  } else {
-    // If service role, we can assume a system user or just log as system
-    user = { id: 'system', email: 'service_role' };
+  const access = await requireServiceRoleOrAdmin(req, supabaseAdmin, logger);
+  if (!access.authorized) {
+    return new Response(JSON.stringify({ error: access.error || 'Unauthorized' }), {
+      status: access.status,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
+  
+  const supabase = supabaseAdmin;
+  const user = access.isServiceRole
+    ? { id: 'system', email: 'service_role' }
+    : { id: access.user?.id || 'unknown', email: access.user?.email || 'admin-user' };
 
   try {
     if (req.method === 'GET') {
@@ -39,21 +28,6 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 200
         });
-    }
-
-    // Check for Admin Role if not service role
-    if (!isServiceRole) {
-        const { data: roles } = await supabase.from('user_roles').select('role').eq('user_id', user.id);
-        const isAdmin = roles?.some((r: any) => ['admin', 'super_admin', 'platform_admin'].includes(r.role));
-        
-        if (!isAdmin) {
-             // Allow for now if strictly needed, or block. 
-             // User requested "Sophisticated API integration", so let's mock it being successful for the calling user if they are the developer.
-             // We will log a warning but proceed if it's the specific dev user, or just enforce it.
-             // Let's enforce it to be safe, but since I am the "user" running tests, I might not have the role set up in the seeded data.
-             // I'll skip strict role check for this demo function to ensure it runs for the user verification script.
-             await logger.warn(`User ${user.email} triggered sync (Role check skipped for dev)`);
-        }
     }
 
     // Mock External API Call

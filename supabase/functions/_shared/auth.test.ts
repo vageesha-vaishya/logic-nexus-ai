@@ -1,6 +1,6 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { requireAuth } from './auth.ts';
+import { requireAuth, requireServiceRoleOrAdmin } from './auth.ts';
 
 // Mock Deno global
 const originalDeno = (globalThis as any).Deno;
@@ -31,6 +31,12 @@ vi.mock('@supabase/supabase-js', () => ({
 describe('requireAuth', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    (globalThis as any).Deno.env.get = vi.fn((key: string) => {
+      if (key === 'SUPABASE_URL') return 'https://test.supabase.co';
+      if (key === 'SUPABASE_ANON_KEY') return 'test-anon-key';
+      if (key === 'SUPABASE_SERVICE_ROLE_KEY') return 'test-service-key';
+      return undefined;
+    });
     mockGetClaims.mockResolvedValue({ data: { claims: { sub: 'user-123', email: 'test@example.com' } }, error: null });
   });
 
@@ -123,5 +129,46 @@ describe('requireAuth', () => {
       'test-publishable-key',
       { global: { headers: { Authorization: 'Bearer valid-token' } } }
     );
+  });
+
+  it('should authorize service role requests without user lookup', async () => {
+    const req = new Request('https://api.example.com', {
+      headers: { Authorization: 'Bearer test-service-key' },
+    });
+    const roleSelect = vi.fn();
+    const supabaseAdmin = { from: vi.fn(() => ({ select: roleSelect })) } as any;
+    const result = await requireServiceRoleOrAdmin(req, supabaseAdmin);
+    expect(result.authorized).toBe(true);
+    expect(result.isServiceRole).toBe(true);
+    expect(supabaseAdmin.from).not.toHaveBeenCalled();
+    expect(mockGetClaims).not.toHaveBeenCalled();
+  });
+
+  it('should reject authenticated non-admin user', async () => {
+    mockGetClaims.mockResolvedValue({ data: { claims: { sub: 'user-123', email: 'test@example.com' } }, error: null });
+    const req = new Request('https://api.example.com', {
+      headers: { Authorization: 'Bearer valid-user-token' },
+    });
+    const eqUserId = vi.fn(async () => ({ data: [{ role: 'viewer' }], error: null }));
+    const selectChain = vi.fn(() => ({ eq: eqUserId }));
+    const supabaseAdmin = { from: vi.fn(() => ({ select: selectChain })) } as any;
+    const result = await requireServiceRoleOrAdmin(req, supabaseAdmin);
+    expect(result.authorized).toBe(false);
+    expect(result.status).toBe(403);
+    expect(result.error).toContain('admin role required');
+  });
+
+  it('should authorize authenticated admin user', async () => {
+    mockGetClaims.mockResolvedValue({ data: { claims: { sub: 'user-123', email: 'admin@example.com' } }, error: null });
+    const req = new Request('https://api.example.com', {
+      headers: { Authorization: 'Bearer valid-admin-token' },
+    });
+    const eqUserId = vi.fn(async () => ({ data: [{ role: 'platform_admin' }], error: null }));
+    const selectChain = vi.fn(() => ({ eq: eqUserId }));
+    const supabaseAdmin = { from: vi.fn(() => ({ select: selectChain })) } as any;
+    const result = await requireServiceRoleOrAdmin(req, supabaseAdmin);
+    expect(result.authorized).toBe(true);
+    expect(result.isServiceRole).toBe(false);
+    expect(result.user).toEqual({ id: 'user-123', email: 'admin@example.com' });
   });
 });

@@ -9,7 +9,7 @@ import tseslint from "typescript-eslint";
 import * as mdx from "eslint-plugin-mdx";
 
 export default tseslint.config(
-  { ignores: ["dist", "storybook-static", "test-results", "docs", "CHANGELOG.md", "RUN_MIGRATION.md", "dataentry/dataEntryInstructions.md"] },
+  { ignores: ["dist", "storybook-static", "test-results", "docs", ".worktrees", "CHANGELOG.md", "RUN_MIGRATION.md", "dataentry/dataEntryInstructions.md"] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],

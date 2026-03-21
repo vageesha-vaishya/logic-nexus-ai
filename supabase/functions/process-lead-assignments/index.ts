@@ -1,9 +1,6 @@
-// Ambient Deno typing for editors without Deno type support
-declare const Deno: any;
-
 import { Logger, serveWithLogger } from '../_shared/logger.ts';
 import { getCorsHeaders } from '../_shared/cors.ts';
-import { isServiceRoleAuthorizationHeader, requireAuth } from '../_shared/auth.ts';
+import { requireServiceRoleOrAdmin } from '../_shared/auth.ts';
 
 interface AssignmentRule {
   id: string;
@@ -31,14 +28,12 @@ serveWithLogger(async (req, logger, supabase) => {
     return new Response(null, { headers });
   }
 
-  // Auth: verify service role key or authenticated user (admin manually triggering)
-  const authHeader = req.headers.get('Authorization');
-  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-  if (!isServiceRoleAuthorizationHeader(authHeader, serviceKey)) {
-    const { user, error: authError } = await requireAuth(req);
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...headers, 'Content-Type': 'application/json' } });
-    }
+  const access = await requireServiceRoleOrAdmin(req, supabase, logger);
+  if (!access.authorized) {
+    return new Response(JSON.stringify({ error: access.error || 'Unauthorized' }), {
+      status: access.status,
+      headers: { ...headers, 'Content-Type': 'application/json' },
+    });
   }
 
   try {

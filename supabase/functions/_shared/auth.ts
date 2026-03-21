@@ -181,3 +181,81 @@ export function isServiceRoleAuthorizationHeader(
     return false;
   }
 }
+
+export async function requireServiceRoleOrAdmin(
+  req: Request,
+  supabaseAdmin: SupabaseClient,
+  logger?: Logger,
+): Promise<{
+  authorized: boolean;
+  status: number;
+  error: string | null;
+  user: { id: string; email?: string } | null;
+  isServiceRole: boolean;
+}> {
+  const authHeader = req.headers.get("Authorization");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  const serviceRoleRequest = isServiceRoleAuthorizationHeader(authHeader, serviceKey);
+
+  if (serviceRoleRequest) {
+    return {
+      authorized: true,
+      status: 200,
+      error: null,
+      user: null,
+      isServiceRole: true,
+    };
+  }
+
+  const { user, error } = await requireAuth(req, logger);
+  if (error || !user) {
+    return {
+      authorized: false,
+      status: 401,
+      error: "Unauthorized",
+      user: null,
+      isServiceRole: false,
+    };
+  }
+
+  const { data: roles, error: rolesError } = await supabaseAdmin
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", user.id);
+
+  if (rolesError) {
+    if (logger) {
+      await logger.error("[requireServiceRoleOrAdmin] Role lookup failed", { error: rolesError.message, userId: user.id });
+    }
+    return {
+      authorized: false,
+      status: 500,
+      error: "Authorization policy check failed",
+      user: null,
+      isServiceRole: false,
+    };
+  }
+
+  const isAdmin = (roles || []).some((entry: any) => {
+    const role = String(entry?.role || "").toLowerCase();
+    return role === "platform_admin" || role === "super_admin" || role === "admin";
+  });
+
+  if (!isAdmin) {
+    return {
+      authorized: false,
+      status: 403,
+      error: "Forbidden: admin role required",
+      user: null,
+      isServiceRole: false,
+    };
+  }
+
+  return {
+    authorized: true,
+    status: 200,
+    error: null,
+    user: { id: user.id, email: user.email },
+    isServiceRole: false,
+  };
+}

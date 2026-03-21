@@ -4,13 +4,15 @@ import { applyCors, authenticateRequest, buildApiContext, enforceAnyPermission, 
 import { sendErrorResponse } from '../../_utils/errorHandler';
 import { importPayloadSchema, processQuotationImportJob } from './import/processor';
 import { enqueueQuotationImportJob } from './import/queue';
+import { applyCompatibilityResponseHeaders, resolveGatewayCompatibility } from '../../_utils/compatibility-facade';
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {
   applyCors(req, res, { methods: ['POST', 'OPTIONS'] });
   if (handlePreflight(req, res)) return;
 
   const ctx = buildApiContext(req);
-  res.setHeader('x-correlation-id', ctx.correlationId);
+  const initialDecision = resolveGatewayCompatibility(req);
+  applyCompatibilityResponseHeaders(res, initialDecision, ctx.correlationId);
 
   try {
     if (req.method !== 'POST') {
@@ -24,7 +26,21 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     const auth = await authenticateRequest(req);
     ctx.userId = auth.userId;
     ctx.role = auth.role;
-    await resolveAndApplyAccessContext(req, ctx);
+    const access = await resolveAndApplyAccessContext(req, ctx);
+    const compatDecision = resolveGatewayCompatibility(req, {
+      tenantId: access.tenantId,
+      franchiseId: access.franchiseId,
+    });
+    applyCompatibilityResponseHeaders(res, compatDecision, ctx.correlationId);
+    logApiEvent('info', '[GatewayFacade] route decision', {
+      correlationId: ctx.correlationId,
+      route: '/api/v2/quotations/import',
+      method: req.method || 'POST',
+      tenantId: access.tenantId || null,
+      franchiseId: access.franchiseId || null,
+      apiVersion: compatDecision.apiVersion,
+      compatMode: compatDecision.compatMode,
+    });
     enforceRoles(auth.role, ['admin', 'operations', 'sales', 'developer']);
     enforceAnyPermission(auth.permissions, ['import_quotation', 'quotes.import_export']);
 
@@ -127,6 +143,6 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       tenantId: ctx.tenantId,
       message: error instanceof Error ? error.message : 'unknown',
     });
-    sendErrorResponse(res, error, ctx.correlationId);
+    sendErrorResponse(res, error, ctx.correlationId, { apiVersion: 'v2' });
   }
 }

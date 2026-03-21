@@ -181,6 +181,7 @@ const Commodities = lazy(() => import("./pages/dashboard/Commodities"));
 const SalesPlaceholder = lazy(() => import("./pages/dashboard/SalesPlaceholder"));
 const SalesCommandCenter = lazy(() => import("./pages/dashboard/SalesCommandCenter"));
 const AmroChangesPreview = lazy(() => import("./pages/dashboard/AmroChangesPreview"));
+const MigrationBaselineDashboard = lazy(() => import("./pages/dashboard/MigrationBaselineDashboard"));
 
 // Initialize plugins at startup
 try {
@@ -758,6 +759,7 @@ const App = () => (
             <Route path="/dashboard/groups" element={<ProtectedRoute requiredPermissions={["groups.view"]}><Groups /></ProtectedRoute>} />
             <Route path="/dashboard/calendar" element={<ProtectedRoute requiredPermissions={["calendar.view"]}><Calendar /></ProtectedRoute>} />
             <Route path="/dashboard/dashboards" element={<ProtectedRoute requiredPermissions={["dashboards.view"]}><Dashboards /></ProtectedRoute>} />
+            <Route path="/dashboard/migration-baseline" element={<ProtectedRoute requiredPermissions={["dashboards.view"]}><MigrationBaselineDashboard /></ProtectedRoute>} />
             <Route path="/dashboard/crm-workspace" element={<ProtectedRoute requiredPermissions={["dashboards.view", "leads.view"]}><CRMWorkspace /></ProtectedRoute>} />
             <Route path="/dashboard/leads-workspace" element={<Navigate to="/dashboard/leads/pipeline" replace />} />
             <Route path="/dashboard/more" element={<ProtectedRoute><More /></ProtectedRoute>} />

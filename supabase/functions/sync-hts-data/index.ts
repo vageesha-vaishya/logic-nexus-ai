@@ -1,7 +1,7 @@
 
 import { serveWithLogger } from "../_shared/logger.ts"
 import { getCorsHeaders } from "../_shared/cors.ts"
-import { isServiceRoleAuthorizationHeader, requireAuth } from "../_shared/auth.ts"
+import { requireServiceRoleOrAdmin } from "../_shared/auth.ts"
 
 declare const Deno: any;
 
@@ -17,26 +17,16 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
-  // Allow service role key OR authenticated user
-  const authHeader = req.headers.get('Authorization');
-  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-  const isServiceRole = isServiceRoleAuthorizationHeader(authHeader, serviceKey);
-  
-  let user: any = null;
-
-  if (isServiceRole) {
-    user = { id: 'system', email: 'system@internal' };
-    logger.info('Authenticated as Service Role');
-  } else {
-    const { user: authUser, error: authError } = await requireAuth(req);
-    if (authError || !authUser) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-    user = authUser;
+  const access = await requireServiceRoleOrAdmin(req, supabaseAdmin, logger);
+  if (!access.authorized) {
+    return new Response(JSON.stringify({ error: access.error || 'Unauthorized' }), {
+      status: access.status,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
+  const user = access.isServiceRole
+    ? { id: 'system', email: 'system@internal' }
+    : { id: access.user?.id || 'unknown', email: access.user?.email || 'unknown@internal' };
 
   try {
     // 2. Health Check (GET)
