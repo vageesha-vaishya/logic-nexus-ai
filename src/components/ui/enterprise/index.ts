@@ -44,3 +44,5 @@ export type {
   EnterpriseFormRowProps,
   EnterpriseFormFieldProps,
 } from './EnterpriseForm';
+export { PlatformWidgetRail, PlatformWidgetSlot } from './PlatformWidgetContracts';
+export type { PlatformWidgetContract } from './PlatformWidgetContracts';

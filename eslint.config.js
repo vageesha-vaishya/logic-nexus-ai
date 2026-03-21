@@ -78,6 +78,121 @@ export default tseslint.config(
     },
   },
   {
+    files: [
+      "src/components/ui/**/*.{ts,tsx}",
+      "src/components/ui/enterprise/**/*.{ts,tsx}"
+    ],
+    rules: {
+      "no-restricted-imports": ["error", {
+        "paths": [
+          { "name": "@/integrations/supabase/client" },
+          { "name": "@/hooks/useCRM" },
+          { "name": "@/lib/db/access" },
+          { "name": "@/services" }
+        ],
+        "patterns": [
+          "@/integrations/supabase/*",
+          "@/services/*"
+        ]
+      }]
+    },
+  },
+  {
+    files: [
+      "src/features/module-crm/**/*.{ts,tsx}"
+    ],
+    rules: {
+      "no-restricted-imports": ["error", {
+        "patterns": [
+          "@/features/module-logistics/*",
+          "@/features/module-logistics/**",
+          "@/features/module-quotation/*",
+          "@/features/module-quotation/**",
+          "@/features/module-finance/*",
+          "@/features/module-finance/**",
+          "@/features/module-compliance/*",
+          "@/features/module-compliance/**"
+        ]
+      }]
+    },
+  },
+  {
+    files: [
+      "src/features/module-logistics/**/*.{ts,tsx}"
+    ],
+    rules: {
+      "no-restricted-imports": ["error", {
+        "patterns": [
+          "@/features/module-crm/*",
+          "@/features/module-crm/**",
+          "@/features/module-quotation/*",
+          "@/features/module-quotation/**",
+          "@/features/module-finance/*",
+          "@/features/module-finance/**",
+          "@/features/module-compliance/*",
+          "@/features/module-compliance/**"
+        ]
+      }]
+    },
+  },
+  {
+    files: [
+      "src/features/module-quotation/**/*.{ts,tsx}"
+    ],
+    rules: {
+      "no-restricted-imports": ["error", {
+        "patterns": [
+          "@/features/module-crm/*",
+          "@/features/module-crm/**",
+          "@/features/module-logistics/*",
+          "@/features/module-logistics/**",
+          "@/features/module-finance/*",
+          "@/features/module-finance/**",
+          "@/features/module-compliance/*",
+          "@/features/module-compliance/**"
+        ]
+      }]
+    },
+  },
+  {
+    files: [
+      "src/features/module-finance/**/*.{ts,tsx}"
+    ],
+    rules: {
+      "no-restricted-imports": ["error", {
+        "patterns": [
+          "@/features/module-crm/*",
+          "@/features/module-crm/**",
+          "@/features/module-logistics/*",
+          "@/features/module-logistics/**",
+          "@/features/module-quotation/*",
+          "@/features/module-quotation/**",
+          "@/features/module-compliance/*",
+          "@/features/module-compliance/**"
+        ]
+      }]
+    },
+  },
+  {
+    files: [
+      "src/features/module-compliance/**/*.{ts,tsx}"
+    ],
+    rules: {
+      "no-restricted-imports": ["error", {
+        "patterns": [
+          "@/features/module-crm/*",
+          "@/features/module-crm/**",
+          "@/features/module-logistics/*",
+          "@/features/module-logistics/**",
+          "@/features/module-quotation/*",
+          "@/features/module-quotation/**",
+          "@/features/module-finance/*",
+          "@/features/module-finance/**"
+        ]
+      }]
+    },
+  },
+  {
     ...mdx.flat
   },
   {

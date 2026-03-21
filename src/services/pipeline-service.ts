@@ -298,6 +298,24 @@ const waitFor = async (ms: number): Promise<void> => {
   await new Promise((resolve) => setTimeout(resolve, ms));
 };
 
+const createClientCorrelationId = (): string => {
+  const fromCrypto = globalThis.crypto?.randomUUID?.();
+  if (fromCrypto) return fromCrypto;
+  return `crm-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+};
+
+const buildCrmApiHeaders = (context: CrmApiLeadRequestContext): Record<string, string> => {
+  const correlationId = createClientCorrelationId();
+  return {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${context.accessToken}`,
+    ...(context.tenantId ? { 'x-tenant-id': context.tenantId } : {}),
+    ...(context.franchiseId ? { 'x-franchise-id': context.franchiseId } : {}),
+    ...(context.userId ? { 'x-user-id': context.userId } : {}),
+    'x-correlation-id': correlationId,
+  };
+};
+
 export const normalizeLeadMutationInput = (
   input: LeadMutationInput
 ): NormalizedLeadMutationInput => {
@@ -379,13 +397,7 @@ export const PipelineService = {
     const requestInit: RequestInit = {
       method: 'GET',
       credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${context.accessToken}`,
-        'x-tenant-id': context.tenantId,
-        ...(context.franchiseId ? { 'x-franchise-id': context.franchiseId } : {}),
-        ...(context.userId ? { 'x-user-id': context.userId } : {}),
-      },
+      headers: buildCrmApiHeaders(context),
     };
 
     let response: Response | null = null;
@@ -455,13 +467,7 @@ export const PipelineService = {
     const response = await fetch(`/api/crm/v1/leads/${params.id}`, {
       method: 'PATCH',
       credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${context.accessToken}`,
-        'x-tenant-id': context.tenantId,
-        ...(context.franchiseId ? { 'x-franchise-id': context.franchiseId } : {}),
-        ...(context.userId ? { 'x-user-id': context.userId } : {}),
-      },
+      headers: buildCrmApiHeaders(context),
       body: JSON.stringify(params.input),
     });
     if (!response.ok) {
@@ -485,13 +491,7 @@ export const PipelineService = {
     const response = await fetch(`/api/crm/v1/leads/${params.id}`, {
       method: 'PATCH',
       credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${context.accessToken}`,
-        'x-tenant-id': context.tenantId,
-        ...(context.franchiseId ? { 'x-franchise-id': context.franchiseId } : {}),
-        ...(context.userId ? { 'x-user-id': context.userId } : {}),
-      },
+      headers: buildCrmApiHeaders(context),
       body: JSON.stringify({ status: params.toStatus }),
     });
     if (!response.ok) {
@@ -512,13 +512,7 @@ export const PipelineService = {
     const response = await fetch(`/api/crm/v1/leads/${id}`, {
       method: 'DELETE',
       credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${context.accessToken}`,
-        'x-tenant-id': context.tenantId,
-        ...(context.franchiseId ? { 'x-franchise-id': context.franchiseId } : {}),
-        ...(context.userId ? { 'x-user-id': context.userId } : {}),
-      },
+      headers: buildCrmApiHeaders(context),
     });
     if (!response.ok) {
       return null;
@@ -534,13 +528,7 @@ export const PipelineService = {
     const response = await fetch('/api/crm/v1/leads', {
       method: 'DELETE',
       credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${context.accessToken}`,
-        'x-tenant-id': context.tenantId,
-        ...(context.franchiseId ? { 'x-franchise-id': context.franchiseId } : {}),
-        ...(context.userId ? { 'x-user-id': context.userId } : {}),
-      },
+      headers: buildCrmApiHeaders(context),
       body: JSON.stringify({ ids }),
     });
     if (!response.ok) {

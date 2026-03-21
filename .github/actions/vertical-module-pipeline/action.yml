@@ -1,0 +1,59 @@
+name: Vertical Module Pipeline
+description: Shared template for extracted vertical CI/CD checks
+inputs:
+  module-key:
+    required: true
+    description: Vertical module identifier
+  test-files:
+    required: true
+    description: Space-delimited vitest files for module contract checks
+  deploy-environment:
+    required: true
+    description: Deployment environment label
+runs:
+  using: composite
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: npm
+
+    - name: Install dependencies
+      shell: bash
+      run: npm ci
+
+    - name: Lint
+      shell: bash
+      run: npm run lint
+
+    - name: Typecheck
+      shell: bash
+      run: npm run typecheck
+
+    - name: Build
+      shell: bash
+      run: npm run build
+
+    - name: Module contract checks
+      shell: bash
+      run: npx vitest run ${{ inputs.test-files }}
+
+    - name: Security scan
+      shell: bash
+      run: npm audit --omit=dev --audit-level=high
+
+    - name: Module deploy manifest
+      shell: bash
+      run: |
+        mkdir -p artifacts/module-deploy
+        IMAGE_TAG="${{ inputs.module-key }}-${GITHUB_SHA}"
+        cat <<EOF > artifacts/module-deploy/${{ inputs.module-key }}.json
+        {"module":"${{ inputs.module-key }}","image":"${IMAGE_TAG}","environment":"${{ inputs.deploy-environment }}","trafficPin":"stable","revision":"${GITHUB_SHA}"}
+        EOF
+
+    - name: Upload deploy manifest
+      uses: actions/upload-artifact@v4
+      with:
+        name: deploy-manifest-${{ inputs.module-key }}
+        path: artifacts/module-deploy/${{ inputs.module-key }}.json

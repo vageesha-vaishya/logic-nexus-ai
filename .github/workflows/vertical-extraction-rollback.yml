@@ -1,0 +1,41 @@
+name: Vertical Extraction Module Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      module_key:
+        description: Module to rollback
+        required: true
+        type: choice
+        options:
+          - module-crm
+          - module-logistics
+          - module-quotation
+          - module-finance
+      stable_revision:
+        description: Stable revision to pin traffic
+        required: true
+        type: string
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: vertical-extraction-${{ inputs.module_key }}
+      cancel-in-progress: false
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Generate rollback manifest
+        run: |
+          mkdir -p artifacts/module-rollback
+          cat <<EOF > artifacts/module-rollback/${{ inputs.module_key }}.json
+          {"module":"${{ inputs.module_key }}","rollbackRevision":"${{ inputs.stable_revision }}","trafficPin":"previous-stable","performedAt":"$(date -u +%Y-%m-%dT%H:%M:%SZ)"}
+          EOF
+
+      - name: Upload rollback manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: rollback-manifest-${{ inputs.module_key }}
+          path: artifacts/module-rollback/${{ inputs.module_key }}.json

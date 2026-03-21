@@ -111,6 +111,7 @@ export interface ErrorResponse {
   code: string;
   statusCode: number;
   path?: string;
+  requestId?: string | null;
 }
 
 export interface TaxNexusAddress {

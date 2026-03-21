@@ -1,0 +1,66 @@
+name: Vertical Extraction Modules CI/CD
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'src/pages/api/_utils/vertical-extraction-acl.ts'
+      - 'src/pages/api/_utils/dual-run-reconciliation.ts'
+      - 'src/pages/api/v1/gateway/vertical-extraction.ts'
+      - 'src/pages/api/v1/gateway/reconciliation-report.ts'
+      - 'src/pages/api/_utils/vertical-extraction-acl.test.ts'
+      - 'src/pages/api/_utils/dual-run-reconciliation.test.ts'
+      - 'src/pages/api/v1/gateway/vertical-extraction.test.ts'
+      - 'src/pages/api/v1/gateway/reconciliation-report.test.ts'
+      - '.github/workflows/vertical-extraction-modules.yml'
+      - '.github/actions/vertical-module-pipeline/action.yml'
+      - 'package.json'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'src/pages/api/_utils/vertical-extraction-acl.ts'
+      - 'src/pages/api/_utils/dual-run-reconciliation.ts'
+      - 'src/pages/api/v1/gateway/vertical-extraction.ts'
+      - 'src/pages/api/v1/gateway/reconciliation-report.ts'
+      - 'src/pages/api/_utils/vertical-extraction-acl.test.ts'
+      - 'src/pages/api/_utils/dual-run-reconciliation.test.ts'
+      - 'src/pages/api/v1/gateway/vertical-extraction.test.ts'
+      - 'src/pages/api/v1/gateway/reconciliation-report.test.ts'
+      - '.github/workflows/vertical-extraction-modules.yml'
+      - '.github/actions/vertical-module-pipeline/action.yml'
+      - 'package.json'
+  workflow_dispatch:
+
+jobs:
+  vertical-module-pipeline:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - module_key: module-crm
+            deploy_environment: crm-staging
+            test_files: src/pages/api/_utils/vertical-extraction-acl.test.ts src/pages/api/v1/gateway/vertical-extraction.test.ts src/pages/api/v1/gateway/reconciliation-report.test.ts
+          - module_key: module-logistics
+            deploy_environment: logistics-staging
+            test_files: src/pages/api/_utils/dual-run-reconciliation.test.ts src/pages/api/v1/gateway/reconciliation-report.test.ts
+          - module_key: module-quotation
+            deploy_environment: quotation-staging
+            test_files: src/pages/api/_utils/vertical-extraction-acl.test.ts src/pages/api/_utils/dual-run-reconciliation.test.ts
+          - module_key: module-finance
+            deploy_environment: finance-staging
+            test_files: src/pages/api/_utils/dual-run-reconciliation.test.ts src/pages/api/v1/gateway/reconciliation-report.test.ts
+    concurrency:
+      group: vertical-extraction-${{ matrix.module_key }}
+      cancel-in-progress: false
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Run shared vertical pipeline template
+        uses: ./.github/actions/vertical-module-pipeline
+        with:
+          module-key: ${{ matrix.module_key }}
+          test-files: ${{ matrix.test_files }}
+          deploy-environment: ${{ matrix.deploy_environment }}

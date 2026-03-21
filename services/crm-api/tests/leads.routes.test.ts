@@ -73,6 +73,30 @@ describe('CRM Leads Routes', () => {
     expect(leadsServiceInstance.getLeads).toHaveBeenCalledWith('tenant-1', 'franchise-1');
   });
 
+  it('propagates incoming correlation id in CRM API responses', async () => {
+    leadsServiceInstance.getLeads.mockResolvedValue([]);
+
+    const response = await request(app)
+      .get('/api/crm/v1/leads')
+      .set('Authorization', 'Bearer test-token')
+      .set('x-correlation-id', 'corr-123');
+
+    expect(response.status).toBe(200);
+    expect(response.headers['x-correlation-id']).toBe('corr-123');
+  });
+
+  it('generates correlation id when request header is missing', async () => {
+    leadsServiceInstance.getLeads.mockResolvedValue([]);
+
+    const response = await request(app)
+      .get('/api/crm/v1/leads')
+      .set('Authorization', 'Bearer test-token');
+
+    expect(response.status).toBe(200);
+    expect(typeof response.headers['x-correlation-id']).toBe('string');
+    expect(response.headers['x-correlation-id']).not.toHaveLength(0);
+  });
+
   it('creates a lead and emits created event', async () => {
     leadsServiceInstance.createLead.mockResolvedValue({
       id: 'lead-2',

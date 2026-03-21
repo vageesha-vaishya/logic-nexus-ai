@@ -188,6 +188,12 @@ describe('pipeline-service CRM API model handling', () => {
       expect(result.data).toHaveLength(1);
     }
     expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [, requestInit] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const requestHeaders = requestInit.headers as Record<string, string>;
+    expect(requestHeaders.Authorization).toBe('Bearer token-1');
+    expect(requestHeaders['x-tenant-id']).toBe('tenant-1');
+    expect(typeof requestHeaders['x-correlation-id']).toBe('string');
+    expect(requestHeaders['x-correlation-id'].length).toBeGreaterThan(0);
   });
 
   it('accepts totalCount alias from CRM API payload', async () => {
