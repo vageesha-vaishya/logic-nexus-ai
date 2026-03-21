@@ -124,10 +124,12 @@ export class GLSyncService {
   }
 
   private static async buildQueueRuntime(): Promise<QueueRuntime | null> {
+    if (!import.meta.env.SSR) return null;
     if (!(await this.isQueueEnabled())) return null;
 
     const redisUrl = String(process.env.REDIS_URL || '').trim();
-    const { Queue, Worker } = await import('bullmq');
+    const moduleName = 'bullmq';
+    const { Queue, Worker } = await import(moduleName);
     const parsedUrl = new URL(redisUrl);
     const connection = {
       host: parsedUrl.hostname,
