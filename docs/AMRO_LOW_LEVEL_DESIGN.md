@@ -2,7 +2,7 @@
 ## Aircraft Maintenance, Repair, and Overhaul Platform
 
 **Document ID:** LLD-AMRO-001  
-**Version:** 2.0.0  
+**Version:** 2.1.0  
 **Date:** 2026-03-21  
 **Status:** Draft for Architecture and Compliance Review  
 **Owner:** AMRO Architecture Working Group  
@@ -1119,6 +1119,143 @@ Errors:
 - Instrument every workflow stage with observability and policy version traces.
 - Keep security and compliance checks in execution paths, not post-processing paths.
 - Treat forecasting as decision support with explainability and human override controls.
+
+---
+
+## 26. Unified Architecture Relationship Mapping
+
+This section is the single-point map from module to UI/UX, database, workflow, and delivery sequence.
+
+### 26.1 System Module and Sub-Module Hierarchy Map
+
+| Module ID | Module | Sub-Modules | Core Ownership Boundary |
+|---|---|---|---|
+| MOD-AMRO-01 | Overview and KPI Intelligence | KPI Aggregation, Risk Heatmap, Forecast Panel, SLA Trends | Read-mostly operational intelligence |
+| MOD-AMRO-02 | Work Package Management | Package CRUD, Status Transition Engine, Saved Views, Detail Context Panel | Work package lifecycle control |
+| MOD-AMRO-03 | Task Execution and Evidence | Task Step Engine, Evidence Capture, Signature Capture, Offline Queue | Technician execution and evidence quality |
+| MOD-AMRO-04 | Maintenance Scheduling | Slot Planner, Constraint Solver, Disruption Replan, Capacity Calendar | Time and resource planning |
+| MOD-AMRO-05 | Parts and Materials | Inventory Availability, Reservation Engine, Shortage Alerting, Supplier ETA | Material readiness and traceability |
+| MOD-AMRO-06 | Compliance and Airworthiness | AD/SB Ingestion, MEL/CDL Policy Engine, Gate Evaluator, Dossier Assembly | Regulatory gate enforcement |
+| MOD-AMRO-07 | Certification and Authority | Qualification Registry, Certifying Privilege Validation, Release Decision Flow | Release authorization integrity |
+| MOD-AMRO-08 | Integration and Partner Hub | Adapter Runtime, Canonical Mapping, Idempotency/Dedup, Replay Queue | External interoperability |
+| MOD-AMRO-09 | Forecast and Reliability | Feature Pipeline, Risk Scoring, Recommendation Engine, Outcome Feedback | Predictive maintenance intelligence |
+| MOD-AMRO-10 | Audit and Evidence Ledger | Event Append Log, Hash Chain Verifier, Replay Export, Security Audit Trail | Non-repudiation and evidentiary replay |
+
+### 26.2 UI/UX Mapping Matrix (Module → Screen → Wireframe → Flow → Interface Spec)
+
+| Module ID | Primary Screens | Wireframe References | User Flow References | Interface Specifications |
+|---|---|---|---|---|
+| MOD-AMRO-01 | SCR-AMRO-001 Overview Dashboard | 5.3.1 | 5.4.1, 17.1 | 16.2 dashboard layout contract, 16.3 behavior rules |
+| MOD-AMRO-02 | SCR-AMRO-002 List, SCR-AMRO-003 Create Drawer, SCR-AMRO-004 Detail Sheet | 5.3.2, 5.3.3 | 5.4.1, 17.1 | 16.2 list/detail contracts, 16.3 role-gated actions |
+| MOD-AMRO-03 | SCR-AMRO-005 Task Execution Card | 5.3.4 | 5.4.2, 17.2 | 16.2 task card contract, 16.4 accessibility |
+| MOD-AMRO-04 | SCR-AMRO-006 Scheduling Board | 5.3.1 context, 16.2 board contract | 5.4.1, 17.1 | 16.3 action ordering and constraint feedback rules |
+| MOD-AMRO-05 | SCR-AMRO-007 Materials Reservation Panel | 5.3.3 materials tab context | 17.1 | 16.2 detail-side material panel behavior |
+| MOD-AMRO-06 | SCR-AMRO-008 Compliance Gate Modal | 5.3.3 compliance tab context | 17.3 | 16.3 irreversible action protections, 16.4 non-color status |
+| MOD-AMRO-07 | SCR-AMRO-009 Certification Decision Panel | 5.3.3 signature/release context | 17.1, 17.3 | 16.3 permission visibility, 16.4 keyboard operability |
+| MOD-AMRO-08 | SCR-AMRO-011 Integration Monitor Console | 18.2 integration flow | 17.2 sync error path | 23.1 retry/replay contract visibility rules |
+| MOD-AMRO-09 | SCR-AMRO-012 Forecast Recommendation Hub | 5.3.1 forecast signals | 17.1 planning decision points | 16.2 recommendation panel and confidence display |
+| MOD-AMRO-10 | SCR-AMRO-010 Audit Replay Timeline | 5.3.3 activity/audit context | 17.3 gate rationale path | 19.2 API-AMRO-014 replay interface requirements |
+
+### 26.3 Database Mapping Matrix (Module → Tables → Key Fields → Constraints)
+
+| Module ID | Primary Tables | Key Fields Used by Module | Critical Constraints and Rules |
+|---|---|---|---|
+| MOD-AMRO-01 | work_packages, maintenance_events, forecast_outputs | status, planned_start, risk_score, created_at | Tenant/franchise scope enforced; KPI queries use indexed status/time fields |
+| MOD-AMRO-02 | work_packages, work_package_templates, tasks | work_package_number, maintenance_type, priority, status | Unique `(tenant_id, work_package_number)`; transition policy validation required |
+| MOD-AMRO-03 | tasks, task_evidence, maintenance_events, sync_conflicts | sequence, steps_json, checksum, signature metadata | Unique `(work_package_id, sequence)`; evidence checksum mandatory |
+| MOD-AMRO-04 | schedules, schedule_constraints, shift_calendars | slot_start, slot_end, station_code, qualification requirements | Constraint solver must enforce capacity and certification availability |
+| MOD-AMRO-05 | parts_inventory, reservations, stock_movements, suppliers | part_number, serial_number, quantity_available, eta | Quantity consistency checks; serialized uniqueness per tenant |
+| MOD-AMRO-06 | compliance_obligations, compliance_records, regulator_profiles, policy_snapshots | obligation_type, due_date, decision_status, policy_version | Mandatory obligations must pass before release; policy snapshot immutability |
+| MOD-AMRO-07 | staff_qualifications, certification_actions, regulator_dossiers | expiration_date, can_certify_release, action_status | Expired authority blocks release; issuer/regulator alignment required |
+| MOD-AMRO-08 | integration_jobs, integration_mappings, webhook_outbox | source_system, idempotency_key, replay_status | Idempotency + dedup required; replay queue state must be durable |
+| MOD-AMRO-09 | asset_health_signals, forecast_features, forecast_outputs, forecast_decisions | feature_vector, confidence, recommendation_id, accepted | Model outputs traceable to feature snapshot and policy context |
+| MOD-AMRO-10 | maintenance_events, mro_audit.records, mro_audit.trails | event_hash, previous_hash, actor_id, timestamp | Append-only semantics; hash-chain integrity required |
+
+### 26.4 Table Relationship Cross-Reference (Functional Join Paths)
+
+| Relationship Path | Purpose | Modules Consuming Path |
+|---|---|---|
+| aircraft -> work_packages -> tasks -> maintenance_events | End-to-end execution trace | MOD-AMRO-02, 03, 10 |
+| work_packages -> reservations -> parts_inventory | Material readiness and shortage control | MOD-AMRO-05 |
+| work_packages -> compliance_records -> compliance_obligations | Gate pass/fail rationale | MOD-AMRO-06 |
+| tasks -> staff_qualifications -> certification_actions | Qualification and release validity | MOD-AMRO-07 |
+| integration_jobs -> webhook_outbox -> maintenance_events | External sync and internal state propagation | MOD-AMRO-08, 10 |
+| asset_health_signals -> forecast_outputs -> work_packages | Predictive recommendation to planned work creation | MOD-AMRO-09, 02 |
+
+### 26.5 Workflow and Data-Flow Mapping by Module
+
+| Module ID | Workflow Diagram Reference | Business Logic Sequence | User Interaction Pattern | Data Flow Reference |
+|---|---|---|---|---|
+| MOD-AMRO-01 | 17.1 (steps 1-3, 7) | Aggregate operational state -> compute KPIs -> publish widgets | Filter, drill-down, export | 18.1 |
+| MOD-AMRO-02 | 17.1 (steps 1-3) | Create -> enrich -> transition -> audit append | List, drawer create, detail tab edit | 18.1 |
+| MOD-AMRO-03 | 17.2 | Step execute -> evidence attach -> sign -> sync/merge | Mobile task card with offline mode | 18.1, 18.3 |
+| MOD-AMRO-04 | 17.1 (step 3) | Constraint validation -> slot allocation -> replan on conflict | Drag/drop schedule and replan prompts | 18.1 |
+| MOD-AMRO-05 | 17.1 (step 2-4) | Demand detect -> reserve -> shortage escalate -> ETA update | Inline reservation and bulk reserve actions | 18.1, 18.2 |
+| MOD-AMRO-06 | 17.3 | Evaluate obligations -> compute gate result -> block/allow release | Gate modal with blockers and rationale | 18.3 |
+| MOD-AMRO-07 | 17.1 (step 6), 17.3 | Validate authority -> capture release decision -> dossier build | Certification panel approve/reject/defer | 18.3 |
+| MOD-AMRO-08 | 17.2, 23.1 | Ingest -> map -> dedup -> apply -> replay failed jobs | Console monitoring, retry, quarantine review | 18.2 |
+| MOD-AMRO-09 | 17.1 planning decision | Score risk -> generate recommendations -> capture outcomes | Recommendation accept/reject with reasons | 18.1 |
+| MOD-AMRO-10 | 17.1 (step 7), 17.3 | Append immutable event -> verify hash chain -> replay export | Audit timeline and export filters | 18.3 |
+
+### 26.6 End-to-End Architecture Flowchart (Module Interaction View)
+
+```text
+User Interfaces (SCR-AMRO-001..012)
+    -> API Gateway (/api/v2/amro/*, scoped auth)
+    -> Domain Modules:
+         MOD-AMRO-02 Work Package
+         MOD-AMRO-04 Scheduling
+         MOD-AMRO-05 Materials
+         MOD-AMRO-06 Compliance
+         MOD-AMRO-07 Certification
+         MOD-AMRO-03 Task Execution
+    -> MOD-AMRO-10 Audit Ledger (mandatory append on state change)
+    -> Operational Database (tenant_id + franchise_id + RLS)
+    -> Event Outbox and Kafka
+    -> MOD-AMRO-01 KPI Intelligence + MOD-AMRO-09 Forecast
+    -> UI Refresh and Notifications
+External Systems
+    <-> MOD-AMRO-08 Integration Hub (ERP/IoT/Regulator adapters, replay queues)
+```
+
+### 26.7 Implementation Sequence Mapping (Build Order, Dependencies, Deployment Priority)
+
+| Sequence | Deliverable Group | Depends On | Blocks/Unblocks | Deployment Priority |
+|---|---|---|---|---|
+| S1 | Schema foundation, RLS, scoped auth, audit primitives | None | Unblocks all modules | Critical |
+| S2 | Work package core (list/create/detail/transitions) | S1 | Unblocks scheduling, materials, compliance | Critical |
+| S3 | Scheduling board + constraint engine | S1, S2 | Unblocks execution slotting and capacity governance | High |
+| S4 | Task execution mobile + evidence + sync | S1, S2 | Unblocks field operations and paperless flow | Critical |
+| S5 | Materials reservations and shortage intelligence | S1, S2, S3 | Unblocks accurate execution and closure quality | High |
+| S6 | Compliance gates + certification release controls | S1, S2, S4 | Unblocks regulator-ready release | Critical |
+| S7 | Integration hub adapters + monitor console | S1, S2 | Unblocks ERP/IoT/regulator interoperability | High |
+| S8 | KPI intelligence and forecast recommendation embedding | S2, S3, S5, S7 | Unblocks optimization and predictive planning | Medium |
+| S9 | Audit replay hardening and export controls | S1..S8 | Unblocks full audit readiness and enterprise acceptance | Critical |
+| S10 | Scale/performance hardening + DR validation | S1..S9 | Unblocks GA rollout | Critical |
+
+### 26.8 Deployment Wave and Environment Priority Map
+
+| Wave | Environment | Included Sequences | Entry Criteria | Exit Criteria |
+|---|---|---|---|---|
+| W1 | Dev and Integration | S1-S4 | Core tests and RLS tests passing | Create-plan-execute basic flow stable |
+| W2 | Staging Compliance | S5-S7 | Integration contract tests passing | Gate outcomes and sync replay validated |
+| W3 | Pre-Prod Performance | S8-S9 | p95/p99 thresholds and audit replay tests passing | Compliance replay and forecast UX accepted |
+| W4 | Production GA | S10 | DR drill success, security sign-off, rollout approvals | Controlled GA with SLO monitoring active |
+
+### 26.9 Quick Lookup Cross-Reference Matrix (Single-Row Navigation)
+
+| Module | Sub-Modules | UI/UX | DB Tables | Workflow | APIs | Implementation Sequence |
+|---|---|---|---|---|---|---|
+| Overview and KPI Intelligence | KPI Aggregation, Risk Heatmap, Forecast Panel | SCR-001, SCR-012 | work_packages, maintenance_events, forecast_outputs | 17.1, 18.1 | API-001, API-015 | S8 |
+| Work Package Management | CRUD, Transitions, Detail Context | SCR-002, SCR-003, SCR-004 | work_packages, work_package_templates, tasks | 17.1 | API-001, API-002, API-003 | S2 |
+| Task Execution and Evidence | Step Engine, Evidence, Offline Queue | SCR-005 | tasks, task_evidence, maintenance_events, sync_conflicts | 17.2, 18.3 | API-006, API-007 | S4 |
+| Maintenance Scheduling | Planner, Solver, Replan | SCR-006 | schedules, schedule_constraints, shift_calendars | 17.1 | API-004, API-005 | S3 |
+| Parts and Materials | Availability, Reservation, Shortage | SCR-007 | parts_inventory, reservations, stock_movements, suppliers | 17.1, 18.2 | API-008, API-009 | S5 |
+| Compliance and Airworthiness | AD/SB, MEL/CDL, Gate Evaluator | SCR-008 | compliance_obligations, compliance_records, policy_snapshots | 17.3 | API-010, API-011 | S6 |
+| Certification and Authority | Qualification, Privilege Validation, Release | SCR-009 | staff_qualifications, certification_actions, regulator_dossiers | 17.1, 17.3 | API-012, API-013 | S6 |
+| Integration and Partner Hub | Adapter Runtime, Mapping, Replay Queue | SCR-011 | integration_jobs, integration_mappings, webhook_outbox | 18.2 | API ingestion and webhook contracts | S7 |
+| Forecast and Reliability | Feature Pipeline, Risk Engine, Feedback | SCR-012 | asset_health_signals, forecast_features, forecast_outputs, forecast_decisions | 18.1 | API-015 | S8 |
+| Audit and Evidence Ledger | Event Append, Hash Verify, Replay Export | SCR-010 | maintenance_events, mro_audit.records, mro_audit.trails | 18.3 | API-014 | S9 |
 
 ---
 
