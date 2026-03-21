@@ -1,7 +1,18 @@
 import { createHash, randomUUID } from 'node:crypto';
 
-export type AmroAuditLedgerEventType = 'amro.audit.recorded.v1' | 'amro.compliance.gate_decided.v1';
-export type AmroAuditLedgerCapability = 'work-packages' | 'tasks' | 'compliance-gates';
+export type AmroAuditLedgerEventType =
+  | 'amro.audit.recorded.v1'
+  | 'amro.compliance.gate_decided.v1'
+  | 'amro.certification.decision.submitted.v1'
+  | 'amro.integration.payload.ingested.v1'
+  | 'amro.forecast.risk.scored.v1';
+export type AmroAuditLedgerCapability =
+  | 'work-packages'
+  | 'tasks'
+  | 'compliance-gates'
+  | 'certification'
+  | 'integration-hub'
+  | 'forecast-reliability';
 
 export type AmroAuditLedgerRecord = {
   recordId: string;
@@ -11,7 +22,13 @@ export type AmroAuditLedgerRecord = {
   version: 'v2';
   capability: AmroAuditLedgerCapability;
   eventType: AmroAuditLedgerEventType;
-  entityType: 'work-package' | 'task' | 'compliance-gate';
+  entityType:
+    | 'work-package'
+    | 'task'
+    | 'compliance-gate'
+    | 'certification-action'
+    | 'integration-job'
+    | 'forecast-assessment';
   entityId: string;
   correlationId: string;
   action: string;
@@ -30,7 +47,13 @@ type AmroAuditLedgerInput = {
   franchiseId: string | null;
   capability: AmroAuditLedgerCapability;
   eventType: AmroAuditLedgerEventType;
-  entityType: 'work-package' | 'task' | 'compliance-gate';
+  entityType:
+    | 'work-package'
+    | 'task'
+    | 'compliance-gate'
+    | 'certification-action'
+    | 'integration-job'
+    | 'forecast-assessment';
   entityId: string;
   correlationId: string;
   action: string;

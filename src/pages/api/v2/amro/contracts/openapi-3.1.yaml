@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: AMRO V2 Integration API
   version: 2.0.0
-  description: AMRO Integration and Coexistence contract for work-packages, tasks, compliance-gates, overview-kpi, phase-plan, phase-1-readiness, and migration-plan.
+  description: AMRO Integration and Coexistence contract for work-packages, tasks, compliance-gates, certification, integration-hub, forecast-reliability, overview-kpi, module-catalog, screen-inventory, phase-plan, phase-1-readiness, and migration-plan.
 servers:
   - url: /
 paths:
@@ -17,6 +17,154 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/WorkPackagesResponse'
+    post:
+      operationId: mutateAmroWorkPackages
+      tags: [AMRO]
+      parameters:
+        - in: query
+          name: interface
+          required: true
+          schema:
+            type: string
+            enum:
+              [
+                create-work-package,
+                transition-work-package,
+                clone-template,
+                assign-maintenance-slot,
+                run-replan-simulation,
+                confirm-replan,
+                reserve-parts,
+                process-shortage-response,
+                sync-supplier-eta,
+              ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - type: object
+                  required: [aircraft_id, maintenance_type, planned_window, station, priority, scope_items]
+                  properties:
+                    aircraft_id:
+                      type: string
+                    maintenance_type:
+                      type: string
+                    planned_window:
+                      type: string
+                    station:
+                      type: string
+                    priority:
+                      type: string
+                    scope_items:
+                      type: array
+                      items:
+                        type: string
+                - type: object
+                  required: [work_package_id, target_status, reason_code, actor_signature]
+                  properties:
+                    work_package_id:
+                      type: string
+                    target_status:
+                      type: string
+                    reason_code:
+                      type: string
+                    actor_signature:
+                      type: string
+                - type: object
+                  required: [template_id, aircraft_id, override_fields]
+                  properties:
+                    template_id:
+                      type: string
+                    aircraft_id:
+                      type: string
+                    override_fields:
+                      type: object
+                      additionalProperties: true
+                - type: object
+                  required: [work_package_id, station_code, slot_start, slot_end, assigned_team]
+                  properties:
+                    work_package_id:
+                      type: string
+                    station_code:
+                      type: string
+                    slot_start:
+                      type: string
+                    slot_end:
+                      type: string
+                    assigned_team:
+                      type: array
+                      items:
+                        type: object
+                        additionalProperties: true
+                - type: object
+                  required: [disrupted_slots, priority_rules, planning_horizon]
+                  properties:
+                    disrupted_slots:
+                      type: array
+                      items:
+                        type: object
+                        additionalProperties: true
+                    priority_rules:
+                      type: object
+                      additionalProperties: true
+                    planning_horizon:
+                      type: string
+                - type: object
+                  required: [selected_option_id, approver_id, reason]
+                  properties:
+                    selected_option_id:
+                      type: string
+                    approver_id:
+                      type: string
+                    reason:
+                      type: string
+                - type: object
+                  required: [work_package_id, demand_lines]
+                  properties:
+                    work_package_id:
+                      type: string
+                    demand_lines:
+                      type: array
+                      items:
+                        type: object
+                        required: [part_number, quantity]
+                        properties:
+                          part_number:
+                            type: string
+                          quantity:
+                            type: number
+                          serial:
+                            type: string
+                - type: object
+                  required: [shortage_id, action, supplier_ref]
+                  properties:
+                    shortage_id:
+                      type: string
+                    action:
+                      type: string
+                      enum: [backorder, substitute, escalate]
+                    supplier_ref:
+                      type: string
+                - type: object
+                  required: [supplier_event_id, part_number, eta, quantity_confirmed]
+                  properties:
+                    supplier_event_id:
+                      type: string
+                    part_number:
+                      type: string
+                    eta:
+                      type: string
+                    quantity_confirmed:
+                      type: number
+      responses:
+        '200':
+          description: Work package mutation response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkPackageMutationResponse'
   /api/v2/amro/tasks:
     get:
       operationId: listAmroTasks
@@ -34,6 +182,67 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TasksResponse'
+    post:
+      operationId: mutateAmroTasks
+      tags: [AMRO]
+      parameters:
+        - in: query
+          name: interface
+          required: true
+          schema:
+            type: string
+            enum: [update-task-step, upload-evidence, submit-signature]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - type: object
+                  required: [task_id, step_id, action, performed_at, device_id]
+                  properties:
+                    task_id:
+                      type: string
+                    step_id:
+                      type: string
+                    action:
+                      type: string
+                    performed_at:
+                      type: string
+                    device_id:
+                      type: string
+                - type: object
+                  required: [task_id, evidence_type, media_ref, checksum, metadata]
+                  properties:
+                    task_id:
+                      type: string
+                    evidence_type:
+                      type: string
+                    media_ref:
+                      type: string
+                    checksum:
+                      type: string
+                    metadata:
+                      type: object
+                      additionalProperties: true
+                - type: object
+                  required: [task_id, signer_id, method, signature_payload]
+                  properties:
+                    task_id:
+                      type: string
+                    signer_id:
+                      type: string
+                    method:
+                      type: string
+                    signature_payload:
+                      type: string
+      responses:
+        '200':
+          description: Task execution mutation response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskExecutionMutationResponse'
   /api/v2/amro/compliance-gates:
     get:
       operationId: listAmroComplianceGates
@@ -52,6 +261,292 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ComplianceGatesResponse'
+    post:
+      operationId: mutateAmroComplianceGates
+      tags: [AMRO]
+      parameters:
+        - in: query
+          name: interface
+          required: true
+          schema:
+            type: string
+            enum: [evaluate-compliance-gate, register-exception-request, generate-compliance-dossier]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - type: object
+                  required: [context, regulator_profile, required_obligations]
+                  properties:
+                    context:
+                      type: object
+                      required: [type, id]
+                      properties:
+                        type:
+                          type: string
+                          enum: [work_package, task]
+                        id:
+                          type: string
+                    regulator_profile:
+                      type: string
+                      enum: [FAA, EASA, CAAC, faa, easa, caac]
+                    required_obligations:
+                      type: array
+                      items:
+                        type: object
+                        additionalProperties: true
+                - type: object
+                  required: [work_package_id, obligation_id, justification, requested_by]
+                  properties:
+                    work_package_id:
+                      type: string
+                    obligation_id:
+                      type: string
+                    justification:
+                      type: string
+                    requested_by:
+                      type: string
+                - type: object
+                  required: [work_package_id, profile, include_artifacts]
+                  properties:
+                    work_package_id:
+                      type: string
+                    profile:
+                      type: string
+                      enum: [FAA, EASA, CAAC, faa, easa, caac]
+                    include_artifacts:
+                      type: array
+                      items:
+                        type: string
+      responses:
+        '200':
+          description: Compliance mutation response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComplianceMutationResponse'
+  /api/v2/amro/certification:
+    post:
+      operationId: mutateAmroCertification
+      tags: [AMRO]
+      parameters:
+        - in: query
+          name: interface
+          required: true
+          schema:
+            type: string
+            enum: [validate-certifying-authority, submit-certification-decision, escalate-blocked-certification]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - type: object
+                  required: [actor_id, aircraft_scope, maintenance_scope, timestamp]
+                  properties:
+                    actor_id:
+                      type: string
+                    aircraft_scope:
+                      type: array
+                      items:
+                        type: string
+                    maintenance_scope:
+                      type: array
+                      items:
+                        type: string
+                    timestamp:
+                      type: string
+                    authority:
+                      type: object
+                      additionalProperties: true
+                - type: object
+                  required: [work_package_id, decision, signatures]
+                  properties:
+                    work_package_id:
+                      type: string
+                    decision:
+                      type: string
+                      enum: [approve, reject, defer]
+                    signatures:
+                      type: array
+                      items:
+                        type: object
+                        additionalProperties: true
+                    unresolved_blockers:
+                      type: array
+                      items:
+                        type: string
+                - type: object
+                  required: [work_package_id, block_reason, escalation_target]
+                  properties:
+                    work_package_id:
+                      type: string
+                    block_reason:
+                      type: string
+                    escalation_target:
+                      type: string
+                    authority_chain:
+                      type: array
+                      items:
+                        type: string
+      responses:
+        '200':
+          description: Certification mutation response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CertificationMutationResponse'
+  /api/v2/amro/integration-hub:
+    post:
+      operationId: mutateAmroIntegrationHub
+      tags: [AMRO]
+      parameters:
+        - in: query
+          name: interface
+          required: true
+          schema:
+            type: string
+            enum: [ingest-partner-payload, replay-failed-integration-job, publish-outbound-callback]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - type: object
+                  required: [source_system, adapter_version, payload, idempotency_key]
+                  properties:
+                    source_system:
+                      type: string
+                    adapter_version:
+                      type: string
+                    payload:
+                      type: object
+                      additionalProperties: true
+                    idempotency_key:
+                      type: string
+                    event_type:
+                      type: string
+                - type: object
+                  required: [job_id, replay_reason, requested_by]
+                  properties:
+                    job_id:
+                      type: string
+                    replay_reason:
+                      type: string
+                    requested_by:
+                      type: string
+                    job_status:
+                      type: string
+                      enum: [failed, quarantined, completed, running]
+                    retry_count:
+                      type: integer
+                - type: object
+                  required: [target_partner, event_type, payload_ref]
+                  properties:
+                    target_partner:
+                      type: string
+                    event_type:
+                      type: string
+                    payload_ref:
+                      type: string
+                    mapping_contract:
+                      type: object
+                      additionalProperties: true
+                    attempt_log:
+                      type: array
+                      items:
+                        type: object
+                        additionalProperties: true
+      responses:
+        '200':
+          description: Integration hub mutation response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntegrationHubMutationResponse'
+  /api/v2/amro/forecast-reliability:
+    post:
+      operationId: mutateAmroForecastReliability
+      tags: [AMRO]
+      parameters:
+        - in: query
+          name: interface
+          required: true
+          schema:
+            type: string
+            enum:
+              [
+                score-maintenance-risk,
+                generate-intervention-recommendations,
+                capture-recommendation-outcome,
+              ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - type: object
+                  required: [asset_id, telemetry_features, defect_history, environment_context]
+                  properties:
+                    asset_id:
+                      type: string
+                    telemetry_features:
+                      type: array
+                      items:
+                        type: object
+                        additionalProperties: true
+                    defect_history:
+                      type: array
+                      items:
+                        type: object
+                        additionalProperties: true
+                    environment_context:
+                      type: object
+                      additionalProperties: true
+                    required_feature_count:
+                      type: number
+                    feature_completeness_threshold:
+                      type: number
+                - type: object
+                  required: [risk_score, policy_rules, resource_constraints]
+                  properties:
+                    risk_score:
+                      type: number
+                    policy_rules:
+                      type: object
+                      additionalProperties: true
+                    resource_constraints:
+                      type: object
+                      additionalProperties: true
+                - type: object
+                  required: [recommendation_id, operator_action, outcome_metrics]
+                  properties:
+                    recommendation_id:
+                      type: string
+                    operator_action:
+                      type: string
+                    outcome_metrics:
+                      type: array
+                      items:
+                        type: object
+                        additionalProperties: true
+                    outcome_at:
+                      type: string
+                    feedback_policy:
+                      type: object
+                      additionalProperties: true
+      responses:
+        '200':
+          description: Forecast reliability mutation response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForecastReliabilityMutationResponse'
   /api/v2/amro/overview-kpi:
     get:
       operationId: getAmroOverviewKpi
@@ -68,6 +563,7 @@ paths:
           required: false
           schema:
             type: string
+          description: Required for load-kpi-dashboard and must be ISO start/end range.
         - in: query
           name: station_ids
           required: false
@@ -88,6 +584,7 @@ paths:
           required: false
           schema:
             type: string
+            enum: [open_work_packages, schedule_adherence, aog_count, compliance_risk, parts_fill_rate]
         - in: query
           name: window
           required: false
@@ -99,6 +596,8 @@ paths:
           required: false
           schema:
             type: string
+            pattern: '^[0-9]+d$'
+          description: Cannot exceed AMRO compare-window policy maximum.
       responses:
         '200':
           description: Overview KPI dashboard or trends response
@@ -133,6 +632,7 @@ paths:
                   type: array
                   items:
                     type: string
+                    enum: [kpi_cards, risk_heatmap, trend_lines, anomaly_flags]
       responses:
         '200':
           description: Export KPI snapshot response
@@ -216,6 +716,28 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Phase1ReadinessResponse'
+  /api/v2/amro/module-catalog:
+    get:
+      operationId: getAmroModuleCatalog
+      tags: [AMRO]
+      responses:
+        '200':
+          description: Module catalog response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModuleCatalogResponse'
+  /api/v2/amro/screen-inventory:
+    get:
+      operationId: getAmroScreenInventory
+      tags: [AMRO]
+      responses:
+        '200':
+          description: Screen inventory response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScreenInventoryResponse'
 components:
   schemas:
     ApiEnvelope:
@@ -278,7 +800,15 @@ components:
           type: boolean
         capability:
           type: string
-          enum: [work-packages, tasks, compliance-gates]
+          enum:
+            [
+              work-packages,
+              tasks,
+              compliance-gates,
+              certification,
+              integration-hub,
+              forecast-reliability,
+            ]
     Reconciliation:
       type: object
       required: [legacyCount, moduleCount, deltaCount, missingInModule, missingInLegacy]
@@ -483,3 +1013,269 @@ components:
               properties:
                 readiness:
                   type: object
+    ModuleCatalogResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiEnvelope'
+        - type: object
+          required: [data]
+          properties:
+            data:
+              type: object
+              required: [moduleCatalog]
+              properties:
+                moduleCatalog:
+                  type: object
+    ScreenInventoryResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiEnvelope'
+        - type: object
+          required: [data]
+          properties:
+            data:
+              type: object
+              required: [screenInventory]
+              properties:
+                screenInventory:
+                  $ref: '#/components/schemas/ScreenInventoryEnvelope'
+    ScreenInventoryEnvelope:
+      type: object
+      required: [screens, layoutContracts, behaviorRules, accessibilityAndI18n, summary]
+      properties:
+        screens:
+          type: array
+          items:
+            $ref: '#/components/schemas/ScreenInventoryRow'
+        layoutContracts:
+          type: array
+          items:
+            $ref: '#/components/schemas/ScreenLayoutContract'
+        behaviorRules:
+          $ref: '#/components/schemas/UiUxBehaviorRules'
+        accessibilityAndI18n:
+          type: array
+          items:
+            $ref: '#/components/schemas/AccessibilityI18nRequirement'
+        summary:
+          type: object
+          required: [totalScreens, totalModules, mobileEnabledScreens, layoutContractScreens, accessibilityAreas]
+          properties:
+            totalScreens:
+              type: integer
+            totalModules:
+              type: integer
+            mobileEnabledScreens:
+              type: integer
+            layoutContractScreens:
+              type: integer
+            accessibilityAreas:
+              type: integer
+    ScreenInventoryRow:
+      type: object
+      required: [screenId, screenName, module, primaryPersona, device]
+      properties:
+        screenId:
+          type: string
+        screenName:
+          type: string
+        module:
+          type: string
+        primaryPersona:
+          type: array
+          items:
+            type: string
+        device:
+          type: array
+          items:
+            type: string
+            enum: [Desktop, Tablet, Mobile]
+    ScreenLayoutContract:
+      type: object
+      required: [screenId, screenName, sections]
+      properties:
+        screenId:
+          type: string
+          enum: [SCR-AMRO-001, SCR-AMRO-002, SCR-AMRO-004, SCR-AMRO-005]
+        screenName:
+          type: string
+        sections:
+          type: array
+          items:
+            $ref: '#/components/schemas/ScreenLayoutContractSection'
+        guardrails:
+          type: array
+          items:
+            type: string
+    ScreenLayoutContractSection:
+      type: object
+      required: [region, requirements]
+      properties:
+        region:
+          type: string
+        requirements:
+          type: array
+          items:
+            type: string
+    UiUxBehaviorRules:
+      type: object
+      required: [stableActionOrder, primaryActionStates, deterministicColorSemantics, persistence, serverPagination, irreversibleActionProtection]
+      properties:
+        stableActionOrder:
+          type: array
+          items:
+            type: string
+            enum: [search, filter, view, create, refresh, import-export, theme]
+        primaryActionStates:
+          type: array
+          items:
+            type: string
+            enum: [enabled, disabled-with-reason, hidden-by-permission]
+        deterministicColorSemantics:
+          type: array
+          items:
+            type: string
+            enum: [success, warning, critical, blocked, informational]
+        persistence:
+          type: object
+          required: [view, theme, restoreOnRemount]
+          properties:
+            view:
+              type: string
+              const: browser-storage
+            theme:
+              type: string
+              const: browser-storage
+            restoreOnRemount:
+              type: boolean
+        serverPagination:
+          type: object
+          required: [defaultEnabled, preserveUserPageSize]
+          properties:
+            defaultEnabled:
+              type: boolean
+            preserveUserPageSize:
+              type: boolean
+        irreversibleActionProtection:
+          type: object
+          required: [dualConfirmationRequired, rationaleCaptureRequired]
+          properties:
+            dualConfirmationRequired:
+              type: boolean
+            rationaleCaptureRequired:
+              type: boolean
+    AccessibilityI18nRequirement:
+      type: object
+      required: [area, requirement, acceptanceCriteria]
+      properties:
+        area:
+          type: string
+          enum: [Keyboard navigation, Screen reader labels, Dynamic updates, Language/locale, Color safety]
+        requirement:
+          type: string
+        acceptanceCriteria:
+          type: string
+    WorkPackageMutationResponse:
+      type: object
+      required: [version, interface, correlationId]
+      properties:
+        version:
+          type: string
+          const: v2
+        interface:
+          type: string
+          enum:
+            [
+              create-work-package,
+              transition-work-package,
+              clone-template,
+              assign-maintenance-slot,
+              run-replan-simulation,
+              confirm-replan,
+              reserve-parts,
+              process-shortage-response,
+              sync-supplier-eta,
+            ]
+        correlationId:
+          type: string
+        output:
+          type: object
+          additionalProperties: true
+    TaskExecutionMutationResponse:
+      type: object
+      required: [version, interface, correlationId]
+      properties:
+        version:
+          type: string
+          const: v2
+        interface:
+          type: string
+          enum: [update-task-step, upload-evidence, submit-signature]
+        correlationId:
+          type: string
+        output:
+          type: object
+          additionalProperties: true
+    ComplianceMutationResponse:
+      type: object
+      required: [version, interface, correlationId]
+      properties:
+        version:
+          type: string
+          const: v2
+        interface:
+          type: string
+          enum: [evaluate-compliance-gate, register-exception-request, generate-compliance-dossier]
+        correlationId:
+          type: string
+        output:
+          type: object
+          additionalProperties: true
+    CertificationMutationResponse:
+      type: object
+      required: [version, interface, correlationId]
+      properties:
+        version:
+          type: string
+          const: v2
+        interface:
+          type: string
+          enum: [validate-certifying-authority, submit-certification-decision, escalate-blocked-certification]
+        correlationId:
+          type: string
+        output:
+          type: object
+          additionalProperties: true
+    IntegrationHubMutationResponse:
+      type: object
+      required: [version, interface, correlationId]
+      properties:
+        version:
+          type: string
+          const: v2
+        interface:
+          type: string
+          enum: [ingest-partner-payload, replay-failed-integration-job, publish-outbound-callback]
+        correlationId:
+          type: string
+        output:
+          type: object
+          additionalProperties: true
+    ForecastReliabilityMutationResponse:
+      type: object
+      required: [version, interface, correlationId]
+      properties:
+        version:
+          type: string
+          const: v2
+        interface:
+          type: string
+          enum:
+            [
+              score-maintenance-risk,
+              generate-intervention-recommendations,
+              capture-recommendation-outcome,
+            ]
+        correlationId:
+          type: string
+        output:
+          type: object
+          additionalProperties: true

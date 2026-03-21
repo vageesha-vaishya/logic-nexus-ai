@@ -77,7 +77,7 @@ type ApiEnvelope<TOutput> = {
 
 const DEFAULT_STATION_IDS = ['station-a'];
 const DEFAULT_FLEET_IDS = ['fleet-a'];
-const DEFAULT_WIDGETS = ['kpi_cards', 'risk_heatmap', 'trend_lines'];
+const DEFAULT_WIDGETS = ['kpi_cards', 'risk_heatmap', 'trend_lines', 'anomaly_flags'];
 
 function buildIsoRange(days: number): string {
   const end = new Date();

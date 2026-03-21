@@ -6,6 +6,7 @@ import {
   authenticateRequest,
   buildApiContext,
   enforceAmroDomainAccess,
+  enforceAnyPermission,
   enforceHttps,
   enforceRateLimit,
   handlePreflight,
@@ -23,6 +24,7 @@ vi.mock('../../_utils/http', () => ({
   authenticateRequest: vi.fn(),
   buildApiContext: vi.fn(),
   enforceAmroDomainAccess: vi.fn(),
+  enforceAnyPermission: vi.fn(),
   enforceHttps: vi.fn(),
   enforceRateLimit: vi.fn(),
   handlePreflight: vi.fn(),
@@ -65,6 +67,7 @@ describe('/api/v2/amro/compliance-gates', () => {
     process.env = { ...envBackup };
     resetAmroAuditLedgerStore();
     vi.clearAllMocks();
+    vi.mocked(enforceAnyPermission).mockImplementation(() => undefined);
     vi.mocked(handlePreflight).mockReturnValue(false);
     vi.mocked(buildApiContext).mockReturnValue({
       correlationId: 'corr-amro-compliance-v2',
@@ -210,5 +213,82 @@ describe('/api/v2/amro/compliance-gates', () => {
       'corr-amro-compliance-v2',
       { apiVersion: 'v2' }
     );
+  });
+
+  it('evaluates compliance gate with policy snapshot and decision evidence', async () => {
+    process.env.AMRO_COMPLIANCE_GATES_V2_ENABLED = 'true';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'evaluate-compliance-gate' },
+      body: {
+        context: { type: 'task', id: 'task-001' },
+        regulator_profile: 'FAA',
+        required_obligations: [
+          { obligation_id: 'obl-1', fulfilled: true },
+          { obligation_id: 'obl-2', fulfilled: false, reason: 'pending inspector signoff' },
+        ],
+        policy_version_snapshot: 'policy-v2026.03.21',
+        decision_evidence: 'evidence-hash-001',
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.interface).toBe('evaluate-compliance-gate');
+    expect((res.jsonBody as any)?.output?.decision).toBe('fail');
+    expect((res.jsonBody as any)?.output?.blockers?.length).toBe(1);
+  });
+
+  it('registers exception request only for allowed roles', async () => {
+    process.env.AMRO_COMPLIANCE_GATES_V2_ENABLED = 'true';
+    vi.mocked(authenticateRequest).mockResolvedValue({
+      userId: 'user-1',
+      role: 'inspector',
+      permissions: ['dashboards.view', 'reports.manage'],
+    } as any);
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'register-exception-request' },
+      body: {
+        work_package_id: 'wp-001',
+        obligation_id: 'obl-100',
+        justification: 'Manual review required due to deferred component replacement',
+        requested_by: 'inspector-01',
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.interface).toBe('register-exception-request');
+    expect((res.jsonBody as any)?.output?.review_status).toBe('pending_review');
+    expect((res.jsonBody as any)?.output?.exception_id).toContain('exception');
+  });
+
+  it('generates compliance dossier only when mandatory artifacts are present', async () => {
+    process.env.AMRO_COMPLIANCE_GATES_V2_ENABLED = 'true';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'generate-compliance-dossier' },
+      body: {
+        work_package_id: 'wp-002',
+        profile: 'EASA',
+        include_artifacts: ['release_certificate', 'task_cards', 'signature_log'],
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.interface).toBe('generate-compliance-dossier');
+    expect((res.jsonBody as any)?.output?.dossier_status).toBe('finalized');
+    expect((res.jsonBody as any)?.output?.artifact_manifest?.length).toBe(3);
   });
 });

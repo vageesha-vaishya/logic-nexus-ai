@@ -121,6 +121,25 @@ describe('/api/v2/amro/overview-kpi', () => {
     expect((res.jsonBody as any)?.input?.station_ids).toEqual(['tenant-1:station-a', 'tenant-1:station-b']);
   });
 
+  it('returns freshness warning when dashboard cache exceeds stale threshold', async () => {
+    process.env.AMRO_OVERVIEW_KPI_V2_ENABLED = 'true';
+    const req: ApiRequest = {
+      method: 'GET',
+      query: {
+        interface: 'load-kpi-dashboard',
+        date_range: '2026-03-01T00:00:00.000Z:2026-03-21T00:00:00.000Z',
+        cache_age_seconds: '1200',
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.output?.freshness_warning).toContain('Data may be stale');
+  });
+
   it('rejects non allow-listed metric key for trends interface', async () => {
     process.env.AMRO_OVERVIEW_KPI_V2_ENABLED = 'true';
     const req: ApiRequest = {
@@ -165,6 +184,31 @@ describe('/api/v2/amro/overview-kpi', () => {
     expect((res.jsonBody as any)?.interface).toBe('load-operational-trends');
     expect((res.jsonBody as any)?.output?.time_series?.length).toBeGreaterThan(0);
     expect((res.jsonBody as any)?.output).toHaveProperty('variance');
+  });
+
+  it('rejects compare window beyond policy maximum', async () => {
+    process.env.AMRO_OVERVIEW_KPI_V2_ENABLED = 'true';
+    process.env.AMRO_KPI_COMPARE_WINDOW_MAX_DAYS = '30';
+    const req: ApiRequest = {
+      method: 'GET',
+      query: {
+        interface: 'load-operational-trends',
+        metric_key: 'schedule_adherence',
+        window: '7d',
+        compare_window: '90d',
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(sendErrorResponse).toHaveBeenCalledWith(
+      res,
+      expect.any(Error),
+      'corr-amro-overview-kpi',
+      { apiVersion: 'v2' }
+    );
   });
 
   it('enforces analytics export privilege for export interface', async () => {
@@ -221,5 +265,31 @@ describe('/api/v2/amro/overview-kpi', () => {
     expect((res.jsonBody as any)?.output?.export_job_id).toContain('tenant-1-kpi-export');
     expect((res.jsonBody as any)?.policy?.row_cap).toBe(2000);
     expect((res.jsonBody as any)?.policy?.row_cap_applied).toBe(true);
+  });
+
+  it('rejects export when selected_widgets is empty', async () => {
+    process.env.AMRO_OVERVIEW_KPI_V2_ENABLED = 'true';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: {
+        interface: 'export-kpi-snapshot',
+      },
+      body: {
+        format: 'pdf',
+        date_range: '2026-03-01T00:00:00.000Z:2026-03-21T00:00:00.000Z',
+        selected_widgets: [],
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(sendErrorResponse).toHaveBeenCalledWith(
+      res,
+      expect.any(Error),
+      'corr-amro-overview-kpi',
+      { apiVersion: 'v2' }
+    );
   });
 });

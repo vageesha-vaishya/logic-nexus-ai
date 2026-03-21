@@ -6,11 +6,13 @@ import {
   AMRO_GRAPHQL_SUBGRAPH_PATH,
   AMRO_GRPC_PROTO_PATH,
   AMRO_INTEGRATION_CONTRACTS,
+  AMRO_MODULE_CATALOG_PATH,
   AMRO_MIGRATION_PLAN_PATH,
   AMRO_OPENAPI_SPEC_PATH,
   AMRO_OVERVIEW_KPI_PATH,
   AMRO_PHASE_1_READINESS_PATH,
   AMRO_PHASE_PLAN_PATH,
+  AMRO_SCREEN_INVENTORY_PATH,
 } from './integration-contracts';
 import { buildAmroIntegrationContractEnvelope } from './anti-corruption-adapter';
 
@@ -25,7 +27,12 @@ describe('AMRO 13.3 integration contracts', () => {
       '/api/v2/amro/work-packages',
       '/api/v2/amro/tasks',
       '/api/v2/amro/compliance-gates',
+      '/api/v2/amro/certification',
+      '/api/v2/amro/integration-hub',
+      '/api/v2/amro/forecast-reliability',
       AMRO_OVERVIEW_KPI_PATH,
+      AMRO_MODULE_CATALOG_PATH,
+      AMRO_SCREEN_INVENTORY_PATH,
       AMRO_PHASE_PLAN_PATH,
       AMRO_PHASE_1_READINESS_PATH,
       AMRO_MIGRATION_PLAN_PATH,
@@ -43,6 +50,9 @@ describe('AMRO 13.3 integration contracts', () => {
       'amro.work_package.created.v1',
       'amro.task.completed.v1',
       'amro.compliance.gate_decided.v1',
+      'amro.certification.decision.submitted.v1',
+      'amro.integration.payload.ingested.v1',
+      'amro.forecast.risk.scored.v1',
       'amro.audit.recorded.v1',
     ]);
   });
@@ -67,7 +77,12 @@ describe('AMRO 13.3 integration contracts', () => {
     expect(openApi).toContain('/api/v2/amro/work-packages');
     expect(openApi).toContain('/api/v2/amro/tasks');
     expect(openApi).toContain('/api/v2/amro/compliance-gates');
+    expect(openApi).toContain('/api/v2/amro/certification');
+    expect(openApi).toContain('/api/v2/amro/integration-hub');
+    expect(openApi).toContain('/api/v2/amro/forecast-reliability');
     expect(openApi).toContain(AMRO_OVERVIEW_KPI_PATH);
+    expect(openApi).toContain(AMRO_MODULE_CATALOG_PATH);
+    expect(openApi).toContain(AMRO_SCREEN_INVENTORY_PATH);
     expect(openApi).toContain(AMRO_PHASE_PLAN_PATH);
     expect(openApi).toContain(AMRO_PHASE_1_READINESS_PATH);
     expect(openApi).toContain('/api/v2/amro/migration-plan');
@@ -86,6 +101,9 @@ describe('AMRO 13.3 integration contracts', () => {
     expect(asyncApi).toContain('amro.work_package.created.v1');
     expect(asyncApi).toContain('amro.task.completed.v1');
     expect(asyncApi).toContain('amro.compliance.gate_decided.v1');
+    expect(asyncApi).toContain('amro.certification.decision.submitted.v1');
+    expect(asyncApi).toContain('amro.integration.payload.ingested.v1');
+    expect(asyncApi).toContain('amro.forecast.risk.scored.v1');
     expect(asyncApi).toContain('amro.audit.recorded.v1');
   });
 });

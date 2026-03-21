@@ -6,6 +6,8 @@ export const AMRO_PHASE_PLAN_PATH = '/api/v2/amro/phase-plan' as const;
 export const AMRO_PHASE_1_READINESS_PATH = '/api/v2/amro/phase-1-readiness' as const;
 export const AMRO_MIGRATION_PLAN_PATH = '/api/v2/amro/migration-plan' as const;
 export const AMRO_OVERVIEW_KPI_PATH = '/api/v2/amro/overview-kpi' as const;
+export const AMRO_MODULE_CATALOG_PATH = '/api/v2/amro/module-catalog' as const;
+export const AMRO_SCREEN_INVENTORY_PATH = '/api/v2/amro/screen-inventory' as const;
 
 export const AMRO_INTEGRATION_CONTRACTS = {
   rest: {
@@ -14,7 +16,12 @@ export const AMRO_INTEGRATION_CONTRACTS = {
       '/api/v2/amro/work-packages',
       '/api/v2/amro/tasks',
       '/api/v2/amro/compliance-gates',
+      '/api/v2/amro/certification',
+      '/api/v2/amro/integration-hub',
+      '/api/v2/amro/forecast-reliability',
       AMRO_OVERVIEW_KPI_PATH,
+      AMRO_MODULE_CATALOG_PATH,
+      AMRO_SCREEN_INVENTORY_PATH,
       AMRO_PHASE_PLAN_PATH,
       AMRO_PHASE_1_READINESS_PATH,
       AMRO_MIGRATION_PLAN_PATH,
@@ -35,6 +42,9 @@ export const AMRO_INTEGRATION_CONTRACTS = {
       'amro.work_package.created.v1',
       'amro.task.completed.v1',
       'amro.compliance.gate_decided.v1',
+      'amro.certification.decision.submitted.v1',
+      'amro.integration.payload.ingested.v1',
+      'amro.forecast.risk.scored.v1',
       'amro.audit.recorded.v1',
     ],
     contractPath: AMRO_ASYNCAPI_SPEC_PATH,

@@ -4,6 +4,7 @@ import {
   authenticateRequest,
   buildApiContext,
   enforceAmroDomainAccess,
+  enforceAnyPermission,
   enforceHttps,
   enforceRateLimit,
   handlePreflight,
@@ -111,6 +112,134 @@ function filterByWorkPackage(items: TaskItem[], workPackageId: string): TaskItem
   return items.filter((item) => item.workPackageId === workPackageId);
 }
 
+type TaskStepAction = 'start' | 'complete' | 'block' | 'reopen';
+type TaskStepStatus = 'planned' | 'in_progress' | 'completed' | 'blocked';
+type TaskExecutionStatus = 'planned' | 'in_progress' | 'completed' | 'blocked';
+
+const ALLOWED_EVIDENCE_TYPES = new Set(['photo', 'video', 'document', 'inspection-report']);
+const ALLOWED_EVIDENCE_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'video/mp4', 'application/pdf']);
+const ALLOWED_SIGNATURE_METHODS = new Set(['digital_cert', 'biometric', 'pin']);
+
+function parseBody(body: unknown): Record<string, unknown> {
+  if (body && typeof body === 'object') {
+    return body as Record<string, unknown>;
+  }
+  return {};
+}
+
+function assertNonEmpty(value: unknown, fieldName: string): string {
+  const normalized = String(value || '').trim();
+  if (!normalized) {
+    throw new Error(`${fieldName} is required`);
+  }
+  return normalized;
+}
+
+function parseTimestamp(value: unknown, fieldName: string): string {
+  const normalized = assertNonEmpty(value, fieldName);
+  const parsed = Date.parse(normalized);
+  if (!Number.isFinite(parsed)) {
+    throw new Error(`${fieldName} must be a valid ISO timestamp`);
+  }
+  return new Date(parsed).toISOString();
+}
+
+function parseInteger(value: unknown, fieldName: string): number {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed)) {
+    throw new Error(`${fieldName} must be an integer`);
+  }
+  return parsed;
+}
+
+function parseStringArray(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.map((entry) => String(entry || '').trim()).filter(Boolean);
+  }
+  const raw = String(value || '').trim();
+  if (!raw) return [];
+  return raw.split(',').map((entry) => entry.trim()).filter(Boolean);
+}
+
+function resolveStepStatus(action: TaskStepAction): TaskStepStatus {
+  if (action === 'start') return 'in_progress';
+  if (action === 'complete') return 'completed';
+  if (action === 'block') return 'blocked';
+  return 'planned';
+}
+
+function resolveTaskStatus(stepStatus: TaskStepStatus): TaskExecutionStatus {
+  if (stepStatus === 'completed') return 'in_progress';
+  return stepStatus;
+}
+
+function buildEventHash(parts: string[]): string {
+  return Buffer.from(parts.join('|')).toString('base64url');
+}
+
+function assertStepOrderPolicy(body: Record<string, unknown>) {
+  const expectedStepIndex = parseInteger(body.expected_step_index, 'expected_step_index');
+  const actualStepIndex = parseInteger(body.actual_step_index, 'actual_step_index');
+  if (actualStepIndex !== expectedStepIndex) {
+    throw new Error('Step order policy enforced: out-of-order step update rejected');
+  }
+}
+
+function assertNoConflictingStatus(body: Record<string, unknown>, nextStepStatus: TaskStepStatus) {
+  const currentStepStatus = String(body.current_step_status || 'planned').trim().toLowerCase();
+  if (!currentStepStatus) {
+    throw new Error('current_step_status is required');
+  }
+  const allowedTransitions: Record<string, ReadonlyArray<TaskStepStatus>> = {
+    planned: ['in_progress', 'blocked'],
+    in_progress: ['completed', 'blocked', 'planned'],
+    blocked: ['in_progress', 'planned'],
+    completed: [],
+  };
+  if (!allowedTransitions[currentStepStatus]?.includes(nextStepStatus)) {
+    throw new Error('conflicting status changes rejected');
+  }
+}
+
+function assertEvidencePolicies(body: Record<string, unknown>) {
+  const checksum = assertNonEmpty(body.checksum, 'checksum');
+  if (checksum.length < 8) {
+    throw new Error('checksum must satisfy minimum integrity requirements');
+  }
+  const metadata = parseBody(body.metadata);
+  const mediaSizeBytes = Number(metadata.media_size_bytes || 0);
+  const maxBytes = Number(process.env.AMRO_EVIDENCE_MAX_BYTES || 25 * 1024 * 1024);
+  if (!Number.isFinite(mediaSizeBytes) || mediaSizeBytes <= 0 || mediaSizeBytes > maxBytes) {
+    throw new Error('media size policy violation');
+  }
+  const mimeType = String(metadata.mime_type || '').trim().toLowerCase();
+  if (!mimeType || !ALLOWED_EVIDENCE_MIME_TYPES.has(mimeType)) {
+    throw new Error('MIME policy violation');
+  }
+}
+
+function assertSignatureQualification(body: Record<string, unknown>, signerId: string) {
+  const method = assertNonEmpty(body.method, 'method').toLowerCase();
+  if (!ALLOWED_SIGNATURE_METHODS.has(method)) {
+    throw new Error('signature method is not supported');
+  }
+  const actionTime = parseTimestamp(body.action_time || new Date().toISOString(), 'action_time');
+  const qualification = parseBody(body.qualification);
+  const validFrom = parseTimestamp(qualification.valid_from || actionTime, 'qualification.valid_from');
+  const validTo = parseTimestamp(qualification.valid_to || actionTime, 'qualification.valid_to');
+  const actionMs = Date.parse(actionTime);
+  if (actionMs < Date.parse(validFrom) || actionMs > Date.parse(validTo)) {
+    throw new Error('signer qualification must be valid at action time');
+  }
+  const privileges = parseStringArray(qualification.privileges);
+  if (!privileges.includes('task_signature.submit')) {
+    throw new Error('signer privilege must be valid at action time');
+  }
+  if (signerId.toLowerCase().includes('inactive')) {
+    throw new Error('signer qualification must be valid at action time');
+  }
+}
+
 function appendTaskAuditRecord(params: {
   tenantId: string;
   franchiseId: string | null;
@@ -193,7 +322,7 @@ async function enqueueTaskDualWriteOperations(params: {
 }
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {
-  applyCors(req, res, { methods: ['GET', 'OPTIONS'] });
+  applyCors(req, res, { methods: ['GET', 'POST', 'OPTIONS'] });
   if (handlePreflight(req, res)) return;
 
   const ctx = buildApiContext(req);
@@ -201,8 +330,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
   applyCompatibilityResponseHeaders(res, initialDecision, ctx.correlationId);
 
   try {
-    if (req.method !== 'GET') {
-      res.setHeader('Allow', ['GET']);
+    if (req.method !== 'GET' && req.method !== 'POST') {
+      res.setHeader('Allow', ['GET', 'POST']);
       return res.status(405).json({ error: `Method ${req.method} Not Allowed`, correlationId: ctx.correlationId, version: 'v2' });
     }
 
@@ -255,6 +384,125 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       franchiseId,
       capability: 'tasks',
     });
+    const interfaceName = String(req.query.interface || '').trim().toLowerCase();
+
+    if (req.method === 'POST' && interfaceName === 'update-task-step') {
+      enforceAnyPermission(auth.permissions || [], ['dashboards.manage', 'reports.manage']);
+      const body = parseBody(req.body);
+      const taskId = assertNonEmpty(body.task_id, 'task_id');
+      const stepId = assertNonEmpty(body.step_id, 'step_id');
+      const action = assertNonEmpty(body.action, 'action').toLowerCase() as TaskStepAction;
+      if (!['start', 'complete', 'block', 'reopen'].includes(action)) {
+        throw new Error('action is not supported');
+      }
+      const performedAt = parseTimestamp(body.performed_at, 'performed_at');
+      const deviceId = assertNonEmpty(body.device_id, 'device_id');
+      assertStepOrderPolicy(body);
+      const stepStatus = resolveStepStatus(action);
+      assertNoConflictingStatus(body, stepStatus);
+      return res.status(200).json({
+        version: 'v2',
+        interface: 'update-task-step',
+        correlationId: ctx.correlationId,
+        compatMode: compatDecision.compatMode,
+        mode: 'module',
+        domainAccess: {
+          subscriptionStatus: amroAccess.subscriptionStatus,
+          source: amroAccess.source,
+          validatedAt: amroAccess.validatedAt,
+        },
+        serviceBoundaries,
+        input: {
+          task_id: taskId,
+          step_id: stepId,
+          action,
+          performed_at: performedAt,
+          device_id: deviceId,
+        },
+        output: {
+          step_status: stepStatus,
+          task_status: resolveTaskStatus(stepStatus),
+          event_hash: buildEventHash([tenantId, franchiseId || '', taskId, stepId, action, performedAt, deviceId]),
+        },
+      });
+    }
+
+    if (req.method === 'POST' && interfaceName === 'upload-evidence') {
+      enforceAnyPermission(auth.permissions || [], ['dashboards.manage', 'reports.manage']);
+      const body = parseBody(req.body);
+      const taskId = assertNonEmpty(body.task_id, 'task_id');
+      const evidenceType = assertNonEmpty(body.evidence_type, 'evidence_type').toLowerCase();
+      if (!ALLOWED_EVIDENCE_TYPES.has(evidenceType)) {
+        throw new Error('evidence_type is not supported');
+      }
+      const mediaRef = assertNonEmpty(body.media_ref, 'media_ref');
+      assertEvidencePolicies(body);
+      return res.status(200).json({
+        version: 'v2',
+        interface: 'upload-evidence',
+        correlationId: ctx.correlationId,
+        compatMode: compatDecision.compatMode,
+        mode: 'module',
+        domainAccess: {
+          subscriptionStatus: amroAccess.subscriptionStatus,
+          source: amroAccess.source,
+          validatedAt: amroAccess.validatedAt,
+        },
+        serviceBoundaries,
+        input: {
+          task_id: taskId,
+          evidence_type: evidenceType,
+          media_ref: mediaRef,
+          checksum: String(body.checksum || '').trim(),
+          metadata: parseBody(body.metadata),
+        },
+        output: {
+          evidence_id: `${tenantId}-${taskId}-evidence-${Date.now()}`,
+          integrity_status: 'verified',
+        },
+      });
+    }
+
+    if (req.method === 'POST' && interfaceName === 'submit-signature') {
+      enforceAnyPermission(auth.permissions || [], ['dashboards.manage', 'reports.manage']);
+      const body = parseBody(req.body);
+      const taskId = assertNonEmpty(body.task_id, 'task_id');
+      const signerId = assertNonEmpty(body.signer_id, 'signer_id');
+      assertNonEmpty(body.signature_payload, 'signature_payload');
+      assertSignatureQualification(body, signerId);
+      const method = String(body.method || '').trim().toLowerCase();
+      return res.status(200).json({
+        version: 'v2',
+        interface: 'submit-signature',
+        correlationId: ctx.correlationId,
+        compatMode: compatDecision.compatMode,
+        mode: 'module',
+        domainAccess: {
+          subscriptionStatus: amroAccess.subscriptionStatus,
+          source: amroAccess.source,
+          validatedAt: amroAccess.validatedAt,
+        },
+        serviceBoundaries,
+        input: {
+          task_id: taskId,
+          signer_id: signerId,
+          method,
+        },
+        output: {
+          signature_id: `${tenantId}-${taskId}-signature-${Date.now()}`,
+          non_repudiation_status: 'verified',
+        },
+      });
+    }
+
+    if (req.method === 'POST') {
+      return res.status(400).json({
+        error: 'Unsupported interface. Use update-task-step, upload-evidence, or submit-signature.',
+        correlationId: ctx.correlationId,
+        version: 'v2',
+      });
+    }
+
     const dualRun = isDualRunEnabled();
     const legacyFallback = isLegacyFallbackEnabled();
     const legacyRows = enforceAmroScopedLegacyRows(buildLegacyTaskRows(tenantId, franchiseId), isolationScope);

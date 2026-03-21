@@ -8,8 +8,16 @@ export type AmroServiceName =
   | 'amro-scheduling-service'
   | 'amro-compliance-service'
   | 'amro-materials-service'
-  | 'amro-audit-ledger-service';
-export type AmroCapability = 'work-packages' | 'tasks' | 'compliance-gates';
+  | 'amro-audit-ledger-service'
+  | 'amro-integration-hub-service'
+  | 'amro-forecast-service';
+export type AmroCapability =
+  | 'work-packages'
+  | 'tasks'
+  | 'compliance-gates'
+  | 'certification'
+  | 'integration-hub'
+  | 'forecast-reliability';
 export type AmroDomainId = 'amro';
 export type AmroApiVersion = 'v2';
 
@@ -118,6 +126,14 @@ export const AMRO_SERVICE_DECOMPOSITION: ReadonlyArray<{
     service: 'amro-audit-ledger-service',
     responsibilities: ['append-only mro_audit writer', 'mro_audit replay api'],
   },
+  {
+    service: 'amro-integration-hub-service',
+    responsibilities: ['partner payload ingestion', 'replay orchestration', 'callback dispatch'],
+  },
+  {
+    service: 'amro-forecast-service',
+    responsibilities: ['risk scoring', 'intervention recommendation', 'model feedback loop'],
+  },
 ] as const;
 
 export const AMRO_DATA_OWNERSHIP = {
@@ -173,6 +189,9 @@ export function buildAmroServiceBoundaryEnvelope(params: {
     'work-packages': ['amro-work-order-service', 'amro-scheduling-service', 'amro-materials-service'],
     tasks: ['amro-work-order-service', 'amro-scheduling-service', 'amro-materials-service'],
     'compliance-gates': ['amro-compliance-service', 'amro-audit-ledger-service'],
+    certification: ['amro-compliance-service', 'amro-audit-ledger-service'],
+    'integration-hub': ['amro-integration-hub-service', 'amro-audit-ledger-service'],
+    'forecast-reliability': ['amro-forecast-service', 'amro-compliance-service'],
   };
   return {
     capability: params.capability,

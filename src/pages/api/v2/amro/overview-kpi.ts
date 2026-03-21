@@ -48,6 +48,9 @@ function isV2Enabled(): boolean {
 
 function parseDateRange(value: unknown): { from: string; to: string } {
   const normalized = String(value || '').trim();
+  if (!normalized) {
+    throw new Error('date_range is required');
+  }
   let from = '';
   let to = '';
   if (normalized.includes('|')) {
@@ -96,6 +99,9 @@ function parseWindowDays(window: string): number {
 }
 
 function assertWithinPolicyWindow(compareWindow: string) {
+  if (!compareWindow.trim()) {
+    throw new Error('compare_window is required');
+  }
   const compareWindowDays = parseWindowDays(compareWindow);
   if (!Number.isFinite(compareWindowDays) || compareWindowDays > getMaxCompareWindowDays()) {
     throw new Error('compare_window cannot exceed policy maximum');
@@ -271,6 +277,9 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       const unsupportedWidget = selectedWidgets.find((widget) => !ALLOWED_WIDGETS.has(widget));
       if (unsupportedWidget) {
         throw new Error('selected_widgets contains unsupported widget');
+      }
+      if (selectedWidgets.length === 0) {
+        throw new Error('selected_widgets must include at least one widget');
       }
 
       const maxExportRows = getMaxExportRows();

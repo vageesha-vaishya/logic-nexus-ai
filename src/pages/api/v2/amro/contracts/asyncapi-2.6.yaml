@@ -19,6 +19,21 @@ channels:
       operationId: publishComplianceGateDecided
       message:
         $ref: '#/components/messages/ComplianceGateDecided'
+  amro.certification.decision.submitted.v1:
+    publish:
+      operationId: publishCertificationDecisionSubmitted
+      message:
+        $ref: '#/components/messages/CertificationDecisionSubmitted'
+  amro.integration.payload.ingested.v1:
+    publish:
+      operationId: publishIntegrationPayloadIngested
+      message:
+        $ref: '#/components/messages/IntegrationPayloadIngested'
+  amro.forecast.risk.scored.v1:
+    publish:
+      operationId: publishForecastRiskScored
+      message:
+        $ref: '#/components/messages/ForecastRiskScored'
   amro.audit.recorded.v1:
     publish:
       operationId: publishAuditRecorded
@@ -38,6 +53,18 @@ components:
       name: amro.compliance.gate_decided.v1
       payload:
         $ref: '#/components/schemas/ComplianceGateDecidedPayload'
+    CertificationDecisionSubmitted:
+      name: amro.certification.decision.submitted.v1
+      payload:
+        $ref: '#/components/schemas/CertificationDecisionSubmittedPayload'
+    IntegrationPayloadIngested:
+      name: amro.integration.payload.ingested.v1
+      payload:
+        $ref: '#/components/schemas/IntegrationPayloadIngestedPayload'
+    ForecastRiskScored:
+      name: amro.forecast.risk.scored.v1
+      payload:
+        $ref: '#/components/schemas/ForecastRiskScoredPayload'
     AuditRecorded:
       name: amro.audit.recorded.v1
       payload:
@@ -102,6 +129,52 @@ components:
             decision:
               type: string
               enum: [approved, rejected, pending]
+    CertificationDecisionSubmittedPayload:
+      allOf:
+        - $ref: '#/components/schemas/EventEnvelope'
+        - type: object
+          required: [certificationActionId, workPackageId, decision]
+          properties:
+            eventType:
+              type: string
+              const: amro.certification.decision.submitted.v1
+            certificationActionId:
+              type: string
+            workPackageId:
+              type: string
+            decision:
+              type: string
+              enum: [approve, reject, defer]
+    IntegrationPayloadIngestedPayload:
+      allOf:
+        - $ref: '#/components/schemas/EventEnvelope'
+        - type: object
+          required: [ingestionId, sourceSystem, canonicalEventId]
+          properties:
+            eventType:
+              type: string
+              const: amro.integration.payload.ingested.v1
+            ingestionId:
+              type: string
+            sourceSystem:
+              type: string
+            canonicalEventId:
+              type: string
+    ForecastRiskScoredPayload:
+      allOf:
+        - $ref: '#/components/schemas/EventEnvelope'
+        - type: object
+          required: [assetId, riskScore, confidenceScore]
+          properties:
+            eventType:
+              type: string
+              const: amro.forecast.risk.scored.v1
+            assetId:
+              type: string
+            riskScore:
+              type: number
+            confidenceScore:
+              type: number
     AuditRecordedPayload:
       allOf:
         - $ref: '#/components/schemas/EventEnvelope'

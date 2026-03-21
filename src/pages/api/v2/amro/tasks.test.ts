@@ -6,6 +6,7 @@ import {
   authenticateRequest,
   buildApiContext,
   enforceAmroDomainAccess,
+  enforceAnyPermission,
   enforceHttps,
   enforceRateLimit,
   handlePreflight,
@@ -24,6 +25,7 @@ vi.mock('../../_utils/http', () => ({
   authenticateRequest: vi.fn(),
   buildApiContext: vi.fn(),
   enforceAmroDomainAccess: vi.fn(),
+  enforceAnyPermission: vi.fn(),
   enforceHttps: vi.fn(),
   enforceRateLimit: vi.fn(),
   handlePreflight: vi.fn(),
@@ -67,6 +69,7 @@ describe('/api/v2/amro/tasks', () => {
     process.env = { ...envBackup };
     vi.clearAllMocks();
     resetAmroAuditLedgerStore();
+    vi.mocked(enforceAnyPermission).mockImplementation(() => undefined);
     vi.mocked(handlePreflight).mockReturnValue(false);
     vi.mocked(buildApiContext).mockReturnValue({
       correlationId: 'corr-amro-tasks-v2',
@@ -219,5 +222,115 @@ describe('/api/v2/amro/tasks', () => {
       'corr-amro-tasks-v2',
       { apiVersion: 'v2' }
     );
+  });
+
+  it('updates task step and returns event hash for 15.2.3 contract', async () => {
+    process.env.AMRO_TASKS_V2_ENABLED = 'true';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'update-task-step' },
+      body: {
+        task_id: 'task-001',
+        step_id: 'step-01',
+        action: 'complete',
+        performed_at: '2026-03-21T09:30:00.000Z',
+        device_id: 'device-77',
+        expected_step_index: 1,
+        actual_step_index: 1,
+        current_step_status: 'in_progress',
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.interface).toBe('update-task-step');
+    expect((res.jsonBody as any)?.output?.step_status).toBe('completed');
+    expect((res.jsonBody as any)?.output?.event_hash).toBeTruthy();
+  });
+
+  it('rejects task step update when step order policy is violated', async () => {
+    process.env.AMRO_TASKS_V2_ENABLED = 'true';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'update-task-step' },
+      body: {
+        task_id: 'task-001',
+        step_id: 'step-02',
+        action: 'start',
+        performed_at: '2026-03-21T09:30:00.000Z',
+        device_id: 'device-77',
+        expected_step_index: 1,
+        actual_step_index: 2,
+        current_step_status: 'planned',
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(sendErrorResponse).toHaveBeenCalledWith(
+      res,
+      expect.any(Error),
+      'corr-amro-tasks-v2',
+      { apiVersion: 'v2' }
+    );
+  });
+
+  it('uploads evidence when checksum, media size, and MIME policies pass', async () => {
+    process.env.AMRO_TASKS_V2_ENABLED = 'true';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'upload-evidence' },
+      body: {
+        task_id: 'task-001',
+        evidence_type: 'photo',
+        media_ref: 's3://bucket/evidence/photo-001.jpg',
+        checksum: 'abc123def456ghi789',
+        metadata: {
+          media_size_bytes: 1024 * 1024,
+          mime_type: 'image/jpeg',
+        },
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.interface).toBe('upload-evidence');
+    expect((res.jsonBody as any)?.output?.integrity_status).toBe('verified');
+  });
+
+  it('submits signature only when qualification and privilege are valid at action time', async () => {
+    process.env.AMRO_TASKS_V2_ENABLED = 'true';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'submit-signature' },
+      body: {
+        task_id: 'task-001',
+        signer_id: 'signer-001',
+        method: 'digital_cert',
+        signature_payload: 'signed-payload',
+        action_time: '2026-03-21T09:30:00.000Z',
+        qualification: {
+          valid_from: '2026-01-01T00:00:00.000Z',
+          valid_to: '2026-12-31T23:59:59.000Z',
+          privileges: ['task_signature.submit'],
+        },
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.interface).toBe('submit-signature');
+    expect((res.jsonBody as any)?.output?.non_repudiation_status).toBe('verified');
   });
 });
