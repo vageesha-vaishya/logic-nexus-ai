@@ -10,8 +10,10 @@ import {
   AMRO_GRPC_PROTO_PATH,
   AMRO_MIGRATION_PLAN_PATH,
   AMRO_OPENAPI_SPEC_PATH,
+  AMRO_PHASE_1_READINESS_PATH,
   AMRO_PHASE_PLAN_PATH,
 } from '@/pages/api/v2/amro/integration-contracts';
+import { AMRO_PHASE_1_DELIVERABLES, AMRO_PHASE_1_SCOPE } from '@/pages/api/v2/amro/phase-1-core-workflows';
 import { AMRO_PHASE_PLAN_MATRIX } from '@/pages/api/v2/amro/phase-plan-model';
 import type { ReactNode } from 'react';
 import { AmroOwnedWorkspace } from '../components/AmroOwnedWorkspace';
@@ -92,9 +94,69 @@ export default function AmroHubVerticalPage() {
                       <a className="rounded-md border p-2 hover:bg-muted/30" href={AMRO_PHASE_PLAN_PATH} target="_blank" rel="noreferrer">
                         Phase-Wise Plan API
                       </a>
+                      <a className="rounded-md border p-2 hover:bg-muted/30" href={AMRO_PHASE_1_READINESS_PATH} target="_blank" rel="noreferrer">
+                        Phase 1 Readiness API
+                      </a>
                       <a className="rounded-md border p-2 hover:bg-muted/30" href={AMRO_MIGRATION_PLAN_PATH} target="_blank" rel="noreferrer">
                         Migration Plan API
                       </a>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card data-amro-phase-1-surface="phase-1-core-workflows">
+                  <CardHeader className="pb-2">
+                    <CardTitle>{AMRO_PHASE_1_SCOPE.title}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant="outline">{AMRO_PHASE_1_SCOPE.phase}</Badge>
+                      <Badge variant="outline">{AMRO_PHASE_1_SCOPE.duration}</Badge>
+                      <Badge variant="outline">{AMRO_PHASE_1_SCOPE.allocation}</Badge>
+                    </div>
+                    <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2">
+                      <div className="rounded-md border p-3">
+                        <p className="font-semibold">Goals</p>
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {AMRO_PHASE_1_SCOPE.goals.map((goal) => (
+                            <Badge key={goal} variant="secondary">
+                              {goal}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="rounded-md border p-3">
+                        <p className="font-semibold">Dependencies</p>
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {AMRO_PHASE_1_SCOPE.blockersAndDependencies.map((dependency) => (
+                            <Badge key={dependency} variant="secondary">
+                              {dependency}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                      {AMRO_PHASE_1_DELIVERABLES.map((deliverable) => (
+                        <div key={deliverable.id} className="rounded-md border p-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-xs font-semibold">{deliverable.id}</p>
+                            <Badge variant="outline">{deliverable.owner}</Badge>
+                          </div>
+                          <p className="mt-1 text-sm">{deliverable.title}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">{deliverable.acceptanceCriteria}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">{deliverable.effort}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="rounded-md border p-3">
+                      <p className="text-xs font-semibold">Success Metrics</p>
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {AMRO_PHASE_1_SCOPE.successMetrics.map((metric) => (
+                          <Badge key={metric} variant="secondary">
+                            {metric}
+                          </Badge>
+                        ))}
+                      </div>
                     </div>
                   </CardContent>
                 </Card>

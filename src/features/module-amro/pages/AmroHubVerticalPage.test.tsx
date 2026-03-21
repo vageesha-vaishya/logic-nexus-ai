@@ -34,7 +34,12 @@ describe('AmroHubVerticalPage', () => {
     expect(screen.getByText('gRPC Proto Contract')).toBeTruthy();
     expect(screen.getByText('AsyncAPI Event Contract')).toBeTruthy();
     expect(screen.getByText('Phase-Wise Plan API')).toBeTruthy();
+    expect(screen.getByText('Phase 1 Readiness API')).toBeTruthy();
     expect(screen.getByText('Migration Plan API')).toBeTruthy();
+    expect(screen.getByText('Core UI Components & Basic Workflows')).toBeTruthy();
+    expect(screen.getByText('Establish AMRO domain routes and navigation')).toBeTruthy();
+    expect(screen.getByText('Overview Dashboard')).toBeTruthy();
+    expect(screen.getByText('Role Controls')).toBeTruthy();
     expect(screen.getByText('AMRO Phase-Wise Implementation Plan')).toBeTruthy();
     expect(screen.getByText('Core UI & APIs')).toBeTruthy();
     expect(screen.getByText('Integration & scale')).toBeTruthy();

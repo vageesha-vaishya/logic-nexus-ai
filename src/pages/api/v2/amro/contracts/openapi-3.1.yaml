@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: AMRO V2 Integration API
   version: 2.0.0
-  description: AMRO Integration and Coexistence contract for work-packages, tasks, compliance-gates, phase-plan, and migration-plan.
+  description: AMRO Integration and Coexistence contract for work-packages, tasks, compliance-gates, phase-plan, phase-1-readiness, and migration-plan.
 servers:
   - url: /
 paths:
@@ -117,6 +117,17 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PhasePlanResponse'
+  /api/v2/amro/phase-1-readiness:
+    get:
+      operationId: getAmroPhase1Readiness
+      tags: [AMRO]
+      responses:
+        '200':
+          description: Phase 1 core workflow readiness response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Phase1ReadinessResponse'
 components:
   schemas:
     ApiEnvelope:
@@ -356,4 +367,16 @@ components:
               required: [phasePlan]
               properties:
                 phasePlan:
+                  type: object
+    Phase1ReadinessResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiEnvelope'
+        - type: object
+          required: [data]
+          properties:
+            data:
+              type: object
+              required: [readiness]
+              properties:
+                readiness:
                   type: object
