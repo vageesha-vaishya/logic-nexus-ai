@@ -2,7 +2,7 @@
 ## Aircraft Maintenance, Repair, and Overhaul Platform
 
 **Document ID:** LLD-AMRO-001  
-**Version:** 2.1.0  
+**Version:** 2.2.0  
 **Date:** 2026-03-21  
 **Status:** Draft for Architecture and Compliance Review  
 **Owner:** AMRO Architecture Working Group  
@@ -718,7 +718,15 @@ Scoring scale: 1 (limited) to 5 (leading maturity for aviation MRO use cases).
 
 ### 15.2 Module-Level Input/Output Specifications
 
-#### 15.2.1 Work Package Management
+#### 15.2.1 Overview and KPI Intelligence
+
+| Interface | Input Contract | Output Contract | Validation Rules |
+|---|---|---|---|
+| Load KPI dashboard | date_range, station_ids[], fleet_ids[], regulator_profile | kpi_cards[], risk_heatmap, trend_lines[], anomaly_flags[] | Date range required; filters must be tenant-scoped; stale cache returns freshness warning |
+| Load operational trends | metric_key, window(7d/30d/90d), compare_window | time_series[], variance, threshold_breaches[] | Metric key must be allow-listed; compare window cannot exceed policy maximum |
+| Export KPI snapshot | format(csv/pdf), date_range, selected_widgets[] | export_job_id, download_url, generated_at | Role must include analytics export privilege; export rows capped by policy |
+
+#### 15.2.2 Work Package Management
 
 | Interface | Input Contract | Output Contract | Validation Rules |
 |---|---|---|---|
@@ -726,7 +734,7 @@ Scoring scale: 1 (limited) to 5 (leading maturity for aviation MRO use cases).
 | Transition work package | work_package_id, target_status, reason_code, actor_signature | updated_status, transition_id, gate_results[] | Transition must be allowed by policy matrix and role |
 | Clone template | template_id, aircraft_id, override_fields | new_work_package_id, inherited_tasks_count | Template version must be active and tenant-visible |
 
-#### 15.2.2 Task Execution and Evidence
+#### 15.2.3 Task Execution and Evidence
 
 | Interface | Input Contract | Output Contract | Validation Rules |
 |---|---|---|---|
@@ -734,13 +742,53 @@ Scoring scale: 1 (limited) to 5 (leading maturity for aviation MRO use cases).
 | Upload evidence | task_id, evidence_type, media_ref, checksum, metadata | evidence_id, integrity_status | File checksum required; media size and MIME policies enforced |
 | Submit signature | task_id, signer_id, method, signature_payload | signature_id, non_repudiation_status | Signer qualification and privilege must be valid at action time |
 
-#### 15.2.3 Compliance and Certification
+#### 15.2.4 Maintenance Scheduling
+
+| Interface | Input Contract | Output Contract | Validation Rules |
+|---|---|---|---|
+| Assign maintenance slot | work_package_id, station_code, slot_start, slot_end, assigned_team[] | schedule_id, assignment_status, conflict_flags[] | No overlap allowed; station capacity and qualification checks required |
+| Run replan simulation | disrupted_slots[], priority_rules, planning_horizon | replan_options[], impact_summary, recommended_option | Simulation must include active constraints and tenant-specific calendars |
+| Confirm replan | selected_option_id, approver_id, reason | updated_schedule, affected_work_packages[] | Approval role required; all affected packages must be in re-plannable states |
+
+#### 15.2.5 Parts and Materials
+
+| Interface | Input Contract | Output Contract | Validation Rules |
+|---|---|---|---|
+| Reserve parts | work_package_id, demand_lines[{part_number, quantity, serial?}] | reservations[], reservation_status, shortages[] | Quantity must be positive; serialized parts must be unique per tenant |
+| Process shortage response | shortage_id, action(backorder/substitute/escalate), supplier_ref | shortage_status, procurement_trigger_id | Substitute must pass approved compatibility mapping |
+| Sync supplier ETA | supplier_event_id, part_number, eta, quantity_confirmed | updated_eta, impacted_work_packages[] | Supplier source must be trusted adapter; ETA must be valid datetime |
+
+#### 15.2.6 Compliance and Airworthiness
 
 | Interface | Input Contract | Output Contract | Validation Rules |
 |---|---|---|---|
 | Evaluate compliance gate | context(work_package/task), regulator_profile, required_obligations[] | decision(pass/fail), blockers[], rationale | Must include policy version snapshot and decision evidence |
+| Register exception request | work_package_id, obligation_id, justification, requested_by | exception_id, review_status, sla_due_at | Justification text mandatory; only allowed roles may request exception |
+| Generate compliance dossier | work_package_id, profile(FAA/EASA/CAAC), include_artifacts[] | dossier_id, dossier_status, artifact_manifest[] | All mandatory artifacts must be present before dossier finalization |
+
+#### 15.2.7 Certification and Authority
+
+| Interface | Input Contract | Output Contract | Validation Rules |
+|---|---|---|---|
 | Validate certifying authority | actor_id, aircraft_scope, maintenance_scope, timestamp | valid/invalid, expiry_info, restriction_reason | Expired or out-of-scope authority always invalid |
-| Release decision | work_package_id, release_type, signatures[], exception_refs[] | release_status, compliance_dossier_id | All mandatory signatures and unresolved blockers must be zero |
+| Submit certification decision | work_package_id, decision(approve/reject/defer), signatures[] | certification_action_id, action_status, blockers[] | Approval requires all mandatory signatures and zero unresolved blockers |
+| Escalate blocked certification | work_package_id, block_reason, escalation_target | escalation_event_id, escalation_status | Escalation target must belong to valid authority chain |
+
+#### 15.2.8 Integration and Partner Hub
+
+| Interface | Input Contract | Output Contract | Validation Rules |
+|---|---|---|---|
+| Ingest partner payload | source_system, adapter_version, payload, idempotency_key | ingestion_id, canonical_event_id, parse_status | Source must be allow-listed; idempotency key required for mutating events |
+| Replay failed integration job | job_id, replay_reason, requested_by | replay_id, replay_status, retry_count | Replay only allowed for failed/quarantined jobs |
+| Publish outbound callback | target_partner, event_type, payload_ref | callback_id, delivery_status, attempt_log[] | Mapping contract must match partner schema version |
+
+#### 15.2.9 Forecast and Reliability
+
+| Interface | Input Contract | Output Contract | Validation Rules |
+|---|---|---|---|
+| Score maintenance risk | asset_id, telemetry_features[], defect_history[], environment_context | risk_score, confidence_score, top_factors[] | Feature completeness threshold required; low-confidence results flagged |
+| Generate intervention recommendations | risk_score, policy_rules, resource_constraints | interventions[], expected_impact, rationale | Recommendations must respect compliance and capacity constraints |
+| Capture recommendation outcome | recommendation_id, operator_action, outcome_metrics[] | feedback_id, learning_status, model_update_hint | Outcome window and metric schema must match configured feedback policy |
 
 ---
 
