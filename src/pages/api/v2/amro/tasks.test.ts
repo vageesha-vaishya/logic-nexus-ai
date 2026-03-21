@@ -145,6 +145,11 @@ describe('/api/v2/amro/tasks', () => {
     expect((res.jsonBody as any)?.mode).toBe('dual-run');
     expect((res.jsonBody as any)?.filters?.workPackageId).toBe('WP-001');
     expect((res.jsonBody as any)?.data?.tasks?.length).toBe(2);
+    expect((res.jsonBody as any)?.serviceBoundaries?.services?.map((item: any) => item.service)).toEqual(
+      expect.arrayContaining(['amro-work-order-service', 'amro-scheduling-service', 'amro-materials-service'])
+    );
+    expect((res.jsonBody as any)?.data?.tasks?.[0]?.domainId).toBe('amro');
+    expect((res.jsonBody as any)?.data?.tasks?.[0]?.version).toBe('v2');
     expect((res.jsonBody as any)?.reconciliation?.deltaCount).toBe(0);
     expect((res.jsonBody as any)?.endpointRollout?.enabled).toBe(true);
     expect((res.jsonBody as any)?.auditLedgerCutover?.enabled).toBe(true);

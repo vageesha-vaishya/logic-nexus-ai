@@ -50,9 +50,11 @@ describe('UI UX separation architecture', () => {
     expect(eslintConfig).toContain('src/features/module-finance/**/*.{ts,tsx}');
     expect(eslintConfig).toContain('src/features/module-compliance/**/*.{ts,tsx}');
     expect(eslintConfig).toContain('src/features/module-communications/**/*.{ts,tsx}');
+    expect(eslintConfig).toContain('src/features/module-amro/**/*.{ts,tsx}');
     expect(eslintConfig).toContain('@/features/module-logistics/**');
     expect(eslintConfig).toContain('@/features/module-crm/**');
     expect(eslintConfig).toContain('@/features/module-communications/**');
+    expect(eslintConfig).toContain('@/features/module-amro/**');
   });
 
   it('routes vertical workspace entry points through module feature packages', () => {
@@ -63,6 +65,7 @@ describe('UI UX separation architecture', () => {
     expect(appContent).toContain('import("./features/module-finance")');
     expect(appContent).toContain('import("./features/module-compliance")');
     expect(appContent).toContain('import("./features/module-communications")');
+    expect(appContent).toContain('import("./features/module-amro")');
   });
 
   it('uses platform widget interfaces in vertical page shells', () => {
@@ -70,14 +73,17 @@ describe('UI UX separation architecture', () => {
     const logisticsShell = read('src/features/module-logistics/pages/ShipmentsPipelineVerticalPage.tsx');
     const quotationShell = read('src/features/module-quotation/pages/QuotesPipelineVerticalPage.tsx');
     const communicationsShell = read('src/features/module-communications/pages/CommunicationsHubVerticalPage.tsx');
+    const amroShell = read('src/features/module-amro/pages/AmroHubVerticalPage.tsx');
     expect(crmShell).toContain('PlatformWidgetSlot');
     expect(logisticsShell).toContain('PlatformWidgetSlot');
     expect(quotationShell).toContain('QuotationManager');
     expect(communicationsShell).toContain('PlatformWidgetSlot');
+    expect(amroShell).toContain('PlatformWidgetSlot');
     expect(crmShell).toContain('data-module-shell="module-crm"');
     expect(logisticsShell).toContain('data-module-shell="module-logistics"');
     expect(quotationShell).toContain('data-module-shell="module-quotation"');
     expect(communicationsShell).toContain('data-module-shell="module-communications"');
+    expect(amroShell).toContain('data-module-shell="module-amro"');
   });
 
   it('keeps data access out of UI primitive libraries', () => {

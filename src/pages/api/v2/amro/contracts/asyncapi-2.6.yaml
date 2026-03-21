@@ -1,0 +1,119 @@
+asyncapi: 2.6.0
+info:
+  title: AMRO V2 Event Contract
+  version: 1.0.0
+defaultContentType: application/json
+channels:
+  amro.work_package.created.v1:
+    publish:
+      operationId: publishWorkPackageCreated
+      message:
+        $ref: '#/components/messages/WorkPackageCreated'
+  amro.task.completed.v1:
+    publish:
+      operationId: publishTaskCompleted
+      message:
+        $ref: '#/components/messages/TaskCompleted'
+  amro.compliance.gate_decided.v1:
+    publish:
+      operationId: publishComplianceGateDecided
+      message:
+        $ref: '#/components/messages/ComplianceGateDecided'
+  amro.audit.recorded.v1:
+    publish:
+      operationId: publishAuditRecorded
+      message:
+        $ref: '#/components/messages/AuditRecorded'
+components:
+  messages:
+    WorkPackageCreated:
+      name: amro.work_package.created.v1
+      payload:
+        $ref: '#/components/schemas/WorkPackageCreatedPayload'
+    TaskCompleted:
+      name: amro.task.completed.v1
+      payload:
+        $ref: '#/components/schemas/TaskCompletedPayload'
+    ComplianceGateDecided:
+      name: amro.compliance.gate_decided.v1
+      payload:
+        $ref: '#/components/schemas/ComplianceGateDecidedPayload'
+    AuditRecorded:
+      name: amro.audit.recorded.v1
+      payload:
+        $ref: '#/components/schemas/AuditRecordedPayload'
+  schemas:
+    EventEnvelope:
+      type: object
+      required: [eventType, eventVersion, tenantId, correlationId, idempotencyKey, occurredAt, mode]
+      properties:
+        eventType:
+          type: string
+        eventVersion:
+          type: string
+          const: v1
+        tenantId:
+          type: string
+        franchiseId:
+          type: [string, 'null']
+        correlationId:
+          type: string
+        idempotencyKey:
+          type: string
+        occurredAt:
+          type: string
+          format: date-time
+        mode:
+          type: string
+          enum: [dual-run, module, legacy-fallback]
+    WorkPackageCreatedPayload:
+      allOf:
+        - $ref: '#/components/schemas/EventEnvelope'
+        - type: object
+          required: [workPackageId]
+          properties:
+            eventType:
+              type: string
+              const: amro.work_package.created.v1
+            workPackageId:
+              type: string
+    TaskCompletedPayload:
+      allOf:
+        - $ref: '#/components/schemas/EventEnvelope'
+        - type: object
+          required: [taskId]
+          properties:
+            eventType:
+              type: string
+              const: amro.task.completed.v1
+            taskId:
+              type: string
+    ComplianceGateDecidedPayload:
+      allOf:
+        - $ref: '#/components/schemas/EventEnvelope'
+        - type: object
+          required: [gateId, decision]
+          properties:
+            eventType:
+              type: string
+              const: amro.compliance.gate_decided.v1
+            gateId:
+              type: string
+            decision:
+              type: string
+              enum: [approved, rejected, pending]
+    AuditRecordedPayload:
+      allOf:
+        - $ref: '#/components/schemas/EventEnvelope'
+        - type: object
+          required: [recordId, chainHash, replayCheckpoint]
+          properties:
+            eventType:
+              type: string
+              const: amro.audit.recorded.v1
+            recordId:
+              type: string
+            chainHash:
+              type: string
+            replayCheckpoint:
+              type: string

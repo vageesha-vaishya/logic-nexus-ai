@@ -1,0 +1,359 @@
+openapi: 3.1.0
+info:
+  title: AMRO V2 Integration API
+  version: 2.0.0
+  description: AMRO Integration and Coexistence contract for work-packages, tasks, compliance-gates, phase-plan, and migration-plan.
+servers:
+  - url: /
+paths:
+  /api/v2/amro/work-packages:
+    get:
+      operationId: listAmroWorkPackages
+      tags: [AMRO]
+      responses:
+        '200':
+          description: Work packages response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkPackagesResponse'
+  /api/v2/amro/tasks:
+    get:
+      operationId: listAmroTasks
+      tags: [AMRO]
+      parameters:
+        - in: query
+          name: workPackageId
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Tasks response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TasksResponse'
+  /api/v2/amro/compliance-gates:
+    get:
+      operationId: listAmroComplianceGates
+      tags: [AMRO]
+      parameters:
+        - in: query
+          name: decision
+          required: false
+          schema:
+            type: string
+            enum: [approved, rejected, pending]
+      responses:
+        '200':
+          description: Compliance gates response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComplianceGatesResponse'
+  /api/v2/amro/migration-plan:
+    get:
+      operationId: getAmroMigrationPlan
+      tags: [AMRO]
+      parameters:
+        - in: query
+          name: capability
+          required: false
+          schema:
+            type: string
+            enum: [work-packages, tasks, compliance-gates]
+        - in: query
+          name: crossTenantLeakageCount
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+        - in: query
+          name: replayCompared
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+        - in: query
+          name: replayMatched
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+        - in: query
+          name: complianceCompared
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+        - in: query
+          name: complianceMatched
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+        - in: query
+          name: switchbackSeconds
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+      responses:
+        '200':
+          description: Migration plan response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MigrationPlanResponse'
+  /api/v2/amro/phase-plan:
+    get:
+      operationId: getAmroPhasePlan
+      tags: [AMRO]
+      responses:
+        '200':
+          description: Phase-wise implementation plan response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PhasePlanResponse'
+components:
+  schemas:
+    ApiEnvelope:
+      type: object
+      required: [version, compatMode, mode, coexistence, endpointRollout, correlationId]
+      properties:
+        version:
+          type: string
+          const: v2
+        compatMode:
+          type: string
+        mode:
+          type: string
+          enum: [dual-run, module, legacy-fallback]
+        coexistence:
+          $ref: '#/components/schemas/CoexistenceEnvelope'
+        endpointRollout:
+          $ref: '#/components/schemas/RolloutState'
+        correlationId:
+          type: string
+    CoexistenceEnvelope:
+      type: object
+      required: [dualRead, dualWrite]
+      properties:
+        dualRead:
+          type: object
+          required: [deterministicComparisonHash, replayCheckpoint, reconciliation]
+          properties:
+            deterministicComparisonHash:
+              type: string
+            replayCheckpoint:
+              type: string
+            reconciliation:
+              $ref: '#/components/schemas/Reconciliation'
+        dualWrite:
+          type: object
+          required: [enabled, approvedEntityCount, operations]
+          properties:
+            enabled:
+              type: boolean
+            approvedEntityCount:
+              type: integer
+            operations:
+              type: array
+              items:
+                $ref: '#/components/schemas/DualWriteOperation'
+    RolloutState:
+      type: object
+      required: [enabled, canaryEnforced, tenantInCanary, franchiseInCanary, capabilityInCanary, capability]
+      properties:
+        enabled:
+          type: boolean
+        canaryEnforced:
+          type: boolean
+        tenantInCanary:
+          type: boolean
+        franchiseInCanary:
+          type: boolean
+        capabilityInCanary:
+          type: boolean
+        capability:
+          type: string
+          enum: [work-packages, tasks, compliance-gates]
+    Reconciliation:
+      type: object
+      required: [legacyCount, moduleCount, deltaCount, missingInModule, missingInLegacy]
+      properties:
+        legacyCount:
+          type: integer
+        moduleCount:
+          type: integer
+        deltaCount:
+          type: integer
+        missingInModule:
+          type: array
+          items:
+            type: string
+        missingInLegacy:
+          type: array
+          items:
+            type: string
+    DualWriteOperation:
+      type: object
+      required: [entityId, eventType, idempotencyKey, queueMode]
+      properties:
+        entityId:
+          type: string
+        eventType:
+          type: string
+          enum: [amro.work_package.created.v1, amro.task.completed.v1, amro.compliance.gate_decided.v1]
+        idempotencyKey:
+          type: string
+        queueMode:
+          type: string
+          enum: [redis, memory, disabled]
+    WorkPackage:
+      type: object
+      required: [id, code, title, status, tenantId, domainId, version]
+      properties:
+        id:
+          type: string
+        code:
+          type: string
+        title:
+          type: string
+        status:
+          type: string
+          enum: [planned, in_progress, completed]
+        tenantId:
+          type: string
+        franchiseId:
+          type: [string, 'null']
+        domainId:
+          type: string
+          const: amro
+        version:
+          type: string
+          const: v2
+    Task:
+      type: object
+      required: [id, workPackageId, taskCode, title, status, certifierAuthorityLevel, tenantId, domainId, version]
+      properties:
+        id:
+          type: string
+        workPackageId:
+          type: string
+        taskCode:
+          type: string
+        title:
+          type: string
+        status:
+          type: string
+          enum: [planned, in_progress, completed]
+        certifierAuthorityLevel:
+          type: string
+          enum: [A, B, C]
+        tenantId:
+          type: string
+        franchiseId:
+          type: [string, 'null']
+        domainId:
+          type: string
+          const: amro
+        version:
+          type: string
+          const: v2
+    ComplianceGate:
+      type: object
+      required: [gateId, workPackageId, taskCode, decision, tenantId, domainId, version]
+      properties:
+        gateId:
+          type: string
+        workPackageId:
+          type: string
+        taskCode:
+          type: string
+        decision:
+          type: string
+          enum: [approved, rejected, pending]
+        decidedBy:
+          type: [string, 'null']
+        decidedAt:
+          type: [string, 'null']
+          format: date-time
+        tenantId:
+          type: string
+        franchiseId:
+          type: [string, 'null']
+        domainId:
+          type: string
+          const: amro
+        version:
+          type: string
+          const: v2
+    WorkPackagesResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiEnvelope'
+        - type: object
+          required: [data]
+          properties:
+            data:
+              type: object
+              required: [workPackages]
+              properties:
+                workPackages:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/WorkPackage'
+    TasksResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiEnvelope'
+        - type: object
+          required: [data]
+          properties:
+            data:
+              type: object
+              required: [tasks]
+              properties:
+                tasks:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/Task'
+    ComplianceGatesResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiEnvelope'
+        - type: object
+          required: [data]
+          properties:
+            data:
+              type: object
+              required: [complianceGates]
+              properties:
+                complianceGates:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/ComplianceGate'
+    MigrationPlanResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiEnvelope'
+        - type: object
+          required: [data]
+          properties:
+            data:
+              type: object
+              required: [migration]
+              properties:
+                migration:
+                  type: object
+    PhasePlanResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiEnvelope'
+        - type: object
+          required: [data]
+          properties:
+            data:
+              type: object
+              required: [phasePlan]
+              properties:
+                phasePlan:
+                  type: object

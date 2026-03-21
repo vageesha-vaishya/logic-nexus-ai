@@ -180,7 +180,7 @@ const DebugConsole = lazy(() => import("./pages/dashboard/DebugConsole"));
 const Commodities = lazy(() => import("./pages/dashboard/Commodities"));
 const SalesPlaceholder = lazy(() => import("./pages/dashboard/SalesPlaceholder"));
 const SalesCommandCenter = lazy(() => import("./pages/dashboard/SalesCommandCenter"));
-const AmroChangesPreview = lazy(() => import("./pages/dashboard/AmroChangesPreview"));
+const AmroHub = lazy(() => import("./features/module-amro").then((module) => ({ default: module.AmroHubVerticalPage })));
 const MigrationBaselineDashboard = lazy(() => import("./pages/dashboard/MigrationBaselineDashboard"));
 
 // Initialize plugins at startup
@@ -825,7 +825,7 @@ const App = () => (
             <Route path="/dashboard/log-test" element={<ProtectedRoute><LogTestPage /></ProtectedRoute>} />
             <Route path="/dashboard/debug-console" element={<ProtectedRoute><DebugConsole /></ProtectedRoute>} />
             <Route path="/dashboard/amro" element={<Navigate to="/dashboard/amro/work-packages" replace />} />
-            <Route path="/dashboard/amro/work-packages" element={<ProtectedRoute requiredDomainCode="AMRO"><AmroChangesPreview /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/work-packages" element={<ProtectedRoute requiredDomainCode="AMRO"><AmroHub /></ProtectedRoute>} />
             <Route path="/dashboard/amro/changes" element={<Navigate to="/dashboard/amro/work-packages" replace />} />
             
             {/* Sales Dashboard Routes */}

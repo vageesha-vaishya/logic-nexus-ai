@@ -1,0 +1,95 @@
+syntax = "proto3";
+
+package amro.v1;
+
+service WorkOrderService {
+  rpc ListWorkPackages (ListWorkPackagesRequest) returns (ListWorkPackagesResponse);
+  rpc ListTasks (ListTasksRequest) returns (ListTasksResponse);
+}
+
+service ComplianceService {
+  rpc GetComplianceGates (GetComplianceGatesRequest) returns (GetComplianceGatesResponse);
+  rpc GetComplianceStatus (GetComplianceStatusRequest) returns (GetComplianceStatusResponse);
+}
+
+message Scope {
+  string tenant_id = 1;
+  string franchise_id = 2;
+}
+
+message WorkPackage {
+  string id = 1;
+  string code = 2;
+  string title = 3;
+  string status = 4;
+  string domain_id = 5;
+  string version = 6;
+}
+
+message Task {
+  string id = 1;
+  string work_package_id = 2;
+  string task_code = 3;
+  string title = 4;
+  string status = 5;
+  string certifier_authority_level = 6;
+  string domain_id = 7;
+  string version = 8;
+}
+
+message ComplianceGate {
+  string gate_id = 1;
+  string work_package_id = 2;
+  string task_code = 3;
+  string decision = 4;
+  string decided_by = 5;
+  string decided_at = 6;
+  string domain_id = 7;
+  string version = 8;
+}
+
+message ListWorkPackagesRequest {
+  Scope scope = 1;
+}
+
+message ListWorkPackagesResponse {
+  repeated WorkPackage work_packages = 1;
+  string mode = 2;
+  string deterministic_comparison_hash = 3;
+  string replay_checkpoint = 4;
+}
+
+message ListTasksRequest {
+  Scope scope = 1;
+  string work_package_id = 2;
+}
+
+message ListTasksResponse {
+  repeated Task tasks = 1;
+  string mode = 2;
+  string deterministic_comparison_hash = 3;
+  string replay_checkpoint = 4;
+}
+
+message GetComplianceGatesRequest {
+  Scope scope = 1;
+  string decision = 2;
+}
+
+message GetComplianceGatesResponse {
+  repeated ComplianceGate compliance_gates = 1;
+  string mode = 2;
+  string deterministic_comparison_hash = 3;
+  string replay_checkpoint = 4;
+}
+
+message GetComplianceStatusRequest {
+  Scope scope = 1;
+}
+
+message GetComplianceStatusResponse {
+  uint32 approved = 1;
+  uint32 rejected = 2;
+  uint32 pending = 3;
+  uint32 total = 4;
+}

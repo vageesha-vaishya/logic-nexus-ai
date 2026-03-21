@@ -123,7 +123,9 @@ export default tseslint.config(
           "@/features/module-compliance/*",
           "@/features/module-compliance/**",
           "@/features/module-communications/*",
-          "@/features/module-communications/**"
+          "@/features/module-communications/**",
+          "@/features/module-amro/*",
+          "@/features/module-amro/**"
         ]
       }]
     },
@@ -144,7 +146,9 @@ export default tseslint.config(
           "@/features/module-compliance/*",
           "@/features/module-compliance/**",
           "@/features/module-communications/*",
-          "@/features/module-communications/**"
+          "@/features/module-communications/**",
+          "@/features/module-amro/*",
+          "@/features/module-amro/**"
         ]
       }]
     },
@@ -165,7 +169,9 @@ export default tseslint.config(
           "@/features/module-compliance/*",
           "@/features/module-compliance/**",
           "@/features/module-communications/*",
-          "@/features/module-communications/**"
+          "@/features/module-communications/**",
+          "@/features/module-amro/*",
+          "@/features/module-amro/**"
         ]
       }]
     },
@@ -186,7 +192,9 @@ export default tseslint.config(
           "@/features/module-compliance/*",
           "@/features/module-compliance/**",
           "@/features/module-communications/*",
-          "@/features/module-communications/**"
+          "@/features/module-communications/**",
+          "@/features/module-amro/*",
+          "@/features/module-amro/**"
         ]
       }]
     },
@@ -207,7 +215,9 @@ export default tseslint.config(
           "@/features/module-finance/*",
           "@/features/module-finance/**",
           "@/features/module-communications/*",
-          "@/features/module-communications/**"
+          "@/features/module-communications/**",
+          "@/features/module-amro/*",
+          "@/features/module-amro/**"
         ]
       }]
     },
@@ -228,7 +238,32 @@ export default tseslint.config(
           "@/features/module-finance/*",
           "@/features/module-finance/**",
           "@/features/module-compliance/*",
-          "@/features/module-compliance/**"
+          "@/features/module-compliance/**",
+          "@/features/module-amro/*",
+          "@/features/module-amro/**"
+        ]
+      }]
+    },
+  },
+  {
+    files: [
+      "src/features/module-amro/**/*.{ts,tsx}"
+    ],
+    rules: {
+      "no-restricted-imports": ["error", {
+        "patterns": [
+          "@/features/module-crm/*",
+          "@/features/module-crm/**",
+          "@/features/module-logistics/*",
+          "@/features/module-logistics/**",
+          "@/features/module-quotation/*",
+          "@/features/module-quotation/**",
+          "@/features/module-finance/*",
+          "@/features/module-finance/**",
+          "@/features/module-compliance/*",
+          "@/features/module-compliance/**",
+          "@/features/module-communications/*",
+          "@/features/module-communications/**"
         ]
       }]
     },

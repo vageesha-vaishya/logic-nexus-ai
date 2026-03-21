@@ -15,6 +15,10 @@ import { applyCompatibilityResponseHeaders, resolveGatewayCompatibility } from '
 import {
   adaptLegacyComplianceGates,
   adaptModuleComplianceGatesFromLegacy,
+  buildAmroIntegrationContractEnvelope,
+  buildAmroServiceBoundaryEnvelope,
+  createAmroIsolationScope,
+  enforceAmroScopedLegacyRows,
   type ComplianceDecision,
   type ComplianceGateItem,
   type LegacyComplianceGateRow,
@@ -22,6 +26,7 @@ import {
 import {
   buildHistoricalBackfillMetadata,
   drainAmroReconciliationQueueForFallback,
+  enqueueAmroDualWriteOperation,
   enqueueAmroReconciliationSnapshot,
 } from './reconciliation-queue';
 import { appendAmroAuditLedgerRecord } from './audit-ledger';
@@ -67,6 +72,8 @@ function buildLegacyComplianceGateRows(tenantId: string, franchiseId: string | n
       decided_at: null,
       tenant_id: tenantId,
       franchise_id: franchiseId,
+      domain_id: 'amro',
+      version: 'v2',
     },
     {
       legacy_gate_id: 'legacy-gate-002',
@@ -77,6 +84,8 @@ function buildLegacyComplianceGateRows(tenantId: string, franchiseId: string | n
       decided_at: '2026-03-20T10:30:00.000Z',
       tenant_id: tenantId,
       franchise_id: franchiseId,
+      domain_id: 'amro',
+      version: 'v2',
     },
     {
       legacy_gate_id: 'legacy-gate-003',
@@ -87,6 +96,8 @@ function buildLegacyComplianceGateRows(tenantId: string, franchiseId: string | n
       decided_at: '2026-03-20T09:00:00.000Z',
       tenant_id: tenantId,
       franchise_id: franchiseId,
+      domain_id: 'amro',
+      version: 'v2',
     },
   ];
 }
@@ -172,6 +183,42 @@ function appendComplianceGateAuditRecord(params: {
   });
 }
 
+async function enqueueComplianceDualWriteOperations(params: {
+  tenantId: string;
+  franchiseId: string | null;
+  correlationId: string;
+  compatMode: string;
+  items: ComplianceGateItem[];
+}) {
+  const approvedItems = params.items.filter((item) => item.decision === 'approved');
+  const operations = await Promise.all(
+    approvedItems.map(async (item) => {
+      const result = await enqueueAmroDualWriteOperation({
+        capability: 'compliance-gates',
+        tenantId: params.tenantId,
+        franchiseId: params.franchiseId,
+        compatMode: params.compatMode,
+        correlationId: params.correlationId,
+        entityType: 'compliance-gate',
+        entityId: item.gateId,
+        eventType: 'amro.compliance.gate_decided.v1',
+        action: 'gate-sync',
+      });
+      return {
+        entityId: item.gateId,
+        eventType: 'amro.compliance.gate_decided.v1',
+        idempotencyKey: result.idempotencyKey,
+        queueMode: result.queueMode,
+      };
+    })
+  );
+  return {
+    enabled: true,
+    approvedEntityCount: approvedItems.length,
+    operations,
+  };
+}
+
 export default async function handler(req: ApiRequest, res: ApiResponse) {
   applyCors(req, res, { methods: ['GET', 'OPTIONS'] });
   if (handlePreflight(req, res)) return;
@@ -210,6 +257,13 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     const decision = parseDecisionFilter(req);
     const tenantId = String(access.tenantId || '');
     const franchiseId = access.franchiseId ? String(access.franchiseId) : null;
+    const isolationScope = createAmroIsolationScope(tenantId, franchiseId);
+    const serviceBoundaries = buildAmroServiceBoundaryEnvelope({
+      capability: 'compliance-gates',
+      scope: isolationScope,
+      subscriptionStatus: amroAccess.subscriptionStatus,
+      validatedAt: amroAccess.validatedAt,
+    });
     const rolloutState = resolveAmroV2EndpointRolloutState({
       tenantId,
       franchiseId,
@@ -230,9 +284,33 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     });
     const dualRun = isDualRunEnabled();
     const legacyFallback = isLegacyFallbackEnabled();
-    const legacyRows = buildLegacyComplianceGateRows(tenantId, franchiseId);
+    const legacyRows = enforceAmroScopedLegacyRows(buildLegacyComplianceGateRows(tenantId, franchiseId), isolationScope);
     const moduleItems = filterByDecision(adaptModuleComplianceGatesFromLegacy(legacyRows), decision);
     const legacyItems = filterByDecision(adaptLegacyComplianceGates(legacyRows), decision);
+    const integrationContracts = buildAmroIntegrationContractEnvelope({
+      capability: 'compliance-gates',
+      tenantId,
+      franchiseId,
+      endpointRollout: rolloutState,
+      auditLedgerCutover: cutoverState,
+    });
+    const reconciliation = buildReconciliation(legacyItems, moduleItems);
+    const deterministicComparison = buildHistoricalBackfillMetadata({
+      capability: 'compliance-gates',
+      correlationId: ctx.correlationId,
+      tenantId,
+      franchiseId,
+      compatMode: compatDecision.compatMode,
+      requestedFilters: { decision },
+      reconciliation,
+    });
+    const dualWrite = await enqueueComplianceDualWriteOperations({
+      tenantId,
+      franchiseId,
+      correlationId: ctx.correlationId,
+      compatMode: compatDecision.compatMode,
+      items: moduleItems,
+    });
 
     if (legacyFallback) {
       const fallback = await drainAmroReconciliationQueueForFallback({
@@ -277,12 +355,26 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           source: amroAccess.source,
           validatedAt: amroAccess.validatedAt,
         },
+        serviceBoundaries,
+        integrationContracts,
+        coexistence: {
+          dualRead: {
+            deterministicComparisonHash: deterministicComparison.sourceHash,
+            replayCheckpoint: deterministicComparison.replayCheckpoint,
+            reconciliation,
+          },
+          dualWrite,
+        },
         filters: { decision },
         fallback: {
           legacyMode: true,
           queueDrained: fallback.drained,
           queueMode: fallback.queueMode,
           snapshotCheckpoint: fallback.snapshotCheckpoint,
+          snapshotCheckpointRestore: {
+            checkpoint: fallback.snapshotCheckpoint,
+            restored: true,
+          },
         },
         endpointRollout: rolloutState,
         auditLedgerCutover: cutoverState,
@@ -333,6 +425,16 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           source: amroAccess.source,
           validatedAt: amroAccess.validatedAt,
         },
+        serviceBoundaries,
+        integrationContracts,
+        coexistence: {
+          dualRead: {
+            deterministicComparisonHash: deterministicComparison.sourceHash,
+            replayCheckpoint: deterministicComparison.replayCheckpoint,
+            reconciliation,
+          },
+          dualWrite,
+        },
         filters: { decision },
         endpointRollout: rolloutState,
         auditLedgerCutover: cutoverState,
@@ -347,7 +449,6 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       });
     }
 
-    const reconciliation = buildReconciliation(legacyItems, moduleItems);
     const queueResult = await enqueueAmroReconciliationSnapshot({
       capability: 'compliance-gates',
       correlationId: ctx.correlationId,
@@ -401,6 +502,16 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         subscriptionStatus: amroAccess.subscriptionStatus,
         source: amroAccess.source,
         validatedAt: amroAccess.validatedAt,
+      },
+      serviceBoundaries,
+      integrationContracts,
+      coexistence: {
+        dualRead: {
+          deterministicComparisonHash: deterministicComparison.sourceHash,
+          replayCheckpoint: deterministicComparison.replayCheckpoint,
+          reconciliation,
+        },
+        dualWrite,
       },
       filters: { decision },
       data: { complianceGates: moduleItems },

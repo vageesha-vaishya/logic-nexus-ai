@@ -1,0 +1,55 @@
+schema {
+  query: Query
+}
+
+type Query {
+  amroWorkPackages: [AmroWorkPackage!]!
+  amroTask(id: ID!): AmroTask
+  amroComplianceStatus: AmroComplianceStatus!
+}
+
+type AmroWorkPackage {
+  id: ID!
+  code: String!
+  title: String!
+  status: AmroWorkPackageStatus!
+  tenantId: String!
+  franchiseId: String
+  domainId: String!
+  version: String!
+}
+
+type AmroTask {
+  id: ID!
+  workPackageId: String!
+  taskCode: String!
+  title: String!
+  status: AmroTaskStatus!
+  certifierAuthorityLevel: String!
+  tenantId: String!
+  franchiseId: String
+  domainId: String!
+  version: String!
+}
+
+type AmroComplianceStatus {
+  tenantId: String!
+  franchiseId: String
+  approved: Int!
+  rejected: Int!
+  pending: Int!
+  total: Int!
+  lastUpdatedAt: String!
+}
+
+enum AmroWorkPackageStatus {
+  planned
+  in_progress
+  completed
+}
+
+enum AmroTaskStatus {
+  planned
+  in_progress
+  completed
+}

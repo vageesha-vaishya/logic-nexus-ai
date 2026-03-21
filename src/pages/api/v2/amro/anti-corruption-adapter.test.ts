@@ -18,6 +18,8 @@ describe('AMRO anti-corruption adapter', () => {
         legacy_status: 'planned' as const,
         tenant_id: 'tenant-1',
         franchise_id: 'fr-1',
+        domain_id: 'amro' as const,
+        version: 'v2' as const,
       },
     ];
 
@@ -27,6 +29,8 @@ describe('AMRO anti-corruption adapter', () => {
     expect(legacyItems[0].id).toBe('legacy-wp-001');
     expect(moduleItems[0].id).toBe('amro-wp-001');
     expect(moduleItems[0].title).toBe('AMRO Structural Inspection');
+    expect(moduleItems[0].domainId).toBe('amro');
+    expect(moduleItems[0].version).toBe('v2');
   });
 
   it('maps legacy task rows to module and legacy task surfaces', () => {
@@ -40,6 +44,8 @@ describe('AMRO anti-corruption adapter', () => {
         certifier_authority_level: 'A' as const,
         tenant_id: 'tenant-1',
         franchise_id: null,
+        domain_id: 'amro' as const,
+        version: 'v2' as const,
       },
     ];
 
@@ -49,6 +55,8 @@ describe('AMRO anti-corruption adapter', () => {
     expect(legacyItems[0].id).toBe('legacy-task-002');
     expect(moduleItems[0].id).toBe('amro-task-002');
     expect(moduleItems[0].title).toBe('AMRO Avionics Wiring Continuity Test');
+    expect(moduleItems[0].domainId).toBe('amro');
+    expect(moduleItems[0].version).toBe('v2');
   });
 
   it('maps legacy compliance rows to module and legacy compliance surfaces', () => {
@@ -62,6 +70,8 @@ describe('AMRO anti-corruption adapter', () => {
         decided_at: '2026-03-20T09:00:00.000Z',
         tenant_id: 'tenant-1',
         franchise_id: 'fr-1',
+        domain_id: 'amro' as const,
+        version: 'v2' as const,
       },
     ];
 
@@ -71,5 +81,7 @@ describe('AMRO anti-corruption adapter', () => {
     expect(legacyItems[0].gateId).toBe('legacy-gate-003');
     expect(moduleItems[0].gateId).toBe('amro-gate-003');
     expect(moduleItems[0].decision).toBe('rejected');
+    expect(moduleItems[0].domainId).toBe('amro');
+    expect(moduleItems[0].version).toBe('v2');
   });
 });

@@ -22,6 +22,12 @@
 - Standardize pipeline page structure as three sections: header controls, kanban workspace with detail panel, and bottom statistics summary.
 - Require pipeline analytics view to include KPI cards, date-range filters, export actions, and permission-aware access checks.
 
+## Base UI/UX Uniformity Rule
+- Require every new module to preserve the existing base UI/UX patterns to maintain a uniform platform look and feel.
+- Implement new requirements as additive layers on top of the base module experience rather than replacing the base interface.
+- Reuse existing layout shells, navigation structures, and established interaction patterns before introducing module-specific variants.
+- Require validation evidence in pull requests that base UI/UX remains intact after enhancement delivery.
+
 ## Database Table Creation Governance
 - Require schema-and-code overlap analysis before any new table migration.
 - Require written extension assessment for candidate existing tables.

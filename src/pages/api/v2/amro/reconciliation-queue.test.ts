@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
+  buildAmroDualWriteIdempotencyKey,
   buildHistoricalBackfillMetadata,
   buildAmroReconciliationIdempotencyKey,
   drainAmroReconciliationQueueForFallback,
+  enqueueAmroDualWriteOperation,
   enqueueAmroReconciliationSnapshot,
   resetAmroReconciliationMemoryQueue,
 } from './reconciliation-queue';
@@ -34,6 +36,22 @@ describe('AMRO reconciliation queue', () => {
     });
 
     expect(key).toBe('amro:tasks:tenant-1:fr-1:v2-shadow:corr-1');
+  });
+
+  it('builds stable idempotency key for dual-write entities', () => {
+    const key = buildAmroDualWriteIdempotencyKey({
+      capability: 'compliance-gates',
+      tenantId: 'tenant-1',
+      franchiseId: 'fr-1',
+      compatMode: 'v2-shadow',
+      correlationId: 'corr-9',
+      entityType: 'compliance-gate',
+      entityId: 'amro-gate-002',
+      eventType: 'amro.compliance.gate_decided.v1',
+      action: 'gate-sync',
+    });
+
+    expect(key).toBe('amro:dual-write:compliance-gates:tenant-1:fr-1:compliance-gate:amro-gate-002:amro.compliance.gate_decided.v1');
   });
 
   it('returns disabled mode when queue is disabled by feature flag', async () => {
@@ -115,6 +133,38 @@ describe('AMRO reconciliation queue', () => {
         missingInLegacy: [],
         missingInModule: [],
       },
+    });
+
+    expect(first.queueMode).toBe('memory');
+    expect(second.queueMode).toBe('memory');
+    expect(first.idempotencyKey).toBe(second.idempotencyKey);
+    expect(first.queued).toBe(true);
+    expect(second.queued).toBe(true);
+  });
+
+  it('deduplicates dual-write operations per entity idempotency key', async () => {
+    process.env.AMRO_RECON_QUEUE_ENABLED = 'true';
+    const first = await enqueueAmroDualWriteOperation({
+      capability: 'tasks',
+      tenantId: 'tenant-1',
+      franchiseId: 'fr-1',
+      compatMode: 'v2-shadow',
+      correlationId: 'corr-8',
+      entityType: 'task',
+      entityId: 'amro-task-003',
+      eventType: 'amro.task.completed.v1',
+      action: 'status-sync',
+    });
+    const second = await enqueueAmroDualWriteOperation({
+      capability: 'tasks',
+      tenantId: 'tenant-1',
+      franchiseId: 'fr-1',
+      compatMode: 'v2-shadow',
+      correlationId: 'corr-8',
+      entityType: 'task',
+      entityId: 'amro-task-003',
+      eventType: 'amro.task.completed.v1',
+      action: 'status-sync',
     });
 
     expect(first.queueMode).toBe('memory');

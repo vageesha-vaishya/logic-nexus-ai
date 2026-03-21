@@ -140,6 +140,11 @@ describe('/api/v2/amro/compliance-gates', () => {
     expect((res.jsonBody as any)?.mode).toBe('dual-run');
     expect((res.jsonBody as any)?.filters?.decision).toBe('approved');
     expect((res.jsonBody as any)?.data?.complianceGates?.length).toBe(1);
+    expect((res.jsonBody as any)?.serviceBoundaries?.services?.map((item: any) => item.service)).toEqual(
+      expect.arrayContaining(['amro-compliance-service', 'amro-audit-ledger-service'])
+    );
+    expect((res.jsonBody as any)?.data?.complianceGates?.[0]?.domainId).toBe('amro');
+    expect((res.jsonBody as any)?.data?.complianceGates?.[0]?.version).toBe('v2');
     expect((res.jsonBody as any)?.reconciliation?.deltaCount).toBe(0);
     expect((res.jsonBody as any)?.endpointRollout?.enabled).toBe(true);
     expect((res.jsonBody as any)?.auditLedgerCutover?.enabled).toBe(true);

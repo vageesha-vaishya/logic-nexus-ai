@@ -140,6 +140,14 @@ describe('/api/v2/amro/work-packages', () => {
     expect((res.jsonBody as any)?.mode).toBe('dual-run');
     expect((res.jsonBody as any)?.reconciliation?.deltaCount).toBe(0);
     expect((res.jsonBody as any)?.domainAccess?.subscriptionStatus).toBe('active');
+    expect((res.jsonBody as any)?.serviceBoundaries?.services?.map((item: any) => item.service)).toEqual(
+      expect.arrayContaining(['amro-work-order-service', 'amro-scheduling-service', 'amro-materials-service'])
+    );
+    expect((res.jsonBody as any)?.serviceBoundaries?.dataOwnership?.mandatoryIsolationFields).toEqual(
+      ['tenant_id', 'franchise_id', 'domain_id', 'version']
+    );
+    expect((res.jsonBody as any)?.data?.workPackages?.[0]?.domainId).toBe('amro');
+    expect((res.jsonBody as any)?.data?.workPackages?.[0]?.version).toBe('v2');
     expect((res.jsonBody as any)?.endpointRollout?.enabled).toBe(true);
     expect((res.jsonBody as any)?.auditLedgerCutover?.enabled).toBe(true);
     expect((res.jsonBody as any)?.auditLedger?.recordId).toBeTruthy();
