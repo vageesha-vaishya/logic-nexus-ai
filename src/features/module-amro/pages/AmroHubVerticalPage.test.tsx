@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import AmroHubVerticalPage from './AmroHubVerticalPage';
 
@@ -41,6 +41,14 @@ vi.mock('@/contexts/DomainContext', () => ({
 }));
 
 describe('AmroHubVerticalPage', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('phase-plan-unavailable')));
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it('renders AMRO integration contract links and active domain badge', () => {
     mockUseDomain.mockReturnValue({ currentDomain: { code: 'AMRO' } });
 
@@ -77,7 +85,8 @@ describe('AmroHubVerticalPage', () => {
     expect(screen.getAllByText('Overview Dashboard').length).toBeGreaterThan(0);
     expect(screen.getByText('Role Controls')).toBeTruthy();
     expect(screen.getByText('AMRO Phase-Wise Implementation Plan')).toBeTruthy();
-    expect(screen.getByText('Core UI & APIs')).toBeTruthy();
-    expect(screen.getByText('Integration & scale')).toBeTruthy();
+    expect(screen.getByText('Phase Plan Source: Fallback Model')).toBeTruthy();
+    expect(screen.getByText('P0 Foundation')).toBeTruthy();
+    expect(screen.getByText('P4 Integration and Scale')).toBeTruthy();
   });
 });

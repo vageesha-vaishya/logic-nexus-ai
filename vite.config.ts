@@ -10,6 +10,7 @@ const require = createRequire(import.meta.url);
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   const crmApiProxyTarget = env.VITE_CRM_API_PROXY_TARGET || 'http://localhost:3011';
+  const amroApiProxyTarget = env.VITE_AMRO_API_PROXY_TARGET || 'http://localhost:3001';
   const enableDesignSystemFederation = env.VITE_ENABLE_DESIGN_SYSTEM_FEDERATION === 'true';
   const enableDesignSystemRemote = env.VITE_ENABLE_DESIGN_SYSTEM_REMOTE === 'true';
   let federationPlugin: PluginOption = false;
@@ -67,6 +68,12 @@ export default defineConfig(({ mode }) => {
         changeOrigin: true,
         secure: false,
       },
+      '/api/amro': {
+        target: amroApiProxyTarget,
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path: string) => path.replace(/^\/api\/amro/, ''),
+      },
       '/functions/v1': {
         target: env.VITE_SUPABASE_URL || 'https://gzhxgoigflftharcmdqj.supabase.co',
         changeOrigin: true,
@@ -89,6 +96,12 @@ export default defineConfig(({ mode }) => {
         target: crmApiProxyTarget,
         changeOrigin: true,
         secure: false,
+      },
+      '/api/amro': {
+        target: amroApiProxyTarget,
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path: string) => path.replace(/^\/api\/amro/, ''),
       },
       '/functions/v1': {
         target: env.VITE_SUPABASE_URL || 'https://gzhxgoigflftharcmdqj.supabase.co',

@@ -61,6 +61,21 @@ describe('/api/v2/amro/integration-hub', () => {
   beforeEach(() => {
     process.env = { ...envBackup };
     vi.clearAllMocks();
+    process.env.AMRO_SEQ_PREREQ_ARCH_SECURITY_APPROVED = 'true';
+    process.env.AMRO_SEQ_PREREQ_ISOLATION_CONTROLS_DEFINED = 'true';
+    process.env.AMRO_SEQ_PREREQ_BACKWARD_COMPAT_COMPLETED = 'true';
+    process.env.AMRO_SEQ_PREREQ_TEST_PLAN_READY = 'true';
+    process.env.AMRO_SEQ_PREREQ_OBSERVABILITY_BASELINE_READY = 'true';
+    process.env.AMRO_SEQ_M1_STATUS = 'completed';
+    process.env.AMRO_SEQ_M2_STATUS = 'completed';
+    process.env.AMRO_SEQ_M3_STATUS = 'completed';
+    process.env.AMRO_SEQ_M4_STATUS = 'completed';
+    process.env.AMRO_SEQ_M5_STATUS = 'completed';
+    process.env.AMRO_SEQ_M6_STATUS = 'completed';
+    process.env.AMRO_SEQ_M7_STATUS = 'in-progress';
+    process.env.AMRO_SEQ_M8_STATUS = 'not-started';
+    process.env.AMRO_SEQ_M9_STATUS = 'not-started';
+    process.env.AMRO_SEQ_M10_STATUS = 'not-started';
     vi.mocked(enforceAnyPermission).mockImplementation(() => undefined);
     vi.mocked(handlePreflight).mockReturnValue(false);
     vi.mocked(buildApiContext).mockReturnValue({
@@ -144,6 +159,9 @@ describe('/api/v2/amro/integration-hub', () => {
         requested_by: 'ops-user',
         job_status: 'failed',
         retry_count: 2,
+        dead_letter_count: 4,
+        replayed_count: 3,
+        closed_count: 3,
       },
       headers: {},
     };
@@ -154,6 +172,13 @@ describe('/api/v2/amro/integration-hub', () => {
     expect(res.statusCode).toBe(200);
     expect((res.jsonBody as any)?.output?.replay_status).toBe('queued');
     expect((res.jsonBody as any)?.output?.retry_count).toBe(3);
+    expect((res.jsonBody as any)?.output?.replay_metrics).toEqual({
+      dead_letter_count: 4,
+      replayed_count: 3,
+      closed_count: 3,
+      closure_rate_percent: 100,
+      replay_closure_status: 'closed',
+    });
   });
 
   it('rejects callback publish when schema mapping mismatches partner version', async () => {
@@ -170,6 +195,33 @@ describe('/api/v2/amro/integration-hub', () => {
           partner_schema_version: 'v1.3',
         },
         attempt_log: [{ attempt: 1, status: 'queued' }],
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(sendErrorResponse).toHaveBeenCalledWith(
+      res,
+      expect.any(Error),
+      'corr-amro-integration-hub-v2',
+      { apiVersion: 'v2' },
+    );
+  });
+
+  it('blocks M7 interfaces when M6 is not completed', async () => {
+    process.env.AMRO_INTEGRATION_HUB_V2_ENABLED = 'true';
+    process.env.AMRO_SEQ_M6_STATUS = 'in-progress';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'ingest-partner-payload' },
+      body: {
+        source_system: 'sap-pm',
+        adapter_version: '2.4.1',
+        event_type: 'task_update',
+        payload: { task_id: 'task-1' },
+        idempotency_key: 'idem-123',
       },
       headers: {},
     };

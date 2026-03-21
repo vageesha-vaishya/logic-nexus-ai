@@ -13,6 +13,7 @@ import {
 import { sendErrorResponse } from '../../_utils/errorHandler';
 import { applyCompatibilityResponseHeaders, resolveGatewayCompatibility } from '../../_utils/compatibility-facade';
 import { buildAmroServiceBoundaryEnvelope, createAmroIsolationScope } from './anti-corruption-adapter';
+import { enforceAmroSequentialMilestoneForOverviewKpiInterface } from './phase-plan-model';
 
 type KpiWindow = '7d' | '30d' | '90d';
 
@@ -175,6 +176,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     });
 
     const interfaceName = String(req.query.interface || '').trim().toLowerCase();
+    enforceAmroSequentialMilestoneForOverviewKpiInterface(interfaceName);
     const stationIds = sanitizeScopeFilters(parseStringArray(req.query.station_ids), 'station_ids');
     const fleetIds = sanitizeScopeFilters(parseStringArray(req.query.fleet_ids), 'fleet_ids');
     const scopeStationIds = stationIds.map((id) => `${tenantId}:${id}`);

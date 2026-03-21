@@ -93,8 +93,8 @@ describe('/api/v2/amro/phase-plan', () => {
 
   it('returns AMRO phase-wise implementation matrix and progress summary', async () => {
     process.env.AMRO_PHASE_PLAN_V2_ENABLED = 'true';
-    process.env.AMRO_PHASE_1_STATUS = 'completed';
-    process.env.AMRO_PHASE_2_STATUS = 'in-progress';
+    process.env.AMRO_PHASE_P0_STATUS = 'completed';
+    process.env.AMRO_PHASE_P1_STATUS = 'in-progress';
     const req: ApiRequest = {
       method: 'GET',
       query: {},
@@ -109,8 +109,10 @@ describe('/api/v2/amro/phase-plan', () => {
     expect(enforceRateLimit).toHaveBeenCalledWith(req);
     expect(res.statusCode).toBe(200);
     expect((res.jsonBody as any)?.mode).toBe('phase-plan');
-    expect((res.jsonBody as any)?.data?.phasePlan?.rows?.length).toBe(4);
+    expect((res.jsonBody as any)?.data?.phasePlan?.rows?.length).toBe(5);
     expect((res.jsonBody as any)?.data?.phasePlan?.summary?.completedPhases).toBe(1);
+    expect((res.jsonBody as any)?.data?.sequentialImplementation?.strictOrder).toEqual(['M1', 'M2', 'M3', 'M4', 'M5', 'M6', 'M7', 'M8', 'M9', 'M10']);
+    expect((res.jsonBody as any)?.data?.sequentialImplementation?.milestones?.length).toBe(10);
     expect(applyCompatibilityResponseHeaders).toHaveBeenCalled();
   });
 

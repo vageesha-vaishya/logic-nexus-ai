@@ -15,6 +15,7 @@ import { applyCompatibilityResponseHeaders, resolveGatewayCompatibility } from '
 import { buildAmroServiceBoundaryEnvelope, createAmroIsolationScope } from './anti-corruption-adapter';
 import { appendAmroAuditLedgerRecord } from './audit-ledger';
 import { resolveAmroAuditLedgerCutoverState, resolveAmroV2EndpointRolloutState } from './audit-ledger-cutover';
+import { enforceAmroSequentialMilestoneForIntegrationHubInterface } from './phase-plan-model';
 
 const ALLOWLISTED_SOURCES = new Set(['sap-pm', 'maximo', 'oracle-eam', 'boeing-partner-gateway']);
 const MUTATING_EVENT_TYPES = new Set(['work_package_update', 'task_update', 'part_reservation', 'callback_trigger']);
@@ -52,6 +53,14 @@ function parseInteger(value: unknown, fieldName: string): number {
   return parsed;
 }
 
+function parseNonNegativeInteger(value: unknown, fieldName: string): number {
+  const parsed = parseInteger(value, fieldName);
+  if (parsed < 0) {
+    throw new Error(`${fieldName} must be zero or greater`);
+  }
+  return parsed;
+}
+
 function parseObjectArray(value: unknown, fieldName: string): Array<Record<string, unknown>> {
   if (!Array.isArray(value)) {
     throw new Error(`${fieldName} must be an array`);
@@ -77,6 +86,26 @@ function assertReplayJobStatus(status: string) {
   if (status !== 'failed' && status !== 'quarantined') {
     throw new Error('Replay only allowed for failed/quarantined jobs');
   }
+}
+
+function buildReplayClosureMetrics(body: Record<string, unknown>) {
+  const deadLetterCount = parseNonNegativeInteger(body.dead_letter_count ?? 1, 'dead_letter_count');
+  const replayedCount = parseNonNegativeInteger(body.replayed_count ?? deadLetterCount, 'replayed_count');
+  const closedCount = parseNonNegativeInteger(body.closed_count ?? replayedCount, 'closed_count');
+  if (replayedCount > deadLetterCount) {
+    throw new Error('replayed_count cannot exceed dead_letter_count');
+  }
+  if (closedCount > replayedCount) {
+    throw new Error('closed_count cannot exceed replayed_count');
+  }
+  const closureRate = replayedCount === 0 ? 0 : Number(((closedCount / replayedCount) * 100).toFixed(2));
+  return {
+    dead_letter_count: deadLetterCount,
+    replayed_count: replayedCount,
+    closed_count: closedCount,
+    closure_rate_percent: closureRate,
+    replay_closure_status: closureRate === 100 ? 'closed' : 'partial',
+  } as const;
 }
 
 function assertMappingContract(body: Record<string, unknown>) {
@@ -153,6 +182,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
     enforceAnyPermission(auth.permissions || [], ['dashboards.manage', 'reports.manage']);
     const interfaceName = String(req.query.interface || '').trim().toLowerCase();
+    enforceAmroSequentialMilestoneForIntegrationHubInterface(interfaceName);
     const body = parseBody(req.body);
 
     if (interfaceName === 'ingest-partner-payload') {
@@ -208,6 +238,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       const jobStatus = assertNonEmpty(body.job_status, 'job_status').toLowerCase();
       assertReplayJobStatus(jobStatus);
       const retryCount = parseInteger(body.retry_count || 0, 'retry_count') + 1;
+      const replayMetrics = buildReplayClosureMetrics(body);
       return res.status(200).json({
         version: 'v2',
         interface: interfaceName,
@@ -216,6 +247,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           replay_id: `${tenantId}-${jobId}-replay-${Date.now()}`,
           replay_status: 'queued',
           retry_count: retryCount,
+          replay_metrics: replayMetrics,
         },
         domainAccess: {
           subscriptionStatus: amroAccess.subscriptionStatus,

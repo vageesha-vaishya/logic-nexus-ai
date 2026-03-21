@@ -65,6 +65,38 @@ describe('/api/v2/amro/work-packages', () => {
 
   beforeEach(() => {
     process.env = { ...envBackup };
+    process.env.AMRO_SEQ_PREREQ_ARCH_SECURITY_APPROVED = 'true';
+    process.env.AMRO_SEQ_PREREQ_ISOLATION_CONTROLS_DEFINED = 'true';
+    process.env.AMRO_SEQ_PREREQ_BACKWARD_COMPAT_COMPLETED = 'true';
+    process.env.AMRO_SEQ_PREREQ_TEST_PLAN_READY = 'true';
+    process.env.AMRO_SEQ_PREREQ_OBSERVABILITY_BASELINE_READY = 'true';
+    process.env.AMRO_SEQ_M1_STATUS = 'completed';
+    process.env.AMRO_SEQ_M2_STATUS = 'completed';
+    process.env.AMRO_SEQ_M3_STATUS = 'completed';
+    process.env.AMRO_SEQ_M4_STATUS = 'completed';
+    process.env.AMRO_SEQ_M5_STATUS = 'completed';
+    process.env.AMRO_SEQ_M6_STATUS = 'not-started';
+    process.env.AMRO_SEQ_M7_STATUS = 'not-started';
+    process.env.AMRO_SEQ_M8_STATUS = 'not-started';
+    process.env.AMRO_SEQ_M9_STATUS = 'not-started';
+    process.env.AMRO_SEQ_M10_STATUS = 'not-started';
+    process.env.AMRO_SEQ_M1_CORE_SCHEMA_MIGRATED = 'true';
+    process.env.AMRO_SEQ_M1_RLS_ENABLED = 'true';
+    process.env.AMRO_SEQ_M1_TENANT_LEAKAGE_TESTS_100 = 'true';
+    process.env.AMRO_SEQ_M1_JWT_SIGNING_KEY_ONLY = 'true';
+    process.env.AMRO_SEQ_M2_API_CONTRACT_TESTS_PASS = 'true';
+    process.env.AMRO_SEQ_M2_TRANSITION_NEGATIVE_PATH_TESTS_PASS = 'true';
+    process.env.AMRO_SEQ_M2_E2E_CREATE_TRANSITION_100 = 'true';
+    process.env.AMRO_SEQ_M3_CAPACITY_VALIDATION_TESTS_PASS = 'true';
+    process.env.AMRO_SEQ_M3_REPLAN_SIMULATION_TESTS_100 = 'true';
+    process.env.AMRO_SEQ_M3_SCHEDULING_P95_TARGET_MET = 'true';
+    process.env.AMRO_SEQ_M4_STEP_ORDER_TESTS_PASS = 'true';
+    process.env.AMRO_SEQ_M4_EVIDENCE_CHECKSUM_100 = 'true';
+    process.env.AMRO_SEQ_M4_OFFLINE_SYNC_TESTS_100 = 'true';
+    process.env.AMRO_SEQ_M4_MOBILE_CRITICAL_FLOWS_PASS = 'true';
+    process.env.AMRO_SEQ_M5_NEGATIVE_PATH_TESTS_PASS = 'true';
+    process.env.AMRO_SEQ_M5_SERIALIZED_UNIQUENESS_TESTS_PASS = 'true';
+    process.env.AMRO_SEQ_M5_SHORTAGE_TO_PROCUREMENT_E2E_SCOPE_SAFE = 'true';
     vi.clearAllMocks();
     resetAmroAuditLedgerStore();
     vi.mocked(enforceAnyPermission).mockImplementation(() => undefined);
@@ -355,6 +387,37 @@ describe('/api/v2/amro/work-packages', () => {
     expect((res.jsonBody as any)?.output?.recommended_option?.option_id).toContain('replan-opt');
   });
 
+  it('blocks M3 scheduling interfaces until M2 is completed', async () => {
+    process.env.AMRO_WORK_PACKAGES_V2_ENABLED = 'true';
+    process.env.AMRO_SEQ_M1_STATUS = 'completed';
+    process.env.AMRO_SEQ_M2_STATUS = 'in-progress';
+    process.env.AMRO_SEQ_M3_STATUS = 'in-progress';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'assign-maintenance-slot' },
+      body: {
+        work_package_id: 'wp-001',
+        station_code: 'station-a',
+        slot_start: '2026-03-22T01:00:00.000Z',
+        slot_end: '2026-03-22T03:00:00.000Z',
+        station_capacity: 2,
+        existing_slots: [],
+        assigned_team: [{ member_id: 'tech-1', qualifications: ['station-a'] }],
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(sendErrorResponse).toHaveBeenCalledWith(
+      res,
+      expect.any(Error),
+      'corr-amro-v2',
+      { apiVersion: 'v2' }
+    );
+  });
+
   it('confirms replan only when affected packages are re-plannable', async () => {
     process.env.AMRO_WORK_PACKAGES_V2_ENABLED = 'true';
     vi.mocked(authenticateRequest).mockResolvedValue({
@@ -387,6 +450,7 @@ describe('/api/v2/amro/work-packages', () => {
 
   it('reserves parts with positive quantities and unique serialized lines', async () => {
     process.env.AMRO_WORK_PACKAGES_V2_ENABLED = 'true';
+    process.env.AMRO_SEQ_M3_STATUS = 'completed';
     const req: ApiRequest = {
       method: 'POST',
       query: { interface: 'reserve-parts' },
@@ -409,8 +473,61 @@ describe('/api/v2/amro/work-packages', () => {
     expect((res.jsonBody as any)?.output?.reservations?.length).toBe(2);
   });
 
+  it('rejects reserve-parts when serialized lines are duplicated within tenant scope', async () => {
+    process.env.AMRO_WORK_PACKAGES_V2_ENABLED = 'true';
+    process.env.AMRO_SEQ_M3_STATUS = 'completed';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'reserve-parts' },
+      body: {
+        work_package_id: 'wp-001',
+        demand_lines: [
+          { part_number: 'PN-001', quantity: 1, serial: 'SER-1' },
+          { part_number: 'PN-002', quantity: 1, serial: 'SER-1' },
+        ],
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(sendErrorResponse).toHaveBeenCalledWith(
+      res,
+      expect.any(Error),
+      'corr-amro-v2',
+      { apiVersion: 'v2' }
+    );
+  });
+
+  it('blocks M5 materials interfaces when M4 is not completed', async () => {
+    process.env.AMRO_WORK_PACKAGES_V2_ENABLED = 'true';
+    process.env.AMRO_SEQ_M3_STATUS = 'completed';
+    process.env.AMRO_SEQ_M4_STATUS = 'in-progress';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'reserve-parts' },
+      body: {
+        work_package_id: 'wp-001',
+        demand_lines: [{ part_number: 'PN-001', quantity: 1, serial: 'SER-1' }],
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(sendErrorResponse).toHaveBeenCalledWith(
+      res,
+      expect.any(Error),
+      'corr-amro-v2',
+      { apiVersion: 'v2' }
+    );
+  });
+
   it('rejects substitute shortage action without approved compatibility mapping', async () => {
     process.env.AMRO_WORK_PACKAGES_V2_ENABLED = 'true';
+    process.env.AMRO_SEQ_M3_STATUS = 'completed';
     const req: ApiRequest = {
       method: 'POST',
       query: { interface: 'process-shortage-response' },
@@ -434,8 +551,32 @@ describe('/api/v2/amro/work-packages', () => {
     );
   });
 
+  it('processes shortage escalation and returns tenant-scoped procurement trigger', async () => {
+    process.env.AMRO_WORK_PACKAGES_V2_ENABLED = 'true';
+    process.env.AMRO_SEQ_M3_STATUS = 'completed';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'process-shortage-response' },
+      body: {
+        shortage_id: 'short-001',
+        action: 'escalate',
+        supplier_ref: 'supp-001',
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.interface).toBe('process-shortage-response');
+    expect((res.jsonBody as any)?.output?.shortage_status).toBe('escalated');
+    expect((res.jsonBody as any)?.output?.procurement_trigger_id).toContain('tenant-1-short-001-proc-');
+  });
+
   it('syncs supplier ETA only from trusted adapters with valid datetime', async () => {
     process.env.AMRO_WORK_PACKAGES_V2_ENABLED = 'true';
+    process.env.AMRO_SEQ_M3_STATUS = 'completed';
     const req: ApiRequest = {
       method: 'POST',
       query: { interface: 'sync-supplier-eta' },

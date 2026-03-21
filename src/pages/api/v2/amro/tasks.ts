@@ -32,6 +32,7 @@ import {
 } from './reconciliation-queue';
 import { appendAmroAuditLedgerRecord } from './audit-ledger';
 import { resolveAmroAuditLedgerCutoverState, resolveAmroV2EndpointRolloutState } from './audit-ledger-cutover';
+import { enforceAmroSequentialMilestoneForTaskInterface } from './phase-plan-model';
 
 function parseBoolean(value: string | undefined, fallback: boolean): boolean {
   const normalized = String(value || '').trim().toLowerCase();
@@ -385,6 +386,9 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       capability: 'tasks',
     });
     const interfaceName = String(req.query.interface || '').trim().toLowerCase();
+    if (req.method === 'POST') {
+      enforceAmroSequentialMilestoneForTaskInterface(interfaceName);
+    }
 
     if (req.method === 'POST' && interfaceName === 'update-task-step') {
       enforceAnyPermission(auth.permissions || [], ['dashboards.manage', 'reports.manage']);

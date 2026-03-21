@@ -61,6 +61,24 @@ describe('/api/v2/amro/overview-kpi', () => {
   beforeEach(() => {
     process.env = { ...envBackup };
     vi.clearAllMocks();
+    process.env.AMRO_SEQ_PREREQ_ARCH_SECURITY_APPROVED = 'true';
+    process.env.AMRO_SEQ_PREREQ_ISOLATION_CONTROLS_DEFINED = 'true';
+    process.env.AMRO_SEQ_PREREQ_BACKWARD_COMPAT_COMPLETED = 'true';
+    process.env.AMRO_SEQ_PREREQ_TEST_PLAN_READY = 'true';
+    process.env.AMRO_SEQ_PREREQ_OBSERVABILITY_BASELINE_READY = 'true';
+    process.env.AMRO_SEQ_M1_STATUS = 'completed';
+    process.env.AMRO_SEQ_M2_STATUS = 'completed';
+    process.env.AMRO_SEQ_M3_STATUS = 'completed';
+    process.env.AMRO_SEQ_M4_STATUS = 'completed';
+    process.env.AMRO_SEQ_M5_STATUS = 'completed';
+    process.env.AMRO_SEQ_M6_STATUS = 'completed';
+    process.env.AMRO_SEQ_M7_STATUS = 'completed';
+    process.env.AMRO_SEQ_M8_STATUS = 'completed';
+    process.env.AMRO_SEQ_M9_STATUS = 'in-progress';
+    process.env.AMRO_SEQ_M10_STATUS = 'not-started';
+    process.env.AMRO_SEQ_M8_KPI_CORRECTNESS_BASELINE_PASS = 'true';
+    process.env.AMRO_SEQ_M8_RECOMMENDATION_CONTRACT_EXPLAINABILITY_PASS = 'true';
+    process.env.AMRO_SEQ_M8_LOW_CONFIDENCE_POLICY_TESTS_PASS = 'true';
     vi.mocked(enforceAnyPermission).mockImplementation(() => undefined);
     vi.mocked(handlePreflight).mockReturnValue(false);
     vi.mocked(buildApiContext).mockReturnValue({
@@ -278,6 +296,33 @@ describe('/api/v2/amro/overview-kpi', () => {
         format: 'pdf',
         date_range: '2026-03-01T00:00:00.000Z:2026-03-21T00:00:00.000Z',
         selected_widgets: [],
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(sendErrorResponse).toHaveBeenCalledWith(
+      res,
+      expect.any(Error),
+      'corr-amro-overview-kpi',
+      { apiVersion: 'v2' }
+    );
+  });
+
+  it('blocks M9 export interface when M8 is not completed', async () => {
+    process.env.AMRO_OVERVIEW_KPI_V2_ENABLED = 'true';
+    process.env.AMRO_SEQ_M8_STATUS = 'in-progress';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: {
+        interface: 'export-kpi-snapshot',
+      },
+      body: {
+        format: 'pdf',
+        date_range: '2026-03-01T00:00:00.000Z:2026-03-21T00:00:00.000Z',
+        selected_widgets: ['kpi_cards'],
       },
       headers: {},
     };

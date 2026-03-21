@@ -61,6 +61,21 @@ describe('/api/v2/amro/forecast-reliability', () => {
   beforeEach(() => {
     process.env = { ...envBackup };
     vi.clearAllMocks();
+    process.env.AMRO_SEQ_PREREQ_ARCH_SECURITY_APPROVED = 'true';
+    process.env.AMRO_SEQ_PREREQ_ISOLATION_CONTROLS_DEFINED = 'true';
+    process.env.AMRO_SEQ_PREREQ_BACKWARD_COMPAT_COMPLETED = 'true';
+    process.env.AMRO_SEQ_PREREQ_TEST_PLAN_READY = 'true';
+    process.env.AMRO_SEQ_PREREQ_OBSERVABILITY_BASELINE_READY = 'true';
+    process.env.AMRO_SEQ_M1_STATUS = 'completed';
+    process.env.AMRO_SEQ_M2_STATUS = 'completed';
+    process.env.AMRO_SEQ_M3_STATUS = 'completed';
+    process.env.AMRO_SEQ_M4_STATUS = 'completed';
+    process.env.AMRO_SEQ_M5_STATUS = 'completed';
+    process.env.AMRO_SEQ_M6_STATUS = 'completed';
+    process.env.AMRO_SEQ_M7_STATUS = 'completed';
+    process.env.AMRO_SEQ_M8_STATUS = 'in-progress';
+    process.env.AMRO_SEQ_M9_STATUS = 'not-started';
+    process.env.AMRO_SEQ_M10_STATUS = 'not-started';
     vi.mocked(enforceAnyPermission).mockImplementation(() => undefined);
     vi.mocked(handlePreflight).mockReturnValue(false);
     vi.mocked(buildApiContext).mockReturnValue({
@@ -175,6 +190,32 @@ describe('/api/v2/amro/forecast-reliability', () => {
           window_end: '2026-03-21T00:00:00.000Z',
           allowed_metric_keys: ['downtime_hours', 'repeat_defect_rate'],
         },
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(sendErrorResponse).toHaveBeenCalledWith(
+      res,
+      expect.any(Error),
+      'corr-amro-forecast-reliability-v2',
+      { apiVersion: 'v2' },
+    );
+  });
+
+  it('blocks M8 interfaces when M7 is not completed', async () => {
+    process.env.AMRO_FORECAST_RELIABILITY_V2_ENABLED = 'true';
+    process.env.AMRO_SEQ_M7_STATUS = 'in-progress';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'score-maintenance-risk' },
+      body: {
+        asset_id: 'aircraft-100',
+        telemetry_features: [{ key: 'vibration', value: 0.81 }],
+        defect_history: [{ code: 'D-1' }],
+        environment_context: { severity: 'moderate' },
       },
       headers: {},
     };

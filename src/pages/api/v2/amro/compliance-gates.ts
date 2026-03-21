@@ -32,6 +32,7 @@ import {
 } from './reconciliation-queue';
 import { appendAmroAuditLedgerRecord } from './audit-ledger';
 import { resolveAmroAuditLedgerCutoverState, resolveAmroV2EndpointRolloutState } from './audit-ledger-cutover';
+import { enforceAmroSequentialMilestoneForComplianceInterface } from './phase-plan-model';
 
 function parseBoolean(value: string | undefined, fallback: boolean): boolean {
   const normalized = String(value || '').trim().toLowerCase();
@@ -337,6 +338,9 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       capability: 'compliance-gates',
     });
     const interfaceName = String(req.query.interface || '').trim().toLowerCase();
+    if (req.method === 'POST') {
+      enforceAmroSequentialMilestoneForComplianceInterface(interfaceName);
+    }
 
     if (req.method === 'POST' && interfaceName === 'evaluate-compliance-gate') {
       enforceAnyPermission(auth.permissions || [], ['dashboards.manage', 'reports.manage']);

@@ -1,4 +1,5 @@
 import type { ApiRequest, ApiResponse } from '../../_utils/types';
+import { createHash } from 'node:crypto';
 import {
   applyCors,
   authenticateRequest,
@@ -13,9 +14,11 @@ import { sendErrorResponse } from '../../_utils/errorHandler';
 import { applyCompatibilityResponseHeaders, resolveGatewayCompatibility } from '../../_utils/compatibility-facade';
 import {
   replayAmroAuditLedgerRecords,
+  type AmroAuditLedgerRecord,
   type AmroAuditLedgerCapability,
 } from './audit-ledger';
 import { resolveAmroAuditLedgerCutoverState, resolveAmroV2EndpointRolloutState } from './audit-ledger-cutover';
+import { enforceAmroSequentialMilestoneForAuditReplay } from './phase-plan-model';
 
 function parseBoolean(value: string | undefined, fallback: boolean): boolean {
   const normalized = String(value || '').trim().toLowerCase();
@@ -45,6 +48,44 @@ function parseLimit(req: ApiRequest): number {
     throw new Error('Bad Request: Invalid limit filter');
   }
   return Math.floor(parsed);
+}
+
+function buildDeterministicReplayTimeline(records: AmroAuditLedgerRecord[]) {
+  const orderedRecords = [...records].sort((left, right) => {
+    if (left.createdAt === right.createdAt) {
+      return left.recordId.localeCompare(right.recordId);
+    }
+    return left.createdAt.localeCompare(right.createdAt);
+  });
+  const events = orderedRecords.map((record, index) => ({
+    sequence: index + 1,
+    record_id: record.recordId,
+    created_at: record.createdAt,
+    chain_hash: record.chainHash,
+    previous_hash: record.previousHash,
+  }));
+  const timelinePayload = events
+    .map((event) => `${event.sequence}|${event.record_id}|${event.created_at}|${event.chain_hash}|${event.previous_hash || ''}`)
+    .join('\n');
+  const timelineHash = createHash('sha256').update(timelinePayload).digest('hex');
+  const hashChainValid = orderedRecords.every((record, index) => {
+    if (index === 0) {
+      return record.previousHash === null;
+    }
+    return record.previousHash === orderedRecords[index - 1].chainHash;
+  });
+  return {
+    ordering: 'created_at:asc,record_id:asc',
+    event_count: orderedRecords.length,
+    start_at: orderedRecords[0]?.createdAt || null,
+    end_at: orderedRecords[orderedRecords.length - 1]?.createdAt || null,
+    timeline_hash: timelineHash,
+    events,
+    assertions: {
+      deterministic_timeline: true,
+      hash_chain_valid: hashChainValid,
+    },
+  };
 }
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {
@@ -102,6 +143,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       franchiseId,
       capability: capability || 'compliance-gates',
     });
+    enforceAmroSequentialMilestoneForAuditReplay();
     const records = cutoverState.enabled
       ? replayAmroAuditLedgerRecords({
         tenantId,
@@ -110,6 +152,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         limit,
       })
       : [];
+    const replayTimeline = buildDeterministicReplayTimeline(records);
 
     return res.status(200).json({
       version: 'v2',
@@ -125,6 +168,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       auditLedgerCutover: cutoverState,
       data: {
         records,
+        replay_timeline: replayTimeline,
+        replay_assertions: replayTimeline.assertions,
       },
       correlationId: ctx.correlationId,
     });

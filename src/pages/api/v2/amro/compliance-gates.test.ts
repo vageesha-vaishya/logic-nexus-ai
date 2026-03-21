@@ -67,6 +67,21 @@ describe('/api/v2/amro/compliance-gates', () => {
     process.env = { ...envBackup };
     resetAmroAuditLedgerStore();
     vi.clearAllMocks();
+    process.env.AMRO_SEQ_PREREQ_ARCH_SECURITY_APPROVED = 'true';
+    process.env.AMRO_SEQ_PREREQ_ISOLATION_CONTROLS_DEFINED = 'true';
+    process.env.AMRO_SEQ_PREREQ_BACKWARD_COMPAT_COMPLETED = 'true';
+    process.env.AMRO_SEQ_PREREQ_TEST_PLAN_READY = 'true';
+    process.env.AMRO_SEQ_PREREQ_OBSERVABILITY_BASELINE_READY = 'true';
+    process.env.AMRO_SEQ_M1_STATUS = 'completed';
+    process.env.AMRO_SEQ_M2_STATUS = 'completed';
+    process.env.AMRO_SEQ_M3_STATUS = 'completed';
+    process.env.AMRO_SEQ_M4_STATUS = 'completed';
+    process.env.AMRO_SEQ_M5_STATUS = 'completed';
+    process.env.AMRO_SEQ_M6_STATUS = 'in-progress';
+    process.env.AMRO_SEQ_M7_STATUS = 'not-started';
+    process.env.AMRO_SEQ_M8_STATUS = 'not-started';
+    process.env.AMRO_SEQ_M9_STATUS = 'not-started';
+    process.env.AMRO_SEQ_M10_STATUS = 'not-started';
     vi.mocked(enforceAnyPermission).mockImplementation(() => undefined);
     vi.mocked(handlePreflight).mockReturnValue(false);
     vi.mocked(buildApiContext).mockReturnValue({
@@ -290,5 +305,32 @@ describe('/api/v2/amro/compliance-gates', () => {
     expect((res.jsonBody as any)?.interface).toBe('generate-compliance-dossier');
     expect((res.jsonBody as any)?.output?.dossier_status).toBe('finalized');
     expect((res.jsonBody as any)?.output?.artifact_manifest?.length).toBe(3);
+  });
+
+  it('blocks M6 interfaces until M5 is completed', async () => {
+    process.env.AMRO_COMPLIANCE_GATES_V2_ENABLED = 'true';
+    process.env.AMRO_SEQ_M5_STATUS = 'in-progress';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'evaluate-compliance-gate' },
+      body: {
+        context: { type: 'task', id: 'task-001' },
+        regulator_profile: 'FAA',
+        required_obligations: [{ obligation_id: 'obl-1', fulfilled: true }],
+        policy_version_snapshot: 'policy-v2026.03.21',
+        decision_evidence: 'evidence-hash-001',
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(sendErrorResponse).toHaveBeenCalledWith(
+      res,
+      expect.any(Error),
+      'corr-amro-compliance-v2',
+      { apiVersion: 'v2' }
+    );
   });
 });

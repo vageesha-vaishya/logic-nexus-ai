@@ -2,8 +2,10 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
+import { useState } from 'react';
 import { useAmroWorkspaceState } from '../hooks/useAmroWorkspaceState';
 import type { AmroAuthorityLevel, AmroAssetType } from '../workspace/amroWorkspaceModel';
 
@@ -26,6 +28,14 @@ const authorityOptions: AmroAuthorityLevel[] = ['technician', 'supervisor', 'eng
 
 export function AmroOwnedWorkspace() {
   const state = useAmroWorkspaceState();
+  const [newWorkPackageTitle, setNewWorkPackageTitle] = useState('');
+
+  const handleCreateWorkPackage = async () => {
+    const ok = await state.createWorkPackage(newWorkPackageTitle);
+    if (ok) {
+      setNewWorkPackageTitle('');
+    }
+  };
 
   return (
     <section className="space-y-4">
@@ -36,6 +46,9 @@ export function AmroOwnedWorkspace() {
         <CardContent className="flex flex-wrap gap-2">
           <Badge variant="outline">Platform → Admin → Multi-Tenant → Multi-Franchisee</Badge>
           <Badge variant="outline">{state.isAmroAuthorized ? 'AMRO Authorized Context' : 'AMRO Authorization Required'}</Badge>
+          <Badge variant={state.realtimeConnected ? 'secondary' : 'outline'}>
+            {state.realtimeConnected ? 'Realtime Connected' : 'Realtime Disconnected'}
+          </Badge>
         </CardContent>
       </Card>
 
@@ -61,6 +74,24 @@ export function AmroOwnedWorkspace() {
           <CardTitle>Work Package and Task Lifecycle Orchestration</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
+          {state.workPackagesError ? (
+            <div className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
+              {state.workPackagesError}
+            </div>
+          ) : null}
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <Input
+              value={newWorkPackageTitle}
+              onChange={(event) => setNewWorkPackageTitle(event.target.value)}
+              placeholder="New work package title"
+            />
+            <Button onClick={handleCreateWorkPackage} disabled={!newWorkPackageTitle.trim()}>
+              Create Work Package
+            </Button>
+            <Button variant="outline" onClick={state.refreshWorkPackages} disabled={state.loadingWorkPackages}>
+              {state.loadingWorkPackages ? 'Refreshing...' : 'Refresh'}
+            </Button>
+          </div>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
             <div className="space-y-1">
               <Label>Work Package</Label>
@@ -86,6 +117,15 @@ export function AmroOwnedWorkspace() {
                 Advance Stage
               </Button>
             </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="destructive"
+              onClick={state.deleteSelectedWorkPackage}
+              disabled={!state.selectedWorkPackageId}
+            >
+              Delete Selected
+            </Button>
           </div>
           <div className="space-y-2">
             {(state.selectedWorkPackage?.tasks ?? []).map((task) => (

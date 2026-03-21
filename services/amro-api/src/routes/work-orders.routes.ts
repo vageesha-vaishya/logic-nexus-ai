@@ -3,7 +3,7 @@
  * Express routes for work package and task management
  */
 
-import { Router } from 'express';
+import { Router, Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { WorkOrdersService } from '../services/work-orders.service';
 import {
@@ -12,11 +12,55 @@ import {
   CreateTaskRequest,
   UpdateTaskRequest,
   ErrorResponse,
+  MaintenanceType,
 } from '../types/amro.types';
 import { asyncHandler } from '../utils/asyncHandler';
+import { workPackagesStream } from '../realtime/work-packages-stream';
 
 const router = Router();
 const workOrdersService = new WorkOrdersService();
+
+type V2CreateWorkPackageRequest = {
+  aircraft_id?: string;
+  maintenance_type?: string;
+  planned_window?: string;
+  station?: string;
+  priority?: string;
+  scope_items?: string[];
+};
+
+function mapV2CreatePayloadToV1Request(request: V2CreateWorkPackageRequest): CreateWorkPackageRequest {
+  const normalizedMaintenanceType = String(request.maintenance_type || '').trim().toLowerCase();
+  const maintenanceType: MaintenanceType =
+    normalizedMaintenanceType === 'base' ||
+    normalizedMaintenanceType === 'component' ||
+    normalizedMaintenanceType === 'inspection' ||
+    normalizedMaintenanceType === 'overhaul' ||
+    normalizedMaintenanceType === 'repair' ||
+    normalizedMaintenanceType === 'upgrade' ||
+    normalizedMaintenanceType === 'modification'
+      ? normalizedMaintenanceType
+      : 'line';
+  const [plannedStartDateRaw, plannedEndDateRaw] = String(request.planned_window || '').split('|');
+  const plannedStartDate = plannedStartDateRaw?.trim() || undefined;
+  const plannedEndDate = plannedEndDateRaw?.trim() || undefined;
+  const scopeItems = Array.isArray(request.scope_items)
+    ? request.scope_items
+        .map((item) => String(item || '').trim())
+        .filter((item) => item.length > 0)
+    : [];
+  const title = scopeItems[0] || 'AMRO Work Package';
+
+  return {
+    aircraft_id: String(request.aircraft_id || '').trim(),
+    title,
+    description: scopeItems.length > 1 ? scopeItems.join('; ') : undefined,
+    maintenance_type: maintenanceType,
+    work_type: maintenanceType,
+    planned_start_date: plannedStartDate,
+    planned_end_date: plannedEndDate,
+  };
+}
 
 // ============================================================================
 // WORK PACKAGES
@@ -47,6 +91,46 @@ router.get(
     return;
   }),
 );
+
+router.get('/work-packages/stream', (req: AuthRequest, res: Response): void => {
+  const tenantId = req.tenantId;
+  if (!tenantId) {
+    res.status(401).json({
+      error: 'Missing tenant context',
+      code: 'MISSING_TENANT',
+      statusCode: 401,
+    } as ErrorResponse);
+    return;
+  }
+
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  const writeEvent = (event: string, data: unknown) => {
+    res.write(`event: ${event}\n`);
+    res.write(`data: ${JSON.stringify(data)}\n\n`);
+  };
+
+  writeEvent('connected', { ok: true, at: new Date().toISOString() });
+
+  const unsubscribe = workPackagesStream.subscribe((event) => {
+    if (event.tenantId !== tenantId) {
+      return;
+    }
+    writeEvent('work-package-change', event);
+  });
+
+  const heartbeat = setInterval(() => {
+    writeEvent('heartbeat', { at: new Date().toISOString() });
+  }, 30000);
+
+  req.on('close', () => {
+    clearInterval(heartbeat);
+    unsubscribe();
+  });
+});
 
 /**
  * GET /api/v1/work-packages/:id
@@ -105,6 +189,45 @@ router.post(
 
     const workPackage = await workOrdersService.createWorkPackage(tenantId, userId, request);
     res.status(201).json({ data: workPackage });
+    return;
+  }),
+);
+
+router.post(
+  '/amro/work-packages',
+  asyncHandler(async (req: AuthRequest, res): Promise<void> => {
+    const tenantId = req.tenantId;
+    const userId = req.userId;
+
+    if (!tenantId || !userId) {
+      res.status(401).json({
+        error: 'Missing tenant or user context',
+        code: 'MISSING_CONTEXT',
+        statusCode: 401,
+      } as ErrorResponse);
+      return;
+    }
+
+    const v2Request = req.body as V2CreateWorkPackageRequest;
+    const request = mapV2CreatePayloadToV1Request(v2Request);
+
+    if (!request.aircraft_id) {
+      res.status(400).json({
+        error: 'Missing required field: aircraft_id',
+        code: 'VALIDATION_ERROR',
+        statusCode: 400,
+      } as ErrorResponse);
+      return;
+    }
+
+    const workPackage = await workOrdersService.createWorkPackage(tenantId, userId, request);
+    res.status(201).json({
+      data: {
+        id: workPackage.id,
+        code: workPackage.work_order_number || workPackage.work_package_number || workPackage.id,
+        status: workPackage.status,
+      },
+    });
     return;
   }),
 );
@@ -354,6 +477,144 @@ router.get(
 
     const material = await workOrdersService.getMaterial(tenantId, id);
     res.json({ data: material });
+    return;
+  }),
+);
+
+router.get(
+  '/assets',
+  asyncHandler(async (req: AuthRequest, res): Promise<void> => {
+    const tenantId = req.tenantId;
+    if (!tenantId) {
+      res.status(401).json({
+        error: 'Missing tenant context',
+        code: 'MISSING_TENANT',
+        statusCode: 401,
+      } as ErrorResponse);
+      return;
+    }
+    const assets = await workOrdersService.getAssetSummaries(tenantId);
+    res.json({
+      data: assets,
+      count: assets.length,
+    });
+    return;
+  }),
+);
+
+router.get(
+  '/qualifications',
+  asyncHandler(async (req: AuthRequest, res): Promise<void> => {
+    const tenantId = req.tenantId;
+    if (!tenantId) {
+      res.status(401).json({
+        error: 'Missing tenant context',
+        code: 'MISSING_TENANT',
+        statusCode: 401,
+      } as ErrorResponse);
+      return;
+    }
+    const qualifications = await workOrdersService.getQualificationSummaries(tenantId);
+    res.json({
+      data: qualifications,
+      count: qualifications.length,
+    });
+    return;
+  }),
+);
+
+router.get(
+  '/compliance/summary',
+  asyncHandler(async (req: AuthRequest, res): Promise<void> => {
+    const tenantId = req.tenantId;
+    if (!tenantId) {
+      res.status(401).json({
+        error: 'Missing tenant context',
+        code: 'MISSING_TENANT',
+        statusCode: 401,
+      } as ErrorResponse);
+      return;
+    }
+    const summary = await workOrdersService.getComplianceSummary(tenantId);
+    res.json({ data: summary });
+    return;
+  }),
+);
+
+router.get(
+  '/evidence',
+  asyncHandler(async (req: AuthRequest, res): Promise<void> => {
+    const tenantId = req.tenantId;
+    if (!tenantId) {
+      res.status(401).json({
+        error: 'Missing tenant context',
+        code: 'MISSING_TENANT',
+        statusCode: 401,
+      } as ErrorResponse);
+      return;
+    }
+    const evidence = await workOrdersService.getEvidenceSummaries(tenantId);
+    res.json({
+      data: evidence,
+      count: evidence.length,
+    });
+    return;
+  }),
+);
+
+router.get(
+  '/forecast/recommendations',
+  asyncHandler(async (req: AuthRequest, res): Promise<void> => {
+    const tenantId = req.tenantId;
+    if (!tenantId) {
+      res.status(401).json({
+        error: 'Missing tenant context',
+        code: 'MISSING_TENANT',
+        statusCode: 401,
+      } as ErrorResponse);
+      return;
+    }
+    const recommendations = await workOrdersService.getForecastRecommendations(tenantId);
+    res.json({
+      data: recommendations,
+      count: recommendations.length,
+    });
+    return;
+  }),
+);
+
+router.get(
+  '/scheduling/summary',
+  asyncHandler(async (req: AuthRequest, res): Promise<void> => {
+    const tenantId = req.tenantId;
+    if (!tenantId) {
+      res.status(401).json({
+        error: 'Missing tenant context',
+        code: 'MISSING_TENANT',
+        statusCode: 401,
+      } as ErrorResponse);
+      return;
+    }
+    const summary = await workOrdersService.getSchedulingSummary(tenantId);
+    res.json({ data: summary });
+    return;
+  }),
+);
+
+router.get(
+  '/integration/summary',
+  asyncHandler(async (req: AuthRequest, res): Promise<void> => {
+    const tenantId = req.tenantId;
+    if (!tenantId) {
+      res.status(401).json({
+        error: 'Missing tenant context',
+        code: 'MISSING_TENANT',
+        statusCode: 401,
+      } as ErrorResponse);
+      return;
+    }
+    const summary = await workOrdersService.getIntegrationSummary(tenantId);
+    res.json({ data: summary });
     return;
   }),
 );

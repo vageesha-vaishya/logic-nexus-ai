@@ -67,6 +67,25 @@ describe('/api/v2/amro/tasks', () => {
 
   beforeEach(() => {
     process.env = { ...envBackup };
+    process.env.AMRO_SEQ_PREREQ_ARCH_SECURITY_APPROVED = 'true';
+    process.env.AMRO_SEQ_PREREQ_ISOLATION_CONTROLS_DEFINED = 'true';
+    process.env.AMRO_SEQ_PREREQ_BACKWARD_COMPAT_COMPLETED = 'true';
+    process.env.AMRO_SEQ_PREREQ_TEST_PLAN_READY = 'true';
+    process.env.AMRO_SEQ_PREREQ_OBSERVABILITY_BASELINE_READY = 'true';
+    process.env.AMRO_SEQ_M1_STATUS = 'completed';
+    process.env.AMRO_SEQ_M2_STATUS = 'completed';
+    process.env.AMRO_SEQ_M3_STATUS = 'completed';
+    process.env.AMRO_SEQ_M4_STATUS = 'in-progress';
+    process.env.AMRO_SEQ_M1_CORE_SCHEMA_MIGRATED = 'true';
+    process.env.AMRO_SEQ_M1_RLS_ENABLED = 'true';
+    process.env.AMRO_SEQ_M1_TENANT_LEAKAGE_TESTS_100 = 'true';
+    process.env.AMRO_SEQ_M1_JWT_SIGNING_KEY_ONLY = 'true';
+    process.env.AMRO_SEQ_M2_API_CONTRACT_TESTS_PASS = 'true';
+    process.env.AMRO_SEQ_M2_TRANSITION_NEGATIVE_PATH_TESTS_PASS = 'true';
+    process.env.AMRO_SEQ_M2_E2E_CREATE_TRANSITION_100 = 'true';
+    process.env.AMRO_SEQ_M3_CAPACITY_VALIDATION_TESTS_PASS = 'true';
+    process.env.AMRO_SEQ_M3_REPLAN_SIMULATION_TESTS_100 = 'true';
+    process.env.AMRO_SEQ_M3_SCHEDULING_P95_TARGET_MET = 'true';
     vi.clearAllMocks();
     resetAmroAuditLedgerStore();
     vi.mocked(enforceAnyPermission).mockImplementation(() => undefined);
@@ -332,5 +351,35 @@ describe('/api/v2/amro/tasks', () => {
     expect(res.statusCode).toBe(200);
     expect((res.jsonBody as any)?.interface).toBe('submit-signature');
     expect((res.jsonBody as any)?.output?.non_repudiation_status).toBe('verified');
+  });
+
+  it('blocks M4 task execution interfaces until M3 is completed', async () => {
+    process.env.AMRO_TASKS_V2_ENABLED = 'true';
+    process.env.AMRO_SEQ_M3_STATUS = 'in-progress';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'upload-evidence' },
+      body: {
+        task_id: 'task-001',
+        evidence_type: 'photo',
+        media_ref: 's3://bucket/evidence/photo-001.jpg',
+        checksum: 'abc123def456ghi789',
+        metadata: {
+          media_size_bytes: 1024,
+          mime_type: 'image/jpeg',
+        },
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(sendErrorResponse).toHaveBeenCalledWith(
+      res,
+      expect.any(Error),
+      'corr-amro-tasks-v2',
+      { apiVersion: 'v2' }
+    );
   });
 });

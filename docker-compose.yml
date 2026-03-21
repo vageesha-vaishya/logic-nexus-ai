@@ -121,10 +121,50 @@ services:
     networks:
       - supabase-network
 
+  amro-api:
+    build:
+      context: ./services/amro-api
+    container_name: amro-api
+    restart: unless-stopped
+    depends_on:
+      - db
+      - auth
+    ports:
+      - "3001:3001"
+    environment:
+      PORT: 3001
+      NODE_ENV: ${NODE_ENV:-development}
+      SUPABASE_URL: ${SUPABASE_URL:-http://rest:3000}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:8083}
+      KAFKA_BROKERS: ${KAFKA_BROKERS:-localhost:9092}
+      KAFKA_TOPIC_WORK_ORDERS: ${KAFKA_TOPIC_WORK_ORDERS:-amro.work-orders}
+      KAFKA_TOPIC_TASKS: ${KAFKA_TOPIC_TASKS:-amro.tasks}
+      KAFKA_CLIENT_ID: ${KAFKA_CLIENT_ID:-amro-api-producer}
+      KAFKA_PRODUCER_TIMEOUT: ${KAFKA_PRODUCER_TIMEOUT:-5000}
+      DEBUG: ${DEBUG:-false}
+    networks:
+      - supabase-network
+
+  web:
+    build:
+      context: .
+      args:
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
+        VITE_SUPABASE_PUBLISHABLE_KEY: ${VITE_SUPABASE_PUBLISHABLE_KEY}
+    container_name: logic-nexus-web
+    restart: unless-stopped
+    depends_on:
+      - amro-api
+    ports:
+      - "8083:80"
+    networks:
+      - supabase-network
+
 networks:
   supabase-network:
     driver: bridge
 
 volumes:
   supabase-db-data:
-

@@ -19,20 +19,22 @@ import {
 } from '@/pages/api/v2/amro/integration-contracts';
 import { AMRO_PHASE_1_DELIVERABLES, AMRO_PHASE_1_SCOPE } from '@/pages/api/v2/amro/phase-1-core-workflows';
 import { AMRO_MODULE_CATALOG } from '@/pages/api/v2/amro/module-catalog-model';
-import { AMRO_PHASE_PLAN_MATRIX } from '@/pages/api/v2/amro/phase-plan-model';
+import { AMRO_PHASE_PLAN_MATRIX, type AmroPhasePlanRow, type AmroPhaseStatus } from '@/pages/api/v2/amro/phase-plan-model';
 import {
   AMRO_ACCESSIBILITY_I18N_REQUIREMENTS,
   AMRO_SCREEN_INVENTORY,
   AMRO_SCREEN_LAYOUT_CONTRACTS,
   AMRO_UIUX_BEHAVIOR_RULES,
 } from '@/pages/api/v2/amro/screen-inventory-model';
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { AmroOwnedWorkspace } from '../components/AmroOwnedWorkspace';
 import { useAmroOverviewKpi } from '../hooks/useAmroOverviewKpi';
 
 type AmroModuleShellProps = {
   children: ReactNode;
 };
+
+type AmroPhasePlanUiRow = AmroPhasePlanRow & { status?: AmroPhaseStatus };
 
 function AmroModuleShell({ children }: AmroModuleShellProps) {
   return (
@@ -50,6 +52,34 @@ export default function AmroHubVerticalPage() {
   const { currentDomain } = useDomain();
   const isAmroDomainActive = currentDomain?.code === 'AMRO';
   const { dashboard, trends, lastExport, loading, exporting, error, exportSnapshot } = useAmroOverviewKpi();
+  const [phasePlanRows, setPhasePlanRows] = useState<AmroPhasePlanUiRow[]>([...AMRO_PHASE_PLAN_MATRIX]);
+  const [phasePlanSource, setPhasePlanSource] = useState<'api' | 'fallback'>('fallback');
+
+  useEffect(() => {
+    let active = true;
+    const loadPhasePlan = async () => {
+      try {
+        const response = await fetch(AMRO_PHASE_PLAN_PATH);
+        const payload = await response.json() as {
+          data?: { phasePlan?: { rows?: AmroPhasePlanUiRow[] } };
+        };
+        const rows = payload?.data?.phasePlan?.rows;
+        if (!response.ok || !Array.isArray(rows) || rows.length === 0 || !active) {
+          return;
+        }
+        setPhasePlanRows(rows);
+        setPhasePlanSource('api');
+      } catch {
+        if (active) {
+          setPhasePlanSource('fallback');
+        }
+      }
+    };
+    void loadPhasePlan();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   return (
     <DashboardLayout>
@@ -386,23 +416,26 @@ export default function AmroHubVerticalPage() {
                     <p className="text-sm text-muted-foreground">
                       Delivery is sequenced by phases to preserve backward compatibility and controlled tenant/franchise rollout.
                     </p>
+                    <Badge variant="outline">
+                      Phase Plan Source: {phasePlanSource === 'api' ? 'Live API' : 'Fallback Model'}
+                    </Badge>
                     <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                      {AMRO_PHASE_PLAN_MATRIX.map((phase) => (
+                      {phasePlanRows.map((phase) => (
                         <div key={phase.id} className="rounded-md border p-3">
                           <div className="flex items-center justify-between gap-2">
                             <p className="text-sm font-semibold">{phase.label}</p>
-                            <Badge variant="outline">{phase.duration}</Badge>
+                            {phase.status ? <Badge variant="secondary">{phase.status}</Badge> : null}
                           </div>
-                          <p className="mt-2 text-xs text-muted-foreground">{phase.primaryFocus}</p>
+                          <p className="mt-2 text-xs font-medium">Backend Build Scope</p>
+                          <p className="text-xs text-muted-foreground">{phase.backendBuildScope}</p>
+                          <p className="mt-2 text-xs font-medium">Frontend Build Scope</p>
+                          <p className="text-xs text-muted-foreground">{phase.frontendBuildScope}</p>
+                          <p className="mt-2 text-xs font-medium">Data and Security Scope</p>
+                          <p className="text-xs text-muted-foreground">{phase.dataAndSecurityScope}</p>
+                          <p className="mt-2 text-xs font-medium">Test Scope</p>
+                          <p className="text-xs text-muted-foreground">{phase.testScope}</p>
                           <p className="mt-2 text-xs font-medium">Deliverables</p>
-                          <div className="mt-1 flex flex-wrap gap-1">
-                            {phase.deliverables.map((deliverable) => (
-                              <Badge key={`${phase.id}-${deliverable}`} variant="secondary">
-                                {deliverable}
-                              </Badge>
-                            ))}
-                          </div>
-                          <p className="mt-2 text-xs text-muted-foreground">{phase.exitCriteria}</p>
+                          <p className="text-xs text-muted-foreground">{phase.deliverables}</p>
                         </div>
                       ))}
                     </div>

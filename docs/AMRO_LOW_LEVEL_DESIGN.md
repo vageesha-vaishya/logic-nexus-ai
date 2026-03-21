@@ -204,6 +204,86 @@ This Low Level Design defines the executable technical blueprint for delivering 
 | M3 Performance + Intelligence | Load test report, p95/p99 report, forecast quality metrics | Engineering + SRE |
 | M4 Integration + Scale | ERP/IoT integration report, DR drill results, rollout playbook | Operations + Leadership |
 
+### 4.6 Development Start Sequence (Execution Order)
+
+This section defines the engineering execution order, per-phase implementation scope, and concrete delivery artifacts required to build AMRO.
+
+#### 4.6.1 Phase-by-Phase Engineering Implementation Plan
+
+| Phase | Backend Build Scope | Frontend Build Scope | Data and Security Scope | Test Scope | Deliverables |
+|---|---|---|---|---|---|
+| P0 Foundation | Build v2 API skeletons, request/response envelope utilities, error model, auth middleware hooks | Build AMRO route shell, module navigation entry points, placeholder pages for Overview/Work Package/Scheduling | Create baseline tables and RLS policies with tenant_id and franchise_id; enforce AMRO domain assignment checks | Add unit tests for auth/access middleware and contract health endpoints | Running AMRO domain routes, secured API scaffold, passing CI baseline |
+| P1 Core Workflows | Implement work package lifecycle APIs (create/transition/clone), task step update APIs, parts reserve/shortage APIs | Implement SCR-AMRO-001/002/003/004/005/006/007 baseline views and forms | Implement schema for work_packages, tasks, reservations, stock movements with policy-safe transitions | Add integration tests for plan-to-execute flow and API validation rules | End-to-end flow: create WP -> schedule -> execute task -> reserve parts |
+| P2 Compliance and Mobility | Implement compliance gate, exception, dossier APIs; implement certification authority and decision APIs | Implement SCR-AMRO-008/009/010 and mobile execution behavior including offline queue UX | Add compliance_records, obligations, certification_actions, signed evidence references; enforce ABAC cert rules | Add replayable audit tests, signature integrity tests, offline sync conflict tests | Compliance and certification gate path fully executable with audit trail |
+| P3 Intelligence and Optimization | Implement risk scoring, intervention recommendation, feedback capture APIs; optimize heavy queries | Implement SCR-AMRO-011/012 analytics, forecast explainability, operator action feedback UI | Add forecast_outputs, asset_health_signals, model feedback policy configs | Add model contract tests, low-confidence flag tests, p95/p99 performance tests | Forecast loop operational: score -> recommend -> outcome feedback |
+| P4 Integration and Scale | Implement partner ingest/replay/callback hardening, adapter retries, dead-letter/replay orchestration | Implement integration monitor operational console hardening and admin controls | Add integration_jobs/mappings audit fields, retention rules, and replay governance controls | Add adapter contract tests, resilience tests, DR validation tests | Production-ready integrations with replay, observability, and DR evidence |
+
+#### 4.6.2 Engineering Sequence by Sprint Window
+
+| Sprint Window | Build Order | Mandatory Outputs |
+|---|---|---|
+| Weeks 1-2 (P0) | Access control -> API scaffolding -> schema/RLS -> observability -> CI gates | Security-approved scaffold PRs, migration scripts, API contract stubs |
+| Weeks 3-5 (P1-A) | Work package CRUD/transition APIs -> Work Package List/Create/Detail UI | Working SCR-AMRO-002/003/004 with server-backed APIs |
+| Weeks 6-8 (P1-B) | Task execution + parts reservation + scheduling APIs/UI | Working SCR-AMRO-005/006/007 and plan-to-execute integration tests |
+| Weeks 9-11 (P2-A) | Compliance APIs/UI + gate explainability + exception workflow | Working SCR-AMRO-008 and dossier generation path |
+| Weeks 12-14 (P2-B) | Certification APIs/UI + audit replay timeline + offline sync conflict handling | Working SCR-AMRO-009/010 with signed audit evidence |
+| Weeks 15-17 (P3-A) | Forecast scoring + recommendation engine + dashboard integration | Working SCR-AMRO-012 with confidence segmentation and rationale |
+| Weeks 18-20 (P3-B) | Query/performance optimization + anomaly tuning + operational SLO hardening | p95/p99 evidence and quality benchmark report |
+| Weeks 21-23 (P4-A) | Partner ingest/replay/callback production hardening | Working SCR-AMRO-011 with replay controls and policy checks |
+| Weeks 24-26 (P4-B) | Multi-region readiness, DR rehearsal, release hardening | GA readiness pack with DR, rollback, and runbook evidence |
+
+#### 4.6.3 Module-to-Interface Build Order (Developer Backlog Sequence)
+
+| Order | Module | Primary Interfaces to Implement | Depends On | Done Definition |
+|---|---|---|---|---|
+| 1 | Work Order Management | 15.2.2 create/transition/clone work package | P0 auth + schema | All transition policies and role checks enforced |
+| 2 | Task Execution and Evidence | 15.2.3 update step/upload evidence/submit signature | Work package lifecycle | Step-order and signature validity tests pass |
+| 3 | Maintenance Scheduling | 15.2.4 assign slot/replan/confirm replan | Work package + staff constraints | No-overlap and capacity validations pass |
+| 4 | Parts and Materials | 15.2.5 reserve/shortage response/supplier ETA sync | Work package + inventory schema | Shortage and serialized uniqueness checks pass |
+| 5 | Compliance and Airworthiness | 15.2.6 evaluate gate/register exception/generate dossier | Task + parts + scheduling data | Mandatory obligation evidence complete |
+| 6 | Certification and Authority | 15.2.7 authority validation/decision/escalation | Compliance outcomes + staff qualifications | Zero unresolved blockers before approve |
+| 7 | Integration and Partner Hub | 15.2.8 ingest/replay/publish callback | Core module events stable | Idempotency, allow-list, schema-version checks pass |
+| 8 | Forecast and Reliability | 15.2.9 risk score/recommend/outcome capture | Historical events + telemetry | Low-confidence flags and feedback policy checks pass |
+
+#### 4.6.4 Definition of Done per Phase (Developer Acceptance Checklist)
+
+- All phase interfaces are implemented with explicit input contract, output contract, and validation rules.
+- Tenant and franchise isolation is enforced in every query path and validated by tests.
+- UI screens in the phase are connected to live APIs and preserve required module shell behavior.
+- Audit ledger events are emitted for every state-changing operation in the phase.
+- Phase test suite passes: unit, integration, and regression tests for impacted modules.
+- Repository checks pass before merge: lint, typecheck, and required API contract checks.
+- Release artifact includes rollback-safe migration scripts and compatibility notes for changed endpoints.
+
+#### 4.6.5 Target Code Locations by Interface (Direct Engineer Assignment)
+
+| Interface Group | Interface Query Value | Endpoint Route | Handler File | Primary Test File | Contract File to Update | Supporting Files |
+|---|---|---|---|---|---|---|
+| 15.2.2 Work Package Management | create-work-package | /api/v2/amro/work-packages | src/pages/api/v2/amro/work-packages.ts | src/pages/api/v2/amro/work-packages.test.ts | src/pages/api/v2/amro/contracts/openapi-3.1.yaml | src/pages/api/v2/amro/audit-ledger.ts; src/pages/api/v2/amro/anti-corruption-adapter.ts; src/features/module-amro/pages/AmroHubVerticalPage.tsx; src/pages/api/v2/amro/contracts/contract-endpoints.test.ts |
+| 15.2.2 Work Package Management | transition-work-package | /api/v2/amro/work-packages | src/pages/api/v2/amro/work-packages.ts | src/pages/api/v2/amro/work-packages.test.ts | src/pages/api/v2/amro/contracts/openapi-3.1.yaml | src/pages/api/v2/amro/audit-ledger.ts; src/pages/api/v2/amro/anti-corruption-adapter.ts; src/features/module-amro/pages/AmroHubVerticalPage.tsx; src/pages/api/v2/amro/contracts/contract-endpoints.test.ts |
+| 15.2.2 Work Package Management | clone-template | /api/v2/amro/work-packages | src/pages/api/v2/amro/work-packages.ts | src/pages/api/v2/amro/work-packages.test.ts | src/pages/api/v2/amro/contracts/openapi-3.1.yaml | src/pages/api/v2/amro/audit-ledger.ts; src/pages/api/v2/amro/anti-corruption-adapter.ts; src/features/module-amro/pages/AmroHubVerticalPage.tsx; src/pages/api/v2/amro/contracts/contract-endpoints.test.ts |
+| 15.2.3 Task Execution and Evidence | update-task-step | /api/v2/amro/tasks | src/pages/api/v2/amro/tasks.ts | src/pages/api/v2/amro/tasks.test.ts | src/pages/api/v2/amro/contracts/openapi-3.1.yaml | src/pages/api/v2/amro/audit-ledger.ts; src/pages/api/v2/amro/anti-corruption-adapter.ts; src/features/module-amro/pages/AmroHubVerticalPage.tsx; src/pages/api/v2/amro/contracts/contract-endpoints.test.ts |
+| 15.2.3 Task Execution and Evidence | upload-evidence | /api/v2/amro/tasks | src/pages/api/v2/amro/tasks.ts | src/pages/api/v2/amro/tasks.test.ts | src/pages/api/v2/amro/contracts/openapi-3.1.yaml | src/pages/api/v2/amro/audit-ledger.ts; src/pages/api/v2/amro/anti-corruption-adapter.ts; src/features/module-amro/pages/AmroHubVerticalPage.tsx; src/pages/api/v2/amro/contracts/contract-endpoints.test.ts |
+| 15.2.3 Task Execution and Evidence | submit-signature | /api/v2/amro/tasks | src/pages/api/v2/amro/tasks.ts | src/pages/api/v2/amro/tasks.test.ts | src/pages/api/v2/amro/contracts/openapi-3.1.yaml | src/pages/api/v2/amro/audit-ledger.ts; src/pages/api/v2/amro/anti-corruption-adapter.ts; src/features/module-amro/pages/AmroHubVerticalPage.tsx; src/pages/api/v2/amro/contracts/contract-endpoints.test.ts |
+| 15.2.4 Maintenance Scheduling | assign-maintenance-slot | /api/v2/amro/work-packages | src/pages/api/v2/amro/work-packages.ts | src/pages/api/v2/amro/work-packages.test.ts | src/pages/api/v2/amro/contracts/openapi-3.1.yaml | src/pages/api/v2/amro/audit-ledger.ts; src/pages/api/v2/amro/anti-corruption-adapter.ts; src/features/module-amro/pages/AmroHubVerticalPage.tsx; src/pages/api/v2/amro/contracts/contract-endpoints.test.ts |
+| 15.2.4 Maintenance Scheduling | run-replan-simulation | /api/v2/amro/work-packages | src/pages/api/v2/amro/work-packages.ts | src/pages/api/v2/amro/work-packages.test.ts | src/pages/api/v2/amro/contracts/openapi-3.1.yaml | src/pages/api/v2/amro/audit-ledger.ts; src/pages/api/v2/amro/anti-corruption-adapter.ts; src/features/module-amro/pages/AmroHubVerticalPage.tsx; src/pages/api/v2/amro/contracts/contract-endpoints.test.ts |
+| 15.2.4 Maintenance Scheduling | confirm-replan | /api/v2/amro/work-packages | src/pages/api/v2/amro/work-packages.ts | src/pages/api/v2/amro/work-packages.test.ts | src/pages/api/v2/amro/contracts/openapi-3.1.yaml | src/pages/api/v2/amro/audit-ledger.ts; src/pages/api/v2/amro/anti-corruption-adapter.ts; src/features/module-amro/pages/AmroHubVerticalPage.tsx; src/pages/api/v2/amro/contracts/contract-endpoints.test.ts |
+| 15.2.5 Parts and Materials | reserve-parts | /api/v2/amro/work-packages | src/pages/api/v2/amro/work-packages.ts | src/pages/api/v2/amro/work-packages.test.ts | src/pages/api/v2/amro/contracts/openapi-3.1.yaml | src/pages/api/v2/amro/audit-ledger.ts; src/pages/api/v2/amro/anti-corruption-adapter.ts; src/features/module-amro/pages/AmroHubVerticalPage.tsx; src/pages/api/v2/amro/contracts/contract-endpoints.test.ts |
+| 15.2.5 Parts and Materials | process-shortage-response | /api/v2/amro/work-packages | src/pages/api/v2/amro/work-packages.ts | src/pages/api/v2/amro/work-packages.test.ts | src/pages/api/v2/amro/contracts/openapi-3.1.yaml | src/pages/api/v2/amro/audit-ledger.ts; src/pages/api/v2/amro/anti-corruption-adapter.ts; src/features/module-amro/pages/AmroHubVerticalPage.tsx; src/pages/api/v2/amro/contracts/contract-endpoints.test.ts |
+| 15.2.5 Parts and Materials | sync-supplier-eta | /api/v2/amro/work-packages | src/pages/api/v2/amro/work-packages.ts | src/pages/api/v2/amro/work-packages.test.ts | src/pages/api/v2/amro/contracts/openapi-3.1.yaml | src/pages/api/v2/amro/audit-ledger.ts; src/pages/api/v2/amro/anti-corruption-adapter.ts; src/features/module-amro/pages/AmroHubVerticalPage.tsx; src/pages/api/v2/amro/contracts/contract-endpoints.test.ts |
+| 15.2.6 Compliance and Airworthiness | evaluate-compliance-gate | /api/v2/amro/compliance-gates | src/pages/api/v2/amro/compliance-gates.ts | src/pages/api/v2/amro/compliance-gates.test.ts | src/pages/api/v2/amro/contracts/openapi-3.1.yaml | src/pages/api/v2/amro/audit-ledger.ts; src/pages/api/v2/amro/anti-corruption-adapter.ts; src/features/module-amro/pages/AmroHubVerticalPage.tsx; src/pages/api/v2/amro/contracts/contract-endpoints.test.ts |
+| 15.2.6 Compliance and Airworthiness | register-exception-request | /api/v2/amro/compliance-gates | src/pages/api/v2/amro/compliance-gates.ts | src/pages/api/v2/amro/compliance-gates.test.ts | src/pages/api/v2/amro/contracts/openapi-3.1.yaml | src/pages/api/v2/amro/audit-ledger.ts; src/pages/api/v2/amro/anti-corruption-adapter.ts; src/features/module-amro/pages/AmroHubVerticalPage.tsx; src/pages/api/v2/amro/contracts/contract-endpoints.test.ts |
+| 15.2.6 Compliance and Airworthiness | generate-compliance-dossier | /api/v2/amro/compliance-gates | src/pages/api/v2/amro/compliance-gates.ts | src/pages/api/v2/amro/compliance-gates.test.ts | src/pages/api/v2/amro/contracts/openapi-3.1.yaml | src/pages/api/v2/amro/audit-ledger.ts; src/pages/api/v2/amro/anti-corruption-adapter.ts; src/features/module-amro/pages/AmroHubVerticalPage.tsx; src/pages/api/v2/amro/contracts/contract-endpoints.test.ts |
+| 15.2.7 Certification and Authority | validate-certifying-authority | /api/v2/amro/certification | src/pages/api/v2/amro/certification.ts | src/pages/api/v2/amro/certification.test.ts | src/pages/api/v2/amro/contracts/openapi-3.1.yaml | src/pages/api/v2/amro/audit-ledger.ts; src/pages/api/v2/amro/anti-corruption-adapter.ts; src/features/module-amro/pages/AmroHubVerticalPage.tsx; src/pages/api/v2/amro/contracts/contract-endpoints.test.ts |
+| 15.2.7 Certification and Authority | submit-certification-decision | /api/v2/amro/certification | src/pages/api/v2/amro/certification.ts | src/pages/api/v2/amro/certification.test.ts | src/pages/api/v2/amro/contracts/openapi-3.1.yaml | src/pages/api/v2/amro/audit-ledger.ts; src/pages/api/v2/amro/anti-corruption-adapter.ts; src/features/module-amro/pages/AmroHubVerticalPage.tsx; src/pages/api/v2/amro/contracts/contract-endpoints.test.ts |
+| 15.2.7 Certification and Authority | escalate-blocked-certification | /api/v2/amro/certification | src/pages/api/v2/amro/certification.ts | src/pages/api/v2/amro/certification.test.ts | src/pages/api/v2/amro/contracts/openapi-3.1.yaml | src/pages/api/v2/amro/audit-ledger.ts; src/pages/api/v2/amro/anti-corruption-adapter.ts; src/features/module-amro/pages/AmroHubVerticalPage.tsx; src/pages/api/v2/amro/contracts/contract-endpoints.test.ts |
+| 15.2.8 Integration and Partner Hub | ingest-partner-payload | /api/v2/amro/integration-hub | src/pages/api/v2/amro/integration-hub.ts | src/pages/api/v2/amro/integration-hub.test.ts | src/pages/api/v2/amro/contracts/openapi-3.1.yaml | src/pages/api/v2/amro/audit-ledger.ts; src/pages/api/v2/amro/anti-corruption-adapter.ts; src/pages/api/v2/amro/integration-contracts.ts; src/pages/api/v2/amro/integration-contracts.test.ts; src/pages/api/v2/amro/contracts/asyncapi-2.6.yaml |
+| 15.2.8 Integration and Partner Hub | replay-failed-integration-job | /api/v2/amro/integration-hub | src/pages/api/v2/amro/integration-hub.ts | src/pages/api/v2/amro/integration-hub.test.ts | src/pages/api/v2/amro/contracts/openapi-3.1.yaml | src/pages/api/v2/amro/audit-ledger.ts; src/pages/api/v2/amro/anti-corruption-adapter.ts; src/pages/api/v2/amro/integration-contracts.ts; src/pages/api/v2/amro/integration-contracts.test.ts; src/pages/api/v2/amro/contracts/asyncapi-2.6.yaml |
+| 15.2.8 Integration and Partner Hub | publish-outbound-callback | /api/v2/amro/integration-hub | src/pages/api/v2/amro/integration-hub.ts | src/pages/api/v2/amro/integration-hub.test.ts | src/pages/api/v2/amro/contracts/openapi-3.1.yaml | src/pages/api/v2/amro/audit-ledger.ts; src/pages/api/v2/amro/anti-corruption-adapter.ts; src/pages/api/v2/amro/integration-contracts.ts; src/pages/api/v2/amro/integration-contracts.test.ts; src/pages/api/v2/amro/contracts/asyncapi-2.6.yaml |
+| 15.2.9 Forecast and Reliability | score-maintenance-risk | /api/v2/amro/forecast-reliability | src/pages/api/v2/amro/forecast-reliability.ts | src/pages/api/v2/amro/forecast-reliability.test.ts | src/pages/api/v2/amro/contracts/openapi-3.1.yaml | src/pages/api/v2/amro/audit-ledger.ts; src/pages/api/v2/amro/anti-corruption-adapter.ts; src/features/module-amro/hooks/useAmroOverviewKpi.ts; src/features/module-amro/pages/AmroHubVerticalPage.tsx; src/pages/api/v2/amro/contracts/contract-endpoints.test.ts |
+| 15.2.9 Forecast and Reliability | generate-intervention-recommendations | /api/v2/amro/forecast-reliability | src/pages/api/v2/amro/forecast-reliability.ts | src/pages/api/v2/amro/forecast-reliability.test.ts | src/pages/api/v2/amro/contracts/openapi-3.1.yaml | src/pages/api/v2/amro/audit-ledger.ts; src/pages/api/v2/amro/anti-corruption-adapter.ts; src/features/module-amro/hooks/useAmroOverviewKpi.ts; src/features/module-amro/pages/AmroHubVerticalPage.tsx; src/pages/api/v2/amro/contracts/contract-endpoints.test.ts |
+| 15.2.9 Forecast and Reliability | capture-recommendation-outcome | /api/v2/amro/forecast-reliability | src/pages/api/v2/amro/forecast-reliability.ts | src/pages/api/v2/amro/forecast-reliability.test.ts | src/pages/api/v2/amro/contracts/openapi-3.1.yaml | src/pages/api/v2/amro/audit-ledger.ts; src/pages/api/v2/amro/anti-corruption-adapter.ts; src/features/module-amro/hooks/useAmroOverviewKpi.ts; src/features/module-amro/pages/AmroHubVerticalPage.tsx; src/pages/api/v2/amro/contracts/contract-endpoints.test.ts |
+
 ---
 
 ## 5. AMRO UI/UX Low Level Design
@@ -1304,6 +1384,73 @@ External Systems
 | Integration and Partner Hub | Adapter Runtime, Mapping, Replay Queue | SCR-011 | integration_jobs, integration_mappings, webhook_outbox | 18.2 | API ingestion and webhook contracts | S7 |
 | Forecast and Reliability | Feature Pipeline, Risk Engine, Feedback | SCR-012 | asset_health_signals, forecast_features, forecast_outputs, forecast_decisions | 18.1 | API-015 | S8 |
 | Audit and Evidence Ledger | Event Append, Hash Verify, Replay Export | SCR-010 | maintenance_events, mro_audit.records, mro_audit.trails | 18.3 | API-014 | S9 |
+
+---
+
+## 27. Mandatory Sequential Implementation Enforcement
+
+This section is normative and mandatory. All AMRO requirements in this LLD must be implemented in strict sequence with no out-of-order execution. A later step cannot begin until the current step satisfies all acceptance criteria and dependency checks.
+
+### 27.1 Sequential Execution Rule
+
+- Implementation order is fixed to Milestones M1 through M10.
+- Parallel work is allowed only for tasks fully contained inside the active milestone.
+- Cross-milestone development branches, feature toggles, or partial deployments are not permitted unless all prerequisite milestones are formally accepted.
+- Any failed validation in a milestone requires immediate remediation and re-validation before progression.
+
+### 27.2 Global Prerequisites and Dependency Gates
+
+All milestones must satisfy the following prerequisite gates before start:
+
+1. Architecture and security scope confirmation approved for Platform -> Admin -> Multi-Tenant -> Multi-Franchisee hierarchy.
+2. Tenant/franchise data isolation controls defined and testable for every affected component.
+3. API and schema backward-compatibility impact assessment completed.
+4. Test plan prepared for unit, integration, contract, security, and performance checks.
+5. Observability baseline available (trace IDs, audit events, error telemetry).
+
+### 27.3 Exact Implementation Sequence and Milestone Acceptance Criteria
+
+| Milestone | Execution Order | Component Scope | Required Dependencies | Measurable Acceptance Criteria (all required before next milestone) |
+|---|---:|---|---|---|
+| M1 | 1 | Schema foundation, RLS, scoped auth, audit primitives | Global prerequisites only | 100% required core tables and indexes migrated; RLS enabled on all AMRO scoped tables; tenant leakage test pass rate = 100%; auth token verification tests pass with JWT signing key only |
+| M2 | 2 | Work package core (list/create/detail/transitions) | M1 accepted | API contract tests for API-AMRO-001/002/003 pass; transition policy negative-path tests pass; end-to-end create->transition flow pass rate = 100% in staging |
+| M3 | 3 | Scheduling board and constraint engine | M1, M2 accepted | No-overlap/capacity validation tests pass; replan simulation test suite pass rate = 100%; scheduling p95 read/write latency within Section 19.3 targets |
+| M4 | 4 | Task execution mobile path, evidence, offline queue | M1, M2, M3 accepted | Step-order enforcement tests pass; evidence integrity checksum validation pass rate = 100%; offline sync conflict test suite pass rate = 100%; mobile critical flows pass for technician role |
+| M5 | 5 | Parts and materials reservation and shortage workflow | M1, M2, M3, M4 accepted | Reservation and shortage negative-path tests pass; serialized uniqueness tests pass; shortage-to-procurement trigger flow verified end-to-end with zero data-scope violations |
+| M6 | 6 | Compliance gates and certification release controls | M1-M5 accepted | Gate evaluation and blocker handling tests pass; certification authority validity checks pass; zero unresolved blocker rule enforced in release tests; compliance dossier generation tests pass |
+| M7 | 7 | Integration hub adapters, idempotency, replay controls | M1-M6 accepted | Adapter contract tests pass for all enabled integrations; idempotency replay tests pass; dead-letter and replay recovery flow tested with successful replay closure rate = 100% |
+| M8 | 8 | KPI intelligence and forecast recommendation embedding | M2, M3, M5, M7 accepted | KPI correctness checks pass against baseline datasets; recommendation API contract and explainability fields validated; low-confidence flag behavior passes all policy tests |
+| M9 | 9 | Audit replay hardening and export controls | M1-M8 accepted | Hash-chain validation tests pass; replay timeline determinism checks pass; replay/export APIs meet functional contract and authorization tests with 100% pass rate |
+| M10 | 10 | Performance hardening, DR validation, and GA readiness | M1-M9 accepted | p95/p99 SLOs meet Section 19.3 and 22 targets; DR rehearsal completed successfully with documented recovery evidence; security and regression suites pass with zero critical defects |
+
+### 27.4 Mandatory Progression Flowchart
+
+```text
+M1 Foundation
+ -> M2 Work Package Core
+ -> M3 Scheduling
+ -> M4 Task Execution + Offline Sync
+ -> M5 Parts and Materials
+ -> M6 Compliance + Certification
+ -> M7 Integration Hub + Replay
+ -> M8 KPI + Forecast Intelligence
+ -> M9 Audit Replay Hardening
+ -> M10 Performance + DR + GA
+```
+
+### 27.5 Step Completion Validation Protocol
+
+A milestone is complete only when every validation checkpoint below is satisfied:
+
+1. Functional completion: all in-scope interfaces and workflows are implemented per Sections 15-19.
+2. Dependency completion: all listed prerequisite milestones are marked accepted.
+3. Quality completion: all required automated test suites pass with zero critical defects.
+4. Security completion: authentication, authorization, isolation, and audit controls pass verification.
+5. Performance completion: milestone-relevant latency and throughput targets are met.
+6. Evidence completion: traceable test evidence, logs, and acceptance records are attached.
+7. Governance completion: architecture and compliance sign-off is recorded for hierarchy-impacting changes.
+
+If any checkpoint fails, milestone status remains In Progress and the next milestone is blocked.
 
 ---
 

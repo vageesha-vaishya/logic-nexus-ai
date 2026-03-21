@@ -31,6 +31,7 @@ import {
 } from './reconciliation-queue';
 import { appendAmroAuditLedgerRecord } from './audit-ledger';
 import { resolveAmroAuditLedgerCutoverState, resolveAmroV2EndpointRolloutState } from './audit-ledger-cutover';
+import { enforceAmroSequentialMilestoneForWorkPackageInterface } from './phase-plan-model';
 
 function parseBoolean(value: string | undefined, fallback: boolean): boolean {
   const normalized = String(value || '').trim().toLowerCase();
@@ -449,6 +450,9 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       capability: 'work-packages',
     });
     const interfaceName = String(req.query.interface || '').trim().toLowerCase();
+    if (req.method === 'POST') {
+      enforceAmroSequentialMilestoneForWorkPackageInterface(interfaceName);
+    }
 
     if (req.method === 'POST' && interfaceName === 'create-work-package') {
       enforceAnyPermission(auth.permissions || [], ['dashboards.manage', 'reports.manage']);

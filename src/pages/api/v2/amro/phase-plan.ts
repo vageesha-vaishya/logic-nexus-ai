@@ -12,7 +12,7 @@ import {
 import { sendErrorResponse } from '../../_utils/errorHandler';
 import { applyCompatibilityResponseHeaders, resolveGatewayCompatibility } from '../../_utils/compatibility-facade';
 import { buildAmroServiceBoundaryEnvelope, createAmroIsolationScope } from './anti-corruption-adapter';
-import { buildAmroPhasePlanProgressEnvelope } from './phase-plan-model';
+import { buildAmroPhasePlanProgressEnvelope, buildAmroSequentialImplementationEnvelope } from './phase-plan-model';
 
 function parseBoolean(value: string | undefined, fallback: boolean): boolean {
   const normalized = String(value || '').trim().toLowerCase();
@@ -64,6 +64,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       validatedAt: amroAccess.validatedAt,
     });
     const phasePlan = buildAmroPhasePlanProgressEnvelope();
+    const sequentialImplementation = buildAmroSequentialImplementationEnvelope();
 
     return res.status(200).json({
       version: 'v2',
@@ -77,6 +78,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       serviceBoundaries,
       data: {
         phasePlan,
+        sequentialImplementation,
       },
       correlationId: ctx.correlationId,
     });

@@ -15,6 +15,7 @@ import { applyCompatibilityResponseHeaders, resolveGatewayCompatibility } from '
 import { buildAmroServiceBoundaryEnvelope, createAmroIsolationScope } from './anti-corruption-adapter';
 import { appendAmroAuditLedgerRecord } from './audit-ledger';
 import { resolveAmroAuditLedgerCutoverState, resolveAmroV2EndpointRolloutState } from './audit-ledger-cutover';
+import { enforceAmroSequentialMilestoneForForecastReliabilityInterface } from './phase-plan-model';
 
 function parseBoolean(value: string | undefined, fallback: boolean): boolean {
   const normalized = String(value || '').trim().toLowerCase();
@@ -149,6 +150,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
     enforceAnyPermission(auth.permissions || [], ['dashboards.manage', 'reports.manage']);
     const interfaceName = String(req.query.interface || '').trim().toLowerCase();
+    enforceAmroSequentialMilestoneForForecastReliabilityInterface(interfaceName);
     const body = parseBody(req.body);
 
     if (interfaceName === 'score-maintenance-risk') {

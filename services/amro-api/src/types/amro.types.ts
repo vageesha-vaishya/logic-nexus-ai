@@ -144,6 +144,52 @@ export interface StaffQualification {
   updated_at: string;
 }
 
+export interface AmroAssetSummary {
+  id: string;
+  tenant_id: string;
+  franchise_id?: string;
+  registration: string;
+  aircraft_type: string;
+  serial_number: string;
+  status: AircraftStatus;
+}
+
+export interface AmroQualificationSummary {
+  id: string;
+  tenant_id: string;
+  staff_id: string;
+  qualification_name: string;
+  rating: string;
+  can_certify_release: boolean;
+  expiration_date?: string | null;
+  is_active: boolean;
+}
+
+export interface AmroComplianceSummary {
+  totalEvents: number;
+  evidenceCapturedEvents: number;
+  pendingSignOffTasks: number;
+  authorityCoverage: string[];
+  activeRulePacks: number;
+}
+
+export interface AmroEvidenceSummary {
+  id: string;
+  entity_type: 'work_package' | 'task' | 'inspection' | 'release';
+  entity_id: string;
+  hash: string;
+  immutable: boolean;
+  created_at: string;
+}
+
+export interface AmroForecastRecommendation {
+  id: string;
+  digital_twin_reference: string;
+  risk_score: number;
+  trigger: 'telemetry' | 'calendar' | 'reliability';
+  recommendation: string;
+}
+
 // API Request/Response Types
 
 export interface CreateWorkPackageRequest {

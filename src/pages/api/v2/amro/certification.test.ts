@@ -63,6 +63,21 @@ describe('/api/v2/amro/certification', () => {
     process.env = { ...envBackup };
     resetAmroAuditLedgerStore();
     vi.clearAllMocks();
+    process.env.AMRO_SEQ_PREREQ_ARCH_SECURITY_APPROVED = 'true';
+    process.env.AMRO_SEQ_PREREQ_ISOLATION_CONTROLS_DEFINED = 'true';
+    process.env.AMRO_SEQ_PREREQ_BACKWARD_COMPAT_COMPLETED = 'true';
+    process.env.AMRO_SEQ_PREREQ_TEST_PLAN_READY = 'true';
+    process.env.AMRO_SEQ_PREREQ_OBSERVABILITY_BASELINE_READY = 'true';
+    process.env.AMRO_SEQ_M1_STATUS = 'completed';
+    process.env.AMRO_SEQ_M2_STATUS = 'completed';
+    process.env.AMRO_SEQ_M3_STATUS = 'completed';
+    process.env.AMRO_SEQ_M4_STATUS = 'completed';
+    process.env.AMRO_SEQ_M5_STATUS = 'completed';
+    process.env.AMRO_SEQ_M6_STATUS = 'in-progress';
+    process.env.AMRO_SEQ_M7_STATUS = 'not-started';
+    process.env.AMRO_SEQ_M8_STATUS = 'not-started';
+    process.env.AMRO_SEQ_M9_STATUS = 'not-started';
+    process.env.AMRO_SEQ_M10_STATUS = 'not-started';
     vi.mocked(enforceAnyPermission).mockImplementation(() => undefined);
     vi.mocked(handlePreflight).mockReturnValue(false);
     vi.mocked(buildApiContext).mockReturnValue({
@@ -176,6 +191,32 @@ describe('/api/v2/amro/certification', () => {
         block_reason: 'unresolved_ad',
         escalation_target: 'chief-certifier',
         authority_chain: ['duty-manager', 'hangar-supervisor'],
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(sendErrorResponse).toHaveBeenCalledWith(
+      res,
+      expect.any(Error),
+      'corr-amro-certification-v2',
+      { apiVersion: 'v2' },
+    );
+  });
+
+  it('blocks M6 certification interfaces when M5 is not completed', async () => {
+    process.env.AMRO_CERTIFICATION_V2_ENABLED = 'true';
+    process.env.AMRO_SEQ_M5_STATUS = 'in-progress';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'submit-certification-decision' },
+      body: {
+        work_package_id: 'wp-100',
+        decision: 'approve',
+        unresolved_blockers: ['none'],
+        signatures: [{ signer_id: 'cert-a', mandatory: true, signature: 'sig-a' }],
       },
       headers: {},
     };

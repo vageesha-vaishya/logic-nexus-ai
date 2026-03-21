@@ -32,8 +32,28 @@ app.use(
 );
 
 // Request logging middleware
-app.use((req: Request, _res: Response, next: NextFunction) => {
-  logger.info(`${req.method} ${req.path}`);
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const requestId = req.header('x-request-id') || crypto.randomUUID();
+  const startedAt = Date.now();
+  res.setHeader('x-request-id', requestId);
+
+  logger.info('Request started', {
+    requestId,
+    method: req.method,
+    path: req.path,
+    ip: req.ip,
+  });
+
+  res.on('finish', () => {
+    logger.info('Request finished', {
+      requestId,
+      method: req.method,
+      path: req.path,
+      statusCode: res.statusCode,
+      durationMs: Date.now() - startedAt,
+    });
+  });
+
   next();
 });
 
@@ -71,9 +91,11 @@ app.get('/', (_req: Request, res: Response) => {
 
 // Apply authentication middleware to all API routes
 app.use('/api/v1', authMiddleware);
+app.use('/api/v2/amro', authMiddleware);
 
 // Mount work orders routes
 app.use('/api/v1', workOrdersRoutes);
+app.use('/api/v2', workOrdersRoutes);
 
 // ============================================================================
 // ERROR HANDLING
@@ -94,8 +116,15 @@ app.use((req: Request, res: Response) => {
 /**
  * Global Error Handler
  */
-app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-  logger.error('Unhandled error:', err);
+app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
+  const requestId = req.header('x-request-id') || crypto.randomUUID();
+  logger.error('Unhandled error', {
+    requestId,
+    method: req.method,
+    path: req.path,
+    message: err instanceof Error ? err.message : 'Unknown error',
+    stack: err instanceof Error ? err.stack : undefined,
+  });
 
   const statusCode = err.statusCode || 500;
   const code = err.code || 'INTERNAL_SERVER_ERROR';
@@ -105,6 +134,7 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     error: message,
     code,
     statusCode,
+    requestId,
   } as ErrorResponse);
 });
 

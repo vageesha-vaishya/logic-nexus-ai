@@ -64,6 +64,21 @@ describe('/api/v2/amro/audit-ledger-replay', () => {
     process.env = { ...envBackup };
     resetAmroAuditLedgerStore();
     vi.clearAllMocks();
+    process.env.AMRO_SEQ_PREREQ_ARCH_SECURITY_APPROVED = 'true';
+    process.env.AMRO_SEQ_PREREQ_ISOLATION_CONTROLS_DEFINED = 'true';
+    process.env.AMRO_SEQ_PREREQ_BACKWARD_COMPAT_COMPLETED = 'true';
+    process.env.AMRO_SEQ_PREREQ_TEST_PLAN_READY = 'true';
+    process.env.AMRO_SEQ_PREREQ_OBSERVABILITY_BASELINE_READY = 'true';
+    process.env.AMRO_SEQ_M1_STATUS = 'completed';
+    process.env.AMRO_SEQ_M2_STATUS = 'completed';
+    process.env.AMRO_SEQ_M3_STATUS = 'completed';
+    process.env.AMRO_SEQ_M4_STATUS = 'completed';
+    process.env.AMRO_SEQ_M5_STATUS = 'completed';
+    process.env.AMRO_SEQ_M6_STATUS = 'completed';
+    process.env.AMRO_SEQ_M7_STATUS = 'completed';
+    process.env.AMRO_SEQ_M8_STATUS = 'completed';
+    process.env.AMRO_SEQ_M9_STATUS = 'in-progress';
+    process.env.AMRO_SEQ_M10_STATUS = 'not-started';
     vi.mocked(handlePreflight).mockReturnValue(false);
     vi.mocked(buildApiContext).mockReturnValue({
       correlationId: 'corr-audit-replay-v2',
@@ -128,6 +143,57 @@ describe('/api/v2/amro/audit-ledger-replay', () => {
     expect((res.jsonBody as any)?.auditLedgerCutover?.enabled).toBe(true);
     expect((res.jsonBody as any)?.data?.records?.length).toBe(1);
     expect((res.jsonBody as any)?.data?.records?.[0]?.correlationId).toBe('corr-seeded');
+    expect((res.jsonBody as any)?.data?.replay_assertions).toEqual({
+      deterministic_timeline: true,
+      hash_chain_valid: true,
+    });
+    expect((res.jsonBody as any)?.data?.replay_timeline?.event_count).toBe(1);
+    expect((res.jsonBody as any)?.data?.replay_timeline?.timeline_hash).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  it('returns deterministic replay timeline ordering metadata', async () => {
+    process.env.AMRO_AUDIT_LEDGER_V2_ENABLED = 'true';
+    appendAmroAuditLedgerRecord({
+      tenantId: 'tenant-1',
+      franchiseId: 'fr-1',
+      capability: 'compliance-gates',
+      eventType: 'amro.audit.recorded.v1',
+      entityType: 'compliance-gate',
+      entityId: 'decision:first',
+      correlationId: 'corr-seeded-1',
+      action: 'dual-run.read',
+      compatMode: 'v2-shadow',
+      sourceHash: 'seed-hash-1',
+      migrationBatchId: 'batch-1',
+      replayCheckpoint: 'checkpoint-1',
+      context: { seeded: true },
+    });
+    appendAmroAuditLedgerRecord({
+      tenantId: 'tenant-1',
+      franchiseId: 'fr-1',
+      capability: 'compliance-gates',
+      eventType: 'amro.audit.recorded.v1',
+      entityType: 'compliance-gate',
+      entityId: 'decision:second',
+      correlationId: 'corr-seeded-2',
+      action: 'dual-run.read',
+      compatMode: 'v2-shadow',
+      sourceHash: 'seed-hash-2',
+      migrationBatchId: 'batch-2',
+      replayCheckpoint: 'checkpoint-2',
+      context: { seeded: true },
+    });
+
+    const req: ApiRequest = { method: 'GET', query: { capability: 'compliance-gates', limit: '10' }, headers: {} };
+    const res = createResponse();
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.data?.replay_timeline?.ordering).toBe('created_at:asc,record_id:asc');
+    expect((res.jsonBody as any)?.data?.replay_timeline?.event_count).toBe(2);
+    expect((res.jsonBody as any)?.data?.replay_timeline?.events?.[0]?.sequence).toBe(1);
+    expect((res.jsonBody as any)?.data?.replay_timeline?.events?.[1]?.sequence).toBe(2);
+    expect((res.jsonBody as any)?.data?.replay_timeline?.events?.[0]?.created_at <= (res.jsonBody as any)?.data?.replay_timeline?.events?.[1]?.created_at).toBe(true);
   });
 
   it('returns 404 when replay endpoint is outside rollout cohort', async () => {
@@ -204,6 +270,22 @@ describe('/api/v2/amro/audit-ledger-replay', () => {
   it('delegates invalid capability to v2 error handler', async () => {
     process.env.AMRO_AUDIT_LEDGER_V2_ENABLED = 'true';
     const req: ApiRequest = { method: 'GET', query: { capability: 'invalid' }, headers: {} };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(sendErrorResponse).toHaveBeenCalledWith(
+      res,
+      expect.any(Error),
+      'corr-audit-replay-v2',
+      { apiVersion: 'v2' }
+    );
+  });
+
+  it('blocks replay endpoint when M8 is not completed', async () => {
+    process.env.AMRO_AUDIT_LEDGER_V2_ENABLED = 'true';
+    process.env.AMRO_SEQ_M8_STATUS = 'in-progress';
+    const req: ApiRequest = { method: 'GET', query: { capability: 'compliance-gates', limit: '10' }, headers: {} };
     const res = createResponse();
 
     await handler(req, res);

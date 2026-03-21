@@ -22,9 +22,14 @@ async function startServer() {
     await initializeTracing();
     logger.info('OpenTelemetry tracing initialized');
 
-    // Initialize Kafka producer
-    await amroEventsProducer.initialize();
-    logger.info('Kafka producer initialized');
+    try {
+      await amroEventsProducer.initialize();
+      logger.info('Kafka producer initialized');
+    } catch (kafkaError) {
+      logger.warn('Kafka producer unavailable, continuing without event bus', {
+        error: kafkaError instanceof Error ? kafkaError.message : String(kafkaError),
+      });
+    }
 
     // Start Express server
     const server = app.listen(PORT, () => {
