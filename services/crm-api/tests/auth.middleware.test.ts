@@ -33,6 +33,7 @@ describe('authMiddleware tenant-aware scope resolution', () => {
     });
     process.env.SUPABASE_URL = 'http://localhost:54321';
     process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-role-key';
+    process.env.SUPABASE_SERVICE_KEY = '';
     getUser.mockResolvedValue({
       data: { user: { id: 'user-1' } },
       error: null
@@ -137,5 +138,31 @@ describe('authMiddleware tenant-aware scope resolution', () => {
     expect(next).toHaveBeenCalledTimes(1);
     expect(req.tenantId).toBe('tenant-1');
     expect(req.franchiseId).toBe('franchise-7');
+  });
+
+  it('accepts SUPABASE_SERVICE_KEY when SUPABASE_SERVICE_ROLE_KEY is absent', async () => {
+    process.env.SUPABASE_SERVICE_ROLE_KEY = '';
+    process.env.SUPABASE_SERVICE_KEY = 'fallback-service-key';
+    eq.mockResolvedValue({
+      data: [
+        { role: 'franchise_admin', tenant_id: 'tenant-1', franchise_id: 'franchise-1' }
+      ],
+      error: null
+    });
+
+    const req = {
+      headers: {
+        authorization: 'Bearer token-1',
+        'x-tenant-id': 'tenant-1',
+        'x-franchise-id': 'franchise-1'
+      }
+    } as unknown as AuthRequest;
+    const res = createMockResponse();
+    const next = jest.fn();
+
+    await authMiddleware(req, res as any, next);
+
+    expect(next).toHaveBeenCalledTimes(1);
+    expect(createClient).toHaveBeenCalledWith('http://localhost:54321', 'fallback-service-key');
   });
 });

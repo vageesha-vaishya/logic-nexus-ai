@@ -4,9 +4,13 @@ import { CreateLeadRequest, LeadRecord, UpdateLeadRequest } from '../types/crm.t
 export class LeadsService {
   private getClient() {
     const supabaseUrl = process.env.SUPABASE_URL;
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
     if (!supabaseUrl || !supabaseServiceKey) {
-      throw this.toServiceError(500, 'MISSING_ENV', 'Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
+      throw this.toServiceError(
+        500,
+        'MISSING_ENV',
+        'Missing SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY or SUPABASE_SERVICE_KEY'
+      );
     }
     return createClient(supabaseUrl, supabaseServiceKey);
   }

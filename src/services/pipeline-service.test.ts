@@ -225,7 +225,7 @@ describe('pipeline-service CRM API model handling', () => {
       {}
     );
 
-    expect(result).toEqual({ ok: false, reason: 'missing_token' });
+    expect(result).toEqual({ ok: false, reason: 'missing_token', telemetry: null });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -233,6 +233,10 @@ describe('pipeline-service CRM API model handling', () => {
     vi.spyOn(globalThis, 'fetch' as any).mockResolvedValue({
       ok: false,
       status: 403,
+      headers: {
+        get: vi.fn().mockReturnValue(null),
+      },
+      json: async () => null,
     } as any);
 
     const result = await PipelineService.listLeadsFromCrmApi(
@@ -243,7 +247,84 @@ describe('pipeline-service CRM API model handling', () => {
       {}
     );
 
-    expect(result).toEqual({ ok: false, reason: 'forbidden_scope' });
+    expect(result.ok).toBe(false);
+    if (result.ok !== false) throw new Error('Expected fallback result');
+    expect(result.reason).toBe('forbidden_scope');
+    expect(result.telemetry?.httpStatus).toBe(403);
+  });
+
+  it('captures backend error code telemetry for API fallback', async () => {
+    vi.spyOn(globalThis, 'fetch' as any).mockResolvedValue({
+      ok: false,
+      status: 500,
+      headers: {
+        get: (name: string) => (name === 'x-request-id' ? 'req-123' : null),
+      },
+      json: async () => ({
+        code: 'MISSING_ENV',
+        statusCode: 500,
+        error: 'Missing service environment configuration',
+      }),
+    } as any);
+
+    const result = await PipelineService.listLeadsFromCrmApi(
+      {
+        accessToken: 'token-1',
+        tenantId: 'tenant-1',
+      },
+      {}
+    );
+
+    expect(result.ok).toBe(false);
+    if (result.ok !== false) throw new Error('Expected fallback result');
+    expect(result.reason).toBe('api_5xx');
+    expect(result.telemetry).toEqual({
+      httpStatus: 500,
+      backendCode: 'MISSING_ENV',
+      backendStatusCode: 500,
+      backendError: 'Missing service environment configuration',
+      requestId: 'req-123',
+    });
+  });
+
+  it('retries once on CRM API 5xx and returns API data when retry succeeds', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch' as any)
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        headers: {
+          get: vi.fn().mockReturnValue(null),
+        },
+        json: async () => ({
+          code: 'TEMPORARY_FAILURE',
+          statusCode: 500,
+          error: 'Temporary backend issue',
+        }),
+      } as any)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          data: [],
+          count: 0,
+        }),
+      } as any);
+
+    const result = await PipelineService.listLeadsFromCrmApi(
+      {
+        accessToken: 'token-1',
+        tenantId: 'tenant-1',
+      },
+      {}
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.source).toBe('api');
+      expect(result.totalCount).toBe(0);
+    }
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it('returns unreachable fallback reason on fetch failure', async () => {
@@ -257,13 +338,21 @@ describe('pipeline-service CRM API model handling', () => {
       {}
     );
 
-    expect(result).toEqual({ ok: false, reason: 'api_unreachable' });
+    expect(result).toEqual({ ok: false, reason: 'api_unreachable', telemetry: null });
   });
 
   it('propagates API fallback reason when listLeads falls back to scoped DB', async () => {
     vi.spyOn(globalThis, 'fetch' as any).mockResolvedValue({
       ok: false,
       status: 401,
+      headers: {
+        get: vi.fn().mockReturnValue(null),
+      },
+      json: async () => ({
+        code: 'MISSING_TOKEN',
+        statusCode: 401,
+        error: 'Missing or malformed Authorization header',
+      }),
     } as any);
 
     const query = {
@@ -298,6 +387,13 @@ describe('pipeline-service CRM API model handling', () => {
 
     expect(result.source).toBe('scopedDb');
     expect(result.fallbackReason).toBe('api_unauthorized');
+    expect(result.fallbackTelemetry).toEqual({
+      httpStatus: 401,
+      backendCode: 'MISSING_TOKEN',
+      backendStatusCode: 401,
+      backendError: 'Missing or malformed Authorization header',
+      requestId: null,
+    });
   });
 });
 

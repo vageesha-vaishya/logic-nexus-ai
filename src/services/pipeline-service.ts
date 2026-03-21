@@ -73,6 +73,13 @@ export interface CrmApiLeadRequestContext {
 }
 
 type LeadDataSource = 'api' | 'scopedDb';
+export interface CrmApiFallbackTelemetry {
+  httpStatus: number | null;
+  backendCode: string | null;
+  backendStatusCode: number | null;
+  backendError: string | null;
+  requestId: string | null;
+}
 export type LeadApiFallbackReason =
   | 'missing_token'
   | 'missing_scope'
@@ -85,7 +92,7 @@ export type LeadApiFallbackReason =
 
 type LeadApiFetchResult =
   | { ok: true; data: Lead[]; totalCount: number; source: LeadDataSource }
-  | { ok: false; reason: LeadApiFallbackReason };
+  | { ok: false; reason: LeadApiFallbackReason; telemetry: CrmApiFallbackTelemetry | null };
 
 export interface OpportunityPipelineQuery {
   page?: number;
@@ -245,6 +252,52 @@ const sortLeadResults = (leads: Lead[], field: string, direction: 'asc' | 'desc'
   return sorted;
 };
 
+const getResponseHeader = (response: Response, name: string): string | null => {
+  const headers = (response as { headers?: { get?: (header: string) => string | null } }).headers;
+  if (!headers?.get) return null;
+  const value = headers.get(name);
+  if (!value) return null;
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : null;
+};
+
+const toNumericValue = (value: unknown): number | null => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+};
+
+const toTextValue = (value: unknown): string | null => {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : null;
+};
+
+const resolveCrmApiFallbackTelemetry = async (response: Response): Promise<CrmApiFallbackTelemetry> => {
+  const payload = await response.json().catch(() => null);
+  const candidateRequestId = getResponseHeader(response, 'x-request-id');
+  const candidateCorrelationId = getResponseHeader(response, 'x-correlation-id');
+  const backendCode = toTextValue(payload?.code);
+  const backendError = toTextValue(payload?.error);
+  const backendStatusCode = toNumericValue(payload?.statusCode);
+  return {
+    httpStatus: response.status ?? null,
+    backendCode,
+    backendStatusCode,
+    backendError,
+    requestId: candidateRequestId ?? candidateCorrelationId,
+  };
+};
+
+const shouldRetryCrmApiStatus = (status: number): boolean => status >= 500;
+
+const waitFor = async (ms: number): Promise<void> => {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+};
+
 export const normalizeLeadMutationInput = (
   input: LeadMutationInput
 ): NormalizedLeadMutationInput => {
@@ -308,10 +361,10 @@ export const PipelineService = {
     options: LeadPipelineQuery = {}
   ): Promise<LeadApiFetchResult> {
     if (!context.accessToken) {
-      return { ok: false, reason: 'missing_token' };
+      return { ok: false, reason: 'missing_token', telemetry: null };
     }
     if (!context.tenantId) {
-      return { ok: false, reason: 'missing_scope' };
+      return { ok: false, reason: 'missing_scope', telemetry: null };
     }
 
     const params = new URLSearchParams();
@@ -323,28 +376,43 @@ export const PipelineService = {
     if (options.franchiseId && options.franchiseId !== 'all') params.set('franchise_id', options.franchiseId);
 
     const queryString = params.toString() ? `?${params.toString()}` : '';
-    let response: Response;
-    try {
-      response = await fetch(`/api/crm/v1/leads${queryString}`, {
-        method: 'GET',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${context.accessToken}`,
-          'x-tenant-id': context.tenantId,
-          ...(context.franchiseId ? { 'x-franchise-id': context.franchiseId } : {}),
-          ...(context.userId ? { 'x-user-id': context.userId } : {}),
-        },
-      });
-    } catch {
-      return { ok: false, reason: 'api_unreachable' };
+    const requestInit: RequestInit = {
+      method: 'GET',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${context.accessToken}`,
+        'x-tenant-id': context.tenantId,
+        ...(context.franchiseId ? { 'x-franchise-id': context.franchiseId } : {}),
+        ...(context.userId ? { 'x-user-id': context.userId } : {}),
+      },
+    };
+
+    let response: Response | null = null;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        response = await fetch(`/api/crm/v1/leads${queryString}`, requestInit);
+        if (!shouldRetryCrmApiStatus(response.status) || attempt === 1) {
+          break;
+        }
+      } catch {
+        if (attempt === 1) {
+          break;
+        }
+      }
+      await waitFor(200);
+    }
+
+    if (!response) {
+      return { ok: false, reason: 'api_unreachable', telemetry: null };
     }
 
     if (!response.ok) {
-      if (response.status === 401) return { ok: false, reason: 'api_unauthorized' };
-      if (response.status === 403) return { ok: false, reason: 'forbidden_scope' };
-      if (response.status >= 500) return { ok: false, reason: 'api_5xx' };
-      return { ok: false, reason: 'api_4xx' };
+      const telemetry = await resolveCrmApiFallbackTelemetry(response);
+      if (response.status === 401) return { ok: false, reason: 'api_unauthorized', telemetry };
+      if (response.status === 403) return { ok: false, reason: 'forbidden_scope', telemetry };
+      if (response.status >= 500) return { ok: false, reason: 'api_5xx', telemetry };
+      return { ok: false, reason: 'api_4xx', telemetry };
     }
 
     const payload = await response.json().catch(() => null);
@@ -625,7 +693,13 @@ export const PipelineService = {
     scopedDb: ScopedDataAccess,
     options: LeadPipelineQuery = {},
     crmApiContext?: CrmApiLeadRequestContext
-  ): Promise<{ data: Lead[]; totalCount: number; source: LeadDataSource; fallbackReason: LeadApiFallbackReason | null }> {
+  ): Promise<{
+    data: Lead[];
+    totalCount: number;
+    source: LeadDataSource;
+    fallbackReason: LeadApiFallbackReason | null;
+    fallbackTelemetry: CrmApiFallbackTelemetry | null;
+  }> {
     const {
       page = 1,
       pageSize = 500,
@@ -645,7 +719,7 @@ export const PipelineService = {
       : null;
 
     if (apiResult?.ok) {
-      return { ...apiResult, fallbackReason: null };
+      return { ...apiResult, fallbackReason: null, fallbackTelemetry: null };
     }
 
     const from = (page - 1) * pageSize;
@@ -706,6 +780,7 @@ export const PipelineService = {
       totalCount: count || 0,
       source: 'scopedDb',
       fallbackReason: apiResult && !apiResult.ok ? apiResult.reason : null,
+      fallbackTelemetry: apiResult && !apiResult.ok ? apiResult.telemetry : null,
     };
   },
 

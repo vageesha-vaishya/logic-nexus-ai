@@ -25,7 +25,7 @@ import { logger } from '@/lib/logger';
 import * as Sentry from '@sentry/react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PipelineService } from '@/services/pipeline-service';
-import type { LeadApiFallbackReason } from '@/services/pipeline-service';
+import type { CrmApiFallbackTelemetry, LeadApiFallbackReason } from '@/services/pipeline-service';
 import { CRM_HEADER_PRIMARY_CONTROL_SEQUENCE, CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
 import { resolveLeadsFallbackBannerCopy } from './leadsListUtils';
 
@@ -98,6 +98,7 @@ export default function LeadsPipeline() {
   const [loading, setLoading] = useState(true);
   const [isDbFallbackActive, setIsDbFallbackActive] = useState(false);
   const [dbFallbackReason, setDbFallbackReason] = useState<LeadApiFallbackReason | null>(null);
+  const [dbFallbackTelemetry, setDbFallbackTelemetry] = useState<CrmApiFallbackTelemetry | null>(null);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const [isCreateTaskOpen, setIsCreateTaskOpen] = useState(false);
   const [isSavingTask, setIsSavingTask] = useState(false);
@@ -323,9 +324,9 @@ export default function LeadsPipeline() {
       const crmApiContext = await resolveCrmApiContext();
       const shouldUseCrmApi = Boolean(
         crmApiContext.accessToken &&
-        (crmApiContext.tenantId || !context?.isPlatformAdmin)
+        crmApiContext.tenantId
       );
-      const { data, source, fallbackReason } = await PipelineService.listLeads(scopedDb, {
+      const { data, source, fallbackReason, fallbackTelemetry } = await PipelineService.listLeads(scopedDb, {
         page: 1,
         pageSize: 2000,
         search: searchQuery || undefined,
@@ -338,6 +339,7 @@ export default function LeadsPipeline() {
       const showFallback = shouldUseCrmApi && source === 'scopedDb';
       setIsDbFallbackActive(showFallback);
       setDbFallbackReason(showFallback ? fallbackReason : null);
+      setDbFallbackTelemetry(showFallback ? fallbackTelemetry : null);
       
       const incomingLeads = (data as any[]) || [];
       const invalidStatusCounts = incomingLeads.reduce<Record<string, number>>((acc, lead) => {
@@ -366,6 +368,7 @@ export default function LeadsPipeline() {
     } catch (error) {
       setIsDbFallbackActive(false);
       setDbFallbackReason(null);
+      setDbFallbackTelemetry(null);
       logger.error('Failed to fetch leads (pipeline)', {
         error: error instanceof Error ? error.message : String(error),
       });
@@ -394,6 +397,27 @@ export default function LeadsPipeline() {
     const copy = resolveLeadsFallbackBannerCopy(dbFallbackReason);
     return t(copy.key);
   }, [dbFallbackReason, t]);
+  const shouldShowFallbackBanner = isDbFallbackActive
+    && dbFallbackReason !== 'api_5xx'
+    && dbFallbackReason !== 'api_unreachable';
+
+  useEffect(() => {
+    if (!isDbFallbackActive) return;
+    logger.warn('CRM API fallback activated for leads pipeline', {
+      fallbackReason: dbFallbackReason,
+      fallbackTelemetry: dbFallbackTelemetry,
+      tenantId: context?.tenantId ?? null,
+      franchiseId: context?.franchiseId ?? null,
+      isPlatformAdmin: context?.isPlatformAdmin ?? false,
+    });
+  }, [
+    isDbFallbackActive,
+    dbFallbackReason,
+    dbFallbackTelemetry,
+    context?.tenantId,
+    context?.franchiseId,
+    context?.isPlatformAdmin,
+  ]);
 
   const fetchTasks = useCallback(async () => {
     if (!isContextReady) return;
@@ -954,8 +978,13 @@ export default function LeadsPipeline() {
             <TabsContent value="board" className="mt-0 flex flex-col gap-6 h-full">
               <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 flex-1 min-h-0">
                 <div className="lg:col-span-3 flex flex-col gap-4 h-full min-h-0">
-                  {isDbFallbackActive && (
-                    <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                  {shouldShowFallbackBanner && (
+                    <div
+                      className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900"
+                      data-fallback-reason={dbFallbackReason ?? ''}
+                      data-fallback-http-status={dbFallbackTelemetry?.httpStatus ?? ''}
+                      data-fallback-backend-code={dbFallbackTelemetry?.backendCode ?? ''}
+                    >
                       {fallbackBannerText}
                     </div>
                   )}

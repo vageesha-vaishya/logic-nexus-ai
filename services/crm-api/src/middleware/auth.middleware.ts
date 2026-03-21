@@ -60,7 +60,7 @@ function canAccessScope(
 export async function authMiddleware(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
     const supabaseUrl = process.env.SUPABASE_URL;
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
     if (!supabaseUrl || !supabaseServiceKey) {
       res.status(500).json({
         error: 'Missing service environment configuration',
