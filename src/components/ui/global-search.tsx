@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Search, Loader2, FileText, Users, Building2, Package } from "lucide-react";
 import { CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useNavigate } from "react-router-dom";
-import { useCRM } from "@/hooks/useCRM";
+import { useCRM } from "../../hooks/useCRM";
 import { cn } from "@/lib/utils";
 import { APP_MENU } from "@/config/navigation";
 
