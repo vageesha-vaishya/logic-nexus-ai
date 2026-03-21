@@ -8,6 +8,7 @@ import {
   AMRO_INTEGRATION_CONTRACTS,
   AMRO_MIGRATION_PLAN_PATH,
   AMRO_OPENAPI_SPEC_PATH,
+  AMRO_OVERVIEW_KPI_PATH,
   AMRO_PHASE_1_READINESS_PATH,
   AMRO_PHASE_PLAN_PATH,
 } from './integration-contracts';
@@ -24,6 +25,7 @@ describe('AMRO 13.3 integration contracts', () => {
       '/api/v2/amro/work-packages',
       '/api/v2/amro/tasks',
       '/api/v2/amro/compliance-gates',
+      AMRO_OVERVIEW_KPI_PATH,
       AMRO_PHASE_PLAN_PATH,
       AMRO_PHASE_1_READINESS_PATH,
       AMRO_MIGRATION_PLAN_PATH,
@@ -65,6 +67,7 @@ describe('AMRO 13.3 integration contracts', () => {
     expect(openApi).toContain('/api/v2/amro/work-packages');
     expect(openApi).toContain('/api/v2/amro/tasks');
     expect(openApi).toContain('/api/v2/amro/compliance-gates');
+    expect(openApi).toContain(AMRO_OVERVIEW_KPI_PATH);
     expect(openApi).toContain(AMRO_PHASE_PLAN_PATH);
     expect(openApi).toContain(AMRO_PHASE_1_READINESS_PATH);
     expect(openApi).toContain('/api/v2/amro/migration-plan');

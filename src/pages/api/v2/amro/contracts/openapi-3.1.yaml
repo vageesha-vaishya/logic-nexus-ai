@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: AMRO V2 Integration API
   version: 2.0.0
-  description: AMRO Integration and Coexistence contract for work-packages, tasks, compliance-gates, phase-plan, phase-1-readiness, and migration-plan.
+  description: AMRO Integration and Coexistence contract for work-packages, tasks, compliance-gates, overview-kpi, phase-plan, phase-1-readiness, and migration-plan.
 servers:
   - url: /
 paths:
@@ -52,6 +52,94 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ComplianceGatesResponse'
+  /api/v2/amro/overview-kpi:
+    get:
+      operationId: getAmroOverviewKpi
+      tags: [AMRO]
+      parameters:
+        - in: query
+          name: interface
+          required: true
+          schema:
+            type: string
+            enum: [load-kpi-dashboard, load-operational-trends]
+        - in: query
+          name: date_range
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: station_ids
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: fleet_ids
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: regulator_profile
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: metric_key
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: window
+          required: false
+          schema:
+            type: string
+            enum: [7d, 30d, 90d]
+        - in: query
+          name: compare_window
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Overview KPI dashboard or trends response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OverviewKpiResponse'
+    post:
+      operationId: exportAmroKpiSnapshot
+      tags: [AMRO]
+      parameters:
+        - in: query
+          name: interface
+          required: true
+          schema:
+            type: string
+            enum: [export-kpi-snapshot]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [format, date_range, selected_widgets]
+              properties:
+                format:
+                  type: string
+                  enum: [csv, pdf]
+                date_range:
+                  type: string
+                selected_widgets:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: Export KPI snapshot response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OverviewKpiResponse'
   /api/v2/amro/migration-plan:
     get:
       operationId: getAmroMigrationPlan
@@ -344,6 +432,21 @@ components:
                   type: array
                   items:
                     $ref: '#/components/schemas/ComplianceGate'
+    OverviewKpiResponse:
+      type: object
+      required: [version, interface, correlationId]
+      properties:
+        version:
+          type: string
+          const: v2
+        interface:
+          type: string
+          enum: [load-kpi-dashboard, load-operational-trends, export-kpi-snapshot]
+        correlationId:
+          type: string
+        output:
+          type: object
+          additionalProperties: true
     MigrationPlanResponse:
       allOf:
         - $ref: '#/components/schemas/ApiEnvelope'

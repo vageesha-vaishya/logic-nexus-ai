@@ -2,6 +2,7 @@ import { PlatformWidgetSlot } from '@/components/ui/enterprise';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useDomain } from '@/contexts/DomainContext';
 import {
@@ -10,6 +11,7 @@ import {
   AMRO_GRPC_PROTO_PATH,
   AMRO_MIGRATION_PLAN_PATH,
   AMRO_OPENAPI_SPEC_PATH,
+  AMRO_OVERVIEW_KPI_PATH,
   AMRO_PHASE_1_READINESS_PATH,
   AMRO_PHASE_PLAN_PATH,
 } from '@/pages/api/v2/amro/integration-contracts';
@@ -17,6 +19,7 @@ import { AMRO_PHASE_1_DELIVERABLES, AMRO_PHASE_1_SCOPE } from '@/pages/api/v2/am
 import { AMRO_PHASE_PLAN_MATRIX } from '@/pages/api/v2/amro/phase-plan-model';
 import type { ReactNode } from 'react';
 import { AmroOwnedWorkspace } from '../components/AmroOwnedWorkspace';
+import { useAmroOverviewKpi } from '../hooks/useAmroOverviewKpi';
 
 type AmroModuleShellProps = {
   children: ReactNode;
@@ -37,6 +40,7 @@ function AmroWorkspaceSurface() {
 export default function AmroHubVerticalPage() {
   const { currentDomain } = useDomain();
   const isAmroDomainActive = currentDomain?.code === 'AMRO';
+  const { dashboard, trends, lastExport, loading, exporting, error, exportSnapshot } = useAmroOverviewKpi();
 
   return (
     <DashboardLayout>
@@ -56,7 +60,42 @@ export default function AmroHubVerticalPage() {
                 <Badge variant={isAmroDomainActive ? 'secondary' : 'destructive'}>
                   {isAmroDomainActive ? 'AMRO Domain Context Active' : 'AMRO Domain Context Required'}
                 </Badge>
+                <Badge variant="outline">KPI Data Source: {AMRO_OVERVIEW_KPI_PATH}</Badge>
+                {loading ? <Badge variant="outline">KPI Loading</Badge> : null}
+                {error ? <Badge variant="destructive">KPI Error</Badge> : null}
               </div>
+              {dashboard ? (
+                <div className="grid grid-cols-1 gap-2 text-xs md:grid-cols-2">
+                  <div className="rounded-md border p-3">
+                    <p className="font-semibold">KPI Cards</p>
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {dashboard.kpi_cards.map((card) => (
+                        <Badge key={card.key} variant="secondary">{`${card.label}: ${card.value} (${card.trend})`}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="rounded-md border p-3">
+                    <p className="font-semibold">Operational Trends</p>
+                    <p className="mt-2 text-muted-foreground">
+                      Variance: {typeof trends?.variance === 'number' ? trends.variance : 'N/A'} | Threshold breaches:{' '}
+                      {trends?.threshold_breaches?.length || 0}
+                    </p>
+                    {dashboard.freshness_warning ? (
+                      <p className="mt-2 text-muted-foreground">Freshness: {dashboard.freshness_warning}</p>
+                    ) : null}
+                    <div className="mt-3">
+                      <Button size="sm" variant="outline" disabled={exporting} onClick={() => void exportSnapshot()}>
+                        {exporting ? 'Exporting KPI Snapshot...' : 'Export KPI Snapshot'}
+                      </Button>
+                    </div>
+                    {lastExport ? (
+                      <p className="mt-2 text-muted-foreground">
+                        Last export job: {lastExport.export_job_id} | {lastExport.generated_at}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
             </CardContent>
           </Card>
 

@@ -16,6 +16,26 @@ vi.mock('../components/AmroOwnedWorkspace', () => ({
   AmroOwnedWorkspace: () => <div data-testid="amro-owned-workspace">AMRO Workspace</div>,
 }));
 
+vi.mock('../hooks/useAmroOverviewKpi', () => ({
+  useAmroOverviewKpi: () => ({
+    dashboard: {
+      kpi_cards: [{ key: 'open_work_packages', label: 'Open Work Packages', value: 42, trend: '+2%' }],
+      risk_heatmap: { cells: [] },
+      trend_lines: [],
+      anomaly_flags: [],
+      freshness_warning: null,
+    },
+    trends: { time_series: [], variance: 1.2, threshold_breaches: [] },
+    lastExport: null,
+    loading: false,
+    exporting: false,
+    error: null,
+    loadDashboard: vi.fn(),
+    loadTrends: vi.fn(),
+    exportSnapshot: vi.fn(),
+  }),
+}));
+
 vi.mock('@/contexts/DomainContext', () => ({
   useDomain: () => mockUseDomain(),
 }));
@@ -28,6 +48,8 @@ describe('AmroHubVerticalPage', () => {
 
     expect(screen.getByText('AMRO Operations Overview')).toBeTruthy();
     expect(screen.getByText('AMRO Domain Context Active')).toBeTruthy();
+    expect(screen.getByText('KPI Data Source: /api/v2/amro/overview-kpi')).toBeTruthy();
+    expect(screen.getByText('Export KPI Snapshot')).toBeTruthy();
     expect(screen.getByText('AMRO Integration Contracts')).toBeTruthy();
     expect(screen.getByText('OpenAPI 3.1 Contract')).toBeTruthy();
     expect(screen.getByText('GraphQL Subgraph Contract')).toBeTruthy();

@@ -5,6 +5,7 @@ export const AMRO_ASYNCAPI_SPEC_PATH = '/api/v2/amro/contracts/asyncapi-2.6.yaml
 export const AMRO_PHASE_PLAN_PATH = '/api/v2/amro/phase-plan' as const;
 export const AMRO_PHASE_1_READINESS_PATH = '/api/v2/amro/phase-1-readiness' as const;
 export const AMRO_MIGRATION_PLAN_PATH = '/api/v2/amro/migration-plan' as const;
+export const AMRO_OVERVIEW_KPI_PATH = '/api/v2/amro/overview-kpi' as const;
 
 export const AMRO_INTEGRATION_CONTRACTS = {
   rest: {
@@ -13,6 +14,7 @@ export const AMRO_INTEGRATION_CONTRACTS = {
       '/api/v2/amro/work-packages',
       '/api/v2/amro/tasks',
       '/api/v2/amro/compliance-gates',
+      AMRO_OVERVIEW_KPI_PATH,
       AMRO_PHASE_PLAN_PATH,
       AMRO_PHASE_1_READINESS_PATH,
       AMRO_MIGRATION_PLAN_PATH,
