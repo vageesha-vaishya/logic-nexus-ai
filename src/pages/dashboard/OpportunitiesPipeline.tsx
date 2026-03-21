@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { useCRM } from "@/hooks/useCRM";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Search, Filter, Layers, Settings, CheckSquare, Square, Trash2, AlertCircle, TrendingUp } from "lucide-react";
+import { Search, Filter, Layers, Settings, CheckSquare, Square, Trash2, AlertCircle, TrendingUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { Droppable } from "@/components/kanban/Droppable";
@@ -23,6 +23,9 @@ import { Opportunity, OpportunityStage as Stage, stageColors, stageLabels, stage
 import { PipelineService } from "@/services/pipeline-service";
 import { useTranslation } from "react-i18next";
 import { resolveCrmFallbackBannerCopy } from "./leadsListUtils";
+import { useTheme } from "@/hooks/useTheme";
+import { useCRMModuleNavigationState } from "@/hooks/useCRMModuleNavigationState";
+import { CRM_HEADER_PRIMARY_CONTROL_SEQUENCE, CRMModuleHeaderNavigation } from "@/components/crm/CRMModuleHeaderNavigation";
 type OpportunityStage = Stage;
 
 export default function OpportunitiesPipeline() {
@@ -30,6 +33,11 @@ export default function OpportunitiesPipeline() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { scopedDb } = useCRM();
+  const { setActive } = useTheme();
+  const { theme, setTheme, setViewMode, hydrated } = useCRMModuleNavigationState("opportunities", {
+    viewMode: "pipeline",
+    theme: "Azure Sky",
+  });
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDbFallbackActive, setIsDbFallbackActive] = useState(false);
@@ -108,6 +116,10 @@ export default function OpportunitiesPipeline() {
   }, [scopedDb]);
 
   const fallbackBannerText = t(resolveCrmFallbackBannerCopy('opportunities', dbFallbackReason).key);
+  const refreshOpportunities = useCallback(() => {
+    void scopedDb.accessContext;
+    void fetchOpportunities();
+  }, [fetchOpportunities, scopedDb]);
 
   const fetchAccounts = useCallback(async () => {
     try {
@@ -125,9 +137,14 @@ export default function OpportunitiesPipeline() {
   }, [scopedDb]);
 
   useEffect(() => {
-    fetchOpportunities();
+    refreshOpportunities();
     fetchAccounts();
-  }, [fetchOpportunities, fetchAccounts]);
+  }, [fetchAccounts, refreshOpportunities]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    setActive(theme);
+  }, [hydrated, setActive, theme]);
 
   const handleStageChange = async (opportunityId: string, newStage: Stage) => {
     const previousOpportunity = opportunities.find((opportunity) => opportunity.id === opportunityId);
@@ -453,10 +470,25 @@ export default function OpportunitiesPipeline() {
               })()}
             </p>
           </div>
-          <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard/opportunities")}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to List
-          </Button>
+          <CRMModuleHeaderNavigation
+            moduleLabel="Opportunities"
+            viewMode="pipeline"
+            theme={theme}
+            onViewModeChange={(mode) => {
+              if (mode === "pipeline") {
+                setViewMode("pipeline");
+                return;
+              }
+              setViewMode(mode);
+              navigate("/dashboard/opportunities");
+            }}
+            onThemeChange={setTheme}
+            onCreate={() => navigate("/dashboard/opportunities/new")}
+            createLabel="New Opportunity"
+            onRefresh={refreshOpportunities}
+            onImportExport={() => navigate("/dashboard/opportunities/import-export")}
+            controlSequence={CRM_HEADER_PRIMARY_CONTROL_SEQUENCE}
+          />
         </div>
 
         <div className="space-y-4">

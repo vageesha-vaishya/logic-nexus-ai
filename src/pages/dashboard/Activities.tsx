@@ -22,7 +22,7 @@ import { format, isToday, isFuture, isPast, startOfDay } from 'date-fns';
 import { matchText, TextOp } from '@/lib/utils';
 import { useTheme } from '@/hooks/useTheme';
 import { useCRMModuleNavigationState } from '@/hooks/useCRMModuleNavigationState';
-import { CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
+import { CRM_HEADER_PRIMARY_CONTROL_SEQUENCE, CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
 import { PipelineService } from '@/services/pipeline-service';
 import { useTranslation } from 'react-i18next';
 import { resolveCrmFallbackBannerCopy } from './leadsListUtils';
@@ -151,12 +151,16 @@ export default function Activities() {
       setLoading(false);
     }
   }, [scopedDb]);
+  const refreshActivities = useCallback(() => {
+    void scopedDb.accessContext;
+    void fetchActivities();
+  }, [fetchActivities, scopedDb]);
 
   const fallbackBannerText = t(resolveCrmFallbackBannerCopy('activities', dbFallbackReason).key);
 
   useEffect(() => {
-    fetchActivities();
-  }, [fetchActivities]);
+    refreshActivities();
+  }, [refreshActivities]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -176,7 +180,7 @@ export default function Activities() {
       if (error) throw error;
 
       toast.success('Activity marked as completed');
-      fetchActivities();
+      refreshActivities();
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       toast.error('Failed to update activity', { description: message });
@@ -417,8 +421,9 @@ export default function Activities() {
             onThemeChange={setTheme}
             onCreate={() => navigate('/dashboard/activities/new')}
             createLabel="New Activity"
-            onRefresh={fetchActivities}
+            onRefresh={refreshActivities}
             onImportExport={() => navigate('/dashboard/activities/import-export')}
+            controlSequence={CRM_HEADER_PRIMARY_CONTROL_SEQUENCE}
           />
           <Button asChild variant="outline" size="sm">
             <Link to="/dashboard/activities/new?type=email">

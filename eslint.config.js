@@ -79,8 +79,18 @@ export default tseslint.config(
   },
   {
     files: [
-      "src/components/ui/**/*.{ts,tsx}",
-      "src/components/ui/enterprise/**/*.{ts,tsx}"
+      "src/components/ui/enterprise/**/*.{ts,tsx}",
+      "src/components/ui/button.tsx",
+      "src/components/ui/card.tsx",
+      "src/components/ui/checkbox.tsx",
+      "src/components/ui/input.tsx",
+      "src/components/ui/label.tsx",
+      "src/components/ui/select.tsx",
+      "src/components/ui/switch.tsx",
+      "src/components/ui/table.tsx",
+      "src/components/ui/tabs.tsx",
+      "src/components/ui/textarea.tsx",
+      "src/components/ui/tooltip.tsx"
     ],
     rules: {
       "no-restricted-imports": ["error", {
@@ -111,7 +121,9 @@ export default tseslint.config(
           "@/features/module-finance/*",
           "@/features/module-finance/**",
           "@/features/module-compliance/*",
-          "@/features/module-compliance/**"
+          "@/features/module-compliance/**",
+          "@/features/module-communications/*",
+          "@/features/module-communications/**"
         ]
       }]
     },
@@ -130,7 +142,9 @@ export default tseslint.config(
           "@/features/module-finance/*",
           "@/features/module-finance/**",
           "@/features/module-compliance/*",
-          "@/features/module-compliance/**"
+          "@/features/module-compliance/**",
+          "@/features/module-communications/*",
+          "@/features/module-communications/**"
         ]
       }]
     },
@@ -149,7 +163,9 @@ export default tseslint.config(
           "@/features/module-finance/*",
           "@/features/module-finance/**",
           "@/features/module-compliance/*",
-          "@/features/module-compliance/**"
+          "@/features/module-compliance/**",
+          "@/features/module-communications/*",
+          "@/features/module-communications/**"
         ]
       }]
     },
@@ -168,7 +184,9 @@ export default tseslint.config(
           "@/features/module-quotation/*",
           "@/features/module-quotation/**",
           "@/features/module-compliance/*",
-          "@/features/module-compliance/**"
+          "@/features/module-compliance/**",
+          "@/features/module-communications/*",
+          "@/features/module-communications/**"
         ]
       }]
     },
@@ -187,7 +205,30 @@ export default tseslint.config(
           "@/features/module-quotation/*",
           "@/features/module-quotation/**",
           "@/features/module-finance/*",
-          "@/features/module-finance/**"
+          "@/features/module-finance/**",
+          "@/features/module-communications/*",
+          "@/features/module-communications/**"
+        ]
+      }]
+    },
+  },
+  {
+    files: [
+      "src/features/module-communications/**/*.{ts,tsx}"
+    ],
+    rules: {
+      "no-restricted-imports": ["error", {
+        "patterns": [
+          "@/features/module-crm/*",
+          "@/features/module-crm/**",
+          "@/features/module-logistics/*",
+          "@/features/module-logistics/**",
+          "@/features/module-quotation/*",
+          "@/features/module-quotation/**",
+          "@/features/module-finance/*",
+          "@/features/module-finance/**",
+          "@/features/module-compliance/*",
+          "@/features/module-compliance/**"
         ]
       }]
     },

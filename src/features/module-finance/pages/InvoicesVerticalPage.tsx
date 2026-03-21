@@ -1,6 +1,6 @@
-import InvoicesLegacy from '@/pages/dashboard/finance/Invoices';
 import { PlatformWidgetSlot } from '@/components/ui/enterprise';
 import type { ReactNode } from 'react';
+import { FinanceOwnedWorkspace } from '../components/FinanceOwnedWorkspace';
 
 type FinanceModuleShellProps = {
   children: ReactNode;
@@ -15,7 +15,7 @@ function FinanceModuleShell({ children }: FinanceModuleShellProps) {
 }
 
 function FinanceWorkspaceSurface() {
-  return <InvoicesLegacy />;
+  return <FinanceOwnedWorkspace />;
 }
 
 export default function InvoicesVerticalPage() {
@@ -27,6 +27,16 @@ export default function InvoicesVerticalPage() {
             id: 'finance-contract',
             title: 'Finance Contract Widget',
             content: 'Cross-module context is linked as references without inline mutation rights.',
+          },
+          {
+            id: 'finance-mutation-contract',
+            title: 'Finance Mutation Guard',
+            content: 'Mutation actions are role-gated and committed records route to compensating workflows.',
+          },
+          {
+            id: 'finance-reconciliation-contract',
+            title: 'Finance Reconciliation Contract',
+            content: 'Discrepancies expose drill-down pointers to traceable source records.',
           },
         ]}
       >

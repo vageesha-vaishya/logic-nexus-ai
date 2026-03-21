@@ -16,7 +16,7 @@ import { matchText, TextOp, formatCurrency } from '@/lib/utils';
 import { Opportunity, OpportunityStage, stageColors, stageLabels } from './opportunities-data';
 import { useTheme } from '@/hooks/useTheme';
 import { useCRMModuleNavigationState } from '@/hooks/useCRMModuleNavigationState';
-import { CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
+import { CRM_HEADER_PRIMARY_CONTROL_SEQUENCE, CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
 import { PipelineService } from '@/services/pipeline-service';
 import { useTranslation } from 'react-i18next';
 import { resolveCrmFallbackBannerCopy } from './leadsListUtils';
@@ -74,10 +74,14 @@ export default function Opportunities() {
       setLoading(false);
     }
   }, [scopedDb]);
+  const refreshOpportunities = useCallback(() => {
+    void scopedDb.accessContext;
+    void fetchOpportunities();
+  }, [fetchOpportunities, scopedDb]);
 
   useEffect(() => {
-    fetchOpportunities();
-  }, [fetchOpportunities]);
+    refreshOpportunities();
+  }, [refreshOpportunities]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -140,6 +144,7 @@ export default function Opportunities() {
             theme={theme}
             onViewModeChange={(mode) => {
               if (mode === 'pipeline') {
+                setViewMode('pipeline');
                 navigate('/dashboard/opportunities/pipeline');
                 return;
               }
@@ -148,8 +153,9 @@ export default function Opportunities() {
             onThemeChange={setTheme}
             onCreate={() => navigate('/dashboard/opportunities/new')}
             createLabel="New Opportunity"
-            onRefresh={fetchOpportunities}
+            onRefresh={refreshOpportunities}
             onImportExport={() => navigate('/dashboard/opportunities/import-export')}
+            controlSequence={CRM_HEADER_PRIMARY_CONTROL_SEQUENCE}
           />
         </div>
         {isDbFallbackActive && (

@@ -80,3 +80,6 @@
 
 ## AMRO Domain Access Governance Rule
 - Domain access is strictly limited to tenants who are explicitly assigned to the AMRO domain through the platform_domains and tenant_domain_assignments database tables, with active subscription status validated in real-time.
+
+## Immediate Error Resolution Rule
+- If any error occurs during testing, coding, or implementation of new requirements, it must be fixed immediately before starting any new requirement.

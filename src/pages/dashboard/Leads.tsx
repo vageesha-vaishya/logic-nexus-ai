@@ -794,6 +794,10 @@ export default function Leads() {
     }
     navigateToLeadEdit(lead);
   }, [navigateToLeadEdit]);
+  const refreshLeads = useCallback(() => {
+    void scopedDb.accessContext;
+    void fetchLeads();
+  }, [fetchLeads, scopedDb]);
 
   useEffect(() => {
     return () => {
@@ -808,8 +812,8 @@ export default function Leads() {
 
   useEffect(() => {
     if (!viewState.hydrated) return;
-    fetchLeads();
-  }, [fetchLeads, viewState.hydrated]);
+    refreshLeads();
+  }, [refreshLeads, viewState.hydrated]);
 
   useEffect(() => {
     const maxPage = Math.max(1, Math.ceil(totalCount / pageSize));
@@ -1639,7 +1643,7 @@ export default function Leads() {
               createLabel="New Lead"
               iconOnly
               layout="compact"
-              onRefresh={fetchLeads}
+              onRefresh={refreshLeads}
               onImportExport={() => {
                 const params = buildLeadsImportExportParams({
                   viewMode,

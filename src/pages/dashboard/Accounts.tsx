@@ -15,7 +15,7 @@ import { EntityCard } from '@/components/system/EntityCard';
 import { EmptyState } from '@/components/system/EmptyState';
 import { useTheme } from '@/hooks/useTheme';
 import { useCRMModuleNavigationState } from '@/hooks/useCRMModuleNavigationState';
-import { CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
+import { CRM_HEADER_PRIMARY_CONTROL_SEQUENCE, CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
 import { PipelineService } from '@/services/pipeline-service';
 import { useTranslation } from 'react-i18next';
 import { resolveCrmFallbackBannerCopy } from './leadsListUtils';
@@ -86,6 +86,10 @@ export default function Accounts() {
   }, [scopedDb]);
 
   const fallbackBannerText = t(resolveCrmFallbackBannerCopy('accounts', dbFallbackReason).key);
+  const refreshAccounts = useCallback(() => {
+    void scopedDb.accessContext;
+    void fetchAccounts();
+  }, [fetchAccounts, scopedDb]);
 
   useEffect(() => {
     fetchAccounts();
@@ -150,7 +154,7 @@ export default function Accounts() {
         }
       }
       toast.success('Duplicates merged successfully');
-      fetchAccounts();
+      refreshAccounts();
     } catch (err: any) {
       console.error('Accounts: merge error', err);
       toast.error(err?.message || 'Failed to merge duplicates');
@@ -202,6 +206,7 @@ export default function Accounts() {
               theme={theme}
               onViewModeChange={(mode) => {
                 if (mode === 'pipeline') {
+                  setViewMode('pipeline');
                   navigate('/dashboard/accounts/pipeline');
                   return;
                 }
@@ -210,8 +215,9 @@ export default function Accounts() {
               onThemeChange={setTheme}
               onCreate={() => navigate('/dashboard/accounts/new')}
               createLabel="New Account"
-              onRefresh={fetchAccounts}
+              onRefresh={refreshAccounts}
               onImportExport={() => navigate('/dashboard/accounts/import-export')}
+              controlSequence={CRM_HEADER_PRIMARY_CONTROL_SEQUENCE}
             />
             <Button variant={hasDuplicates ? 'default' : 'outline'} className="ml-2" onClick={onMergeDuplicates}>
               {hasDuplicates ? `DeDup (${duplicateGroups.length})` : 'Find Duplicates'}

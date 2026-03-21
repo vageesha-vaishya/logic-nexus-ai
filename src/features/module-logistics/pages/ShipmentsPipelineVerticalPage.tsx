@@ -1,6 +1,6 @@
-import ShipmentsPipelineLegacy from '@/pages/dashboard/ShipmentsPipeline';
 import { PlatformWidgetSlot } from '@/components/ui/enterprise';
 import type { ReactNode } from 'react';
+import { LogisticsOwnedWorkspace } from '../components/LogisticsOwnedWorkspace';
 
 type LogisticsModuleShellProps = {
   children: ReactNode;
@@ -15,7 +15,7 @@ function LogisticsModuleShell({ children }: LogisticsModuleShellProps) {
 }
 
 function LogisticsWorkspaceSurface() {
-  return <ShipmentsPipelineLegacy />;
+  return <LogisticsOwnedWorkspace />;
 }
 
 export default function ShipmentsPipelineVerticalPage() {
@@ -27,6 +27,11 @@ export default function ShipmentsPipelineVerticalPage() {
             id: 'logistics-contract',
             title: 'Logistics Contract Widget',
             content: 'Pricing and compliance references are embedded as read-only platform widgets.',
+          },
+          {
+            id: 'logistics-interaction-contract',
+            title: 'Logistics Interaction Contract',
+            content: 'Leg rendering, route validation, diagnostics, and retries remain logistics-owned interactions.',
           },
         ]}
       >

@@ -421,6 +421,10 @@ export default function Quotes() {
       setLoading(false);
     }
   }, [scopedDb, filters.page, filters.pageSize, activeSorts, filters.q, filters.status, activeFilters]);
+  const refreshQuotes = useCallback(() => {
+    void scopedDb.accessContext;
+    void fetchQuotes();
+  }, [fetchQuotes, scopedDb]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -433,13 +437,13 @@ export default function Quotes() {
       // CMD/CTRL + R = Refresh
       if ((e.metaKey || e.ctrlKey) && e.key === 'r') {
         e.preventDefault();
-        fetchQuotes();
+        refreshQuotes();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [fetchQuotes, navigate]);
+  }, [navigate, refreshQuotes]);
 
   const quotationDeleteService = useMemo(() => new QuotationDeleteService(scopedDb), [scopedDb]);
 
@@ -457,7 +461,7 @@ export default function Quotes() {
 
   // Real-time subscription
   useEffect(() => {
-    fetchQuotes();
+    refreshQuotes();
 
     const channel = supabase
       .channel('quotes-list-changes')
@@ -470,7 +474,7 @@ export default function Quotes() {
         },
         () => {
           logger.info('Real-time update detected, refreshing quotes list...');
-          fetchQuotes();
+          refreshQuotes();
         }
       )
       .subscribe();
@@ -478,7 +482,7 @@ export default function Quotes() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [fetchQuotes, supabase]);
+  }, [refreshQuotes, supabase]);
 
   const handleDuplicate = async (id: string) => {
     try {
@@ -766,7 +770,7 @@ export default function Quotes() {
             createLabel="New Quote"
             iconOnly
             layout="compact"
-            onRefresh={fetchQuotes}
+            onRefresh={refreshQuotes}
             onImportExport={() => navigate('/dashboard/quotes/import-export')}
             controlSequence={CRM_HEADER_PRIMARY_CONTROL_SEQUENCE}
           />

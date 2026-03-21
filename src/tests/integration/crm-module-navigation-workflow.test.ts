@@ -17,6 +17,12 @@ describe('CRM module navigation workflow consistency', () => {
       'src/pages/dashboard/Activities.tsx',
       'src/pages/dashboard/Quotes.tsx',
     ];
+    const pipelineModulesUsingModuleState = [
+      'src/pages/dashboard/AccountsPipeline.tsx',
+      'src/pages/dashboard/ContactsPipeline.tsx',
+      'src/pages/dashboard/OpportunitiesPipeline.tsx',
+      'src/pages/dashboard/QuotationManager.tsx',
+    ];
 
     const leadsContent = read('src/pages/dashboard/Leads.tsx');
     const leadsPipelineContent = read('src/pages/dashboard/LeadsPipeline.tsx');
@@ -30,6 +36,13 @@ describe('CRM module navigation workflow consistency', () => {
       expect(content).toContain('CRMModuleHeaderNavigation');
       expect(content).toContain('useCRMModuleNavigationState');
       expect(content).toContain("theme: 'Azure Sky'");
+    });
+
+    pipelineModulesUsingModuleState.forEach((modulePath) => {
+      const content = read(modulePath);
+      expect(content).toContain('CRMModuleHeaderNavigation');
+      expect(content).toContain('useCRMModuleNavigationState');
+      expect(content).toContain('theme: "Azure Sky"');
     });
   });
 
@@ -46,10 +59,37 @@ describe('CRM module navigation workflow consistency', () => {
   it('enforces unified header control ordering contract', () => {
     const leadsWorkspace = read('src/pages/dashboard/Leads.tsx');
     const leadsPipeline = read('src/pages/dashboard/LeadsPipeline.tsx');
+    const accountsWorkspace = read('src/pages/dashboard/Accounts.tsx');
+    const contactsWorkspace = read('src/pages/dashboard/Contacts.tsx');
+    const opportunitiesWorkspace = read('src/pages/dashboard/Opportunities.tsx');
+    const activitiesWorkspace = read('src/pages/dashboard/Activities.tsx');
+    const quotesWorkspace = read('src/pages/dashboard/Quotes.tsx');
+    const accountsPipeline = read('src/pages/dashboard/AccountsPipeline.tsx');
+    const contactsPipeline = read('src/pages/dashboard/ContactsPipeline.tsx');
+    const opportunitiesPipeline = read('src/pages/dashboard/OpportunitiesPipeline.tsx');
+    const quotationManager = read('src/pages/dashboard/QuotationManager.tsx');
+    const headerNavigation = read('src/components/crm/CRMModuleHeaderNavigation.tsx');
     const dashboardLayout = read('src/components/layout/DashboardLayout.tsx');
-    const controlOrder = "['pipeline', 'list', 'create', 'card', 'grid', 'refresh', 'analytics', 'importExport', 'theme']";
-    expect(leadsWorkspace).toContain(`controlSequence={${controlOrder}}`);
-    expect(leadsPipeline).toContain(`controlSequence={${controlOrder}}`);
+    expect(headerNavigation).toContain("export const CRM_HEADER_PRIMARY_CONTROL_SEQUENCE: CRMHeaderControl[] = [");
+    expect(headerNavigation).toContain("'pipeline',");
+    expect(headerNavigation).toContain("'card',");
+    expect(headerNavigation).toContain("'grid',");
+    expect(headerNavigation).toContain("'list',");
+    expect(headerNavigation).toContain("'create',");
+    expect(headerNavigation).toContain("'refresh',");
+    expect(headerNavigation).toContain("'importExport',");
+    expect(headerNavigation).toContain("'theme',");
+    expect(leadsWorkspace).toContain('controlSequence={CRM_HEADER_PRIMARY_CONTROL_SEQUENCE}');
+    expect(leadsPipeline).toContain('controlSequence={CRM_HEADER_PRIMARY_CONTROL_SEQUENCE}');
+    expect(accountsWorkspace).toContain('controlSequence={CRM_HEADER_PRIMARY_CONTROL_SEQUENCE}');
+    expect(contactsWorkspace).toContain('controlSequence={CRM_HEADER_PRIMARY_CONTROL_SEQUENCE}');
+    expect(opportunitiesWorkspace).toContain('controlSequence={CRM_HEADER_PRIMARY_CONTROL_SEQUENCE}');
+    expect(activitiesWorkspace).toContain('controlSequence={CRM_HEADER_PRIMARY_CONTROL_SEQUENCE}');
+    expect(quotesWorkspace).toContain('controlSequence={CRM_HEADER_PRIMARY_CONTROL_SEQUENCE}');
+    expect(accountsPipeline).toContain('controlSequence={CRM_HEADER_PRIMARY_CONTROL_SEQUENCE}');
+    expect(contactsPipeline).toContain('controlSequence={CRM_HEADER_PRIMARY_CONTROL_SEQUENCE}');
+    expect(opportunitiesPipeline).toContain('controlSequence={CRM_HEADER_PRIMARY_CONTROL_SEQUENCE}');
+    expect(quotationManager).toContain('controlSequence={CRM_HEADER_PRIMARY_CONTROL_SEQUENCE}');
     expect(dashboardLayout).toContain('overflow-x-hidden');
   });
 
@@ -138,8 +178,9 @@ describe('CRM module navigation workflow consistency', () => {
     expect(appContent).toContain('<ProtectedRoute requiredPermissions={["quotes.view"]}>');
     expect(appContent).toContain('path="/dashboard/quotes/new"');
     expect(appContent).toContain('<ProtectedRoute requiredPermissions={["quotes.create"]}>');
-    expect(quotationManager).toContain("const [viewMode, setViewMode] = useState<ViewMode>('board');");
-    expect(quotationManager).toContain("navigate('/dashboard/quotes');");
+    expect(quotationManager).toContain('useCRMModuleNavigationState("quotes"');
+    expect(quotationManager).toContain('viewMode: "pipeline"');
+    expect(quotationManager).toContain('navigate("/dashboard/quotes");');
     expect(quotationManager).not.toContain("localStorage.getItem('quotesViewMode')");
   });
 });

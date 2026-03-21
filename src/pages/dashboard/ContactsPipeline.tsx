@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Search, Filter, Layers, Settings, AlertCircle, Download } from "lucide-react";
+import { Search, Filter, Layers, Settings, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useCRM } from "@/hooks/useCRM";
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
@@ -19,6 +19,9 @@ import { Separator } from "@/components/ui/separator";
 import { PipelineService } from "@/services/pipeline-service";
 import { useTranslation } from "react-i18next";
 import { resolveCrmFallbackBannerCopy } from "./leadsListUtils";
+import { useTheme } from "@/hooks/useTheme";
+import { useCRMModuleNavigationState } from "@/hooks/useCRMModuleNavigationState";
+import { CRM_HEADER_PRIMARY_CONTROL_SEQUENCE, CRMModuleHeaderNavigation } from "@/components/crm/CRMModuleHeaderNavigation";
 
 type ContactStage = 'new_contact' | 'verified' | 'key_decision_maker' | 'active' | 'inactive' | 'bounced_invalid';
 
@@ -65,6 +68,11 @@ export default function ContactsPipeline() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { context, scopedDb } = useCRM();
+  const { setActive } = useTheme();
+  const { theme, setTheme, setViewMode, hydrated } = useCRMModuleNavigationState("contacts", {
+    viewMode: "pipeline",
+    theme: "Azure Sky",
+  });
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
@@ -116,10 +124,19 @@ export default function ContactsPipeline() {
   }, [scopedDb]);
 
   const fallbackBannerText = t(resolveCrmFallbackBannerCopy('contacts', dbFallbackReason).key);
+  const refreshContacts = useCallback(() => {
+    void scopedDb.accessContext;
+    void fetchData();
+  }, [fetchData, scopedDb]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    refreshContacts();
+  }, [refreshContacts]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    setActive(theme);
+  }, [hydrated, setActive, theme]);
 
   const latestActivityByContact = useMemo(() => {
     const m: Record<string, number> = {};
@@ -183,16 +200,25 @@ export default function ContactsPipeline() {
             <h1 className="text-3xl font-bold">Contacts Pipeline</h1>
             <p className="text-muted-foreground">Engagement lifecycle for contacts</p>
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={() => navigate('/dashboard/contacts/import-export')}>
-              <Download className="h-4 w-4 mr-2" />
-              Import/Export
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => navigate('/dashboard/contacts')}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to List
-            </Button>
-          </div>
+          <CRMModuleHeaderNavigation
+            moduleLabel="Contacts"
+            viewMode="pipeline"
+            theme={theme}
+            onViewModeChange={(mode) => {
+              if (mode === "pipeline") {
+                setViewMode("pipeline");
+                return;
+              }
+              setViewMode(mode);
+              navigate("/dashboard/contacts");
+            }}
+            onThemeChange={setTheme}
+            onCreate={() => navigate("/dashboard/contacts/new")}
+            createLabel="New Contact"
+            onRefresh={refreshContacts}
+            onImportExport={() => navigate("/dashboard/contacts/import-export")}
+            controlSequence={CRM_HEADER_PRIMARY_CONTROL_SEQUENCE}
+          />
         </div>
         {isDbFallbackActive && (
           <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">

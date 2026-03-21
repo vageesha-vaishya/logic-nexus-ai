@@ -80,7 +80,7 @@ const QueueManagement = lazy(() => import("./pages/dashboard/QueueManagement"));
 const OnboardingOperations = lazy(() => import("./pages/dashboard/OnboardingOperations"));
 const LeadAssignment = lazy(() => import("./pages/dashboard/LeadAssignment"));
 const EmailManagement = lazy(() => import("./pages/dashboard/EmailManagement"));
-const CommunicationsHub = lazy(() => import("./pages/dashboard/CommunicationsHub"));
+const CommunicationsHub = lazy(() => import("./features/module-communications").then((module) => ({ default: module.CommunicationsHubVerticalPage })));
 const ChannelIntegrations = lazy(() => import("./pages/dashboard/ChannelIntegrations"));
 const ThemeManagement = lazy(() => import("./pages/dashboard/ThemeManagement"));
 const Files = lazy(() => import("./pages/dashboard/Files"));
@@ -89,7 +89,7 @@ const Reports = lazy(() => import("./pages/dashboard/Reports"));
 const Chatter = lazy(() => import("./pages/dashboard/Chatter"));
 const Groups = lazy(() => import("./pages/dashboard/Groups"));
 const Calendar = lazy(() => import("./pages/dashboard/Calendar"));
-const CRMWorkspace = lazy(() => import("./pages/dashboard/CRMWorkspace"));
+const CRMWorkspace = lazy(() => import("./features/module-crm").then((module) => ({ default: module.CRMWorkspaceVerticalPage })));
 const More = lazy(() => import("./pages/dashboard/More"));
 const PermissionsMatrix = lazy(() => import("./pages/dashboard/PermissionsMatrix"));
 const AuditLogs = lazy(() => import("./pages/dashboard/AuditLogs"));
@@ -104,7 +104,7 @@ const Shipments = lazy(() => import("./pages/dashboard/Shipments"));
 const ShipmentNew = lazy(() => import("./pages/dashboard/ShipmentNew"));
 const ShipmentDetail = lazy(() => import("./pages/dashboard/ShipmentDetail"));
 const ShipmentDocumentViewer = lazy(() => import("./pages/dashboard/ShipmentDocumentViewer"));
-const ShipmentsPipeline = lazy(() => import("./pages/dashboard/ShipmentsPipeline"));
+const ShipmentsPipeline = lazy(() => import("./features/module-logistics").then((module) => ({ default: module.ShipmentsPipelineVerticalPage })));
 const Warehouses = lazy(() => import("./pages/dashboard/Warehouses"));
 const WarehouseNew = lazy(() => import("./pages/dashboard/WarehouseNew"));
 const Vehicles = lazy(() => import("./pages/dashboard/Vehicles"));
@@ -117,10 +117,10 @@ const QuoteNew = lazy(() => import("./pages/dashboard/QuoteNew"));
 const QuoteDetail = lazy(() => import("./pages/dashboard/QuoteDetail"));
 const QuotesImportExport = lazy(() => import("./pages/dashboard/QuotesImportExport"));
 const QuotesPipeline = lazy(() => 
-  import("./pages/dashboard/QuotesPipeline").catch(() => {
+  import("./features/module-quotation").then((module) => ({ default: module.QuotesPipelineVerticalPage })).catch(() => {
     // Retry once after 1s in case of network glitch
     return new Promise(resolve => setTimeout(resolve, 1000))
-      .then(() => import("./pages/dashboard/QuotesPipeline"));
+      .then(() => import("./features/module-quotation").then((module) => ({ default: module.QuotesPipelineVerticalPage })));
   })
 );
 
@@ -142,7 +142,7 @@ const QuotationSettings = lazy(() => import("./pages/dashboard/QuotationSettings
 const DataManagement = lazy(() => import("./pages/dashboard/DataManagement"));
 const ServiceTypeMappings = lazy(() => import("./pages/dashboard/ServiceTypeMappings"));
 const ServiceTypes = lazy(() => import("./pages/dashboard/ServiceTypes"));
-const RestrictedPartyScreening = lazy(() => import("./pages/dashboard/RestrictedPartyScreening"));
+const RestrictedPartyScreening = lazy(() => import("./features/module-compliance").then((module) => ({ default: module.RestrictedPartyScreeningVerticalPage })));
 const TransportModes = lazy(() => import("./pages/dashboard/TransportModes"));
 const Services = lazy(() => import("./pages/dashboard/Services"));
 const Currencies = lazy(() => import("./pages/dashboard/Currencies"));
@@ -152,7 +152,7 @@ const ContainerAnalytics = lazy(() => import("./pages/dashboard/ContainerAnalyti
 const ContainerTracking = lazy(() => import("./pages/dashboard/ContainerTracking"));
 const PlatformDomains = lazy(() => import("./pages/dashboard/PlatformDomains"));
 const PlatformDomainDetail = lazy(() => import("./pages/dashboard/PlatformDomainDetail"));
-const Invoices = lazy(() => import("./pages/dashboard/finance/Invoices"));
+const Invoices = lazy(() => import("./features/module-finance").then((module) => ({ default: module.InvoicesVerticalPage })));
 const MarginRules = lazy(() => import("./pages/dashboard/finance/MarginRules"));
 const InvoiceDetail = lazy(() => import("./pages/dashboard/finance/InvoiceDetail"));
 const TaxJurisdictions = lazy(() => import("./pages/dashboard/finance/TaxJurisdictions"));

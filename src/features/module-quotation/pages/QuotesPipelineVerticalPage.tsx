@@ -1,5 +1,4 @@
-import QuotesPipelineLegacy from '@/pages/dashboard/QuotesPipeline';
-import { PlatformWidgetSlot } from '@/components/ui/enterprise';
+import QuotationManager from '@/pages/dashboard/QuotationManager';
 import type { ReactNode } from 'react';
 
 type QuotationModuleShellProps = {
@@ -14,24 +13,10 @@ function QuotationModuleShell({ children }: QuotationModuleShellProps) {
   );
 }
 
-function QuotationWorkspaceSurface() {
-  return <QuotesPipelineLegacy />;
-}
-
 export default function QuotesPipelineVerticalPage() {
   return (
     <QuotationModuleShell>
-      <PlatformWidgetSlot
-        widgets={[
-          {
-            id: 'quotation-contract',
-            title: 'Quotation Contract Widget',
-            content: 'Route and compliance projections are consumed through explicit widget contracts.',
-          },
-        ]}
-      >
-        <QuotationWorkspaceSurface />
-      </PlatformWidgetSlot>
+      <QuotationManager />
     </QuotationModuleShell>
   );
 }

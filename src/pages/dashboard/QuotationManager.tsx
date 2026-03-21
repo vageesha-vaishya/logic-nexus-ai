@@ -28,6 +28,7 @@ import { format } from "date-fns";
 import { FeatureErrorBoundary } from "@/components/FeatureErrorBoundary";
 import { useTranslation } from "react-i18next";
 import { CrmFallbackReason, resolveCrmFallbackBannerCopy } from "./leadsListUtils";
+import { QuotationOwnedWorkspace } from "@/features/module-quotation/components/QuotationOwnedWorkspace";
 
 type PipelineView = "board" | "analytics";
 
@@ -697,6 +698,8 @@ export default function QuotationManager() {
                       })}
                     </CardContent>
                   </Card>
+
+                  <QuotationOwnedWorkspace />
                 </div>
               </div>
 

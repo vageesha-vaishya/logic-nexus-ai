@@ -13,7 +13,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useTheme } from '@/hooks/useTheme';
 import { useCRMModuleNavigationState } from '@/hooks/useCRMModuleNavigationState';
-import { CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
+import { CRM_HEADER_PRIMARY_CONTROL_SEQUENCE, CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
 import { PipelineService } from '@/services/pipeline-service';
 import { useTranslation } from 'react-i18next';
 import { resolveCrmFallbackBannerCopy } from './leadsListUtils';
@@ -85,10 +85,14 @@ export default function Contacts() {
   }, [scopedDb]);
 
   const fallbackBannerText = t(resolveCrmFallbackBannerCopy('contacts', dbFallbackReason).key);
+  const refreshContacts = useCallback(() => {
+    void scopedDb.accessContext;
+    void fetchContacts();
+  }, [fetchContacts, scopedDb]);
 
   useEffect(() => {
-    fetchContacts();
-  }, [fetchContacts]);
+    refreshContacts();
+  }, [refreshContacts]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -125,6 +129,7 @@ export default function Contacts() {
             theme={theme}
             onViewModeChange={(mode) => {
               if (mode === 'pipeline') {
+                setViewMode('pipeline');
                 navigate('/dashboard/contacts/pipeline');
                 return;
               }
@@ -133,8 +138,9 @@ export default function Contacts() {
             onThemeChange={setTheme}
             onCreate={() => navigate('/dashboard/contacts/new')}
             createLabel="New Contact"
-            onRefresh={fetchContacts}
+            onRefresh={refreshContacts}
             onImportExport={() => navigate('/dashboard/contacts/import-export')}
+            controlSequence={CRM_HEADER_PRIMARY_CONTROL_SEQUENCE}
           />
         </div>
       </div>

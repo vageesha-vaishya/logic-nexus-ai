@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { useCRM } from "@/hooks/useCRM";
-import { useNavigate, useSearchParams, Link } from "react-router-dom";
-import { ArrowLeft, Search, Filter, Layers, Settings, CheckSquare, Square, AlertCircle, LayoutGrid, Download } from "lucide-react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { Search, Filter, Layers, Settings, CheckSquare, Square, AlertCircle, LayoutGrid } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { Droppable } from "@/components/kanban/Droppable";
@@ -21,6 +21,9 @@ import { KanbanFunnel } from "@/components/kanban/KanbanFunnel";
 import { PipelineService } from "@/services/pipeline-service";
 import { useTranslation } from "react-i18next";
 import { resolveCrmFallbackBannerCopy } from "./leadsListUtils";
+import { useTheme } from "@/hooks/useTheme";
+import { useCRMModuleNavigationState } from "@/hooks/useCRMModuleNavigationState";
+import { CRM_HEADER_PRIMARY_CONTROL_SEQUENCE, CRMModuleHeaderNavigation } from "@/components/crm/CRMModuleHeaderNavigation";
 
 type AccountStage = 'new_account' | 'kyc_pending' | 'active' | 'vip' | 'payment_issues' | 'inactive' | 'blocked';
 type AccountType = 'prospect' | 'customer' | 'partner' | 'vendor';
@@ -65,6 +68,11 @@ export default function AccountsPipeline() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { context, scopedDb } = useCRM();
+  const { setActive } = useTheme();
+  const { theme, setTheme, setViewMode, hydrated } = useCRMModuleNavigationState("accounts", {
+    viewMode: "pipeline",
+    theme: "Azure Sky",
+  });
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDbFallbackActive, setIsDbFallbackActive] = useState(false);
@@ -129,10 +137,19 @@ export default function AccountsPipeline() {
   }, [scopedDb]);
 
   const fallbackBannerText = t(resolveCrmFallbackBannerCopy('accounts', dbFallbackReason).key);
+  const refreshAccounts = useCallback(() => {
+    void scopedDb.accessContext;
+    void fetchAccounts();
+  }, [fetchAccounts, scopedDb]);
 
   useEffect(() => {
-    fetchAccounts();
-  }, [fetchAccounts]);
+    refreshAccounts();
+  }, [refreshAccounts]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    setActive(theme);
+  }, [hydrated, setActive, theme]);
 
   const computeStage = (a: Account): AccountStage => {
     const status = (a.status || '').toLowerCase();
@@ -288,16 +305,25 @@ export default function AccountsPipeline() {
               })()}
             </p>
           </div>
-          <Button variant="ghost" size="sm" asChild className="mr-2">
-            <Link to="/dashboard/accounts/import-export">
-              <Download className="h-4 w-4 mr-2" />
-              Import/Export
-            </Link>
-          </Button>
-          <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard/accounts")}> 
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to List
-          </Button>
+          <CRMModuleHeaderNavigation
+            moduleLabel="Accounts"
+            viewMode="pipeline"
+            theme={theme}
+            onViewModeChange={(mode) => {
+              if (mode === "pipeline") {
+                setViewMode("pipeline");
+                return;
+              }
+              setViewMode(mode);
+              navigate("/dashboard/accounts");
+            }}
+            onThemeChange={setTheme}
+            onCreate={() => navigate("/dashboard/accounts/new")}
+            createLabel="New Account"
+            onRefresh={refreshAccounts}
+            onImportExport={() => navigate("/dashboard/accounts/import-export")}
+            controlSequence={CRM_HEADER_PRIMARY_CONTROL_SEQUENCE}
+          />
         </div>
         {isDbFallbackActive && (
           <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
