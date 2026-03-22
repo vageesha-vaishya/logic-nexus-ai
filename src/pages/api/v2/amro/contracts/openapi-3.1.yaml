@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: AMRO V2 Integration API
   version: 2.0.0
-  description: AMRO Integration and Coexistence contract for work-packages, tasks, compliance-gates, certification, integration-hub, forecast-reliability, overview-kpi, module-catalog, screen-inventory, phase-plan, phase-1-readiness, and migration-plan.
+  description: AMRO Integration and Coexistence contract for work-packages, schedules, tasks, compliance-gates, certification, integration-hub, forecast-reliability, overview-kpi, module-catalog, screen-inventory, phase-plan, phase-1-readiness, and migration-plan.
 servers:
   - url: /
 paths:
@@ -165,6 +165,207 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/WorkPackageMutationResponse'
+  /api/v2/amro/work-packages/{id}:
+    get:
+      operationId: getAmroWorkPackageDetail
+      tags: [AMRO]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Work package detail response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkPackageDetailResponse'
+    patch:
+      operationId: patchAmroWorkPackage
+      tags: [AMRO]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Work package update response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkPackageUpdateResponse'
+  /api/v2/amro/work-packages/{id}/transitions:
+    post:
+      operationId: transitionAmroWorkPackage
+      tags: [AMRO]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [target_status, reason_code, actor_signature]
+              properties:
+                current_status:
+                  type: string
+                target_status:
+                  type: string
+                reason_code:
+                  type: string
+                actor_signature:
+                  type: string
+      responses:
+        '200':
+          description: Work package transition response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkPackageTransitionResponse'
+  /api/v2/amro/schedules:
+    get:
+      operationId: listAmroSchedules
+      tags: [AMRO]
+      parameters:
+        - in: query
+          name: station
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: date
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Scheduling board response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+    post:
+      operationId: mutateAmroSchedules
+      tags: [AMRO]
+      parameters:
+        - in: query
+          name: interface
+          required: true
+          schema:
+            type: string
+            enum: [assign-maintenance-slot]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [work_package_id, station_code, slot_start, slot_end, assigned_team]
+              properties:
+                work_package_id:
+                  type: string
+                station_code:
+                  type: string
+                slot_start:
+                  type: string
+                slot_end:
+                  type: string
+                station_capacity:
+                  type: number
+                existing_slots:
+                  type: array
+                  items:
+                    type: object
+                    additionalProperties: true
+                assigned_team:
+                  type: array
+                  items:
+                    type: object
+                    additionalProperties: true
+      responses:
+        '200':
+          description: Scheduling mutation response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /api/v2/amro/schedules/replan:
+    post:
+      operationId: replanAmroSchedules
+      tags: [AMRO]
+      parameters:
+        - in: query
+          name: interface
+          required: true
+          schema:
+            type: string
+            enum: [run-replan-simulation, confirm-replan]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - type: object
+                  required: [disrupted_slots, priority_rules, planning_horizon, active_constraints, tenant_calendar_id]
+                  properties:
+                    disrupted_slots:
+                      type: array
+                      items:
+                        type: object
+                        additionalProperties: true
+                    priority_rules:
+                      type: object
+                      additionalProperties: true
+                    planning_horizon:
+                      type: string
+                    active_constraints:
+                      type: array
+                      items:
+                        type: object
+                        additionalProperties: true
+                    tenant_calendar_id:
+                      type: string
+                - type: object
+                  required: [selected_option_id, approver_id, reason, affected_work_packages]
+                  properties:
+                    selected_option_id:
+                      type: string
+                    approver_id:
+                      type: string
+                    reason:
+                      type: string
+                    affected_work_packages:
+                      type: array
+                      items:
+                        type: object
+                        additionalProperties: true
+      responses:
+        '200':
+          description: Scheduling replan response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
   /api/v2/amro/tasks:
     get:
       operationId: listAmroTasks
@@ -191,7 +392,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [update-task-step, upload-evidence, submit-signature]
+            enum: [update-task-step, upload-evidence, submit-signature, save-offline-task-action, sync-offline-queue]
       requestBody:
         required: true
         content:
@@ -236,9 +437,68 @@ paths:
                       type: string
                     signature_payload:
                       type: string
+                - type: object
+                  required: [task_id, step_id, action, expected_step_index, actual_step_index]
+                  properties:
+                    task_id:
+                      type: string
+                    step_id:
+                      type: string
+                    action:
+                      type: string
+                    expected_step_index:
+                      type: integer
+                    actual_step_index:
+                      type: integer
+                    local_revision:
+                      type: integer
+                    queued_at:
+                      type: string
+                - type: object
+                  required: [queue_entries]
+                  properties:
+                    queue_entries:
+                      type: array
+                      items:
+                        type: object
+                        additionalProperties: true
       responses:
         '200':
           description: Task execution mutation response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskExecutionMutationResponse'
+  /api/v2/amro/tasks/{id}/evidence:
+    post:
+      operationId: uploadAmroTaskEvidenceById
+      tags: [AMRO]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [evidence_type, media_ref, checksum, metadata]
+              properties:
+                evidence_type:
+                  type: string
+                media_ref:
+                  type: string
+                checksum:
+                  type: string
+                metadata:
+                  type: object
+                  additionalProperties: true
+      responses:
+        '200':
+          description: Evidence upload response
           content:
             application/json:
               schema:
@@ -1199,6 +1459,77 @@ components:
         output:
           type: object
           additionalProperties: true
+    WorkPackageDetailResponse:
+      type: object
+      required: [version, interface, correlationId, data]
+      properties:
+        version:
+          type: string
+          const: v2
+        interface:
+          type: string
+          enum: [detail-work-package]
+        correlationId:
+          type: string
+        data:
+          type: object
+          required: [work_package]
+          properties:
+            work_package:
+              type: object
+              additionalProperties: true
+    WorkPackageUpdateResponse:
+      type: object
+      required: [version, interface, correlationId, data]
+      properties:
+        version:
+          type: string
+          const: v2
+        interface:
+          type: string
+          enum: [update-work-package]
+        correlationId:
+          type: string
+        data:
+          type: object
+          required: [work_package]
+          properties:
+            work_package:
+              type: object
+              additionalProperties: true
+    WorkPackageTransitionResponse:
+      type: object
+      required: [version, interface, correlationId, output]
+      properties:
+        version:
+          type: string
+          const: v2
+        interface:
+          type: string
+          enum: [transition-work-package]
+        correlationId:
+          type: string
+        output:
+          type: object
+          required: [work_package_id, from_status, to_status, audit_event_id]
+          properties:
+            work_package_id:
+              type: string
+            from_status:
+              type: string
+            to_status:
+              type: string
+            reason_code:
+              type: string
+            actor_signature:
+              type: string
+            audit_event_id:
+              type: string
+            gate_results:
+              type: array
+              items:
+                type: object
+                additionalProperties: true
     TaskExecutionMutationResponse:
       type: object
       required: [version, interface, correlationId]
@@ -1208,7 +1539,7 @@ components:
           const: v2
         interface:
           type: string
-          enum: [update-task-step, upload-evidence, submit-signature]
+          enum: [update-task-step, upload-evidence, submit-signature, save-offline-task-action, sync-offline-queue]
         correlationId:
           type: string
         output:

@@ -116,10 +116,12 @@ function filterByWorkPackage(items: TaskItem[], workPackageId: string): TaskItem
 type TaskStepAction = 'start' | 'complete' | 'block' | 'reopen';
 type TaskStepStatus = 'planned' | 'in_progress' | 'completed' | 'blocked';
 type TaskExecutionStatus = 'planned' | 'in_progress' | 'completed' | 'blocked';
+type OfflineEventType = 'update-task-step' | 'upload-evidence';
 
 const ALLOWED_EVIDENCE_TYPES = new Set(['photo', 'video', 'document', 'inspection-report']);
 const ALLOWED_EVIDENCE_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'video/mp4', 'application/pdf']);
 const ALLOWED_SIGNATURE_METHODS = new Set(['digital_cert', 'biometric', 'pin']);
+const MOBILE_EXECUTION_INTERFACES = new Set(['update-task-step', 'upload-evidence', 'submit-signature', 'save-offline-task-action', 'sync-offline-queue']);
 
 function parseBody(body: unknown): Record<string, unknown> {
   if (body && typeof body === 'object') {
@@ -160,6 +162,13 @@ function parseStringArray(value: unknown): string[] {
   const raw = String(value || '').trim();
   if (!raw) return [];
   return raw.split(',').map((entry) => entry.trim()).filter(Boolean);
+}
+
+function parseObjectArray(value: unknown, fieldName: string): Array<Record<string, unknown>> {
+  if (!Array.isArray(value)) {
+    throw new Error(`${fieldName} must be an array`);
+  }
+  return value.map((entry) => (entry && typeof entry === 'object' ? (entry as Record<string, unknown>) : {}));
 }
 
 function resolveStepStatus(action: TaskStepAction): TaskStepStatus {
@@ -239,6 +248,48 @@ function assertSignatureQualification(body: Record<string, unknown>, signerId: s
   if (signerId.toLowerCase().includes('inactive')) {
     throw new Error('signer qualification must be valid at action time');
   }
+}
+
+function enforceTaskMutationAccess(auth: { role?: string; permissions?: string[] }, interfaceName: string) {
+  const role = String(auth.role || '').trim().toLowerCase();
+  if (role === 'technician' && MOBILE_EXECUTION_INTERFACES.has(interfaceName)) {
+    return;
+  }
+  enforceAnyPermission(auth.permissions || [], ['dashboards.manage', 'reports.manage']);
+}
+
+function validateOfflineQueueEntry(entry: Record<string, unknown>) {
+  const eventType = assertNonEmpty(entry.event_type, 'event_type').toLowerCase() as OfflineEventType;
+  if (eventType !== 'update-task-step' && eventType !== 'upload-evidence') {
+    throw new Error('offline event type is not supported');
+  }
+  const taskId = assertNonEmpty(entry.task_id, 'task_id');
+  const localRevision = parseInteger(entry.local_revision, 'local_revision');
+  const serverRevision = parseInteger(entry.server_revision, 'server_revision');
+  const performedAt = parseTimestamp(entry.performed_at, 'performed_at');
+  if (eventType === 'update-task-step') {
+    const action = assertNonEmpty(entry.action, 'action').toLowerCase() as TaskStepAction;
+    if (!['start', 'complete', 'block', 'reopen'].includes(action)) {
+      throw new Error('action is not supported');
+    }
+    const stepStatus = resolveStepStatus(action);
+    assertNoConflictingStatus(entry, stepStatus);
+  }
+  if (eventType === 'upload-evidence') {
+    const evidenceType = assertNonEmpty(entry.evidence_type, 'evidence_type').toLowerCase();
+    if (!ALLOWED_EVIDENCE_TYPES.has(evidenceType)) {
+      throw new Error('evidence_type is not supported');
+    }
+    assertEvidencePolicies(entry);
+  }
+  return {
+    eventType,
+    taskId,
+    localRevision,
+    serverRevision,
+    performedAt,
+    conflict: localRevision < serverRevision,
+  };
 }
 
 function appendTaskAuditRecord(params: {
@@ -391,7 +442,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     }
 
     if (req.method === 'POST' && interfaceName === 'update-task-step') {
-      enforceAnyPermission(auth.permissions || [], ['dashboards.manage', 'reports.manage']);
+      enforceTaskMutationAccess(auth, interfaceName);
       const body = parseBody(req.body);
       const taskId = assertNonEmpty(body.task_id, 'task_id');
       const stepId = assertNonEmpty(body.step_id, 'step_id');
@@ -432,7 +483,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     }
 
     if (req.method === 'POST' && interfaceName === 'upload-evidence') {
-      enforceAnyPermission(auth.permissions || [], ['dashboards.manage', 'reports.manage']);
+      enforceTaskMutationAccess(auth, interfaceName);
       const body = parseBody(req.body);
       const taskId = assertNonEmpty(body.task_id, 'task_id');
       const evidenceType = assertNonEmpty(body.evidence_type, 'evidence_type').toLowerCase();
@@ -468,7 +519,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     }
 
     if (req.method === 'POST' && interfaceName === 'submit-signature') {
-      enforceAnyPermission(auth.permissions || [], ['dashboards.manage', 'reports.manage']);
+      enforceTaskMutationAccess(auth, interfaceName);
       const body = parseBody(req.body);
       const taskId = assertNonEmpty(body.task_id, 'task_id');
       const signerId = assertNonEmpty(body.signer_id, 'signer_id');
@@ -499,9 +550,91 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       });
     }
 
+    if (req.method === 'POST' && interfaceName === 'save-offline-task-action') {
+      enforceTaskMutationAccess(auth, interfaceName);
+      const body = parseBody(req.body);
+      const taskId = assertNonEmpty(body.task_id, 'task_id');
+      const stepId = assertNonEmpty(body.step_id, 'step_id');
+      const action = assertNonEmpty(body.action, 'action').toLowerCase() as TaskStepAction;
+      if (!['start', 'complete', 'block', 'reopen'].includes(action)) {
+        throw new Error('action is not supported');
+      }
+      assertStepOrderPolicy(body);
+      const queuedAt = parseTimestamp(body.queued_at || new Date().toISOString(), 'queued_at');
+      const localRevision = parseInteger(body.local_revision || 1, 'local_revision');
+      return res.status(200).json({
+        version: 'v2',
+        interface: 'save-offline-task-action',
+        correlationId: ctx.correlationId,
+        compatMode: compatDecision.compatMode,
+        mode: 'module',
+        domainAccess: {
+          subscriptionStatus: amroAccess.subscriptionStatus,
+          source: amroAccess.source,
+          validatedAt: amroAccess.validatedAt,
+        },
+        serviceBoundaries,
+        input: {
+          task_id: taskId,
+          step_id: stepId,
+          action,
+          local_revision: localRevision,
+        },
+        output: {
+          queue_item_id: `${tenantId}-${taskId}-offline-${Date.now()}`,
+          queue_status: 'queued',
+          queued_at: queuedAt,
+          conflict_strategy: 'deterministic-merge',
+        },
+      });
+    }
+
+    if (req.method === 'POST' && interfaceName === 'sync-offline-queue') {
+      enforceTaskMutationAccess(auth, interfaceName);
+      const body = parseBody(req.body);
+      const queueEntries = parseObjectArray(body.queue_entries, 'queue_entries');
+      if (!queueEntries.length) {
+        throw new Error('queue_entries must include at least one event');
+      }
+      const validatedEntries = queueEntries.map((entry) => validateOfflineQueueEntry(entry));
+      const conflicts = validatedEntries.filter((entry) => entry.conflict);
+      const mergedEntries = validatedEntries
+        .filter((entry) => !entry.conflict)
+        .sort((a, b) => Date.parse(a.performedAt) - Date.parse(b.performedAt));
+      return res.status(200).json({
+        version: 'v2',
+        interface: 'sync-offline-queue',
+        correlationId: ctx.correlationId,
+        compatMode: compatDecision.compatMode,
+        mode: 'module',
+        domainAccess: {
+          subscriptionStatus: amroAccess.subscriptionStatus,
+          source: amroAccess.source,
+          validatedAt: amroAccess.validatedAt,
+        },
+        serviceBoundaries,
+        output: {
+          sync_status: conflicts.length > 0 ? 'conflict' : 'merged',
+          merged_count: mergedEntries.length,
+          conflict_count: conflicts.length,
+          conflicts: conflicts.map((entry) => ({
+            task_id: entry.taskId,
+            local_revision: entry.localRevision,
+            server_revision: entry.serverRevision,
+            resolution: 'manual-review-required',
+          })),
+          merged_events: mergedEntries.map((entry) => ({
+            task_id: entry.taskId,
+            event_type: entry.eventType,
+            merged_at: new Date().toISOString(),
+          })),
+        },
+      });
+    }
+
     if (req.method === 'POST') {
       return res.status(400).json({
-        error: 'Unsupported interface. Use update-task-step, upload-evidence, or submit-signature.',
+        error: 'Unsupported interface. Use update-task-step, upload-evidence, submit-signature, save-offline-task-action, or sync-offline-queue.',
         correlationId: ctx.correlationId,
         version: 'v2',
       });

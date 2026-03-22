@@ -78,6 +78,23 @@ describe('/api/v2/amro/certification', () => {
     process.env.AMRO_SEQ_M8_STATUS = 'not-started';
     process.env.AMRO_SEQ_M9_STATUS = 'not-started';
     process.env.AMRO_SEQ_M10_STATUS = 'not-started';
+    process.env.AMRO_SEQ_M1_CORE_SCHEMA_MIGRATED = 'true';
+    process.env.AMRO_SEQ_M1_RLS_ENABLED = 'true';
+    process.env.AMRO_SEQ_M1_TENANT_LEAKAGE_TESTS_100 = 'true';
+    process.env.AMRO_SEQ_M1_JWT_SIGNING_KEY_ONLY = 'true';
+    process.env.AMRO_SEQ_M2_API_CONTRACT_TESTS_PASS = 'true';
+    process.env.AMRO_SEQ_M2_TRANSITION_NEGATIVE_PATH_TESTS_PASS = 'true';
+    process.env.AMRO_SEQ_M2_E2E_CREATE_TRANSITION_100 = 'true';
+    process.env.AMRO_SEQ_M3_CAPACITY_VALIDATION_TESTS_PASS = 'true';
+    process.env.AMRO_SEQ_M3_REPLAN_SIMULATION_TESTS_100 = 'true';
+    process.env.AMRO_SEQ_M3_SCHEDULING_P95_TARGET_MET = 'true';
+    process.env.AMRO_SEQ_M4_STEP_ORDER_TESTS_PASS = 'true';
+    process.env.AMRO_SEQ_M4_EVIDENCE_CHECKSUM_100 = 'true';
+    process.env.AMRO_SEQ_M4_OFFLINE_SYNC_TESTS_100 = 'true';
+    process.env.AMRO_SEQ_M4_MOBILE_CRITICAL_FLOWS_PASS = 'true';
+    process.env.AMRO_SEQ_M5_NEGATIVE_PATH_TESTS_PASS = 'true';
+    process.env.AMRO_SEQ_M5_SERIALIZED_UNIQUENESS_TESTS_PASS = 'true';
+    process.env.AMRO_SEQ_M5_SHORTAGE_TO_PROCUREMENT_E2E_SCOPE_SAFE = 'true';
     vi.mocked(enforceAnyPermission).mockImplementation(() => undefined);
     vi.mocked(handlePreflight).mockReturnValue(false);
     vi.mocked(buildApiContext).mockReturnValue({

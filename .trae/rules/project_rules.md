@@ -84,6 +84,45 @@
 - Require pre-commit enforcement for AMRO-related work to verify documentation compliance metadata is present in commit scope, including referenced AMRO docs and traceability IDs.
 - Reject AMRO pull requests that do not include documentation references, review checklist confirmation, and pre-commit compliance evidence.
 
+## AMRO Database Component Documentation Enforcement Rule
+- Require immediate documentation updates in `docs/AMRO_LOW_LEVEL_DESIGN.md` under the `Plugins and Modules Documentation Contract` section for every new or changed:
+  - database table;
+  - SQL function or trigger function;
+  - edge function;
+  - module object;
+  - module API.
+- Require each documentation entry to include complete technical specifications:
+  - table or component name with namespace prefix;
+  - detailed purpose description;
+  - exhaustive columns/fields with type and nullability;
+  - primary key definitions;
+  - foreign key relationships and cascade/delete rules;
+  - unique constraints;
+  - check constraints;
+  - default values;
+  - index definitions;
+  - estimated row count (or request volume for APIs/functions);
+  - security considerations.
+- Require formal review workflow before merge:
+  - mandatory peer review by a senior developer;
+  - mandatory database architect approval for schema-impacting changes;
+  - mandatory documentation completeness checklist verification;
+  - mandatory pre-deployment validation execution and evidence attachment.
+- Require automated compliance validation for every deployment:
+  - run `npm run amro:db-docs:validate` to compare actual schema in `supabase/migrations` against the LLD authoritative database section;
+  - run `npm run amro:db-docs:report` to generate deployment compliance reports in `artifacts/mro/analysis/`;
+  - block deployment when undocumented or partially documented components are detected.
+- Enforce non-compliance penalties:
+  - immediate deployment block for any undocumented component;
+  - PR rejection for missing technical specification fields;
+  - mandatory remediation PR within one business day;
+  - escalation to architecture review board after repeated violations in the same quarter.
+- Require quarterly audit process:
+  - perform one formal AMRO schema-vs-documentation audit per quarter;
+  - archive audit evidence and gap remediation status in `artifacts/mro/analysis/`;
+  - track open documentation gaps until closure with owner and due date.
+- Require use of standard templates defined in LLD `Plugins and Modules Documentation Contract` for all database components and module interfaces to keep formatting consistent and machine-validated.
+
 ## AMRO Domain Access Governance Rule
 - Domain access is strictly limited to tenants who are explicitly assigned to the AMRO domain through the platform_domains and tenant_domain_assignments database tables, with active subscription status validated in real-time.
 

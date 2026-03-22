@@ -500,6 +500,30 @@ describe('/api/v2/amro/work-packages', () => {
     );
   });
 
+  it('rejects reserve-parts when work package scope does not match tenant scope', async () => {
+    process.env.AMRO_WORK_PACKAGES_V2_ENABLED = 'true';
+    process.env.AMRO_SEQ_M3_STATUS = 'completed';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'reserve-parts' },
+      body: {
+        work_package_id: 'tenant-999:wp-001',
+        demand_lines: [{ part_number: 'PN-001', quantity: 1, serial: 'SER-1' }],
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(sendErrorResponse).toHaveBeenCalledWith(
+      res,
+      expect.any(Error),
+      'corr-amro-v2',
+      { apiVersion: 'v2' }
+    );
+  });
+
   it('blocks M5 materials interfaces when M4 is not completed', async () => {
     process.env.AMRO_WORK_PACKAGES_V2_ENABLED = 'true';
     process.env.AMRO_SEQ_M3_STATUS = 'completed';
@@ -572,6 +596,37 @@ describe('/api/v2/amro/work-packages', () => {
     expect((res.jsonBody as any)?.interface).toBe('process-shortage-response');
     expect((res.jsonBody as any)?.output?.shortage_status).toBe('escalated');
     expect((res.jsonBody as any)?.output?.procurement_trigger_id).toContain('tenant-1-short-001-proc-');
+    expect((res.jsonBody as any)?.output?.procurement_trigger?.tenant_id).toBe('tenant-1');
+    expect((res.jsonBody as any)?.output?.procurement_trigger?.franchise_id).toBe('fr-1');
+  });
+
+  it('rejects shortage response when explicit scope context mismatches tenant scope', async () => {
+    process.env.AMRO_WORK_PACKAGES_V2_ENABLED = 'true';
+    process.env.AMRO_SEQ_M3_STATUS = 'completed';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'process-shortage-response' },
+      body: {
+        shortage_id: 'short-001',
+        action: 'escalate',
+        supplier_ref: 'supp-001',
+        scope: {
+          tenant_id: 'tenant-999',
+          franchise_id: 'fr-1',
+        },
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(sendErrorResponse).toHaveBeenCalledWith(
+      res,
+      expect.any(Error),
+      'corr-amro-v2',
+      { apiVersion: 'v2' }
+    );
   });
 
   it('syncs supplier ETA only from trusted adapters with valid datetime', async () => {
@@ -598,5 +653,33 @@ describe('/api/v2/amro/work-packages', () => {
     expect((res.jsonBody as any)?.interface).toBe('sync-supplier-eta');
     expect((res.jsonBody as any)?.output?.updated_eta).toBe('2026-03-25T11:00:00.000Z');
     expect((res.jsonBody as any)?.output?.impacted_work_packages).toEqual(['wp-001', 'wp-002']);
+  });
+
+  it('rejects supplier ETA sync from untrusted adapter', async () => {
+    process.env.AMRO_WORK_PACKAGES_V2_ENABLED = 'true';
+    process.env.AMRO_SEQ_M3_STATUS = 'completed';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'sync-supplier-eta' },
+      body: {
+        supplier_event_id: 'event-1001',
+        part_number: 'PN-001',
+        eta: '2026-03-25T11:00:00.000Z',
+        quantity_confirmed: 5,
+        supplier_source: 'unknown-adapter',
+        impacted_work_packages: ['wp-001'],
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(sendErrorResponse).toHaveBeenCalledWith(
+      res,
+      expect.any(Error),
+      'corr-amro-v2',
+      { apiVersion: 'v2' }
+    );
   });
 });

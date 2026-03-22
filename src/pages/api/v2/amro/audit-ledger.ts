@@ -8,6 +8,7 @@ export type AmroAuditLedgerEventType =
   | 'amro.forecast.risk.scored.v1';
 export type AmroAuditLedgerCapability =
   | 'work-packages'
+  | 'schedules'
   | 'tasks'
   | 'compliance-gates'
   | 'certification'

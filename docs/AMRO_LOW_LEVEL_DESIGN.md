@@ -1454,5 +1454,505 @@ If any checkpoint fails, milestone status remains In Progress and the next miles
 
 ---
 
+## 28. Database Tables (Authoritative Reference)
+
+This section is the authoritative AMRO schema inventory for all table-level components implemented by:
+
+- `supabase/migrations/20260319143000_create_amro_schema.sql`
+- `supabase/migrations/20260319143100_create_amro_audit_schema.sql`
+
+All database implementation and review activities must treat this section as normative.
+
+### 28.1 Inventory Summary
+
+| Table | Purpose | Estimated Row Count (12 months per active tenant) | PK | RLS/Security |
+|---|---|---:|---|---|
+| `public.aircraft` | Aircraft master registry and lifecycle status | 200-10,000 | `id` | RLS enabled; tenant-isolated; platform-admin override |
+| `public.components` | Serialized rotable/repairable component registry | 5,000-250,000 | `id` | RLS enabled; tenant-isolated; aircraft/work package linkage |
+| `public.work_packages` | Maintenance package planning/execution container | 1,000-60,000 | `id` | RLS enabled; tenant-isolated; role-gated transitions |
+| `public.tasks` | Unit execution tasks inside work packages | 10,000-1,000,000 | `id` | RLS enabled; tenant-isolated; execution evidence fields |
+| `public.staff_qualifications` | Certification and authority records | 200-50,000 | `id` | RLS enabled; tenant-isolated; certifier authority controls |
+| `public.maintenance_events` | Operational maintenance event stream | 50,000-5,000,000 | `id` | RLS enabled; tenant-isolated; performed-by user required |
+| `public.work_package_materials` | Parts/material demand, reservation, and sourcing lines | 5,000-750,000 | `id` | RLS enabled; tenant-isolated; material lifecycle status controls |
+| `mro_audit.records` | Immutable hash-linked audit evidence records | 100,000-20,000,000 | `id` | RLS enabled; immutable trigger blocks update/delete |
+| `mro_audit.trails` | Immutable replay timeline trail for compliance events | 100,000-20,000,000 | `id` | RLS enabled; immutable trigger blocks update/delete |
+
+### 28.2 Detailed Table Specifications
+
+#### 28.2.1 `public.aircraft`
+
+- Namespace prefix: `public`
+- Purpose: Core AMRO aircraft asset registry with operational counters and ownership metadata.
+- Primary key: `id`
+- Security considerations: Tenant and franchise scoping via `tenant_id` and `franchise_id`; RLS enforced.
+
+| Column | Type | Nullable | Default | Constraints |
+|---|---|---|---|---|
+| `id` | `uuid` | No | `gen_random_uuid()` | Primary key |
+| `tenant_id` | `uuid` | No | — | FK -> `public.tenants(id)` ON DELETE CASCADE |
+| `franchise_id` | `uuid` | Yes | — | FK -> `public.franchises(id)` ON DELETE SET NULL |
+| `registration` | `text` | No | — | — |
+| `aircraft_type` | `text` | No | — | — |
+| `manufacturer` | `text` | No | — | — |
+| `model` | `text` | No | — | — |
+| `serial_number` | `text` | No | — | Unique |
+| `line_number` | `text` | Yes | — | — |
+| `msn` | `text` | Yes | — | Unique |
+| `current_flight_hours` | `decimal(15,2)` | Yes | `0` | — |
+| `current_cycles` | `integer` | Yes | `0` | — |
+| `current_flight_hours_since_new` | `decimal(15,2)` | Yes | `0` | — |
+| `current_cycles_since_new` | `integer` | Yes | `0` | — |
+| `owner_id` | `uuid` | Yes | — | FK -> `auth.users(id)` ON DELETE SET NULL |
+| `status` | `aircraft_status` | No | `'active'::aircraft_status` | Domain-constrained |
+| `operator_code` | `text` | Yes | — | — |
+| `base_location` | `text` | Yes | — | — |
+| `home_base` | `uuid` | Yes | — | FK -> `public.aircraft(id)` ON DELETE SET NULL |
+| `created_at` | `timestamptz` | No | `now()` | — |
+| `updated_at` | `timestamptz` | No | `now()` | — |
+| `created_by` | `uuid` | Yes | — | FK -> `auth.users(id)` ON DELETE SET NULL |
+| `updated_by` | `uuid` | Yes | — | FK -> `auth.users(id)` ON DELETE SET NULL |
+
+- Indexes: `idx_aircraft_tenant_id`, `idx_aircraft_franchise_id`, `idx_aircraft_registration`, `idx_aircraft_serial_number`, `idx_aircraft_status`
+
+#### 28.2.2 `public.components`
+
+- Namespace prefix: `public`
+- Purpose: Serialized part/component registry with LLP tracking and assignment context.
+- Primary key: `id`
+- Security considerations: Tenant scope enforced with RLS; cross-entity traceability to aircraft and work packages.
+
+| Column | Type | Nullable | Default | Constraints |
+|---|---|---|---|---|
+| `id` | `uuid` | No | `gen_random_uuid()` | Primary key |
+| `tenant_id` | `uuid` | No | — | FK -> `public.tenants(id)` ON DELETE CASCADE |
+| `franchise_id` | `uuid` | Yes | — | FK -> `public.franchises(id)` ON DELETE SET NULL |
+| `aircraft_id` | `uuid` | No | — | FK -> `public.aircraft(id)` ON DELETE CASCADE |
+| `part_number` | `text` | No | — | — |
+| `serial_number` | `text` | No | — | — |
+| `alternate_part_numbers` | `text[]` | Yes | `ARRAY[]::text[]` | — |
+| `component_type` | `text` | No | — | — |
+| `category` | `text` | No | — | — |
+| `manufacturer` | `text` | No | — | — |
+| `model` | `text` | No | — | — |
+| `ata_chapter` | `varchar(10)` | Yes | — | — |
+| `is_llp_part` | `boolean` | Yes | `false` | — |
+| `llp_hours` | `decimal(10,2)` | Yes | — | — |
+| `llp_cycles` | `integer` | Yes | — | — |
+| `llp_calendar_days` | `integer` | Yes | — | — |
+| `status` | `component_status` | No | `'installed'::component_status` | Domain-constrained |
+| `condition_code` | `text` | Yes | — | — |
+| `installation_date` | `timestamptz` | Yes | — | — |
+| `removal_date` | `timestamptz` | Yes | — | — |
+| `hours_since_new` | `decimal(15,2)` | Yes | `0` | — |
+| `cycles_since_new` | `integer` | Yes | `0` | — |
+| `location` | `text` | Yes | — | — |
+| `work_package_id` | `uuid` | Yes | — | FK (`components_work_package_id_fkey`) -> `public.work_packages(id)` ON DELETE SET NULL |
+| `created_at` | `timestamptz` | No | `now()` | — |
+| `updated_at` | `timestamptz` | No | `now()` | — |
+| `created_by` | `uuid` | Yes | — | FK -> `auth.users(id)` ON DELETE SET NULL |
+| `updated_by` | `uuid` | Yes | — | FK -> `auth.users(id)` ON DELETE SET NULL |
+
+- Indexes: `idx_components_tenant_id`, `idx_components_franchise_id`, `idx_components_aircraft_id`, `idx_components_part_number`, `idx_components_serial_number`, `idx_components_status`, `idx_components_work_package_id`
+
+#### 28.2.3 `public.work_packages`
+
+- Namespace prefix: `public`
+- Purpose: Central maintenance planning and execution package object.
+- Primary key: `id`
+- Security considerations: Tenant RLS boundaries; workflow transitions controlled by service policies.
+
+| Column | Type | Nullable | Default | Constraints |
+|---|---|---|---|---|
+| `id` | `uuid` | No | `gen_random_uuid()` | Primary key |
+| `tenant_id` | `uuid` | No | — | FK -> `public.tenants(id)` ON DELETE CASCADE |
+| `franchise_id` | `uuid` | Yes | — | FK -> `public.franchises(id)` ON DELETE SET NULL |
+| `aircraft_id` | `uuid` | No | — | FK -> `public.aircraft(id)` ON DELETE CASCADE |
+| `work_order_number` | `text` | No | — | Unique |
+| `title` | `text` | No | — | — |
+| `description` | `text` | Yes | — | — |
+| `work_type` | `text` | No | — | — |
+| `maintenance_type` | `maintenance_type` | No | — | Domain-constrained |
+| `priority` | `integer` | Yes | `3` | Check: `priority >= 1 AND priority <= 5` |
+| `source` | `varchar(100)` | Yes | — | — |
+| `planned_start_date` | `timestamptz` | Yes | — | — |
+| `planned_end_date` | `timestamptz` | Yes | — | — |
+| `actual_start_date` | `timestamptz` | Yes | — | — |
+| `actual_end_date` | `timestamptz` | Yes | — | — |
+| `estimated_labor_hours` | `decimal(10,2)` | Yes | — | — |
+| `estimated_cost` | `decimal(15,2)` | Yes | — | — |
+| `actual_labor_hours` | `decimal(10,2)` | Yes | — | — |
+| `actual_cost` | `decimal(15,2)` | Yes | — | — |
+| `status` | `work_package_status` | No | `'planning'::work_package_status` | Domain-constrained |
+| `assigned_to` | `uuid` | Yes | — | FK -> `auth.users(id)` ON DELETE SET NULL |
+| `supervisor_id` | `uuid` | Yes | — | FK -> `auth.users(id)` ON DELETE SET NULL |
+| `reference_documents` | `text[]` | Yes | `ARRAY[]::text[]` | — |
+| `notes` | `text` | Yes | — | — |
+| `external_reference` | `text` | Yes | — | — |
+| `created_at` | `timestamptz` | No | `now()` | — |
+| `updated_at` | `timestamptz` | No | `now()` | — |
+| `created_by` | `uuid` | Yes | — | FK -> `auth.users(id)` ON DELETE SET NULL |
+| `updated_by` | `uuid` | Yes | — | FK -> `auth.users(id)` ON DELETE SET NULL |
+
+- Indexes: `idx_work_packages_tenant_id`, `idx_work_packages_franchise_id`, `idx_work_packages_aircraft_id`, `idx_work_packages_work_order_number`, `idx_work_packages_status`, `idx_work_packages_assigned_to`, `idx_work_packages_maintenance_type`
+
+#### 28.2.4 `public.tasks`
+
+- Namespace prefix: `public`
+- Purpose: Task-level execution records for each work package.
+- Primary key: `id`
+- Security considerations: Tenant RLS boundaries; evidence and qualification fields retained as structured JSONB.
+
+| Column | Type | Nullable | Default | Constraints |
+|---|---|---|---|---|
+| `id` | `uuid` | No | `gen_random_uuid()` | Primary key |
+| `tenant_id` | `uuid` | No | — | FK -> `public.tenants(id)` ON DELETE CASCADE |
+| `franchise_id` | `uuid` | Yes | — | FK -> `public.franchises(id)` ON DELETE SET NULL |
+| `work_package_id` | `uuid` | No | — | FK -> `public.work_packages(id)` ON DELETE CASCADE |
+| `task_number` | `text` | No | — | — |
+| `title` | `text` | No | — | — |
+| `description` | `text` | Yes | — | — |
+| `task_category` | `text` | No | — | — |
+| `estimated_duration_hours` | `decimal(10,2)` | Yes | — | — |
+| `complexity_level` | `integer` | Yes | `3` | Check: `complexity_level >= 1 AND complexity_level <= 5` |
+| `procedure_reference` | `varchar(255)` | Yes | — | — |
+| `steps` | `jsonb` | Yes | — | — |
+| `qualifications` | `jsonb` | Yes | — | — |
+| `evidence_fields` | `jsonb` | Yes | — | — |
+| `sequence_order` | `integer` | Yes | — | — |
+| `planned_start_date` | `timestamptz` | Yes | — | — |
+| `planned_end_date` | `timestamptz` | Yes | — | — |
+| `actual_start_date` | `timestamptz` | Yes | — | — |
+| `actual_end_date` | `timestamptz` | Yes | — | — |
+| `status` | `task_status` | No | `'pending'::task_status` | Domain-constrained |
+| `progress_percentage` | `integer` | Yes | `0` | Check: `progress_percentage >= 0 AND progress_percentage <= 100` |
+| `assigned_to` | `uuid` | Yes | — | FK -> `auth.users(id)` ON DELETE SET NULL |
+| `qa_verified_by` | `uuid` | Yes | — | FK -> `auth.users(id)` ON DELETE SET NULL |
+| `qa_verified_at` | `timestamptz` | Yes | — | — |
+| `checklist` | `jsonb` | Yes | `'{}'::jsonb` | — |
+| `notes` | `text` | Yes | — | — |
+| `created_at` | `timestamptz` | No | `now()` | — |
+| `updated_at` | `timestamptz` | No | `now()` | — |
+| `created_by` | `uuid` | Yes | — | FK -> `auth.users(id)` ON DELETE SET NULL |
+| `updated_by` | `uuid` | Yes | — | FK -> `auth.users(id)` ON DELETE SET NULL |
+
+- Indexes: `idx_tasks_tenant_id`, `idx_tasks_franchise_id`, `idx_tasks_work_package_id`, `idx_tasks_status`, `idx_tasks_assigned_to`, `idx_tasks_task_category`
+
+#### 28.2.5 `public.staff_qualifications`
+
+- Namespace prefix: `public`
+- Purpose: Qualification, authority, and certification metadata for maintenance staff.
+- Primary key: `id`
+- Security considerations: Qualification authority is tenant-scoped and used by release-gate logic.
+
+| Column | Type | Nullable | Default | Constraints |
+|---|---|---|---|---|
+| `id` | `uuid` | No | `gen_random_uuid()` | Primary key |
+| `tenant_id` | `uuid` | No | — | FK -> `public.tenants(id)` ON DELETE CASCADE |
+| `franchise_id` | `uuid` | Yes | — | FK -> `public.franchises(id)` ON DELETE SET NULL |
+| `staff_id` | `uuid` | No | — | FK -> `auth.users(id)` ON DELETE CASCADE |
+| `qualification_code` | `text` | No | — | — |
+| `qualification_name` | `text` | No | — | — |
+| `issuing_authority` | `text` | No | — | — |
+| `issue_date` | `date` | No | — | — |
+| `expiration_date` | `date` | Yes | — | — |
+| `renewal_date` | `date` | Yes | — | — |
+| `is_active` | `boolean` | No | `true` | — |
+| `license_number` | `text` | Yes | — | Unique |
+| `certificate_number` | `text` | Yes | — | Unique |
+| `scope` | `text` | Yes | — | — |
+| `rating` | `varchar(100)` | No | — | — |
+| `aircraft_types` | `text[]` | Yes | `ARRAY[]::text[]` | — |
+| `component_categories` | `text[]` | Yes | `ARRAY[]::text[]` | — |
+| `limitations` | `text` | Yes | — | — |
+| `can_certify_release` | `boolean` | Yes | `false` | — |
+| `can_defer` | `boolean` | Yes | `false` | — |
+| `document_url` | `text` | Yes | — | — |
+| `supporting_documents` | `text[]` | Yes | `ARRAY[]::text[]` | — |
+| `verified_by` | `uuid` | Yes | — | FK -> `auth.users(id)` ON DELETE SET NULL |
+| `verified_at` | `timestamptz` | Yes | — | — |
+| `created_at` | `timestamptz` | No | `now()` | — |
+| `updated_at` | `timestamptz` | No | `now()` | — |
+| `created_by` | `uuid` | Yes | — | FK -> `auth.users(id)` ON DELETE SET NULL |
+| `updated_by` | `uuid` | Yes | — | FK -> `auth.users(id)` ON DELETE SET NULL |
+
+- Indexes: `idx_staff_qualifications_tenant_id`, `idx_staff_qualifications_franchise_id`, `idx_staff_qualifications_staff_id`, `idx_staff_qualifications_is_active`, `idx_staff_qualifications_expiration_date`, `idx_staff_qualifications_qualification_code`
+
+#### 28.2.6 `public.maintenance_events`
+
+- Namespace prefix: `public`
+- Purpose: Operational event ledger for execution, signatures, and compliance-linked actions.
+- Primary key: `id`
+- Security considerations: Event actor (`performed_by`) is mandatory; signature metadata supports evidentiary traceability.
+
+| Column | Type | Nullable | Default | Constraints |
+|---|---|---|---|---|
+| `id` | `uuid` | No | `gen_random_uuid()` | Primary key |
+| `tenant_id` | `uuid` | No | — | FK -> `public.tenants(id)` ON DELETE CASCADE |
+| `franchise_id` | `uuid` | Yes | — | FK -> `public.franchises(id)` ON DELETE SET NULL |
+| `aircraft_id` | `uuid` | Yes | — | FK -> `public.aircraft(id)` ON DELETE SET NULL |
+| `component_id` | `uuid` | Yes | — | FK -> `public.components(id)` ON DELETE SET NULL |
+| `work_package_id` | `uuid` | Yes | — | FK -> `public.work_packages(id)` ON DELETE SET NULL |
+| `task_id` | `uuid` | Yes | — | FK -> `public.tasks(id)` ON DELETE SET NULL |
+| `event_type` | `text` | No | — | — |
+| `event_code` | `text` | Yes | — | — |
+| `title` | `text` | No | — | — |
+| `description` | `text` | Yes | — | — |
+| `performed_by` | `uuid` | No | — | FK -> `auth.users(id)` ON DELETE RESTRICT |
+| `approved_by` | `uuid` | Yes | — | FK -> `auth.users(id)` ON DELETE SET NULL |
+| `data` | `jsonb` | Yes | `'{}'::jsonb` | — |
+| `metadata` | `jsonb` | Yes | `'{}'::jsonb` | — |
+| `signature` | `text` | Yes | — | — |
+| `signature_timestamp` | `timestamptz` | Yes | — | — |
+| `signature_method` | `signature_method` | Yes | — | Domain-constrained |
+| `evidence_hash` | `text` | Yes | — | — |
+| `regulatory_requirement` | `text` | Yes | — | — |
+| `compliance_authority` | `text` | Yes | — | — |
+| `event_timestamp` | `timestamptz` | No | `now()` | — |
+| `created_at` | `timestamptz` | No | `now()` | — |
+
+- Indexes: `idx_maintenance_events_tenant_id`, `idx_maintenance_events_franchise_id`, `idx_maintenance_events_aircraft_id`, `idx_maintenance_events_component_id`, `idx_maintenance_events_work_package_id`, `idx_maintenance_events_task_id`, `idx_maintenance_events_event_type`, `idx_maintenance_events_event_timestamp`, `idx_maintenance_events_performed_by`
+
+#### 28.2.7 `public.work_package_materials`
+
+- Namespace prefix: `public`
+- Purpose: Parts/material demand lines for reservation, shortage handling, and procurement.
+- Primary key: `id`
+- Security considerations: Critical parts traceability and supplier linkage are tenant-scoped under RLS.
+
+| Column | Type | Nullable | Default | Constraints |
+|---|---|---|---|---|
+| `id` | `uuid` | No | `gen_random_uuid()` | Primary key |
+| `tenant_id` | `uuid` | No | — | FK -> `public.tenants(id)` ON DELETE CASCADE |
+| `franchise_id` | `uuid` | Yes | — | FK -> `public.franchises(id)` ON DELETE SET NULL |
+| `work_package_id` | `uuid` | No | — | FK -> `public.work_packages(id)` ON DELETE CASCADE |
+| `part_number` | `text` | No | — | — |
+| `description` | `text` | No | — | — |
+| `manufacturer` | `text` | Yes | — | — |
+| `component_id` | `uuid` | Yes | — | FK -> `public.components(id)` ON DELETE SET NULL |
+| `action` | `material_action` | Yes | — | Domain-constrained |
+| `quantity` | `integer` | No | `1` | — |
+| `unit_of_measure` | `text` | No | `'EA'` | — |
+| `unit_cost` | `decimal(12,2)` | Yes | — | — |
+| `total_cost` | `decimal(15,2)` | Yes | — | — |
+| `currency` | `text` | Yes | `'USD'` | — |
+| `status` | `material_status` | No | `'pending'::material_status` | Domain-constrained |
+| `supplier_id` | `text` | Yes | — | — |
+| `supplier_name` | `text` | Yes | — | — |
+| `purchase_order_number` | `text` | Yes | — | — |
+| `order_date` | `timestamptz` | Yes | — | — |
+| `required_date` | `timestamptz` | Yes | — | — |
+| `received_date` | `timestamptz` | Yes | — | — |
+| `batch_lot_number` | `text` | Yes | — | — |
+| `material_certification` | `text` | Yes | — | — |
+| `notes` | `text` | Yes | — | — |
+| `is_critical` | `boolean` | Yes | `false` | — |
+| `created_at` | `timestamptz` | No | `now()` | — |
+| `updated_at` | `timestamptz` | No | `now()` | — |
+| `created_by` | `uuid` | Yes | — | FK -> `auth.users(id)` ON DELETE SET NULL |
+| `updated_by` | `uuid` | Yes | — | FK -> `auth.users(id)` ON DELETE SET NULL |
+
+- Indexes: `idx_work_package_materials_tenant_id`, `idx_work_package_materials_franchise_id`, `idx_work_package_materials_work_package_id`, `idx_work_package_materials_part_number`, `idx_work_package_materials_status`, `idx_work_package_materials_order_date`
+
+#### 28.2.8 `mro_audit.records`
+
+- Namespace prefix: `mro_audit`
+- Purpose: Immutable hash-linked audit record chain.
+- Primary key: `id`
+- Security considerations: Update/delete blocked by trigger; RLS tenant isolation; append-only write model.
+
+| Column | Type | Nullable | Default | Constraints |
+|---|---|---|---|---|
+| `id` | `uuid` | No | `gen_random_uuid()` | Primary key |
+| `tenant_id` | `uuid` | No | — | FK -> `public.tenants(id)` ON DELETE CASCADE |
+| `record_type` | `audit_record_type` | No | — | Domain-constrained |
+| `related_entity_id` | `text` | No | — | — |
+| `related_entity_type` | `audit_entity_type` | No | — | Domain-constrained |
+| `actor_id` | `text` | No | — | — |
+| `actor_role` | `audit_actor_role` | No | — | Domain-constrained |
+| `action` | `text` | No | — | — |
+| `context` | `jsonb` | Yes | `'{}'::jsonb` | — |
+| `signature` | `bytea` | Yes | — | — |
+| `previous_hash` | `bytea` | Yes | — | Hash-chain linkage |
+| `created_at` | `timestamptz` | No | `now()` | Immutable timestamp intent |
+
+- Indexes: `idx_mro_audit_records_tenant_id`, `idx_mro_audit_records_related_entity`, `idx_mro_audit_records_tenant_created`, `idx_mro_audit_records_created_at`, `idx_mro_audit_records_actor_id`
+
+#### 28.2.9 `mro_audit.trails`
+
+- Namespace prefix: `mro_audit`
+- Purpose: Immutable replay timeline events for compliance reconstruction.
+- Primary key: `id`
+- Security considerations: Update/delete blocked by trigger; RLS tenant isolation; append-only write model.
+
+| Column | Type | Nullable | Default | Constraints |
+|---|---|---|---|---|
+| `id` | `uuid` | No | `gen_random_uuid()` | Primary key |
+| `tenant_id` | `uuid` | No | — | FK -> `public.tenants(id)` ON DELETE CASCADE |
+| `event_type` | `audit_event_type` | No | — | Domain-constrained |
+| `entity_type` | `audit_entity_type` | No | — | Domain-constrained |
+| `entity_id` | `text` | No | — | — |
+| `user_id` | `text` | No | — | — |
+| `user_email` | `text` | No | — | — |
+| `timestamp` | `timestamptz` | No | — | Replay ordering key |
+| `action_description` | `text` | No | — | — |
+| `regulatory_context` | `jsonb` | Yes | `'{}'::jsonb` | — |
+| `created_at` | `timestamptz` | No | `now()` | — |
+
+- Indexes: `idx_mro_audit_trails_tenant_id`, `idx_mro_audit_trails_tenant_created`, `idx_mro_audit_trails_entity`, `idx_mro_audit_trails_created_at`, `idx_mro_audit_trails_timestamp`, `idx_mro_audit_trails_event_type`
+
+### 28.3 Supporting Schema Components
+
+- Domains in `public` schema:
+  - `aircraft_status`, `component_status`, `maintenance_type`, `work_package_status`, `task_status`, `material_status`, `material_action`, `signature_method`
+  - `audit_record_type`, `audit_event_type`, `audit_actor_role`, `audit_entity_type`
+- Audit immutability function:
+  - `mro_audit.prevent_audit_updates()` blocks update/delete operations on `mro_audit.records` and `mro_audit.trails`
+- Immutability triggers:
+  - `audit_records_immutable`
+  - `audit_trails_immutable`
+- Security posture:
+  - RLS is enabled across all AMRO operational and audit tables.
+  - Access is controlled by platform-admin and tenant-scoped policies using `public.user_roles`.
+
+## 29. Plugins and Modules Documentation Contract
+
+This section is mandatory for every new AMRO database component and AMRO module API surface.
+
+### 29.1 Required Documentation Targets
+
+Every PR that introduces or changes any of the following must add or update an entry in this section in the same change set:
+
+- New table or table alteration
+- New SQL function or trigger function
+- New edge function
+- New module object or module data contract
+- New module API interface or endpoint
+
+### 29.2 Required Entry Format
+
+Each entry must include:
+
+- Component identifier with namespace prefix
+- Detailed purpose
+- Exhaustive column or field list with data type and nullability
+- Primary key definition
+- Foreign key relationships and cascade/delete rules
+- Unique constraints
+- Check constraints
+- Default values
+- Index definitions
+- Estimated row counts (or request volume for APIs/functions)
+- Security considerations
+
+### 29.3 Templates
+
+#### Template: Database Table
+
+```text
+Component Type: Table
+Component Name: <schema.table_name>
+Purpose: <business purpose and lifecycle role>
+Estimated Row Count: <range and sizing assumptions>
+Primary Key: <pk columns>
+Foreign Keys:
+  - <column> -> <schema.table(column)> ON DELETE <rule>
+Unique Constraints:
+  - <constraint expression>
+Check Constraints:
+  - <check expression>
+Defaults:
+  - <column>: <default expression>
+Indexes:
+  - <index_name>(<columns>)
+Columns:
+  - <column_name> | <data_type> | nullable:<yes/no> | default:<value>
+Security Considerations:
+  - <tenant isolation, RLS, access constraints, audit sensitivity>
+Implementation Notes:
+  - <migration id, compatibility notes, rollout notes>
+```
+
+#### Template: SQL Function / Trigger Function
+
+```text
+Component Type: SQL Function
+Component Name: <schema.function_name(arg_types)>
+Purpose: <business and technical role>
+Input Parameters:
+  - <name> | <type> | nullable:<yes/no>
+Output Contract:
+  - <return type and shape>
+Dependencies:
+  - <tables/functions/domains>
+Security:
+  - Security Definer/Invoker
+  - Required grants
+  - Tenant/franchise access behavior
+Performance:
+  - Expected p95 target
+Validation:
+  - Unit/integration test references
+```
+
+#### Template: Edge Function
+
+```text
+Component Type: Edge Function
+Component Name: <function_name>
+Purpose: <business capability>
+Input Contract:
+  - <payload schema>
+Output Contract:
+  - <response schema>
+Dependencies:
+  - <db tables, external adapters, queues>
+Idempotency and Replay:
+  - <keys, conflict policy, retries>
+Security Considerations:
+  - <auth requirements, tenant scope, secrets usage>
+Operational Limits:
+  - <rate limits, timeout, payload size>
+Validation:
+  - <test references>
+```
+
+#### Template: Module Object
+
+```text
+Component Type: Module Object
+Component Name: <module.object_name>
+Purpose: <domain role>
+Fields:
+  - <field> | <type> | nullable:<yes/no> | default:<value>
+Relationships:
+  - <links to table/object/api>
+Constraints:
+  - <validation and state rules>
+Security Considerations:
+  - <scope boundaries and permission model>
+```
+
+#### Template: Module API
+
+```text
+Component Type: Module API
+Component Name: <method path or interface>
+Purpose: <business capability>
+Input Contract:
+  - <fields and validation>
+Output Contract:
+  - <fields and semantics>
+Authorization:
+  - <required permissions and hierarchy scope>
+Data Dependencies:
+  - <tables/functions/objects>
+Failure Modes:
+  - <status codes and error contracts>
+Performance Targets:
+  - <p95/p99 and throughput expectations>
+```
+
+---
+
 **Document End**  
 This LLD is a living implementation contract and must be updated in the same PR set as architecture, module, schema, or compliance-impacting changes.

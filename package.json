@@ -71,7 +71,9 @@
     "test:email-pipeline": "node --env-file=.env scripts/verify_email_attachment_pipeline.js",
     "test:phase1": "node scripts/tests/test_phase1_tenants.cjs",
     "pgdump:export": "node scripts/pgdump-export.js",
-    "build:extension": "tsc -b nexus-connect-extension/tsconfig.json && vite build --config vite.extension.config.ts"
+    "build:extension": "tsc -b nexus-connect-extension/tsconfig.json && vite build --config vite.extension.config.ts",
+    "amro:db-docs:validate": "node scripts/amro-db-docs-compliance.mjs --strict",
+    "amro:db-docs:report": "node scripts/amro-db-docs-compliance.mjs --report-only"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

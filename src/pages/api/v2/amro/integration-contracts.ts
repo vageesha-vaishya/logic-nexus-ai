@@ -14,7 +14,12 @@ export const AMRO_INTEGRATION_CONTRACTS = {
     specification: 'OpenAPI 3.1',
     endpoints: [
       '/api/v2/amro/work-packages',
+      '/api/v2/amro/work-packages/{id}',
+      '/api/v2/amro/work-packages/{id}/transitions',
+      '/api/v2/amro/schedules',
+      '/api/v2/amro/schedules/replan',
       '/api/v2/amro/tasks',
+      '/api/v2/amro/tasks/{id}/evidence',
       '/api/v2/amro/compliance-gates',
       '/api/v2/amro/certification',
       '/api/v2/amro/integration-hub',

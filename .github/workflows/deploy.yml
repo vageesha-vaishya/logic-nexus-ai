@@ -20,8 +20,20 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Validate AMRO database documentation compliance
+        run: npm run amro:db-docs:validate
+
+      - name: Generate AMRO database documentation compliance report
+        run: npm run amro:db-docs:report
+
       - name: Build
         run: npm run build
+
+      - name: Upload AMRO compliance report
+        uses: actions/upload-artifact@v4
+        with:
+          name: amro-db-docs-compliance-report
+          path: artifacts/mro/analysis/amro-db-docs-compliance-report.json
 
       - name: Deploy (Placeholder)
         run: echo "Deploying to production..."

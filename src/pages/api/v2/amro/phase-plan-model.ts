@@ -183,6 +183,8 @@ const AMRO_TASK_INTERFACE_MILESTONES: Readonly<Record<string, AmroSequentialMile
   'update-task-step': 'M4',
   'upload-evidence': 'M4',
   'submit-signature': 'M4',
+  'save-offline-task-action': 'M4',
+  'sync-offline-queue': 'M4',
 } as const;
 
 const AMRO_COMPLIANCE_INTERFACE_MILESTONES: Readonly<Record<string, AmroSequentialMilestoneId>> = {

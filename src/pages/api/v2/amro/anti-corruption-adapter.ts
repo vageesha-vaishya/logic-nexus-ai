@@ -13,6 +13,7 @@ export type AmroServiceName =
   | 'amro-forecast-service';
 export type AmroCapability =
   | 'work-packages'
+  | 'schedules'
   | 'tasks'
   | 'compliance-gates'
   | 'certification'
@@ -187,6 +188,7 @@ export function buildAmroServiceBoundaryEnvelope(params: {
 }) {
   const capabilityServiceMap: Record<AmroCapability, AmroServiceName[]> = {
     'work-packages': ['amro-work-order-service', 'amro-scheduling-service', 'amro-materials-service'],
+    schedules: ['amro-scheduling-service', 'amro-work-order-service'],
     tasks: ['amro-work-order-service', 'amro-scheduling-service', 'amro-materials-service'],
     'compliance-gates': ['amro-compliance-service', 'amro-audit-ledger-service'],
     certification: ['amro-compliance-service', 'amro-audit-ledger-service'],

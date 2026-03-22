@@ -290,6 +290,28 @@ function assertScopeRequired(tenantId: string, franchiseId: string | null) {
   }
 }
 
+function assertOptionalScopedIdentifier(value: string, tenantId: string, fieldName: string) {
+  const normalized = String(value || '').trim();
+  if (!normalized.includes(':')) return;
+  const [scopedTenant = ''] = normalized.split(':');
+  if (scopedTenant !== tenantId) {
+    throw new Error(`${fieldName} violates tenant scope`);
+  }
+}
+
+function assertOptionalScopeContext(body: Record<string, unknown>, tenantId: string, franchiseId: string | null) {
+  const scope = parseBody(body.scope);
+  if (!Object.keys(scope).length) return;
+  const scopeTenantId = String(scope.tenant_id || '').trim();
+  const scopeFranchiseId = String(scope.franchise_id || '').trim();
+  if (scopeTenantId && scopeTenantId !== tenantId) {
+    throw new Error('data scope violation detected');
+  }
+  if (scopeFranchiseId && scopeFranchiseId !== String(franchiseId || '')) {
+    throw new Error('data scope violation detected');
+  }
+}
+
 function assertAircraftActive(aircraftId: string) {
   const normalized = aircraftId.trim().toLowerCase();
   if (normalized.includes('inactive') || normalized.includes('retired')) {
@@ -729,6 +751,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       assertScopeRequired(tenantId, franchiseId);
       const body = parseBody(req.body);
       const workPackageId = assertNonEmpty(body.work_package_id, 'work_package_id');
+      assertOptionalScopedIdentifier(workPackageId, tenantId, 'work_package_id');
+      assertOptionalScopeContext(body, tenantId, franchiseId);
       const demandLines = parseDemandLines(body.demand_lines, tenantId);
       const reservations = demandLines.map((line) => ({
         reservation_id: `${tenantId}-${line.partNumber}-${Date.now()}`,
@@ -762,8 +786,11 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
     if (req.method === 'POST' && interfaceName === 'process-shortage-response') {
       enforceAnyPermission(auth.permissions || [], ['dashboards.manage', 'reports.manage']);
+      assertScopeRequired(tenantId, franchiseId);
       const body = parseBody(req.body);
+      assertOptionalScopeContext(body, tenantId, franchiseId);
       const shortageId = assertNonEmpty(body.shortage_id, 'shortage_id');
+      assertOptionalScopedIdentifier(shortageId, tenantId, 'shortage_id');
       const action = assertNonEmpty(body.action, 'action').toLowerCase() as ShortageAction;
       if (!ALLOWED_SHORTAGE_ACTIONS.has(action)) {
         throw new Error('action must be backorder, substitute, or escalate');
@@ -792,13 +819,21 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         output: {
           shortage_status: action === 'escalate' ? 'escalated' : action === 'substitute' ? 'substitute-approved' : 'backordered',
           procurement_trigger_id: `${tenantId}-${shortageId}-proc-${Date.now()}`,
+          procurement_trigger: {
+            tenant_id: tenantId,
+            franchise_id: franchiseId,
+            source_shortage_id: shortageId,
+            supplier_ref: supplierRef,
+          },
         },
       });
     }
 
     if (req.method === 'POST' && interfaceName === 'sync-supplier-eta') {
       enforceAnyPermission(auth.permissions || [], ['dashboards.manage', 'reports.manage']);
+      assertScopeRequired(tenantId, franchiseId);
       const body = parseBody(req.body);
+      assertOptionalScopeContext(body, tenantId, franchiseId);
       const supplierEventId = assertNonEmpty(body.supplier_event_id, 'supplier_event_id');
       const partNumber = assertNonEmpty(body.part_number, 'part_number');
       const eta = parseIsoTimestamp(body.eta, 'eta');
@@ -811,6 +846,9 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         throw new Error('Supplier source must be trusted adapter');
       }
       const impactedWorkPackages = parseStringArray(body.impacted_work_packages);
+      impactedWorkPackages.forEach((workPackageId) => {
+        assertOptionalScopedIdentifier(workPackageId, tenantId, 'impacted_work_packages');
+      });
       return res.status(200).json({
         version: 'v2',
         interface: 'sync-supplier-eta',

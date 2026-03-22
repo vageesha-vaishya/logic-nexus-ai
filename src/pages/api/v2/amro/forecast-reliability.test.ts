@@ -76,6 +76,18 @@ describe('/api/v2/amro/forecast-reliability', () => {
     process.env.AMRO_SEQ_M8_STATUS = 'in-progress';
     process.env.AMRO_SEQ_M9_STATUS = 'not-started';
     process.env.AMRO_SEQ_M10_STATUS = 'not-started';
+    process.env.AMRO_SEQ_M2_API_CONTRACT_TESTS_PASS = 'true';
+    process.env.AMRO_SEQ_M2_TRANSITION_NEGATIVE_PATH_TESTS_PASS = 'true';
+    process.env.AMRO_SEQ_M2_E2E_CREATE_TRANSITION_100 = 'true';
+    process.env.AMRO_SEQ_M3_CAPACITY_VALIDATION_TESTS_PASS = 'true';
+    process.env.AMRO_SEQ_M3_REPLAN_SIMULATION_TESTS_100 = 'true';
+    process.env.AMRO_SEQ_M3_SCHEDULING_P95_TARGET_MET = 'true';
+    process.env.AMRO_SEQ_M5_NEGATIVE_PATH_TESTS_PASS = 'true';
+    process.env.AMRO_SEQ_M5_SERIALIZED_UNIQUENESS_TESTS_PASS = 'true';
+    process.env.AMRO_SEQ_M5_SHORTAGE_TO_PROCUREMENT_E2E_SCOPE_SAFE = 'true';
+    process.env.AMRO_SEQ_M7_ADAPTER_CONTRACT_TESTS_PASS = 'true';
+    process.env.AMRO_SEQ_M7_IDEMPOTENCY_REPLAY_TESTS_PASS = 'true';
+    process.env.AMRO_SEQ_M7_DLQ_REPLAY_CLOSURE_100 = 'true';
     vi.mocked(enforceAnyPermission).mockImplementation(() => undefined);
     vi.mocked(handlePreflight).mockReturnValue(false);
     vi.mocked(buildApiContext).mockReturnValue({

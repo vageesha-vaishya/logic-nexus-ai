@@ -325,6 +325,124 @@ describe('/api/v2/amro/tasks', () => {
     expect((res.jsonBody as any)?.output?.integrity_status).toBe('verified');
   });
 
+  it('rejects evidence upload when checksum is missing', async () => {
+    process.env.AMRO_TASKS_V2_ENABLED = 'true';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'upload-evidence' },
+      body: {
+        task_id: 'task-001',
+        evidence_type: 'photo',
+        media_ref: 's3://bucket/evidence/photo-001.jpg',
+        checksum: '',
+        metadata: {
+          media_size_bytes: 1024 * 1024,
+          mime_type: 'image/jpeg',
+        },
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(sendErrorResponse).toHaveBeenCalledWith(
+      res,
+      expect.any(Error),
+      'corr-amro-tasks-v2',
+      { apiVersion: 'v2' }
+    );
+  });
+
+  it('queues offline task action for mobile execution path', async () => {
+    process.env.AMRO_TASKS_V2_ENABLED = 'true';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'save-offline-task-action' },
+      body: {
+        task_id: 'task-001',
+        step_id: 'step-01',
+        action: 'start',
+        expected_step_index: 1,
+        actual_step_index: 1,
+        local_revision: 2,
+        queued_at: '2026-03-21T09:30:00.000Z',
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.interface).toBe('save-offline-task-action');
+    expect((res.jsonBody as any)?.output?.queue_status).toBe('queued');
+    expect((res.jsonBody as any)?.output?.conflict_strategy).toBe('deterministic-merge');
+  });
+
+  it('merges offline queue when server revision has no conflicts', async () => {
+    process.env.AMRO_TASKS_V2_ENABLED = 'true';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'sync-offline-queue' },
+      body: {
+        queue_entries: [
+          {
+            event_type: 'update-task-step',
+            task_id: 'task-001',
+            step_id: 'step-01',
+            action: 'complete',
+            current_step_status: 'in_progress',
+            local_revision: 5,
+            server_revision: 5,
+            performed_at: '2026-03-21T09:30:00.000Z',
+          },
+        ],
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.interface).toBe('sync-offline-queue');
+    expect((res.jsonBody as any)?.output?.sync_status).toBe('merged');
+    expect((res.jsonBody as any)?.output?.conflict_count).toBe(0);
+    expect((res.jsonBody as any)?.output?.merged_count).toBe(1);
+  });
+
+  it('returns conflict payload when offline queue has stale client revision', async () => {
+    process.env.AMRO_TASKS_V2_ENABLED = 'true';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'sync-offline-queue' },
+      body: {
+        queue_entries: [
+          {
+            event_type: 'update-task-step',
+            task_id: 'task-001',
+            step_id: 'step-01',
+            action: 'complete',
+            current_step_status: 'in_progress',
+            local_revision: 3,
+            server_revision: 5,
+            performed_at: '2026-03-21T09:30:00.000Z',
+          },
+        ],
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.output?.sync_status).toBe('conflict');
+    expect((res.jsonBody as any)?.output?.conflict_count).toBe(1);
+    expect((res.jsonBody as any)?.output?.conflicts?.[0]?.resolution).toBe('manual-review-required');
+  });
+
   it('submits signature only when qualification and privilege are valid at action time', async () => {
     process.env.AMRO_TASKS_V2_ENABLED = 'true';
     const req: ApiRequest = {
@@ -381,5 +499,36 @@ describe('/api/v2/amro/tasks', () => {
       'corr-amro-tasks-v2',
       { apiVersion: 'v2' }
     );
+  });
+
+  it('allows technician role to execute mobile critical task flow without manage permissions', async () => {
+    process.env.AMRO_TASKS_V2_ENABLED = 'true';
+    vi.mocked(authenticateRequest).mockResolvedValue({
+      userId: 'tech-1',
+      role: 'technician',
+      permissions: ['dashboards.view'],
+    } as any);
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'update-task-step' },
+      body: {
+        task_id: 'task-001',
+        step_id: 'step-01',
+        action: 'start',
+        performed_at: '2026-03-21T09:30:00.000Z',
+        device_id: 'device-77',
+        expected_step_index: 1,
+        actual_step_index: 1,
+        current_step_status: 'planned',
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.output?.step_status).toBe('in_progress');
+    expect(enforceAnyPermission).not.toHaveBeenCalled();
   });
 });

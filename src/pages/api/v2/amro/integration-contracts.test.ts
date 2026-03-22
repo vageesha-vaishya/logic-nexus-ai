@@ -25,7 +25,12 @@ describe('AMRO 13.3 integration contracts', () => {
   it('maps all required contract surfaces', () => {
     expect(AMRO_INTEGRATION_CONTRACTS.rest.endpoints).toEqual([
       '/api/v2/amro/work-packages',
+      '/api/v2/amro/work-packages/{id}',
+      '/api/v2/amro/work-packages/{id}/transitions',
+      '/api/v2/amro/schedules',
+      '/api/v2/amro/schedules/replan',
       '/api/v2/amro/tasks',
+      '/api/v2/amro/tasks/{id}/evidence',
       '/api/v2/amro/compliance-gates',
       '/api/v2/amro/certification',
       '/api/v2/amro/integration-hub',
@@ -75,7 +80,12 @@ describe('AMRO 13.3 integration contracts', () => {
   it('keeps OpenAPI, GraphQL, gRPC, and AsyncAPI artifacts aligned to 13.3 names', () => {
     const openApi = readContractFile(AMRO_OPENAPI_SPEC_PATH);
     expect(openApi).toContain('/api/v2/amro/work-packages');
+    expect(openApi).toContain('/api/v2/amro/work-packages/{id}');
+    expect(openApi).toContain('/api/v2/amro/work-packages/{id}/transitions');
+    expect(openApi).toContain('/api/v2/amro/schedules');
+    expect(openApi).toContain('/api/v2/amro/schedules/replan');
     expect(openApi).toContain('/api/v2/amro/tasks');
+    expect(openApi).toContain('/api/v2/amro/tasks/{id}/evidence');
     expect(openApi).toContain('/api/v2/amro/compliance-gates');
     expect(openApi).toContain('/api/v2/amro/certification');
     expect(openApi).toContain('/api/v2/amro/integration-hub');
@@ -105,5 +115,26 @@ describe('AMRO 13.3 integration contracts', () => {
     expect(asyncApi).toContain('amro.integration.payload.ingested.v1');
     expect(asyncApi).toContain('amro.forecast.risk.scored.v1');
     expect(asyncApi).toContain('amro.audit.recorded.v1');
+  });
+
+  it('keeps API-AMRO-001/002/003 OpenAPI contract operations aligned', () => {
+    const openApi = readContractFile(AMRO_OPENAPI_SPEC_PATH);
+    expect(openApi).toContain('/api/v2/amro/work-packages:');
+    expect(openApi).toContain('operationId: listAmroWorkPackages');
+    expect(openApi).toContain('operationId: mutateAmroWorkPackages');
+    expect(openApi).toContain('/api/v2/amro/work-packages/{id}:');
+    expect(openApi).toContain('operationId: getAmroWorkPackageDetail');
+    expect(openApi).toContain('operationId: patchAmroWorkPackage');
+    expect(openApi).toContain('/api/v2/amro/work-packages/{id}/transitions:');
+    expect(openApi).toContain('operationId: transitionAmroWorkPackage');
+  });
+
+  it('keeps API-AMRO-004/005 OpenAPI contract operations aligned', () => {
+    const openApi = readContractFile(AMRO_OPENAPI_SPEC_PATH);
+    expect(openApi).toContain('/api/v2/amro/schedules:');
+    expect(openApi).toContain('operationId: listAmroSchedules');
+    expect(openApi).toContain('operationId: mutateAmroSchedules');
+    expect(openApi).toContain('/api/v2/amro/schedules/replan:');
+    expect(openApi).toContain('operationId: replanAmroSchedules');
   });
 });
