@@ -32,10 +32,15 @@ describe('AMRO 13.3 integration contracts', () => {
       '/api/v2/amro/schedules/replan',
       '/api/v2/amro/tasks',
       '/api/v2/amro/tasks/{id}/evidence',
-      '/api/v2/amro/compliance-gates',
-      '/api/v2/amro/certification',
+      '/api/v2/amro/inventory/reservations',
+      '/api/v2/amro/inventory/availability',
+      '/api/v2/amro/compliance/obligations',
+      '/api/v2/amro/compliance/gates/evaluate',
+      '/api/v2/amro/certifications/validate',
+      '/api/v2/amro/certifications/actions',
+      '/api/v2/amro/audit/replay',
+      '/api/v2/amro/forecast/recommendations',
       '/api/v2/amro/integration-hub',
-      '/api/v2/amro/forecast-reliability',
       AMRO_OVERVIEW_KPI_PATH,
       AMRO_MODULE_CATALOG_PATH,
       AMRO_SCREEN_INVENTORY_PATH,
@@ -88,10 +93,15 @@ describe('AMRO 13.3 integration contracts', () => {
     expect(openApi).toContain('/api/v2/amro/schedules/replan');
     expect(openApi).toContain('/api/v2/amro/tasks');
     expect(openApi).toContain('/api/v2/amro/tasks/{id}/evidence');
-    expect(openApi).toContain('/api/v2/amro/compliance-gates');
-    expect(openApi).toContain('/api/v2/amro/certification');
+    expect(openApi).toContain('/api/v2/amro/inventory/reservations');
+    expect(openApi).toContain('/api/v2/amro/inventory/availability');
+    expect(openApi).toContain('/api/v2/amro/compliance/obligations');
+    expect(openApi).toContain('/api/v2/amro/compliance/gates/evaluate');
+    expect(openApi).toContain('/api/v2/amro/certifications/validate');
+    expect(openApi).toContain('/api/v2/amro/certifications/actions');
+    expect(openApi).toContain('/api/v2/amro/audit/replay');
+    expect(openApi).toContain('/api/v2/amro/forecast/recommendations');
     expect(openApi).toContain('/api/v2/amro/integration-hub');
-    expect(openApi).toContain('/api/v2/amro/forecast-reliability');
     expect(openApi).toContain(AMRO_OVERVIEW_KPI_PATH);
     expect(openApi).toContain(AMRO_MODULE_CATALOG_PATH);
     expect(openApi).toContain(AMRO_SCREEN_INVENTORY_PATH);
@@ -139,5 +149,35 @@ describe('AMRO 13.3 integration contracts', () => {
     expect(openApi).toContain('operationId: mutateAmroSchedules');
     expect(openApi).toContain('/api/v2/amro/schedules/replan:');
     expect(openApi).toContain('operationId: replanAmroSchedules');
+  });
+
+  it('keeps API-AMRO-006 through API-AMRO-015 operations aligned', () => {
+    const openApi = readContractFile(AMRO_OPENAPI_SPEC_PATH);
+    expect(openApi).toContain('/api/v2/amro/tasks:');
+    expect(openApi).toContain('/api/v2/amro/tasks/{id}/evidence:');
+    expect(openApi).toContain('/api/v2/amro/inventory/reservations:');
+    expect(openApi).toContain('operationId: reserveAmroInventory');
+    expect(openApi).toContain('operationId: releaseAmroInventoryReservation');
+    expect(openApi).toContain('/api/v2/amro/inventory/availability:');
+    expect(openApi).toContain('operationId: getAmroInventoryAvailability');
+    expect(openApi).toContain('/api/v2/amro/compliance/obligations:');
+    expect(openApi).toContain('operationId: listAmroComplianceObligations');
+    expect(openApi).toContain('operationId: ingestAmroComplianceObligations');
+    expect(openApi).toContain('/api/v2/amro/compliance/gates/evaluate:');
+    expect(openApi).toContain('operationId: evaluateAmroComplianceGate');
+    expect(openApi).toContain('/api/v2/amro/certifications/validate:');
+    expect(openApi).toContain('operationId: validateAmroCertificationAuthority');
+    expect(openApi).toContain('/api/v2/amro/certifications/actions:');
+    expect(openApi).toContain('operationId: actionAmroCertification');
+    expect(openApi).toContain('/api/v2/amro/audit/replay:');
+    expect(openApi).toContain('operationId: replayAmroAudit');
+    expect(openApi).toContain('/api/v2/amro/forecast/recommendations:');
+    expect(openApi).toContain('operationId: getAmroForecastRecommendations');
+    expect(openApi).toContain('list-external-adapters');
+    expect(openApi).toContain('sync-erp-financials');
+    expect(openApi).toContain('ingest-legacy-mro-records');
+    expect(openApi).toContain('ingest-iot-telemetry');
+    expect(openApi).toContain('ingest-regulatory-feed');
+    expect(openApi).toContain('dispatch-notification-gateway');
   });
 });

@@ -216,7 +216,13 @@ const AMRO_CERTIFICATION_INTERFACE_MILESTONES: Readonly<Record<string, AmroSeque
 } as const;
 
 const AMRO_INTEGRATION_HUB_INTERFACE_MILESTONES: Readonly<Record<string, AmroSequentialMilestoneId>> = {
+  'list-external-adapters': 'M7',
   'ingest-partner-payload': 'M7',
+  'sync-erp-financials': 'M7',
+  'ingest-legacy-mro-records': 'M7',
+  'ingest-iot-telemetry': 'M7',
+  'ingest-regulatory-feed': 'M7',
+  'dispatch-notification-gateway': 'M7',
   'replay-failed-integration-job': 'M7',
   'publish-outbound-callback': 'M7',
 } as const;

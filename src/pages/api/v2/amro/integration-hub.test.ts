@@ -145,6 +145,17 @@ describe('/api/v2/amro/integration-hub', () => {
     expect(sendErrorResponse).not.toHaveBeenCalled();
   });
 
+  it('returns external adapter catalog for interoperability mappings', async () => {
+    process.env.AMRO_INTEGRATION_HUB_V2_ENABLED = 'true';
+    const req: ApiRequest = { method: 'POST', query: { interface: 'list-external-adapters' }, body: {}, headers: {} };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.output?.adapters?.length).toBeGreaterThanOrEqual(5);
+  });
+
   it('ingests allow-listed partner payload with idempotency for mutating events', async () => {
     process.env.AMRO_INTEGRATION_HUB_V2_ENABLED = 'true';
     const req: ApiRequest = {
@@ -170,6 +181,72 @@ describe('/api/v2/amro/integration-hub', () => {
     expect(applyCompatibilityResponseHeaders).toHaveBeenCalled();
     expect(res.statusCode).toBe(200);
     expect((res.jsonBody as any)?.output?.parse_status).toBe('parsed');
+    expect((res.jsonBody as any)?.output?.outbox?.publish_status).toBe('queued');
+  });
+
+  it('syncs ERP financial postings through adapter interface', async () => {
+    process.env.AMRO_INTEGRATION_HUB_V2_ENABLED = 'true';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'sync-erp-financials' },
+      body: {
+        source_system: 'sap-pm',
+        adapter_version: '2.4.1',
+        work_package_id: 'wp-1',
+        financial_posting: { currency: 'USD', amount: 2500 },
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.output?.sync_status).toBe('posted');
+    expect((res.jsonBody as any)?.output?.outbox?.event_type).toBe('amro.erp.financials.synced.v1');
+  });
+
+  it('ingests legacy MRO records and returns accepted count', async () => {
+    process.env.AMRO_INTEGRATION_HUB_V2_ENABLED = 'true';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'ingest-legacy-mro-records' },
+      body: {
+        source_system: 'maximo',
+        adapter_version: '1.0.0',
+        migration_batch_id: 'batch-1',
+        records: [{ legacy_id: 'legacy-1' }, { legacy_id: 'legacy-2' }],
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.output?.accepted_count).toBe(2);
+  });
+
+  it('dispatches notifications through notification gateway adapter', async () => {
+    process.env.AMRO_INTEGRATION_HUB_V2_ENABLED = 'true';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'dispatch-notification-gateway' },
+      body: {
+        target_partner: 'notification-gateway',
+        notification_type: 'compliance_exception',
+        message_ref: 'msg-1',
+        channels: [{ type: 'email' }, { type: 'sms' }],
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.output?.dispatch_status).toBe('queued');
+    expect((res.jsonBody as any)?.output?.channel_count).toBe(2);
   });
 
   it('rejects ingest when source system is not allow-listed', async () => {

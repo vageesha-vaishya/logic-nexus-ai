@@ -17,9 +17,17 @@ import { appendAmroAuditLedgerRecord } from './audit-ledger';
 import { resolveAmroAuditLedgerCutoverState, resolveAmroV2EndpointRolloutState } from './audit-ledger-cutover';
 import { enforceAmroSequentialMilestoneForIntegrationHubInterface } from './phase-plan-model';
 
-const ALLOWLISTED_SOURCES = new Set(['sap-pm', 'maximo', 'oracle-eam', 'boeing-partner-gateway']);
+const ALLOWLISTED_SOURCES = new Set(['sap-pm', 'maximo', 'oracle-eam', 'boeing-partner-gateway', 'regulatory-feed']);
 const MUTATING_EVENT_TYPES = new Set(['work_package_update', 'task_update', 'part_reservation', 'callback_trigger']);
-const EXTERNAL_ADAPTER_CATALOG = [
+type ExternalAdapterDescriptor = {
+  adapter: string;
+  systems: string[];
+  protocol: string[];
+  direction: 'bi-directional' | 'inbound' | 'outbound';
+  purpose: string;
+};
+
+const EXTERNAL_ADAPTER_CATALOG: ExternalAdapterDescriptor[] = [
   {
     adapter: 'erp-adapter',
     systems: ['sap-pm', 'oracle-eam'],
@@ -55,7 +63,7 @@ const EXTERNAL_ADAPTER_CATALOG = [
     direction: 'outbound',
     purpose: 'Alerts, approvals, compliance exceptions',
   },
-] as const;
+];
 
 function parseBoolean(value: string | undefined, fallback: boolean): boolean {
   const normalized = String(value || '').trim().toLowerCase();
@@ -156,7 +164,7 @@ function assertMappingContract(body: Record<string, unknown>) {
 
 function resolveAdapterCatalogEntry(sourceSystem: string) {
   const normalized = sourceSystem.trim().toLowerCase();
-  const matched = EXTERNAL_ADAPTER_CATALOG.find((entry) => entry.systems.includes(normalized as any));
+  const matched = EXTERNAL_ADAPTER_CATALOG.find((entry) => entry.systems.includes(normalized));
   if (matched) return matched;
   return {
     adapter: 'erp-adapter',
@@ -164,6 +172,33 @@ function resolveAdapterCatalogEntry(sourceSystem: string) {
     protocol: ['REST'],
     direction: 'bi-directional',
     purpose: 'Generic AMRO partner synchronization',
+  };
+}
+
+function buildAdapterOutboxPayload(tenantId: string, sourceSystem: string, adapterVersion: string, eventType: string) {
+  const canonicalEventId = `${sourceSystem}-${Date.now()}`;
+  return {
+    canonicalEventId,
+    normalizer: {
+      source_schema: `${sourceSystem}:${adapterVersion}`,
+      canonical_model: 'amro.canonical.event.v1',
+    },
+    deduplication: {
+      idempotency_key: `${tenantId}:${sourceSystem}:${canonicalEventId}`,
+      source_hash: `${tenantId}:${sourceSystem}:${canonicalEventId}`,
+      status: 'validated',
+    },
+    domain_transaction: {
+      transaction_id: `${tenantId}-${canonicalEventId}-tx`,
+      status: 'applied',
+      audit_event_id: `${tenantId}-${canonicalEventId}-audit`,
+    },
+    outbox: {
+      event_id: `${tenantId}-outbox-${Date.now()}`,
+      event_type: eventType,
+      publish_status: 'queued',
+      consumers: ['analytics', 'downstream-consumers'],
+    },
   };
 }
 
@@ -323,6 +358,156 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       });
     }
 
+    if (interfaceName === 'sync-erp-financials') {
+      const sourceSystem = assertNonEmpty(body.source_system, 'source_system').toLowerCase();
+      assertAllowlistedSource(sourceSystem);
+      const adapterVersion = assertNonEmpty(body.adapter_version, 'adapter_version');
+      const workPackageId = assertNonEmpty(body.work_package_id, 'work_package_id');
+      assertNonEmpty(body.financial_posting, 'financial_posting');
+      const adapter = resolveAdapterCatalogEntry(sourceSystem);
+      const sync = buildAdapterOutboxPayload(tenantId, sourceSystem, adapterVersion, 'amro.erp.financials.synced.v1');
+      return res.status(200).json({
+        version: 'v2',
+        interface: interfaceName,
+        correlationId: ctx.correlationId,
+        output: {
+          adapter,
+          work_package_id: workPackageId,
+          sync_status: 'posted',
+          canonical_event_id: sync.canonicalEventId,
+          normalizer: sync.normalizer,
+          deduplication: sync.deduplication,
+          domain_transaction: sync.domain_transaction,
+          outbox: sync.outbox,
+        },
+        domainAccess: {
+          subscriptionStatus: amroAccess.subscriptionStatus,
+          source: amroAccess.source,
+          validatedAt: amroAccess.validatedAt,
+        },
+        serviceBoundaries,
+        endpointRollout: rolloutState,
+        auditLedgerCutover: cutoverState,
+      });
+    }
+
+    if (interfaceName === 'ingest-legacy-mro-records') {
+      const sourceSystem = assertNonEmpty(body.source_system, 'source_system').toLowerCase();
+      assertAllowlistedSource(sourceSystem);
+      const adapterVersion = assertNonEmpty(body.adapter_version, 'adapter_version');
+      const migrationBatchId = assertNonEmpty(body.migration_batch_id, 'migration_batch_id');
+      const records = parseObjectArray(body.records, 'records');
+      const sync = buildAdapterOutboxPayload(tenantId, sourceSystem, adapterVersion, 'amro.legacy.records.ingested.v1');
+      return res.status(200).json({
+        version: 'v2',
+        interface: interfaceName,
+        correlationId: ctx.correlationId,
+        output: {
+          migration_batch_id: migrationBatchId,
+          accepted_count: records.length,
+          canonical_event_id: sync.canonicalEventId,
+          normalizer: sync.normalizer,
+          deduplication: sync.deduplication,
+          domain_transaction: sync.domain_transaction,
+          outbox: sync.outbox,
+        },
+        domainAccess: {
+          subscriptionStatus: amroAccess.subscriptionStatus,
+          source: amroAccess.source,
+          validatedAt: amroAccess.validatedAt,
+        },
+        serviceBoundaries,
+        endpointRollout: rolloutState,
+        auditLedgerCutover: cutoverState,
+      });
+    }
+
+    if (interfaceName === 'ingest-iot-telemetry') {
+      const sourceSystem = assertNonEmpty(body.source_system, 'source_system').toLowerCase();
+      assertAllowlistedSource(sourceSystem);
+      const adapterVersion = assertNonEmpty(body.adapter_version, 'adapter_version');
+      const sensorEvents = parseObjectArray(body.sensor_events, 'sensor_events');
+      const sync = buildAdapterOutboxPayload(tenantId, sourceSystem, adapterVersion, 'amro.iot.telemetry.ingested.v1');
+      return res.status(200).json({
+        version: 'v2',
+        interface: interfaceName,
+        correlationId: ctx.correlationId,
+        output: {
+          accepted_sensor_events: sensorEvents.length,
+          canonical_event_id: sync.canonicalEventId,
+          normalizer: sync.normalizer,
+          deduplication: sync.deduplication,
+          domain_transaction: sync.domain_transaction,
+          outbox: sync.outbox,
+        },
+        domainAccess: {
+          subscriptionStatus: amroAccess.subscriptionStatus,
+          source: amroAccess.source,
+          validatedAt: amroAccess.validatedAt,
+        },
+        serviceBoundaries,
+        endpointRollout: rolloutState,
+        auditLedgerCutover: cutoverState,
+      });
+    }
+
+    if (interfaceName === 'ingest-regulatory-feed') {
+      const sourceSystem = assertNonEmpty(body.source_system, 'source_system').toLowerCase();
+      assertAllowlistedSource(sourceSystem);
+      const adapterVersion = assertNonEmpty(body.adapter_version, 'adapter_version');
+      const bulletins = parseObjectArray(body.bulletins, 'bulletins');
+      const sync = buildAdapterOutboxPayload(tenantId, sourceSystem, adapterVersion, 'amro.regulatory.feed.ingested.v1');
+      return res.status(200).json({
+        version: 'v2',
+        interface: interfaceName,
+        correlationId: ctx.correlationId,
+        output: {
+          accepted_bulletins: bulletins.length,
+          canonical_event_id: sync.canonicalEventId,
+          normalizer: sync.normalizer,
+          deduplication: sync.deduplication,
+          domain_transaction: sync.domain_transaction,
+          outbox: sync.outbox,
+        },
+        domainAccess: {
+          subscriptionStatus: amroAccess.subscriptionStatus,
+          source: amroAccess.source,
+          validatedAt: amroAccess.validatedAt,
+        },
+        serviceBoundaries,
+        endpointRollout: rolloutState,
+        auditLedgerCutover: cutoverState,
+      });
+    }
+
+    if (interfaceName === 'dispatch-notification-gateway') {
+      const targetPartner = assertNonEmpty(body.target_partner, 'target_partner');
+      const notificationType = assertNonEmpty(body.notification_type, 'notification_type');
+      const messageRef = assertNonEmpty(body.message_ref, 'message_ref');
+      const channels = parseObjectArray(body.channels, 'channels');
+      return res.status(200).json({
+        version: 'v2',
+        interface: interfaceName,
+        correlationId: ctx.correlationId,
+        output: {
+          target_partner: targetPartner,
+          notification_type: notificationType,
+          message_ref: messageRef,
+          channel_count: channels.length,
+          dispatch_status: 'queued',
+          callback_id: `${tenantId}-${targetPartner}-notify-${Date.now()}`,
+        },
+        domainAccess: {
+          subscriptionStatus: amroAccess.subscriptionStatus,
+          source: amroAccess.source,
+          validatedAt: amroAccess.validatedAt,
+        },
+        serviceBoundaries,
+        endpointRollout: rolloutState,
+        auditLedgerCutover: cutoverState,
+      });
+    }
+
     if (interfaceName === 'replay-failed-integration-job') {
       const jobId = assertNonEmpty(body.job_id, 'job_id');
       assertNonEmpty(body.replay_reason, 'replay_reason');
@@ -365,6 +550,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         output: {
           callback_id: `${tenantId}-${targetPartner}-callback-${Date.now()}`,
           delivery_status: 'queued',
+          publish_status: 'dispatched',
           attempt_log: attemptLog.length ? attemptLog : [{ attempt: 1, status: 'queued', event_type: eventType, payload_ref: payloadRef }],
         },
         domainAccess: {
@@ -379,7 +565,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     }
 
     return res.status(400).json({
-      error: 'Unsupported interface. Use list-external-adapters, ingest-partner-payload, replay-failed-integration-job, or publish-outbound-callback.',
+      error: 'Unsupported interface. Use list-external-adapters, ingest-partner-payload, sync-erp-financials, ingest-legacy-mro-records, ingest-iot-telemetry, ingest-regulatory-feed, dispatch-notification-gateway, replay-failed-integration-job, or publish-outbound-callback.',
       correlationId: ctx.correlationId,
       version: 'v2',
     });

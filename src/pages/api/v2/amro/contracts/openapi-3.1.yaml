@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: AMRO V2 Integration API
   version: 2.0.0
-  description: AMRO Integration and Coexistence contract for work-packages, schedules, tasks, compliance-gates, certification, integration-hub, forecast-reliability, overview-kpi, module-catalog, screen-inventory, phase-plan, phase-1-readiness, and migration-plan.
+  description: AMRO Integration and Coexistence contract for work-packages, schedules, tasks, inventory, compliance, certifications, audit replay, forecast recommendations, integration-hub, overview-kpi, module-catalog, screen-inventory, phase-plan, phase-1-readiness, and migration-plan.
 servers:
   - url: /
 paths:
@@ -579,6 +579,225 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TaskExecutionMutationResponse'
+  /api/v2/amro/inventory/reservations:
+    post:
+      operationId: reserveAmroInventory
+      tags: [AMRO]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [work_package_id, line_items]
+              properties:
+                work_package_id:
+                  type: string
+                line_items:
+                  type: array
+                  items:
+                    type: object
+                    additionalProperties: true
+      responses:
+        '200':
+          description: Inventory reservation response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+    delete:
+      operationId: releaseAmroInventoryReservation
+      tags: [AMRO]
+      parameters:
+        - in: query
+          name: reservation_id
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Inventory reservation release response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /api/v2/amro/inventory/availability:
+    get:
+      operationId: getAmroInventoryAvailability
+      tags: [AMRO]
+      parameters:
+        - in: query
+          name: station_code
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: part_numbers
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Inventory availability response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /api/v2/amro/compliance/obligations:
+    get:
+      operationId: listAmroComplianceObligations
+      tags: [AMRO]
+      parameters:
+        - in: query
+          name: work_package_id
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Compliance obligations list response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+    post:
+      operationId: ingestAmroComplianceObligations
+      tags: [AMRO]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [source, obligations]
+              properties:
+                source:
+                  type: string
+                feed_batch_id:
+                  type: string
+                obligations:
+                  type: array
+                  items:
+                    type: object
+                    additionalProperties: true
+      responses:
+        '200':
+          description: Compliance obligations ingest response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /api/v2/amro/compliance/gates/evaluate:
+    post:
+      operationId: evaluateAmroComplianceGate
+      tags: [AMRO]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Compliance gate evaluation response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComplianceMutationResponse'
+  /api/v2/amro/certifications/validate:
+    post:
+      operationId: validateAmroCertificationAuthority
+      tags: [AMRO]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Certification validation response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CertificationMutationResponse'
+  /api/v2/amro/certifications/actions:
+    post:
+      operationId: actionAmroCertification
+      tags: [AMRO]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Certification action response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CertificationMutationResponse'
+  /api/v2/amro/audit/replay:
+    get:
+      operationId: replayAmroAudit
+      tags: [AMRO]
+      parameters:
+        - in: query
+          name: capability
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Audit replay response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /api/v2/amro/forecast/recommendations:
+    get:
+      operationId: getAmroForecastRecommendations
+      tags: [AMRO]
+      parameters:
+        - in: query
+          name: work_package_id
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: planning_horizon_days
+          required: false
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Forecast recommendation response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForecastReliabilityMutationResponse'
   /api/v2/amro/compliance-gates:
     get:
       operationId: listAmroComplianceGates
@@ -779,13 +998,27 @@ paths:
           required: true
           schema:
             type: string
-            enum: [ingest-partner-payload, replay-failed-integration-job, publish-outbound-callback]
+            enum:
+              [
+                list-external-adapters,
+                ingest-partner-payload,
+                sync-erp-financials,
+                ingest-legacy-mro-records,
+                ingest-iot-telemetry,
+                ingest-regulatory-feed,
+                dispatch-notification-gateway,
+                replay-failed-integration-job,
+                publish-outbound-callback,
+              ]
       requestBody:
         required: true
         content:
           application/json:
             schema:
               oneOf:
+                - type: object
+                  required: []
+                  properties: {}
                 - type: object
                   required: [source_system, adapter_version, payload, idempotency_key]
                   properties:
@@ -800,6 +1033,70 @@ paths:
                       type: string
                     event_type:
                       type: string
+                - type: object
+                  required: [source_system, adapter_version, work_package_id, financial_posting]
+                  properties:
+                    source_system:
+                      type: string
+                    adapter_version:
+                      type: string
+                    work_package_id:
+                      type: string
+                    financial_posting:
+                      type: object
+                      additionalProperties: true
+                - type: object
+                  required: [source_system, adapter_version, migration_batch_id, records]
+                  properties:
+                    source_system:
+                      type: string
+                    adapter_version:
+                      type: string
+                    migration_batch_id:
+                      type: string
+                    records:
+                      type: array
+                      items:
+                        type: object
+                        additionalProperties: true
+                - type: object
+                  required: [source_system, adapter_version, sensor_events]
+                  properties:
+                    source_system:
+                      type: string
+                    adapter_version:
+                      type: string
+                    sensor_events:
+                      type: array
+                      items:
+                        type: object
+                        additionalProperties: true
+                - type: object
+                  required: [source_system, adapter_version, bulletins]
+                  properties:
+                    source_system:
+                      type: string
+                    adapter_version:
+                      type: string
+                    bulletins:
+                      type: array
+                      items:
+                        type: object
+                        additionalProperties: true
+                - type: object
+                  required: [target_partner, notification_type, message_ref, channels]
+                  properties:
+                    target_partner:
+                      type: string
+                    notification_type:
+                      type: string
+                    message_ref:
+                      type: string
+                    channels:
+                      type: array
+                      items:
+                        type: object
+                        additionalProperties: true
                 - type: object
                   required: [job_id, replay_reason, requested_by]
                   properties:
