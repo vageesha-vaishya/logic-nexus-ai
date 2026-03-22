@@ -35,7 +35,7 @@ jobs:
           E2E_ADMIN_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
           E2E_ADMIN_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
         run: npm run test:playwright:quotation -- --project=${{ matrix.project }} --shard=${{ matrix.shard }}/2
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: quotation-e2e-report-${{ matrix.project }}-shard-${{ matrix.shard }}
