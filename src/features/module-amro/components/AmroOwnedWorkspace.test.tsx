@@ -151,7 +151,12 @@ function createWorkspaceState(overrides: Record<string, unknown> = {}) {
 
 describe('AmroOwnedWorkspace', () => {
   it('renders work package filters, tabs, and role gating badges', () => {
-    mockUseAmroWorkspaceState.mockReturnValue(createWorkspaceState());
+    mockUseAmroWorkspaceState.mockReturnValue(createWorkspaceState({
+      complianceAuditReplay: {
+        eventCount: 1,
+        events: [{ sequence: 1, action: 'gate-approved', createdAt: '2026-03-22T00:00:00.000Z', recordId: 'rec-1' }],
+      },
+    }));
     render(<AmroOwnedWorkspace />);
 
     expect(screen.getByText('Work Package and Task Lifecycle Orchestration')).toBeTruthy();
@@ -163,6 +168,14 @@ describe('AmroOwnedWorkspace', () => {
     expect(screen.getAllByText('Role: planner').length).toBeGreaterThan(0);
     expect(screen.getByText('Create Allowed')).toBeTruthy();
     expect(screen.getByText('Delete Allowed')).toBeTruthy();
+    expect(screen.getByText('SCR-AMRO-001 Overview Dashboard')).toBeTruthy();
+    expect(screen.getByText('SCR-AMRO-002 Work Package List')).toBeTruthy();
+    expect(screen.getByText('SCR-AMRO-005 Task Execution Card')).toBeTruthy();
+    expect(screen.getByText('SCR-AMRO-011 Integration Monitor Console')).toBeTruthy();
+    expect(screen.getByText('SCR-AMRO-012 Forecast Recommendation Hub')).toBeTruthy();
+    expect(screen.getByText('SCR-AMRO-010 Audit Replay Timeline')).toBeTruthy();
+    expect(screen.getByLabelText('Locale selector')).toBeTruthy();
+    expect(screen.getByText('✓ Success: task completed')).toBeTruthy();
   });
 
   it('tracks unsaved detail changes in detail sheet', () => {
@@ -180,7 +193,7 @@ describe('AmroOwnedWorkspace', () => {
     mockUseAmroWorkspaceState.mockReturnValue(createWorkspaceState({ validateCertifyingPrivilege }));
     render(<AmroOwnedWorkspace />);
 
-    expect(screen.getByText('Certification Management and Authority Templates')).toBeTruthy();
+    expect(screen.getByText('SCR-AMRO-009 Certification Decision Panel')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Validate Privilege' }));
     expect(validateCertifyingPrivilege).toHaveBeenCalledTimes(1);
   });

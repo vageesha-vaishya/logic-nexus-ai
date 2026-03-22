@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { ApiRequest, ApiResponse } from '../../_utils/types';
 import {
   applyCors,
@@ -116,6 +117,35 @@ const ALLOWED_DEFERRAL_TYPES = new Set(['mel', 'cdl']);
 const ALLOWED_DEFERRAL_CATEGORIES = new Set(['A', 'B', 'C', 'D']);
 const ALLOWED_AUDIT_REPLAY_CAPABILITIES = new Set(['work-packages', 'tasks', 'compliance-gates']);
 const ALLOWED_EXPORT_FORMATS = new Set(['csv', 'json']);
+const REGULATOR_COMPLIANCE_PROFILES = {
+  faa: {
+    profile: 'FAA',
+    requiredControls: [
+      'airworthiness_compliance',
+      'certifying_release_authority',
+      'maintenance_records_integrity',
+    ],
+    dataArtifacts: ['ad_linkage', 'rts_decisions', 'signer_credentials'],
+  },
+  easa: {
+    profile: 'EASA',
+    requiredControls: [
+      'continuing_airworthiness_records',
+      'certifying_staff_validity',
+      'task_evidence_traceability',
+    ],
+    dataArtifacts: ['compliance_dossiers', 'qualification_evidence'],
+  },
+  caac: {
+    profile: 'CAAC',
+    requiredControls: [
+      'local_operational_oversight',
+      'maintenance_qualification_checks',
+      'maintenance_event_completeness',
+    ],
+    dataArtifacts: ['regulator_profile_mapping', 'localized_obligation_records'],
+  },
+} as const;
 const MANDATORY_DOSSIER_ARTIFACTS: Record<string, ReadonlyArray<string>> = {
   faa: ['release_certificate', 'task_cards', 'signature_log'],
   easa: ['release_certificate', 'task_cards', 'signature_log'],
@@ -183,6 +213,22 @@ function parseIsoTimestamp(value: unknown, fieldName: string): string {
   return new Date(parsed).toISOString();
 }
 
+function buildEvidenceLinkHash(input: Record<string, unknown>): string {
+  return createHash('sha256').update(JSON.stringify(input)).digest('hex');
+}
+
+function buildActorAttribution(userId: string, role: string) {
+  return {
+    actor_id: String(userId || 'unknown'),
+    actor_role: String(role || 'unknown'),
+    actor_at: new Date().toISOString(),
+  };
+}
+
+function getRegulatorComplianceProfile(profile: 'faa' | 'easa' | 'caac') {
+  return REGULATOR_COMPLIANCE_PROFILES[profile];
+}
+
 function resolveComplianceDecision(requiredObligations: Array<Record<string, unknown>>) {
   const blockers = requiredObligations
     .filter((obligation) => obligation.fulfilled !== true)
@@ -212,27 +258,34 @@ function parseNumber(value: unknown, fieldName: string): number {
 }
 
 function buildRegulatorProfilePack(profile: 'faa' | 'easa' | 'caac') {
+  const profileDefinition = getRegulatorComplianceProfile(profile);
   if (profile === 'faa') {
     return {
-      profile: 'FAA',
+      profile: profileDefinition.profile,
       obligations: ['14CFR-39-AD-tracking', 'part-145-release-to-service', 'maintenance-record-append-only'],
       melPolicy: { maxDeferralCategoryAHours: 24, maxDeferralCategoryBHours: 72 },
       gateRules: ['faa-signature-chain-valid', 'faa-mandatory-ad-closed'],
+      required_controls: profileDefinition.requiredControls,
+      data_artifacts: profileDefinition.dataArtifacts,
     };
   }
   if (profile === 'easa') {
     return {
-      profile: 'EASA',
+      profile: profileDefinition.profile,
       obligations: ['part-m-subpart-g-closure', 'part-145-certifying-staff-check', 'camo-deviation-evidence'],
       melPolicy: { maxDeferralCategoryAHours: 24, maxDeferralCategoryBHours: 72 },
       gateRules: ['easa-form-1-linked', 'easa-mel-cdl-policy-pass'],
+      required_controls: profileDefinition.requiredControls,
+      data_artifacts: profileDefinition.dataArtifacts,
     };
   }
   return {
-    profile: 'CAAC',
+    profile: profileDefinition.profile,
     obligations: ['ccar145-release-signoff', 'ccar66-license-verification', 'caac-ad-sb-traceability'],
     melPolicy: { maxDeferralCategoryAHours: 24, maxDeferralCategoryBHours: 72 },
     gateRules: ['caac-closure-criteria-pass', 'caac-airworthiness-directive-satisfied'],
+    required_controls: profileDefinition.requiredControls,
+    data_artifacts: profileDefinition.dataArtifacts,
   };
 }
 
@@ -320,7 +373,10 @@ function appendComplianceMutationAuditRecord(params: {
   interfaceName: string;
   entityId: string;
   context: Record<string, unknown>;
+  actorId: string;
+  actorRole: string;
 }) {
+  const actorAttribution = buildActorAttribution(params.actorId, params.actorRole);
   return appendAmroAuditLedgerRecord({
     tenantId: params.tenantId,
     franchiseId: params.franchiseId,
@@ -334,7 +390,10 @@ function appendComplianceMutationAuditRecord(params: {
     sourceHash: `${params.tenantId}:${params.interfaceName}:${params.entityId}:${params.correlationId}`,
     migrationBatchId: `runtime:${params.tenantId}:${params.franchiseId || 'franchise-none'}`,
     replayCheckpoint: `mutation:${Date.now()}`,
-    context: params.context,
+    context: {
+      ...params.context,
+      actor: actorAttribution,
+    },
   });
 }
 
@@ -463,8 +522,18 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         throw new Error('required_obligations must include at least one obligation');
       }
       const requiredObligations = obligationsRaw.map((entry) => (entry && typeof entry === 'object' ? entry as Record<string, unknown> : {}));
-      assertNonEmpty(body.policy_version_snapshot, 'policy_version_snapshot');
-      assertNonEmpty(body.decision_evidence, 'decision_evidence');
+      const policyVersionSnapshot = assertNonEmpty(body.policy_version_snapshot, 'policy_version_snapshot');
+      const decisionEvidence = assertNonEmpty(body.decision_evidence, 'decision_evidence');
+      const actorAttribution = buildActorAttribution(ctx.userId, ctx.role);
+      const evidenceLinkHash = buildEvidenceLinkHash({
+        tenant_id: tenantId,
+        franchise_id: franchiseId,
+        context: { type: contextType, id: contextId },
+        regulator_profile: regulatorProfile,
+        policy_version_snapshot: policyVersionSnapshot,
+        decision_evidence: decisionEvidence,
+        obligations: requiredObligations,
+      });
       const resolved = resolveComplianceDecision(requiredObligations);
       const auditRecord = cutoverState.enabled
         ? appendComplianceMutationAuditRecord({
@@ -479,7 +548,16 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
             blockerCount: resolved.blockers.length,
             contextType,
             regulatorProfile,
+            policyVersionSnapshot,
+            decisionEvidence,
+            evidenceLinkHash,
+            traceability: {
+              source_trigger: `${contextType}:${contextId}`,
+              closure_decision: resolved.decision,
+            },
           },
+          actorId: ctx.userId,
+          actorRole: ctx.role,
         })
         : null;
       return res.status(200).json({
@@ -505,6 +583,14 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           rationale: resolved.decision === 'pass'
             ? 'All required obligations satisfied'
             : 'One or more obligations are unresolved',
+          auditability: {
+            traceability: {
+              source_trigger: `${contextType}:${contextId}`,
+              closure_decision: resolved.decision,
+            },
+            evidence_link_hash: evidenceLinkHash,
+            actor_attribution: actorAttribution,
+          },
         },
         auditLedgerCutover: cutoverState,
         auditLedger: auditRecord ? {
@@ -577,6 +663,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
             sourceAdapter,
             regulatorProfile,
           },
+          actorId: ctx.userId,
+          actorRole: ctx.role,
         })
         : null;
       return res.status(200).json({
@@ -597,6 +685,134 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           source_adapter: sourceAdapter,
         },
         output,
+        auditLedgerCutover: cutoverState,
+        auditLedger: auditRecord ? {
+          eventType: auditRecord.eventType,
+          recordId: auditRecord.recordId,
+          chainHash: auditRecord.chainHash,
+          replayCheckpoint: auditRecord.replayCheckpoint,
+        } : null,
+      });
+    }
+
+    if (req.method === 'POST' && interfaceName === 'pre-schedule-compliance-gate') {
+      enforceAnyPermission(auth.permissions || [], ['dashboards.manage', 'reports.manage']);
+      const body = parseBody(req.body);
+      const workPackageId = assertNonEmpty(body.work_package_id, 'work_package_id');
+      const aircraftStatus = assertNonEmpty(body.aircraft_status, 'aircraft_status').toLowerCase();
+      const unresolvedObligations = parseStringArray(body.unresolved_mandatory_obligations);
+      const blockedStatus = new Set(['grounded', 'airworthiness_hold', 'maintenance_blocked']);
+      const decision = blockedStatus.has(aircraftStatus) || unresolvedObligations.length > 0 ? 'fail' : 'pass';
+      const blockers = [
+        blockedStatus.has(aircraftStatus) ? `aircraft status ${aircraftStatus} blocks scheduling` : '',
+        ...unresolvedObligations.map((obligationId) => `mandatory obligation unresolved: ${obligationId}`),
+      ].filter((value) => Boolean(value));
+      const auditRecord = cutoverState.enabled
+        ? appendComplianceMutationAuditRecord({
+          tenantId,
+          franchiseId,
+          correlationId: ctx.correlationId,
+          compatMode: compatDecision.compatMode,
+          interfaceName,
+          entityId: workPackageId,
+          context: {
+            gate: 'pre-schedule',
+            aircraftStatus,
+            unresolvedMandatoryObligations: unresolvedObligations,
+            decision,
+            blockerCount: blockers.length,
+          },
+          actorId: ctx.userId,
+          actorRole: ctx.role,
+        })
+        : null;
+      return res.status(200).json({
+        version: 'v2',
+        interface: 'pre-schedule-compliance-gate',
+        correlationId: ctx.correlationId,
+        compatMode: compatDecision.compatMode,
+        mode: 'module',
+        domainAccess: {
+          subscriptionStatus: amroAccess.subscriptionStatus,
+          source: amroAccess.source,
+          validatedAt: amroAccess.validatedAt,
+        },
+        serviceBoundaries,
+        input: {
+          work_package_id: workPackageId,
+          aircraft_status: aircraftStatus,
+          unresolved_mandatory_obligations: unresolvedObligations,
+        },
+        output: {
+          decision,
+          blockers,
+          gate: 'pre-schedule',
+        },
+        auditLedgerCutover: cutoverState,
+        auditLedger: auditRecord ? {
+          eventType: auditRecord.eventType,
+          recordId: auditRecord.recordId,
+          chainHash: auditRecord.chainHash,
+          replayCheckpoint: auditRecord.replayCheckpoint,
+        } : null,
+      });
+    }
+
+    if (req.method === 'POST' && interfaceName === 'pre-execution-compliance-gate') {
+      enforceAnyPermission(auth.permissions || [], ['dashboards.manage', 'reports.manage']);
+      const body = parseBody(req.body);
+      const taskId = assertNonEmpty(body.task_id, 'task_id');
+      const technicianId = assertNonEmpty(body.technician_id, 'technician_id');
+      const competencyValid = body.technician_competency_valid === true;
+      const certificationValid = body.certification_valid === true;
+      const decision = competencyValid && certificationValid ? 'pass' : 'fail';
+      const blockers = [
+        competencyValid ? '' : `technician competency invalid: ${technicianId}`,
+        certificationValid ? '' : `technician certification invalid: ${technicianId}`,
+      ].filter((value) => Boolean(value));
+      const auditRecord = cutoverState.enabled
+        ? appendComplianceMutationAuditRecord({
+          tenantId,
+          franchiseId,
+          correlationId: ctx.correlationId,
+          compatMode: compatDecision.compatMode,
+          interfaceName,
+          entityId: taskId,
+          context: {
+            gate: 'pre-execution',
+            technicianId,
+            competencyValid,
+            certificationValid,
+            decision,
+            blockerCount: blockers.length,
+          },
+          actorId: ctx.userId,
+          actorRole: ctx.role,
+        })
+        : null;
+      return res.status(200).json({
+        version: 'v2',
+        interface: 'pre-execution-compliance-gate',
+        correlationId: ctx.correlationId,
+        compatMode: compatDecision.compatMode,
+        mode: 'module',
+        domainAccess: {
+          subscriptionStatus: amroAccess.subscriptionStatus,
+          source: amroAccess.source,
+          validatedAt: amroAccess.validatedAt,
+        },
+        serviceBoundaries,
+        input: {
+          task_id: taskId,
+          technician_id: technicianId,
+          technician_competency_valid: competencyValid,
+          certification_valid: certificationValid,
+        },
+        output: {
+          decision,
+          blockers,
+          gate: 'pre-execution',
+        },
         auditLedgerCutover: cutoverState,
         auditLedger: auditRecord ? {
           eventType: auditRecord.eventType,
@@ -760,6 +976,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           replay_timeline: {
             event_count: orderedEvents.length,
             events: orderedEvents,
+            deterministic_sequence: 'created_at:asc',
           },
           export_filters: {
             capability,
@@ -771,6 +988,22 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
             export_id: `${tenantId}-${capability}-audit-export-${Date.now()}`,
             format: exportFormat,
             row_count: orderedEvents.length,
+          },
+          policy_context: {
+            policy_snapshots: Array.from(
+              new Set(
+                records
+                  .map((record) => String((record.context || {}).policyVersionSnapshot || ''))
+                  .filter(Boolean)
+              )
+            ),
+            regulator_profiles: Array.from(
+              new Set(
+                records
+                  .map((record) => String((record.context || {}).regulatorProfile || ''))
+                  .filter(Boolean)
+              )
+            ),
           },
         },
       });
@@ -879,6 +1112,26 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         pendingSignatures > 0 ? { gate: 'pending_signatures', reason: `${pendingSignatures} signatures pending` } : null,
         evidenceCoveragePct < 95 ? { gate: 'evidence_coverage', reason: 'evidence coverage below 95%' } : null,
       ].filter(Boolean);
+      const auditRecord = cutoverState.enabled
+        ? appendComplianceMutationAuditRecord({
+          tenantId,
+          franchiseId,
+          correlationId: ctx.correlationId,
+          compatMode: compatDecision.compatMode,
+          interfaceName,
+          entityId: workPackageId,
+          context: {
+            gate: 'pre-closure',
+            openFindings,
+            unresolvedDeferrals,
+            pendingSignatures,
+            evidenceCoveragePct,
+            decision: closureDecision,
+          },
+          actorId: ctx.userId,
+          actorRole: ctx.role,
+        })
+        : null;
       return res.status(200).json({
         version: 'v2',
         interface: 'evaluate-closure-quality-gate',
@@ -903,6 +1156,86 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           blockers,
           release_ready: closureDecision === 'pass',
         },
+        auditLedgerCutover: cutoverState,
+        auditLedger: auditRecord ? {
+          eventType: auditRecord.eventType,
+          recordId: auditRecord.recordId,
+          chainHash: auditRecord.chainHash,
+          replayCheckpoint: auditRecord.replayCheckpoint,
+        } : null,
+      });
+    }
+
+    if (req.method === 'POST' && interfaceName === 'post-release-audit-gate') {
+      enforceAnyPermission(auth.permissions || [], ['dashboards.manage', 'reports.manage']);
+      const body = parseBody(req.body);
+      const workPackageId = assertNonEmpty(body.work_package_id, 'work_package_id');
+      const releaseDecisionId = assertNonEmpty(body.release_decision_id, 'release_decision_id');
+      const evidenceLinkHash = assertNonEmpty(body.evidence_link_hash, 'evidence_link_hash');
+      const records = replayAmroAuditLedgerRecords({
+        tenantId,
+        franchiseId,
+        limit: 200,
+      });
+      const releaseRecord = records.find((record) =>
+        record.capability === 'certification' && String(record.entityId) === workPackageId
+      );
+      const replayReady = records.length > 0
+        && records.every((record, index) => index === 0 || record.previousHash === records[index - 1]?.chainHash);
+      const decision = releaseRecord && replayReady ? 'pass' : 'fail';
+      const blockers = [
+        releaseRecord ? '' : 'release decision audit entry missing',
+        replayReady ? '' : 'replay chain verification failed',
+      ].filter((value) => Boolean(value));
+      const auditRecord = cutoverState.enabled
+        ? appendComplianceMutationAuditRecord({
+          tenantId,
+          franchiseId,
+          correlationId: ctx.correlationId,
+          compatMode: compatDecision.compatMode,
+          interfaceName,
+          entityId: workPackageId,
+          context: {
+            gate: 'post-release',
+            releaseDecisionId,
+            evidenceLinkHash,
+            replayReady,
+            decision,
+          },
+          actorId: ctx.userId,
+          actorRole: ctx.role,
+        })
+        : null;
+      return res.status(200).json({
+        version: 'v2',
+        interface: 'post-release-audit-gate',
+        correlationId: ctx.correlationId,
+        compatMode: compatDecision.compatMode,
+        mode: 'module',
+        domainAccess: {
+          subscriptionStatus: amroAccess.subscriptionStatus,
+          source: amroAccess.source,
+          validatedAt: amroAccess.validatedAt,
+        },
+        serviceBoundaries,
+        input: {
+          work_package_id: workPackageId,
+          release_decision_id: releaseDecisionId,
+          evidence_link_hash: evidenceLinkHash,
+        },
+        output: {
+          decision,
+          blockers,
+          immutable_audit_entry: Boolean(releaseRecord),
+          replay_readiness_verified: replayReady,
+        },
+        auditLedgerCutover: cutoverState,
+        auditLedger: auditRecord ? {
+          eventType: auditRecord.eventType,
+          recordId: auditRecord.recordId,
+          chainHash: auditRecord.chainHash,
+          replayCheckpoint: auditRecord.replayCheckpoint,
+        } : null,
       });
     }
 
@@ -940,6 +1273,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
             obligationId,
             requestedBy,
           },
+          actorId: ctx.userId,
+          actorRole: ctx.role,
         })
         : null;
       return res.status(200).json({
@@ -1009,6 +1344,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
             profile,
             artifactCount: includeArtifacts.length,
           },
+          actorId: ctx.userId,
+          actorRole: ctx.role,
         })
         : null;
       return res.status(200).json({
@@ -1041,7 +1378,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
     if (req.method === 'POST') {
       return res.status(400).json({
-        error: 'Unsupported interface. Use evaluate-compliance-gate, ingest-ad-sb-obligations, evaluate-mel-cdl-deferral, load-compliance-gate-explainability, load-audit-replay-timeline, detect-compliance-anomalies, load-regulator-profile-pack, evaluate-closure-quality-gate, register-exception-request, or generate-compliance-dossier.',
+        error: 'Unsupported interface. Use evaluate-compliance-gate, pre-schedule-compliance-gate, pre-execution-compliance-gate, ingest-ad-sb-obligations, evaluate-mel-cdl-deferral, load-compliance-gate-explainability, load-audit-replay-timeline, detect-compliance-anomalies, load-regulator-profile-pack, evaluate-closure-quality-gate, post-release-audit-gate, register-exception-request, or generate-compliance-dossier.',
         correlationId: ctx.correlationId,
         version: 'v2',
       });

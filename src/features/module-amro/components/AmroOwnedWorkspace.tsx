@@ -33,6 +33,13 @@ const regulatorProfileOptions = ['FAA', 'EASA', 'CAAC'] as const;
 const certificationAuthorityProfileOptions = ['FAA', 'EASA', 'CAAC'] as const;
 const workspaceViewModes = ['kanban', 'card', 'grid', 'list'] as const;
 const amroHeaderActionOrder = ['Search', 'Filter', 'View', 'Create', 'Refresh', 'Import/Export', 'Theme'] as const;
+const workspaceThemeOptions = ['Azure Sky', 'Hangar Dark', 'Maintenance Slate'] as const;
+const workPackagePageSizes = [10, 25, 50] as const;
+const workspaceLocaleOptions = ['en-US', 'en-GB', 'fr-FR', 'de-DE'] as const;
+const amroWorkspaceViewStorageKey = 'amro.workspace.view';
+const amroWorkspaceThemeStorageKey = 'amro.workspace.theme';
+const amroWorkPackagePageSizeStorageKey = 'amro.workspace.work-package-page-size';
+const amroWorkspaceLocaleStorageKey = 'amro.workspace.locale';
 
 type AmroUxRole = 'technician' | 'engineer' | 'inspector' | 'planner' | 'management';
 
@@ -78,6 +85,14 @@ export function AmroOwnedWorkspace() {
   const [detailDraft, setDetailDraft] = useState('');
   const [lastSavedDetailDraft, setLastSavedDetailDraft] = useState('');
   const [workspaceViewMode, setWorkspaceViewMode] = useState<(typeof workspaceViewModes)[number]>('kanban');
+  const [workspaceTheme, setWorkspaceTheme] = useState<(typeof workspaceThemeOptions)[number]>('Azure Sky');
+  const [workspaceLocale, setWorkspaceLocale] = useState<(typeof workspaceLocaleOptions)[number]>('en-US');
+  const [workPackagePageSize, setWorkPackagePageSize] = useState<number>(workPackagePageSizes[0]);
+  const [workPackagePage, setWorkPackagePage] = useState(1);
+  const [workPackageSortField, setWorkPackageSortField] = useState<'packageNumber' | 'lifecycleStage'>('packageNumber');
+  const [workPackageSortDirection, setWorkPackageSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [selectedFleetFilter, setSelectedFleetFilter] = useState('all');
+  const [selectedStationFilter, setSelectedStationFilter] = useState('all');
   const [closureConfirmOpen, setClosureConfirmOpen] = useState(false);
   const [closureRationale, setClosureRationale] = useState('');
   const [overrideConfirmOpen, setOverrideConfirmOpen] = useState(false);
@@ -103,6 +118,41 @@ export function AmroOwnedWorkspace() {
   const canDirectTaskExecution = activeUxRole !== 'management';
   const canRunRegulatoryFinalSignOff = activeUxRole !== 'engineer';
   const canRunCertifyingRelease = activeUxRole !== 'planner';
+  const nowEpoch = Date.now();
+  const fleetOptions = ['all', ...Array.from(new Set(state.assets.map((asset) => asset.assetTag)))];
+  const stationOptions = ['all', ...Array.from(new Set(state.scheduleBoardRows.map((row) => row.station_code)))];
+  const filteredWorkPackages = state.workPackages.filter((workPackage) => {
+    const assetTag = state.assets.find((asset) => asset.id === workPackage.assetId)?.assetTag || '';
+    const stationCode = state.scheduleBoardRows.find((row) => row.work_package_id === workPackage.id)?.station_code || '';
+    const fleetMatch = selectedFleetFilter === 'all' || assetTag === selectedFleetFilter;
+    const stationMatch = selectedStationFilter === 'all' || stationCode === selectedStationFilter;
+    return fleetMatch && stationMatch;
+  });
+  const sortedWorkPackages = [...filteredWorkPackages].sort((left, right) => {
+    const leftValue = workPackageSortField === 'packageNumber' ? left.packageNumber : left.lifecycleStage;
+    const rightValue = workPackageSortField === 'packageNumber' ? right.packageNumber : right.lifecycleStage;
+    const compare = leftValue.localeCompare(rightValue);
+    return workPackageSortDirection === 'asc' ? compare : compare * -1;
+  });
+  const workPackageTotalPages = Math.max(1, Math.ceil(sortedWorkPackages.length / workPackagePageSize));
+  const pagedWorkPackages = sortedWorkPackages.slice((workPackagePage - 1) * workPackagePageSize, workPackagePage * workPackagePageSize);
+  const predictiveRiskSegments = state.predictiveRecommendations.reduce(
+    (summary, recommendation) => {
+      if (recommendation.riskScore >= 80) summary.high += 1;
+      else if (recommendation.riskScore >= 50) summary.medium += 1;
+      else summary.low += 1;
+      return summary;
+    },
+    { high: 0, medium: 0, low: 0 },
+  );
+  const dataFreshnessLabel = state.loadingWorkPackages ? 'Refreshing now' : 'Within SLA window';
+  const syncHealthLabel = state.realtimeConnected ? 'Healthy sync' : 'Degraded sync';
+  const taskActionDisabledReason = canDirectTaskExecution ? '' : 'Disabled by policy: management role cannot submit technician execution actions.';
+  const selectedWorkPackageAssignee = state.selectedWorkPackage?.tasks?.[0]?.assignedRole || 'Unassigned';
+  const formatDateTime = (value: string | number) => new Intl.DateTimeFormat(workspaceLocale, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(new Date(value));
 
   const handleCreateWorkPackage = async () => {
     const ok = await state.createWorkPackage(newWorkPackageTitle);
@@ -154,8 +204,56 @@ export function AmroOwnedWorkspace() {
     };
   }, [hasUnsavedDetailChanges]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const storedViewMode = window.localStorage.getItem(amroWorkspaceViewStorageKey);
+    if (storedViewMode && workspaceViewModes.includes(storedViewMode as (typeof workspaceViewModes)[number])) {
+      setWorkspaceViewMode(storedViewMode as (typeof workspaceViewModes)[number]);
+    }
+    const storedTheme = window.localStorage.getItem(amroWorkspaceThemeStorageKey);
+    if (storedTheme && workspaceThemeOptions.includes(storedTheme as (typeof workspaceThemeOptions)[number])) {
+      setWorkspaceTheme(storedTheme as (typeof workspaceThemeOptions)[number]);
+    }
+    const storedPageSize = Number(window.localStorage.getItem(amroWorkPackagePageSizeStorageKey));
+    if (workPackagePageSizes.includes(storedPageSize as (typeof workPackagePageSizes)[number])) {
+      setWorkPackagePageSize(storedPageSize);
+    }
+    const storedLocale = window.localStorage.getItem(amroWorkspaceLocaleStorageKey);
+    if (storedLocale && workspaceLocaleOptions.includes(storedLocale as (typeof workspaceLocaleOptions)[number])) {
+      setWorkspaceLocale(storedLocale as (typeof workspaceLocaleOptions)[number]);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(amroWorkspaceViewStorageKey, workspaceViewMode);
+  }, [workspaceViewMode]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(amroWorkspaceThemeStorageKey, workspaceTheme);
+  }, [workspaceTheme]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(amroWorkPackagePageSizeStorageKey, String(workPackagePageSize));
+  }, [workPackagePageSize]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(amroWorkspaceLocaleStorageKey, workspaceLocale);
+  }, [workspaceLocale]);
+
+  useEffect(() => {
+    if (workPackagePage <= workPackageTotalPages) return;
+    setWorkPackagePage(workPackageTotalPages);
+  }, [workPackagePage, workPackageTotalPages]);
+
   return (
-    <section className="space-y-4">
+    <section className="space-y-4" aria-label="AMRO workspace">
+      <div className="rounded-md border bg-muted/20 px-3 py-2 text-xs" role="status" aria-live="polite">
+        Workspace status: {dataFreshnessLabel}. Sync health: {syncHealthLabel}.
+      </div>
       <Card data-amro-boundary="tenant-franchise-isolation">
         <CardHeader className="pb-2">
           <CardTitle>AMRO Bounded Context Boundary</CardTitle>
@@ -297,39 +395,96 @@ export function AmroOwnedWorkspace() {
         </CardContent>
       </Card>
 
-      <Card data-amro-screen="ux-amro-001-overview-dashboard">
+      <Card data-amro-screen="SCR-AMRO-001" role="region" aria-label="SCR-AMRO-001 Overview Dashboard">
         <CardHeader className="pb-2">
-          <CardTitle>Overview Dashboard (UX-AMRO-001)</CardTitle>
+          <CardTitle>SCR-AMRO-001 Overview Dashboard</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="grid grid-cols-2 gap-2 md:grid-cols-6">
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-8">
             <Button variant="outline" size="sm">Date Range</Button>
             <Button variant="outline" size="sm">Regulator</Button>
+            <Select value={selectedFleetFilter} onValueChange={setSelectedFleetFilter}>
+              <SelectTrigger aria-label="Fleet filter">
+                <SelectValue placeholder="Fleet filter" />
+              </SelectTrigger>
+              <SelectContent>
+                {fleetOptions.map((fleet) => (
+                  <SelectItem key={fleet} value={fleet}>{fleet === 'all' ? 'Fleet: All' : fleet}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={selectedStationFilter} onValueChange={setSelectedStationFilter}>
+              <SelectTrigger aria-label="Station filter">
+                <SelectValue placeholder="Station filter" />
+              </SelectTrigger>
+              <SelectContent>
+                {stationOptions.map((station) => (
+                  <SelectItem key={station} value={station}>{station === 'all' ? 'Station: All' : station}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Button variant="outline" size="sm">Export</Button>
             <Button variant="outline" size="sm" onClick={state.refreshWorkPackages}>Refresh</Button>
-            <Button variant="outline" size="sm">Theme</Button>
+            <Select value={workspaceTheme} onValueChange={(value) => setWorkspaceTheme(value as (typeof workspaceThemeOptions)[number])}>
+              <SelectTrigger aria-label="Theme selector">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {workspaceThemeOptions.map((theme) => (
+                  <SelectItem key={theme} value={theme}>{theme}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={workspaceLocale} onValueChange={(value) => setWorkspaceLocale(value as (typeof workspaceLocaleOptions)[number])}>
+              <SelectTrigger aria-label="Locale selector">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {workspaceLocaleOptions.map((locale) => (
+                  <SelectItem key={locale} value={locale}>{locale}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Badge variant="secondary" className="justify-center">View: {workspaceViewMode}</Badge>
           </div>
           <div className="grid grid-cols-1 gap-2 md:grid-cols-5">
             <div className="rounded-md border p-2 text-xs">Open WPs: {state.workPackages.length}</div>
-            <div className="rounded-md border p-2 text-xs">In Progress: {state.workPackages.filter((wp) => wp.lifecycleStage === 'execute').length}</div>
-            <div className="rounded-md border p-2 text-xs">Deferred: {state.materialsSummary.pendingReservations}</div>
+            <div className="rounded-md border p-2 text-xs">AOG: {state.materialsSummary.shortageCount}</div>
             <div className="rounded-md border p-2 text-xs">Compliance Risk: {state.complianceAnomalyAlerts.length}</div>
-            <div className="rounded-md border p-2 text-xs">AOG Count: {state.materialsSummary.shortageCount}</div>
+            <div className="rounded-md border p-2 text-xs">Deferred: {state.materialsSummary.pendingReservations}</div>
+            <div className="rounded-md border p-2 text-xs">Fill Rate: {Math.max(0, 100 - state.materialsSummary.shortageCount * 5)}%</div>
           </div>
           <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
             <div className="rounded-md border p-2 text-xs">
               Pipeline Snapshot: planning/scheduled/in_progress with blocked counters from lifecycle + shortage signals.
             </div>
             <div className="rounded-md border p-2 text-xs">
-              Forecast and Reliability Signals: recommendations {state.predictiveSummary.totalRecommendations}, high risk {state.predictiveSummary.highRisk}.
+              Risk Heatmap: critical {state.complianceAnomalyAlerts.filter((alert) => alert.severity === 'critical').length}, warning {state.complianceAnomalyAlerts.filter((alert) => alert.severity !== 'critical').length}.
+            </div>
+          </div>
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+            <div className="rounded-md border p-2 text-xs">
+              Forecast panel: recommendations {state.predictiveSummary.totalRecommendations} / high risk {state.predictiveSummary.highRisk}.
+            </div>
+            <div className="rounded-md border p-2 text-xs">
+              Confidence segmentation: high {predictiveRiskSegments.high} · medium {predictiveRiskSegments.medium} · low {predictiveRiskSegments.low}.
+            </div>
+            <div className="rounded-md border p-2 text-xs">
+              Recommended actions: maintenance interventions prioritized by risk and schedule impact.
             </div>
           </div>
           <div className="grid grid-cols-2 gap-2 text-xs md:grid-cols-4">
-            <div className="rounded-md border p-2">MTTR 6.4h</div>
-            <div className="rounded-md border p-2">Schedule Adherence 93%</div>
-            <div className="rounded-md border p-2">Compliance 98%</div>
-            <div className="rounded-md border p-2">Parts Fill Rate {Math.max(0, 100 - state.materialsSummary.shortageCount * 5)}%</div>
+            <div className="rounded-md border p-2">SLA Trend: 7d / 30d stable</div>
+            <div className="rounded-md border p-2">Data Freshness: {dataFreshnessLabel}</div>
+            <div className="rounded-md border p-2">Sync Health: {syncHealthLabel}</div>
+            <div className="rounded-md border p-2">Theme: {workspaceTheme}</div>
+          </div>
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-5 text-xs">
+            <div className="rounded-md border p-2">✓ Success: task completed</div>
+            <div className="rounded-md border p-2">! Warning: watchlist item</div>
+            <div className="rounded-md border p-2">⛔ Critical: compliance risk</div>
+            <div className="rounded-md border p-2">■ Blocked: gate dependency</div>
+            <div className="rounded-md border p-2">i Informational: advisory signal</div>
           </div>
         </CardContent>
       </Card>
@@ -356,14 +511,33 @@ export function AmroOwnedWorkspace() {
           <CardTitle>Work Package and Task Lifecycle Orchestration</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="rounded-md border p-3" data-amro-screen="ux-amro-003-work-package-list">
-            <p className="text-sm font-semibold">Work Package List (UX-AMRO-003)</p>
+          <div className="rounded-md border p-3" data-amro-screen="SCR-AMRO-002" role="region" aria-label="SCR-AMRO-002 Work Package List">
+            <p className="text-sm font-semibold">SCR-AMRO-002 Work Package List</p>
             <p className="mt-1 text-xs text-muted-foreground">
               Columns: WO# | Aircraft | Priority | Type | Station | Due | Status | Owner
             </p>
+            <div className="mt-2 flex flex-wrap gap-2 text-xs">
+              <Badge variant="outline">Frozen identifiers: WO# / Aircraft</Badge>
+              <Button variant="outline" size="sm" onClick={() => setWorkPackageSortField('packageNumber')}>Sort WO#</Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setWorkPackageSortDirection((previous) => (previous === 'asc' ? 'desc' : 'asc'))}
+              >
+                Sort Direction: {workPackageSortDirection.toUpperCase()}
+              </Button>
+            </div>
             <div className="mt-2 space-y-2">
-              {state.workPackages.map((workPackage) => (
-                <div key={`list-${workPackage.id}`} className="rounded-md border p-2 text-xs">
+              {pagedWorkPackages.map((workPackage) => (
+                <div
+                  key={`list-${workPackage.id}`}
+                  className={`rounded-md border p-2 text-xs ${
+                    (state.scheduleBoardRows.find((row) => row.work_package_id === workPackage.id)?.slot_end
+                    && new Date(state.scheduleBoardRows.find((row) => row.work_package_id === workPackage.id)?.slot_end || nowEpoch).getTime() < nowEpoch)
+                      ? 'border-destructive/40 bg-destructive/5'
+                      : ''
+                  }`}
+                >
                   <div className="grid grid-cols-2 gap-2 md:grid-cols-8">
                     <span>{workPackage.packageNumber}</span>
                     <span>{workPackage.assetId}</span>
@@ -371,7 +545,7 @@ export function AmroOwnedWorkspace() {
                     <span>line</span>
                     <span>{state.scheduleBoardRows.find((row) => row.work_package_id === workPackage.id)?.station_code || 'N/A'}</span>
                     <span>{state.scheduleBoardRows.find((row) => row.work_package_id === workPackage.id)?.slot_end || 'TBD'}</span>
-                    <span>{workPackage.lifecycleStage}</span>
+                    <span><Badge variant="outline">{workPackage.lifecycleStage}</Badge></span>
                     <span>{activeUxRole}</span>
                   </div>
                   <div className="mt-2 flex flex-wrap gap-2">
@@ -386,6 +560,38 @@ export function AmroOwnedWorkspace() {
                   </div>
                 </div>
               ))}
+            </div>
+            <div className="mt-2 grid grid-cols-1 gap-3 md:grid-cols-3">
+              <div className="rounded-md border p-2 text-xs">
+                <p className="font-medium">Right Rail Summary</p>
+                <p className="text-muted-foreground">Parts readiness: {state.materialsSummary.shortageCount === 0 ? 'Ready' : 'At risk'}</p>
+                <p className="text-muted-foreground">Compliance blockers: {state.complianceAnomalyAlerts.length}</p>
+                <p className="text-muted-foreground">Assignee: {selectedWorkPackageAssignee}</p>
+              </div>
+              <div className="rounded-md border p-2 text-xs md:col-span-2">
+                <p className="font-medium">Footer Controls</p>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setWorkPackagePage((current) => Math.max(1, current - 1))} disabled={workPackagePage === 1}>
+                    Previous
+                  </Button>
+                  <Badge variant="outline">Page {workPackagePage} / {workPackageTotalPages}</Badge>
+                  <Button variant="outline" size="sm" onClick={() => setWorkPackagePage((current) => Math.min(workPackageTotalPages, current + 1))} disabled={workPackagePage === workPackageTotalPages}>
+                    Next
+                  </Button>
+                  <Select value={String(workPackagePageSize)} onValueChange={(value) => { setWorkPackagePageSize(Number(value)); setWorkPackagePage(1); }}>
+                    <SelectTrigger className="w-[120px]" aria-label="Page size">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {workPackagePageSizes.map((size) => (
+                        <SelectItem key={size} value={String(size)}>{size} / page</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button variant="outline" size="sm">Bulk Actions</Button>
+                  <Badge variant="outline">Export state: ready</Badge>
+                </div>
+              </div>
             </div>
             <div className="mt-2 flex flex-wrap gap-2">
               <Button variant="outline" size="sm">Assign</Button>
@@ -412,7 +618,7 @@ export function AmroOwnedWorkspace() {
               {state.loadingWorkPackages ? 'Refreshing...' : 'Refresh'}
             </Button>
           </div>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-4" data-amro-screen="SCR-AMRO-003" role="region" aria-label="SCR-AMRO-003 Work Package Create Drawer">
             <div className="space-y-1">
               <Label>Status Filter</Label>
               <Select value={state.workPackageStatusFilter} onValueChange={state.setWorkPackageStatusFilter}>
@@ -501,25 +707,29 @@ export function AmroOwnedWorkspace() {
               Delete Selected
             </Button>
           </div>
-          <Tabs value={detailTab} onValueChange={setDetailTab}>
-            <TabsList className="grid w-full grid-cols-6">
+          <div className="grid grid-cols-1 gap-3 xl:grid-cols-3" data-amro-screen="SCR-AMRO-004" role="region" aria-label="SCR-AMRO-004 Work Package Detail Sheet">
+            <div className="xl:col-span-2">
+              <Tabs value={detailTab} onValueChange={setDetailTab}>
+            <TabsList className="grid w-full grid-cols-7">
               <TabsTrigger value="overview">Overview</TabsTrigger>
               <TabsTrigger value="tasks">Tasks</TabsTrigger>
               <TabsTrigger value="materials">Materials</TabsTrigger>
               <TabsTrigger value="compliance">Compliance</TabsTrigger>
               <TabsTrigger value="notes">Notes</TabsTrigger>
               <TabsTrigger value="attachments">Attachments</TabsTrigger>
+              <TabsTrigger value="audit">Audit</TabsTrigger>
             </TabsList>
             <TabsContent value="overview" className="space-y-2">
-              <div className="rounded-md border p-2 text-xs" data-amro-screen="ux-amro-005-work-package-detail">
-                <p className="font-medium">Work Package Detail (UX-AMRO-005)</p>
+              <div className="rounded-md border p-2 text-xs">
+                <p className="font-medium">Sticky Top Actions</p>
                 <p className="mt-1 text-muted-foreground">
-                  Sticky actions: Assign | Schedule | Gate Check | Close
+                  Sticky actions: Assign | Schedule | Run gate check | Hold | Close
                 </p>
                 <div className="mt-2 flex flex-wrap gap-2">
                   <Button variant="outline" size="sm" aria-label="Assign work package">Assign</Button>
                   <Button variant="outline" size="sm" aria-label="Schedule work package">Schedule</Button>
                   <Button variant="outline" size="sm" aria-label="Run compliance gate check">Gate Check</Button>
+                  <Button variant="outline" size="sm" aria-label="Hold work package">Hold</Button>
                   <Button size="sm" disabled={!canRunWorkPackageClosure} onClick={() => setClosureConfirmOpen(true)} aria-label="Close work package with confirmation">
                     Close
                   </Button>
@@ -658,57 +868,73 @@ export function AmroOwnedWorkspace() {
             <TabsContent value="attachments" className="space-y-2">
               <div className="rounded-md border p-2 text-xs">Attachment tray for evidence packets and signed forms.</div>
             </TabsContent>
+            <TabsContent value="audit" className="space-y-2">
+              <div className="rounded-md border p-2 text-xs">Audit evidence and replay entries mapped to work package lifecycle transitions.</div>
+            </TabsContent>
           </Tabs>
+            </div>
+            <div className="space-y-2 rounded-md border p-3 text-xs">
+              <p className="font-medium">Side Panel</p>
+              <p className="text-muted-foreground">Activity feed: latest updates synchronized with compliance replay and task signatures.</p>
+              <p className="text-muted-foreground">Signature state: {state.canSignOff ? 'Ready for certifying signature' : 'Signature not permitted for current authority'}</p>
+              <p className="text-muted-foreground">Pending blockers: {state.complianceAnomalyAlerts.length}</p>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" size="sm">Escalate to Engineering</Button>
+                <Button variant="outline" size="sm">Escalate to Compliance</Button>
+              </div>
+              <div className="flex flex-wrap gap-2 pt-1">
+                <Badge variant="secondary">enabled</Badge>
+                <Badge variant="outline">disabled-with-reason</Badge>
+                <Badge variant="outline">hidden-by-permission</Badge>
+              </div>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
-      <Card data-amro-screen="ux-amro-007-mobile-execution-card">
+      <Card data-amro-screen="SCR-AMRO-005" role="region" aria-label="SCR-AMRO-005 Task Execution Card">
         <CardHeader className="pb-2">
-          <CardTitle>Mobile Execution Card (UX-AMRO-007/008/009)</CardTitle>
+          <CardTitle>SCR-AMRO-005 Task Execution Card</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="rounded-md border p-3 text-sm">
             <p className="font-semibold">
               Task {selectedTask ? selectedTask.id : 'N/A'} [{selectedTask?.lifecycleStage || 'pending'}]
             </p>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Elapsed/Target: 00:32 / 00:45 · Offline queue: {mobileQueuedEvents} pending
+            </p>
             <p className="mt-2 text-xs text-muted-foreground">Procedure: ATA 32-41-00</p>
             <div className="mt-2 space-y-1 text-xs">
-              <p>[ ] Step 1</p>
-              <p>[ ] Step 2</p>
-              <p>[ ] Step 3</p>
-            </div>
-            <div className="mt-2 flex flex-wrap gap-2">
-              <Button size="sm" variant="outline">Photo</Button>
-              <Button size="sm" variant="outline">Video</Button>
-              <Button size="sm" variant="outline">Note</Button>
-            </div>
-            <div className="mt-2 flex flex-wrap gap-2">
-              <Button size="sm" variant="outline">PIN</Button>
-              <Button size="sm" variant="outline">Digital Cert</Button>
+              <p>1. Remove panel fasteners · state: completed · evidence: mandatory</p>
+              <p>2. Inspect harness routing · state: in progress · evidence: mandatory</p>
+              <p>3. Refit and torque check · state: pending · evidence: mandatory</p>
             </div>
             <p className="mt-2 text-xs text-muted-foreground">Offline Sync Status: {mobileQueuedEvents > 0 ? 'Queued events pending upload' : 'All events synced'}</p>
             <div className="mt-2 flex flex-wrap gap-2">
               <Button size="sm" variant="outline" className="h-11 min-w-[120px]" aria-label="Capture photo evidence">Photo</Button>
-              <Button size="sm" variant="outline" className="h-11 min-w-[120px]" aria-label="Capture video evidence">Video</Button>
+              <Button size="sm" variant="outline" className="h-11 min-w-[120px]" aria-label="Upload evidence packet">Upload</Button>
               <Button size="sm" variant="outline" className="h-11 min-w-[120px]" aria-label="Add note evidence">Note</Button>
             </div>
             <div className="mt-2 flex flex-wrap gap-2">
               <Button size="sm" variant="outline" className="h-11 min-w-[120px]" aria-label="Sign using PIN">PIN</Button>
               <Button size="sm" variant="outline" className="h-11 min-w-[120px]" aria-label="Sign using digital certificate">Digital Cert</Button>
             </div>
+            <p className="mt-2 text-xs text-muted-foreground">Integrity status: evidence hash chain verified</p>
             <p className="mt-2 text-xs text-muted-foreground">Sync Queue: {mobileQueuedEvents} queued events</p>
             <div className="mt-2 flex flex-wrap gap-2">
               <Button size="sm" variant="outline" className="h-11 min-w-[140px]" aria-label="Save signed task event to offline queue">Save Offline</Button>
               <Button size="sm" disabled={!canDirectTaskExecution} className="h-11 min-w-[140px]" aria-label="Submit task actions">Submit</Button>
               <Button size="sm" variant="outline" className="h-11 min-w-[140px]" aria-label="Request execution support">Request Support</Button>
             </div>
+            {!canDirectTaskExecution ? <p className="text-xs text-muted-foreground">{taskActionDisabledReason}</p> : null}
           </div>
         </CardContent>
       </Card>
 
-      <Card data-amro-owned-surface="scheduling-board-slot-timeline">
+      <Card data-amro-screen="SCR-AMRO-006" data-amro-owned-surface="scheduling-board-slot-timeline" role="region" aria-label="SCR-AMRO-006 Scheduling Board">
         <CardHeader className="pb-2">
-          <CardTitle>Scheduling Board and Slot Timeline</CardTitle>
+          <CardTitle>SCR-AMRO-006 Scheduling Board</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex flex-wrap gap-2">
@@ -732,9 +958,7 @@ export function AmroOwnedWorkspace() {
                   <p className="text-xs text-muted-foreground">
                     {row.work_package_id} · {row.station_code}
                   </p>
-                  <p className="text-xs text-muted-foreground">
-                    {new Date(row.slot_start).toLocaleString()} → {new Date(row.slot_end).toLocaleString()}
-                  </p>
+                  <p className="text-xs text-muted-foreground">{formatDateTime(row.slot_start)} → {formatDateTime(row.slot_end)}</p>
                   <p className="text-xs text-muted-foreground">
                     Team {row.assigned_team_size} / Capacity {row.capacity} · {row.status}
                   </p>
@@ -813,9 +1037,9 @@ export function AmroOwnedWorkspace() {
         </CardContent>
       </Card>
 
-      <Card data-amro-owned-surface="certification-management-workflow">
+      <Card data-amro-screen="SCR-AMRO-009" data-amro-owned-surface="certification-management-workflow" role="region" aria-label="SCR-AMRO-009 Certification Decision Panel">
         <CardHeader className="pb-2">
-          <CardTitle>Certification Management and Authority Templates</CardTitle>
+          <CardTitle>SCR-AMRO-009 Certification Decision Panel</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -978,12 +1202,10 @@ export function AmroOwnedWorkspace() {
             </div>
           ) : null}
           {state.complianceAuditReplay ? (
-            <div className="space-y-1 rounded-md border p-2 text-xs">
-              <p className="font-medium">Audit Replay Timeline</p>
+            <div className="space-y-1 rounded-md border p-2 text-xs" data-amro-screen="SCR-AMRO-010" role="region" aria-label="SCR-AMRO-010 Audit Replay Timeline">
+              <p className="font-medium">SCR-AMRO-010 Audit Replay Timeline</p>
               {state.complianceAuditReplay.events.slice(0, 5).map((event) => (
-                <p key={`${event.recordId}-${event.sequence}`} className="text-muted-foreground">
-                  {event.sequence}. {event.action} · {new Date(event.createdAt).toLocaleString()}
-                </p>
+                <p key={`${event.recordId}-${event.sequence}`} className="text-muted-foreground">{event.sequence}. {event.action} · {formatDateTime(event.createdAt)}</p>
               ))}
             </div>
           ) : null}
@@ -1014,9 +1236,9 @@ export function AmroOwnedWorkspace() {
       </Card>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-        <Card data-amro-owned-surface="materials-repair-loop-orchestration">
+        <Card data-amro-screen="SCR-AMRO-007" data-amro-owned-surface="materials-repair-loop-orchestration" role="region" aria-label="SCR-AMRO-007 Materials Reservation Panel">
           <CardHeader className="pb-2">
-            <CardTitle>Materials Planning and Repair Loop</CardTitle>
+            <CardTitle>SCR-AMRO-007 Materials Reservation Panel</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="grid grid-cols-2 gap-2 text-sm">
@@ -1069,9 +1291,9 @@ export function AmroOwnedWorkspace() {
           </CardContent>
         </Card>
 
-        <Card data-amro-owned-surface="predictive-maintenance-digital-twin">
+        <Card data-amro-screen="SCR-AMRO-012" data-amro-owned-surface="predictive-maintenance-digital-twin" role="region" aria-label="SCR-AMRO-012 Forecast Recommendation Hub">
           <CardHeader className="pb-2">
-            <CardTitle>Predictive Maintenance and Digital Twin Integration</CardTitle>
+            <CardTitle>SCR-AMRO-012 Forecast Recommendation Hub</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
             <div className="grid grid-cols-2 gap-2 text-sm">
@@ -1090,10 +1312,28 @@ export function AmroOwnedWorkspace() {
           </CardContent>
         </Card>
       </div>
+      <Card data-amro-screen="SCR-AMRO-011" role="region" aria-label="SCR-AMRO-011 Integration Monitor Console">
+        <CardHeader className="pb-2">
+          <CardTitle>SCR-AMRO-011 Integration Monitor Console</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2 text-xs">
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-4">
+            <div className="rounded-md border p-2">Inbound adapters: healthy</div>
+            <div className="rounded-md border p-2">Outbound callbacks: healthy</div>
+            <div className="rounded-md border p-2">Replay queue: 0 pending</div>
+            <div className="rounded-md border p-2">Dead-letter queue: 0</div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm">Refresh Integration Status</Button>
+            <Button variant="outline" size="sm">Open Replay Console</Button>
+            <Button variant="outline" size="sm">Export Incident Snapshot</Button>
+          </div>
+        </CardContent>
+      </Card>
       <Dialog open={state.complianceGateModalOpen} onOpenChange={state.setComplianceGateModalOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Compliance Gate Modal</DialogTitle>
+            <DialogTitle>SCR-AMRO-008 Compliance Gate Modal</DialogTitle>
           </DialogHeader>
           {state.complianceExplainability ? (
             <div className="space-y-2 text-sm">

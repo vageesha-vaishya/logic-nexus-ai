@@ -161,6 +161,10 @@ describe('/api/v2/amro/overview-kpi', () => {
     expect((res.jsonBody as any)?.interface).toBe('load-kpi-dashboard');
     expect((res.jsonBody as any)?.output?.kpi_cards?.length).toBeGreaterThan(0);
     expect((res.jsonBody as any)?.input?.station_ids).toEqual(['tenant-1:station-a', 'tenant-1:station-b']);
+    expect((res.jsonBody as any)?.input?.fleet_ids).toEqual(['tenant-1:fleet-a']);
+    expect((res.jsonBody as any)?.output).toHaveProperty('risk_heatmap');
+    expect((res.jsonBody as any)?.output).toHaveProperty('trend_lines');
+    expect((res.jsonBody as any)?.output).toHaveProperty('anomaly_flags');
   });
 
   it('returns freshness warning when dashboard cache exceeds stale threshold', async () => {

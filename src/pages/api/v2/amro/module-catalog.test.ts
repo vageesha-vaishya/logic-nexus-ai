@@ -109,6 +109,20 @@ describe('/api/v2/amro/module-catalog', () => {
     expect((res.jsonBody as any)?.mode).toBe('module-catalog');
     expect((res.jsonBody as any)?.data?.moduleCatalog?.summary?.totalModules).toBe(9);
     expect((res.jsonBody as any)?.data?.moduleCatalog?.modules?.[0]?.module).toBe('Overview and KPI Intelligence');
+    expect((res.jsonBody as any)?.data?.moduleCatalog?.modules?.[0]).toEqual({
+      module: 'Overview and KPI Intelligence',
+      primaryUsers: ['Management', 'planner', 'compliance lead'],
+      primaryInputs: ['Work package states', 'telemetry', 'SLA targets', 'compliance events'],
+      primaryOutputs: ['KPI cards', 'risk heatmaps', 'trend lines', 'anomalies'],
+      coreDependencies: ['Event stream', 'analytics cache', 'forecast engine'],
+    });
+    expect((res.jsonBody as any)?.data?.moduleCatalog?.modules?.[8]).toEqual({
+      module: 'Forecast and Reliability',
+      primaryUsers: ['Planner', 'management'],
+      primaryInputs: ['Telemetry features', 'historical defects', 'environmental context'],
+      primaryOutputs: ['Risk scores', 'suggested interventions', 'confidence/explainability'],
+      coreDependencies: ['ML pipeline', 'feature store'],
+    });
     expect(applyCompatibilityResponseHeaders).toHaveBeenCalled();
   });
 

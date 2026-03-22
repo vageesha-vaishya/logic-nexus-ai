@@ -272,9 +272,56 @@ describe('/api/v2/amro/compliance-gates', () => {
     expect((res.jsonBody as any)?.interface).toBe('evaluate-compliance-gate');
     expect((res.jsonBody as any)?.output?.decision).toBe('fail');
     expect((res.jsonBody as any)?.output?.blockers?.length).toBe(1);
+    expect((res.jsonBody as any)?.output?.auditability?.evidence_link_hash).toBeTruthy();
+    expect((res.jsonBody as any)?.output?.auditability?.actor_attribution?.actor_id).toBe('user-1');
     expect((res.jsonBody as any)?.auditLedgerCutover?.enabled).toBe(true);
     expect((res.jsonBody as any)?.auditLedger?.eventType).toBe('amro.audit.recorded.v1');
     expect((res.jsonBody as any)?.auditLedger?.recordId).toBeTruthy();
+  });
+
+  it('evaluates pre-schedule gate and blocks unresolved obligations', async () => {
+    process.env.AMRO_COMPLIANCE_GATES_V2_ENABLED = 'true';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'pre-schedule-compliance-gate' },
+      body: {
+        work_package_id: 'wp-pre-schedule-1',
+        aircraft_status: 'grounded',
+        unresolved_mandatory_obligations: ['obl-100'],
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.output?.decision).toBe('fail');
+    expect((res.jsonBody as any)?.output?.blockers?.length).toBeGreaterThan(0);
+    expect((res.jsonBody as any)?.auditLedger?.eventType).toBe('amro.audit.recorded.v1');
+  });
+
+  it('evaluates pre-execution gate and fails invalid technician checks', async () => {
+    process.env.AMRO_COMPLIANCE_GATES_V2_ENABLED = 'true';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'pre-execution-compliance-gate' },
+      body: {
+        task_id: 'task-pre-exec-1',
+        technician_id: 'tech-9',
+        technician_competency_valid: false,
+        certification_valid: true,
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.output?.decision).toBe('fail');
+    expect((res.jsonBody as any)?.output?.blockers?.[0]).toContain('technician competency invalid');
+    expect((res.jsonBody as any)?.auditLedger?.eventType).toBe('amro.audit.recorded.v1');
   });
 
   it('registers exception request only for allowed roles', async () => {
@@ -532,6 +579,31 @@ describe('/api/v2/amro/compliance-gates', () => {
     expect((res.jsonBody as any)?.output?.export_filters?.format).toBe('csv');
     expect(Array.isArray((res.jsonBody as any)?.output?.replay_timeline?.events)).toBe(true);
     expect((res.jsonBody as any)?.output?.replay_timeline?.event_count).toBeGreaterThan(0);
+    expect((res.jsonBody as any)?.output?.replay_timeline?.deterministic_sequence).toBe('created_at:asc');
+    expect(Array.isArray((res.jsonBody as any)?.output?.policy_context?.policy_snapshots)).toBe(true);
+    expect(Array.isArray((res.jsonBody as any)?.output?.policy_context?.regulator_profiles)).toBe(true);
+  });
+
+  it('evaluates post-release audit gate with immutable verification', async () => {
+    process.env.AMRO_COMPLIANCE_GATES_V2_ENABLED = 'true';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'post-release-audit-gate' },
+      body: {
+        work_package_id: 'wp-missing-release',
+        release_decision_id: 'decision-1',
+        evidence_link_hash: 'abc123',
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.output?.decision).toBe('fail');
+    expect((res.jsonBody as any)?.output?.immutable_audit_entry).toBe(false);
+    expect((res.jsonBody as any)?.output?.replay_readiness_verified).toBe(false);
   });
 
   it('detects compliance anomalies and returns alerts', async () => {
@@ -574,6 +646,8 @@ describe('/api/v2/amro/compliance-gates', () => {
       await handler(req, res);
       expect(res.statusCode).toBe(200);
       expect((res.jsonBody as any)?.output?.profile_pack?.profile).toBe(profile);
+      expect(Array.isArray((res.jsonBody as any)?.output?.profile_pack?.required_controls)).toBe(true);
+      expect(Array.isArray((res.jsonBody as any)?.output?.profile_pack?.data_artifacts)).toBe(true);
     }
   });
 });

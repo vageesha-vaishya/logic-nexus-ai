@@ -825,7 +825,22 @@ paths:
           required: true
           schema:
             type: string
-            enum: [evaluate-compliance-gate, register-exception-request, generate-compliance-dossier]
+            enum:
+              [
+                evaluate-compliance-gate,
+                pre-schedule-compliance-gate,
+                pre-execution-compliance-gate,
+                evaluate-closure-quality-gate,
+                post-release-audit-gate,
+                register-exception-request,
+                generate-compliance-dossier,
+                ingest-ad-sb-obligations,
+                evaluate-mel-cdl-deferral,
+                load-compliance-gate-explainability,
+                load-audit-replay-timeline,
+                detect-compliance-anomalies,
+                load-regulator-profile-pack,
+              ]
       requestBody:
         required: true
         content:
@@ -875,6 +890,50 @@ paths:
                       type: array
                       items:
                         type: string
+                - type: object
+                  required: [work_package_id, aircraft_status]
+                  properties:
+                    work_package_id:
+                      type: string
+                    aircraft_status:
+                      type: string
+                    unresolved_mandatory_obligations:
+                      type: array
+                      items:
+                        type: string
+                - type: object
+                  required: [task_id, technician_id, technician_competency_valid, certification_valid]
+                  properties:
+                    task_id:
+                      type: string
+                    technician_id:
+                      type: string
+                    technician_competency_valid:
+                      type: boolean
+                    certification_valid:
+                      type: boolean
+                - type: object
+                  required: [work_package_id, open_findings, unresolved_deferrals, pending_signatures, evidence_coverage_pct]
+                  properties:
+                    work_package_id:
+                      type: string
+                    open_findings:
+                      type: integer
+                    unresolved_deferrals:
+                      type: integer
+                    pending_signatures:
+                      type: integer
+                    evidence_coverage_pct:
+                      type: number
+                - type: object
+                  required: [work_package_id, release_decision_id, evidence_link_hash]
+                  properties:
+                    work_package_id:
+                      type: string
+                    release_decision_id:
+                      type: string
+                    evidence_link_hash:
+                      type: string
       responses:
         '200':
           description: Compliance mutation response

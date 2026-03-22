@@ -120,11 +120,17 @@ function assertAllowlistedSource(sourceSystem: string) {
 }
 
 function assertIdempotencyForMutatingEvents(body: Record<string, unknown>) {
+  const idempotencyKey = assertNonEmpty(body.idempotency_key, 'idempotency_key');
   const eventType = String(body.event_type || '').trim().toLowerCase();
-  if (!MUTATING_EVENT_TYPES.has(eventType)) {
+  if (eventType && !MUTATING_EVENT_TYPES.has(eventType)) {
+    if (idempotencyKey.length < 8) {
+      throw new Error('idempotency_key must satisfy minimum length requirements');
+    }
     return;
   }
-  assertNonEmpty(body.idempotency_key, 'idempotency_key');
+  if (idempotencyKey.length < 8) {
+    throw new Error('idempotency_key must satisfy minimum length requirements');
+  }
 }
 
 function assertReplayJobStatus(status: string) {

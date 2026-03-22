@@ -275,6 +275,30 @@ describe('/api/v2/amro/integration-hub', () => {
     );
   });
 
+  it('rejects ingest when idempotency key is missing', async () => {
+    process.env.AMRO_INTEGRATION_HUB_V2_ENABLED = 'true';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'ingest-partner-payload' },
+      body: {
+        source_system: 'sap-pm',
+        adapter_version: '2.4.1',
+        payload: { task_id: 'task-1' },
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(sendErrorResponse).toHaveBeenCalledWith(
+      res,
+      expect.any(Error),
+      'corr-amro-integration-hub-v2',
+      { apiVersion: 'v2' },
+    );
+  });
+
   it('replays only failed or quarantined jobs', async () => {
     process.env.AMRO_INTEGRATION_HUB_V2_ENABLED = 'true';
     const req: ApiRequest = {

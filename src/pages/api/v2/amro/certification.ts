@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { ApiRequest, ApiResponse } from '../../_utils/types';
 import {
   applyCors,
@@ -76,7 +77,7 @@ function parseOptionalStringArray(value: unknown, fallback: string[] = []): stri
   return normalized.split(',').map((entry) => entry.trim()).filter(Boolean);
 }
 
-function assertAuthorityScope(
+function hasAuthorityScope(
   requestedAircraftScope: string[],
   requestedMaintenanceScope: string[],
   authorityAircraftScope: string[],
@@ -88,9 +89,7 @@ function assertAuthorityScope(
   const maintenanceAllowed = requestedMaintenanceScope.every(
     (scope) => authorityMaintenanceScope.includes('*') || authorityMaintenanceScope.includes(scope),
   );
-  if (!aircraftAllowed || !maintenanceAllowed) {
-    throw new Error('Expired or out-of-scope authority always invalid');
-  }
+  return aircraftAllowed && maintenanceAllowed;
 }
 
 function parseObjectArray(value: unknown, fieldName: string): Array<Record<string, unknown>> {
@@ -170,6 +169,30 @@ function resolveAuthorityTemplate(profile: 'FAA' | 'EASA' | 'CAAC') {
   };
 }
 
+function buildActorAttribution(userId: string, role: string) {
+  return {
+    actor_id: String(userId || 'unknown'),
+    actor_role: String(role || 'unknown'),
+    actor_at: new Date().toISOString(),
+  };
+}
+
+function buildNonRepudiationSignatureBundle(signatures: Array<Record<string, unknown>>) {
+  const normalizedSignatures = signatures.map((signature) => ({
+    signer_id: String(signature.signer_id || '').trim(),
+    signer_credential_id: String(signature.signer_credential_id || '').trim(),
+    signed_at: parseTimestamp(signature.signed_at || new Date().toISOString(), 'signatures[].signed_at'),
+    signature: String(signature.signature || '').trim(),
+  }));
+  const payload = JSON.stringify(normalizedSignatures);
+  const signatureBundleHash = createHash('sha256').update(payload).digest('hex');
+  return {
+    signatures: normalizedSignatures,
+    signature_bundle_hash: signatureBundleHash,
+    signature_count: normalizedSignatures.length,
+  };
+}
+
 export default async function handler(req: ApiRequest, res: ApiResponse) {
   applyCors(req, res, { methods: ['POST', 'OPTIONS'] });
   if (handlePreflight(req, res)) return;
@@ -237,6 +260,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     const interfaceName = String(req.query.interface || '').trim().toLowerCase();
     enforceAmroSequentialMilestoneForCertificationInterface(interfaceName);
     const body = parseBody(req.body);
+    const actorAttribution = buildActorAttribution(ctx.userId, ctx.role);
 
     if (interfaceName === 'validate-certifying-authority') {
       const actorId = assertNonEmpty(body.actor_id, 'actor_id');
@@ -252,13 +276,25 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       const grantedPrivileges = parseOptionalStringArray(authority.granted_privileges, ['release_approval']);
       const requiredPrivileges = parseOptionalStringArray(body.required_privileges, ['release_approval']);
       const at = Date.parse(timestamp);
-      if (at < Date.parse(validFrom) || at > Date.parse(validTo) || actorId.toLowerCase().includes('expired')) {
-        throw new Error('Expired or out-of-scope authority always invalid');
-      }
-      assertAuthorityScope(requestedAircraftScope, requestedMaintenanceScope, authorityAircraftScope, authorityMaintenanceScope);
+      const isExpired = at < Date.parse(validFrom) || at > Date.parse(validTo) || actorId.toLowerCase().includes('expired');
+      const scopeAllowed = hasAuthorityScope(
+        requestedAircraftScope,
+        requestedMaintenanceScope,
+        authorityAircraftScope,
+        authorityMaintenanceScope,
+      );
       const missingPrivileges = requiredPrivileges.filter((privilege) => !grantedPrivileges.includes(privilege));
-      if (!canCertifyRelease || missingPrivileges.length > 0) {
-        throw new Error('Certifying privilege validation failed');
+      let authorityStatus: 'valid' | 'invalid' = 'valid';
+      let restrictionReason: string | null = null;
+      if (isExpired || !scopeAllowed) {
+        authorityStatus = 'invalid';
+        restrictionReason = 'Expired or out-of-scope authority always invalid';
+      } else if (!canCertifyRelease) {
+        authorityStatus = 'invalid';
+        restrictionReason = 'Certifying privilege validation failed';
+      } else if (missingPrivileges.length > 0) {
+        authorityStatus = 'invalid';
+        restrictionReason = 'Certifying privilege validation failed';
       }
       const expiryInDays = Math.max(0, Math.ceil((Date.parse(validTo) - Date.parse(timestamp)) / 86_400_000));
       const warning = expiryInDays <= 30
@@ -275,7 +311,16 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           correlationId: ctx.correlationId,
           action: interfaceName,
           compatMode: compatDecision.compatMode,
-          context: { actorId, timestamp, requestedAircraftScope, requestedMaintenanceScope, requiredPrivileges },
+          context: {
+            actorId,
+            timestamp,
+            requestedAircraftScope,
+            requestedMaintenanceScope,
+            requiredPrivileges,
+            authorityStatus,
+            restrictionReason,
+            actor: actorAttribution,
+          },
           sourceHash: `${tenantId}:${actorId}:${timestamp}`,
           migrationBatchId: `migration-${tenantId}-${Date.now()}`,
           replayCheckpoint: `cert-${Date.now()}`,
@@ -286,9 +331,10 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         interface: interfaceName,
         correlationId: ctx.correlationId,
         output: {
-          validation_result: 'valid',
-          expiry_info: { valid_from: validFrom, valid_to: validTo, expired: false },
-          restriction_reason: null,
+          authority_status: authorityStatus,
+          validation_result: authorityStatus,
+          expiry_info: { valid_from: validFrom, valid_to: validTo, expired: isExpired },
+          restriction_reason: restrictionReason,
           privilege_check: {
             can_certify_release: canCertifyRelease,
             granted_privileges: grantedPrivileges,
@@ -313,6 +359,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       const workPackageId = assertNonEmpty(body.work_package_id, 'work_package_id');
       const decision = parseDecision(body.decision);
       const signatures = parseObjectArray(body.signatures, 'signatures');
+      const nonRepudiation = buildNonRepudiationSignatureBundle(signatures);
       const unresolvedBlockers = parseStringArray(body.unresolved_blockers || ['none'], 'unresolved_blockers');
       const blockers = unresolvedBlockers.includes('none') ? [] : unresolvedBlockers;
       const deferReason = decision === 'defer' ? assertNonEmpty(body.defer_reason, 'defer_reason') : null;
@@ -332,7 +379,15 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           correlationId: ctx.correlationId,
           action: interfaceName,
           compatMode: compatDecision.compatMode,
-          context: { decision, signatureCount: signatures.length, blockers, deferReason, followUpDueAt },
+          context: {
+            decision,
+            signatureCount: signatures.length,
+            blockers,
+            deferReason,
+            followUpDueAt,
+            nonRepudiation,
+            actor: actorAttribution,
+          },
           sourceHash: `${tenantId}:${workPackageId}:${decision}`,
           migrationBatchId: `migration-${tenantId}-${Date.now()}`,
           replayCheckpoint: `cert-${Date.now()}`,
@@ -356,6 +411,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
                 ? 'remediate-and-resubmit'
                 : 'await-follow-up-review',
           },
+          non_repudiation: nonRepudiation,
+          actor_attribution: actorAttribution,
         },
         domainAccess: {
           subscriptionStatus: amroAccess.subscriptionStatus,
@@ -386,7 +443,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           correlationId: ctx.correlationId,
           action: interfaceName,
           compatMode: compatDecision.compatMode,
-          context: { blockReason, escalationTarget },
+          context: { blockReason, escalationTarget, actor: actorAttribution },
           sourceHash: `${tenantId}:${workPackageId}:${escalationTarget}`,
           migrationBatchId: `migration-${tenantId}-${Date.now()}`,
           replayCheckpoint: `cert-${Date.now()}`,
@@ -445,7 +502,12 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           correlationId: ctx.correlationId,
           action: interfaceName,
           compatMode: compatDecision.compatMode,
-          context: { warningWindowDays, warningCount: warnings.length, suspensionCount: suspensions.length },
+          context: {
+            warningWindowDays,
+            warningCount: warnings.length,
+            suspensionCount: suspensions.length,
+            actor: actorAttribution,
+          },
           sourceHash: `${tenantId}:expiry:${Date.now()}`,
           migrationBatchId: `migration-${tenantId}-${Date.now()}`,
           replayCheckpoint: `cert-${Date.now()}`,

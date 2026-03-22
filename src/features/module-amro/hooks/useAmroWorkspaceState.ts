@@ -289,8 +289,9 @@ function getAmroApiBaseUrl(): string {
         (window as unknown as { __APP_CONFIG__?: Record<string, unknown> }).__APP_CONFIG__ ||
         {})
       : {};
-  const base = String(import.meta.env.VITE_AMRO_API_BASE_URL || runtimeEnv.VITE_AMRO_API_BASE_URL || '/api/amro');
-  return base.replace(/\/$/, '');
+  const rawBase = String(import.meta.env.VITE_AMRO_API_BASE_URL || runtimeEnv.VITE_AMRO_API_BASE_URL || '/api/amro').trim();
+  const normalizedBase = rawBase === '' || rawBase === '/' ? '/api/amro' : rawBase;
+  return normalizedBase.replace(/\/$/, '');
 }
 
 function mapStatusToLifecycle(status: string): AmroWorkPackageLifecycleStage {

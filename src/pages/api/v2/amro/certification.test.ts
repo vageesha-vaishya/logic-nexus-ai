@@ -170,7 +170,38 @@ describe('/api/v2/amro/certification', () => {
     expect(applyCompatibilityResponseHeaders).toHaveBeenCalled();
     expect(res.statusCode).toBe(200);
     expect((res.jsonBody as any)?.interface).toBe('validate-certifying-authority');
+    expect((res.jsonBody as any)?.output?.authority_status).toBe('valid');
     expect((res.jsonBody as any)?.output?.validation_result).toBe('valid');
+  });
+
+  it('returns invalid authority output when certifier is out of scope', async () => {
+    process.env.AMRO_CERTIFICATION_V2_ENABLED = 'true';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'validate-certifying-authority' },
+      body: {
+        actor_id: 'certifier-01',
+        aircraft_scope: ['B777'],
+        maintenance_scope: ['line'],
+        timestamp: '2026-03-20T10:00:00.000Z',
+        authority: {
+          valid_from: '2026-03-01T00:00:00.000Z',
+          valid_to: '2026-04-01T00:00:00.000Z',
+          aircraft_scope: ['A320'],
+          maintenance_scope: ['line', 'base'],
+        },
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.output?.authority_status).toBe('invalid');
+    expect((res.jsonBody as any)?.output?.validation_result).toBe('invalid');
+    expect((res.jsonBody as any)?.output?.restriction_reason).toBe('Expired or out-of-scope authority always invalid');
+    expect(sendErrorResponse).not.toHaveBeenCalled();
   });
 
   it('submits approval decision when mandatory signatures are present', async () => {
@@ -183,8 +214,8 @@ describe('/api/v2/amro/certification', () => {
         decision: 'approve',
         unresolved_blockers: ['none'],
         signatures: [
-          { signer_id: 'cert-a', mandatory: true, signature: 'sig-a' },
-          { signer_id: 'cert-b', mandatory: true, signature: 'sig-b' },
+          { signer_id: 'cert-a', signer_credential_id: 'cred-a', signed_at: '2026-03-20T10:05:00.000Z', mandatory: true, signature: 'sig-a' },
+          { signer_id: 'cert-b', signer_credential_id: 'cred-b', signed_at: '2026-03-20T10:06:00.000Z', mandatory: true, signature: 'sig-b' },
         ],
       },
       headers: {},
@@ -196,6 +227,8 @@ describe('/api/v2/amro/certification', () => {
     expect(res.statusCode).toBe(200);
     expect((res.jsonBody as any)?.output?.action_status).toBe('approved');
     expect((res.jsonBody as any)?.output?.blockers).toEqual([]);
+    expect((res.jsonBody as any)?.output?.non_repudiation?.signature_bundle_hash).toBeTruthy();
+    expect((res.jsonBody as any)?.output?.actor_attribution?.actor_id).toBe('user-1');
   });
 
   it('rejects approval decision when unresolved blockers remain', async () => {

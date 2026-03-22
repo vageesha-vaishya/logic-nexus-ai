@@ -68,6 +68,16 @@ export default defineConfig(({ mode }) => {
         changeOrigin: true,
         secure: false,
       },
+      '/api/v1': {
+        target: amroApiProxyTarget,
+        changeOrigin: true,
+        secure: false,
+      },
+      '/api/v2/amro': {
+        target: amroApiProxyTarget,
+        changeOrigin: true,
+        secure: false,
+      },
       '/api/amro': {
         target: amroApiProxyTarget,
         changeOrigin: true,
@@ -94,6 +104,16 @@ export default defineConfig(({ mode }) => {
     proxy: {
       '/api/crm': {
         target: crmApiProxyTarget,
+        changeOrigin: true,
+        secure: false,
+      },
+      '/api/v1': {
+        target: amroApiProxyTarget,
+        changeOrigin: true,
+        secure: false,
+      },
+      '/api/v2/amro': {
+        target: amroApiProxyTarget,
         changeOrigin: true,
         secure: false,
       },

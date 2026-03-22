@@ -194,8 +194,11 @@ const AMRO_TASK_INTERFACE_MILESTONES: Readonly<Record<string, AmroSequentialMile
 } as const;
 
 const AMRO_COMPLIANCE_INTERFACE_MILESTONES: Readonly<Record<string, AmroSequentialMilestoneId>> = {
+  'pre-schedule-compliance-gate': 'M6',
+  'pre-execution-compliance-gate': 'M6',
   'evaluate-compliance-gate': 'M6',
   'evaluate-closure-quality-gate': 'M6',
+  'post-release-audit-gate': 'M6',
   'register-exception-request': 'M6',
   'generate-compliance-dossier': 'M6',
   'ingest-ad-sb-obligations': 'M6',
