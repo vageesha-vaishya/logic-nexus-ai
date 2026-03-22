@@ -31,6 +31,44 @@ const authorityOptions: AmroAuthorityLevel[] = ['technician', 'supervisor', 'eng
 const workPackageStatusFilters = ['all', 'planning', 'scheduled', 'in_progress', 'completed', 'blocked', 'cancelled'] as const;
 const regulatorProfileOptions = ['FAA', 'EASA', 'CAAC'] as const;
 const certificationAuthorityProfileOptions = ['FAA', 'EASA', 'CAAC'] as const;
+const workspaceViewModes = ['kanban', 'card', 'grid', 'list'] as const;
+const amroHeaderActionOrder = ['Search', 'Filter', 'View', 'Create', 'Refresh', 'Import/Export', 'Theme'] as const;
+
+type AmroUxRole = 'technician' | 'engineer' | 'inspector' | 'planner' | 'management';
+
+type AmroRoleVariant = {
+  primaryViews: string;
+  coreActions: string;
+  restrictedActions: string;
+};
+
+const amroRoleVariants: Record<AmroUxRole, AmroRoleVariant> = {
+  technician: {
+    primaryViews: 'Task cards, assigned work package details',
+    coreActions: 'Execute steps, capture evidence, request support',
+    restrictedActions: 'Work package closure, compliance override',
+  },
+  engineer: {
+    primaryViews: 'Work package detail, materials, schedule board',
+    coreActions: 'Plan tasks, assign resources, adjust estimates',
+    restrictedActions: 'Regulatory final sign-off',
+  },
+  inspector: {
+    primaryViews: 'Compliance gate, audit timeline, evidence review',
+    coreActions: 'Validate evidence, approve/reject tasks',
+    restrictedActions: 'Parts allocation edits',
+  },
+  planner: {
+    primaryViews: 'Work package list, scheduler board, capacity views',
+    coreActions: 'Create/plan/schedule work packages',
+    restrictedActions: 'Certifying release',
+  },
+  management: {
+    primaryViews: 'Overview dashboards, SLA/compliance analytics',
+    coreActions: 'Monitor KPIs, approve exceptions',
+    restrictedActions: 'Direct task execution',
+  },
+};
 
 export function AmroOwnedWorkspace() {
   const state = useAmroWorkspaceState();
@@ -39,7 +77,32 @@ export function AmroOwnedWorkspace() {
   const [detailTab, setDetailTab] = useState('overview');
   const [detailDraft, setDetailDraft] = useState('');
   const [lastSavedDetailDraft, setLastSavedDetailDraft] = useState('');
+  const [workspaceViewMode, setWorkspaceViewMode] = useState<(typeof workspaceViewModes)[number]>('kanban');
+  const [closureConfirmOpen, setClosureConfirmOpen] = useState(false);
+  const [closureRationale, setClosureRationale] = useState('');
+  const [overrideConfirmOpen, setOverrideConfirmOpen] = useState(false);
+  const [overrideRationale, setOverrideRationale] = useState('');
+  const [deferralConfirmOpen, setDeferralConfirmOpen] = useState(false);
+  const [deferralRationale, setDeferralRationale] = useState('');
   const hasUnsavedDetailChanges = detailDraft.trim() !== lastSavedDetailDraft.trim();
+  const activeUxRole: AmroUxRole = state.activeRole === 'technician'
+    ? 'technician'
+    : state.activeRole === 'engineer'
+      ? 'engineer'
+      : state.activeRole === 'inspector'
+        ? 'inspector'
+        : state.activeRole === 'planner'
+          ? 'planner'
+          : 'management';
+  const roleVariant = amroRoleVariants[activeUxRole];
+  const selectedTask = state.selectedWorkPackage?.tasks?.[0] ?? null;
+  const mobileQueuedEvents = Math.max(0, (state.selectedWorkPackage?.tasks?.filter((task) => !task.completed).length ?? 0) - 1);
+  const canRunWorkPackageClosure = activeUxRole !== 'technician';
+  const canRunComplianceOverride = activeUxRole !== 'technician';
+  const canEditPartsAllocation = activeUxRole !== 'inspector';
+  const canDirectTaskExecution = activeUxRole !== 'management';
+  const canRunRegulatoryFinalSignOff = activeUxRole !== 'engineer';
+  const canRunCertifyingRelease = activeUxRole !== 'planner';
 
   const handleCreateWorkPackage = async () => {
     const ok = await state.createWorkPackage(newWorkPackageTitle);
@@ -57,6 +120,26 @@ export function AmroOwnedWorkspace() {
 
   const handlePersistDetailDraft = () => {
     setLastSavedDetailDraft(detailDraft);
+  };
+
+  const handleConfirmWorkPackageClosure = async () => {
+    if (!closureRationale.trim()) return;
+    await state.advanceWorkPackageLifecycle();
+    setClosureConfirmOpen(false);
+    setClosureRationale('');
+  };
+
+  const handleConfirmComplianceOverride = () => {
+    if (!overrideRationale.trim()) return;
+    setOverrideConfirmOpen(false);
+    setOverrideRationale('');
+  };
+
+  const handleConfirmDeferral = async () => {
+    if (!deferralRationale.trim()) return;
+    await state.submitCertificationDecision('defer');
+    setDeferralConfirmOpen(false);
+    setDeferralRationale('');
   };
 
   useEffect(() => {
@@ -86,6 +169,171 @@ export function AmroOwnedWorkspace() {
         </CardContent>
       </Card>
 
+      <Card data-amro-uiux-shell="ux-amro-architecture">
+        <CardHeader className="pb-2">
+          <CardTitle>AMRO UI/UX Unified Module Shell</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex flex-wrap gap-2">
+            <Badge variant="outline">Header Controls</Badge>
+            <Badge variant="outline">Workspace</Badge>
+            <Badge variant="outline">Context Panel</Badge>
+            <Badge variant="outline">Bottom Summary</Badge>
+          </div>
+          <div className="rounded-md border p-3">
+            <p className="text-xs font-semibold">Header Controls</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {amroHeaderActionOrder.map((action) => (
+                <Badge key={action} variant="secondary">
+                  {action}
+                </Badge>
+              ))}
+            </div>
+            <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-4">
+              <Input value={state.workPackageSearch} onChange={(event) => state.setWorkPackageSearch(event.target.value)} placeholder="Search" />
+              <Select value={state.workPackageStatusFilter} onValueChange={state.setWorkPackageStatusFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Filter" />
+                </SelectTrigger>
+                <SelectContent>
+                  {workPackageStatusFilters.map((status) => (
+                    <SelectItem key={status} value={status}>
+                      {status}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={workspaceViewMode} onValueChange={(value) => setWorkspaceViewMode(value as (typeof workspaceViewModes)[number])}>
+                <SelectTrigger>
+                  <SelectValue placeholder="View" />
+                </SelectTrigger>
+                <SelectContent>
+                  {workspaceViewModes.map((mode) => (
+                    <SelectItem key={mode} value={mode}>
+                      {mode}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button onClick={handleCreateWorkPackage} disabled={!newWorkPackageTitle.trim() || !state.canCreateWorkPackage}>
+                Create
+              </Button>
+            </div>
+            <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-3">
+              <Button variant="outline" onClick={state.refreshWorkPackages} disabled={state.loadingWorkPackages}>
+                {state.loadingWorkPackages ? 'Refreshing...' : 'Refresh'}
+              </Button>
+              <Button variant="outline">Import/Export</Button>
+              <Button variant="outline">Theme</Button>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 gap-3 xl:grid-cols-[2fr_1fr]">
+            <div className="rounded-md border p-3">
+              <p className="text-xs font-semibold">Workspace</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Active role: {activeUxRole}. Primary view set: {roleVariant.primaryViews}.
+              </p>
+            </div>
+            <div className="rounded-md border p-3">
+              <p className="text-xs font-semibold">Context Panel</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Audit feed, validation hints, and activity timeline are rendered through compliance replay and qualification status.
+              </p>
+            </div>
+          </div>
+          <div className="rounded-md border p-3">
+            <p className="text-xs font-semibold">Bottom Summary</p>
+            <div className="mt-2 grid grid-cols-2 gap-2 text-xs md:grid-cols-4">
+              <div className="rounded-md border p-2">MTTR: 6.4h</div>
+              <div className="rounded-md border p-2">Schedule Adherence: 93%</div>
+              <div className="rounded-md border p-2">Compliance: {state.complianceCoverage.activePacks}/{state.complianceCoverage.totalPacks}</div>
+              <div className="rounded-md border p-2">Parts Fill Rate: {Math.max(0, 100 - state.materialsSummary.shortageCount * 5)}%</div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card data-amro-uiux-shell="ux-amro-role-variants">
+        <CardHeader className="pb-2">
+          <CardTitle>AMRO Role-Based UX Variants</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="rounded-md border p-3 text-xs">
+            <p className="font-semibold">Current Role Context</p>
+            <p className="mt-1 text-muted-foreground">Role: {activeUxRole}</p>
+            <p className="mt-1 text-muted-foreground">Core Actions: {roleVariant.coreActions}</p>
+            <p className="mt-1 text-muted-foreground">Restricted Actions: {roleVariant.restrictedActions}</p>
+          </div>
+          <div className="space-y-2">
+            {Object.entries(amroRoleVariants).map(([role, variant]) => (
+              <div key={role} className="rounded-md border p-3 text-xs">
+                <p className="font-semibold">{role}</p>
+                <p className="mt-1 text-muted-foreground">Primary Views: {variant.primaryViews}</p>
+                <p className="mt-1 text-muted-foreground">Core Actions: {variant.coreActions}</p>
+                <p className="mt-1 text-muted-foreground">Restricted Actions: {variant.restrictedActions}</p>
+              </div>
+            ))}
+          </div>
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+            <Button variant="outline" disabled={!canRunWorkPackageClosure} onClick={() => setClosureConfirmOpen(true)} aria-label="Run work package closure transition">
+              Work Package Closure
+            </Button>
+            <Button variant="outline" disabled={!canRunComplianceOverride} onClick={() => setOverrideConfirmOpen(true)} aria-label="Run compliance override transition">
+              Compliance Override
+            </Button>
+            <Button variant="outline" disabled={!canEditPartsAllocation}>
+              Parts Allocation Edits
+            </Button>
+            <Button variant="outline" disabled={!canRunRegulatoryFinalSignOff}>
+              Regulatory Final Sign-off
+            </Button>
+            <Button variant="outline" disabled={!canRunCertifyingRelease}>
+              Certifying Release
+            </Button>
+            <Button variant="outline" disabled={!canDirectTaskExecution}>
+              Direct Task Execution
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card data-amro-screen="ux-amro-001-overview-dashboard">
+        <CardHeader className="pb-2">
+          <CardTitle>Overview Dashboard (UX-AMRO-001)</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-6">
+            <Button variant="outline" size="sm">Date Range</Button>
+            <Button variant="outline" size="sm">Regulator</Button>
+            <Button variant="outline" size="sm">Export</Button>
+            <Button variant="outline" size="sm" onClick={state.refreshWorkPackages}>Refresh</Button>
+            <Button variant="outline" size="sm">Theme</Button>
+            <Badge variant="secondary" className="justify-center">View: {workspaceViewMode}</Badge>
+          </div>
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-5">
+            <div className="rounded-md border p-2 text-xs">Open WPs: {state.workPackages.length}</div>
+            <div className="rounded-md border p-2 text-xs">In Progress: {state.workPackages.filter((wp) => wp.lifecycleStage === 'execute').length}</div>
+            <div className="rounded-md border p-2 text-xs">Deferred: {state.materialsSummary.pendingReservations}</div>
+            <div className="rounded-md border p-2 text-xs">Compliance Risk: {state.complianceAnomalyAlerts.length}</div>
+            <div className="rounded-md border p-2 text-xs">AOG Count: {state.materialsSummary.shortageCount}</div>
+          </div>
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+            <div className="rounded-md border p-2 text-xs">
+              Pipeline Snapshot: planning/scheduled/in_progress with blocked counters from lifecycle + shortage signals.
+            </div>
+            <div className="rounded-md border p-2 text-xs">
+              Forecast and Reliability Signals: recommendations {state.predictiveSummary.totalRecommendations}, high risk {state.predictiveSummary.highRisk}.
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2 text-xs md:grid-cols-4">
+            <div className="rounded-md border p-2">MTTR 6.4h</div>
+            <div className="rounded-md border p-2">Schedule Adherence 93%</div>
+            <div className="rounded-md border p-2">Compliance 98%</div>
+            <div className="rounded-md border p-2">Parts Fill Rate {Math.max(0, 100 - state.materialsSummary.shortageCount * 5)}%</div>
+          </div>
+        </CardContent>
+      </Card>
+
       <Card data-amro-owned-surface="asset-registry-configuration-state">
         <CardHeader className="pb-2">
           <CardTitle>Asset Registry and Configuration State</CardTitle>
@@ -108,6 +356,44 @@ export function AmroOwnedWorkspace() {
           <CardTitle>Work Package and Task Lifecycle Orchestration</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
+          <div className="rounded-md border p-3" data-amro-screen="ux-amro-003-work-package-list">
+            <p className="text-sm font-semibold">Work Package List (UX-AMRO-003)</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Columns: WO# | Aircraft | Priority | Type | Station | Due | Status | Owner
+            </p>
+            <div className="mt-2 space-y-2">
+              {state.workPackages.map((workPackage) => (
+                <div key={`list-${workPackage.id}`} className="rounded-md border p-2 text-xs">
+                  <div className="grid grid-cols-2 gap-2 md:grid-cols-8">
+                    <span>{workPackage.packageNumber}</span>
+                    <span>{workPackage.assetId}</span>
+                    <span>normal</span>
+                    <span>line</span>
+                    <span>{state.scheduleBoardRows.find((row) => row.work_package_id === workPackage.id)?.station_code || 'N/A'}</span>
+                    <span>{state.scheduleBoardRows.find((row) => row.work_package_id === workPackage.id)?.slot_end || 'TBD'}</span>
+                    <span>{workPackage.lifecycleStage}</span>
+                    <span>{activeUxRole}</span>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <Button variant="outline" size="sm" aria-label={`Open work package ${workPackage.packageNumber}`}>Open</Button>
+                    <Button variant="outline" size="sm" aria-label={`Schedule work package ${workPackage.packageNumber}`}>Schedule</Button>
+                    <Button variant="outline" size="sm" aria-label={`Hold work package ${workPackage.packageNumber}`}>Hold</Button>
+                    <Button variant="outline" size="sm" aria-label={`Clone work package ${workPackage.packageNumber}`}>Clone</Button>
+                    <Button variant="outline" size="sm" aria-label={`Export work package ${workPackage.packageNumber}`}>Export</Button>
+                    <Button variant="outline" size="sm" aria-label={`Drag handle for ${workPackage.packageNumber}`}>
+                      Drag Handle
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Button variant="outline" size="sm">Assign</Button>
+              <Button variant="outline" size="sm">Shift Window</Button>
+              <Button variant="outline" size="sm" disabled={!canEditPartsAllocation}>Material Reserve</Button>
+              <Button variant="outline" size="sm">Compliance Precheck</Button>
+            </div>
+          </div>
           {state.workPackagesError ? (
             <div className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
               {state.workPackagesError}
@@ -216,12 +502,29 @@ export function AmroOwnedWorkspace() {
             </Button>
           </div>
           <Tabs value={detailTab} onValueChange={setDetailTab}>
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-6">
               <TabsTrigger value="overview">Overview</TabsTrigger>
               <TabsTrigger value="tasks">Tasks</TabsTrigger>
+              <TabsTrigger value="materials">Materials</TabsTrigger>
               <TabsTrigger value="compliance">Compliance</TabsTrigger>
+              <TabsTrigger value="notes">Notes</TabsTrigger>
+              <TabsTrigger value="attachments">Attachments</TabsTrigger>
             </TabsList>
             <TabsContent value="overview" className="space-y-2">
+              <div className="rounded-md border p-2 text-xs" data-amro-screen="ux-amro-005-work-package-detail">
+                <p className="font-medium">Work Package Detail (UX-AMRO-005)</p>
+                <p className="mt-1 text-muted-foreground">
+                  Sticky actions: Assign | Schedule | Gate Check | Close
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <Button variant="outline" size="sm" aria-label="Assign work package">Assign</Button>
+                  <Button variant="outline" size="sm" aria-label="Schedule work package">Schedule</Button>
+                  <Button variant="outline" size="sm" aria-label="Run compliance gate check">Gate Check</Button>
+                  <Button size="sm" disabled={!canRunWorkPackageClosure} onClick={() => setClosureConfirmOpen(true)} aria-label="Close work package with confirmation">
+                    Close
+                  </Button>
+                </div>
+              </div>
               <div className="rounded-md border p-2 text-xs">
                 <p className="font-medium">Detail Draft</p>
                 <Textarea
@@ -248,22 +551,32 @@ export function AmroOwnedWorkspace() {
                     {task.lifecycleStage} · {task.assignedRole}
                   </p>
                   <div className="mt-2 flex flex-wrap gap-2">
-                    <Button variant="outline" size="sm" onClick={() => state.updateTaskExecutionStatus(task.id, 'start')}>
+                    <Button variant="outline" size="sm" onClick={() => state.updateTaskExecutionStatus(task.id, 'start')} aria-label={`Start task ${task.id}`}>
                       Start
                     </Button>
-                    <Button variant="outline" size="sm" onClick={() => state.updateTaskExecutionStatus(task.id, 'complete')}>
+                    <Button variant="outline" size="sm" onClick={() => state.updateTaskExecutionStatus(task.id, 'complete')} aria-label={`Complete task ${task.id}`}>
                       Complete
                     </Button>
-                    <Button variant="outline" size="sm" onClick={() => state.updateTaskExecutionStatus(task.id, 'block')}>
+                    <Button variant="outline" size="sm" onClick={() => state.updateTaskExecutionStatus(task.id, 'block')} aria-label={`Block task ${task.id}`}>
                       Block
                     </Button>
-                    <Button variant="outline" size="sm" onClick={() => state.uploadTaskEvidence(task.id)}>
+                    <Button variant="outline" size="sm" onClick={() => state.uploadTaskEvidence(task.id)} aria-label={`Upload evidence for task ${task.id}`}>
                       Bind Evidence
                     </Button>
-                    <Button size="sm" onClick={() => state.submitTaskSignature(task.id)} disabled={!state.canSignOff}>
+                    <Button size="sm" onClick={() => state.submitTaskSignature(task.id)} disabled={!state.canSignOff} aria-label={`Submit signature for task ${task.id}`}>
                       E-Sign
                     </Button>
                   </div>
+                </div>
+              ))}
+            </TabsContent>
+            <TabsContent value="materials" className="space-y-2">
+              {state.materials.map((material) => (
+                <div key={`detail-material-${material.id}`} className="rounded-md border p-2 text-xs">
+                  <p className="font-medium">{material.partNumber}</p>
+                  <p className="text-muted-foreground">
+                    Required/Allocated status: {material.reservationStatus} · shortage: {material.shortageSeverity}
+                  </p>
                 </div>
               ))}
             </TabsContent>
@@ -334,7 +647,62 @@ export function AmroOwnedWorkspace() {
                 ))}
               </div>
             </TabsContent>
+            <TabsContent value="notes" className="space-y-2">
+              <Textarea
+                value={detailDraft}
+                onChange={(event) => setDetailDraft(event.target.value)}
+                placeholder="Operational notes and escalation context"
+                className="min-h-[96px]"
+              />
+            </TabsContent>
+            <TabsContent value="attachments" className="space-y-2">
+              <div className="rounded-md border p-2 text-xs">Attachment tray for evidence packets and signed forms.</div>
+            </TabsContent>
           </Tabs>
+        </CardContent>
+      </Card>
+
+      <Card data-amro-screen="ux-amro-007-mobile-execution-card">
+        <CardHeader className="pb-2">
+          <CardTitle>Mobile Execution Card (UX-AMRO-007/008/009)</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="rounded-md border p-3 text-sm">
+            <p className="font-semibold">
+              Task {selectedTask ? selectedTask.id : 'N/A'} [{selectedTask?.lifecycleStage || 'pending'}]
+            </p>
+            <p className="mt-2 text-xs text-muted-foreground">Procedure: ATA 32-41-00</p>
+            <div className="mt-2 space-y-1 text-xs">
+              <p>[ ] Step 1</p>
+              <p>[ ] Step 2</p>
+              <p>[ ] Step 3</p>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Button size="sm" variant="outline">Photo</Button>
+              <Button size="sm" variant="outline">Video</Button>
+              <Button size="sm" variant="outline">Note</Button>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Button size="sm" variant="outline">PIN</Button>
+              <Button size="sm" variant="outline">Digital Cert</Button>
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">Offline Sync Status: {mobileQueuedEvents > 0 ? 'Queued events pending upload' : 'All events synced'}</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" className="h-11 min-w-[120px]" aria-label="Capture photo evidence">Photo</Button>
+              <Button size="sm" variant="outline" className="h-11 min-w-[120px]" aria-label="Capture video evidence">Video</Button>
+              <Button size="sm" variant="outline" className="h-11 min-w-[120px]" aria-label="Add note evidence">Note</Button>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" className="h-11 min-w-[120px]" aria-label="Sign using PIN">PIN</Button>
+              <Button size="sm" variant="outline" className="h-11 min-w-[120px]" aria-label="Sign using digital certificate">Digital Cert</Button>
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">Sync Queue: {mobileQueuedEvents} queued events</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" className="h-11 min-w-[140px]" aria-label="Save signed task event to offline queue">Save Offline</Button>
+              <Button size="sm" disabled={!canDirectTaskExecution} className="h-11 min-w-[140px]" aria-label="Submit task actions">Submit</Button>
+              <Button size="sm" variant="outline" className="h-11 min-w-[140px]" aria-label="Request execution support">Request Support</Button>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -505,7 +873,7 @@ export function AmroOwnedWorkspace() {
             <Button variant="outline" size="sm" onClick={() => state.submitCertificationDecision('reject')} disabled={!state.selectedWorkPackageId}>
               Reject
             </Button>
-            <Button variant="outline" size="sm" onClick={() => state.submitCertificationDecision('defer')} disabled={!state.selectedWorkPackageId}>
+            <Button variant="outline" size="sm" onClick={() => setDeferralConfirmOpen(true)} disabled={!state.selectedWorkPackageId} aria-label="Defer certification decision with rationale">
               Defer
             </Button>
             <Button variant="outline" size="sm" onClick={state.runExpiryWarningAndSuspension}>
@@ -749,6 +1117,66 @@ export function AmroOwnedWorkspace() {
           ) : (
             <div className="text-sm text-muted-foreground">No explainability data loaded.</div>
           )}
+        </DialogContent>
+      </Dialog>
+      <Dialog open={closureConfirmOpen} onOpenChange={setClosureConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Work Package Closure</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">Closure requires explicit rationale and acknowledgement.</p>
+            <Textarea
+              value={closureRationale}
+              onChange={(event) => setClosureRationale(event.target.value)}
+              placeholder="Enter closure rationale"
+              aria-label="Closure rationale"
+              className="min-h-[96px]"
+            />
+            <Button onClick={() => void handleConfirmWorkPackageClosure()} disabled={!closureRationale.trim()} aria-label="Confirm closure with rationale">
+              Confirm Closure
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={overrideConfirmOpen} onOpenChange={setOverrideConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Compliance Override</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">Compliance override requires documented rationale.</p>
+            <Textarea
+              value={overrideRationale}
+              onChange={(event) => setOverrideRationale(event.target.value)}
+              placeholder="Enter override rationale"
+              aria-label="Compliance override rationale"
+              className="min-h-[96px]"
+            />
+            <Button onClick={handleConfirmComplianceOverride} disabled={!overrideRationale.trim()} aria-label="Confirm compliance override">
+              Confirm Override
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={deferralConfirmOpen} onOpenChange={setDeferralConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Certification Deferral</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">Deferral requires rationale before submission.</p>
+            <Textarea
+              value={deferralRationale}
+              onChange={(event) => setDeferralRationale(event.target.value)}
+              placeholder="Enter deferral rationale"
+              aria-label="Certification deferral rationale"
+              className="min-h-[96px]"
+            />
+            <Button onClick={() => void handleConfirmDeferral()} disabled={!deferralRationale.trim()} aria-label="Confirm certification deferral">
+              Confirm Deferral
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
       <Separator />

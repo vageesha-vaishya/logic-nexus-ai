@@ -137,6 +137,34 @@ function assertNonEmpty(value: unknown, fieldName: string): string {
   return normalized;
 }
 
+function assertScopeRequired(tenantId: string, franchiseId: string | null) {
+  if (!tenantId || !franchiseId) {
+    throw new Error('tenant and franchise scope are required');
+  }
+}
+
+function assertOptionalScopedIdentifier(value: string, tenantId: string, fieldName: string) {
+  const normalized = String(value || '').trim();
+  if (!normalized || !normalized.includes(':')) {
+    return;
+  }
+  const [scopedTenant] = normalized.split(':', 1);
+  if (scopedTenant !== tenantId) {
+    throw new Error(`${fieldName} must be scoped to tenant ${tenantId}`);
+  }
+}
+
+function assertOptionalScopeContext(body: Record<string, unknown>, tenantId: string, franchiseId: string | null) {
+  const scopeTenantId = String(body.scope_tenant_id || '').trim();
+  const scopeFranchiseId = String(body.scope_franchise_id || '').trim();
+  if (scopeTenantId && scopeTenantId !== tenantId) {
+    throw new Error('scope_tenant_id does not match authenticated tenant scope');
+  }
+  if (scopeFranchiseId && scopeFranchiseId !== String(franchiseId || '')) {
+    throw new Error('scope_franchise_id does not match authenticated franchise scope');
+  }
+}
+
 function parseStringArray(value: unknown): string[] {
   if (Array.isArray(value)) {
     return value.map((entry) => String(entry || '').trim()).filter(Boolean);
@@ -284,6 +312,32 @@ function appendComplianceGateAuditRecord(params: {
   });
 }
 
+function appendComplianceMutationAuditRecord(params: {
+  tenantId: string;
+  franchiseId: string | null;
+  correlationId: string;
+  compatMode: string;
+  interfaceName: string;
+  entityId: string;
+  context: Record<string, unknown>;
+}) {
+  return appendAmroAuditLedgerRecord({
+    tenantId: params.tenantId,
+    franchiseId: params.franchiseId,
+    capability: 'compliance-gates',
+    eventType: 'amro.audit.recorded.v1',
+    entityType: 'compliance-gate',
+    entityId: params.entityId,
+    correlationId: params.correlationId,
+    action: params.interfaceName,
+    compatMode: params.compatMode,
+    sourceHash: `${params.tenantId}:${params.interfaceName}:${params.entityId}:${params.correlationId}`,
+    migrationBatchId: `runtime:${params.tenantId}:${params.franchiseId || 'franchise-none'}`,
+    replayCheckpoint: `mutation:${Date.now()}`,
+    context: params.context,
+  });
+}
+
 async function enqueueComplianceDualWriteOperations(params: {
   tenantId: string;
   franchiseId: string | null;
@@ -391,12 +445,15 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     if (req.method === 'POST' && interfaceName === 'evaluate-compliance-gate') {
       enforceAnyPermission(auth.permissions || [], ['dashboards.manage', 'reports.manage']);
       const body = parseBody(req.body);
+      assertScopeRequired(tenantId, franchiseId);
+      assertOptionalScopeContext(body, tenantId, franchiseId);
       const context = parseBody(body.context);
       const contextType = assertNonEmpty(context.type, 'context.type').toLowerCase();
       if (contextType !== 'work_package' && contextType !== 'task') {
         throw new Error('context must be work_package or task');
       }
       const contextId = assertNonEmpty(context.id, 'context.id');
+      assertOptionalScopedIdentifier(contextId, tenantId, 'context.id');
       const regulatorProfile = assertNonEmpty(body.regulator_profile, 'regulator_profile').toLowerCase();
       if (!ALLOWED_REGULATOR_PROFILES.has(regulatorProfile)) {
         throw new Error('regulator_profile is not supported');
@@ -409,6 +466,22 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       assertNonEmpty(body.policy_version_snapshot, 'policy_version_snapshot');
       assertNonEmpty(body.decision_evidence, 'decision_evidence');
       const resolved = resolveComplianceDecision(requiredObligations);
+      const auditRecord = cutoverState.enabled
+        ? appendComplianceMutationAuditRecord({
+          tenantId,
+          franchiseId,
+          correlationId: ctx.correlationId,
+          compatMode: compatDecision.compatMode,
+          interfaceName,
+          entityId: contextId,
+          context: {
+            decision: resolved.decision,
+            blockerCount: resolved.blockers.length,
+            contextType,
+            regulatorProfile,
+          },
+        })
+        : null;
       return res.status(200).json({
         version: 'v2',
         interface: 'evaluate-compliance-gate',
@@ -433,13 +506,23 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
             ? 'All required obligations satisfied'
             : 'One or more obligations are unresolved',
         },
+        auditLedgerCutover: cutoverState,
+        auditLedger: auditRecord ? {
+          eventType: auditRecord.eventType,
+          recordId: auditRecord.recordId,
+          chainHash: auditRecord.chainHash,
+          replayCheckpoint: auditRecord.replayCheckpoint,
+        } : null,
       });
     }
 
     if (req.method === 'POST' && interfaceName === 'ingest-ad-sb-obligations') {
       enforceAnyPermission(auth.permissions || [], ['dashboards.manage', 'reports.manage']);
       const body = parseBody(req.body);
+      assertScopeRequired(tenantId, franchiseId);
+      assertOptionalScopeContext(body, tenantId, franchiseId);
       const workPackageId = assertNonEmpty(body.work_package_id, 'work_package_id');
+      assertOptionalScopedIdentifier(workPackageId, tenantId, 'work_package_id');
       const regulatorProfile = assertNonEmpty(body.regulator_profile, 'regulator_profile').toLowerCase();
       if (!ALLOWED_REGULATOR_PROFILES.has(regulatorProfile)) {
         throw new Error('regulator_profile is not supported');
@@ -472,6 +555,30 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           mapping_status: 'mapped',
         };
       });
+      const output = {
+        ingestion_id: `${tenantId}-${workPackageId}-obligation-ingest-${Date.now()}`,
+        mapped_obligations: mappedObligations,
+        mapping_summary: {
+          total: mappedObligations.length,
+          ad_count: mappedObligations.filter((item) => item.obligation_type === 'ad').length,
+          sb_count: mappedObligations.filter((item) => item.obligation_type === 'sb').length,
+        },
+      };
+      const auditRecord = cutoverState.enabled
+        ? appendComplianceMutationAuditRecord({
+          tenantId,
+          franchiseId,
+          correlationId: ctx.correlationId,
+          compatMode: compatDecision.compatMode,
+          interfaceName,
+          entityId: workPackageId,
+          context: {
+            mappedCount: output.mapping_summary.total,
+            sourceAdapter,
+            regulatorProfile,
+          },
+        })
+        : null;
       return res.status(200).json({
         version: 'v2',
         interface: 'ingest-ad-sb-obligations',
@@ -489,15 +596,14 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           regulator_profile: regulatorProfile,
           source_adapter: sourceAdapter,
         },
-        output: {
-          ingestion_id: `${tenantId}-${workPackageId}-obligation-ingest-${Date.now()}`,
-          mapped_obligations: mappedObligations,
-          mapping_summary: {
-            total: mappedObligations.length,
-            ad_count: mappedObligations.filter((item) => item.obligation_type === 'ad').length,
-            sb_count: mappedObligations.filter((item) => item.obligation_type === 'sb').length,
-          },
-        },
+        output,
+        auditLedgerCutover: cutoverState,
+        auditLedger: auditRecord ? {
+          eventType: auditRecord.eventType,
+          recordId: auditRecord.recordId,
+          chainHash: auditRecord.chainHash,
+          replayCheckpoint: auditRecord.replayCheckpoint,
+        } : null,
       });
     }
 
@@ -807,11 +913,35 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         throw new Error('only allowed roles may request exception');
       }
       const body = parseBody(req.body);
+      assertScopeRequired(tenantId, franchiseId);
+      assertOptionalScopeContext(body, tenantId, franchiseId);
       const workPackageId = assertNonEmpty(body.work_package_id, 'work_package_id');
+      assertOptionalScopedIdentifier(workPackageId, tenantId, 'work_package_id');
       const obligationId = assertNonEmpty(body.obligation_id, 'obligation_id');
+      assertOptionalScopedIdentifier(obligationId, tenantId, 'obligation_id');
       const justification = assertNonEmpty(body.justification, 'justification');
       const requestedBy = assertNonEmpty(body.requested_by, 'requested_by');
       const slaDueAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
+      const output = {
+        exception_id: `${tenantId}-${workPackageId}-exception-${Date.now()}`,
+        review_status: 'pending_review',
+        sla_due_at: slaDueAt,
+      };
+      const auditRecord = cutoverState.enabled
+        ? appendComplianceMutationAuditRecord({
+          tenantId,
+          franchiseId,
+          correlationId: ctx.correlationId,
+          compatMode: compatDecision.compatMode,
+          interfaceName,
+          entityId: output.exception_id,
+          context: {
+            workPackageId,
+            obligationId,
+            requestedBy,
+          },
+        })
+        : null;
       return res.status(200).json({
         version: 'v2',
         interface: 'register-exception-request',
@@ -830,18 +960,24 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           justification,
           requested_by: requestedBy,
         },
-        output: {
-          exception_id: `${tenantId}-${workPackageId}-exception-${Date.now()}`,
-          review_status: 'pending_review',
-          sla_due_at: slaDueAt,
-        },
+        output,
+        auditLedgerCutover: cutoverState,
+        auditLedger: auditRecord ? {
+          eventType: auditRecord.eventType,
+          recordId: auditRecord.recordId,
+          chainHash: auditRecord.chainHash,
+          replayCheckpoint: auditRecord.replayCheckpoint,
+        } : null,
       });
     }
 
     if (req.method === 'POST' && interfaceName === 'generate-compliance-dossier') {
       enforceAnyPermission(auth.permissions || [], ['dashboards.manage', 'reports.manage']);
       const body = parseBody(req.body);
+      assertScopeRequired(tenantId, franchiseId);
+      assertOptionalScopeContext(body, tenantId, franchiseId);
       const workPackageId = assertNonEmpty(body.work_package_id, 'work_package_id');
+      assertOptionalScopedIdentifier(workPackageId, tenantId, 'work_package_id');
       const profile = assertNonEmpty(body.profile, 'profile').toLowerCase();
       if (!ALLOWED_REGULATOR_PROFILES.has(profile)) {
         throw new Error('profile must be FAA, EASA, or CAAC');
@@ -852,6 +988,29 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       if (missingMandatory.length > 0) {
         throw new Error('All mandatory artifacts must be present before dossier finalization');
       }
+      const output = {
+        dossier_id: `${tenantId}-${workPackageId}-dossier-${Date.now()}`,
+        dossier_status: 'finalized',
+        artifact_manifest: includeArtifacts.map((artifact) => ({
+          artifact,
+          collected_at: parseIsoTimestamp(new Date().toISOString(), 'collected_at'),
+        })),
+      };
+      const auditRecord = cutoverState.enabled
+        ? appendComplianceMutationAuditRecord({
+          tenantId,
+          franchiseId,
+          correlationId: ctx.correlationId,
+          compatMode: compatDecision.compatMode,
+          interfaceName,
+          entityId: output.dossier_id,
+          context: {
+            workPackageId,
+            profile,
+            artifactCount: includeArtifacts.length,
+          },
+        })
+        : null;
       return res.status(200).json({
         version: 'v2',
         interface: 'generate-compliance-dossier',
@@ -869,14 +1028,14 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           profile,
           include_artifacts: includeArtifacts,
         },
-        output: {
-          dossier_id: `${tenantId}-${workPackageId}-dossier-${Date.now()}`,
-          dossier_status: 'finalized',
-          artifact_manifest: includeArtifacts.map((artifact) => ({
-            artifact,
-            collected_at: parseIsoTimestamp(new Date().toISOString(), 'collected_at'),
-          })),
-        },
+        output,
+        auditLedgerCutover: cutoverState,
+        auditLedger: auditRecord ? {
+          eventType: auditRecord.eventType,
+          recordId: auditRecord.recordId,
+          chainHash: auditRecord.chainHash,
+          replayCheckpoint: auditRecord.replayCheckpoint,
+        } : null,
       });
     }
 

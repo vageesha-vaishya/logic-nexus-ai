@@ -272,6 +272,9 @@ describe('/api/v2/amro/compliance-gates', () => {
     expect((res.jsonBody as any)?.interface).toBe('evaluate-compliance-gate');
     expect((res.jsonBody as any)?.output?.decision).toBe('fail');
     expect((res.jsonBody as any)?.output?.blockers?.length).toBe(1);
+    expect((res.jsonBody as any)?.auditLedgerCutover?.enabled).toBe(true);
+    expect((res.jsonBody as any)?.auditLedger?.eventType).toBe('amro.audit.recorded.v1');
+    expect((res.jsonBody as any)?.auditLedger?.recordId).toBeTruthy();
   });
 
   it('registers exception request only for allowed roles', async () => {
@@ -300,6 +303,7 @@ describe('/api/v2/amro/compliance-gates', () => {
     expect((res.jsonBody as any)?.interface).toBe('register-exception-request');
     expect((res.jsonBody as any)?.output?.review_status).toBe('pending_review');
     expect((res.jsonBody as any)?.output?.exception_id).toContain('exception');
+    expect((res.jsonBody as any)?.auditLedger?.eventType).toBe('amro.audit.recorded.v1');
   });
 
   it('generates compliance dossier only when mandatory artifacts are present', async () => {
@@ -322,6 +326,7 @@ describe('/api/v2/amro/compliance-gates', () => {
     expect((res.jsonBody as any)?.interface).toBe('generate-compliance-dossier');
     expect((res.jsonBody as any)?.output?.dossier_status).toBe('finalized');
     expect((res.jsonBody as any)?.output?.artifact_manifest?.length).toBe(3);
+    expect((res.jsonBody as any)?.auditLedger?.eventType).toBe('amro.audit.recorded.v1');
   });
 
   it('blocks M6 interfaces until M5 is completed', async () => {
@@ -413,6 +418,32 @@ describe('/api/v2/amro/compliance-gates', () => {
     expect((res.jsonBody as any)?.output?.mapping_summary?.total).toBe(2);
     expect((res.jsonBody as any)?.output?.mapping_summary?.ad_count).toBe(1);
     expect((res.jsonBody as any)?.output?.mapping_summary?.sb_count).toBe(1);
+    expect((res.jsonBody as any)?.auditLedger?.eventType).toBe('amro.audit.recorded.v1');
+  });
+
+  it('rejects tenant scope mismatches for compliance mutations', async () => {
+    process.env.AMRO_COMPLIANCE_GATES_V2_ENABLED = 'true';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'register-exception-request' },
+      body: {
+        work_package_id: 'tenant-2:wp-001',
+        obligation_id: 'tenant-2:obl-100',
+        justification: 'Manual review required due to deferred component replacement',
+        requested_by: 'inspector-01',
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(sendErrorResponse).toHaveBeenCalledWith(
+      res,
+      expect.any(Error),
+      'corr-amro-compliance-v2',
+      { apiVersion: 'v2' }
+    );
   });
 
   it('evaluates MEL/CDL deferral policy and returns explainability factors', async () => {
@@ -500,6 +531,7 @@ describe('/api/v2/amro/compliance-gates', () => {
     expect((res.jsonBody as any)?.interface).toBe('load-audit-replay-timeline');
     expect((res.jsonBody as any)?.output?.export_filters?.format).toBe('csv');
     expect(Array.isArray((res.jsonBody as any)?.output?.replay_timeline?.events)).toBe(true);
+    expect((res.jsonBody as any)?.output?.replay_timeline?.event_count).toBeGreaterThan(0);
   });
 
   it('detects compliance anomalies and returns alerts', async () => {

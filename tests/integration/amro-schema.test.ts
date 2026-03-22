@@ -119,6 +119,63 @@ amroOperationalSchemaSuite('AMRO Operational Schema', () => {
       expect(error).toBeNull();
       expect(Array.isArray(data)).toBe(true);
     });
+
+    it('should have LLD v6.1 AMRO domain tables', async () => {
+      const tables = [
+        'component_positions',
+        'schedules',
+        'schedule_constraints',
+        'shift_calendars',
+        'parts_inventory',
+        'stock_movements',
+        'reservations',
+        'suppliers',
+        'compliance_obligations',
+        'compliance_records',
+        'regulator_profiles',
+        'certification_actions',
+        'integration_jobs',
+        'integration_mappings',
+        'webhook_outbox',
+        'asset_health_signals',
+        'forecast_outputs',
+      ];
+
+      for (const table of tables) {
+        const { data, error } = await supabase
+          .from(table)
+          .select('*')
+          .limit(1);
+
+        expect(error).toBeNull();
+        expect(Array.isArray(data)).toBe(true);
+      }
+    });
+
+    it('should have AMRO 6.2 operational core alignment columns', async () => {
+      const checks: Array<{ table: string; columns: string }> = [
+        { table: 'aircraft', columns: 'tail_number,msn,operator_code,aircraft_model,engine_type,status,station_code' },
+        { table: 'work_packages', columns: 'work_package_number,maintenance_type,priority,status,planned_start,planned_end,estimated_labor_hours,estimated_downtime_minutes' },
+        { table: 'tasks', columns: 'sequence,procedure_reference,steps_json,qualifications_json,status,assigned_technician_id' },
+        { table: 'parts_inventory', columns: 'part_number,serial_number,batch_number,condition_code,uom,quantity_on_hand,quantity_available,warehouse_location,expiry_date' },
+        { table: 'compliance_obligations', columns: 'obligation_type,due_date,due_hours,due_cycles,regulator_code,status,aircraft_id' },
+        { table: 'compliance_records', columns: 'obligation_id,decision_status,approving_authority,approving_authority_profile_id,work_package_id' },
+        { table: 'staff_qualifications', columns: 'technician_id,rating,scope,issuer_authority,valid_from,valid_to,can_certify_release' },
+        { table: 'certification_actions', columns: 'action_status,rejection_reason,policy_reference,signer_id,signature_method' },
+        { table: 'maintenance_events', columns: 'event_hash,previous_hash,signature,signature_method,task_id,created_at' },
+        { table: 'task_qualification_requirements', columns: 'task_id,staff_qualification_id,is_mandatory' },
+      ];
+
+      for (const check of checks) {
+        const { data, error } = await supabase
+          .from(check.table)
+          .select(check.columns)
+          .limit(1);
+
+        expect(error).toBeNull();
+        expect(Array.isArray(data)).toBe(true);
+      }
+    });
   });
 
   describe('RLS policy validation', () => {

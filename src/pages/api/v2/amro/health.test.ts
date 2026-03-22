@@ -113,6 +113,23 @@ describe('/api/v2/amro/health', () => {
     expect(applyCompatibilityResponseHeaders).toHaveBeenCalled();
   });
 
+  it('preserves tenant and franchise isolation scope in service boundaries', async () => {
+    process.env.AMRO_HEALTH_V2_ENABLED = 'true';
+    const req: ApiRequest = {
+      method: 'GET',
+      query: {},
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.serviceBoundaries?.scopedAccess?.tenant_id).toBe('tenant-1');
+    expect((res.jsonBody as any)?.serviceBoundaries?.scopedAccess?.franchise_id).toBe('fr-1');
+    expect((res.jsonBody as any)?.serviceBoundaries?.capability).toBe('work-packages');
+  });
+
   it('reports GA readiness when M10 evidence checks are satisfied', async () => {
     process.env.AMRO_HEALTH_V2_ENABLED = 'true';
     process.env.AMRO_SEQ_PREREQ_ARCH_SECURITY_APPROVED = 'true';

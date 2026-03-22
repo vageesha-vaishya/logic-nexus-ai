@@ -351,6 +351,35 @@ describe('/api/v2/amro/work-packages', () => {
     );
   });
 
+  it('publishes lifecycle closure event when transition reaches completed', async () => {
+    process.env.AMRO_WORK_PACKAGES_V2_ENABLED = 'true';
+    vi.mocked(authenticateRequest).mockResolvedValue({
+      userId: 'user-1',
+      role: 'inspector',
+      permissions: ['dashboards.view', 'reports.manage'],
+    } as any);
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'transition-work-package' },
+      body: {
+        work_package_id: 'wp-closure-001',
+        current_status: 'in_progress',
+        target_status: 'completed',
+        reason_code: 'all-gates-passed',
+        actor_signature: 'sig-closure-001',
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.interface).toBe('transition-work-package');
+    expect((res.jsonBody as any)?.output?.published_events?.[0]?.event_type).toBe('amro.work_package.lifecycle.closed.v1');
+    expect((res.jsonBody as any)?.closure?.lifecycle_event_published).toBe(true);
+  });
+
   it('clones template only when template is active and tenant-visible', async () => {
     process.env.AMRO_WORK_PACKAGES_V2_ENABLED = 'true';
     const req: ApiRequest = {

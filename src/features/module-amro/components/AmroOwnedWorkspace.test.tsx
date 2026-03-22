@@ -160,7 +160,7 @@ describe('AmroOwnedWorkspace', () => {
     expect(screen.getByText('Overview')).toBeTruthy();
     expect(screen.getByText('Tasks')).toBeTruthy();
     expect(screen.getByText('Compliance')).toBeTruthy();
-    expect(screen.getByText('Role: planner')).toBeTruthy();
+    expect(screen.getAllByText('Role: planner').length).toBeGreaterThan(0);
     expect(screen.getByText('Create Allowed')).toBeTruthy();
     expect(screen.getByText('Delete Allowed')).toBeTruthy();
   });
@@ -183,5 +183,27 @@ describe('AmroOwnedWorkspace', () => {
     expect(screen.getByText('Certification Management and Authority Templates')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Validate Privilege' }));
     expect(validateCertifyingPrivilege).toHaveBeenCalledTimes(1);
+  });
+
+  it('requires rationale before closure and certification deferral actions', async () => {
+    const advanceWorkPackageLifecycle = vi.fn().mockResolvedValue(true);
+    const submitCertificationDecision = vi.fn().mockResolvedValue(true);
+    mockUseAmroWorkspaceState.mockReturnValue(createWorkspaceState({
+      advanceWorkPackageLifecycle,
+      submitCertificationDecision,
+    }));
+    render(<AmroOwnedWorkspace />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close work package with confirmation' }));
+    expect(screen.getByText('Confirm Work Package Closure')).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('Closure rationale'), { target: { value: 'All checks passed and signed.' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm closure with rationale' }));
+    expect(advanceWorkPackageLifecycle).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByLabelText('Defer certification decision with rationale'));
+    expect(screen.getByText('Confirm Certification Deferral')).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('Certification deferral rationale'), { target: { value: 'Awaiting authority package update.' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm certification deferral' }));
+    expect(submitCertificationDecision).toHaveBeenCalledWith('defer');
   });
 });

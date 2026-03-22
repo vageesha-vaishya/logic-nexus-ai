@@ -19,6 +19,43 @@ import { enforceAmroSequentialMilestoneForIntegrationHubInterface } from './phas
 
 const ALLOWLISTED_SOURCES = new Set(['sap-pm', 'maximo', 'oracle-eam', 'boeing-partner-gateway']);
 const MUTATING_EVENT_TYPES = new Set(['work_package_update', 'task_update', 'part_reservation', 'callback_trigger']);
+const EXTERNAL_ADAPTER_CATALOG = [
+  {
+    adapter: 'erp-adapter',
+    systems: ['sap-pm', 'oracle-eam'],
+    protocol: ['REST', 'SOAP'],
+    direction: 'bi-directional',
+    purpose: 'Work order financials, procurement, cost posting',
+  },
+  {
+    adapter: 'legacy-mro-adapter',
+    systems: ['maximo'],
+    protocol: ['REST', 'File'],
+    direction: 'inbound',
+    purpose: 'Historical records and active order migration',
+  },
+  {
+    adapter: 'iot-telemetry-ingest',
+    systems: ['boeing-partner-gateway'],
+    protocol: ['MQTT', 'Kafka'],
+    direction: 'inbound',
+    purpose: 'Sensor events, condition monitoring, health indicators',
+  },
+  {
+    adapter: 'regulatory-data-feed',
+    systems: ['regulatory-feed'],
+    protocol: ['API', 'SFTP'],
+    direction: 'inbound',
+    purpose: 'AD/SB bulletins and authority updates',
+  },
+  {
+    adapter: 'notification-gateway',
+    systems: ['notification-gateway'],
+    protocol: ['Webhook', 'SMS', 'Email'],
+    direction: 'outbound',
+    purpose: 'Alerts, approvals, compliance exceptions',
+  },
+] as const;
 
 function parseBoolean(value: string | undefined, fallback: boolean): boolean {
   const normalized = String(value || '').trim().toLowerCase();
@@ -117,6 +154,19 @@ function assertMappingContract(body: Record<string, unknown>) {
   }
 }
 
+function resolveAdapterCatalogEntry(sourceSystem: string) {
+  const normalized = sourceSystem.trim().toLowerCase();
+  const matched = EXTERNAL_ADAPTER_CATALOG.find((entry) => entry.systems.includes(normalized as any));
+  if (matched) return matched;
+  return {
+    adapter: 'erp-adapter',
+    systems: [normalized],
+    protocol: ['REST'],
+    direction: 'bi-directional',
+    purpose: 'Generic AMRO partner synchronization',
+  };
+}
+
 export default async function handler(req: ApiRequest, res: ApiResponse) {
   applyCors(req, res, { methods: ['POST', 'OPTIONS'] });
   if (handlePreflight(req, res)) return;
@@ -185,6 +235,25 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     enforceAmroSequentialMilestoneForIntegrationHubInterface(interfaceName);
     const body = parseBody(req.body);
 
+    if (interfaceName === 'list-external-adapters') {
+      return res.status(200).json({
+        version: 'v2',
+        interface: interfaceName,
+        correlationId: ctx.correlationId,
+        output: {
+          adapters: EXTERNAL_ADAPTER_CATALOG,
+        },
+        domainAccess: {
+          subscriptionStatus: amroAccess.subscriptionStatus,
+          source: amroAccess.source,
+          validatedAt: amroAccess.validatedAt,
+        },
+        serviceBoundaries,
+        endpointRollout: rolloutState,
+        auditLedgerCutover: cutoverState,
+      });
+    }
+
     if (interfaceName === 'ingest-partner-payload') {
       const sourceSystem = assertNonEmpty(body.source_system, 'source_system').toLowerCase();
       assertAllowlistedSource(sourceSystem);
@@ -193,6 +262,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       assertIdempotencyForMutatingEvents(body);
       const ingestionId = `${tenantId}-ingestion-${Date.now()}`;
       const canonicalEventId = `${sourceSystem}-${Date.now()}`;
+      const adapter = resolveAdapterCatalogEntry(sourceSystem);
+      const outboxEventId = `${tenantId}-outbox-${Date.now()}`;
       const auditRecord = cutoverState.enabled
         ? appendAmroAuditLedgerRecord({
           tenantId,
@@ -217,7 +288,28 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         output: {
           ingestion_id: ingestionId,
           canonical_event_id: canonicalEventId,
+          adapter,
           parse_status: 'parsed',
+          normalizer: {
+            source_schema: `${sourceSystem}:${body.adapter_version}`,
+            canonical_model: 'amro.canonical.event.v1',
+          },
+          deduplication: {
+            idempotency_key: String(body.idempotency_key || ''),
+            source_hash: `${tenantId}:${sourceSystem}:${canonicalEventId}`,
+            status: 'validated',
+          },
+          domain_transaction: {
+            transaction_id: `${tenantId}-${canonicalEventId}-tx`,
+            status: 'applied',
+            audit_event_id: auditRecord?.recordId || `${tenantId}-${canonicalEventId}-audit`,
+          },
+          outbox: {
+            event_id: outboxEventId,
+            event_type: 'amro.integration.payload.ingested.v1',
+            publish_status: 'queued',
+            consumers: ['analytics', 'downstream-consumers'],
+          },
         },
         domainAccess: {
           subscriptionStatus: amroAccess.subscriptionStatus,
@@ -287,7 +379,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     }
 
     return res.status(400).json({
-      error: 'Unsupported interface. Use ingest-partner-payload, replay-failed-integration-job, or publish-outbound-callback.',
+      error: 'Unsupported interface. Use list-external-adapters, ingest-partner-payload, replay-failed-integration-job, or publish-outbound-callback.',
       correlationId: ctx.correlationId,
       version: 'v2',
     });

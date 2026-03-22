@@ -95,6 +95,7 @@ type WorkPackageStatus = 'planning' | 'scheduled' | 'in_progress' | 'completed' 
 type ReplanWorkPackageState = 'planning' | 'scheduled' | 'blocked';
 type ShortageAction = 'backorder' | 'substitute' | 'escalate';
 type TraceabilityAction = 'verify' | 'quarantine' | 'release';
+type WorkPackageCreationTrigger = 'schedule' | 'compliance';
 
 const ALLOWED_MAINTENANCE_TYPES = new Set(['line', 'base', 'component', 'a-check', 'c-check']);
 const ALLOWED_PRIORITIES = new Set(['low', 'medium', 'high', 'critical']);
@@ -219,6 +220,42 @@ function parseIsoTimestamp(value: unknown, fieldName: string): string {
     throw new Error(`${fieldName} must be a valid ISO timestamp`);
   }
   return new Date(parsed).toISOString();
+}
+
+function parseCreationTrigger(body: Record<string, unknown>) {
+  const source = String(body.trigger_source || 'schedule').trim().toLowerCase() as WorkPackageCreationTrigger;
+  if (source !== 'schedule' && source !== 'compliance') {
+    throw new Error('trigger_source must be schedule or compliance');
+  }
+  const referenceId = assertNonEmpty(body.trigger_reference_id || `${source}-trigger`, 'trigger_reference_id');
+  const triggeredAt = parseIsoTimestamp(body.triggered_at || new Date().toISOString(), 'triggered_at');
+  return {
+    source,
+    referenceId,
+    triggeredAt,
+  };
+}
+
+function parseEngineerPlan(body: Record<string, unknown>, scopeItems: string[]) {
+  const taskPlan = parseStringArray(body.task_plan || scopeItems);
+  const laborHours = parseNumber(body.labor_hours ?? Math.max(1, taskPlan.length * 1.5), 'labor_hours');
+  const partsPlan = parseStringArray(body.parts_plan);
+  const downtimeMinutes = parseNumber(body.downtime_minutes ?? Math.max(30, taskPlan.length * 45), 'downtime_minutes');
+  if (taskPlan.length === 0) {
+    throw new Error('task_plan must include at least one task');
+  }
+  if (laborHours < 0) {
+    throw new Error('labor_hours must be a non-negative value');
+  }
+  if (downtimeMinutes < 0) {
+    throw new Error('downtime_minutes must be a non-negative value');
+  }
+  return {
+    tasks: taskPlan,
+    labor_hours: laborHours,
+    parts_plan: partsPlan,
+    downtime_minutes: downtimeMinutes,
+  };
 }
 
 function parseScheduleWindow(start: unknown, end: unknown): { slotStart: string; slotEnd: string } {
@@ -416,6 +453,32 @@ function appendWorkPackageAuditRecord(params: {
   });
 }
 
+function appendWorkPackageMutationAuditRecord(params: {
+  tenantId: string;
+  franchiseId: string | null;
+  correlationId: string;
+  compatMode: string;
+  interfaceName: string;
+  entityId: string;
+  context: Record<string, unknown>;
+}) {
+  return appendAmroAuditLedgerRecord({
+    tenantId: params.tenantId,
+    franchiseId: params.franchiseId,
+    capability: 'work-packages',
+    eventType: 'amro.audit.recorded.v1',
+    entityType: 'work-package',
+    entityId: params.entityId,
+    correlationId: params.correlationId,
+    action: `${params.interfaceName}.write`,
+    compatMode: params.compatMode,
+    sourceHash: `${params.tenantId}:${params.interfaceName}:${params.entityId}:${params.correlationId}`,
+    migrationBatchId: `runtime:${params.tenantId}:${params.franchiseId || 'franchise-none'}`,
+    replayCheckpoint: `mutation:${Date.now()}`,
+    context: params.context,
+  });
+}
+
 async function enqueueWorkPackageDualWriteOperations(params: {
   tenantId: string;
   franchiseId: string | null;
@@ -539,7 +602,41 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       if (scopeItems.length === 0) {
         throw new Error('scope_items must include at least one item');
       }
+      const creationTrigger = parseCreationTrigger(body);
+      const engineerPlan = parseEngineerPlan(body, scopeItems);
       const createdAt = new Date().toISOString();
+      const output = {
+        work_package_id: `${tenantId}-${franchiseId}-wp-${Date.now()}`,
+        status: 'planning',
+        created_at: createdAt,
+        created_by: ctx.userId,
+        planning_bundle: {
+          task_count: engineerPlan.tasks.length,
+          labor_hours: engineerPlan.labor_hours,
+          parts_count: engineerPlan.parts_plan.length,
+          downtime_minutes: engineerPlan.downtime_minutes,
+        },
+      };
+      const auditRecord = cutoverState.enabled
+        ? appendWorkPackageMutationAuditRecord({
+          tenantId,
+          franchiseId,
+          correlationId: ctx.correlationId,
+          compatMode: compatDecision.compatMode,
+          interfaceName,
+          entityId: output.work_package_id,
+          context: {
+            input: {
+              aircraft_id: aircraftId,
+              maintenance_type: maintenanceType,
+              planned_window: plannedWindow,
+              station: `${tenantId}:${station}`,
+              priority,
+            },
+            output,
+          },
+        })
+        : null;
       return res.status(200).json({
         version: 'v2',
         interface: 'create-work-package',
@@ -559,13 +656,21 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           station: `${tenantId}:${station}`,
           priority,
           scope_items: scopeItems,
+          creation_trigger: {
+            source: creationTrigger.source,
+            reference_id: creationTrigger.referenceId,
+            triggered_at: creationTrigger.triggeredAt,
+          },
+          engineer_plan: engineerPlan,
         },
-        output: {
-          work_package_id: `${tenantId}-${franchiseId}-wp-${Date.now()}`,
-          status: 'planning',
-          created_at: createdAt,
-          created_by: ctx.userId,
-        },
+        output,
+        auditLedgerCutover: cutoverState,
+        auditLedger: auditRecord ? {
+          eventType: auditRecord.eventType,
+          recordId: auditRecord.recordId,
+          chainHash: auditRecord.chainHash,
+          replayCheckpoint: auditRecord.replayCheckpoint,
+        } : null,
       });
     }
 
@@ -579,6 +684,25 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         throw new Error('filters.status is invalid');
       }
       const searchFilter = String(filters.search || '').trim().toLowerCase();
+      const output = {
+        saved_view_id: `${tenantId}-${franchiseId}-view-${Date.now()}`,
+        view_name: viewName,
+        filters: {
+          status: statusFilter,
+          search: searchFilter,
+        },
+      };
+      const auditRecord = cutoverState.enabled
+        ? appendWorkPackageMutationAuditRecord({
+          tenantId,
+          franchiseId,
+          correlationId: ctx.correlationId,
+          compatMode: compatDecision.compatMode,
+          interfaceName,
+          entityId: output.saved_view_id,
+          context: { output },
+        })
+        : null;
       return res.status(200).json({
         version: 'v2',
         interface: 'save-work-package-view',
@@ -591,14 +715,14 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           validatedAt: amroAccess.validatedAt,
         },
         serviceBoundaries,
-        output: {
-          saved_view_id: `${tenantId}-${franchiseId}-view-${Date.now()}`,
-          view_name: viewName,
-          filters: {
-            status: statusFilter,
-            search: searchFilter,
-          },
-        },
+        output,
+        auditLedgerCutover: cutoverState,
+        auditLedger: auditRecord ? {
+          eventType: auditRecord.eventType,
+          recordId: auditRecord.recordId,
+          chainHash: auditRecord.chainHash,
+          replayCheckpoint: auditRecord.replayCheckpoint,
+        } : null,
       });
     }
 
@@ -623,6 +747,39 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       if (!roleAllowedStatuses.includes(targetStatus)) {
         throw new Error('transition is not allowed for role');
       }
+      if (targetStatus === 'scheduled') {
+        parseEngineerPlan(body, parseStringArray(body.scope_items));
+      }
+      const lifecycleEventType = targetStatus === 'completed'
+        ? 'amro.work_package.lifecycle.closed.v1'
+        : 'amro.work_package.lifecycle.transitioned.v1';
+      const publishedEvent = {
+        event_type: lifecycleEventType,
+        work_package_id: workPackageId,
+        previous_status: currentStatus,
+        next_status: targetStatus,
+        published_at: new Date().toISOString(),
+      };
+      const output = {
+        updated_status: targetStatus,
+        transition_id: `${tenantId}-${workPackageId}-${Date.now()}`,
+        gate_results: [
+          { gate: 'policy-matrix', status: 'passed' },
+          { gate: 'role-authorization', status: 'passed' },
+        ],
+        published_events: [publishedEvent],
+      };
+      const auditRecord = cutoverState.enabled
+        ? appendWorkPackageMutationAuditRecord({
+          tenantId,
+          franchiseId,
+          correlationId: ctx.correlationId,
+          compatMode: compatDecision.compatMode,
+          interfaceName,
+          entityId: workPackageId,
+          context: { output, published_event: publishedEvent },
+        })
+        : null;
       return res.status(200).json({
         version: 'v2',
         interface: 'transition-work-package',
@@ -642,14 +799,18 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           reason_code: reasonCode,
           actor_signature: actorSignature,
         },
-        output: {
-          updated_status: targetStatus,
-          transition_id: `${tenantId}-${workPackageId}-${Date.now()}`,
-          gate_results: [
-            { gate: 'policy-matrix', status: 'passed' },
-            { gate: 'role-authorization', status: 'passed' },
-          ],
-        },
+        output,
+        closure: targetStatus === 'completed' ? {
+          immutable_audit_chain_written: Boolean(auditRecord),
+          lifecycle_event_published: true,
+        } : null,
+        auditLedgerCutover: cutoverState,
+        auditLedger: auditRecord ? {
+          eventType: auditRecord.eventType,
+          recordId: auditRecord.recordId,
+          chainHash: auditRecord.chainHash,
+          replayCheckpoint: auditRecord.replayCheckpoint,
+        } : null,
       });
     }
 
@@ -662,6 +823,21 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       const aircraftId = assertNonEmpty(body.aircraft_id, 'aircraft_id');
       assertAircraftActive(aircraftId);
       const overrideFields = parseBody(body.override_fields);
+      const output = {
+        new_work_package_id: `${tenantId}-${franchiseId}-wp-clone-${Date.now()}`,
+        inherited_tasks_count: 14,
+      };
+      const auditRecord = cutoverState.enabled
+        ? appendWorkPackageMutationAuditRecord({
+          tenantId,
+          franchiseId,
+          correlationId: ctx.correlationId,
+          compatMode: compatDecision.compatMode,
+          interfaceName,
+          entityId: output.new_work_package_id,
+          context: { output },
+        })
+        : null;
       return res.status(200).json({
         version: 'v2',
         interface: 'clone-template',
@@ -679,10 +855,14 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           aircraft_id: aircraftId,
           override_fields: overrideFields,
         },
-        output: {
-          new_work_package_id: `${tenantId}-${franchiseId}-wp-clone-${Date.now()}`,
-          inherited_tasks_count: 14,
-        },
+        output,
+        auditLedgerCutover: cutoverState,
+        auditLedger: auditRecord ? {
+          eventType: auditRecord.eventType,
+          recordId: auditRecord.recordId,
+          chainHash: auditRecord.chainHash,
+          replayCheckpoint: auditRecord.replayCheckpoint,
+        } : null,
       });
     }
 
@@ -698,6 +878,22 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       assertNoOverlap(window, existingSlots);
       assertStationCapacity(assignedTeam.length, parseNumber(body.station_capacity || assignedTeam.length, 'station_capacity'));
       assertTeamQualifications(assignedTeam, stationCode);
+      const output = {
+        schedule_id: `${tenantId}-${franchiseId}-schedule-${Date.now()}`,
+        assignment_status: 'assigned',
+        conflict_flags: [],
+      };
+      const auditRecord = cutoverState.enabled
+        ? appendWorkPackageMutationAuditRecord({
+          tenantId,
+          franchiseId,
+          correlationId: ctx.correlationId,
+          compatMode: compatDecision.compatMode,
+          interfaceName,
+          entityId: workPackageId,
+          context: { output },
+        })
+        : null;
       return res.status(200).json({
         version: 'v2',
         interface: 'assign-maintenance-slot',
@@ -717,11 +913,14 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           slot_end: window.slotEnd,
           assigned_team: assignedTeam,
         },
-        output: {
-          schedule_id: `${tenantId}-${franchiseId}-schedule-${Date.now()}`,
-          assignment_status: 'assigned',
-          conflict_flags: [],
-        },
+        output,
+        auditLedgerCutover: cutoverState,
+        auditLedger: auditRecord ? {
+          eventType: auditRecord.eventType,
+          recordId: auditRecord.recordId,
+          chainHash: auditRecord.chainHash,
+          replayCheckpoint: auditRecord.replayCheckpoint,
+        } : null,
       });
     }
 
@@ -750,6 +949,26 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           impact_score: 0.27,
         },
       ];
+      const output = {
+        replan_options: replanOptions,
+        impact_summary: {
+          constrained_by: activeConstraints.map((constraint) => String(constraint.id || '')).filter(Boolean),
+          tenant_calendar_id: tenantCalendarId,
+          delayed_packages: disruptedSlots.length,
+        },
+        recommended_option: replanOptions[0],
+      };
+      const auditRecord = cutoverState.enabled
+        ? appendWorkPackageMutationAuditRecord({
+          tenantId,
+          franchiseId,
+          correlationId: ctx.correlationId,
+          compatMode: compatDecision.compatMode,
+          interfaceName,
+          entityId: `${tenantId}-replan`,
+          context: { output },
+        })
+        : null;
       return res.status(200).json({
         version: 'v2',
         interface: 'run-replan-simulation',
@@ -767,15 +986,14 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           priority_rules: priorityRules,
           planning_horizon: planningHorizon,
         },
-        output: {
-          replan_options: replanOptions,
-          impact_summary: {
-            constrained_by: activeConstraints.map((constraint) => String(constraint.id || '')).filter(Boolean),
-            tenant_calendar_id: tenantCalendarId,
-            delayed_packages: disruptedSlots.length,
-          },
-          recommended_option: replanOptions[0],
-        },
+        output,
+        auditLedgerCutover: cutoverState,
+        auditLedger: auditRecord ? {
+          eventType: auditRecord.eventType,
+          recordId: auditRecord.recordId,
+          chainHash: auditRecord.chainHash,
+          replayCheckpoint: auditRecord.replayCheckpoint,
+        } : null,
       });
     }
 
@@ -791,6 +1009,28 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       const reason = assertNonEmpty(body.reason, 'reason');
       const affectedWorkPackages = parseObjectArray(body.affected_work_packages, 'affected_work_packages');
       assertReplannableStates(affectedWorkPackages);
+      const output = {
+        updated_schedule: {
+          schedule_id: `${tenantId}-${franchiseId}-schedule-${Date.now()}`,
+          applied_option_id: selectedOptionId,
+          approved_by: approverId,
+        },
+        affected_work_packages: affectedWorkPackages.map((workPackage) => ({
+          work_package_id: String(workPackage.work_package_id || ''),
+          new_state: 'scheduled',
+        })),
+      };
+      const auditRecord = cutoverState.enabled
+        ? appendWorkPackageMutationAuditRecord({
+          tenantId,
+          franchiseId,
+          correlationId: ctx.correlationId,
+          compatMode: compatDecision.compatMode,
+          interfaceName,
+          entityId: selectedOptionId,
+          context: { output },
+        })
+        : null;
       return res.status(200).json({
         version: 'v2',
         interface: 'confirm-replan',
@@ -808,17 +1048,14 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           approver_id: approverId,
           reason,
         },
-        output: {
-          updated_schedule: {
-            schedule_id: `${tenantId}-${franchiseId}-schedule-${Date.now()}`,
-            applied_option_id: selectedOptionId,
-            approved_by: approverId,
-          },
-          affected_work_packages: affectedWorkPackages.map((workPackage) => ({
-            work_package_id: String(workPackage.work_package_id || ''),
-            new_state: 'scheduled',
-          })),
-        },
+        output,
+        auditLedgerCutover: cutoverState,
+        auditLedger: auditRecord ? {
+          eventType: auditRecord.eventType,
+          recordId: auditRecord.recordId,
+          chainHash: auditRecord.chainHash,
+          replayCheckpoint: auditRecord.replayCheckpoint,
+        } : null,
       });
     }
 
@@ -836,6 +1073,22 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         quantity: line.quantity,
         serial: line.serial,
       }));
+      const output = {
+        reservations,
+        reservation_status: 'reserved',
+        shortages: [],
+      };
+      const auditRecord = cutoverState.enabled
+        ? appendWorkPackageMutationAuditRecord({
+          tenantId,
+          franchiseId,
+          correlationId: ctx.correlationId,
+          compatMode: compatDecision.compatMode,
+          interfaceName,
+          entityId: workPackageId,
+          context: { output },
+        })
+        : null;
       return res.status(200).json({
         version: 'v2',
         interface: 'reserve-parts',
@@ -852,11 +1105,14 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           work_package_id: workPackageId,
           demand_lines: demandLines,
         },
-        output: {
-          reservations,
-          reservation_status: 'reserved',
-          shortages: [],
-        },
+        output,
+        auditLedgerCutover: cutoverState,
+        auditLedger: auditRecord ? {
+          eventType: auditRecord.eventType,
+          recordId: auditRecord.recordId,
+          chainHash: auditRecord.chainHash,
+          replayCheckpoint: auditRecord.replayCheckpoint,
+        } : null,
       });
     }
 
@@ -875,6 +1131,27 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       if (action === 'substitute' && body.compatibility_mapping_approved !== true) {
         throw new Error('Substitute must pass approved compatibility mapping');
       }
+      const output = {
+        shortage_status: action === 'escalate' ? 'escalated' : action === 'substitute' ? 'substitute-approved' : 'backordered',
+        procurement_trigger_id: `${tenantId}-${shortageId}-proc-${Date.now()}`,
+        procurement_trigger: {
+          tenant_id: tenantId,
+          franchise_id: franchiseId,
+          source_shortage_id: shortageId,
+          supplier_ref: supplierRef,
+        },
+      };
+      const auditRecord = cutoverState.enabled
+        ? appendWorkPackageMutationAuditRecord({
+          tenantId,
+          franchiseId,
+          correlationId: ctx.correlationId,
+          compatMode: compatDecision.compatMode,
+          interfaceName,
+          entityId: shortageId,
+          context: { output },
+        })
+        : null;
       return res.status(200).json({
         version: 'v2',
         interface: 'process-shortage-response',
@@ -892,16 +1169,14 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           action,
           supplier_ref: supplierRef,
         },
-        output: {
-          shortage_status: action === 'escalate' ? 'escalated' : action === 'substitute' ? 'substitute-approved' : 'backordered',
-          procurement_trigger_id: `${tenantId}-${shortageId}-proc-${Date.now()}`,
-          procurement_trigger: {
-            tenant_id: tenantId,
-            franchise_id: franchiseId,
-            source_shortage_id: shortageId,
-            supplier_ref: supplierRef,
-          },
-        },
+        output,
+        auditLedgerCutover: cutoverState,
+        auditLedger: auditRecord ? {
+          eventType: auditRecord.eventType,
+          recordId: auditRecord.recordId,
+          chainHash: auditRecord.chainHash,
+          replayCheckpoint: auditRecord.replayCheckpoint,
+        } : null,
       });
     }
 
@@ -925,6 +1200,21 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       impactedWorkPackages.forEach((workPackageId) => {
         assertOptionalScopedIdentifier(workPackageId, tenantId, 'impacted_work_packages');
       });
+      const output = {
+        updated_eta: eta,
+        impacted_work_packages: impactedWorkPackages,
+      };
+      const auditRecord = cutoverState.enabled
+        ? appendWorkPackageMutationAuditRecord({
+          tenantId,
+          franchiseId,
+          correlationId: ctx.correlationId,
+          compatMode: compatDecision.compatMode,
+          interfaceName,
+          entityId: supplierEventId,
+          context: { output },
+        })
+        : null;
       return res.status(200).json({
         version: 'v2',
         interface: 'sync-supplier-eta',
@@ -943,10 +1233,14 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           eta,
           quantity_confirmed: quantityConfirmed,
         },
-        output: {
-          updated_eta: eta,
-          impacted_work_packages: impactedWorkPackages,
-        },
+        output,
+        auditLedgerCutover: cutoverState,
+        auditLedger: auditRecord ? {
+          eventType: auditRecord.eventType,
+          recordId: auditRecord.recordId,
+          chainHash: auditRecord.chainHash,
+          replayCheckpoint: auditRecord.replayCheckpoint,
+        } : null,
       });
     }
 

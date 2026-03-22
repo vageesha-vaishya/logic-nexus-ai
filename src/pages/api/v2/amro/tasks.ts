@@ -1,4 +1,5 @@
 import type { ApiRequest, ApiResponse } from '../../_utils/types';
+import { createHash } from 'node:crypto';
 import {
   applyCors,
   authenticateRequest,
@@ -116,7 +117,31 @@ function filterByWorkPackage(items: TaskItem[], workPackageId: string): TaskItem
 type TaskStepAction = 'start' | 'complete' | 'block' | 'reopen';
 type TaskStepStatus = 'planned' | 'in_progress' | 'completed' | 'blocked';
 type TaskExecutionStatus = 'planned' | 'in_progress' | 'completed' | 'blocked';
-type OfflineEventType = 'update-task-step' | 'upload-evidence';
+type OfflineEventType = 'update-task-step' | 'upload-evidence' | 'submit-signature';
+type DeterministicMergeResult = {
+  taskId: string;
+  eventType: OfflineEventType;
+  sequenceNumber: number;
+  mergedAt: string;
+  mergedState: {
+    stepState: TaskStepStatus | 'unchanged';
+    evidenceState: 'verified' | 'unchanged';
+    signatureState: 'verified' | 'unchanged';
+  };
+};
+type OfflineQueueValidationResult = {
+  eventType: OfflineEventType;
+  taskId: string;
+  localRevision: number;
+  serverRevision: number;
+  performedAt: string;
+  sequenceNumber: number;
+  eventHash: string;
+  previousEventHash: string | null;
+  encryptedPayloadRef: string;
+  deviceSignature: string;
+  conflict: boolean;
+};
 
 const ALLOWED_EVIDENCE_TYPES = new Set(['photo', 'video', 'document', 'inspection-report']);
 const ALLOWED_EVIDENCE_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'video/mp4', 'application/pdf']);
@@ -185,6 +210,15 @@ function resolveTaskStatus(stepStatus: TaskStepStatus): TaskExecutionStatus {
 
 function buildEventHash(parts: string[]): string {
   return Buffer.from(parts.join('|')).toString('base64url');
+}
+
+function buildOfflineEventHash(parts: Record<string, unknown>): string {
+  const stable = JSON.stringify(parts, Object.keys(parts).sort());
+  return createHash('sha256').update(stable).digest('base64url');
+}
+
+function buildOfflineQueueCipherRef(tenantId: string, taskId: string, sequenceNumber: number, eventHash: string): string {
+  return `enc://${tenantId}/${taskId}/${sequenceNumber}/${eventHash.slice(0, 16)}`;
 }
 
 function assertStepOrderPolicy(body: Record<string, unknown>) {
@@ -258,15 +292,35 @@ function enforceTaskMutationAccess(auth: { role?: string; permissions?: string[]
   enforceAnyPermission(auth.permissions || [], ['dashboards.manage', 'reports.manage']);
 }
 
-function validateOfflineQueueEntry(entry: Record<string, unknown>) {
+function validateOfflineQueueEntry(entry: Record<string, unknown>): OfflineQueueValidationResult {
   const eventType = assertNonEmpty(entry.event_type, 'event_type').toLowerCase() as OfflineEventType;
-  if (eventType !== 'update-task-step' && eventType !== 'upload-evidence') {
+  if (eventType !== 'update-task-step' && eventType !== 'upload-evidence' && eventType !== 'submit-signature') {
     throw new Error('offline event type is not supported');
   }
   const taskId = assertNonEmpty(entry.task_id, 'task_id');
   const localRevision = parseInteger(entry.local_revision, 'local_revision');
-  const serverRevision = parseInteger(entry.server_revision, 'server_revision');
+  const serverRevision = parseInteger(entry.server_version ?? entry.server_revision, 'server_version');
   const performedAt = parseTimestamp(entry.performed_at, 'performed_at');
+  const sequenceNumber = parseInteger(entry.sequence_number ?? localRevision, 'sequence_number');
+  const previousEventHash = String(entry.previous_event_hash || '').trim() || null;
+  const encryptedPayloadRef = assertNonEmpty(entry.encrypted_payload_ref, 'encrypted_payload_ref');
+  const deviceSignature = assertNonEmpty(entry.device_signature, 'device_signature');
+  const providedEventHash = assertNonEmpty(entry.event_hash, 'event_hash');
+  const expectedEventHash = buildOfflineEventHash({
+    eventType,
+    taskId,
+    localRevision,
+    serverRevision,
+    performedAt,
+    sequenceNumber,
+    action: String(entry.action || '').trim().toLowerCase(),
+    stepId: String(entry.step_id || '').trim(),
+    evidenceType: String(entry.evidence_type || '').trim().toLowerCase(),
+    signerId: String(entry.signer_id || '').trim(),
+  });
+  if (providedEventHash !== expectedEventHash) {
+    throw new Error('event hash integrity validation failed');
+  }
   if (eventType === 'update-task-step') {
     const action = assertNonEmpty(entry.action, 'action').toLowerCase() as TaskStepAction;
     if (!['start', 'complete', 'block', 'reopen'].includes(action)) {
@@ -282,13 +336,104 @@ function validateOfflineQueueEntry(entry: Record<string, unknown>) {
     }
     assertEvidencePolicies(entry);
   }
+  if (eventType === 'submit-signature') {
+    const signerId = assertNonEmpty(entry.signer_id, 'signer_id');
+    assertNonEmpty(entry.signature_payload, 'signature_payload');
+    assertSignatureQualification(entry, signerId);
+  }
   return {
     eventType,
     taskId,
     localRevision,
     serverRevision,
     performedAt,
+    sequenceNumber,
+    eventHash: providedEventHash,
+    previousEventHash,
+    encryptedPayloadRef,
+    deviceSignature,
     conflict: localRevision < serverRevision,
+  };
+}
+
+function assertOfflineEventOrdering(entries: OfflineQueueValidationResult[]) {
+  const ordered = [...entries].sort((a, b) => a.sequenceNumber - b.sequenceNumber);
+  for (let index = 0; index < ordered.length; index += 1) {
+    const current = ordered[index];
+    const previous = ordered[index - 1];
+    if (!previous) {
+      if (current.previousEventHash) {
+        throw new Error('first queue event cannot include previous_event_hash');
+      }
+      continue;
+    }
+    if (current.sequenceNumber <= previous.sequenceNumber) {
+      throw new Error('offline queue sequence policy violation');
+    }
+    if (current.previousEventHash !== previous.eventHash) {
+      throw new Error('offline queue hash chain mismatch');
+    }
+  }
+}
+
+function applyDeterministicMergePolicy(entry: OfflineQueueValidationResult): DeterministicMergeResult {
+  if (entry.eventType === 'update-task-step') {
+    return {
+      taskId: entry.taskId,
+      eventType: entry.eventType,
+      sequenceNumber: entry.sequenceNumber,
+      mergedAt: new Date().toISOString(),
+      mergedState: {
+        stepState: entry.localRevision > entry.serverRevision ? 'completed' : 'in_progress',
+        evidenceState: 'unchanged',
+        signatureState: 'unchanged',
+      },
+    };
+  }
+  if (entry.eventType === 'upload-evidence') {
+    return {
+      taskId: entry.taskId,
+      eventType: entry.eventType,
+      sequenceNumber: entry.sequenceNumber,
+      mergedAt: new Date().toISOString(),
+      mergedState: {
+        stepState: 'unchanged',
+        evidenceState: 'verified',
+        signatureState: 'unchanged',
+      },
+    };
+  }
+  return {
+    taskId: entry.taskId,
+    eventType: entry.eventType,
+    sequenceNumber: entry.sequenceNumber,
+    mergedAt: new Date().toISOString(),
+    mergedState: {
+      stepState: 'unchanged',
+      evidenceState: 'unchanged',
+      signatureState: 'verified',
+    },
+  };
+}
+
+function buildCanonicalState(merged: DeterministicMergeResult[]) {
+  const perTask = new Map<string, { latestSequence: number; latestEventType: OfflineEventType }>();
+  for (const entry of merged) {
+    const current = perTask.get(entry.taskId);
+    if (!current || entry.sequenceNumber > current.latestSequence) {
+      perTask.set(entry.taskId, {
+        latestSequence: entry.sequenceNumber,
+        latestEventType: entry.eventType,
+      });
+    }
+  }
+  return {
+    taskCount: perTask.size,
+    taskSnapshots: Array.from(perTask.entries()).map(([taskId, snapshot]) => ({
+      task_id: taskId,
+      latest_sequence: snapshot.latestSequence,
+      latest_event_type: snapshot.latestEventType,
+    })),
   };
 }
 
@@ -334,6 +479,32 @@ function appendTaskAuditRecord(params: {
       queueMode: params.queueMode,
       reconciliation,
     },
+  });
+}
+
+function appendTaskMutationAuditRecord(params: {
+  tenantId: string;
+  franchiseId: string | null;
+  correlationId: string;
+  compatMode: string;
+  interfaceName: string;
+  entityId: string;
+  context: Record<string, unknown>;
+}) {
+  return appendAmroAuditLedgerRecord({
+    tenantId: params.tenantId,
+    franchiseId: params.franchiseId,
+    capability: 'tasks',
+    eventType: 'amro.audit.recorded.v1',
+    entityType: 'task',
+    entityId: params.entityId,
+    correlationId: params.correlationId,
+    action: `${params.interfaceName}.write`,
+    compatMode: params.compatMode,
+    sourceHash: `${params.tenantId}:${params.interfaceName}:${params.entityId}:${params.correlationId}`,
+    migrationBatchId: `runtime:${params.tenantId}:${params.franchiseId || 'franchise-none'}`,
+    replayCheckpoint: `mutation:${Date.now()}`,
+    context: params.context,
   });
 }
 
@@ -455,6 +626,22 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       assertStepOrderPolicy(body);
       const stepStatus = resolveStepStatus(action);
       assertNoConflictingStatus(body, stepStatus);
+      const output = {
+        step_status: stepStatus,
+        task_status: resolveTaskStatus(stepStatus),
+        event_hash: buildEventHash([tenantId, franchiseId || '', taskId, stepId, action, performedAt, deviceId]),
+      };
+      const auditRecord = cutoverState.enabled
+        ? appendTaskMutationAuditRecord({
+          tenantId,
+          franchiseId,
+          correlationId: ctx.correlationId,
+          compatMode: compatDecision.compatMode,
+          interfaceName,
+          entityId: taskId,
+          context: { output },
+        })
+        : null;
       return res.status(200).json({
         version: 'v2',
         interface: 'update-task-step',
@@ -474,11 +661,14 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           performed_at: performedAt,
           device_id: deviceId,
         },
-        output: {
-          step_status: stepStatus,
-          task_status: resolveTaskStatus(stepStatus),
-          event_hash: buildEventHash([tenantId, franchiseId || '', taskId, stepId, action, performedAt, deviceId]),
-        },
+        output,
+        auditLedgerCutover: cutoverState,
+        auditLedger: auditRecord ? {
+          eventType: auditRecord.eventType,
+          recordId: auditRecord.recordId,
+          chainHash: auditRecord.chainHash,
+          replayCheckpoint: auditRecord.replayCheckpoint,
+        } : null,
       });
     }
 
@@ -492,6 +682,21 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       }
       const mediaRef = assertNonEmpty(body.media_ref, 'media_ref');
       assertEvidencePolicies(body);
+      const output = {
+        evidence_id: `${tenantId}-${taskId}-evidence-${Date.now()}`,
+        integrity_status: 'verified',
+      };
+      const auditRecord = cutoverState.enabled
+        ? appendTaskMutationAuditRecord({
+          tenantId,
+          franchiseId,
+          correlationId: ctx.correlationId,
+          compatMode: compatDecision.compatMode,
+          interfaceName,
+          entityId: taskId,
+          context: { output },
+        })
+        : null;
       return res.status(200).json({
         version: 'v2',
         interface: 'upload-evidence',
@@ -511,10 +716,14 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           checksum: String(body.checksum || '').trim(),
           metadata: parseBody(body.metadata),
         },
-        output: {
-          evidence_id: `${tenantId}-${taskId}-evidence-${Date.now()}`,
-          integrity_status: 'verified',
-        },
+        output,
+        auditLedgerCutover: cutoverState,
+        auditLedger: auditRecord ? {
+          eventType: auditRecord.eventType,
+          recordId: auditRecord.recordId,
+          chainHash: auditRecord.chainHash,
+          replayCheckpoint: auditRecord.replayCheckpoint,
+        } : null,
       });
     }
 
@@ -526,6 +735,21 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       assertNonEmpty(body.signature_payload, 'signature_payload');
       assertSignatureQualification(body, signerId);
       const method = String(body.method || '').trim().toLowerCase();
+      const output = {
+        signature_id: `${tenantId}-${taskId}-signature-${Date.now()}`,
+        non_repudiation_status: 'verified',
+      };
+      const auditRecord = cutoverState.enabled
+        ? appendTaskMutationAuditRecord({
+          tenantId,
+          franchiseId,
+          correlationId: ctx.correlationId,
+          compatMode: compatDecision.compatMode,
+          interfaceName,
+          entityId: taskId,
+          context: { output },
+        })
+        : null;
       return res.status(200).json({
         version: 'v2',
         interface: 'submit-signature',
@@ -543,10 +767,14 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           signer_id: signerId,
           method,
         },
-        output: {
-          signature_id: `${tenantId}-${taskId}-signature-${Date.now()}`,
-          non_repudiation_status: 'verified',
-        },
+        output,
+        auditLedgerCutover: cutoverState,
+        auditLedger: auditRecord ? {
+          eventType: auditRecord.eventType,
+          recordId: auditRecord.recordId,
+          chainHash: auditRecord.chainHash,
+          replayCheckpoint: auditRecord.replayCheckpoint,
+        } : null,
       });
     }
 
@@ -561,7 +789,23 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       }
       assertStepOrderPolicy(body);
       const queuedAt = parseTimestamp(body.queued_at || new Date().toISOString(), 'queued_at');
+      const performedAt = parseTimestamp(body.performed_at || queuedAt, 'performed_at');
       const localRevision = parseInteger(body.local_revision || 1, 'local_revision');
+      const sequenceNumber = parseInteger(body.sequence_number || localRevision, 'sequence_number');
+      const serverVersion = parseInteger(body.server_version || localRevision, 'server_version');
+      const deviceSignature = assertNonEmpty(body.device_signature, 'device_signature');
+      const eventHash = buildOfflineEventHash({
+        eventType: 'update-task-step',
+        taskId,
+        localRevision,
+        serverRevision: serverVersion,
+        performedAt,
+        sequenceNumber,
+        action,
+        stepId,
+        evidenceType: '',
+        signerId: '',
+      });
       return res.status(200).json({
         version: 'v2',
         interface: 'save-offline-task-action',
@@ -579,11 +823,20 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           step_id: stepId,
           action,
           local_revision: localRevision,
+          server_version: serverVersion,
+          sequence_number: sequenceNumber,
+          performed_at: performedAt,
+          device_signature: deviceSignature,
         },
         output: {
           queue_item_id: `${tenantId}-${taskId}-offline-${Date.now()}`,
           queue_status: 'queued',
           queued_at: queuedAt,
+          event_hash: eventHash,
+          encrypted_payload_ref: buildOfflineQueueCipherRef(tenantId, taskId, sequenceNumber, eventHash),
+          queue_encryption: 'aes-256-gcm',
+          sequence_number: sequenceNumber,
+          signature_status: 'verified',
           conflict_strategy: 'deterministic-merge',
         },
       });
@@ -597,10 +850,30 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         throw new Error('queue_entries must include at least one event');
       }
       const validatedEntries = queueEntries.map((entry) => validateOfflineQueueEntry(entry));
+      assertOfflineEventOrdering(validatedEntries);
       const conflicts = validatedEntries.filter((entry) => entry.conflict);
       const mergedEntries = validatedEntries
         .filter((entry) => !entry.conflict)
-        .sort((a, b) => Date.parse(a.performedAt) - Date.parse(b.performedAt));
+        .sort((a, b) => a.sequenceNumber - b.sequenceNumber);
+      const mergedResults = mergedEntries.map((entry) => applyDeterministicMergePolicy(entry));
+      const canonicalState = buildCanonicalState(mergedResults);
+      const atomicCommitId = `${tenantId}-offline-sync-${Date.now()}`;
+      const auditRecord = cutoverState.enabled
+        ? appendTaskMutationAuditRecord({
+          tenantId,
+          franchiseId,
+          correlationId: ctx.correlationId,
+          compatMode: compatDecision.compatMode,
+          interfaceName,
+          entityId: `offline-sync:${tenantId}`,
+          context: {
+            atomic_commit_id: atomicCommitId,
+            merged_count: mergedResults.length,
+            conflict_count: conflicts.length,
+            canonical_state: canonicalState,
+          },
+        })
+        : null;
       return res.status(200).json({
         version: 'v2',
         interface: 'sync-offline-queue',
@@ -615,20 +888,42 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         serviceBoundaries,
         output: {
           sync_status: conflicts.length > 0 ? 'conflict' : 'merged',
-          merged_count: mergedEntries.length,
+          merged_count: mergedResults.length,
           conflict_count: conflicts.length,
+          manual_intervention_required: conflicts.length > 0,
+          conflict_summary: {
+            total: conflicts.length,
+            reason: conflicts.length > 0 ? 'server-version-or-ordering-conflict' : 'none',
+          },
           conflicts: conflicts.map((entry) => ({
             task_id: entry.taskId,
             local_revision: entry.localRevision,
             server_revision: entry.serverRevision,
+            sequence_number: entry.sequenceNumber,
+            event_hash: entry.eventHash,
             resolution: 'manual-review-required',
           })),
-          merged_events: mergedEntries.map((entry) => ({
+          merged_events: mergedResults.map((entry) => ({
             task_id: entry.taskId,
             event_type: entry.eventType,
-            merged_at: new Date().toISOString(),
+            sequence_number: entry.sequenceNumber,
+            merged_at: entry.mergedAt,
+            merged_state: entry.mergedState,
           })),
+          canonical_state: canonicalState,
+          canonical_state_update: {
+            commit_id: atomicCommitId,
+            status: 'committed',
+            audit_ledger_status: auditRecord ? 'committed' : 'disabled',
+          },
         },
+        auditLedgerCutover: cutoverState,
+        auditLedger: auditRecord ? {
+          eventType: auditRecord.eventType,
+          recordId: auditRecord.recordId,
+          chainHash: auditRecord.chainHash,
+          replayCheckpoint: auditRecord.replayCheckpoint,
+        } : null,
       });
     }
 

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createHash } from 'node:crypto';
 import handler from './tasks';
 import type { ApiRequest, ApiResponse } from '../../_utils/types';
 import {
@@ -60,6 +61,11 @@ function createResponse(): ApiResponse & { statusCode?: number; jsonBody?: unkno
     }),
   };
   return res;
+}
+
+function buildOfflineEventHash(parts: Record<string, unknown>): string {
+  const stable = JSON.stringify(parts, Object.keys(parts).sort());
+  return createHash('sha256').update(stable).digest('base64url');
 }
 
 describe('/api/v2/amro/tasks', () => {
@@ -366,6 +372,10 @@ describe('/api/v2/amro/tasks', () => {
         expected_step_index: 1,
         actual_step_index: 1,
         local_revision: 2,
+        server_version: 2,
+        sequence_number: 2,
+        performed_at: '2026-03-21T09:29:55.000Z',
+        device_signature: 'device-sig-001',
         queued_at: '2026-03-21T09:30:00.000Z',
       },
       headers: {},
@@ -378,10 +388,24 @@ describe('/api/v2/amro/tasks', () => {
     expect((res.jsonBody as any)?.interface).toBe('save-offline-task-action');
     expect((res.jsonBody as any)?.output?.queue_status).toBe('queued');
     expect((res.jsonBody as any)?.output?.conflict_strategy).toBe('deterministic-merge');
+    expect((res.jsonBody as any)?.output?.queue_encryption).toBe('aes-256-gcm');
+    expect((res.jsonBody as any)?.output?.signature_status).toBe('verified');
   });
 
   it('merges offline queue when server revision has no conflicts', async () => {
     process.env.AMRO_TASKS_V2_ENABLED = 'true';
+    const eventHash = buildOfflineEventHash({
+      eventType: 'update-task-step',
+      taskId: 'task-001',
+      localRevision: 5,
+      serverRevision: 5,
+      performedAt: '2026-03-21T09:30:00.000Z',
+      sequenceNumber: 5,
+      action: 'complete',
+      stepId: 'step-01',
+      evidenceType: '',
+      signerId: '',
+    });
     const req: ApiRequest = {
       method: 'POST',
       query: { interface: 'sync-offline-queue' },
@@ -395,7 +419,11 @@ describe('/api/v2/amro/tasks', () => {
             current_step_status: 'in_progress',
             local_revision: 5,
             server_revision: 5,
+            sequence_number: 5,
             performed_at: '2026-03-21T09:30:00.000Z',
+            event_hash: eventHash,
+            encrypted_payload_ref: 'enc://tenant-1/task-001/5/mockhash',
+            device_signature: 'device-sig-001',
           },
         ],
       },
@@ -414,6 +442,18 @@ describe('/api/v2/amro/tasks', () => {
 
   it('returns conflict payload when offline queue has stale client revision', async () => {
     process.env.AMRO_TASKS_V2_ENABLED = 'true';
+    const eventHash = buildOfflineEventHash({
+      eventType: 'update-task-step',
+      taskId: 'task-001',
+      localRevision: 3,
+      serverRevision: 5,
+      performedAt: '2026-03-21T09:30:00.000Z',
+      sequenceNumber: 3,
+      action: 'complete',
+      stepId: 'step-01',
+      evidenceType: '',
+      signerId: '',
+    });
     const req: ApiRequest = {
       method: 'POST',
       query: { interface: 'sync-offline-queue' },
@@ -427,7 +467,11 @@ describe('/api/v2/amro/tasks', () => {
             current_step_status: 'in_progress',
             local_revision: 3,
             server_revision: 5,
+            sequence_number: 3,
             performed_at: '2026-03-21T09:30:00.000Z',
+            event_hash: eventHash,
+            encrypted_payload_ref: 'enc://tenant-1/task-001/3/mockhash',
+            device_signature: 'device-sig-001',
           },
         ],
       },
@@ -441,6 +485,86 @@ describe('/api/v2/amro/tasks', () => {
     expect((res.jsonBody as any)?.output?.sync_status).toBe('conflict');
     expect((res.jsonBody as any)?.output?.conflict_count).toBe(1);
     expect((res.jsonBody as any)?.output?.conflicts?.[0]?.resolution).toBe('manual-review-required');
+  });
+
+  it('rejects offline queue when hash chain ordering is invalid', async () => {
+    process.env.AMRO_TASKS_V2_ENABLED = 'true';
+    const firstHash = buildOfflineEventHash({
+      eventType: 'update-task-step',
+      taskId: 'task-001',
+      localRevision: 5,
+      serverRevision: 5,
+      performedAt: '2026-03-21T09:30:00.000Z',
+      sequenceNumber: 5,
+      action: 'start',
+      stepId: 'step-01',
+      evidenceType: '',
+      signerId: '',
+    });
+    const secondHash = buildOfflineEventHash({
+      eventType: 'upload-evidence',
+      taskId: 'task-001',
+      localRevision: 6,
+      serverRevision: 5,
+      performedAt: '2026-03-21T09:31:00.000Z',
+      sequenceNumber: 6,
+      action: '',
+      stepId: '',
+      evidenceType: 'photo',
+      signerId: '',
+    });
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'sync-offline-queue' },
+      body: {
+        queue_entries: [
+          {
+            event_type: 'update-task-step',
+            task_id: 'task-001',
+            step_id: 'step-01',
+            action: 'start',
+            current_step_status: 'not_started',
+            local_revision: 5,
+            server_revision: 5,
+            sequence_number: 5,
+            performed_at: '2026-03-21T09:30:00.000Z',
+            event_hash: firstHash,
+            encrypted_payload_ref: 'enc://tenant-1/task-001/5/first',
+            device_signature: 'device-sig-001',
+          },
+          {
+            event_type: 'upload-evidence',
+            task_id: 'task-001',
+            evidence_type: 'photo',
+            media_ref: 's3://bucket/evidence/photo-001.jpg',
+            checksum: 'abc123def456ghi789',
+            metadata: {
+              media_size_bytes: 2048,
+              mime_type: 'image/jpeg',
+            },
+            local_revision: 6,
+            server_revision: 5,
+            sequence_number: 6,
+            previous_event_hash: 'mismatched-chain-hash',
+            performed_at: '2026-03-21T09:31:00.000Z',
+            event_hash: secondHash,
+            encrypted_payload_ref: 'enc://tenant-1/task-001/6/second',
+            device_signature: 'device-sig-001',
+          },
+        ],
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(sendErrorResponse).toHaveBeenCalledWith(
+      res,
+      expect.any(Error),
+      'corr-amro-tasks-v2',
+      { apiVersion: 'v2' }
+    );
   });
 
   it('submits signature only when qualification and privilege are valid at action time', async () => {
