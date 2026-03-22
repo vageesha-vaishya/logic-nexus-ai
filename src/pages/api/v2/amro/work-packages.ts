@@ -94,11 +94,14 @@ function buildReconciliation(legacyItems: WorkPackageItem[], moduleItems: WorkPa
 type WorkPackageStatus = 'planning' | 'scheduled' | 'in_progress' | 'completed' | 'blocked' | 'cancelled';
 type ReplanWorkPackageState = 'planning' | 'scheduled' | 'blocked';
 type ShortageAction = 'backorder' | 'substitute' | 'escalate';
+type TraceabilityAction = 'verify' | 'quarantine' | 'release';
 
 const ALLOWED_MAINTENANCE_TYPES = new Set(['line', 'base', 'component', 'a-check', 'c-check']);
 const ALLOWED_PRIORITIES = new Set(['low', 'medium', 'high', 'critical']);
 const ALLOWED_SHORTAGE_ACTIONS = new Set(['backorder', 'substitute', 'escalate']);
+const ALLOWED_TRACEABILITY_ACTIONS = new Set(['verify', 'quarantine', 'release']);
 const TRUSTED_SUPPLIER_ADAPTERS = new Set(['sap-pm', 'maximo', 'oracle-eam']);
+const TRUSTED_PROCUREMENT_ADAPTERS = new Set(['sap-pm', 'oracle-eam', 'maximo', 'ariba', 'coupa']);
 const REPLAN_APPROVER_ROLES = new Set(['tenant_admin', 'planner']);
 const REPLANNABLE_STATES = new Set<ReplanWorkPackageState>(['planning', 'scheduled', 'blocked']);
 const ROLE_TRANSITION_POLICY: Record<string, ReadonlyArray<WorkPackageStatus>> = {
@@ -116,12 +119,52 @@ const ALLOWED_TRANSITIONS: Record<WorkPackageStatus, ReadonlyArray<WorkPackageSt
   blocked: ['planning', 'scheduled', 'in_progress', 'cancelled'],
   cancelled: [],
 };
+const ALLOWED_FILTER_STATUSES = new Set(['all', 'planning', 'scheduled', 'in_progress', 'completed', 'blocked', 'cancelled']);
+const SAVED_WORK_PACKAGE_VIEWS: ReadonlyArray<{
+  id: string;
+  name: string;
+  filters: { status: string; search: string };
+}> = [
+  { id: 'default-all', name: 'All Work Packages', filters: { status: 'all', search: '' } },
+  { id: 'scheduled-only', name: 'Scheduled Today', filters: { status: 'scheduled', search: '' } },
+  { id: 'blocked-items', name: 'Blocked Items', filters: { status: 'blocked', search: '' } },
+];
 
 function parseBody(body: unknown): Record<string, unknown> {
   if (body && typeof body === 'object') {
     return body as Record<string, unknown>;
   }
   return {};
+}
+
+function parseStatusFilter(req: ApiRequest): string {
+  const raw = Array.isArray(req.query.status) ? req.query.status[0] : req.query.status;
+  const normalized = String(raw || 'all').trim().toLowerCase() || 'all';
+  if (!ALLOWED_FILTER_STATUSES.has(normalized)) {
+    throw new Error('Bad Request: status filter is invalid');
+  }
+  return normalized;
+}
+
+function parseSearchFilter(req: ApiRequest): string {
+  const raw = Array.isArray(req.query.search) ? req.query.search[0] : req.query.search;
+  return String(raw || '').trim().toLowerCase();
+}
+
+function parseSavedViewId(req: ApiRequest): string | null {
+  const raw = Array.isArray(req.query.saved_view) ? req.query.saved_view[0] : req.query.saved_view;
+  const normalized = String(raw || '').trim();
+  return normalized || null;
+}
+
+function applyWorkPackageFilters(items: WorkPackageItem[], status: string, search: string): WorkPackageItem[] {
+  return items.filter((item) => {
+    const statusMatch = status === 'all' ? true : item.status.toLowerCase() === status;
+    const searchMatch = !search
+      ? true
+      : item.code.toLowerCase().includes(search) || item.title.toLowerCase().includes(search);
+    return statusMatch && searchMatch;
+  });
 }
 
 function parseDateWindow(value: unknown): { from: string; to: string } {
@@ -526,6 +569,39 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       });
     }
 
+    if (req.method === 'POST' && interfaceName === 'save-work-package-view') {
+      enforceAnyPermission(auth.permissions || [], ['dashboards.manage', 'reports.manage']);
+      const body = parseBody(req.body);
+      const viewName = assertNonEmpty(body.view_name, 'view_name');
+      const filters = parseBody(body.filters);
+      const statusFilter = String(filters.status || 'all').trim().toLowerCase();
+      if (!ALLOWED_FILTER_STATUSES.has(statusFilter)) {
+        throw new Error('filters.status is invalid');
+      }
+      const searchFilter = String(filters.search || '').trim().toLowerCase();
+      return res.status(200).json({
+        version: 'v2',
+        interface: 'save-work-package-view',
+        correlationId: ctx.correlationId,
+        compatMode: compatDecision.compatMode,
+        mode: 'module',
+        domainAccess: {
+          subscriptionStatus: amroAccess.subscriptionStatus,
+          source: amroAccess.source,
+          validatedAt: amroAccess.validatedAt,
+        },
+        serviceBoundaries,
+        output: {
+          saved_view_id: `${tenantId}-${franchiseId}-view-${Date.now()}`,
+          view_name: viewName,
+          filters: {
+            status: statusFilter,
+            search: searchFilter,
+          },
+        },
+      });
+    }
+
     if (req.method === 'POST' && interfaceName === 'transition-work-package') {
       enforceAnyPermission(auth.permissions || [], ['dashboards.manage', 'reports.manage']);
       const body = parseBody(req.body);
@@ -874,16 +950,166 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       });
     }
 
+    if (req.method === 'POST' && interfaceName === 'trace-rotable-llp') {
+      enforceAnyPermission(auth.permissions || [], ['dashboards.manage', 'reports.manage']);
+      assertScopeRequired(tenantId, franchiseId);
+      const body = parseBody(req.body);
+      assertOptionalScopeContext(body, tenantId, franchiseId);
+      const componentId = assertNonEmpty(body.component_id, 'component_id');
+      assertOptionalScopedIdentifier(componentId, tenantId, 'component_id');
+      const partNumber = assertNonEmpty(body.part_number, 'part_number');
+      const serialNumber = assertNonEmpty(body.serial_number, 'serial_number');
+      const rotableStatus = assertNonEmpty(body.rotable_status, 'rotable_status').toLowerCase();
+      if (!['serviceable', 'unserviceable', 'quarantined'].includes(rotableStatus)) {
+        throw new Error('rotable_status must be serviceable, unserviceable, or quarantined');
+      }
+      const llpRemainingCycles = parseNumber(body.llp_remaining_cycles, 'llp_remaining_cycles');
+      if (llpRemainingCycles < 0) {
+        throw new Error('llp_remaining_cycles must be zero or greater');
+      }
+      const traceabilityAction = assertNonEmpty(body.traceability_action, 'traceability_action').toLowerCase() as TraceabilityAction;
+      if (!ALLOWED_TRACEABILITY_ACTIONS.has(traceabilityAction)) {
+        throw new Error('traceability_action must be verify, quarantine, or release');
+      }
+      return res.status(200).json({
+        version: 'v2',
+        interface: 'trace-rotable-llp',
+        correlationId: ctx.correlationId,
+        compatMode: compatDecision.compatMode,
+        mode: 'module',
+        domainAccess: {
+          subscriptionStatus: amroAccess.subscriptionStatus,
+          source: amroAccess.source,
+          validatedAt: amroAccess.validatedAt,
+        },
+        serviceBoundaries,
+        input: {
+          component_id: componentId,
+          part_number: partNumber,
+          serial_number: serialNumber,
+          rotable_status: rotableStatus,
+          llp_remaining_cycles: llpRemainingCycles,
+          traceability_action: traceabilityAction,
+        },
+        output: {
+          traceability_status: traceabilityAction === 'verify'
+            ? 'verified'
+            : traceabilityAction === 'quarantine'
+              ? 'quarantined'
+              : 'released',
+          llp_control: {
+            threshold_cycles: 500,
+            within_threshold: llpRemainingCycles <= 500,
+          },
+          component_history_ref: `${tenantId}-${componentId}-history`,
+        },
+      });
+    }
+
+    if (req.method === 'POST' && interfaceName === 'run-inventory-optimization') {
+      enforceAnyPermission(auth.permissions || [], ['dashboards.manage', 'reports.manage']);
+      assertScopeRequired(tenantId, franchiseId);
+      const body = parseBody(req.body);
+      assertOptionalScopeContext(body, tenantId, franchiseId);
+      const workPackageId = assertNonEmpty(body.work_package_id, 'work_package_id');
+      assertOptionalScopedIdentifier(workPackageId, tenantId, 'work_package_id');
+      const forecastSignalIds = parseStringArray(body.forecast_signal_ids);
+      const optimizationWindow = assertNonEmpty(body.optimization_window, 'optimization_window');
+      return res.status(200).json({
+        version: 'v2',
+        interface: 'run-inventory-optimization',
+        correlationId: ctx.correlationId,
+        compatMode: compatDecision.compatMode,
+        mode: 'module',
+        domainAccess: {
+          subscriptionStatus: amroAccess.subscriptionStatus,
+          source: amroAccess.source,
+          validatedAt: amroAccess.validatedAt,
+        },
+        serviceBoundaries,
+        input: {
+          work_package_id: workPackageId,
+          forecast_signal_ids: forecastSignalIds,
+          optimization_window: optimizationWindow,
+        },
+        output: {
+          optimization_run_id: `${tenantId}-${workPackageId}-inventory-opt-${Date.now()}`,
+          recommendations: [
+            { part_number: 'PN-ATA72-889', action: 'reserve-now', confidence: 0.92 },
+            { part_number: 'PN-ATA27-190', action: 'expedite-supplier', confidence: 0.86 },
+          ],
+          forecast_signal_count: forecastSignalIds.length,
+        },
+      });
+    }
+
+    if (req.method === 'POST' && interfaceName === 'sync-supplier-asn-erp') {
+      enforceAnyPermission(auth.permissions || [], ['dashboards.manage', 'reports.manage']);
+      assertScopeRequired(tenantId, franchiseId);
+      const body = parseBody(req.body);
+      assertOptionalScopeContext(body, tenantId, franchiseId);
+      const asnEventId = assertNonEmpty(body.asn_event_id, 'asn_event_id');
+      const procurementSource = assertNonEmpty(body.procurement_source, 'procurement_source').toLowerCase();
+      if (!TRUSTED_PROCUREMENT_ADAPTERS.has(procurementSource)) {
+        throw new Error('procurement_source must be trusted adapter');
+      }
+      const poNumber = assertNonEmpty(body.po_number, 'po_number');
+      const lineItems = parseObjectArray(body.line_items, 'line_items');
+      if (lineItems.length === 0) {
+        throw new Error('line_items must include at least one line');
+      }
+      const impactedWorkPackages = parseStringArray(body.impacted_work_packages);
+      impactedWorkPackages.forEach((workPackageId) => {
+        assertOptionalScopedIdentifier(workPackageId, tenantId, 'impacted_work_packages');
+      });
+      return res.status(200).json({
+        version: 'v2',
+        interface: 'sync-supplier-asn-erp',
+        correlationId: ctx.correlationId,
+        compatMode: compatDecision.compatMode,
+        mode: 'module',
+        domainAccess: {
+          subscriptionStatus: amroAccess.subscriptionStatus,
+          source: amroAccess.source,
+          validatedAt: amroAccess.validatedAt,
+        },
+        serviceBoundaries,
+        input: {
+          asn_event_id: asnEventId,
+          procurement_source: procurementSource,
+          po_number: poNumber,
+          line_item_count: lineItems.length,
+        },
+        output: {
+          sync_status: 'applied',
+          procurement_sync_id: `${tenantId}-${asnEventId}-proc-sync-${Date.now()}`,
+          impacted_work_packages: impactedWorkPackages,
+        },
+      });
+    }
+
     if (req.method === 'POST') {
       return res.status(400).json({
-        error: 'Unsupported interface. Use create-work-package, transition-work-package, clone-template, assign-maintenance-slot, run-replan-simulation, confirm-replan, reserve-parts, process-shortage-response, or sync-supplier-eta.',
+        error: 'Unsupported interface. Use create-work-package, save-work-package-view, transition-work-package, clone-template, assign-maintenance-slot, run-replan-simulation, confirm-replan, reserve-parts, process-shortage-response, sync-supplier-eta, trace-rotable-llp, run-inventory-optimization, or sync-supplier-asn-erp.',
         correlationId: ctx.correlationId,
         version: 'v2',
       });
     }
 
+    const selectedSavedViewId = parseSavedViewId(req);
+    const selectedSavedView = selectedSavedViewId
+      ? SAVED_WORK_PACKAGE_VIEWS.find((item) => item.id === selectedSavedViewId) || null
+      : null;
+    if (selectedSavedViewId && !selectedSavedView) {
+      throw new Error('Bad Request: saved_view is invalid');
+    }
+    const queryStatusFilter = parseStatusFilter(req);
+    const querySearchFilter = parseSearchFilter(req);
+    const activeStatusFilter = selectedSavedView?.filters.status || queryStatusFilter;
+    const activeSearchFilter = selectedSavedView?.filters.search || querySearchFilter;
     const legacyRows = enforceAmroScopedLegacyRows(buildLegacyRows(tenantId, franchiseId), isolationScope);
-    const moduleItems = adaptModuleWorkPackagesFromLegacy(legacyRows);
+    const unfilteredModuleItems = adaptModuleWorkPackagesFromLegacy(legacyRows);
+    const moduleItems = applyWorkPackageFilters(unfilteredModuleItems, activeStatusFilter, activeSearchFilter);
     const integrationContracts = buildAmroIntegrationContractEnvelope({
       capability: 'work-packages',
       tenantId,
@@ -892,7 +1118,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       auditLedgerCutover: cutoverState,
     });
     const dualRun = isDualRunEnabled();
-    const legacyItems = adaptLegacyWorkPackages(legacyRows);
+    const unfilteredLegacyItems = adaptLegacyWorkPackages(legacyRows);
+    const legacyItems = applyWorkPackageFilters(unfilteredLegacyItems, activeStatusFilter, activeSearchFilter);
     const legacyFallback = isLegacyFallbackEnabled();
     const reconciliation = buildReconciliation(legacyItems, moduleItems);
     const deterministicComparison = buildHistoricalBackfillMetadata({
@@ -901,7 +1128,11 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       tenantId,
       franchiseId,
       compatMode: compatDecision.compatMode,
-      requestedFilters: {},
+      requestedFilters: {
+        status: activeStatusFilter,
+        search: activeSearchFilter,
+        saved_view: selectedSavedView?.id || null,
+      },
       reconciliation,
     });
     const dualWrite = await enqueueWorkPackageDualWriteOperations({
@@ -952,6 +1183,12 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           },
           dualWrite,
         },
+        filters: {
+          status: activeStatusFilter,
+          search: activeSearchFilter,
+          saved_view: selectedSavedView?.id || null,
+        },
+        savedViews: SAVED_WORK_PACKAGE_VIEWS,
         fallback: {
           legacyMode: true,
           queueDrained: fallback.drained,
@@ -1008,6 +1245,12 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           },
           dualWrite,
         },
+        filters: {
+          status: activeStatusFilter,
+          search: activeSearchFilter,
+          saved_view: selectedSavedView?.id || null,
+        },
+        savedViews: SAVED_WORK_PACKAGE_VIEWS,
         endpointRollout: rolloutState,
         auditLedgerCutover: cutoverState,
         auditLedger: auditRecord ? {
@@ -1071,6 +1314,12 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         },
         dualWrite,
       },
+      filters: {
+        status: activeStatusFilter,
+        search: activeSearchFilter,
+        saved_view: selectedSavedView?.id || null,
+      },
+      savedViews: SAVED_WORK_PACKAGE_VIEWS,
       data: { workPackages: moduleItems },
       legacy: { workPackages: legacyItems },
       reconciliation,

@@ -124,6 +124,29 @@ type ApiRecommendation = {
   recommendation: string;
 };
 
+type ComplianceRegulatorProfile = 'FAA' | 'EASA' | 'CAAC';
+
+type ApiScheduleRow = {
+  schedule_id: string;
+  work_package_id: string;
+  station_code: string;
+  slot_start: string;
+  slot_end: string;
+  assigned_team_size: number;
+  capacity: number;
+  status: string;
+};
+
+type ApiScheduleOptimizationRecommendation = {
+  recommendation_id: string;
+  title: string;
+  station_code: string;
+  schedule_date: string;
+  expected_delay_reduction_pct: number;
+  confidence: number;
+  rationale: string;
+};
+
 type ApiEnvelope<T> = {
   data: T;
 };
@@ -139,6 +162,101 @@ type V2TaskItem = {
   workPackageId: string;
   title: string;
   status: string;
+};
+
+type V2SavedWorkPackageView = {
+  id: string;
+  name: string;
+  filters: {
+    status: string;
+    search: string;
+  };
+};
+
+type V2SchedulesResponse = {
+  output?: {
+    schedules?: ApiScheduleRow[];
+  };
+  error?: string;
+};
+
+type V2WorkPackagesResponse = {
+  data?: {
+    workPackages?: V2WorkPackageItem[];
+  };
+  savedViews?: V2SavedWorkPackageView[];
+  error?: string;
+};
+
+type V2ScheduleOptimizationResponse = {
+  output?: {
+    recommendations?: ApiScheduleOptimizationRecommendation[];
+  };
+  error?: string;
+};
+
+type ComplianceExplainabilityState = {
+  decision: 'pass' | 'fail';
+  blockerCount: number;
+  blockers: string[];
+  policyVersion: string;
+};
+
+type ComplianceAuditReplayState = {
+  capability: 'work-packages' | 'tasks' | 'compliance-gates';
+  format: 'csv' | 'json';
+  eventCount: number;
+  events: Array<{ sequence: number; recordId: string; action: string; createdAt: string }>;
+};
+
+type ComplianceAnomalyAlert = {
+  severity: string;
+  code: string;
+  metric: number;
+};
+
+type ComplianceRegulatorProfilePackState = {
+  regulatorProfile: ComplianceRegulatorProfile;
+  obligations: string[];
+  gateRules: string[];
+};
+
+type CertificationAuthorityProfile = 'FAA' | 'EASA' | 'CAAC';
+
+type CertificationDecisionOption = 'approve' | 'reject' | 'defer';
+
+type CertificationQualificationStatusState = {
+  lifecycle: 'active' | 'warning' | 'suspended';
+  daysUntilExpiry: number;
+  reason: string;
+};
+
+type CertificationDecisionState = {
+  actionStatus: string;
+  nextAction: string;
+  blockers: string[];
+};
+
+type CertificationExpiryAutomationState = {
+  warningCount: number;
+  suspensionCount: number;
+  evaluatedCount: number;
+};
+
+type CertificationCompetencyAnalyticsState = {
+  totalQualifiedStaff: number;
+  activeCertifiers: number;
+  warningWindowStaff: number;
+  suspendedCertifiers: number;
+  authorityDistribution: Record<string, number>;
+};
+
+type CertificationTemplateState = {
+  templateId: string;
+  authorityProfile: CertificationAuthorityProfile;
+  requiredSignatures: string[];
+  mandatoryChecks: string[];
+  deferMaxDays: number;
 };
 
 async function parseJsonSafe<T>(response: Response): Promise<T | null> {
@@ -193,6 +311,15 @@ function mapLifecycleToStatus(stage: AmroWorkPackageLifecycleStage): string {
   return 'closed';
 }
 
+function resolveRoleTransitionTargets(role: string): string[] {
+  if (role === 'tenant_admin') return ['planning', 'scheduled', 'in_progress', 'completed', 'blocked', 'cancelled'];
+  if (role === 'planner') return ['planning', 'scheduled', 'blocked'];
+  if (role === 'engineer') return ['scheduled', 'in_progress', 'blocked'];
+  if (role === 'technician') return ['in_progress'];
+  if (role === 'inspector') return ['completed', 'blocked'];
+  return [];
+}
+
 const initialQualifications: AmroQualification[] = [
   {
     id: 'qual-1',
@@ -223,8 +350,9 @@ const initialQualifications: AmroQualification[] = [
 const initialRulePacks: AmroComplianceRulePack[] = [
   { id: 'rc-1', authority: 'FAA', ruleVersion: '2026.1', active: true },
   { id: 'rc-2', authority: 'EASA', ruleVersion: '2026.2', active: true },
-  { id: 'rc-3', authority: 'SACAA', ruleVersion: '2026.1', active: true },
-  { id: 'rc-4', authority: 'ISO_55000', ruleVersion: '2014.9', active: true },
+  { id: 'rc-3', authority: 'CAAC', ruleVersion: '2026.1', active: true },
+  { id: 'rc-4', authority: 'SACAA', ruleVersion: '2026.1', active: true },
+  { id: 'rc-5', authority: 'ISO_55000', ruleVersion: '2014.9', active: true },
 ];
 
 const initialEvidenceChain: AmroEvidenceRecord[] = [
@@ -234,9 +362,42 @@ const initialEvidenceChain: AmroEvidenceRecord[] = [
 ];
 
 const initialMaterials: AmroMaterialPlanningRecord[] = [
-  { id: 'mat-1', partNumber: 'PN-ATA72-889', reservationStatus: 'reserved', repairAction: 'install', supplierEta: '2026-03-24T09:00:00.000Z' },
-  { id: 'mat-2', partNumber: 'PN-ATA27-190', reservationStatus: 'pending', repairAction: 'repair', supplierEta: '2026-03-26T09:00:00.000Z' },
-  { id: 'mat-3', partNumber: 'PN-ATA32-672', reservationStatus: 'shortage', repairAction: 'remove', supplierEta: '2026-03-29T09:00:00.000Z' },
+  {
+    id: 'mat-1',
+    partNumber: 'PN-ATA72-889',
+    reservationStatus: 'reserved',
+    repairAction: 'install',
+    supplierEta: '2026-03-24T09:00:00.000Z',
+    shortageSeverity: 'none',
+    etaStatus: 'on_time',
+    rotableStatus: 'serviceable',
+    llpRemainingCycles: 1240,
+    traceabilityStatus: 'verified',
+  },
+  {
+    id: 'mat-2',
+    partNumber: 'PN-ATA27-190',
+    reservationStatus: 'pending',
+    repairAction: 'repair',
+    supplierEta: '2026-03-26T09:00:00.000Z',
+    shortageSeverity: 'watch',
+    etaStatus: 'at_risk',
+    rotableStatus: 'serviceable',
+    llpRemainingCycles: 620,
+    traceabilityStatus: 'verified',
+  },
+  {
+    id: 'mat-3',
+    partNumber: 'PN-ATA32-672',
+    reservationStatus: 'shortage',
+    repairAction: 'remove',
+    supplierEta: '2026-03-29T09:00:00.000Z',
+    shortageSeverity: 'critical',
+    etaStatus: 'late',
+    rotableStatus: 'quarantined',
+    llpRemainingCycles: 420,
+    traceabilityStatus: 'quarantined',
+  },
 ];
 
 const initialPredictiveRecommendations: AmroPredictiveRecommendation[] = [
@@ -275,6 +436,12 @@ export function useAmroWorkspaceState() {
   const [selectedWorkPackageId, setSelectedWorkPackageId] = useState<string>('');
   const [loadingWorkPackages, setLoadingWorkPackages] = useState<boolean>(false);
   const [workPackagesError, setWorkPackagesError] = useState<string | null>(null);
+  const [workPackageStatusFilter, setWorkPackageStatusFilter] = useState<string>('all');
+  const [workPackageSearch, setWorkPackageSearch] = useState<string>('');
+  const [selectedSavedViewId, setSelectedSavedViewId] = useState<string>('default-all');
+  const [savedWorkPackageViews, setSavedWorkPackageViews] = useState<V2SavedWorkPackageView[]>([
+    { id: 'default-all', name: 'All Work Packages', filters: { status: 'all', search: '' } },
+  ]);
   const [realtimeConnected, setRealtimeConnected] = useState<boolean>(false);
   const [requiredAuthority, setRequiredAuthority] = useState<AmroAuthorityLevel>('supervisor');
   const [selectedQualificationId, setSelectedQualificationId] = useState<string>(initialQualifications[0]?.id ?? '');
@@ -283,6 +450,25 @@ export function useAmroWorkspaceState() {
   const [evidenceChain, setEvidenceChain] = useState<AmroEvidenceRecord[]>(initialEvidenceChain);
   const [materials, setMaterials] = useState<AmroMaterialPlanningRecord[]>(initialMaterials);
   const [predictiveRecommendations, setPredictiveRecommendations] = useState<AmroPredictiveRecommendation[]>(initialPredictiveRecommendations);
+  const [scheduleBoardRows, setScheduleBoardRows] = useState<ApiScheduleRow[]>([]);
+  const [scheduleOptimizationRecommendations, setScheduleOptimizationRecommendations] = useState<ApiScheduleOptimizationRecommendation[]>([]);
+  const [lastInventoryOptimizationRunId, setLastInventoryOptimizationRunId] = useState<string>('');
+  const [lastProcurementSyncId, setLastProcurementSyncId] = useState<string>('');
+  const [complianceGateModalOpen, setComplianceGateModalOpen] = useState<boolean>(false);
+  const [complianceExplainability, setComplianceExplainability] = useState<ComplianceExplainabilityState | null>(null);
+  const [complianceAuditReplay, setComplianceAuditReplay] = useState<ComplianceAuditReplayState | null>(null);
+  const [complianceAnomalyAlerts, setComplianceAnomalyAlerts] = useState<ComplianceAnomalyAlert[]>([]);
+  const [selectedRegulatorProfile, setSelectedRegulatorProfile] = useState<ComplianceRegulatorProfile>('FAA');
+  const [regulatorProfilePack, setRegulatorProfilePack] = useState<ComplianceRegulatorProfilePackState | null>(null);
+  const [obligationIngestionSummary, setObligationIngestionSummary] = useState<{ total: number; adCount: number; sbCount: number } | null>(null);
+  const [deferralDecision, setDeferralDecision] = useState<{ decision: string; actions: string[] } | null>(null);
+  const [selectedCertificationAuthorityProfile, setSelectedCertificationAuthorityProfile] = useState<CertificationAuthorityProfile>('FAA');
+  const [qualificationStatusIndicator, setQualificationStatusIndicator] = useState<CertificationQualificationStatusState | null>(null);
+  const [certifyingPrivilegeValidated, setCertifyingPrivilegeValidated] = useState<boolean>(false);
+  const [latestCertificationDecision, setLatestCertificationDecision] = useState<CertificationDecisionState | null>(null);
+  const [expiryAutomationSummary, setExpiryAutomationSummary] = useState<CertificationExpiryAutomationState | null>(null);
+  const [competencyAnalytics, setCompetencyAnalytics] = useState<CertificationCompetencyAnalyticsState | null>(null);
+  const [authorityCertificationTemplate, setAuthorityCertificationTemplate] = useState<CertificationTemplateState | null>(null);
 
   const authHeaders = useMemo(
     () =>
@@ -341,11 +527,27 @@ export function useAmroWorkspaceState() {
           throw error;
         }
         setHasV1WorkPackageConnectivity(false);
-        const v2Response = await fetch(`${apiBaseUrl}/api/v2/amro/work-packages`, { headers: authHeaders });
-        const v2Payload = await parseJsonSafe<{ data?: { workPackages?: V2WorkPackageItem[] }; error?: string }>(v2Response);
+        const query = new URLSearchParams();
+        if (workPackageStatusFilter !== 'all') {
+          query.set('status', workPackageStatusFilter);
+        }
+        if (workPackageSearch.trim()) {
+          query.set('search', workPackageSearch.trim());
+        }
+        if (selectedSavedViewId && selectedSavedViewId !== 'default-all') {
+          query.set('saved_view', selectedSavedViewId);
+        }
+        const endpoint = query.size
+          ? `${apiBaseUrl}/api/v2/amro/work-packages?${query.toString()}`
+          : `${apiBaseUrl}/api/v2/amro/work-packages`;
+        const v2Response = await fetch(endpoint, { headers: authHeaders });
+        const v2Payload = await parseJsonSafe<V2WorkPackagesResponse>(v2Response);
         const v2Items = v2Payload?.data?.workPackages;
         if (!v2Response.ok || !Array.isArray(v2Items)) {
           throw new Error(v2Payload?.error || `Failed to load work packages (${v2Response.status})`);
+        }
+        if (Array.isArray(v2Payload?.savedViews) && v2Payload.savedViews.length > 0) {
+          setSavedWorkPackageViews(v2Payload.savedViews);
         }
         next = v2Items.map((item) =>
           mapWorkPackageRecord({
@@ -355,6 +557,17 @@ export function useAmroWorkspaceState() {
             assetId: '',
           }),
         ) as AmroWorkPackage[];
+      }
+      if (hasV1WorkPackageConnectivity) {
+        const normalizedSearch = workPackageSearch.trim().toLowerCase();
+        next = next.filter((item) => {
+          const status = mapLifecycleToStatus(item.lifecycleStage);
+          const statusMatch = workPackageStatusFilter === 'all' ? true : status === workPackageStatusFilter;
+          const searchMatch = !normalizedSearch
+            ? true
+            : item.packageNumber.toLowerCase().includes(normalizedSearch) || item.id.toLowerCase().includes(normalizedSearch);
+          return statusMatch && searchMatch;
+        });
       }
       setWorkPackages(next);
       setSelectedWorkPackageId((previous) => {
@@ -373,7 +586,17 @@ export function useAmroWorkspaceState() {
     } finally {
       setLoadingWorkPackages(false);
     }
-  }, [apiBaseUrl, authHeaders, isApiTemporarilyUnavailable, mapWorkPackageRecord, markApiTemporarilyUnavailable]);
+  }, [
+    apiBaseUrl,
+    authHeaders,
+    hasV1WorkPackageConnectivity,
+    isApiTemporarilyUnavailable,
+    mapWorkPackageRecord,
+    markApiTemporarilyUnavailable,
+    selectedSavedViewId,
+    workPackageSearch,
+    workPackageStatusFilter,
+  ]);
 
   const fetchModuleSurfaces = useCallback(async () => {
     if (!authHeaders) {
@@ -494,6 +717,27 @@ export function useAmroWorkspaceState() {
                     : 'shortage',
               repairAction: item.action === 'inspect' ? 'repair' : item.action,
               supplierEta: item.received_date || new Date(Date.now() + 86400000 * 3).toISOString(),
+              shortageSeverity:
+                item.status === 'cancelled' || item.status === 'returned'
+                  ? 'critical'
+                  : item.status === 'pending' || item.status === 'ordered'
+                    ? 'watch'
+                    : 'none',
+              etaStatus:
+                item.status === 'cancelled' || item.status === 'returned'
+                  ? 'late'
+                  : item.status === 'pending' || item.status === 'ordered'
+                    ? 'at_risk'
+                    : 'on_time',
+              rotableStatus:
+                item.status === 'cancelled' || item.status === 'returned'
+                  ? 'quarantined'
+                  : 'serviceable',
+              llpRemainingCycles: item.status === 'installed' ? 1200 : item.status === 'received' ? 800 : 460,
+              traceabilityStatus:
+                item.status === 'cancelled' || item.status === 'returned'
+                  ? 'quarantined'
+                  : 'verified',
             })),
           );
         }
@@ -586,6 +830,33 @@ export function useAmroWorkspaceState() {
     [apiBaseUrl, authHeaders, isApiTemporarilyUnavailable, markApiTemporarilyUnavailable],
   );
 
+  const fetchScheduleBoard = useCallback(async () => {
+    if (!authHeaders) {
+      setScheduleBoardRows([]);
+      return;
+    }
+    if (isApiTemporarilyUnavailable()) {
+      return;
+    }
+    try {
+      const todayIso = new Date().toISOString();
+      const response = await fetch(`${apiBaseUrl}/api/v2/amro/schedules?date=${encodeURIComponent(todayIso)}`, { headers: authHeaders });
+      const payload = await parseJsonSafe<V2SchedulesResponse>(response);
+      const rows = payload?.output?.schedules;
+      if (!response.ok || !Array.isArray(rows)) {
+        throw new Error(payload?.error || `Failed to load schedules (${response.status})`);
+      }
+      setScheduleBoardRows(rows);
+    } catch (error) {
+      if (isNetworkConnectivityError(error)) {
+        markApiTemporarilyUnavailable();
+        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        return;
+      }
+      setWorkPackagesError(error instanceof Error ? error.message : 'Failed to load scheduling board');
+    }
+  }, [apiBaseUrl, authHeaders, isApiTemporarilyUnavailable, markApiTemporarilyUnavailable]);
+
   useEffect(() => {
     void fetchWorkPackages();
   }, [fetchWorkPackages]);
@@ -600,6 +871,10 @@ export function useAmroWorkspaceState() {
     }
     void fetchTasksForWorkPackage(selectedWorkPackageId);
   }, [fetchTasksForWorkPackage, selectedWorkPackageId]);
+
+  useEffect(() => {
+    void fetchScheduleBoard();
+  }, [fetchScheduleBoard]);
 
   useEffect(() => {
     if (!token) {
@@ -654,6 +929,7 @@ export function useAmroWorkspaceState() {
     const intervalId = setInterval(() => {
       void fetchWorkPackages();
       void fetchModuleSurfaces();
+      void fetchScheduleBoard();
       if (selectedWorkPackageId) {
         void fetchTasksForWorkPackage(selectedWorkPackageId);
       }
@@ -666,6 +942,7 @@ export function useAmroWorkspaceState() {
     fetchModuleSurfaces,
     fetchTasksForWorkPackage,
     fetchWorkPackages,
+    fetchScheduleBoard,
     hasV1WorkPackageConnectivity,
     selectedWorkPackageId,
   ]);
@@ -685,15 +962,60 @@ export function useAmroWorkspaceState() {
     return hasPermission('*') || hasRole('tenant_admin') || hasRole('franchise_admin');
   }, [hasPermission, hasRole, isPlatformAdmin]);
 
+  const activeRole = useMemo(() => {
+    if (hasRole('tenant_admin')) return 'tenant_admin';
+    if (hasPermission('dashboards.manage')) return 'planner';
+    if (hasPermission('reports.manage')) return 'engineer';
+    if (hasPermission('reports.view')) return 'technician';
+    if (hasPermission('dashboards.view')) return 'inspector';
+    return 'viewer';
+  }, [hasPermission, hasRole]);
+
+  const canCreateWorkPackage = useMemo(
+    () => isAmroAuthorized || hasPermission('dashboards.manage') || hasPermission('reports.manage'),
+    [hasPermission, isAmroAuthorized],
+  );
+
+  const canDeleteWorkPackage = useMemo(
+    () => isPlatformAdmin() || hasRole('tenant_admin') || hasPermission('dashboards.manage'),
+    [hasPermission, hasRole, isPlatformAdmin],
+  );
+
   const canAdvanceLifecycle = useMemo(() => {
     if (!isAmroAuthorized || !selectedWorkPackage) return false;
-    return selectedWorkPackage.lifecycleStage !== 'close';
-  }, [isAmroAuthorized, selectedWorkPackage]);
+    if (selectedWorkPackage.lifecycleStage === 'close') return false;
+    const nextStage = getNextWorkPackageLifecycleStage(selectedWorkPackage.lifecycleStage);
+    const nextStatus = mapLifecycleToStatus(nextStage);
+    return resolveRoleTransitionTargets(activeRole).includes(nextStatus);
+  }, [activeRole, isAmroAuthorized, selectedWorkPackage]);
 
   const canSignOff = useMemo(() => {
     if (!selectedQualification) return false;
     return canPerformAuthoritySignOff(selectedQualification, requiredAuthority);
   }, [requiredAuthority, selectedQualification]);
+
+  useEffect(() => {
+    if (!selectedQualification) {
+      setQualificationStatusIndicator(null);
+      return;
+    }
+    const daysUntilExpiry = Math.floor((Date.parse(selectedQualification.validUntil) - Date.now()) / 86_400_000);
+    const lifecycle = daysUntilExpiry < 0
+      ? 'suspended'
+      : daysUntilExpiry <= 30
+        ? 'warning'
+        : 'active';
+    const reason = lifecycle === 'suspended'
+      ? 'Qualification expired'
+      : lifecycle === 'warning'
+        ? 'Qualification near expiry'
+        : 'Qualification valid';
+    setQualificationStatusIndicator({
+      lifecycle,
+      daysUntilExpiry,
+      reason,
+    });
+  }, [selectedQualification]);
 
   const complianceCoverage = useMemo(() => buildComplianceCoverage(rulePacks), [rulePacks]);
   const materialsSummary = useMemo(() => buildMaterialsPlanningSummary(materials), [materials]);
@@ -701,6 +1023,465 @@ export function useAmroWorkspaceState() {
     () => buildPredictiveMaintenanceSummary(predictiveRecommendations),
     [predictiveRecommendations]
   );
+
+  const callComplianceInterface = useCallback(async (interfaceName: string, body: Record<string, unknown>) => {
+    if (!authHeaders) {
+      throw new Error('Authorization required');
+    }
+    const response = await fetch(`${apiBaseUrl}/api/v2/amro/compliance-gates?interface=${interfaceName}`, {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify(body),
+    });
+    const payload = await parseJsonSafe<{ output?: Record<string, unknown>; error?: string }>(response);
+    if (!response.ok) {
+      throw new Error(payload?.error || `Compliance request failed (${response.status})`);
+    }
+    return payload;
+  }, [apiBaseUrl, authHeaders]);
+
+  const callCertificationInterface = useCallback(async (interfaceName: string, body: Record<string, unknown>) => {
+    if (!authHeaders) {
+      throw new Error('Authorization required');
+    }
+    const response = await fetch(`${apiBaseUrl}/api/v2/amro/certification?interface=${interfaceName}`, {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify(body),
+    });
+    const payload = await parseJsonSafe<{ output?: Record<string, unknown>; error?: string }>(response);
+    if (!response.ok) {
+      throw new Error(payload?.error || `Certification request failed (${response.status})`);
+    }
+    return payload;
+  }, [apiBaseUrl, authHeaders]);
+
+  const loadComplianceGateExplainability = useCallback(async () => {
+    if (!selectedWorkPackageId || isApiTemporarilyUnavailable()) return false;
+    try {
+      const payload = await callComplianceInterface('load-compliance-gate-explainability', {
+        context: { type: 'work_package', id: selectedWorkPackageId },
+        policy_version_snapshot: 'policy-v2026.03.22',
+        required_obligations: [
+          { obligation_id: `${selectedWorkPackageId}-ad-1`, fulfilled: true },
+          { obligation_id: `${selectedWorkPackageId}-sb-1`, fulfilled: true },
+        ],
+      });
+      const output = (payload?.output || {}) as Record<string, unknown>;
+      const explainabilityPanel = (output.explainability_panel || {}) as Record<string, unknown>;
+      const blockers = Array.isArray(explainabilityPanel.blockers)
+        ? explainabilityPanel.blockers.map((item) => String(item))
+        : [];
+      setComplianceExplainability({
+        decision: String(output.decision || 'fail').toLowerCase() === 'pass' ? 'pass' : 'fail',
+        blockerCount: Number((output.gate_modal as Record<string, unknown> | undefined)?.blocker_count || blockers.length || 0),
+        blockers,
+        policyVersion: String(explainabilityPanel.policy_version_snapshot || 'policy-v2026.03.22'),
+      });
+      setComplianceGateModalOpen(true);
+      return true;
+    } catch (error) {
+      if (isNetworkConnectivityError(error)) {
+        markApiTemporarilyUnavailable();
+        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        return false;
+      }
+      setWorkPackagesError(error instanceof Error ? error.message : 'Failed to load compliance explainability');
+      return false;
+    }
+  }, [
+    callComplianceInterface,
+    isApiTemporarilyUnavailable,
+    markApiTemporarilyUnavailable,
+    selectedWorkPackageId,
+  ]);
+
+  const loadAuditReplayTimeline = useCallback(async () => {
+    if (isApiTemporarilyUnavailable()) return false;
+    try {
+      const payload = await callComplianceInterface('load-audit-replay-timeline', {
+        export_filters: {
+          capability: 'compliance-gates',
+          action: 'evaluate-compliance-gate',
+          format: 'csv',
+          limit: 50,
+        },
+      });
+      const output = (payload?.output || {}) as Record<string, unknown>;
+      const replayTimeline = (output.replay_timeline || {}) as Record<string, unknown>;
+      const exportFilters = (output.export_filters || {}) as Record<string, unknown>;
+      const events = Array.isArray(replayTimeline.events) ? replayTimeline.events : [];
+      setComplianceAuditReplay({
+        capability: String(exportFilters.capability || 'compliance-gates') as 'work-packages' | 'tasks' | 'compliance-gates',
+        format: String(exportFilters.format || 'csv') as 'csv' | 'json',
+        eventCount: Number(replayTimeline.event_count || events.length || 0),
+        events: events.map((entry) => {
+          const item = (entry && typeof entry === 'object' ? entry : {}) as Record<string, unknown>;
+          return {
+            sequence: Number(item.sequence || 0),
+            recordId: String(item.record_id || ''),
+            action: String(item.action || ''),
+            createdAt: String(item.created_at || ''),
+          };
+        }),
+      });
+      return true;
+    } catch (error) {
+      if (isNetworkConnectivityError(error)) {
+        markApiTemporarilyUnavailable();
+        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        return false;
+      }
+      setWorkPackagesError(error instanceof Error ? error.message : 'Failed to load audit replay timeline');
+      return false;
+    }
+  }, [callComplianceInterface, isApiTemporarilyUnavailable, markApiTemporarilyUnavailable]);
+
+  const detectComplianceAnomalies = useCallback(async () => {
+    if (isApiTemporarilyUnavailable()) return false;
+    try {
+      const payload = await callComplianceInterface('detect-compliance-anomalies', {
+        detection_window: 'P30D',
+        review_population: Math.max(10, complianceCoverage.activePacks * 15),
+        overdue_obligations: Math.max(2, materialsSummary.shortageCount * 3),
+        exception_escalations: Math.max(1, complianceCoverage.activePacks - 1),
+        mel_cdl_deferral_count: Math.max(1, complianceCoverage.activePacks),
+        anomaly_threshold: 0.2,
+      });
+      const output = (payload?.output || {}) as Record<string, unknown>;
+      const alertsRaw = Array.isArray(output.alerts) ? output.alerts : [];
+      const alerts = alertsRaw.map((entry) => {
+        const item = (entry && typeof entry === 'object' ? entry : {}) as Record<string, unknown>;
+        return {
+          severity: String(item.severity || 'low'),
+          code: String(item.code || 'unclassified-anomaly'),
+          metric: Number(item.metric || 0),
+        };
+      });
+      setComplianceAnomalyAlerts(alerts);
+      return true;
+    } catch (error) {
+      if (isNetworkConnectivityError(error)) {
+        markApiTemporarilyUnavailable();
+        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        return false;
+      }
+      setWorkPackagesError(error instanceof Error ? error.message : 'Failed to detect compliance anomalies');
+      return false;
+    }
+  }, [
+    callComplianceInterface,
+    complianceCoverage.activePacks,
+    isApiTemporarilyUnavailable,
+    markApiTemporarilyUnavailable,
+    materialsSummary.shortageCount,
+  ]);
+
+  const loadRegulatorProfilePack = useCallback(async () => {
+    if (isApiTemporarilyUnavailable()) return false;
+    try {
+      const payload = await callComplianceInterface('load-regulator-profile-pack', {
+        regulator_profile: selectedRegulatorProfile,
+        effective_at: new Date().toISOString(),
+      });
+      const output = (payload?.output || {}) as Record<string, unknown>;
+      const profilePack = (output.profile_pack || {}) as Record<string, unknown>;
+      const obligations = Array.isArray(profilePack.obligations) ? profilePack.obligations.map((item) => String(item)) : [];
+      const gateRules = Array.isArray(profilePack.gateRules) ? profilePack.gateRules.map((item) => String(item)) : [];
+      setRegulatorProfilePack({
+        regulatorProfile: selectedRegulatorProfile,
+        obligations,
+        gateRules,
+      });
+      const packVersion = selectedRegulatorProfile === 'FAA' ? '2026.1' : selectedRegulatorProfile === 'EASA' ? '2026.2' : '2026.1';
+      setRulePacks((previous) => {
+        const next = previous.map((pack) =>
+          pack.authority === selectedRegulatorProfile ? { ...pack, ruleVersion: packVersion, active: true } : pack
+        );
+        if (next.some((pack) => pack.authority === selectedRegulatorProfile)) {
+          return next;
+        }
+        return [...next, { id: `rc-${Date.now()}`, authority: selectedRegulatorProfile, ruleVersion: packVersion, active: true }];
+      });
+      return true;
+    } catch (error) {
+      if (isNetworkConnectivityError(error)) {
+        markApiTemporarilyUnavailable();
+        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        return false;
+      }
+      setWorkPackagesError(error instanceof Error ? error.message : 'Failed to load regulator profile pack');
+      return false;
+    }
+  }, [callComplianceInterface, isApiTemporarilyUnavailable, markApiTemporarilyUnavailable, selectedRegulatorProfile]);
+
+  const ingestAdSbObligations = useCallback(async () => {
+    if (!selectedWorkPackageId || isApiTemporarilyUnavailable()) return false;
+    try {
+      const payload = await callComplianceInterface('ingest-ad-sb-obligations', {
+        work_package_id: selectedWorkPackageId,
+        regulator_profile: selectedRegulatorProfile,
+        source_adapter: 'ad-sb-feed-v1',
+        obligations: [
+          {
+            obligation_id: `${selectedWorkPackageId}-ad-001`,
+            obligation_type: 'ad',
+            reference_number: 'AD-2026-001',
+            due_at: new Date(Date.now() + 86400000 * 10).toISOString(),
+            applicability: { aircraft_id: selectedWorkPackage?.assetId || 'asset-1' },
+          },
+          {
+            obligation_id: `${selectedWorkPackageId}-sb-001`,
+            obligation_type: 'sb',
+            reference_number: 'SB-A320-27-1121',
+            due_at: new Date(Date.now() + 86400000 * 14).toISOString(),
+            applicability: { aircraft_id: selectedWorkPackage?.assetId || 'asset-1' },
+          },
+        ],
+      });
+      const output = (payload?.output || {}) as Record<string, unknown>;
+      const summary = (output.mapping_summary || {}) as Record<string, unknown>;
+      setObligationIngestionSummary({
+        total: Number(summary.total || 0),
+        adCount: Number(summary.ad_count || 0),
+        sbCount: Number(summary.sb_count || 0),
+      });
+      return true;
+    } catch (error) {
+      if (isNetworkConnectivityError(error)) {
+        markApiTemporarilyUnavailable();
+        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        return false;
+      }
+      setWorkPackagesError(error instanceof Error ? error.message : 'Failed to ingest AD/SB obligations');
+      return false;
+    }
+  }, [
+    callComplianceInterface,
+    isApiTemporarilyUnavailable,
+    markApiTemporarilyUnavailable,
+    selectedRegulatorProfile,
+    selectedWorkPackage?.assetId,
+    selectedWorkPackageId,
+  ]);
+
+  const evaluateMelCdlDeferral = useCallback(async () => {
+    if (!selectedWorkPackageId || isApiTemporarilyUnavailable()) return false;
+    try {
+      const payload = await callComplianceInterface('evaluate-mel-cdl-deferral', {
+        work_package_id: selectedWorkPackageId,
+        deferral_type: 'mel',
+        item_reference: `${selectedWorkPackageId}-mel-001`,
+        deferral_category: 'B',
+        dispatch_conditions: ['operational-limitation-logged', 'next-flight-crew-briefed'],
+        expires_at: new Date(Date.now() + 3600000 * 36).toISOString(),
+      });
+      const output = (payload?.output || {}) as Record<string, unknown>;
+      const actions = Array.isArray(output.required_actions) ? output.required_actions.map((item) => String(item)) : [];
+      setDeferralDecision({
+        decision: String(output.deferral_decision || 'reject'),
+        actions,
+      });
+      return true;
+    } catch (error) {
+      if (isNetworkConnectivityError(error)) {
+        markApiTemporarilyUnavailable();
+        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        return false;
+      }
+      setWorkPackagesError(error instanceof Error ? error.message : 'Failed to evaluate MEL/CDL deferral');
+      return false;
+    }
+  }, [
+    callComplianceInterface,
+    isApiTemporarilyUnavailable,
+    markApiTemporarilyUnavailable,
+    selectedWorkPackageId,
+  ]);
+
+  const validateCertifyingPrivilege = useCallback(async () => {
+    if (!selectedQualification || isApiTemporarilyUnavailable()) return false;
+    try {
+      const payload = await callCertificationInterface('validate-certifying-authority', {
+        actor_id: selectedQualification.id,
+        timestamp: new Date().toISOString(),
+        aircraft_scope: [selectedWorkPackage?.assetId || 'asset-1'],
+        maintenance_scope: ['line'],
+        required_privileges: ['release_approval'],
+        authority: {
+          valid_from: new Date(Date.now() - 86_400_000).toISOString(),
+          valid_to: selectedQualification.validUntil,
+          aircraft_scope: ['*'],
+          maintenance_scope: ['line', 'base'],
+          can_certify_release: selectedQualification.signOffAuthority,
+          granted_privileges: selectedQualification.signOffAuthority ? ['release_approval'] : [],
+        },
+      });
+      const output = (payload?.output || {}) as Record<string, unknown>;
+      setCertifyingPrivilegeValidated(String(output.validation_result || '').toLowerCase() === 'valid');
+      return true;
+    } catch (error) {
+      if (isNetworkConnectivityError(error)) {
+        markApiTemporarilyUnavailable();
+        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        return false;
+      }
+      setCertifyingPrivilegeValidated(false);
+      setWorkPackagesError(error instanceof Error ? error.message : 'Failed to validate certifying privilege');
+      return false;
+    }
+  }, [
+    callCertificationInterface,
+    isApiTemporarilyUnavailable,
+    markApiTemporarilyUnavailable,
+    selectedQualification,
+    selectedWorkPackage?.assetId,
+  ]);
+
+  const submitCertificationDecision = useCallback(async (decision: CertificationDecisionOption) => {
+    if (!selectedWorkPackageId || !selectedQualification || isApiTemporarilyUnavailable()) return false;
+    try {
+      const payload = await callCertificationInterface('submit-certification-decision', {
+        work_package_id: selectedWorkPackageId,
+        decision,
+        unresolved_blockers: ['none'],
+        defer_reason: decision === 'defer' ? 'Additional engineering review required' : undefined,
+        follow_up_due_at: decision === 'defer' ? new Date(Date.now() + 172_800_000).toISOString() : undefined,
+        signatures: [
+          {
+            signer_id: selectedQualification.id,
+            mandatory: true,
+            signature: selectedQualification.signOffAuthority ? `sig-${selectedQualification.id}-${Date.now()}` : '',
+          },
+        ],
+      });
+      const output = (payload?.output || {}) as Record<string, unknown>;
+      const workflow = (output.workflow || {}) as Record<string, unknown>;
+      setLatestCertificationDecision({
+        actionStatus: String(output.action_status || 'pending'),
+        nextAction: String(workflow.next_action || ''),
+        blockers: Array.isArray(output.blockers) ? output.blockers.map((item) => String(item)) : [],
+      });
+      return true;
+    } catch (error) {
+      if (isNetworkConnectivityError(error)) {
+        markApiTemporarilyUnavailable();
+        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        return false;
+      }
+      setWorkPackagesError(error instanceof Error ? error.message : 'Failed to submit certification decision');
+      return false;
+    }
+  }, [
+    callCertificationInterface,
+    isApiTemporarilyUnavailable,
+    markApiTemporarilyUnavailable,
+    selectedQualification,
+    selectedWorkPackageId,
+  ]);
+
+  const runExpiryWarningAndSuspension = useCallback(async () => {
+    if (isApiTemporarilyUnavailable()) return false;
+    try {
+      const payload = await callCertificationInterface('automate-expiry-suspension', {
+        timestamp: new Date().toISOString(),
+        warning_window_days: 30,
+        qualifications: qualifications.map((qualification) => ({
+          id: qualification.id,
+          valid_to: qualification.validUntil,
+          can_certify_release: qualification.signOffAuthority,
+          status: 'active',
+        })),
+      });
+      const summary = ((payload?.output || {}) as Record<string, unknown>).summary as Record<string, unknown> | undefined;
+      setExpiryAutomationSummary({
+        warningCount: Number(summary?.warning_count || 0),
+        suspensionCount: Number(summary?.suspension_count || 0),
+        evaluatedCount: Number(summary?.evaluated_count || 0),
+      });
+      return true;
+    } catch (error) {
+      if (isNetworkConnectivityError(error)) {
+        markApiTemporarilyUnavailable();
+        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        return false;
+      }
+      setWorkPackagesError(error instanceof Error ? error.message : 'Failed to run expiry warning automation');
+      return false;
+    }
+  }, [callCertificationInterface, isApiTemporarilyUnavailable, markApiTemporarilyUnavailable, qualifications]);
+
+  const loadCompetencyAnalyticsDashboard = useCallback(async () => {
+    if (isApiTemporarilyUnavailable()) return false;
+    try {
+      const payload = await callCertificationInterface('load-competency-analytics-dashboard', {
+        qualifications: qualifications.map((qualification) => ({
+          id: qualification.id,
+          authority_level: qualification.authorityLevel,
+          valid_to: qualification.validUntil,
+          can_certify_release: qualification.signOffAuthority,
+        })),
+      });
+      const output = (payload?.output || {}) as Record<string, unknown>;
+      const cards = (output.kpi_cards || {}) as Record<string, unknown>;
+      const distribution = (output.authority_distribution || {}) as Record<string, unknown>;
+      setCompetencyAnalytics({
+        totalQualifiedStaff: Number(cards.total_qualified_staff || 0),
+        activeCertifiers: Number(cards.active_certifiers || 0),
+        warningWindowStaff: Number(cards.warning_window_staff || 0),
+        suspendedCertifiers: Number(cards.suspended_certifiers || 0),
+        authorityDistribution: Object.keys(distribution).reduce<Record<string, number>>((acc, key) => {
+          acc[key] = Number(distribution[key] || 0);
+          return acc;
+        }, {}),
+      });
+      return true;
+    } catch (error) {
+      if (isNetworkConnectivityError(error)) {
+        markApiTemporarilyUnavailable();
+        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        return false;
+      }
+      setWorkPackagesError(error instanceof Error ? error.message : 'Failed to load competency analytics');
+      return false;
+    }
+  }, [callCertificationInterface, isApiTemporarilyUnavailable, markApiTemporarilyUnavailable, qualifications]);
+
+  const loadAuthorityCertificationTemplate = useCallback(async () => {
+    if (isApiTemporarilyUnavailable()) return false;
+    try {
+      const payload = await callCertificationInterface('load-authority-certification-template', {
+        authority_profile: selectedCertificationAuthorityProfile,
+      });
+      const template = (((payload?.output || {}) as Record<string, unknown>).template || {}) as Record<string, unknown>;
+      const deferPolicy = (template.defer_policy || {}) as Record<string, unknown>;
+      setAuthorityCertificationTemplate({
+        templateId: String(template.template_id || ''),
+        authorityProfile: selectedCertificationAuthorityProfile,
+        requiredSignatures: Array.isArray(template.required_signatures)
+          ? template.required_signatures.map((item) => String(item))
+          : [],
+        mandatoryChecks: Array.isArray(template.mandatory_checks)
+          ? template.mandatory_checks.map((item) => String(item))
+          : [],
+        deferMaxDays: Number(deferPolicy.max_defer_days || 0),
+      });
+      return true;
+    } catch (error) {
+      if (isNetworkConnectivityError(error)) {
+        markApiTemporarilyUnavailable();
+        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        return false;
+      }
+      setWorkPackagesError(error instanceof Error ? error.message : 'Failed to load authority certification template');
+      return false;
+    }
+  }, [
+    callCertificationInterface,
+    isApiTemporarilyUnavailable,
+    markApiTemporarilyUnavailable,
+    selectedCertificationAuthorityProfile,
+  ]);
 
   const advanceWorkPackageLifecycle = async () => {
     if (!selectedWorkPackage || !canAdvanceLifecycle) return false;
@@ -710,6 +1491,34 @@ export function useAmroWorkspaceState() {
       return false;
     }
     try {
+      if (nextStage === 'close') {
+        const selectedTasks = selectedWorkPackage.tasks || [];
+        const completedTasks = selectedTasks.filter((task) => task.completed).length;
+        const evidenceForPackage = evidenceChain.filter(
+          (record) =>
+            (record.entityType === 'work_package' && record.entityId === selectedWorkPackage.id)
+            || (record.entityType === 'task' && selectedTasks.some((task) => task.id === record.entityId)),
+        ).length;
+        const signaturePending = canSignOff ? 0 : 1;
+        const qualityGateResponse = await fetch(
+          `${apiBaseUrl}/api/v2/amro/compliance-gates?interface=evaluate-closure-quality-gate`,
+          {
+            method: 'POST',
+            headers: authHeaders,
+            body: JSON.stringify({
+              work_package_id: selectedWorkPackage.id,
+              open_findings: selectedTasks.length - completedTasks,
+              unresolved_deferrals: 0,
+              pending_signatures: signaturePending,
+              evidence_coverage_pct: selectedTasks.length > 0 ? Math.min(100, (evidenceForPackage / selectedTasks.length) * 100) : 0,
+            }),
+          },
+        );
+        const qualityGatePayload = await parseJsonSafe<{ output?: { release_ready?: boolean }; error?: string }>(qualityGateResponse);
+        if (!qualityGateResponse.ok || !qualityGatePayload?.output?.release_ready) {
+          throw new Error(qualityGatePayload?.error || 'Closure quality gate is not satisfied');
+        }
+      }
       try {
         const response = await fetch(`${apiBaseUrl}/api/v1/work-packages/${selectedWorkPackage.id}`, {
           method: 'PATCH',
@@ -812,6 +1621,536 @@ export function useAmroWorkspaceState() {
     ],
   );
 
+  const assignSelectedWorkPackageToNextSlot = useCallback(async () => {
+    if (!authHeaders || !selectedWorkPackageId) return false;
+    if (isApiTemporarilyUnavailable()) {
+      setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+      return false;
+    }
+    try {
+      const now = Date.now();
+      const slotStart = new Date(now + 3600000).toISOString();
+      const slotEnd = new Date(now + 7200000).toISOString();
+      const response = await fetch(`${apiBaseUrl}/api/v2/amro/schedules?interface=assign-maintenance-slot`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({
+          work_package_id: selectedWorkPackageId,
+          station_code: 'station-a',
+          slot_start: slotStart,
+          slot_end: slotEnd,
+          station_capacity: 2,
+          existing_slots: scheduleBoardRows.map((item) => ({ slot_start: item.slot_start, slot_end: item.slot_end })),
+          assigned_team: [{ member_id: 'tech-ui-1', qualifications: ['station-a'] }],
+        }),
+      });
+      const payload = await parseJsonSafe<{ error?: string }>(response);
+      if (!response.ok) {
+        throw new Error(payload?.error || `Failed to assign maintenance slot (${response.status})`);
+      }
+      await fetchScheduleBoard();
+      return true;
+    } catch (error) {
+      if (isNetworkConnectivityError(error)) {
+        markApiTemporarilyUnavailable();
+        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        return false;
+      }
+      setWorkPackagesError(error instanceof Error ? error.message : 'Failed to assign maintenance slot');
+      return false;
+    }
+  }, [
+    apiBaseUrl,
+    authHeaders,
+    fetchScheduleBoard,
+    isApiTemporarilyUnavailable,
+    markApiTemporarilyUnavailable,
+    scheduleBoardRows,
+    selectedWorkPackageId,
+  ]);
+
+  const acknowledgeScheduleUpdate = useCallback(
+    async (scheduleId: string, workPackageId: string) => {
+      if (!authHeaders) return false;
+      if (isApiTemporarilyUnavailable()) {
+        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        return false;
+      }
+      try {
+        const response = await fetch(`${apiBaseUrl}/api/v2/amro/schedules?interface=acknowledge-schedule-update`, {
+          method: 'POST',
+          headers: authHeaders,
+          body: JSON.stringify({
+            schedule_id: scheduleId,
+            work_package_id: workPackageId,
+            acknowledged_at: new Date().toISOString(),
+            device_id: 'mobile-ui-emulator',
+          }),
+        });
+        const payload = await parseJsonSafe<{ error?: string }>(response);
+        if (!response.ok) {
+          throw new Error(payload?.error || `Failed to acknowledge schedule (${response.status})`);
+        }
+        return true;
+      } catch (error) {
+        if (isNetworkConnectivityError(error)) {
+          markApiTemporarilyUnavailable();
+          setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+          return false;
+        }
+        setWorkPackagesError(error instanceof Error ? error.message : 'Failed to acknowledge schedule');
+        return false;
+      }
+    },
+    [apiBaseUrl, authHeaders, isApiTemporarilyUnavailable, markApiTemporarilyUnavailable],
+  );
+
+  const fetchScheduleOptimizationRecommendations = useCallback(async () => {
+    if (!authHeaders) return false;
+    if (isApiTemporarilyUnavailable()) {
+      setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+      return false;
+    }
+    try {
+      const response = await fetch(
+        `${apiBaseUrl}/api/v2/amro/schedules/replan?interface=generate-schedule-optimization-recommendations`,
+        {
+          method: 'POST',
+          headers: authHeaders,
+          body: JSON.stringify({
+            schedule_date: new Date().toISOString().slice(0, 10),
+            station_code: 'station-a',
+            demand_pressure: 0.74,
+            disruption_risk: 0.58,
+            recommendation_count: 3,
+          }),
+        },
+      );
+      const payload = await parseJsonSafe<V2ScheduleOptimizationResponse>(response);
+      const recommendations = payload?.output?.recommendations;
+      if (!response.ok || !Array.isArray(recommendations)) {
+        throw new Error(payload?.error || `Failed to load schedule optimization recommendations (${response.status})`);
+      }
+      setScheduleOptimizationRecommendations(recommendations);
+      return true;
+    } catch (error) {
+      if (isNetworkConnectivityError(error)) {
+        markApiTemporarilyUnavailable();
+        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        return false;
+      }
+      setWorkPackagesError(error instanceof Error ? error.message : 'Failed to load schedule optimization recommendations');
+      return false;
+    }
+  }, [apiBaseUrl, authHeaders, isApiTemporarilyUnavailable, markApiTemporarilyUnavailable]);
+
+  const reservePartsAllocationForSelectedWorkPackage = useCallback(async () => {
+    if (!authHeaders || !selectedWorkPackageId || materials.length === 0) return false;
+    if (isApiTemporarilyUnavailable()) {
+      setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+      return false;
+    }
+    try {
+      const demandLines = materials.slice(0, 2).map((material, index) => ({
+        part_number: material.partNumber,
+        quantity: index === 0 ? 1 : 2,
+        serial: index === 0 ? `${material.id}-serial` : undefined,
+      }));
+      const response = await fetch(`${apiBaseUrl}/api/v2/amro/work-packages?interface=reserve-parts`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({
+          work_package_id: selectedWorkPackageId,
+          demand_lines: demandLines,
+        }),
+      });
+      const payload = await parseJsonSafe<{ error?: string }>(response);
+      if (!response.ok) {
+        throw new Error(payload?.error || `Failed to reserve parts (${response.status})`);
+      }
+      await fetchModuleSurfaces();
+      return true;
+    } catch (error) {
+      if (isNetworkConnectivityError(error)) {
+        markApiTemporarilyUnavailable();
+        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        return false;
+      }
+      setWorkPackagesError(error instanceof Error ? error.message : 'Failed to reserve parts');
+      return false;
+    }
+  }, [
+    apiBaseUrl,
+    authHeaders,
+    fetchModuleSurfaces,
+    isApiTemporarilyUnavailable,
+    markApiTemporarilyUnavailable,
+    materials,
+    selectedWorkPackageId,
+  ]);
+
+  const processCriticalShortageResponse = useCallback(async () => {
+    if (!authHeaders) return false;
+    if (isApiTemporarilyUnavailable()) {
+      setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+      return false;
+    }
+    try {
+      const shortageMaterial = materials.find((item) => item.reservationStatus === 'shortage') || materials[0];
+      if (!shortageMaterial) return false;
+      const response = await fetch(`${apiBaseUrl}/api/v2/amro/work-packages?interface=process-shortage-response`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({
+          shortage_id: shortageMaterial.id,
+          action: 'escalate',
+          supplier_ref: shortageMaterial.partNumber,
+        }),
+      });
+      const payload = await parseJsonSafe<{ error?: string }>(response);
+      if (!response.ok) {
+        throw new Error(payload?.error || `Failed to process shortage response (${response.status})`);
+      }
+      await fetchModuleSurfaces();
+      return true;
+    } catch (error) {
+      if (isNetworkConnectivityError(error)) {
+        markApiTemporarilyUnavailable();
+        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        return false;
+      }
+      setWorkPackagesError(error instanceof Error ? error.message : 'Failed to process shortage response');
+      return false;
+    }
+  }, [apiBaseUrl, authHeaders, fetchModuleSurfaces, isApiTemporarilyUnavailable, markApiTemporarilyUnavailable, materials]);
+
+  const applyRotableLlpTraceability = useCallback(async (materialId: string) => {
+    if (!authHeaders) return false;
+    if (isApiTemporarilyUnavailable()) {
+      setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+      return false;
+    }
+    try {
+      const targetMaterial = materials.find((item) => item.id === materialId);
+      if (!targetMaterial) return false;
+      const response = await fetch(`${apiBaseUrl}/api/v2/amro/work-packages?interface=trace-rotable-llp`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({
+          component_id: targetMaterial.id,
+          part_number: targetMaterial.partNumber,
+          serial_number: `${targetMaterial.id}-serial`,
+          rotable_status: targetMaterial.rotableStatus,
+          llp_remaining_cycles: targetMaterial.llpRemainingCycles,
+          traceability_action: targetMaterial.rotableStatus === 'quarantined' ? 'release' : 'verify',
+        }),
+      });
+      const payload = await parseJsonSafe<{ output?: { traceability_status?: 'verified' | 'quarantined' | 'released' }; error?: string }>(response);
+      if (!response.ok) {
+        throw new Error(payload?.error || `Failed to apply traceability controls (${response.status})`);
+      }
+      const nextStatus = payload?.output?.traceability_status || 'verified';
+      setMaterials((previous) =>
+        previous.map((material) =>
+          material.id === materialId
+            ? {
+                ...material,
+                traceabilityStatus: nextStatus,
+                rotableStatus: nextStatus === 'quarantined' ? 'quarantined' : 'serviceable',
+              }
+            : material,
+        ),
+      );
+      return true;
+    } catch (error) {
+      if (isNetworkConnectivityError(error)) {
+        markApiTemporarilyUnavailable();
+        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        return false;
+      }
+      setWorkPackagesError(error instanceof Error ? error.message : 'Failed to apply rotable/LLP traceability');
+      return false;
+    }
+  }, [apiBaseUrl, authHeaders, isApiTemporarilyUnavailable, markApiTemporarilyUnavailable, materials]);
+
+  const runInventoryOptimizationModel = useCallback(async () => {
+    if (!authHeaders || !selectedWorkPackageId) return false;
+    if (isApiTemporarilyUnavailable()) {
+      setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+      return false;
+    }
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/v2/amro/work-packages?interface=run-inventory-optimization`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({
+          work_package_id: selectedWorkPackageId,
+          forecast_signal_ids: predictiveRecommendations.slice(0, 3).map((item) => item.id),
+          optimization_window: 'P14D',
+        }),
+      });
+      const payload = await parseJsonSafe<{ output?: { optimization_run_id?: string }; error?: string }>(response);
+      if (!response.ok) {
+        throw new Error(payload?.error || `Failed to run inventory optimization (${response.status})`);
+      }
+      setLastInventoryOptimizationRunId(String(payload?.output?.optimization_run_id || ''));
+      return true;
+    } catch (error) {
+      if (isNetworkConnectivityError(error)) {
+        markApiTemporarilyUnavailable();
+        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        return false;
+      }
+      setWorkPackagesError(error instanceof Error ? error.message : 'Failed to run inventory optimization');
+      return false;
+    }
+  }, [
+    apiBaseUrl,
+    authHeaders,
+    isApiTemporarilyUnavailable,
+    markApiTemporarilyUnavailable,
+    predictiveRecommendations,
+    selectedWorkPackageId,
+  ]);
+
+  const syncSupplierAsnAndErpProcurement = useCallback(async () => {
+    if (!authHeaders) return false;
+    if (isApiTemporarilyUnavailable()) {
+      setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+      return false;
+    }
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/v2/amro/work-packages?interface=sync-supplier-asn-erp`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({
+          asn_event_id: `asn-${Date.now()}`,
+          procurement_source: 'sap-pm',
+          po_number: `PO-${Date.now()}`,
+          line_items: materials.slice(0, 2).map((material) => ({
+            part_number: material.partNumber,
+            qty: material.reservationStatus === 'shortage' ? 2 : 1,
+          })),
+          impacted_work_packages: selectedWorkPackageId ? [selectedWorkPackageId] : [],
+        }),
+      });
+      const payload = await parseJsonSafe<{ output?: { procurement_sync_id?: string }; error?: string }>(response);
+      if (!response.ok) {
+        throw new Error(payload?.error || `Failed to sync supplier ASN and ERP procurement (${response.status})`);
+      }
+      setLastProcurementSyncId(String(payload?.output?.procurement_sync_id || ''));
+      return true;
+    } catch (error) {
+      if (isNetworkConnectivityError(error)) {
+        markApiTemporarilyUnavailable();
+        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        return false;
+      }
+      setWorkPackagesError(error instanceof Error ? error.message : 'Failed to sync supplier ASN and ERP procurement');
+      return false;
+    }
+  }, [apiBaseUrl, authHeaders, isApiTemporarilyUnavailable, markApiTemporarilyUnavailable, materials, selectedWorkPackageId]);
+
+  const applySavedWorkPackageView = useCallback((viewId: string) => {
+    setSelectedSavedViewId(viewId);
+    const selectedView = savedWorkPackageViews.find((item) => item.id === viewId) || null;
+    if (selectedView) {
+      setWorkPackageStatusFilter(selectedView.filters.status || 'all');
+      setWorkPackageSearch(selectedView.filters.search || '');
+    }
+  }, [savedWorkPackageViews]);
+
+  const saveCurrentWorkPackageView = useCallback(
+    async (name: string) => {
+      if (!authHeaders) return false;
+      const cleanName = name.trim();
+      if (!cleanName) return false;
+      if (isApiTemporarilyUnavailable()) {
+        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        return false;
+      }
+      try {
+        const response = await fetch(`${apiBaseUrl}/api/v2/amro/work-packages?interface=save-work-package-view`, {
+          method: 'POST',
+          headers: authHeaders,
+          body: JSON.stringify({
+            view_name: cleanName,
+            filters: {
+              status: workPackageStatusFilter,
+              search: workPackageSearch,
+            },
+          }),
+        });
+        const payload = await parseJsonSafe<{ output?: { saved_view_id?: string; view_name?: string; filters?: { status?: string; search?: string } }; error?: string }>(response);
+        if (!response.ok) {
+          throw new Error(payload?.error || `Failed to save view (${response.status})`);
+        }
+        const savedViewId = String(payload?.output?.saved_view_id || '').trim();
+        if (savedViewId) {
+          setSavedWorkPackageViews((previous) => [
+            ...previous,
+            {
+              id: savedViewId,
+              name: String(payload?.output?.view_name || cleanName),
+              filters: {
+                status: String(payload?.output?.filters?.status || workPackageStatusFilter),
+                search: String(payload?.output?.filters?.search || workPackageSearch),
+              },
+            },
+          ]);
+          setSelectedSavedViewId(savedViewId);
+        }
+        return true;
+      } catch (error) {
+        if (isNetworkConnectivityError(error)) {
+          markApiTemporarilyUnavailable();
+          setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+          return false;
+        }
+        setWorkPackagesError(error instanceof Error ? error.message : 'Failed to save work package view');
+        return false;
+      }
+    },
+    [
+      apiBaseUrl,
+      authHeaders,
+      isApiTemporarilyUnavailable,
+      markApiTemporarilyUnavailable,
+      workPackageSearch,
+      workPackageStatusFilter,
+    ],
+  );
+
+  const updateTaskExecutionStatus = useCallback(
+    async (taskId: string, action: 'start' | 'complete' | 'block' | 'reopen') => {
+      if (!authHeaders || !selectedWorkPackageId) return false;
+      if (isApiTemporarilyUnavailable()) {
+        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        return false;
+      }
+      try {
+        const response = await fetch(`${apiBaseUrl}/api/v2/amro/tasks?interface=update-task-step`, {
+          method: 'POST',
+          headers: authHeaders,
+          body: JSON.stringify({
+            task_id: taskId,
+            step_id: `step-${taskId}`,
+            action,
+            performed_at: new Date().toISOString(),
+            device_id: 'amro-ui-workspace',
+          }),
+        });
+        const payload = await parseJsonSafe<{ error?: string }>(response);
+        if (!response.ok) {
+          throw new Error(payload?.error || `Failed to update task step (${response.status})`);
+        }
+        await fetchTasksForWorkPackage(selectedWorkPackageId);
+        return true;
+      } catch (error) {
+        if (isNetworkConnectivityError(error)) {
+          markApiTemporarilyUnavailable();
+          setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+          return false;
+        }
+        setWorkPackagesError(error instanceof Error ? error.message : 'Failed to update task step');
+        return false;
+      }
+    },
+    [
+      apiBaseUrl,
+      authHeaders,
+      fetchTasksForWorkPackage,
+      isApiTemporarilyUnavailable,
+      markApiTemporarilyUnavailable,
+      selectedWorkPackageId,
+    ],
+  );
+
+  const uploadTaskEvidence = useCallback(
+    async (taskId: string) => {
+      if (!authHeaders) return false;
+      if (isApiTemporarilyUnavailable()) {
+        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        return false;
+      }
+      try {
+        const now = Date.now();
+        const response = await fetch(`${apiBaseUrl}/api/v2/amro/tasks?interface=upload-evidence`, {
+          method: 'POST',
+          headers: authHeaders,
+          body: JSON.stringify({
+            task_id: taskId,
+            evidence_type: 'photo',
+            media_ref: `amro://evidence/${taskId}/${now}`,
+            checksum: `sha256-${now}`,
+          }),
+        });
+        const payload = await parseJsonSafe<{ output?: { evidence_id?: string }; error?: string }>(response);
+        if (!response.ok) {
+          throw new Error(payload?.error || `Failed to upload evidence (${response.status})`);
+        }
+        const evidenceId = String(payload?.output?.evidence_id || `${taskId}-${now}`);
+        setEvidenceChain((previous) => [
+          ...previous,
+          {
+            id: evidenceId,
+            entityType: 'task',
+            entityId: taskId,
+            hash: `sha256-${now}`,
+            immutable: true,
+            createdAt: new Date(now).toISOString(),
+          },
+        ]);
+        return true;
+      } catch (error) {
+        if (isNetworkConnectivityError(error)) {
+          markApiTemporarilyUnavailable();
+          setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+          return false;
+        }
+        setWorkPackagesError(error instanceof Error ? error.message : 'Failed to upload task evidence');
+        return false;
+      }
+    },
+    [apiBaseUrl, authHeaders, isApiTemporarilyUnavailable, markApiTemporarilyUnavailable],
+  );
+
+  const submitTaskSignature = useCallback(
+    async (taskId: string) => {
+      if (!authHeaders || !selectedQualification) return false;
+      if (isApiTemporarilyUnavailable()) {
+        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        return false;
+      }
+      try {
+        const response = await fetch(`${apiBaseUrl}/api/v2/amro/tasks?interface=submit-signature`, {
+          method: 'POST',
+          headers: authHeaders,
+          body: JSON.stringify({
+            task_id: taskId,
+            signer_id: selectedQualification.id,
+            signature_payload: `sig-${selectedQualification.id}-${Date.now()}`,
+            method: 'digital_certificate',
+          }),
+        });
+        const payload = await parseJsonSafe<{ error?: string }>(response);
+        if (!response.ok) {
+          throw new Error(payload?.error || `Failed to submit signature (${response.status})`);
+        }
+        return true;
+      } catch (error) {
+        if (isNetworkConnectivityError(error)) {
+          markApiTemporarilyUnavailable();
+          setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+          return false;
+        }
+        setWorkPackagesError(error instanceof Error ? error.message : 'Failed to submit signature');
+        return false;
+      }
+    },
+    [apiBaseUrl, authHeaders, isApiTemporarilyUnavailable, markApiTemporarilyUnavailable, selectedQualification],
+  );
+
   const deleteSelectedWorkPackage = useCallback(async () => {
     if (!authHeaders || !selectedWorkPackageId) return false;
     if (isApiTemporarilyUnavailable()) {
@@ -819,13 +2158,27 @@ export function useAmroWorkspaceState() {
       return false;
     }
     try {
-      const response = await fetch(`${apiBaseUrl}/api/v1/work-packages/${selectedWorkPackageId}`, {
-        method: 'DELETE',
-        headers: authHeaders,
-      });
-      if (!response.ok && response.status !== 204) {
-        const payload = await parseJsonSafe<{ error?: string }>(response);
-        throw new Error(payload?.error || `Failed to delete work package (${response.status})`);
+      try {
+        const response = await fetch(`${apiBaseUrl}/api/v1/work-packages/${selectedWorkPackageId}`, {
+          method: 'DELETE',
+          headers: authHeaders,
+        });
+        if (!response.ok && response.status !== 204) {
+          const payload = await parseJsonSafe<{ error?: string }>(response);
+          throw new Error(payload?.error || `Failed to delete work package (${response.status})`);
+        }
+      } catch (error) {
+        if (!isNetworkConnectivityError(error)) {
+          throw error;
+        }
+        const v2Response = await fetch(`${apiBaseUrl}/api/v2/amro/work-packages/${selectedWorkPackageId}`, {
+          method: 'DELETE',
+          headers: authHeaders,
+        });
+        const v2Payload = await parseJsonSafe<{ error?: string }>(v2Response);
+        if (!v2Response.ok) {
+          throw new Error(v2Payload?.error || `Failed to delete work package (${v2Response.status})`);
+        }
       }
       await fetchWorkPackages();
       return true;
@@ -863,9 +2216,34 @@ export function useAmroWorkspaceState() {
     evidenceChain,
     materials,
     predictiveRecommendations,
+    scheduleBoardRows,
+    scheduleOptimizationRecommendations,
+    lastInventoryOptimizationRunId,
+    lastProcurementSyncId,
+    complianceGateModalOpen,
+    setComplianceGateModalOpen,
+    complianceExplainability,
+    complianceAuditReplay,
+    complianceAnomalyAlerts,
+    selectedRegulatorProfile,
+    setSelectedRegulatorProfile,
+    regulatorProfilePack,
+    obligationIngestionSummary,
+    deferralDecision,
+    selectedCertificationAuthorityProfile,
+    setSelectedCertificationAuthorityProfile,
+    qualificationStatusIndicator,
+    certifyingPrivilegeValidated,
+    latestCertificationDecision,
+    expiryAutomationSummary,
+    competencyAnalytics,
+    authorityCertificationTemplate,
     isAmroAuthorized,
     canAdvanceLifecycle,
     canSignOff,
+    canCreateWorkPackage,
+    canDeleteWorkPackage,
+    activeRole,
     complianceCoverage,
     materialsSummary,
     predictiveSummary,
@@ -874,7 +2252,37 @@ export function useAmroWorkspaceState() {
     workPackagesError,
     realtimeConnected,
     refreshWorkPackages: fetchWorkPackages,
+    workPackageStatusFilter,
+    setWorkPackageStatusFilter,
+    workPackageSearch,
+    setWorkPackageSearch,
+    selectedSavedViewId,
+    setSelectedSavedViewId: applySavedWorkPackageView,
+    savedWorkPackageViews,
+    saveCurrentWorkPackageView,
     createWorkPackage,
+    assignSelectedWorkPackageToNextSlot,
+    updateTaskExecutionStatus,
+    uploadTaskEvidence,
+    submitTaskSignature,
+    acknowledgeScheduleUpdate,
+    fetchScheduleOptimizationRecommendations,
+    reservePartsAllocationForSelectedWorkPackage,
+    processCriticalShortageResponse,
+    applyRotableLlpTraceability,
+    runInventoryOptimizationModel,
+    syncSupplierAsnAndErpProcurement,
     deleteSelectedWorkPackage,
+    loadComplianceGateExplainability,
+    loadAuditReplayTimeline,
+    detectComplianceAnomalies,
+    loadRegulatorProfilePack,
+    ingestAdSbObligations,
+    evaluateMelCdlDeferral,
+    validateCertifyingPrivilege,
+    submitCertificationDecision,
+    runExpiryWarningAndSuspension,
+    loadCompetencyAnalyticsDashboard,
+    loadAuthorityCertificationTemplate,
   };
 }

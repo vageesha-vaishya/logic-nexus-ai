@@ -1,6 +1,26 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createClient } from '@supabase/supabase-js';
 
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+async function resolveSupabaseAvailability(): Promise<boolean> {
+  if (!supabaseUrl || !supabaseServiceKey) return false;
+  try {
+    const response = await fetch(`${supabaseUrl.replace(/\/$/, '')}/rest/v1/`, {
+      headers: {
+        apikey: supabaseServiceKey,
+        Authorization: `Bearer ${supabaseServiceKey}`,
+      },
+    });
+    return response.status < 500;
+  } catch {
+    return false;
+  }
+}
+
+const amroOperationalSchemaSuite = (await resolveSupabaseAvailability()) ? describe : describe.skip;
+
 /**
  * Integration test for AMRO operational database schema
  *
@@ -15,16 +35,13 @@ import { createClient } from '@supabase/supabase-js';
  *
  * Tests ensure RLS policies are correctly applied for tenant isolation.
  */
-describe('AMRO Operational Schema', () => {
+amroOperationalSchemaSuite('AMRO Operational Schema', () => {
   let supabase: ReturnType<typeof createClient>;
   const testTenantId = 'test-tenant-amro-001';
   const testFranchiseId = 'test-franchise-amro-001';
 
   beforeAll(async () => {
-    const supabaseUrl = process.env.SUPABASE_URL || 'http://localhost:54321';
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc19zdXBlcmFkbWluIjp0cnVlfQ.rGL32GQBYaO69BIkD_K1t-nxrngilvpVVPreh74XUkQ';
-
-    supabase = createClient(supabaseUrl, supabaseServiceKey);
+    supabase = createClient(supabaseUrl!, supabaseServiceKey!);
   });
 
   afterAll(async () => {

@@ -172,6 +172,32 @@ describe('/api/v2/amro/integration-hub', () => {
     expect((res.jsonBody as any)?.output?.parse_status).toBe('parsed');
   });
 
+  it('rejects ingest when source system is not allow-listed', async () => {
+    process.env.AMRO_INTEGRATION_HUB_V2_ENABLED = 'true';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'ingest-partner-payload' },
+      body: {
+        source_system: 'unknown-partner',
+        adapter_version: '2.4.1',
+        event_type: 'task_update',
+        payload: { task_id: 'task-1' },
+        idempotency_key: 'idem-123',
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(sendErrorResponse).toHaveBeenCalledWith(
+      res,
+      expect.any(Error),
+      'corr-amro-integration-hub-v2',
+      { apiVersion: 'v2' },
+    );
+  });
+
   it('replays only failed or quarantined jobs', async () => {
     process.env.AMRO_INTEGRATION_HUB_V2_ENABLED = 'true';
     const req: ApiRequest = {
@@ -232,6 +258,31 @@ describe('/api/v2/amro/integration-hub', () => {
       'corr-amro-integration-hub-v2',
       { apiVersion: 'v2' },
     );
+  });
+
+  it('publishes callback when schema mapping matches partner version', async () => {
+    process.env.AMRO_INTEGRATION_HUB_V2_ENABLED = 'true';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'publish-outbound-callback' },
+      body: {
+        target_partner: 'sap-pm',
+        event_type: 'amro.task.completed.v1',
+        payload_ref: 'payload-abc',
+        mapping_contract: {
+          schema_version: 'v1.3',
+          partner_schema_version: 'v1.3',
+        },
+        attempt_log: [{ attempt: 1, status: 'queued' }],
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.output?.publish_status).toBe('dispatched');
   });
 
   it('blocks M7 interfaces when M6 is not completed', async () => {

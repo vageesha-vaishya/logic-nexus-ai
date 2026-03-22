@@ -4,7 +4,7 @@ export type AmroWorkPackageLifecycleStage = 'create' | 'plan' | 'schedule' | 'ex
 
 export type AmroAuthorityLevel = 'technician' | 'supervisor' | 'engineering' | 'qa' | 'compliance';
 
-export type AmroRegulatoryAuthority = 'FAA' | 'EASA' | 'SACAA' | 'ISO_55000';
+export type AmroRegulatoryAuthority = 'FAA' | 'EASA' | 'CAAC' | 'SACAA' | 'ISO_55000';
 
 export type AmroAssetRegistryRecord = {
   id: string;
@@ -64,6 +64,11 @@ export type AmroMaterialPlanningRecord = {
   reservationStatus: 'reserved' | 'pending' | 'shortage';
   repairAction: 'install' | 'remove' | 'repair';
   supplierEta: string;
+  shortageSeverity: 'none' | 'watch' | 'critical';
+  etaStatus: 'on_time' | 'at_risk' | 'late';
+  rotableStatus: 'serviceable' | 'unserviceable' | 'quarantined';
+  llpRemainingCycles: number;
+  traceabilityStatus: 'verified' | 'quarantined' | 'released';
 };
 
 export type AmroPredictiveRecommendation = {
@@ -116,10 +121,14 @@ export function buildComplianceCoverage(rulePacks: AmroComplianceRulePack[]) {
 export function buildMaterialsPlanningSummary(materials: AmroMaterialPlanningRecord[]) {
   const shortageCount = materials.filter((material) => material.reservationStatus === 'shortage').length;
   const pendingReservations = materials.filter((material) => material.reservationStatus === 'pending').length;
+  const atRiskEtaCount = materials.filter((material) => material.etaStatus === 'at_risk' || material.etaStatus === 'late').length;
+  const llpAlertCount = materials.filter((material) => material.llpRemainingCycles <= 500).length;
   return {
     totalRecords: materials.length,
     shortageCount,
     pendingReservations,
+    atRiskEtaCount,
+    llpAlertCount,
   };
 }
 

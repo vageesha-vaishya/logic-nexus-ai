@@ -157,6 +157,18 @@ describe('/api/v2/amro/work-packages/[id] + transitions', () => {
     expect((res.jsonBody as any)?.data?.to_status).toBe('scheduled');
   });
 
+  it('deletes work package for API-AMRO-002 DELETE', async () => {
+    const req: ApiRequest = { method: 'DELETE', query: { id: 'wp-delete-1' }, headers: {} };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.interface).toBe('delete-work-package');
+    expect((res.jsonBody as any)?.data?.deleted).toBe(true);
+    expect((res.jsonBody as any)?.data?.work_package_id).toBe('wp-delete-1');
+  });
+
   it('blocks invalid transition path in API-AMRO-003 endpoint', async () => {
     const req: ApiRequest = {
       method: 'POST',

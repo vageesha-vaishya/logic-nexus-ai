@@ -350,4 +350,198 @@ describe('/api/v2/amro/compliance-gates', () => {
       { apiVersion: 'v2' }
     );
   });
+
+  it('evaluates closure quality gate and returns fail with blockers', async () => {
+    process.env.AMRO_COMPLIANCE_GATES_V2_ENABLED = 'true';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'evaluate-closure-quality-gate' },
+      body: {
+        work_package_id: 'wp-closure-1',
+        open_findings: 1,
+        unresolved_deferrals: 0,
+        pending_signatures: 0,
+        evidence_coverage_pct: 92,
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.interface).toBe('evaluate-closure-quality-gate');
+    expect((res.jsonBody as any)?.output?.decision).toBe('fail');
+    expect((res.jsonBody as any)?.output?.release_ready).toBe(false);
+    expect((res.jsonBody as any)?.output?.blockers?.length).toBeGreaterThan(0);
+  });
+
+  it('ingests AD/SB obligations and returns mapping summary', async () => {
+    process.env.AMRO_COMPLIANCE_GATES_V2_ENABLED = 'true';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'ingest-ad-sb-obligations' },
+      body: {
+        work_package_id: 'wp-100',
+        regulator_profile: 'CAAC',
+        source_adapter: 'feed-v1',
+        obligations: [
+          {
+            obligation_id: 'obl-ad-1',
+            obligation_type: 'ad',
+            reference_number: 'AD-2026-001',
+            due_at: '2026-04-10T00:00:00.000Z',
+            applicability: { aircraft_id: 'asset-1' },
+          },
+          {
+            obligation_id: 'obl-sb-1',
+            obligation_type: 'sb',
+            reference_number: 'SB-A320-01',
+            due_at: '2026-04-12T00:00:00.000Z',
+            applicability: { component_id: 'cmp-1' },
+          },
+        ],
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.interface).toBe('ingest-ad-sb-obligations');
+    expect((res.jsonBody as any)?.output?.mapping_summary?.total).toBe(2);
+    expect((res.jsonBody as any)?.output?.mapping_summary?.ad_count).toBe(1);
+    expect((res.jsonBody as any)?.output?.mapping_summary?.sb_count).toBe(1);
+  });
+
+  it('evaluates MEL/CDL deferral policy and returns explainability factors', async () => {
+    process.env.AMRO_COMPLIANCE_GATES_V2_ENABLED = 'true';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'evaluate-mel-cdl-deferral' },
+      body: {
+        work_package_id: 'wp-101',
+        deferral_type: 'mel',
+        item_reference: 'MEL-ATA27-001',
+        deferral_category: 'B',
+        dispatch_conditions: ['flight-crew-notified'],
+        expires_at: '2026-04-01T10:00:00.000Z',
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.interface).toBe('evaluate-mel-cdl-deferral');
+    expect(Array.isArray((res.jsonBody as any)?.output?.explainability)).toBe(true);
+    expect(Array.isArray((res.jsonBody as any)?.output?.required_actions)).toBe(true);
+  });
+
+  it('loads compliance gate modal explainability payload', async () => {
+    process.env.AMRO_COMPLIANCE_GATES_V2_ENABLED = 'true';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'load-compliance-gate-explainability' },
+      body: {
+        context: { type: 'work_package', id: 'wp-102' },
+        policy_version_snapshot: 'policy-v2026.03.22',
+        required_obligations: [{ obligation_id: 'obl-1', fulfilled: true }],
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.interface).toBe('load-compliance-gate-explainability');
+    expect((res.jsonBody as any)?.output?.gate_modal?.title).toBe('Compliance Gate Decision');
+    expect((res.jsonBody as any)?.output?.explainability_panel?.policy_version_snapshot).toBe('policy-v2026.03.22');
+  });
+
+  it('loads audit replay timeline with export filters', async () => {
+    process.env.AMRO_COMPLIANCE_GATES_V2_ENABLED = 'true';
+    const primeReq: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'evaluate-compliance-gate' },
+      body: {
+        context: { type: 'task', id: 'task-prime' },
+        regulator_profile: 'FAA',
+        required_obligations: [{ obligation_id: 'obl-1', fulfilled: true }],
+        policy_version_snapshot: 'policy-v2026.03.21',
+        decision_evidence: 'evidence-prime',
+      },
+      headers: {},
+    };
+    const primeRes = createResponse();
+    await handler(primeReq, primeRes);
+
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'load-audit-replay-timeline' },
+      body: {
+        export_filters: {
+          capability: 'compliance-gates',
+          action: 'evaluate-compliance-gate',
+          format: 'csv',
+          limit: 50,
+        },
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.interface).toBe('load-audit-replay-timeline');
+    expect((res.jsonBody as any)?.output?.export_filters?.format).toBe('csv');
+    expect(Array.isArray((res.jsonBody as any)?.output?.replay_timeline?.events)).toBe(true);
+  });
+
+  it('detects compliance anomalies and returns alerts', async () => {
+    process.env.AMRO_COMPLIANCE_GATES_V2_ENABLED = 'true';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'detect-compliance-anomalies' },
+      body: {
+        detection_window: 'P30D',
+        review_population: 10,
+        overdue_obligations: 4,
+        exception_escalations: 3,
+        mel_cdl_deferral_count: 2,
+        anomaly_threshold: 0.2,
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.interface).toBe('detect-compliance-anomalies');
+    expect((res.jsonBody as any)?.output?.alert_count).toBeGreaterThan(0);
+  });
+
+  it('loads regulator profile packs for FAA/EASA/CAAC', async () => {
+    process.env.AMRO_COMPLIANCE_GATES_V2_ENABLED = 'true';
+    for (const profile of ['FAA', 'EASA', 'CAAC']) {
+      const req: ApiRequest = {
+        method: 'POST',
+        query: { interface: 'load-regulator-profile-pack' },
+        body: {
+          regulator_profile: profile,
+          effective_at: '2026-03-22T00:00:00.000Z',
+        },
+        headers: {},
+      };
+      const res = createResponse();
+      await handler(req, res);
+      expect(res.statusCode).toBe(200);
+      expect((res.jsonBody as any)?.output?.profile_pack?.profile).toBe(profile);
+    }
+  });
 });

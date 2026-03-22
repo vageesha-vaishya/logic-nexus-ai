@@ -171,6 +171,7 @@ describe('/api/v2/amro/schedules', () => {
     expect(res.statusCode).toBe(200);
     expect((res.jsonBody as any)?.interface).toBe('assign-maintenance-slot');
     expect((res.jsonBody as any)?.output?.assignment_status).toBe('assigned');
+    expect((res.jsonBody as any)?.output?.published_events?.length).toBe(1);
   });
 
   it('rejects overlapping slot assignment requests', async () => {
@@ -216,6 +217,62 @@ describe('/api/v2/amro/schedules', () => {
           { member_id: 'tech-1', qualifications: ['station-a'] },
           { member_id: 'tech-2', qualifications: ['station-a'] },
         ],
+      },
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(sendErrorResponse).toHaveBeenCalledWith(
+      res,
+      expect.any(Error),
+      'corr-amro-schedules',
+      { apiVersion: 'v2' }
+    );
+  });
+
+  it('accepts mobile schedule acknowledgment for operational roles', async () => {
+    vi.mocked(authenticateRequest).mockResolvedValue({
+      userId: 'tech-1',
+      role: 'technician',
+      permissions: ['dashboards.view'],
+    } as any);
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'acknowledge-schedule-update' },
+      headers: {},
+      body: {
+        schedule_id: 'tenant-1-fr-1-schedule-a',
+        work_package_id: 'wp-120',
+        acknowledged_at: '2026-03-22T07:15:00.000Z',
+        device_id: 'device-mobile-7',
+      },
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.interface).toBe('acknowledge-schedule-update');
+    expect((res.jsonBody as any)?.output?.status).toBe('acknowledged');
+    expect((res.jsonBody as any)?.output?.published_events?.length).toBe(1);
+  });
+
+  it('rejects mobile schedule acknowledgment for non-operational roles', async () => {
+    vi.mocked(authenticateRequest).mockResolvedValue({
+      userId: 'auditor-1',
+      role: 'auditor',
+      permissions: ['dashboards.view'],
+    } as any);
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'acknowledge-schedule-update' },
+      headers: {},
+      body: {
+        schedule_id: 'tenant-1-fr-1-schedule-a',
+        work_package_id: 'wp-120',
+        acknowledged_at: '2026-03-22T07:15:00.000Z',
+        device_id: 'device-mobile-7',
       },
     };
     const res = createResponse();

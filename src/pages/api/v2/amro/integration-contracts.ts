@@ -8,6 +8,7 @@ export const AMRO_MIGRATION_PLAN_PATH = '/api/v2/amro/migration-plan' as const;
 export const AMRO_OVERVIEW_KPI_PATH = '/api/v2/amro/overview-kpi' as const;
 export const AMRO_MODULE_CATALOG_PATH = '/api/v2/amro/module-catalog' as const;
 export const AMRO_SCREEN_INVENTORY_PATH = '/api/v2/amro/screen-inventory' as const;
+export const AMRO_HEALTH_PATH = '/api/v2/amro/health' as const;
 
 export const AMRO_INTEGRATION_CONTRACTS = {
   rest: {
@@ -30,6 +31,7 @@ export const AMRO_INTEGRATION_CONTRACTS = {
       AMRO_PHASE_PLAN_PATH,
       AMRO_PHASE_1_READINESS_PATH,
       AMRO_MIGRATION_PLAN_PATH,
+      AMRO_HEALTH_PATH,
     ],
     contractPath: AMRO_OPENAPI_SPEC_PATH,
   },

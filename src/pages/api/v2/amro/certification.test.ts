@@ -198,6 +198,34 @@ describe('/api/v2/amro/certification', () => {
     expect((res.jsonBody as any)?.output?.blockers).toEqual([]);
   });
 
+  it('rejects approval decision when unresolved blockers remain', async () => {
+    process.env.AMRO_CERTIFICATION_V2_ENABLED = 'true';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'submit-certification-decision' },
+      body: {
+        work_package_id: 'wp-100',
+        decision: 'approve',
+        unresolved_blockers: ['open-ad-2026-001'],
+        signatures: [
+          { signer_id: 'cert-a', mandatory: true, signature: 'sig-a' },
+          { signer_id: 'cert-b', mandatory: true, signature: 'sig-b' },
+        ],
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(sendErrorResponse).toHaveBeenCalledWith(
+      res,
+      expect.any(Error),
+      'corr-amro-certification-v2',
+      { apiVersion: 'v2' },
+    );
+  });
+
   it('rejects escalation when target is outside authority chain', async () => {
     process.env.AMRO_CERTIFICATION_V2_ENABLED = 'true';
     const req: ApiRequest = {
@@ -221,6 +249,101 @@ describe('/api/v2/amro/certification', () => {
       'corr-amro-certification-v2',
       { apiVersion: 'v2' },
     );
+  });
+
+  it('runs expiry warning and suspension automation', async () => {
+    process.env.AMRO_CERTIFICATION_V2_ENABLED = 'true';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'automate-expiry-suspension' },
+      body: {
+        timestamp: '2026-03-20T10:00:00.000Z',
+        warning_window_days: 30,
+        qualifications: [
+          {
+            id: 'qual-active',
+            valid_to: '2026-05-01T00:00:00.000Z',
+            can_certify_release: true,
+            status: 'active',
+          },
+          {
+            id: 'qual-suspended',
+            valid_to: '2026-03-01T00:00:00.000Z',
+            can_certify_release: true,
+            status: 'active',
+          },
+        ],
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.output?.summary?.evaluated_count).toBe(2);
+    expect((res.jsonBody as any)?.output?.summary?.suspension_count).toBe(1);
+  });
+
+  it('loads competency analytics dashboard', async () => {
+    process.env.AMRO_CERTIFICATION_V2_ENABLED = 'true';
+    process.env.AMRO_SEQ_M6_STATUS = 'completed';
+    process.env.AMRO_SEQ_M7_STATUS = 'completed';
+    process.env.AMRO_SEQ_M8_STATUS = 'in-progress';
+    process.env.AMRO_SEQ_M6_GATE_EVALUATION_BLOCKER_TESTS_PASS = 'true';
+    process.env.AMRO_SEQ_M6_CERT_AUTHORITY_VALIDITY_TESTS_PASS = 'true';
+    process.env.AMRO_SEQ_M6_ZERO_UNRESOLVED_BLOCKER_RULE_PASS = 'true';
+    process.env.AMRO_SEQ_M6_DOSSIER_GENERATION_TESTS_PASS = 'true';
+    process.env.AMRO_SEQ_M7_ADAPTER_CONTRACT_TESTS_PASS = 'true';
+    process.env.AMRO_SEQ_M7_IDEMPOTENCY_REPLAY_TESTS_PASS = 'true';
+    process.env.AMRO_SEQ_M7_DLQ_REPLAY_CLOSURE_100 = 'true';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'load-competency-analytics-dashboard' },
+      body: {
+        qualifications: [
+          {
+            id: 'qual-1',
+            authority_level: 'supervisor',
+            valid_to: '2026-06-01T00:00:00.000Z',
+            can_certify_release: true,
+          },
+          {
+            id: 'qual-2',
+            authority_level: 'technician',
+            valid_to: '2026-03-01T00:00:00.000Z',
+            can_certify_release: false,
+          },
+        ],
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.output?.kpi_cards?.total_qualified_staff).toBe(2);
+    expect((res.jsonBody as any)?.output?.kpi_cards?.suspended_certifiers).toBe(1);
+  });
+
+  it('loads authority-specific certification template for FAA', async () => {
+    process.env.AMRO_CERTIFICATION_V2_ENABLED = 'true';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'load-authority-certification-template' },
+      body: {
+        authority_profile: 'FAA',
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.output?.template?.template_id).toBe('tmpl-faa-cert-release-v1');
+    expect((res.jsonBody as any)?.output?.template?.authority_profile).toBe('FAA');
   });
 
   it('blocks M6 certification interfaces when M5 is not completed', async () => {

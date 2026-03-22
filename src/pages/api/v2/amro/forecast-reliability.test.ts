@@ -55,6 +55,13 @@ function createResponse(): ApiResponse & { statusCode?: number; jsonBody?: unkno
   return res;
 }
 
+function computePercentile(values: number[], percentile: number): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  if (!sorted.length) return 0;
+  const index = Math.min(sorted.length - 1, Math.ceil((percentile / 100) * sorted.length) - 1);
+  return sorted[index];
+}
+
 describe('/api/v2/amro/forecast-reliability', () => {
   const envBackup = { ...process.env };
 
@@ -241,5 +248,34 @@ describe('/api/v2/amro/forecast-reliability', () => {
       'corr-amro-forecast-reliability-v2',
       { apiVersion: 'v2' },
     );
+  });
+
+  it('produces p95 and p99 latency evidence for score-maintenance-risk', async () => {
+    process.env.AMRO_FORECAST_RELIABILITY_V2_ENABLED = 'true';
+    const samples: number[] = [];
+    for (let index = 0; index < 40; index += 1) {
+      const req: ApiRequest = {
+        method: 'POST',
+        query: { interface: 'score-maintenance-risk' },
+        body: {
+          asset_id: `aircraft-${index}`,
+          telemetry_features: [{ key: 'vibration', value: 0.5 + (index % 10) / 20 }],
+          defect_history: [{ code: `D-${index}` }],
+          environment_context: { severity: index % 2 === 0 ? 'moderate' : 'severe' },
+          required_feature_count: 2,
+          feature_completeness_threshold: 0.5,
+        },
+        headers: {},
+      };
+      const res = createResponse();
+      const startedAt = performance.now();
+      await handler(req, res);
+      samples.push(performance.now() - startedAt);
+      expect(res.statusCode).toBe(200);
+    }
+    const p95 = computePercentile(samples, 95);
+    const p99 = computePercentile(samples, 99);
+    expect(p95).toBeLessThan(100);
+    expect(p99).toBeLessThan(120);
   });
 });

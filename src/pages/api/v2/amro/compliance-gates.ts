@@ -30,7 +30,7 @@ import {
   enqueueAmroDualWriteOperation,
   enqueueAmroReconciliationSnapshot,
 } from './reconciliation-queue';
-import { appendAmroAuditLedgerRecord } from './audit-ledger';
+import { appendAmroAuditLedgerRecord, replayAmroAuditLedgerRecords } from './audit-ledger';
 import { resolveAmroAuditLedgerCutoverState, resolveAmroV2EndpointRolloutState } from './audit-ledger-cutover';
 import { enforceAmroSequentialMilestoneForComplianceInterface } from './phase-plan-model';
 
@@ -111,6 +111,11 @@ function filterByDecision(items: ComplianceGateItem[], decision: ComplianceDecis
 
 const ALLOWED_REGULATOR_PROFILES = new Set(['faa', 'easa', 'caac']);
 const ALLOWED_EXCEPTION_REQUEST_ROLES = new Set(['tenant_admin', 'inspector', 'engineer']);
+const ALLOWED_OBLIGATION_TYPES = new Set(['ad', 'sb']);
+const ALLOWED_DEFERRAL_TYPES = new Set(['mel', 'cdl']);
+const ALLOWED_DEFERRAL_CATEGORIES = new Set(['A', 'B', 'C', 'D']);
+const ALLOWED_AUDIT_REPLAY_CAPABILITIES = new Set(['work-packages', 'tasks', 'compliance-gates']);
+const ALLOWED_EXPORT_FORMATS = new Set(['csv', 'json']);
 const MANDATORY_DOSSIER_ARTIFACTS: Record<string, ReadonlyArray<string>> = {
   faa: ['release_certificate', 'task_cards', 'signature_log'],
   easa: ['release_certificate', 'task_cards', 'signature_log'],
@@ -160,6 +165,47 @@ function resolveComplianceDecision(requiredObligations: Array<Record<string, unk
     .filter((blocker) => blocker.obligation_id);
   const decision = blockers.length === 0 ? 'pass' : 'fail';
   return { decision, blockers };
+}
+
+function parseInteger(value: unknown, fieldName: string): number {
+  const parsed = Number.parseInt(String(value ?? ''), 10);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    throw new Error(`${fieldName} must be a non-negative integer`);
+  }
+  return parsed;
+}
+
+function parseNumber(value: unknown, fieldName: string): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    throw new Error(`${fieldName} must be a valid number`);
+  }
+  return parsed;
+}
+
+function buildRegulatorProfilePack(profile: 'faa' | 'easa' | 'caac') {
+  if (profile === 'faa') {
+    return {
+      profile: 'FAA',
+      obligations: ['14CFR-39-AD-tracking', 'part-145-release-to-service', 'maintenance-record-append-only'],
+      melPolicy: { maxDeferralCategoryAHours: 24, maxDeferralCategoryBHours: 72 },
+      gateRules: ['faa-signature-chain-valid', 'faa-mandatory-ad-closed'],
+    };
+  }
+  if (profile === 'easa') {
+    return {
+      profile: 'EASA',
+      obligations: ['part-m-subpart-g-closure', 'part-145-certifying-staff-check', 'camo-deviation-evidence'],
+      melPolicy: { maxDeferralCategoryAHours: 24, maxDeferralCategoryBHours: 72 },
+      gateRules: ['easa-form-1-linked', 'easa-mel-cdl-policy-pass'],
+    };
+  }
+  return {
+    profile: 'CAAC',
+    obligations: ['ccar145-release-signoff', 'ccar66-license-verification', 'caac-ad-sb-traceability'],
+    melPolicy: { maxDeferralCategoryAHours: 24, maxDeferralCategoryBHours: 72 },
+    gateRules: ['caac-closure-criteria-pass', 'caac-airworthiness-directive-satisfied'],
+  };
 }
 
 function buildReconciliation(legacyItems: ComplianceGateItem[], moduleItems: ComplianceGateItem[]) {
@@ -390,6 +436,370 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       });
     }
 
+    if (req.method === 'POST' && interfaceName === 'ingest-ad-sb-obligations') {
+      enforceAnyPermission(auth.permissions || [], ['dashboards.manage', 'reports.manage']);
+      const body = parseBody(req.body);
+      const workPackageId = assertNonEmpty(body.work_package_id, 'work_package_id');
+      const regulatorProfile = assertNonEmpty(body.regulator_profile, 'regulator_profile').toLowerCase();
+      if (!ALLOWED_REGULATOR_PROFILES.has(regulatorProfile)) {
+        throw new Error('regulator_profile is not supported');
+      }
+      const sourceAdapter = assertNonEmpty(body.source_adapter, 'source_adapter');
+      const obligationsRaw = Array.isArray(body.obligations) ? body.obligations : [];
+      if (obligationsRaw.length === 0) {
+        throw new Error('obligations must include at least one AD/SB item');
+      }
+      const mappedObligations = obligationsRaw.map((entry, index) => {
+        const item = parseBody(entry);
+        const obligationId = assertNonEmpty(item.obligation_id, `obligations[${index}].obligation_id`);
+        const obligationType = assertNonEmpty(item.obligation_type, `obligations[${index}].obligation_type`).toLowerCase();
+        if (!ALLOWED_OBLIGATION_TYPES.has(obligationType)) {
+          throw new Error('obligation_type must be ad or sb');
+        }
+        const referenceNumber = assertNonEmpty(item.reference_number, `obligations[${index}].reference_number`);
+        const dueAt = parseIsoTimestamp(item.due_at, `obligations[${index}].due_at`);
+        const applicability = parseBody(item.applicability);
+        const applicabilityTarget = String(applicability.aircraft_id || applicability.component_id || '').trim();
+        if (!applicabilityTarget) {
+          throw new Error(`obligations[${index}].applicability must include aircraft_id or component_id`);
+        }
+        return {
+          obligation_id: obligationId,
+          obligation_type: obligationType,
+          reference_number: referenceNumber,
+          due_at: dueAt,
+          mapped_target: applicabilityTarget,
+          mapping_status: 'mapped',
+        };
+      });
+      return res.status(200).json({
+        version: 'v2',
+        interface: 'ingest-ad-sb-obligations',
+        correlationId: ctx.correlationId,
+        compatMode: compatDecision.compatMode,
+        mode: 'module',
+        domainAccess: {
+          subscriptionStatus: amroAccess.subscriptionStatus,
+          source: amroAccess.source,
+          validatedAt: amroAccess.validatedAt,
+        },
+        serviceBoundaries,
+        input: {
+          work_package_id: workPackageId,
+          regulator_profile: regulatorProfile,
+          source_adapter: sourceAdapter,
+        },
+        output: {
+          ingestion_id: `${tenantId}-${workPackageId}-obligation-ingest-${Date.now()}`,
+          mapped_obligations: mappedObligations,
+          mapping_summary: {
+            total: mappedObligations.length,
+            ad_count: mappedObligations.filter((item) => item.obligation_type === 'ad').length,
+            sb_count: mappedObligations.filter((item) => item.obligation_type === 'sb').length,
+          },
+        },
+      });
+    }
+
+    if (req.method === 'POST' && interfaceName === 'evaluate-mel-cdl-deferral') {
+      enforceAnyPermission(auth.permissions || [], ['dashboards.manage', 'reports.manage']);
+      const body = parseBody(req.body);
+      const workPackageId = assertNonEmpty(body.work_package_id, 'work_package_id');
+      const deferralType = assertNonEmpty(body.deferral_type, 'deferral_type').toLowerCase();
+      if (!ALLOWED_DEFERRAL_TYPES.has(deferralType)) {
+        throw new Error('deferral_type must be mel or cdl');
+      }
+      const itemReference = assertNonEmpty(body.item_reference, 'item_reference');
+      const category = assertNonEmpty(body.deferral_category, 'deferral_category').toUpperCase();
+      if (!ALLOWED_DEFERRAL_CATEGORIES.has(category)) {
+        throw new Error('deferral_category must be A, B, C, or D');
+      }
+      const expiresAt = parseIsoTimestamp(body.expires_at, 'expires_at');
+      const dispatchConditions = parseStringArray(body.dispatch_conditions);
+      if (dispatchConditions.length === 0) {
+        throw new Error('dispatch_conditions must include at least one condition');
+      }
+      const expiresInHours = Math.max(0, Math.floor((Date.parse(expiresAt) - Date.now()) / 3600000));
+      const decision = category === 'A' && expiresInHours < 24 ? 'reject' : 'approve';
+      return res.status(200).json({
+        version: 'v2',
+        interface: 'evaluate-mel-cdl-deferral',
+        correlationId: ctx.correlationId,
+        compatMode: compatDecision.compatMode,
+        mode: 'module',
+        domainAccess: {
+          subscriptionStatus: amroAccess.subscriptionStatus,
+          source: amroAccess.source,
+          validatedAt: amroAccess.validatedAt,
+        },
+        serviceBoundaries,
+        input: {
+          work_package_id: workPackageId,
+          deferral_type: deferralType,
+          item_reference: itemReference,
+          deferral_category: category,
+          dispatch_conditions: dispatchConditions,
+          expires_at: expiresAt,
+        },
+        output: {
+          deferral_decision: decision,
+          explainability: [
+            { factor: 'deferral_category', value: category },
+            { factor: 'hours_to_expiry', value: expiresInHours },
+            { factor: 'dispatch_conditions', value: dispatchConditions.length },
+          ],
+          required_actions: decision === 'approve'
+            ? ['capture-operational-briefing', 'schedule-next-review-checkpoint']
+            : ['close-deferral-before-dispatch', 'escalate-to-compliance-duty-manager'],
+        },
+      });
+    }
+
+    if (req.method === 'POST' && interfaceName === 'load-compliance-gate-explainability') {
+      enforceAnyPermission(auth.permissions || [], ['dashboards.manage', 'reports.manage']);
+      const body = parseBody(req.body);
+      const context = parseBody(body.context);
+      const contextType = assertNonEmpty(context.type, 'context.type').toLowerCase();
+      if (contextType !== 'work_package' && contextType !== 'task') {
+        throw new Error('context must be work_package or task');
+      }
+      const contextId = assertNonEmpty(context.id, 'context.id');
+      const policyVersionSnapshot = assertNonEmpty(body.policy_version_snapshot, 'policy_version_snapshot');
+      const obligationsRaw = Array.isArray(body.required_obligations) ? body.required_obligations : [];
+      if (obligationsRaw.length === 0) {
+        throw new Error('required_obligations must include at least one obligation');
+      }
+      const requiredObligations = obligationsRaw.map((entry) => (entry && typeof entry === 'object' ? entry as Record<string, unknown> : {}));
+      const decision = resolveComplianceDecision(requiredObligations);
+      return res.status(200).json({
+        version: 'v2',
+        interface: 'load-compliance-gate-explainability',
+        correlationId: ctx.correlationId,
+        compatMode: compatDecision.compatMode,
+        mode: 'module',
+        domainAccess: {
+          subscriptionStatus: amroAccess.subscriptionStatus,
+          source: amroAccess.source,
+          validatedAt: amroAccess.validatedAt,
+        },
+        serviceBoundaries,
+        input: {
+          context: { type: contextType, id: contextId },
+          policy_version_snapshot: policyVersionSnapshot,
+        },
+        output: {
+          decision: decision.decision,
+          gate_modal: {
+            title: 'Compliance Gate Decision',
+            status: decision.decision,
+            blocker_count: decision.blockers.length,
+          },
+          explainability_panel: {
+            policy_version_snapshot: policyVersionSnapshot,
+            decision_path: [
+              { step: 'obligation-ingestion', status: 'pass' },
+              { step: 'rule-evaluation', status: decision.decision === 'pass' ? 'pass' : 'fail' },
+              { step: 'release-gate', status: decision.decision === 'pass' ? 'pass' : 'blocked' },
+            ],
+            blockers: decision.blockers,
+          },
+        },
+      });
+    }
+
+    if (req.method === 'POST' && interfaceName === 'load-audit-replay-timeline') {
+      enforceAnyPermission(auth.permissions || [], ['dashboards.manage', 'reports.manage']);
+      const body = parseBody(req.body);
+      const exportFilters = parseBody(body.export_filters);
+      const capability = String(exportFilters.capability || 'compliance-gates').trim().toLowerCase();
+      if (!ALLOWED_AUDIT_REPLAY_CAPABILITIES.has(capability)) {
+        throw new Error('export_filters.capability is invalid');
+      }
+      const exportFormat = String(exportFilters.format || 'csv').trim().toLowerCase();
+      if (!ALLOWED_EXPORT_FORMATS.has(exportFormat)) {
+        throw new Error('export_filters.format must be csv or json');
+      }
+      const limit = Math.min(parseInteger(exportFilters.limit || 50, 'export_filters.limit'), 200);
+      const actionFilter = String(exportFilters.action || '').trim().toLowerCase();
+      const records = replayAmroAuditLedgerRecords({
+        tenantId,
+        franchiseId,
+        capability: capability as 'work-packages' | 'tasks' | 'compliance-gates',
+        limit,
+      }).filter((record) => {
+        if (!actionFilter) return true;
+        return String(record.action || '').toLowerCase() === actionFilter;
+      });
+      const orderedEvents = records
+        .sort((left, right) => left.createdAt.localeCompare(right.createdAt))
+        .map((record, index) => ({
+          sequence: index + 1,
+          record_id: record.recordId,
+          action: record.action,
+          created_at: record.createdAt,
+        }));
+      return res.status(200).json({
+        version: 'v2',
+        interface: 'load-audit-replay-timeline',
+        correlationId: ctx.correlationId,
+        compatMode: compatDecision.compatMode,
+        mode: 'module',
+        domainAccess: {
+          subscriptionStatus: amroAccess.subscriptionStatus,
+          source: amroAccess.source,
+          validatedAt: amroAccess.validatedAt,
+        },
+        serviceBoundaries,
+        output: {
+          replay_timeline: {
+            event_count: orderedEvents.length,
+            events: orderedEvents,
+          },
+          export_filters: {
+            capability,
+            action: actionFilter || null,
+            format: exportFormat,
+            limit,
+          },
+          export_preview: {
+            export_id: `${tenantId}-${capability}-audit-export-${Date.now()}`,
+            format: exportFormat,
+            row_count: orderedEvents.length,
+          },
+        },
+      });
+    }
+
+    if (req.method === 'POST' && interfaceName === 'detect-compliance-anomalies') {
+      enforceAnyPermission(auth.permissions || [], ['dashboards.manage', 'reports.manage']);
+      const body = parseBody(req.body);
+      const detectionWindow = assertNonEmpty(body.detection_window, 'detection_window');
+      const reviewPopulation = parseInteger(body.review_population, 'review_population');
+      const overdueObligations = parseInteger(body.overdue_obligations, 'overdue_obligations');
+      const exceptionEscalations = parseInteger(body.exception_escalations, 'exception_escalations');
+      const melCdlDeferralCount = parseInteger(body.mel_cdl_deferral_count, 'mel_cdl_deferral_count');
+      const anomalyThreshold = parseNumber(body.anomaly_threshold || 0.2, 'anomaly_threshold');
+      if (anomalyThreshold <= 0 || anomalyThreshold > 1) {
+        throw new Error('anomaly_threshold must be between 0 and 1');
+      }
+      const alerts = [
+        overdueObligations > Math.ceil(reviewPopulation * anomalyThreshold)
+          ? { severity: 'high', code: 'overdue-obligations-spike', metric: overdueObligations }
+          : null,
+        exceptionEscalations > Math.ceil(reviewPopulation * anomalyThreshold)
+          ? { severity: 'medium', code: 'exception-escalation-spike', metric: exceptionEscalations }
+          : null,
+        melCdlDeferralCount > Math.ceil(reviewPopulation * anomalyThreshold)
+          ? { severity: 'medium', code: 'mel-cdl-deferral-spike', metric: melCdlDeferralCount }
+          : null,
+      ].filter((alert): alert is { severity: string; code: string; metric: number } => Boolean(alert));
+      return res.status(200).json({
+        version: 'v2',
+        interface: 'detect-compliance-anomalies',
+        correlationId: ctx.correlationId,
+        compatMode: compatDecision.compatMode,
+        mode: 'module',
+        domainAccess: {
+          subscriptionStatus: amroAccess.subscriptionStatus,
+          source: amroAccess.source,
+          validatedAt: amroAccess.validatedAt,
+        },
+        serviceBoundaries,
+        input: {
+          detection_window: detectionWindow,
+          review_population: reviewPopulation,
+          anomaly_threshold: anomalyThreshold,
+        },
+        output: {
+          alert_count: alerts.length,
+          alerts,
+        },
+      });
+    }
+
+    if (req.method === 'POST' && interfaceName === 'load-regulator-profile-pack') {
+      enforceAnyPermission(auth.permissions || [], ['dashboards.manage', 'reports.manage']);
+      const body = parseBody(req.body);
+      const regulatorProfile = assertNonEmpty(body.regulator_profile, 'regulator_profile').toLowerCase();
+      if (!ALLOWED_REGULATOR_PROFILES.has(regulatorProfile)) {
+        throw new Error('regulator_profile is not supported');
+      }
+      const effectiveAt = parseIsoTimestamp(body.effective_at || new Date().toISOString(), 'effective_at');
+      const profilePack = buildRegulatorProfilePack(regulatorProfile as 'faa' | 'easa' | 'caac');
+      return res.status(200).json({
+        version: 'v2',
+        interface: 'load-regulator-profile-pack',
+        correlationId: ctx.correlationId,
+        compatMode: compatDecision.compatMode,
+        mode: 'module',
+        domainAccess: {
+          subscriptionStatus: amroAccess.subscriptionStatus,
+          source: amroAccess.source,
+          validatedAt: amroAccess.validatedAt,
+        },
+        serviceBoundaries,
+        input: {
+          regulator_profile: regulatorProfile,
+          effective_at: effectiveAt,
+        },
+        output: {
+          profile_pack_id: `${tenantId}-${regulatorProfile}-profile-pack-${Date.now()}`,
+          profile_pack: profilePack,
+        },
+      });
+    }
+
+    if (req.method === 'POST' && interfaceName === 'evaluate-closure-quality-gate') {
+      enforceAnyPermission(auth.permissions || [], ['dashboards.manage', 'reports.manage']);
+      const body = parseBody(req.body);
+      const workPackageId = assertNonEmpty(body.work_package_id, 'work_package_id');
+      const openFindings = parseInteger(body.open_findings, 'open_findings');
+      const unresolvedDeferrals = parseInteger(body.unresolved_deferrals, 'unresolved_deferrals');
+      const pendingSignatures = parseInteger(body.pending_signatures, 'pending_signatures');
+      const evidenceCoveragePct = Number(body.evidence_coverage_pct);
+      if (!Number.isFinite(evidenceCoveragePct) || evidenceCoveragePct < 0 || evidenceCoveragePct > 100) {
+        throw new Error('evidence_coverage_pct must be between 0 and 100');
+      }
+      const closureDecision =
+        openFindings === 0
+        && unresolvedDeferrals === 0
+        && pendingSignatures === 0
+        && evidenceCoveragePct >= 95
+          ? 'pass'
+          : 'fail';
+      const blockers = [
+        openFindings > 0 ? { gate: 'open_findings', reason: `${openFindings} findings remain open` } : null,
+        unresolvedDeferrals > 0 ? { gate: 'unresolved_deferrals', reason: `${unresolvedDeferrals} deferrals unresolved` } : null,
+        pendingSignatures > 0 ? { gate: 'pending_signatures', reason: `${pendingSignatures} signatures pending` } : null,
+        evidenceCoveragePct < 95 ? { gate: 'evidence_coverage', reason: 'evidence coverage below 95%' } : null,
+      ].filter(Boolean);
+      return res.status(200).json({
+        version: 'v2',
+        interface: 'evaluate-closure-quality-gate',
+        correlationId: ctx.correlationId,
+        compatMode: compatDecision.compatMode,
+        mode: 'module',
+        domainAccess: {
+          subscriptionStatus: amroAccess.subscriptionStatus,
+          source: amroAccess.source,
+          validatedAt: amroAccess.validatedAt,
+        },
+        serviceBoundaries,
+        input: {
+          work_package_id: workPackageId,
+          open_findings: openFindings,
+          unresolved_deferrals: unresolvedDeferrals,
+          pending_signatures: pendingSignatures,
+          evidence_coverage_pct: evidenceCoveragePct,
+        },
+        output: {
+          decision: closureDecision,
+          blockers,
+          release_ready: closureDecision === 'pass',
+        },
+      });
+    }
+
     if (req.method === 'POST' && interfaceName === 'register-exception-request') {
       enforceAnyPermission(auth.permissions || [], ['dashboards.manage', 'reports.manage']);
       const role = String(ctx.role || '').trim().toLowerCase();
@@ -472,7 +882,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
     if (req.method === 'POST') {
       return res.status(400).json({
-        error: 'Unsupported interface. Use evaluate-compliance-gate, register-exception-request, or generate-compliance-dossier.',
+        error: 'Unsupported interface. Use evaluate-compliance-gate, ingest-ad-sb-obligations, evaluate-mel-cdl-deferral, load-compliance-gate-explainability, load-audit-replay-timeline, detect-compliance-anomalies, load-regulator-profile-pack, evaluate-closure-quality-gate, register-exception-request, or generate-compliance-dossier.',
         correlationId: ctx.correlationId,
         version: 'v2',
       });

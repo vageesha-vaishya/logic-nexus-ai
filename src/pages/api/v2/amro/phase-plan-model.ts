@@ -170,13 +170,19 @@ const AMRO_SEQUENTIAL_COMPONENT_SCOPE: Readonly<Record<AmroSequentialMilestoneId
 const AMRO_WORK_PACKAGE_INTERFACE_MILESTONES: Readonly<Record<string, AmroSequentialMilestoneId>> = {
   'create-work-package': 'M2',
   'transition-work-package': 'M2',
+  'save-work-package-view': 'M2',
   'clone-template': 'M2',
   'assign-maintenance-slot': 'M3',
+  'acknowledge-schedule-update': 'M2',
   'run-replan-simulation': 'M3',
   'confirm-replan': 'M3',
+  'generate-schedule-optimization-recommendations': 'M3',
   'reserve-parts': 'M5',
   'process-shortage-response': 'M5',
   'sync-supplier-eta': 'M5',
+  'trace-rotable-llp': 'M5',
+  'run-inventory-optimization': 'M8',
+  'sync-supplier-asn-erp': 'M7',
 } as const;
 
 const AMRO_TASK_INTERFACE_MILESTONES: Readonly<Record<string, AmroSequentialMilestoneId>> = {
@@ -189,14 +195,24 @@ const AMRO_TASK_INTERFACE_MILESTONES: Readonly<Record<string, AmroSequentialMile
 
 const AMRO_COMPLIANCE_INTERFACE_MILESTONES: Readonly<Record<string, AmroSequentialMilestoneId>> = {
   'evaluate-compliance-gate': 'M6',
+  'evaluate-closure-quality-gate': 'M6',
   'register-exception-request': 'M6',
   'generate-compliance-dossier': 'M6',
+  'ingest-ad-sb-obligations': 'M6',
+  'evaluate-mel-cdl-deferral': 'M6',
+  'load-compliance-gate-explainability': 'M6',
+  'load-audit-replay-timeline': 'M6',
+  'detect-compliance-anomalies': 'M6',
+  'load-regulator-profile-pack': 'M6',
 } as const;
 
 const AMRO_CERTIFICATION_INTERFACE_MILESTONES: Readonly<Record<string, AmroSequentialMilestoneId>> = {
   'validate-certifying-authority': 'M6',
   'submit-certification-decision': 'M6',
   'escalate-blocked-certification': 'M6',
+  'automate-expiry-suspension': 'M6',
+  'load-authority-certification-template': 'M6',
+  'load-competency-analytics-dashboard': 'M8',
 } as const;
 
 const AMRO_INTEGRATION_HUB_INTERFACE_MILESTONES: Readonly<Record<string, AmroSequentialMilestoneId>> = {
@@ -314,7 +330,10 @@ function buildSequentialMilestoneCriteria(): Readonly<Record<AmroSequentialMiles
     ],
     M10: [
       { key: 'p95_p99_slo_targets', label: 'p95/p99 SLO targets meet Section 19.3 and 22', satisfied: parseBoolean(process.env.AMRO_SEQ_M10_P95_P99_SLO_TARGETS_MET, false) },
+      { key: 'multi_region_failover_readiness', label: 'Multi-region failover readiness validation passes', satisfied: parseBoolean(process.env.AMRO_SEQ_M10_MULTI_REGION_FAILOVER_PASS, false) },
       { key: 'dr_rehearsal_recovery_evidence', label: 'DR rehearsal completed with documented recovery evidence', satisfied: parseBoolean(process.env.AMRO_SEQ_M10_DR_REHEARSAL_EVIDENCE_PASS, false) },
+      { key: 'rollback_rehearsal_evidence', label: 'Rollback rehearsal evidence validated for GA cutover', satisfied: parseBoolean(process.env.AMRO_SEQ_M10_ROLLBACK_REHEARSAL_PASS, false) },
+      { key: 'runbook_operational_readiness', label: 'Operational runbook readiness evidence approved', satisfied: parseBoolean(process.env.AMRO_SEQ_M10_RUNBOOK_EVIDENCE_APPROVED, false) },
       { key: 'security_regression_zero_critical', label: 'Security and regression suites pass with zero critical defects', satisfied: parseBoolean(process.env.AMRO_SEQ_M10_SECURITY_REGRESSION_ZERO_CRITICAL, false) },
     ],
   } as const;
@@ -344,6 +363,28 @@ export function buildAmroSequentialImplementationEnvelope() {
     strictOrder: AMRO_SEQUENTIAL_STRICT_ORDER,
     prerequisites: prerequisiteGates,
     milestones,
+  };
+}
+
+export function buildAmroGaReadinessEnvelope() {
+  const sequential = buildAmroSequentialImplementationEnvelope();
+  const gaMilestone = sequential.milestones.find((item) => item.id === 'M10');
+  if (!gaMilestone) {
+    return {
+      milestone: 'M10' as const,
+      status: 'not-started' as const,
+      readyForGa: false,
+      criteria: [] as ReadonlyArray<AmroSequentialMilestoneCriteria>,
+      missingCriteria: [] as string[],
+    };
+  }
+  const missingCriteria = listMissingCriteria(gaMilestone.criteria);
+  return {
+    milestone: gaMilestone.id,
+    status: gaMilestone.status,
+    readyForGa: gaMilestone.status === 'completed' && missingCriteria.length === 0,
+    criteria: gaMilestone.criteria,
+    missingCriteria,
   };
 }
 

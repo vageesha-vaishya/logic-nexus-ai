@@ -55,6 +55,19 @@ function formatContainerLabel(size, type) {
   return values.join(' ').trim() || 'Container';
 }
 
+function buildItemContainerFallbackQueue(items) {
+  const queue = [];
+  (items || []).forEach((item) => {
+    const label = String(item?.container || '').trim();
+    if (!label || /^container$/i.test(label)) return;
+    const quantity = Math.max(1, Number(item?.quantity || 0) || 1);
+    for (let i = 0; i < quantity; i += 1) {
+      queue.push(label);
+    }
+  });
+  return queue;
+}
+
 function deriveContainerFromText(...values) {
   const haystack = values
     .map((value) => String(value || '').trim())
@@ -326,6 +339,7 @@ async function extractPdfTextSummary(pdfBuffer, expectedCarriers = []) {
 
 async function main() {
   console.log(`Validating PDF generation for ${QUOTE_NUMBER}...`);
+  let itemContainerFallbackQueue = [];
 
   // 1. Get Quote ID
   const { data: quotes, error: quoteError } = await supabase
@@ -368,6 +382,7 @@ async function main() {
       };
     });
     console.log('Quote Item Containers:', normalizedItemContainers);
+    itemContainerFallbackQueue = buildItemContainerFallbackQueue(normalizedItemContainers);
   }
 
   // 1.1 Fetch latest version and its options
@@ -408,13 +423,18 @@ async function main() {
               const optionSizeIds = [...new Set(options.map((o) => o.container_size_id).filter(Boolean))];
               const optionTypeIds = [...new Set(options.map((o) => o.container_type_id).filter(Boolean))];
               const { sizeMap, typeMap } = await fetchContainerMaps(optionSizeIds, optionTypeIds);
-              const optionContainers = options.map((o) =>
+              const rawOptionContainers = options.map((o) =>
                 formatContainerLabel(
                   (o.container_size_id ? sizeMap.get(o.container_size_id)?.code || sizeMap.get(o.container_size_id)?.name : null) || o.container_size || o.container_size_id,
                   (o.container_type_id ? typeMap.get(o.container_type_id)?.code || typeMap.get(o.container_type_id)?.name : null) || o.container_type_id,
                 )
               );
-              console.log('Option Containers:', optionContainers);
+              const effectiveOptionContainers = rawOptionContainers.map((rawLabel, index) => {
+                if (!/^container$/i.test(String(rawLabel || '').trim())) return rawLabel;
+                return itemContainerFallbackQueue[index] || itemContainerFallbackQueue[0] || 'Standard';
+              });
+              console.log('Option Containers (raw):', rawOptionContainers);
+              console.log('Option Containers (effective):', effectiveOptionContainers);
           } else {
               console.log('No standard options found.');
           }

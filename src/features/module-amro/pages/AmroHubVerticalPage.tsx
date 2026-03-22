@@ -9,6 +9,7 @@ import {
   AMRO_ASYNCAPI_SPEC_PATH,
   AMRO_GRAPHQL_SUBGRAPH_PATH,
   AMRO_GRPC_PROTO_PATH,
+  AMRO_HEALTH_PATH,
   AMRO_MODULE_CATALOG_PATH,
   AMRO_MIGRATION_PLAN_PATH,
   AMRO_OPENAPI_SPEC_PATH,
@@ -183,6 +184,9 @@ export default function AmroHubVerticalPage() {
                       </a>
                       <a className="rounded-md border p-2 hover:bg-muted/30" href={AMRO_MIGRATION_PLAN_PATH} target="_blank" rel="noreferrer">
                         Migration Plan API
+                      </a>
+                      <a className="rounded-md border p-2 hover:bg-muted/30" href={AMRO_HEALTH_PATH} target="_blank" rel="noreferrer">
+                        Contract Health API
                       </a>
                     </div>
                   </CardContent>

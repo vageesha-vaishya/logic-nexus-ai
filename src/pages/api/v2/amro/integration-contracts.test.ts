@@ -6,6 +6,7 @@ import {
   AMRO_GRAPHQL_SUBGRAPH_PATH,
   AMRO_GRPC_PROTO_PATH,
   AMRO_INTEGRATION_CONTRACTS,
+  AMRO_HEALTH_PATH,
   AMRO_MODULE_CATALOG_PATH,
   AMRO_MIGRATION_PLAN_PATH,
   AMRO_OPENAPI_SPEC_PATH,
@@ -41,6 +42,7 @@ describe('AMRO 13.3 integration contracts', () => {
       AMRO_PHASE_PLAN_PATH,
       AMRO_PHASE_1_READINESS_PATH,
       AMRO_MIGRATION_PLAN_PATH,
+      AMRO_HEALTH_PATH,
     ]);
     expect(AMRO_INTEGRATION_CONTRACTS.graphql.fields).toEqual([
       'amroWorkPackages',
@@ -96,6 +98,7 @@ describe('AMRO 13.3 integration contracts', () => {
     expect(openApi).toContain(AMRO_PHASE_PLAN_PATH);
     expect(openApi).toContain(AMRO_PHASE_1_READINESS_PATH);
     expect(openApi).toContain('/api/v2/amro/migration-plan');
+    expect(openApi).toContain(AMRO_HEALTH_PATH);
 
     const graphQl = readContractFile(AMRO_GRAPHQL_SUBGRAPH_PATH);
     expect(graphQl).toContain('amroWorkPackages');

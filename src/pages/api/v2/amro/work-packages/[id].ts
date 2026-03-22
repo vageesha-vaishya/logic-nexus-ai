@@ -93,7 +93,7 @@ function buildWorkPackageDetail(id: string, tenantId: string, franchiseId: strin
 }
 
 export default async function handler(req: ApiRequest, res: ApiResponse): Promise<void> {
-  applyCors(req, res, { methods: ['GET', 'PATCH', 'OPTIONS'] });
+  applyCors(req, res, { methods: ['GET', 'PATCH', 'DELETE', 'OPTIONS'] });
   if (handlePreflight(req, res)) return;
 
   const ctx = buildApiContext(req);
@@ -106,8 +106,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       return;
     }
 
-    if (req.method !== 'GET' && req.method !== 'PATCH') {
-      res.setHeader('Allow', ['GET', 'PATCH']);
+    if (req.method !== 'GET' && req.method !== 'PATCH' && req.method !== 'DELETE') {
+      res.setHeader('Allow', ['GET', 'PATCH', 'DELETE']);
       res.status(405).json({ error: `Method ${req.method} Not Allowed`, version: 'v2', correlationId: ctx.correlationId });
       return;
     }
@@ -131,6 +131,22 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         correlationId: ctx.correlationId,
         data: {
           work_package: detail,
+          domainAccess,
+        },
+      });
+      return;
+    }
+
+    if (req.method === 'DELETE') {
+      enforceAnyPermission(authUser.permissions, ['dashboards.manage', 'reports.manage']);
+      res.status(200).json({
+        version: 'v2',
+        interface: 'delete-work-package',
+        correlationId: ctx.correlationId,
+        data: {
+          work_package_id: id,
+          deleted: true,
+          deleted_by: scopedAccess.userId,
           domainAccess,
         },
       });

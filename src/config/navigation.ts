@@ -68,7 +68,9 @@ export const APP_MENU: MenuModule[] = [
     items: [
       { name: 'Bookings', path: '/dashboard/bookings', icon: BookOpen, description: 'Manage bookings' },
       { name: 'Shipments', path: '/dashboard/shipments/pipeline', icon: Package, description: 'Track shipments' },
+      { name: 'AMRO Overview', path: '/dashboard/amro/overview', icon: BarChart3, description: 'Maintenance overview and KPI shell' },
       { name: 'AMRO Work Packages', path: '/dashboard/amro/work-packages', icon: CheckSquare, description: 'Maintenance work package execution board' },
+      { name: 'AMRO Scheduling', path: '/dashboard/amro/scheduling', icon: CalendarDays, description: 'Maintenance scheduling shell' },
       { name: 'Warehouses', path: '/dashboard/warehouses', icon: Warehouse, description: 'Manage warehouses' },
       { name: 'Vehicles', path: '/dashboard/vehicles', icon: Truck, description: 'Fleet management' },
       { name: 'Rate Management', path: '/dashboard/rate-management', icon: LineChart, description: 'Market analysis & rate sheets' },

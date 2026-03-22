@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   AMRO_PHASE_PLAN_MATRIX,
+  buildAmroGaReadinessEnvelope,
   buildAmroPhasePlanProgressEnvelope,
   buildAmroSequentialImplementationEnvelope,
   enforceAmroSequentialMilestoneForAuditReplay,
@@ -78,6 +79,38 @@ describe('phase-plan-model', () => {
       id: 'M8',
       requiredDependencies: ['M2', 'M3', 'M5', 'M7'],
     });
+
+    vi.unstubAllEnvs();
+  });
+
+  it('builds GA readiness envelope with DR, rollback, and runbook evidence checks', () => {
+    vi.stubEnv('AMRO_SEQ_PREREQ_ARCH_SECURITY_APPROVED', 'true');
+    vi.stubEnv('AMRO_SEQ_PREREQ_ISOLATION_CONTROLS_DEFINED', 'true');
+    vi.stubEnv('AMRO_SEQ_PREREQ_BACKWARD_COMPAT_COMPLETED', 'true');
+    vi.stubEnv('AMRO_SEQ_PREREQ_TEST_PLAN_READY', 'true');
+    vi.stubEnv('AMRO_SEQ_PREREQ_OBSERVABILITY_BASELINE_READY', 'true');
+    vi.stubEnv('AMRO_SEQ_M1_STATUS', 'completed');
+    vi.stubEnv('AMRO_SEQ_M2_STATUS', 'completed');
+    vi.stubEnv('AMRO_SEQ_M3_STATUS', 'completed');
+    vi.stubEnv('AMRO_SEQ_M4_STATUS', 'completed');
+    vi.stubEnv('AMRO_SEQ_M5_STATUS', 'completed');
+    vi.stubEnv('AMRO_SEQ_M6_STATUS', 'completed');
+    vi.stubEnv('AMRO_SEQ_M7_STATUS', 'completed');
+    vi.stubEnv('AMRO_SEQ_M8_STATUS', 'completed');
+    vi.stubEnv('AMRO_SEQ_M9_STATUS', 'completed');
+    vi.stubEnv('AMRO_SEQ_M10_STATUS', 'completed');
+    vi.stubEnv('AMRO_SEQ_M10_P95_P99_SLO_TARGETS_MET', 'true');
+    vi.stubEnv('AMRO_SEQ_M10_MULTI_REGION_FAILOVER_PASS', 'true');
+    vi.stubEnv('AMRO_SEQ_M10_DR_REHEARSAL_EVIDENCE_PASS', 'true');
+    vi.stubEnv('AMRO_SEQ_M10_ROLLBACK_REHEARSAL_PASS', 'true');
+    vi.stubEnv('AMRO_SEQ_M10_RUNBOOK_EVIDENCE_APPROVED', 'true');
+    vi.stubEnv('AMRO_SEQ_M10_SECURITY_REGRESSION_ZERO_CRITICAL', 'true');
+
+    const readiness = buildAmroGaReadinessEnvelope();
+    expect(readiness.status).toBe('completed');
+    expect(readiness.readyForGa).toBe(true);
+    expect(readiness.criteria.some((item) => item.key === 'rollback_rehearsal_evidence')).toBe(true);
+    expect(readiness.criteria.some((item) => item.key === 'runbook_operational_readiness')).toBe(true);
 
     vi.unstubAllEnvs();
   });

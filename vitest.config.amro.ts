@@ -15,7 +15,7 @@ export default defineConfig({
     },
     testMatch: ['**/tests/integration/amro*.test.ts'],
     include: ['**/tests/integration/amro*.test.ts'],
-    exclude: ['**/node_modules/**', '**/.dist/**'],
+    exclude: ['**/node_modules/**', '**/.dist/**', '**/.worktrees/**'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html', 'lcov'],

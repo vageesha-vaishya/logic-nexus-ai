@@ -252,4 +252,27 @@ describe('/api/v2/amro/schedules/replan', () => {
       { apiVersion: 'v2' }
     );
   });
+
+  it('returns schedule optimization recommendations with bounded confidence ranking', async () => {
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'generate-schedule-optimization-recommendations' },
+      headers: {},
+      body: {
+        schedule_date: '2026-03-22',
+        station_code: 'station-a',
+        demand_pressure: 0.78,
+        disruption_risk: 0.56,
+        recommendation_count: 4,
+      },
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.interface).toBe('generate-schedule-optimization-recommendations');
+    expect((res.jsonBody as any)?.output?.recommendations?.length).toBe(4);
+    expect((res.jsonBody as any)?.output?.recommendations?.[0]?.confidence).toBeGreaterThanOrEqual(0.5);
+  });
 });

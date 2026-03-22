@@ -1952,6 +1952,91 @@ Performance Targets:
   - <p95/p99 and throughput expectations>
 ```
 
+### 29.4 Module API Entries
+
+```text
+Component Type: Module API
+Component Name: POST /api/v2/amro/work-packages?interface=trace-rotable-llp
+Purpose: Apply rotable and LLP traceability controls on serialized AMRO material lines.
+Input Contract:
+  - component_id | string | required
+  - part_number | string | required
+  - serial_number | string | required
+  - rotable_status | enum(serviceable,unserviceable,quarantined) | required
+  - llp_remaining_cycles | number >= 0 | required
+  - traceability_action | enum(verify,quarantine,release) | required
+Output Contract:
+  - traceability_status | enum(verified,quarantined,released)
+  - llp_control.threshold_cycles | number
+  - llp_control.within_threshold | boolean
+  - component_history_ref | string
+Authorization:
+  - platform_admin or tenant role with dashboards.manage/reports.manage
+Data Dependencies:
+  - mro_core.material_planning
+  - mro_core.components
+Failure Modes:
+  - 400 invalid status/action/LLP values
+  - 403 unauthorized AMRO domain access
+  - 422 invalid tenant or franchise scope context
+Performance Targets:
+  - p95 <= 350ms, throughput 50 req/s per tenant
+```
+
+```text
+Component Type: Module API
+Component Name: POST /api/v2/amro/work-packages?interface=run-inventory-optimization
+Purpose: Trigger inventory optimization model hooks using demand and forecast signals for a work package.
+Input Contract:
+  - work_package_id | string | required
+  - forecast_signal_ids | string[] | required
+  - optimization_window | string | required
+Output Contract:
+  - optimization_run_id | string
+  - recommendations[] | object(part_number, action, confidence)
+  - forecast_signal_count | number
+Authorization:
+  - platform_admin or tenant role with dashboards.manage/reports.manage
+Data Dependencies:
+  - mro_core.work_packages
+  - mro_core.material_planning
+  - mro_analytics.predictive_recommendations
+Failure Modes:
+  - 400 invalid optimization payload
+  - 403 unauthorized AMRO domain access
+  - 412 sequential milestone dependency not satisfied (M7 prerequisite)
+Performance Targets:
+  - p95 <= 500ms, throughput 30 req/s per tenant
+```
+
+```text
+Component Type: Module API
+Component Name: POST /api/v2/amro/work-packages?interface=sync-supplier-asn-erp
+Purpose: Reconcile supplier ASN events with ERP procurement records and propagate impacts to work packages.
+Input Contract:
+  - asn_event_id | string | required
+  - procurement_source | enum(sap-pm,oracle-eam,maximo,ariba,coupa) | required
+  - po_number | string | required
+  - line_items | object[] | required
+  - impacted_work_packages | string[] | optional
+Output Contract:
+  - sync_status | string
+  - procurement_sync_id | string
+  - impacted_work_packages | string[]
+Authorization:
+  - platform_admin or tenant role with dashboards.manage/reports.manage
+Data Dependencies:
+  - mro_integration.supplier_events
+  - mro_integration.procurement_sync
+  - mro_core.work_packages
+Failure Modes:
+  - 400 untrusted procurement adapter or empty line items
+  - 403 unauthorized AMRO domain access
+  - 422 invalid tenant-scoped work package identifiers
+Performance Targets:
+  - p95 <= 450ms, throughput 40 req/s per tenant
+```
+
 ---
 
 **Document End**  

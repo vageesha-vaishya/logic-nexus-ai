@@ -67,6 +67,12 @@ function assertReplannableStates(affectedWorkPackages: Array<Record<string, unkn
   if (invalidPackage) throw new Error('all affected packages must be in re-plannable states');
 }
 
+function normalizeRecommendationCount(value: unknown): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return 3;
+  return Math.min(5, Math.floor(parsed));
+}
+
 export default async function handler(req: ApiRequest, res: ApiResponse) {
   applyCors(req, res, { methods: ['POST', 'OPTIONS'] });
   if (handlePreflight(req, res)) return;
@@ -211,8 +217,53 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       });
     }
 
+    if (interfaceName === 'generate-schedule-optimization-recommendations') {
+      enforceAnyPermission(auth.permissions || [], ['dashboards.manage', 'reports.manage']);
+      const scheduleDate = assertNonEmpty(body.schedule_date, 'schedule_date');
+      const stationCode = assertNonEmpty(body.station_code, 'station_code');
+      const demandPressure = Number(body.demand_pressure || 0.65);
+      const disruptionRisk = Number(body.disruption_risk || 0.42);
+      const recommendationCount = normalizeRecommendationCount(body.recommendation_count);
+      const recommendations = Array.from({ length: recommendationCount }).map((_, index) => {
+        const rank = index + 1;
+        const confidence = Number(Math.max(0.51, 0.94 - index * 0.08).toFixed(2));
+        const expectedDelayReduction = Number((Math.max(0.2, demandPressure - index * 0.08) * 100).toFixed(1));
+        return {
+          recommendation_id: `${tenantId}-${franchiseId}-schedule-opt-${rank}`,
+          title: rank === 1 ? 'Advance critical night-stop slot' : `Rebalance bay utilization strategy ${rank}`,
+          station_code: `${tenantId}:${stationCode}`,
+          schedule_date: scheduleDate,
+          expected_delay_reduction_pct: expectedDelayReduction,
+          confidence,
+          rationale: disruptionRisk >= 0.5 ? 'Disruption risk weighted with historical constraints' : 'Capacity weighted with station throughput trend',
+        };
+      });
+      return res.status(200).json({
+        version: 'v2',
+        interface: 'generate-schedule-optimization-recommendations',
+        correlationId: ctx.correlationId,
+        compatMode: compatDecision.compatMode,
+        domainAccess: {
+          subscriptionStatus: amroAccess.subscriptionStatus,
+          source: amroAccess.source,
+          validatedAt: amroAccess.validatedAt,
+        },
+        serviceBoundaries,
+        input: {
+          schedule_date: scheduleDate,
+          station_code: `${tenantId}:${stationCode}`,
+          demand_pressure: demandPressure,
+          disruption_risk: disruptionRisk,
+        },
+        output: {
+          recommendations,
+          latency_budget_ms: 500,
+        },
+      });
+    }
+
     return res.status(400).json({
-      error: 'Unsupported interface. Use run-replan-simulation or confirm-replan.',
+      error: 'Unsupported interface. Use run-replan-simulation, confirm-replan, or generate-schedule-optimization-recommendations.',
       correlationId: ctx.correlationId,
       version: 'v2',
     });

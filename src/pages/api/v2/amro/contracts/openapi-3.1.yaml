@@ -37,6 +37,9 @@ paths:
                 reserve-parts,
                 process-shortage-response,
                 sync-supplier-eta,
+                trace-rotable-llp,
+                run-inventory-optimization,
+                sync-supplier-asn-erp,
               ]
       requestBody:
         required: true
@@ -158,6 +161,52 @@ paths:
                       type: string
                     quantity_confirmed:
                       type: number
+                - type: object
+                  required: [component_id, part_number, serial_number, rotable_status, llp_remaining_cycles, traceability_action]
+                  properties:
+                    component_id:
+                      type: string
+                    part_number:
+                      type: string
+                    serial_number:
+                      type: string
+                    rotable_status:
+                      type: string
+                      enum: [serviceable, unserviceable, quarantined]
+                    llp_remaining_cycles:
+                      type: number
+                    traceability_action:
+                      type: string
+                      enum: [verify, quarantine, release]
+                - type: object
+                  required: [work_package_id, forecast_signal_ids, optimization_window]
+                  properties:
+                    work_package_id:
+                      type: string
+                    forecast_signal_ids:
+                      type: array
+                      items:
+                        type: string
+                    optimization_window:
+                      type: string
+                - type: object
+                  required: [asn_event_id, procurement_source, po_number, line_items]
+                  properties:
+                    asn_event_id:
+                      type: string
+                    procurement_source:
+                      type: string
+                    po_number:
+                      type: string
+                    line_items:
+                      type: array
+                      items:
+                        type: object
+                        additionalProperties: true
+                    impacted_work_packages:
+                      type: array
+                      items:
+                        type: string
       responses:
         '200':
           description: Work package mutation response
@@ -270,35 +319,49 @@ paths:
           required: true
           schema:
             type: string
-            enum: [assign-maintenance-slot]
+            enum: [assign-maintenance-slot, acknowledge-schedule-update]
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              type: object
-              required: [work_package_id, station_code, slot_start, slot_end, assigned_team]
-              properties:
-                work_package_id:
-                  type: string
-                station_code:
-                  type: string
-                slot_start:
-                  type: string
-                slot_end:
-                  type: string
-                station_capacity:
-                  type: number
-                existing_slots:
-                  type: array
-                  items:
-                    type: object
-                    additionalProperties: true
-                assigned_team:
-                  type: array
-                  items:
-                    type: object
-                    additionalProperties: true
+              oneOf:
+                - type: object
+                  required: [work_package_id, station_code, slot_start, slot_end, assigned_team]
+                  properties:
+                    work_package_id:
+                      type: string
+                    station_code:
+                      type: string
+                    slot_start:
+                      type: string
+                    slot_end:
+                      type: string
+                    station_capacity:
+                      type: number
+                    existing_slots:
+                      type: array
+                      items:
+                        type: object
+                        additionalProperties: true
+                    assigned_team:
+                      type: array
+                      items:
+                        type: object
+                        additionalProperties: true
+                - type: object
+                  required: [schedule_id, work_package_id, acknowledged_at, device_id]
+                  properties:
+                    schedule_id:
+                      type: string
+                    work_package_id:
+                      type: string
+                    acknowledged_at:
+                      type: string
+                    device_id:
+                      type: string
+                    note:
+                      type: string
       responses:
         '200':
           description: Scheduling mutation response
@@ -317,7 +380,7 @@ paths:
           required: true
           schema:
             type: string
-            enum: [run-replan-simulation, confirm-replan]
+            enum: [run-replan-simulation, confirm-replan, generate-schedule-optimization-recommendations]
       requestBody:
         required: true
         content:
@@ -358,6 +421,19 @@ paths:
                       items:
                         type: object
                         additionalProperties: true
+                - type: object
+                  required: [schedule_date, station_code]
+                  properties:
+                    schedule_date:
+                      type: string
+                    station_code:
+                      type: string
+                    demand_pressure:
+                      type: number
+                    disruption_risk:
+                      type: number
+                    recommendation_count:
+                      type: number
       responses:
         '200':
           description: Scheduling replan response
@@ -597,7 +673,15 @@ paths:
           required: true
           schema:
             type: string
-            enum: [validate-certifying-authority, submit-certification-decision, escalate-blocked-certification]
+            enum:
+              [
+                validate-certifying-authority,
+                submit-certification-decision,
+                escalate-blocked-certification,
+                automate-expiry-suspension,
+                load-competency-analytics-dashboard,
+                load-authority-certification-template,
+              ]
       requestBody:
         required: true
         content:
@@ -652,6 +736,32 @@ paths:
                       type: array
                       items:
                         type: string
+                - type: object
+                  required: [timestamp, warning_window_days, qualifications]
+                  properties:
+                    timestamp:
+                      type: string
+                    warning_window_days:
+                      type: number
+                    qualifications:
+                      type: array
+                      items:
+                        type: object
+                        additionalProperties: true
+                - type: object
+                  required: [qualifications]
+                  properties:
+                    qualifications:
+                      type: array
+                      items:
+                        type: object
+                        additionalProperties: true
+                - type: object
+                  required: [authority_profile]
+                  properties:
+                    authority_profile:
+                      type: string
+                      enum: [FAA, EASA, CAAC]
       responses:
         '200':
           description: Certification mutation response
@@ -998,6 +1108,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ScreenInventoryResponse'
+  /api/v2/amro/health:
+    get:
+      operationId: getAmroHealth
+      tags: [AMRO]
+      responses:
+        '200':
+          description: AMRO contract and service health response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
 components:
   schemas:
     ApiEnvelope:
@@ -1569,7 +1691,15 @@ components:
           const: v2
         interface:
           type: string
-          enum: [validate-certifying-authority, submit-certification-decision, escalate-blocked-certification]
+          enum:
+            [
+              validate-certifying-authority,
+              submit-certification-decision,
+              escalate-blocked-certification,
+              automate-expiry-suspension,
+              load-competency-analytics-dashboard,
+              load-authority-certification-template,
+            ]
         correlationId:
           type: string
         output:

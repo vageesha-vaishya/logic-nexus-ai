@@ -72,6 +72,26 @@ function parseNumber(value: unknown, fieldName: string): number {
   return parsed;
 }
 
+function buildScheduleUpdateEvent(params: {
+  tenantId: string;
+  franchiseId: string | null;
+  scheduleId: string;
+  workPackageId: string;
+  eventType: 'schedule.slot.assigned' | 'schedule.update.acknowledged';
+  actorId: string;
+}) {
+  const franchise = params.franchiseId || 'global';
+  return {
+    event_id: `${params.tenantId}-${franchise}-${Date.now()}`,
+    event_type: params.eventType,
+    topic: 'amro.schedule.updated.v1',
+    schedule_id: params.scheduleId,
+    work_package_id: params.workPackageId,
+    actor_id: params.actorId,
+    published_at: new Date().toISOString(),
+  };
+}
+
 function assertNoOverlap(window: { slotStart: string; slotEnd: string }, existingSlots: Array<Record<string, unknown>>) {
   const start = Date.parse(window.slotStart);
   const end = Date.parse(window.slotEnd);
@@ -206,28 +226,85 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
     const interfaceName = String(req.query.interface || 'assign-maintenance-slot').trim().toLowerCase();
     enforceAmroSequentialMilestoneForWorkPackageInterface(interfaceName);
-    if (interfaceName !== 'assign-maintenance-slot') {
+    if (interfaceName !== 'assign-maintenance-slot' && interfaceName !== 'acknowledge-schedule-update') {
       return res.status(400).json({
-        error: 'Unsupported interface. Use assign-maintenance-slot.',
+        error: 'Unsupported interface. Use assign-maintenance-slot or acknowledge-schedule-update.',
         correlationId: ctx.correlationId,
         version: 'v2',
       });
     }
 
-    enforceAnyPermission(auth.permissions || [], ['dashboards.manage', 'reports.manage']);
     const body = parseBody(req.body);
+    if (interfaceName === 'assign-maintenance-slot') {
+      enforceAnyPermission(auth.permissions || [], ['dashboards.manage', 'reports.manage']);
+      const workPackageId = assertNonEmpty(body.work_package_id, 'work_package_id');
+      const stationCode = assertNonEmpty(body.station_code, 'station_code');
+      const window = parseScheduleWindow(body.slot_start, body.slot_end);
+      const assignedTeam = parseObjectArray(body.assigned_team, 'assigned_team');
+      const existingSlots = parseObjectArray(body.existing_slots || [], 'existing_slots');
+      assertNoOverlap(window, existingSlots);
+      assertStationCapacity(assignedTeam.length, parseNumber(body.station_capacity || assignedTeam.length, 'station_capacity'));
+      assertTeamQualifications(assignedTeam, stationCode);
+      const scheduleId = `${tenantId}-${franchiseId}-schedule-${Date.now()}`;
+      const publishedEvent = buildScheduleUpdateEvent({
+        tenantId,
+        franchiseId,
+        scheduleId,
+        workPackageId,
+        eventType: 'schedule.slot.assigned',
+        actorId: String(auth.userId || ''),
+      });
+
+      return res.status(200).json({
+        version: 'v2',
+        interface: 'assign-maintenance-slot',
+        correlationId: ctx.correlationId,
+        compatMode: compatDecision.compatMode,
+        domainAccess: {
+          subscriptionStatus: amroAccess.subscriptionStatus,
+          source: amroAccess.source,
+          validatedAt: amroAccess.validatedAt,
+        },
+        serviceBoundaries,
+        input: {
+          work_package_id: workPackageId,
+          station_code: `${tenantId}:${stationCode}`,
+          slot_start: window.slotStart,
+          slot_end: window.slotEnd,
+          assigned_team: assignedTeam,
+        },
+        output: {
+          schedule_id: scheduleId,
+          assignment_status: 'assigned',
+          conflict_flags: [],
+          published_events: [publishedEvent],
+          latency_budget_ms: 500,
+        },
+      });
+    }
+
+    enforceAnyPermission(auth.permissions || [], ['dashboards.view', 'reports.manage']);
+    const actorRole = String(ctx.role || '').trim().toLowerCase();
+    if (!['technician', 'supervisor', 'planner', 'tenant_admin'].includes(actorRole)) {
+      throw new Error('mobile schedule acknowledgment requires operational role');
+    }
+    const scheduleId = assertNonEmpty(body.schedule_id, 'schedule_id');
     const workPackageId = assertNonEmpty(body.work_package_id, 'work_package_id');
-    const stationCode = assertNonEmpty(body.station_code, 'station_code');
-    const window = parseScheduleWindow(body.slot_start, body.slot_end);
-    const assignedTeam = parseObjectArray(body.assigned_team, 'assigned_team');
-    const existingSlots = parseObjectArray(body.existing_slots || [], 'existing_slots');
-    assertNoOverlap(window, existingSlots);
-    assertStationCapacity(assignedTeam.length, parseNumber(body.station_capacity || assignedTeam.length, 'station_capacity'));
-    assertTeamQualifications(assignedTeam, stationCode);
+    const acknowledgedAt = parseIsoTimestamp(body.acknowledged_at || new Date().toISOString(), 'acknowledged_at');
+    const deviceId = assertNonEmpty(body.device_id, 'device_id');
+    const acknowledgmentNote = String(body.note || '').trim();
+    const publishedEvent = buildScheduleUpdateEvent({
+      tenantId,
+      franchiseId,
+      scheduleId,
+      workPackageId,
+      eventType: 'schedule.update.acknowledged',
+      actorId: String(auth.userId || ''),
+    });
 
     return res.status(200).json({
       version: 'v2',
-      interface: 'assign-maintenance-slot',
+      interface: 'acknowledge-schedule-update',
       correlationId: ctx.correlationId,
       compatMode: compatDecision.compatMode,
       domainAccess: {
@@ -237,17 +314,18 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       },
       serviceBoundaries,
       input: {
+        schedule_id: scheduleId,
         work_package_id: workPackageId,
-        station_code: `${tenantId}:${stationCode}`,
-        slot_start: window.slotStart,
-        slot_end: window.slotEnd,
-        assigned_team: assignedTeam,
+        acknowledged_at: acknowledgedAt,
+        device_id: deviceId,
+        note: acknowledgmentNote || null,
       },
       output: {
-        schedule_id: `${tenantId}-${franchiseId}-schedule-${Date.now()}`,
-        assignment_status: 'assigned',
-        conflict_flags: [],
-        latency_budget_ms: 500,
+        status: 'acknowledged',
+        acknowledged_by: String(auth.userId || ''),
+        role: actorRole,
+        published_events: [publishedEvent],
+        latency_budget_ms: 300,
       },
     });
   } catch (error) {

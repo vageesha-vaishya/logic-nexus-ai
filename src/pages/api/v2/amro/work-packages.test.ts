@@ -276,6 +276,50 @@ describe('/api/v2/amro/work-packages', () => {
     expect((res.jsonBody as any)?.output?.created_by).toBe('user-1');
   });
 
+  it('saves work package view with filters', async () => {
+    process.env.AMRO_WORK_PACKAGES_V2_ENABLED = 'true';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'save-work-package-view' },
+      body: {
+        view_name: 'Blocked View',
+        filters: {
+          status: 'blocked',
+          search: 'wp',
+        },
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.interface).toBe('save-work-package-view');
+    expect((res.jsonBody as any)?.output?.filters?.status).toBe('blocked');
+    expect((res.jsonBody as any)?.output?.saved_view_id).toContain('tenant-1-fr-1-view-');
+  });
+
+  it('applies list filters and saved views in read response', async () => {
+    process.env.AMRO_WORK_PACKAGES_V2_ENABLED = 'true';
+    const req: ApiRequest = {
+      method: 'GET',
+      query: {
+        status: 'blocked',
+        search: 'legacy',
+        saved_view: 'blocked-items',
+      },
+      headers: { 'x-api-version': 'v2' },
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.filters?.status).toBe('blocked');
+    expect(Array.isArray((res.jsonBody as any)?.savedViews)).toBe(true);
+  });
+
   it('blocks transition when policy matrix disallows target status for current role', async () => {
     process.env.AMRO_WORK_PACKAGES_V2_ENABLED = 'true';
     vi.mocked(authenticateRequest).mockResolvedValue({
@@ -681,5 +725,136 @@ describe('/api/v2/amro/work-packages', () => {
       'corr-amro-v2',
       { apiVersion: 'v2' }
     );
+  });
+
+  it('applies rotable/LLP traceability controls for serialized component', async () => {
+    process.env.AMRO_WORK_PACKAGES_V2_ENABLED = 'true';
+    process.env.AMRO_SEQ_M3_STATUS = 'completed';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'trace-rotable-llp' },
+      body: {
+        component_id: 'comp-001',
+        part_number: 'PN-LLP-001',
+        serial_number: 'SER-LLP-001',
+        rotable_status: 'serviceable',
+        llp_remaining_cycles: 420,
+        traceability_action: 'verify',
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.interface).toBe('trace-rotable-llp');
+    expect((res.jsonBody as any)?.output?.traceability_status).toBe('verified');
+    expect((res.jsonBody as any)?.output?.llp_control?.within_threshold).toBe(true);
+  });
+
+  it('runs inventory optimization hooks when M8 is completed', async () => {
+    process.env.AMRO_WORK_PACKAGES_V2_ENABLED = 'true';
+    process.env.AMRO_SEQ_M6_STATUS = 'completed';
+    process.env.AMRO_SEQ_M7_STATUS = 'completed';
+    process.env.AMRO_SEQ_M8_STATUS = 'completed';
+    process.env.AMRO_SEQ_M6_GATE_EVALUATION_BLOCKER_TESTS_PASS = 'true';
+    process.env.AMRO_SEQ_M6_CERT_AUTHORITY_VALIDITY_TESTS_PASS = 'true';
+    process.env.AMRO_SEQ_M6_ZERO_UNRESOLVED_BLOCKER_RULE_PASS = 'true';
+    process.env.AMRO_SEQ_M6_DOSSIER_GENERATION_TESTS_PASS = 'true';
+    process.env.AMRO_SEQ_M7_ADAPTER_CONTRACT_TESTS_PASS = 'true';
+    process.env.AMRO_SEQ_M7_IDEMPOTENCY_REPLAY_TESTS_PASS = 'true';
+    process.env.AMRO_SEQ_M7_DLQ_REPLAY_CLOSURE_100 = 'true';
+    process.env.AMRO_SEQ_M8_KPI_CORRECTNESS_BASELINE_PASS = 'true';
+    process.env.AMRO_SEQ_M8_RECOMMENDATION_CONTRACT_EXPLAINABILITY_PASS = 'true';
+    process.env.AMRO_SEQ_M8_LOW_CONFIDENCE_POLICY_TESTS_PASS = 'true';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'run-inventory-optimization' },
+      body: {
+        work_package_id: 'wp-001',
+        forecast_signal_ids: ['sig-1', 'sig-2'],
+        optimization_window: 'P14D',
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.interface).toBe('run-inventory-optimization');
+    expect((res.jsonBody as any)?.output?.forecast_signal_count).toBe(2);
+    expect((res.jsonBody as any)?.output?.optimization_run_id).toContain('tenant-1-wp-001-inventory-opt-');
+  });
+
+  it('blocks inventory optimization hooks when M7 is not completed', async () => {
+    process.env.AMRO_WORK_PACKAGES_V2_ENABLED = 'true';
+    process.env.AMRO_SEQ_M6_STATUS = 'completed';
+    process.env.AMRO_SEQ_M8_STATUS = 'completed';
+    process.env.AMRO_SEQ_M7_STATUS = 'in-progress';
+    process.env.AMRO_SEQ_M6_GATE_EVALUATION_BLOCKER_TESTS_PASS = 'true';
+    process.env.AMRO_SEQ_M6_CERT_AUTHORITY_VALIDITY_TESTS_PASS = 'true';
+    process.env.AMRO_SEQ_M6_ZERO_UNRESOLVED_BLOCKER_RULE_PASS = 'true';
+    process.env.AMRO_SEQ_M6_DOSSIER_GENERATION_TESTS_PASS = 'true';
+    process.env.AMRO_SEQ_M8_KPI_CORRECTNESS_BASELINE_PASS = 'true';
+    process.env.AMRO_SEQ_M8_RECOMMENDATION_CONTRACT_EXPLAINABILITY_PASS = 'true';
+    process.env.AMRO_SEQ_M8_LOW_CONFIDENCE_POLICY_TESTS_PASS = 'true';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'run-inventory-optimization' },
+      body: {
+        work_package_id: 'wp-001',
+        forecast_signal_ids: ['sig-1'],
+        optimization_window: 'P7D',
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(sendErrorResponse).toHaveBeenCalledWith(
+      res,
+      expect.any(Error),
+      'corr-amro-v2',
+      { apiVersion: 'v2' }
+    );
+  });
+
+  it('syncs supplier ASN with ERP procurement when M7 is completed', async () => {
+    process.env.AMRO_WORK_PACKAGES_V2_ENABLED = 'true';
+    process.env.AMRO_SEQ_M6_STATUS = 'completed';
+    process.env.AMRO_SEQ_M7_STATUS = 'completed';
+    process.env.AMRO_SEQ_M6_GATE_EVALUATION_BLOCKER_TESTS_PASS = 'true';
+    process.env.AMRO_SEQ_M6_CERT_AUTHORITY_VALIDITY_TESTS_PASS = 'true';
+    process.env.AMRO_SEQ_M6_ZERO_UNRESOLVED_BLOCKER_RULE_PASS = 'true';
+    process.env.AMRO_SEQ_M6_DOSSIER_GENERATION_TESTS_PASS = 'true';
+    process.env.AMRO_SEQ_M7_ADAPTER_CONTRACT_TESTS_PASS = 'true';
+    process.env.AMRO_SEQ_M7_IDEMPOTENCY_REPLAY_TESTS_PASS = 'true';
+    process.env.AMRO_SEQ_M7_DLQ_REPLAY_CLOSURE_100 = 'true';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'sync-supplier-asn-erp' },
+      body: {
+        asn_event_id: 'asn-001',
+        procurement_source: 'sap-pm',
+        po_number: 'PO-1001',
+        line_items: [
+          { part_number: 'PN-001', qty: 2 },
+          { part_number: 'PN-002', qty: 1 },
+        ],
+        impacted_work_packages: ['wp-001'],
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.interface).toBe('sync-supplier-asn-erp');
+    expect((res.jsonBody as any)?.output?.sync_status).toBe('applied');
+    expect((res.jsonBody as any)?.output?.impacted_work_packages).toEqual(['wp-001']);
   });
 });
