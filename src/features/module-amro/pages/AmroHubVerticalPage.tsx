@@ -4,6 +4,8 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { useAuth } from '@/hooks/useAuth';
 import { useDomain } from '@/contexts/DomainContext';
 import {
   AMRO_ASYNCAPI_SPEC_PATH,
@@ -27,7 +29,7 @@ import {
   AMRO_SCREEN_LAYOUT_CONTRACTS,
   AMRO_UIUX_BEHAVIOR_RULES,
 } from '@/pages/api/v2/amro/screen-inventory-model';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { AmroOwnedWorkspace } from '../components/AmroOwnedWorkspace';
 import { useAmroOverviewKpi } from '../hooks/useAmroOverviewKpi';
 
@@ -36,6 +38,48 @@ type AmroModuleShellProps = {
 };
 
 type AmroPhasePlanUiRow = AmroPhasePlanRow & { status?: AmroPhaseStatus };
+type PersonaRole = 'platform_admin' | 'tenant_admin' | 'franchise_admin' | 'user';
+type AmroModuleKey =
+  | 'overview'
+  | 'work-packages'
+  | 'task-execution'
+  | 'scheduling'
+  | 'parts'
+  | 'compliance'
+  | 'certification'
+  | 'audit'
+  | 'integration'
+  | 'intelligence';
+
+type AmroHubVerticalPageProps = {
+  moduleKey?: AmroModuleKey;
+};
+
+const AMRO_MODULE_ROUTE_BY_NAME: Record<string, AmroModuleKey> = {
+  Overview: 'overview',
+  'Work Package': 'work-packages',
+  'Task Execution': 'task-execution',
+  Scheduling: 'scheduling',
+  Parts: 'parts',
+  Compliance: 'compliance',
+  Certification: 'certification',
+  Audit: 'audit',
+  Integration: 'integration',
+  Intelligence: 'intelligence',
+};
+
+const AMRO_MODULE_PAGE_LABEL: Record<AmroModuleKey, string> = {
+  overview: 'AMRO Overview',
+  'work-packages': 'AMRO Work Packages',
+  'task-execution': 'AMRO Task Execution',
+  scheduling: 'AMRO Scheduling',
+  parts: 'AMRO Parts',
+  compliance: 'AMRO Compliance',
+  certification: 'AMRO Certification',
+  audit: 'AMRO Audit',
+  integration: 'AMRO Integration',
+  intelligence: 'AMRO Intelligence',
+};
 
 function AmroModuleShell({ children }: AmroModuleShellProps) {
   return (
@@ -45,16 +89,71 @@ function AmroModuleShell({ children }: AmroModuleShellProps) {
   );
 }
 
-function AmroWorkspaceSurface() {
-  return <AmroOwnedWorkspace />;
+function AmroWorkspaceSurface({ moduleKey }: { moduleKey?: AmroModuleKey }) {
+  return <AmroOwnedWorkspace moduleKey={moduleKey} />;
 }
 
-export default function AmroHubVerticalPage() {
+function getAmroModuleRoutePath(moduleName: string) {
+  const moduleKey = AMRO_MODULE_ROUTE_BY_NAME[moduleName] || 'overview';
+  return `/dashboard/amro/${moduleKey}`;
+}
+
+export default function AmroHubVerticalPage({ moduleKey }: AmroHubVerticalPageProps = {}) {
   const { currentDomain } = useDomain();
+  const { hasRole, isPlatformAdmin } = useAuth();
   const isAmroDomainActive = currentDomain?.code === 'AMRO';
-  const { dashboard, trends, lastExport, loading, exporting, error, exportSnapshot } = useAmroOverviewKpi();
+  const {
+    dashboard,
+    trends,
+    lastExport,
+    loading,
+    exporting,
+    error,
+    exportSnapshot,
+    refreshAll,
+    getMetricTier,
+    refreshCadence,
+    lastDashboardRefreshAt,
+    lastTrendsRefreshAt,
+    loadDashboard,
+  } = useAmroOverviewKpi();
   const [phasePlanRows, setPhasePlanRows] = useState<AmroPhasePlanUiRow[]>([...AMRO_PHASE_PLAN_MATRIX]);
   const [phasePlanSource, setPhasePlanSource] = useState<'api' | 'fallback'>('fallback');
+  const [plannerFilter, setPlannerFilter] = useState<string>('');
+  const [engineerFilter, setEngineerFilter] = useState<string>('');
+  const moduleScopedScreens = useMemo(
+    () => (moduleKey ? AMRO_SCREEN_INVENTORY.filter((row) => AMRO_MODULE_ROUTE_BY_NAME[row.module] === moduleKey) : AMRO_SCREEN_INVENTORY),
+    [moduleKey]
+  );
+  const modulePageLabel = moduleKey ? AMRO_MODULE_PAGE_LABEL[moduleKey] : 'AMRO Operations Overview';
+  const activePersona = useMemo<PersonaRole>(() => {
+    if (isPlatformAdmin()) return 'platform_admin';
+    if (hasRole('tenant_admin')) return 'tenant_admin';
+    if (hasRole('franchise_admin')) return 'franchise_admin';
+    return 'user';
+  }, [hasRole, isPlatformAdmin]);
+  const canViewAnomalyFlags = activePersona !== 'user';
+  const canExportKpiSnapshot = activePersona === 'platform_admin' || activePersona === 'tenant_admin';
+  const canViewDetailedOps = activePersona !== 'user';
+  const canViewCertificationQueue = activePersona === 'platform_admin' || activePersona === 'tenant_admin' || activePersona === 'franchise_admin';
+  const criticalCards = useMemo(
+    () => (dashboard?.kpi_cards || []).filter((card) => getMetricTier(card.key) === 'critical'),
+    [dashboard?.kpi_cards, getMetricTier]
+  );
+  const standardCards = useMemo(
+    () => (dashboard?.kpi_cards || []).filter((card) => getMetricTier(card.key) === 'standard'),
+    [dashboard?.kpi_cards, getMetricTier]
+  );
+  const applyScopeFilters = async () => {
+    const end = new Date();
+    const start = new Date(end);
+    start.setDate(start.getDate() - 30);
+    await loadDashboard({
+      dateRange: `${start.toISOString()}|${end.toISOString()}`,
+      plannerId: plannerFilter.trim() || undefined,
+      engineerId: engineerFilter.trim() || undefined,
+    });
+  };
 
   useEffect(() => {
     let active = true;
@@ -88,7 +187,7 @@ export default function AmroHubVerticalPage() {
         <div className="flex-1 space-y-4 p-6" data-amro-uiux="base-preserved">
           <Card data-amro-base-surface="operations-overview">
             <CardHeader className="pb-2">
-              <CardTitle>AMRO Operations Overview</CardTitle>
+              <CardTitle>{modulePageLabel}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <p className="text-sm text-muted-foreground">
@@ -101,37 +200,333 @@ export default function AmroHubVerticalPage() {
                   {isAmroDomainActive ? 'AMRO Domain Context Active' : 'AMRO Domain Context Required'}
                 </Badge>
                 <Badge variant="outline">KPI Data Source: {AMRO_OVERVIEW_KPI_PATH}</Badge>
+                {moduleKey ? <Badge variant="outline">Module Route: /dashboard/amro/{moduleKey}</Badge> : null}
+                <Badge variant="outline">Persona: {activePersona.replace('_', ' ')}</Badge>
+                <Badge variant="outline">Critical Refresh: {Math.round(refreshCadence.criticalMs / 1000)}s</Badge>
+                <Badge variant="outline">Standard Refresh: {Math.round(refreshCadence.standardMs / 1000)}s</Badge>
                 {loading ? <Badge variant="outline">KPI Loading</Badge> : null}
                 {error ? <Badge variant="destructive">KPI Error</Badge> : null}
               </div>
+              <div className="grid grid-cols-1 gap-3 rounded-md border p-3 text-xs md:grid-cols-4" role="region" aria-label="AMRO Dashboard CRUD Controls">
+                <div className="md:col-span-1">
+                  <p className="font-semibold">Planner Filter</p>
+                  <Input value={plannerFilter} onChange={(event) => setPlannerFilter(event.target.value)} placeholder="planner_id" />
+                </div>
+                <div className="md:col-span-1">
+                  <p className="font-semibold">Engineer Filter</p>
+                  <Input value={engineerFilter} onChange={(event) => setEngineerFilter(event.target.value)} placeholder="engineer_id" />
+                </div>
+                <div className="flex items-end gap-2 md:col-span-2">
+                  <Button size="sm" variant="outline" onClick={() => void applyScopeFilters()}>
+                    Apply Dashboard Scope
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setPlannerFilter('');
+                      setEngineerFilter('');
+                      void loadDashboard({
+                        dateRange: `${new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()}|${new Date().toISOString()}`,
+                      });
+                    }}
+                  >
+                    Clear Scope
+                  </Button>
+                </div>
+              </div>
+              <div className="rounded-md border p-3 text-xs" role="region" aria-label="Module CRUD Hub">
+                <p className="font-semibold">AMRO Module CRUD Hub</p>
+                <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
+                  {moduleScopedScreens.map((row) => (
+                    <div key={`crud-${row.screenId}`} className="rounded-md border p-2">
+                      <p className="font-medium">{row.screenId}</p>
+                      <p className="text-muted-foreground">{row.screenName}</p>
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        <a
+                          className="rounded-md border px-2 py-1 hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                          href={`${getAmroModuleRoutePath(row.module)}?screen=${encodeURIComponent(row.screenId)}&mode=create`}
+                        >
+                          Create
+                        </a>
+                        <a
+                          className="rounded-md border px-2 py-1 hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                          href={`${getAmroModuleRoutePath(row.module)}?screen=${encodeURIComponent(row.screenId)}&mode=read`}
+                        >
+                          Read
+                        </a>
+                        <a
+                          className="rounded-md border px-2 py-1 hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                          href={`${getAmroModuleRoutePath(row.module)}?screen=${encodeURIComponent(row.screenId)}&mode=update`}
+                        >
+                          Update
+                        </a>
+                        <a
+                          className="rounded-md border px-2 py-1 hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                          href={`${getAmroModuleRoutePath(row.module)}?screen=${encodeURIComponent(row.screenId)}&mode=delete`}
+                        >
+                          Delete
+                        </a>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {error ? (
+                <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-xs" role="alert" aria-live="polite">
+                  <p className="font-semibold">Overview Widget Error State</p>
+                  <p className="mt-1 text-muted-foreground">{error}</p>
+                  <div className="mt-3">
+                    <Button size="sm" variant="outline" onClick={() => void refreshAll()}>
+                      Retry KPI Refresh
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
               {dashboard ? (
-                <div className="grid grid-cols-1 gap-2 text-xs md:grid-cols-2">
-                  <div className="rounded-md border p-3">
-                    <p className="font-semibold">KPI Cards</p>
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {dashboard.kpi_cards.map((card) => (
-                        <Badge key={card.key} variant="secondary">{`${card.label}: ${card.value} (${card.trend})`}</Badge>
-                      ))}
+                <div className="grid grid-cols-1 gap-3 text-xs md:grid-cols-2 xl:grid-cols-4">
+                  <div className="rounded-md border p-3" role="region" aria-label="Executive Summary Panel">
+                    <p className="font-semibold">Executive Summary Panel</p>
+                    <div className="mt-2 grid grid-cols-2 gap-2">
+                      <div className="rounded-md border p-2">
+                        <p className="text-[11px] text-muted-foreground">Active Work Packages</p>
+                        <p className="mt-1 text-base font-semibold">{dashboard.executive_summary.active_work_packages}</p>
+                      </div>
+                      <div className="rounded-md border p-2">
+                        <p className="text-[11px] text-muted-foreground">Overdue Tasks</p>
+                        <p className="mt-1 text-base font-semibold">{dashboard.executive_summary.overdue_tasks}</p>
+                      </div>
+                      <div className="rounded-md border p-2">
+                        <p className="text-[11px] text-muted-foreground">Compliance Status %</p>
+                        <p className="mt-1 text-base font-semibold">{dashboard.executive_summary.compliance_status_pct}</p>
+                      </div>
+                      <div className="rounded-md border p-2">
+                        <p className="text-[11px] text-muted-foreground">Forecast Accuracy %</p>
+                        <p className="mt-1 text-base font-semibold">{dashboard.executive_summary.forecast_accuracy_pct}</p>
+                      </div>
                     </div>
                   </div>
-                  <div className="rounded-md border p-3">
-                    <p className="font-semibold">Operational Trends</p>
+                  <div className="rounded-md border p-3" role="region" aria-label="Critical KPI Metrics">
+                    <p className="font-semibold">Critical KPI Metrics</p>
+                    {criticalCards.length ? (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {criticalCards.map((card) => (
+                          <Badge key={card.key} variant="destructive">{`${card.label}: ${card.value} (${card.trend})`}</Badge>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="mt-2 text-muted-foreground">No critical metrics returned for this scope.</p>
+                    )}
+                    {lastDashboardRefreshAt ? (
+                      <p className="mt-2 text-muted-foreground">Last critical refresh: {lastDashboardRefreshAt}</p>
+                    ) : null}
+                  </div>
+                  <div className="rounded-md border p-3" role="region" aria-label="Standard KPI Metrics">
+                    <p className="font-semibold">Standard KPI Metrics</p>
+                    {standardCards.length ? (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {standardCards.map((card) => (
+                          <Badge key={card.key} variant="secondary">{`${card.label}: ${card.value} (${card.trend})`}</Badge>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="mt-2 text-muted-foreground">No standard metrics returned for this scope.</p>
+                    )}
+                    {dashboard.freshness_warning ? (
+                      <p className="mt-2 text-muted-foreground">Freshness: {dashboard.freshness_warning}</p>
+                    ) : null}
+                  </div>
+                  <div className="rounded-md border p-3" role="region" aria-label="Operational Trends and Export">
+                    <p className="font-semibold">Task Execution Monitor</p>
+                    <p className="mt-2 text-muted-foreground">
+                      Technician productivity: {trends?.task_execution_monitor?.average_productivity_pct ?? 0}% | Mobile completion:{' '}
+                      {trends?.task_execution_monitor?.mobile_completion_rate_pct ?? 0}%
+                    </p>
+                    <p className="mt-1 text-muted-foreground">
+                      Completed tasks: {trends?.task_execution_monitor?.completed_tasks ?? 0} | Technicians:{' '}
+                      {trends?.task_execution_monitor?.technician_count ?? 0}
+                    </p>
+                    <p className="mt-3 font-semibold">Operational Trends</p>
                     <p className="mt-2 text-muted-foreground">
                       Variance: {typeof trends?.variance === 'number' ? trends.variance : 'N/A'} | Threshold breaches:{' '}
                       {trends?.threshold_breaches?.length || 0}
                     </p>
-                    {dashboard.freshness_warning ? (
-                      <p className="mt-2 text-muted-foreground">Freshness: {dashboard.freshness_warning}</p>
+                    {lastTrendsRefreshAt ? (
+                      <p className="mt-2 text-muted-foreground">Last standard refresh: {lastTrendsRefreshAt}</p>
                     ) : null}
-                    <div className="mt-3">
-                      <Button size="sm" variant="outline" disabled={exporting} onClick={() => void exportSnapshot()}>
-                        {exporting ? 'Exporting KPI Snapshot...' : 'Export KPI Snapshot'}
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Button size="sm" variant="outline" onClick={() => void refreshAll()}>
+                        Refresh Widgets
                       </Button>
+                      {canExportKpiSnapshot ? (
+                        <Button size="sm" variant="outline" disabled={exporting} onClick={() => void exportSnapshot()}>
+                          {exporting ? 'Exporting KPI Snapshot...' : 'Export KPI Snapshot'}
+                        </Button>
+                      ) : (
+                        <Badge variant="outline">Export restricted to tenant/platform admin persona</Badge>
+                      )}
                     </div>
                     {lastExport ? (
                       <p className="mt-2 text-muted-foreground">
                         Last export job: {lastExport.export_job_id} | {lastExport.generated_at}
                       </p>
+                    ) : null}
+                  </div>
+                  <div className="rounded-md border p-3 md:col-span-2 xl:col-span-4" role="region" aria-label="Work Package Overview Grid">
+                    <p className="font-semibold">Work Package Overview Grid</p>
+                    <div className="mt-2 overflow-x-auto">
+                      <table className="w-full min-w-[720px] border-collapse">
+                        <thead>
+                          <tr className="text-left">
+                            <th className="border-b py-1 pr-2">Work Package</th>
+                            <th className="border-b py-1 pr-2">Status</th>
+                            <th className="border-b py-1 pr-2">Planner</th>
+                            <th className="border-b py-1 pr-2">Engineer</th>
+                            <th className="border-b py-1 pr-2">Due</th>
+                            <th className="border-b py-1 pr-2">Progress %</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(dashboard.work_package_overview || []).map((item) => (
+                            <tr key={item.work_package_id}>
+                              <td className="border-b py-1 pr-2">{item.title}</td>
+                              <td className="border-b py-1 pr-2">{item.status}</td>
+                              <td className="border-b py-1 pr-2">{item.planner_id}</td>
+                              <td className="border-b py-1 pr-2">{item.engineer_id}</td>
+                              <td className="border-b py-1 pr-2">{item.due_at || 'N/A'}</td>
+                              <td className="border-b py-1 pr-2">{item.progress_pct}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                  <div className="rounded-md border p-3 md:col-span-2" role="region" aria-label="Scheduling Board Snapshot">
+                    <p className="font-semibold">Scheduling Board Snapshot</p>
+                    <p className="mt-2 text-muted-foreground">
+                      Resource utilization: {trends?.scheduling_board_snapshot?.resource_utilization_pct ?? 0}%
+                    </p>
+                    <div className="mt-2 space-y-1">
+                      {(trends?.scheduling_board_snapshot?.upcoming_slots || []).slice(0, 5).map((slot) => (
+                        <div key={slot.slot_id} className="rounded-md border p-2">
+                          {slot.station} | {slot.resource} | {slot.start_at || 'unscheduled'}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="rounded-md border p-3 md:col-span-2" role="region" aria-label="Materials Reservation Alert Panel">
+                    <p className="font-semibold">Materials Reservation Alert Panel</p>
+                    <div className="mt-2 space-y-1">
+                      {(dashboard.materials_reservation_alerts || []).slice(0, 5).map((alert) => (
+                        <div key={`${alert.part_number}-${alert.location}`} className="rounded-md border p-2">
+                          {alert.part_number} | {alert.location} | Shortage: {alert.shortage_qty}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="rounded-md border p-3 md:col-span-2" role="region" aria-label="Compliance Gate Status">
+                    <p className="font-semibold">Compliance Gate Status</p>
+                    <div className="mt-2 space-y-1">
+                      {(dashboard.compliance_gate_status || []).slice(0, 5).map((gate) => (
+                        <div key={gate.gate_id} className="rounded-md border p-2">
+                          {gate.gate_name} | {gate.status} | {gate.due_at || 'No due date'}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="rounded-md border p-3 md:col-span-2" role="region" aria-label="Certification Decision Queue">
+                    <p className="font-semibold">Certification Decision Queue</p>
+                    {canViewCertificationQueue ? (
+                      <div className="mt-2 space-y-1">
+                        {(trends?.certification_decision_queue || []).slice(0, 5).map((item) => (
+                          <div key={item.certification_id} className="rounded-md border p-2">
+                            {item.certification_id} | {item.authority} | {item.status}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="mt-2 text-muted-foreground">Certification queue is hidden for current persona.</p>
+                    )}
+                  </div>
+                  <div className="rounded-md border p-3 md:col-span-2" role="region" aria-label="Audit Timeline Widget">
+                    <p className="font-semibold">Audit Timeline Widget</p>
+                    {canViewDetailedOps ? (
+                      <div className="mt-2 space-y-1">
+                        {(trends?.audit_timeline || []).slice(0, 5).map((event) => (
+                          <div key={event.event_id} className="rounded-md border p-2">
+                            {event.action} | {event.actor} | {event.outcome}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="mt-2 text-muted-foreground">Audit timeline is hidden for current persona.</p>
+                    )}
+                  </div>
+                  <div className="rounded-md border p-3 md:col-span-2" role="region" aria-label="Integration Monitor">
+                    <p className="font-semibold">Integration Monitor</p>
+                    <p className="mt-2 text-muted-foreground">
+                      Health: {dashboard.integration_monitor?.status || 'unknown'} | Failed attempts: {dashboard.integration_monitor?.failed_attempts || 0} | Failure rate:{' '}
+                      {dashboard.integration_monitor?.failure_rate_pct || 0}%
+                    </p>
+                    <div className="mt-2 space-y-1">
+                      {(dashboard.integration_monitor?.recent_failures || []).slice(0, 4).map((failure) => (
+                        <div key={`${failure.integration_id}-${failure.last_attempt_at}`} className="rounded-md border p-2">
+                          {failure.integration_id} | {failure.status} | {failure.error_message || 'No error details'}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="rounded-md border p-3 md:col-span-2" role="region" aria-label="Forecast Recommendation Hub">
+                    <p className="font-semibold">Forecast Recommendation Hub</p>
+                    <div className="mt-2 space-y-1">
+                      {(trends?.forecast_recommendation_hub || []).slice(0, 5).map((item) => (
+                        <div key={item.recommendation_id} className="rounded-md border p-2">
+                          {item.recommendation} | Confidence: {item.confidence_pct}% | Risk: {item.risk_score}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="rounded-md border p-3 md:col-span-2 xl:col-span-4" role="region" aria-label="Quick Navigation">
+                    <p className="font-semibold">Quick Navigation to 16.1 Screen Modules</p>
+                    <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
+                      {moduleScopedScreens.map((row) => (
+                        <a
+                          key={row.screenId}
+                          className="rounded-md border p-2 hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                          href={`${getAmroModuleRoutePath(row.module)}?screen=${encodeURIComponent(row.screenId)}`}
+                        >
+                          {row.screenId} | {row.screenName}
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="rounded-md border p-3 md:col-span-2 xl:col-span-4" role="region" aria-label="Anomaly Flags">
+                    <p className="font-semibold">Anomaly Flags</p>
+                    {canViewAnomalyFlags ? (
+                      dashboard.anomaly_flags.length ? (
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {dashboard.anomaly_flags.map((flag) => (
+                            <Badge key={flag.id} variant="secondary">{`${flag.metric_key}: ${flag.message}`}</Badge>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="mt-2 text-muted-foreground">No anomalies detected for the active scope.</p>
+                      )
+                    ) : (
+                      <p className="mt-2 text-muted-foreground">
+                        Role Controls: anomaly intelligence is hidden for user persona.
+                      </p>
+                    )}
+                    {(dashboard.data_issues?.length || trends?.data_issues?.length) ? (
+                      <div className="mt-3 rounded-md border border-warning/50 bg-warning/10 p-2" aria-live="polite">
+                        <p className="font-semibold">Data Connectivity Issues</p>
+                        {dashboard.data_issues?.slice(0, 3).map((issue) => (
+                          <p key={`dashboard-${issue}`} className="mt-1 text-muted-foreground">{issue}</p>
+                        ))}
+                        {trends?.data_issues?.slice(0, 3).map((issue) => (
+                          <p key={`trends-${issue}`} className="mt-1 text-muted-foreground">{issue}</p>
+                        ))}
+                      </div>
                     ) : null}
                   </div>
                 </div>
@@ -471,7 +866,7 @@ export default function AmroHubVerticalPage() {
                     },
                   ]}
                 >
-                  <AmroWorkspaceSurface />
+                  <AmroWorkspaceSurface moduleKey={moduleKey} />
                 </PlatformWidgetSlot>
               </AccordionContent>
             </AccordionItem>
@@ -480,4 +875,44 @@ export default function AmroHubVerticalPage() {
       </AmroModuleShell>
     </DashboardLayout>
   );
+}
+
+export function AmroOverviewPage() {
+  return <AmroHubVerticalPage moduleKey="overview" />;
+}
+
+export function AmroWorkPackagesPage() {
+  return <AmroHubVerticalPage moduleKey="work-packages" />;
+}
+
+export function AmroTaskExecutionPage() {
+  return <AmroHubVerticalPage moduleKey="task-execution" />;
+}
+
+export function AmroSchedulingPage() {
+  return <AmroHubVerticalPage moduleKey="scheduling" />;
+}
+
+export function AmroPartsPage() {
+  return <AmroHubVerticalPage moduleKey="parts" />;
+}
+
+export function AmroCompliancePage() {
+  return <AmroHubVerticalPage moduleKey="compliance" />;
+}
+
+export function AmroCertificationPage() {
+  return <AmroHubVerticalPage moduleKey="certification" />;
+}
+
+export function AmroAuditPage() {
+  return <AmroHubVerticalPage moduleKey="audit" />;
+}
+
+export function AmroIntegrationPage() {
+  return <AmroHubVerticalPage moduleKey="integration" />;
+}
+
+export function AmroIntelligencePage() {
+  return <AmroHubVerticalPage moduleKey="intelligence" />;
 }

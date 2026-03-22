@@ -3,6 +3,8 @@ export type AmroPhaseStatus = 'not-started' | 'in-progress' | 'completed';
 export type AmroSequentialMilestoneId = 'M1' | 'M2' | 'M3' | 'M4' | 'M5' | 'M6' | 'M7' | 'M8' | 'M9' | 'M10';
 export type AmroSequentialMilestoneStatus = 'not-started' | 'in-progress' | 'completed';
 export type AmroDeliverySequenceId = 'S1' | 'S2' | 'S3' | 'S4' | 'S5' | 'S6' | 'S7';
+export type AmroArchitectureDecisionPriorityId = 'P1' | 'P2' | 'P3' | 'P4' | 'P5' | 'P6';
+export type AmroPriorityWindow = 'Immediate' | 'Near-term' | 'Mid-term';
 export type AmroSequentialPrerequisiteId =
   | 'architecture-security-scope-approved'
   | 'tenant-franchise-isolation-defined'
@@ -17,6 +19,12 @@ export type AmroModuleCompletionChecklistId =
   | 'schema-indexes-rls-tests-passing'
   | 'security-audit-evidence-verified'
   | 'performance-benchmarks-met';
+export type AmroFinalImplementationGuidanceId =
+  | 'additive-backward-compatible'
+  | 'module-consistency-over-bespoke'
+  | 'workflow-observability-policy-traces'
+  | 'security-compliance-in-execution-paths'
+  | 'forecast-explainability-human-override';
 
 export type AmroPhasePlanRow = {
   id: AmroPhaseId;
@@ -58,6 +66,21 @@ export type AmroDeliverySequenceRow = {
 
 export type AmroModuleCompletionChecklistItem = {
   id: AmroModuleCompletionChecklistId;
+  label: string;
+  satisfied: boolean;
+};
+
+export type AmroArchitectureDecisionPriorityRow = {
+  id: AmroArchitectureDecisionPriorityId;
+  priorityWindow: AmroPriorityWindow;
+  decisionTheme: string;
+  whyItMatters: string;
+  successIndicator: string;
+  satisfied: boolean;
+};
+
+export type AmroFinalImplementationGuidanceItem = {
+  id: AmroFinalImplementationGuidanceId;
   label: string;
   satisfied: boolean;
 };
@@ -155,6 +178,51 @@ export const AMRO_DEVELOPMENT_DELIVERY_SEQUENCE: ReadonlyArray<AmroDeliverySeque
   },
 ] as const;
 
+const AMRO_ARCHITECTURE_DECISION_PRIORITY_BASE: ReadonlyArray<Omit<AmroArchitectureDecisionPriorityRow, 'satisfied'>> = [
+  {
+    id: 'P1',
+    priorityWindow: 'Immediate',
+    decisionTheme: 'Paperless mobile execution parity',
+    whyItMatters: 'Market leaders treat field mobility as baseline',
+    successIndicator: '>90% task execution completed digitally',
+  },
+  {
+    id: 'P2',
+    priorityWindow: 'Immediate',
+    decisionTheme: 'Compliance-as-gate architecture',
+    whyItMatters: 'Release safety and regulator confidence',
+    successIndicator: 'Zero unauthorized releases',
+  },
+  {
+    id: 'P3',
+    priorityWindow: 'Immediate',
+    decisionTheme: 'Tenant/franchise isolation hardening',
+    whyItMatters: 'Multi-tenant enterprise trust requirement',
+    successIndicator: 'Zero cross-tenant data leakage findings',
+  },
+  {
+    id: 'P4',
+    priorityWindow: 'Near-term',
+    decisionTheme: 'Embedded AI in planning/materials workflows',
+    whyItMatters: 'Operational differentiation and reduced downtime',
+    successIndicator: 'Reduction in AOG and material shortages',
+  },
+  {
+    id: 'P5',
+    priorityWindow: 'Near-term',
+    decisionTheme: 'High-fidelity audit replay and policy snapshots',
+    whyItMatters: 'Faster regulator response and root-cause analysis',
+    successIndicator: 'Audit replay completion within SLA',
+  },
+  {
+    id: 'P6',
+    priorityWindow: 'Mid-term',
+    decisionTheme: 'Partner ecosystem adapter acceleration',
+    whyItMatters: 'Enterprise integration competitiveness',
+    successIndicator: 'Faster onboarding of ERP and telemetry partners',
+  },
+] as const;
+
 function parseStatus(value: string | undefined): AmroPhaseStatus {
   const normalized = String(value || '').trim().toLowerCase();
   if (normalized === 'completed') return 'completed';
@@ -173,6 +241,11 @@ function parseBoolean(value: string | undefined, fallback: boolean): boolean {
   const normalized = String(value || '').trim().toLowerCase();
   if (!normalized) return fallback;
   return normalized === 'true' || normalized === '1' || normalized === 'on';
+}
+
+function parseNumber(value: string | undefined, fallback: number): number {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : fallback;
 }
 
 export function resolveAmroModuleCompletionChecklist(): ReadonlyArray<AmroModuleCompletionChecklistItem> {
@@ -213,6 +286,82 @@ export function resolveAmroModuleCompletionChecklist(): ReadonlyArray<AmroModule
       satisfied: parseBoolean(process.env.AMRO_MODCHECK_PERFORMANCE_BENCHMARKS_MET, false),
     },
   ] as const;
+}
+
+export function buildAmroArchitectureDecisionPrioritiesEnvelope() {
+  const mobileDigitalExecutionRatio = parseNumber(process.env.AMRO_ARCH_PRIORITY_MOBILE_DIGITAL_EXECUTION_RATIO, 0);
+  const unauthorizedReleaseCount = parseNumber(process.env.AMRO_ARCH_PRIORITY_UNAUTHORIZED_RELEASE_COUNT, 0);
+  const crossTenantLeakageCount = parseNumber(process.env.AMRO_ARCH_PRIORITY_CROSS_TENANT_LEAKAGE_COUNT, 0);
+  const aogShortageReductionValidated = parseBoolean(process.env.AMRO_ARCH_PRIORITY_AOG_SHORTAGE_REDUCTION_VALIDATED, false);
+  const auditReplaySlaValidated = parseBoolean(process.env.AMRO_ARCH_PRIORITY_AUDIT_REPLAY_SLA_VALIDATED, false);
+  const partnerOnboardingAccelerationValidated = parseBoolean(process.env.AMRO_ARCH_PRIORITY_PARTNER_ONBOARDING_ACCELERATION_VALIDATED, false);
+
+  const roadmap = AMRO_ARCHITECTURE_DECISION_PRIORITY_BASE.map((item) => {
+    if (item.id === 'P1') return { ...item, satisfied: mobileDigitalExecutionRatio >= 0.9 };
+    if (item.id === 'P2') return { ...item, satisfied: unauthorizedReleaseCount === 0 };
+    if (item.id === 'P3') return { ...item, satisfied: crossTenantLeakageCount === 0 };
+    if (item.id === 'P4') return { ...item, satisfied: aogShortageReductionValidated };
+    if (item.id === 'P5') return { ...item, satisfied: auditReplaySlaValidated };
+    return { ...item, satisfied: partnerOnboardingAccelerationValidated };
+  });
+
+  const finalImplementationGuidance: ReadonlyArray<AmroFinalImplementationGuidanceItem> = [
+    {
+      id: 'additive-backward-compatible',
+      label: 'Keep AMRO architecture additive and backward-compatible for APIs, schema, and workflows',
+      satisfied: parseBoolean(process.env.AMRO_ARCH_GUIDANCE_ADDITIVE_BACKWARD_COMPATIBLE, false),
+    },
+    {
+      id: 'module-consistency-over-bespoke',
+      label: 'Prioritize module consistency over bespoke UX variants to preserve operational predictability',
+      satisfied: parseBoolean(process.env.AMRO_ARCH_GUIDANCE_MODULE_CONSISTENCY, false),
+    },
+    {
+      id: 'workflow-observability-policy-traces',
+      label: 'Instrument every workflow stage with observability and policy version traces',
+      satisfied: parseBoolean(process.env.AMRO_ARCH_GUIDANCE_OBSERVABILITY_POLICY_TRACES, false),
+    },
+    {
+      id: 'security-compliance-in-execution-paths',
+      label: 'Keep security and compliance checks in execution paths, not post-processing paths',
+      satisfied: parseBoolean(process.env.AMRO_ARCH_GUIDANCE_SECURITY_IN_PATH, false),
+    },
+    {
+      id: 'forecast-explainability-human-override',
+      label: 'Treat forecasting as decision support with explainability and human override controls',
+      satisfied: parseBoolean(process.env.AMRO_ARCH_GUIDANCE_FORECAST_EXPLAINABILITY_OVERRIDE, false),
+    },
+  ] as const;
+
+  const satisfiedPriorityCount = roadmap.filter((item) => item.satisfied).length;
+  const satisfiedGuidanceCount = finalImplementationGuidance.filter((item) => item.satisfied).length;
+
+  return {
+    priorityRoadmap: roadmap,
+    finalImplementationGuidance: {
+      items: finalImplementationGuidance,
+      summary: {
+        totalGuidanceChecks: finalImplementationGuidance.length,
+        satisfiedGuidanceChecks: satisfiedGuidanceCount,
+        pendingGuidanceChecks: finalImplementationGuidance.length - satisfiedGuidanceCount,
+        completionRatio: Number((satisfiedGuidanceCount / finalImplementationGuidance.length).toFixed(2)),
+      },
+    },
+    successIndicators: {
+      mobileDigitalExecutionRatio,
+      unauthorizedReleaseCount,
+      crossTenantLeakageCount,
+      aogShortageReductionValidated,
+      auditReplaySlaValidated,
+      partnerOnboardingAccelerationValidated,
+    },
+    summary: {
+      totalPriorityDecisions: roadmap.length,
+      satisfiedPriorityDecisions: satisfiedPriorityCount,
+      pendingPriorityDecisions: roadmap.length - satisfiedPriorityCount,
+      completionRatio: Number((satisfiedPriorityCount / roadmap.length).toFixed(2)),
+    },
+  };
 }
 
 export function resolveAmroPhasePlanStatuses(): Record<AmroPhaseId, AmroPhaseStatus> {

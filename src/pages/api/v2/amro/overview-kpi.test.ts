@@ -14,6 +14,7 @@ import {
 } from '../../_utils/http';
 import { sendErrorResponse } from '../../_utils/errorHandler';
 import { applyCompatibilityResponseHeaders, resolveGatewayCompatibility } from '../../_utils/compatibility-facade';
+import { getSupabaseAdminClient } from '../../_utils/supabaseAdmin';
 
 vi.mock('../../_utils/http', () => ({
   applyCors: vi.fn(),
@@ -34,6 +35,10 @@ vi.mock('../../_utils/errorHandler', () => ({
 vi.mock('../../_utils/compatibility-facade', () => ({
   applyCompatibilityResponseHeaders: vi.fn(),
   resolveGatewayCompatibility: vi.fn(),
+}));
+
+vi.mock('../../_utils/supabaseAdmin', () => ({
+  getSupabaseAdminClient: vi.fn(),
 }));
 
 function createResponse(): ApiResponse & { statusCode?: number; jsonBody?: unknown; headers: Record<string, any> } {
@@ -134,6 +139,116 @@ describe('/api/v2/amro/overview-kpi', () => {
       source: 'database',
       validatedAt: '2026-03-21T00:00:00.000Z',
     } as any);
+    const tableRows: Record<string, unknown[]> = {
+      work_package_master: [
+        {
+          id: 'wp-1',
+          title: 'A Check WP',
+          status: 'in_progress',
+          planner_id: 'planner-1',
+          engineer_id: 'engineer-1',
+          due_at: '2026-03-22T05:00:00.000Z',
+          progress_pct: 52,
+          tenant_id: 'tenant-1',
+        },
+      ],
+      materials_inventory: [
+        {
+          id: 'mat-1',
+          part_number: 'PART-001',
+          station_id: 'station-a',
+          available_qty: 1,
+          reserved_qty: 4,
+          tenant_id: 'tenant-1',
+        },
+      ],
+      compliance_gates: [
+        {
+          id: 'gate-1',
+          gate_name: 'AD Closeout',
+          status: 'failed',
+          due_at: '2026-03-23T00:00:00.000Z',
+          owner_id: 'inspector-1',
+          tenant_id: 'tenant-1',
+        },
+      ],
+      integration_logs: [
+        {
+          id: 'int-1',
+          integration_id: 'sap-pm',
+          status: 'failed',
+          direction: 'outbound',
+          last_attempt_at: '2026-03-21T09:00:00.000Z',
+          error_message: 'Timeout',
+          tenant_id: 'tenant-1',
+        },
+      ],
+      forecast_recommendations: [
+        {
+          id: 'fc-1',
+          recommendation: 'Pull inspection forward by 12 hours',
+          confidence_pct: 94,
+          risk_score: 88,
+          reason: 'Anomaly cluster increased',
+          work_package_id: 'wp-1',
+          tenant_id: 'tenant-1',
+        },
+      ],
+      task_execution_status: [
+        {
+          id: 'task-1',
+          status: 'completed',
+          technician_id: 'tech-1',
+          completed_on_mobile: true,
+          productivity_score: 93,
+          completed_at: '2026-03-21T10:00:00.000Z',
+          tenant_id: 'tenant-1',
+        },
+      ],
+      scheduling_board_data: [
+        {
+          id: 'slot-1',
+          station_id: 'station-a',
+          slot_start_at: '2026-03-23T10:00:00.000Z',
+          slot_end_at: '2026-03-23T12:00:00.000Z',
+          resource_name: 'Line Team 1',
+          utilization_pct: 82,
+          tenant_id: 'tenant-1',
+        },
+      ],
+      certification_records: [
+        {
+          id: 'cert-1',
+          work_package_id: 'wp-1',
+          authority: 'FAA',
+          status: 'pending',
+          submitted_at: '2026-03-21T11:00:00.000Z',
+          tenant_id: 'tenant-1',
+        },
+      ],
+      audit_trails: [
+        {
+          id: 'audit-1',
+          action: 'gate-evaluation',
+          actor: 'inspector-1',
+          created_at: '2026-03-21T12:00:00.000Z',
+          outcome: 'failed',
+          tenant_id: 'tenant-1',
+        },
+      ],
+    };
+    vi.mocked(getSupabaseAdminClient).mockReturnValue({
+      from: vi.fn((tableName: string) => ({
+        select: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            limit: vi.fn(async () => ({
+              data: tableRows[tableName] || [],
+              error: null,
+            })),
+          })),
+        })),
+      })),
+    } as any);
   });
 
   it('returns dashboard payload for load-kpi-dashboard interface', async () => {
@@ -162,6 +277,11 @@ describe('/api/v2/amro/overview-kpi', () => {
     expect((res.jsonBody as any)?.output?.kpi_cards?.length).toBeGreaterThan(0);
     expect((res.jsonBody as any)?.input?.station_ids).toEqual(['tenant-1:station-a', 'tenant-1:station-b']);
     expect((res.jsonBody as any)?.input?.fleet_ids).toEqual(['tenant-1:fleet-a']);
+    expect((res.jsonBody as any)?.output).toHaveProperty('executive_summary');
+    expect((res.jsonBody as any)?.output).toHaveProperty('work_package_overview');
+    expect((res.jsonBody as any)?.output).toHaveProperty('materials_reservation_alerts');
+    expect((res.jsonBody as any)?.output).toHaveProperty('compliance_gate_status');
+    expect((res.jsonBody as any)?.output).toHaveProperty('integration_monitor');
     expect((res.jsonBody as any)?.output).toHaveProperty('risk_heatmap');
     expect((res.jsonBody as any)?.output).toHaveProperty('trend_lines');
     expect((res.jsonBody as any)?.output).toHaveProperty('anomaly_flags');
@@ -230,6 +350,11 @@ describe('/api/v2/amro/overview-kpi', () => {
     expect((res.jsonBody as any)?.interface).toBe('load-operational-trends');
     expect((res.jsonBody as any)?.output?.time_series?.length).toBeGreaterThan(0);
     expect((res.jsonBody as any)?.output).toHaveProperty('variance');
+    expect((res.jsonBody as any)?.output).toHaveProperty('task_execution_monitor');
+    expect((res.jsonBody as any)?.output).toHaveProperty('scheduling_board_snapshot');
+    expect((res.jsonBody as any)?.output).toHaveProperty('certification_decision_queue');
+    expect((res.jsonBody as any)?.output).toHaveProperty('audit_timeline');
+    expect((res.jsonBody as any)?.output).toHaveProperty('forecast_recommendation_hub');
   });
 
   it('rejects compare window beyond policy maximum', async () => {

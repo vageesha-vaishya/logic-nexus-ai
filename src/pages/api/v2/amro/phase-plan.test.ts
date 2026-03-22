@@ -90,6 +90,8 @@ describe('/api/v2/amro/phase-plan', () => {
     expect((res.jsonBody as any)?.data?.sequentialImplementation?.milestones?.length).toBe(10);
     expect((res.jsonBody as any)?.data?.developmentBlueprint?.deliverySequence?.length).toBe(7);
     expect((res.jsonBody as any)?.data?.developmentBlueprint?.moduleCompletionChecklist?.summary?.totalChecks).toBe(7);
+    expect((res.jsonBody as any)?.data?.architectureDecisionPriorities?.priorityRoadmap?.length).toBe(6);
+    expect((res.jsonBody as any)?.data?.architectureDecisionPriorities?.finalImplementationGuidance?.summary?.totalGuidanceChecks).toBe(5);
     expect((res.jsonBody as any)?.domainAccess?.subscriptionStatus).toBe('public');
     expect((res.jsonBody as any)?.serviceBoundaries?.scopedAccess?.tenant_id).toBe('public');
     expect(applyCompatibilityResponseHeaders).toHaveBeenCalled();

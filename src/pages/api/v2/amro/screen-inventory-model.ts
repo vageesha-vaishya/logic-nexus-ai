@@ -1,4 +1,15 @@
 export type AmroScreenDevice = 'Desktop' | 'Tablet' | 'Mobile';
+export type AmroModuleId =
+  | 'MOD-AMRO-01'
+  | 'MOD-AMRO-02'
+  | 'MOD-AMRO-03'
+  | 'MOD-AMRO-04'
+  | 'MOD-AMRO-05'
+  | 'MOD-AMRO-06'
+  | 'MOD-AMRO-07'
+  | 'MOD-AMRO-08'
+  | 'MOD-AMRO-09'
+  | 'MOD-AMRO-10';
 
 export type AmroScreenInventoryRow = {
   screenId: string;
@@ -46,6 +57,14 @@ export type AmroAccessibilityRequirement = {
   area: 'Keyboard navigation' | 'Screen reader labels' | 'Dynamic updates' | 'Language/locale' | 'Color safety';
   requirement: string;
   acceptanceCriteria: string;
+};
+
+export type AmroUiUxMappingMatrixRow = {
+  moduleId: AmroModuleId;
+  primaryScreens: string[];
+  wireframeReferences: string[];
+  userFlowReferences: string[];
+  interfaceSpecifications: string[];
 };
 
 export const AMRO_SCREEN_INVENTORY: ReadonlyArray<AmroScreenInventoryRow> = [
@@ -274,18 +293,94 @@ export const AMRO_ACCESSIBILITY_I18N_REQUIREMENTS: ReadonlyArray<AmroAccessibili
   },
 ] as const;
 
+export const AMRO_UIUX_MAPPING_MATRIX: ReadonlyArray<AmroUiUxMappingMatrixRow> = [
+  {
+    moduleId: 'MOD-AMRO-01',
+    primaryScreens: ['SCR-AMRO-001 Overview Dashboard'],
+    wireframeReferences: ['5.3.1'],
+    userFlowReferences: ['5.4.1', '17.1'],
+    interfaceSpecifications: ['16.2 dashboard layout contract', '16.3 behavior rules'],
+  },
+  {
+    moduleId: 'MOD-AMRO-02',
+    primaryScreens: ['SCR-AMRO-002 List', 'SCR-AMRO-003 Create Drawer', 'SCR-AMRO-004 Detail Sheet'],
+    wireframeReferences: ['5.3.2', '5.3.3'],
+    userFlowReferences: ['5.4.1', '17.1'],
+    interfaceSpecifications: ['16.2 list/detail contracts', '16.3 role-gated actions'],
+  },
+  {
+    moduleId: 'MOD-AMRO-03',
+    primaryScreens: ['SCR-AMRO-005 Task Execution Card'],
+    wireframeReferences: ['5.3.4'],
+    userFlowReferences: ['5.4.2', '17.2'],
+    interfaceSpecifications: ['16.2 task card contract', '16.4 accessibility'],
+  },
+  {
+    moduleId: 'MOD-AMRO-04',
+    primaryScreens: ['SCR-AMRO-006 Scheduling Board'],
+    wireframeReferences: ['5.3.1 context', '16.2 board contract'],
+    userFlowReferences: ['5.4.1', '17.1'],
+    interfaceSpecifications: ['16.3 action ordering and constraint feedback rules'],
+  },
+  {
+    moduleId: 'MOD-AMRO-05',
+    primaryScreens: ['SCR-AMRO-007 Materials Reservation Panel'],
+    wireframeReferences: ['5.3.3 materials tab context'],
+    userFlowReferences: ['17.1'],
+    interfaceSpecifications: ['16.2 detail-side material panel behavior'],
+  },
+  {
+    moduleId: 'MOD-AMRO-06',
+    primaryScreens: ['SCR-AMRO-008 Compliance Gate Modal'],
+    wireframeReferences: ['5.3.3 compliance tab context'],
+    userFlowReferences: ['17.3'],
+    interfaceSpecifications: ['16.3 irreversible action protections', '16.4 non-color status'],
+  },
+  {
+    moduleId: 'MOD-AMRO-07',
+    primaryScreens: ['SCR-AMRO-009 Certification Decision Panel'],
+    wireframeReferences: ['5.3.3 signature/release context'],
+    userFlowReferences: ['17.1', '17.3'],
+    interfaceSpecifications: ['16.3 permission visibility', '16.4 keyboard operability'],
+  },
+  {
+    moduleId: 'MOD-AMRO-08',
+    primaryScreens: ['SCR-AMRO-011 Integration Monitor Console'],
+    wireframeReferences: ['18.2 integration flow'],
+    userFlowReferences: ['17.2 sync error path'],
+    interfaceSpecifications: ['23.1 retry/replay contract visibility rules'],
+  },
+  {
+    moduleId: 'MOD-AMRO-09',
+    primaryScreens: ['SCR-AMRO-012 Forecast Recommendation Hub'],
+    wireframeReferences: ['5.3.1 forecast signals'],
+    userFlowReferences: ['17.1 planning decision points'],
+    interfaceSpecifications: ['16.2 recommendation panel and confidence display'],
+  },
+  {
+    moduleId: 'MOD-AMRO-10',
+    primaryScreens: ['SCR-AMRO-010 Audit Replay Timeline'],
+    wireframeReferences: ['5.3.3 activity/audit context'],
+    userFlowReferences: ['17.3 gate rationale path'],
+    interfaceSpecifications: ['19.2 API-AMRO-014 replay interface requirements'],
+  },
+] as const;
+
 export function buildAmroScreenInventoryEnvelope() {
   const screens = [...AMRO_SCREEN_INVENTORY];
   const layoutContracts = [...AMRO_SCREEN_LAYOUT_CONTRACTS];
   const accessibilityAndI18n = [...AMRO_ACCESSIBILITY_I18N_REQUIREMENTS];
+  const uiUxMappingMatrix = [...AMRO_UIUX_MAPPING_MATRIX];
   return {
     screens,
     layoutContracts,
+    uiUxMappingMatrix,
     behaviorRules: AMRO_UIUX_BEHAVIOR_RULES,
     accessibilityAndI18n,
     summary: {
       totalScreens: screens.length,
       totalModules: new Set(screens.map((screen) => screen.module)).size,
+      mappingMatrixModules: uiUxMappingMatrix.length,
       mobileEnabledScreens: screens.filter((screen) => screen.device.includes('Mobile')).length,
       layoutContractScreens: layoutContracts.length,
       accessibilityAreas: accessibilityAndI18n.length,

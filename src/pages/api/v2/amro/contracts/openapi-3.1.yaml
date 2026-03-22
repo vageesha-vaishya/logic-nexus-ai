@@ -1390,6 +1390,18 @@ paths:
           schema:
             type: string
         - in: query
+          name: planner_id
+          required: false
+          schema:
+            type: string
+          description: Optional planner assignment filter for work package overview grid.
+        - in: query
+          name: engineer_id
+          required: false
+          schema:
+            type: string
+          description: Optional engineer assignment filter for work package overview grid.
+        - in: query
           name: metric_key
           required: false
           schema:
@@ -1819,9 +1831,15 @@ components:
           properties:
             data:
               type: object
-              required: [phasePlan]
+              required: [phasePlan, sequentialImplementation, developmentBlueprint, architectureDecisionPriorities]
               properties:
                 phasePlan:
+                  type: object
+                sequentialImplementation:
+                  type: object
+                developmentBlueprint:
+                  type: object
+                architectureDecisionPriorities:
                   type: object
     Phase1ReadinessResponse:
       allOf:
@@ -1846,7 +1864,266 @@ components:
               required: [moduleCatalog]
               properties:
                 moduleCatalog:
-                  type: object
+                  $ref: '#/components/schemas/ModuleCatalogEnvelope'
+    ModuleCatalogEnvelope:
+      type: object
+      required: [modules, hierarchyMap, databaseMappingMatrix, tableRelationshipCrossReference, workflowDataFlowMapping, endToEndArchitectureFlowchart, implementationSequenceMapping, deploymentWavePriorityMap, quickLookupCrossReference, summary]
+      properties:
+        modules:
+          type: array
+          items:
+            $ref: '#/components/schemas/ModuleCatalogRow'
+        hierarchyMap:
+          type: array
+          items:
+            $ref: '#/components/schemas/ModuleHierarchyRow'
+        databaseMappingMatrix:
+          type: array
+          items:
+            $ref: '#/components/schemas/ModuleDatabaseMappingRow'
+        tableRelationshipCrossReference:
+          type: array
+          items:
+            $ref: '#/components/schemas/ModuleTableRelationshipCrossReferenceRow'
+        workflowDataFlowMapping:
+          type: array
+          items:
+            $ref: '#/components/schemas/ModuleWorkflowDataFlowMappingRow'
+        endToEndArchitectureFlowchart:
+          $ref: '#/components/schemas/ModuleEndToEndArchitectureFlowchart'
+        implementationSequenceMapping:
+          type: array
+          items:
+            $ref: '#/components/schemas/ModuleImplementationSequenceMappingRow'
+        deploymentWavePriorityMap:
+          type: array
+          items:
+            $ref: '#/components/schemas/ModuleDeploymentWavePriorityMapRow'
+        quickLookupCrossReference:
+          type: array
+          items:
+            $ref: '#/components/schemas/ModuleQuickLookupCrossReferenceRow'
+        summary:
+          type: object
+          required: [totalModules, databaseMappingModules, relationshipPaths, workflowMappings, implementationSequences, deploymentWaves, quickLookupRows, totalSubModules, totalPrimaryUsers, totalDependencies]
+          properties:
+            totalModules:
+              type: integer
+            databaseMappingModules:
+              type: integer
+            relationshipPaths:
+              type: integer
+            workflowMappings:
+              type: integer
+            implementationSequences:
+              type: integer
+            deploymentWaves:
+              type: integer
+            quickLookupRows:
+              type: integer
+            totalSubModules:
+              type: integer
+            totalPrimaryUsers:
+              type: integer
+            totalDependencies:
+              type: integer
+    ModuleCatalogRow:
+      type: object
+      required: [moduleId, module, subModules, coreOwnershipBoundary, primaryUsers, primaryInputs, primaryOutputs, coreDependencies]
+      properties:
+        moduleId:
+          type: string
+          enum: [MOD-AMRO-01, MOD-AMRO-02, MOD-AMRO-03, MOD-AMRO-04, MOD-AMRO-05, MOD-AMRO-06, MOD-AMRO-07, MOD-AMRO-08, MOD-AMRO-09, MOD-AMRO-10]
+        module:
+          type: string
+        subModules:
+          type: array
+          items:
+            type: string
+        coreOwnershipBoundary:
+          type: string
+        primaryUsers:
+          type: array
+          items:
+            type: string
+        primaryInputs:
+          type: array
+          items:
+            type: string
+        primaryOutputs:
+          type: array
+          items:
+            type: string
+        coreDependencies:
+          type: array
+          items:
+            type: string
+    ModuleHierarchyRow:
+      type: object
+      required: [moduleId, module, subModules, coreOwnershipBoundary]
+      properties:
+        moduleId:
+          type: string
+          enum: [MOD-AMRO-01, MOD-AMRO-02, MOD-AMRO-03, MOD-AMRO-04, MOD-AMRO-05, MOD-AMRO-06, MOD-AMRO-07, MOD-AMRO-08, MOD-AMRO-09, MOD-AMRO-10]
+        module:
+          type: string
+        subModules:
+          type: array
+          items:
+            type: string
+        coreOwnershipBoundary:
+          type: string
+    ModuleDatabaseMappingRow:
+      type: object
+      required: [moduleId, primaryTables, keyFieldsUsedByModule, criticalConstraintsAndRules]
+      properties:
+        moduleId:
+          type: string
+          enum: [MOD-AMRO-01, MOD-AMRO-02, MOD-AMRO-03, MOD-AMRO-04, MOD-AMRO-05, MOD-AMRO-06, MOD-AMRO-07, MOD-AMRO-08, MOD-AMRO-09, MOD-AMRO-10]
+        primaryTables:
+          type: array
+          items:
+            type: string
+        keyFieldsUsedByModule:
+          type: array
+          items:
+            type: string
+        criticalConstraintsAndRules:
+          type: array
+          items:
+            type: string
+    ModuleTableRelationshipCrossReferenceRow:
+      type: object
+      required: [relationshipPath, purpose, modulesConsumingPath]
+      properties:
+        relationshipPath:
+          type: string
+        purpose:
+          type: string
+        modulesConsumingPath:
+          type: array
+          items:
+            type: string
+            enum: [MOD-AMRO-01, MOD-AMRO-02, MOD-AMRO-03, MOD-AMRO-04, MOD-AMRO-05, MOD-AMRO-06, MOD-AMRO-07, MOD-AMRO-08, MOD-AMRO-09, MOD-AMRO-10]
+    ModuleWorkflowDataFlowMappingRow:
+      type: object
+      required: [moduleId, workflowDiagramReference, businessLogicSequence, userInteractionPattern, dataFlowReference]
+      properties:
+        moduleId:
+          type: string
+          enum: [MOD-AMRO-01, MOD-AMRO-02, MOD-AMRO-03, MOD-AMRO-04, MOD-AMRO-05, MOD-AMRO-06, MOD-AMRO-07, MOD-AMRO-08, MOD-AMRO-09, MOD-AMRO-10]
+        workflowDiagramReference:
+          type: string
+        businessLogicSequence:
+          type: string
+        userInteractionPattern:
+          type: string
+        dataFlowReference:
+          type: array
+          items:
+            type: string
+    ModuleEndToEndArchitectureFlowchart:
+      type: object
+      required: [userInterfaces, apiGateway, domainModules, mandatoryAuditLedger, operationalDatabase, eventBackbone, downstreamIntelligence, uiRefreshAndNotifications, externalSystemsIntegration]
+      properties:
+        userInterfaces:
+          type: string
+        apiGateway:
+          type: string
+        domainModules:
+          type: array
+          items:
+            type: object
+            required: [moduleId, module]
+            properties:
+              moduleId:
+                type: string
+                enum: [MOD-AMRO-01, MOD-AMRO-02, MOD-AMRO-03, MOD-AMRO-04, MOD-AMRO-05, MOD-AMRO-06, MOD-AMRO-07, MOD-AMRO-08, MOD-AMRO-09, MOD-AMRO-10]
+              module:
+                type: string
+        mandatoryAuditLedger:
+          type: object
+          required: [moduleId, module, rule]
+          properties:
+            moduleId:
+              type: string
+              enum: [MOD-AMRO-10]
+            module:
+              type: string
+            rule:
+              type: string
+        operationalDatabase:
+          type: string
+        eventBackbone:
+          type: string
+        downstreamIntelligence:
+          type: string
+        uiRefreshAndNotifications:
+          type: string
+        externalSystemsIntegration:
+          type: object
+          required: [moduleId, module, adapters]
+          properties:
+            moduleId:
+              type: string
+              enum: [MOD-AMRO-08]
+            module:
+              type: string
+            adapters:
+              type: string
+    ModuleImplementationSequenceMappingRow:
+      type: object
+      required: [sequence, deliverableGroup, dependsOn, blocksOrUnblocks, deploymentPriority]
+      properties:
+        sequence:
+          type: string
+          enum: [S1, S2, S3, S4, S5, S6, S7, S8, S9, S10]
+        deliverableGroup:
+          type: string
+        dependsOn:
+          type: array
+          items:
+            type: string
+        blocksOrUnblocks:
+          type: string
+        deploymentPriority:
+          type: string
+          enum: [Critical, High, Medium]
+    ModuleDeploymentWavePriorityMapRow:
+      type: object
+      required: [wave, environment, includedSequences, entryCriteria, exitCriteria]
+      properties:
+        wave:
+          type: string
+          enum: [W1, W2, W3, W4]
+        environment:
+          type: string
+        includedSequences:
+          type: array
+          items:
+            type: string
+        entryCriteria:
+          type: string
+        exitCriteria:
+          type: string
+    ModuleQuickLookupCrossReferenceRow:
+      type: object
+      required: [module, subModules, uiUx, dbTables, workflow, apis, implementationSequence]
+      properties:
+        module:
+          type: string
+        subModules:
+          type: string
+        uiUx:
+          type: string
+        dbTables:
+          type: string
+        workflow:
+          type: string
+        apis:
+          type: string
+        implementationSequence:
+          type: string
     ScreenInventoryResponse:
       allOf:
         - $ref: '#/components/schemas/ApiEnvelope'
@@ -1861,7 +2138,7 @@ components:
                   $ref: '#/components/schemas/ScreenInventoryEnvelope'
     ScreenInventoryEnvelope:
       type: object
-      required: [screens, layoutContracts, behaviorRules, accessibilityAndI18n, summary]
+      required: [screens, layoutContracts, uiUxMappingMatrix, behaviorRules, accessibilityAndI18n, summary]
       properties:
         screens:
           type: array
@@ -1871,6 +2148,10 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ScreenLayoutContract'
+        uiUxMappingMatrix:
+          type: array
+          items:
+            $ref: '#/components/schemas/ScreenUiUxMappingRow'
         behaviorRules:
           $ref: '#/components/schemas/UiUxBehaviorRules'
         accessibilityAndI18n:
@@ -1879,11 +2160,13 @@ components:
             $ref: '#/components/schemas/AccessibilityI18nRequirement'
         summary:
           type: object
-          required: [totalScreens, totalModules, mobileEnabledScreens, layoutContractScreens, accessibilityAreas]
+          required: [totalScreens, totalModules, mappingMatrixModules, mobileEnabledScreens, layoutContractScreens, accessibilityAreas]
           properties:
             totalScreens:
               type: integer
             totalModules:
+              type: integer
+            mappingMatrixModules:
               type: integer
             mobileEnabledScreens:
               type: integer
@@ -1891,6 +2174,29 @@ components:
               type: integer
             accessibilityAreas:
               type: integer
+    ScreenUiUxMappingRow:
+      type: object
+      required: [moduleId, primaryScreens, wireframeReferences, userFlowReferences, interfaceSpecifications]
+      properties:
+        moduleId:
+          type: string
+          enum: [MOD-AMRO-01, MOD-AMRO-02, MOD-AMRO-03, MOD-AMRO-04, MOD-AMRO-05, MOD-AMRO-06, MOD-AMRO-07, MOD-AMRO-08, MOD-AMRO-09, MOD-AMRO-10]
+        primaryScreens:
+          type: array
+          items:
+            type: string
+        wireframeReferences:
+          type: array
+          items:
+            type: string
+        userFlowReferences:
+          type: array
+          items:
+            type: string
+        interfaceSpecifications:
+          type: array
+          items:
+            type: string
     ScreenInventoryRow:
       type: object
       required: [screenId, screenName, module, primaryPersona, device]

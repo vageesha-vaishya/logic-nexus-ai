@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   AMRO_DEVELOPMENT_DELIVERY_SEQUENCE,
   AMRO_PHASE_PLAN_MATRIX,
+  buildAmroArchitectureDecisionPrioritiesEnvelope,
   buildAmroDevelopmentBlueprintEnvelope,
   buildAmroGaReadinessEnvelope,
   buildAmroPhasePlanProgressEnvelope,
@@ -51,6 +52,47 @@ describe('phase-plan-model', () => {
       satisfiedChecks: 4,
       pendingChecks: 3,
       completionRatio: 0.57,
+    });
+
+    vi.unstubAllEnvs();
+  });
+
+  it('builds section 25 architecture decision priorities and implementation guidance summary', () => {
+    vi.stubEnv('AMRO_ARCH_PRIORITY_MOBILE_DIGITAL_EXECUTION_RATIO', '0.92');
+    vi.stubEnv('AMRO_ARCH_PRIORITY_UNAUTHORIZED_RELEASE_COUNT', '0');
+    vi.stubEnv('AMRO_ARCH_PRIORITY_CROSS_TENANT_LEAKAGE_COUNT', '0');
+    vi.stubEnv('AMRO_ARCH_PRIORITY_AOG_SHORTAGE_REDUCTION_VALIDATED', 'true');
+    vi.stubEnv('AMRO_ARCH_PRIORITY_AUDIT_REPLAY_SLA_VALIDATED', 'false');
+    vi.stubEnv('AMRO_ARCH_PRIORITY_PARTNER_ONBOARDING_ACCELERATION_VALIDATED', 'false');
+    vi.stubEnv('AMRO_ARCH_GUIDANCE_ADDITIVE_BACKWARD_COMPATIBLE', 'true');
+    vi.stubEnv('AMRO_ARCH_GUIDANCE_MODULE_CONSISTENCY', 'true');
+    vi.stubEnv('AMRO_ARCH_GUIDANCE_OBSERVABILITY_POLICY_TRACES', 'true');
+    vi.stubEnv('AMRO_ARCH_GUIDANCE_SECURITY_IN_PATH', 'true');
+    vi.stubEnv('AMRO_ARCH_GUIDANCE_FORECAST_EXPLAINABILITY_OVERRIDE', 'false');
+
+    const priorities = buildAmroArchitectureDecisionPrioritiesEnvelope();
+    expect(priorities.priorityRoadmap.length).toBe(6);
+    expect(priorities.priorityRoadmap[0]).toMatchObject({
+      id: 'P1',
+      priorityWindow: 'Immediate',
+      satisfied: true,
+    });
+    expect(priorities.priorityRoadmap[4]).toMatchObject({
+      id: 'P5',
+      priorityWindow: 'Near-term',
+      satisfied: false,
+    });
+    expect(priorities.summary).toMatchObject({
+      totalPriorityDecisions: 6,
+      satisfiedPriorityDecisions: 4,
+      pendingPriorityDecisions: 2,
+      completionRatio: 0.67,
+    });
+    expect(priorities.finalImplementationGuidance.summary).toMatchObject({
+      totalGuidanceChecks: 5,
+      satisfiedGuidanceChecks: 4,
+      pendingGuidanceChecks: 1,
+      completionRatio: 0.8,
     });
 
     vi.unstubAllEnvs();

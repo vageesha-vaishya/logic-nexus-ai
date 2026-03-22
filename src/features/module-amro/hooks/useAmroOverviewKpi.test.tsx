@@ -2,6 +2,27 @@ import { renderHook, waitFor, act } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAmroOverviewKpi } from './useAmroOverviewKpi';
 
+vi.mock('@/integrations/supabase/client', () => ({
+  supabase: {
+    auth: {
+      getSession: vi.fn(async () => ({
+        data: {
+          session: {
+            access_token: 'test-session-token',
+          },
+        },
+      })),
+      refreshSession: vi.fn(async () => ({
+        data: {
+          session: {
+            access_token: 'test-session-token',
+          },
+        },
+      })),
+    },
+  },
+}));
+
 describe('useAmroOverviewKpi', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -41,6 +62,7 @@ describe('useAmroOverviewKpi', () => {
     expect(String(fetchMock.mock.calls[0][0])).toContain('/api/v2/amro/overview-kpi?');
     expect(String(fetchMock.mock.calls[0][0])).toContain('interface=load-kpi-dashboard');
     expect(String(fetchMock.mock.calls[1][0])).toContain('interface=load-operational-trends');
+    expect(new Headers((fetchMock.mock.calls[0][1] as RequestInit).headers).get('Authorization')).toBe('Bearer test-session-token');
     expect(result.current.dashboard?.kpi_cards[0]?.label).toBe('Open Work Packages');
     expect(result.current.trends?.variance).toBe(2.1);
   });
@@ -96,6 +118,8 @@ describe('useAmroOverviewKpi', () => {
     expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(String(fetchMock.mock.calls[2][0])).toContain('interface=export-kpi-snapshot');
     expect(fetchMock.mock.calls[2][1]).toMatchObject({ method: 'POST' });
+    expect(new Headers((fetchMock.mock.calls[2][1] as RequestInit).headers).get('Content-Type')).toBe('application/json');
+    expect(new Headers((fetchMock.mock.calls[2][1] as RequestInit).headers).get('Authorization')).toBe('Bearer test-session-token');
     expect(result.current.lastExport?.export_job_id).toBe('tenant-1-kpi-export-123');
   });
 
@@ -123,5 +147,103 @@ describe('useAmroOverviewKpi', () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     expect(result.current.error).toContain('Forbidden');
+  });
+
+  it('maps metric tiers and refreshes dashboard plus trends on demand', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('interface=load-kpi-dashboard')) {
+        return {
+          ok: true,
+          json: async () => ({
+            output: {
+              kpi_cards: [{ key: 'compliance_risk', label: 'Compliance Risk', value: 2, trend: '-3%' }],
+              risk_heatmap: { cells: [] },
+              trend_lines: [],
+              anomaly_flags: [],
+              freshness_warning: null,
+            },
+          }),
+        };
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          output: {
+            time_series: [],
+            variance: 1.4,
+            threshold_breaches: [],
+          },
+        }),
+      };
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { result } = renderHook(() => useAmroOverviewKpi());
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.refreshCadence.criticalMs).toBe(30000);
+    expect(result.current.refreshCadence.standardMs).toBe(300000);
+    expect(result.current.getMetricTier('overdue_tasks')).toBe('critical');
+    expect(result.current.getMetricTier('schedule_adherence')).toBe('standard');
+
+    await act(async () => {
+      await result.current.refreshAll();
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(result.current.lastDashboardRefreshAt).toBeTruthy();
+    expect(result.current.lastTrendsRefreshAt).toBeTruthy();
+  });
+
+  it('retries with access_token query when backend rejects Authorization header format', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      const hasAccessTokenFallback = url.includes('access_token=test-session-token');
+      if (!hasAccessTokenFallback) {
+        return {
+          ok: false,
+          status: 401,
+          json: async () => ({ error: 'Missing or malformed Authorization header' }),
+        };
+      }
+      if (url.includes('interface=load-kpi-dashboard')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            output: {
+              kpi_cards: [{ key: 'open_work_packages', label: 'Open Work Packages', value: 5, trend: '+1%' }],
+              risk_heatmap: { cells: [] },
+              trend_lines: [],
+              anomaly_flags: [],
+              freshness_warning: null,
+            },
+          }),
+        };
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          output: {
+            time_series: [],
+            variance: 0.8,
+            threshold_breaches: [],
+          },
+        }),
+      };
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { result } = renderHook(() => useAmroOverviewKpi());
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(result.current.error).toBeNull();
+    expect(result.current.dashboard?.kpi_cards[0]?.label).toBe('Open Work Packages');
+    expect(result.current.trends?.variance).toBe(0.8);
+    const calledUrls = fetchMock.mock.calls.map((call) => String(call[0]));
+    expect(calledUrls.some((url) => url.includes('access_token=test-session-token'))).toBe(true);
   });
 });

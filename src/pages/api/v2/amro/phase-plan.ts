@@ -10,6 +10,7 @@ import { sendErrorResponse } from '../../_utils/errorHandler';
 import { applyCompatibilityResponseHeaders, resolveGatewayCompatibility } from '../../_utils/compatibility-facade';
 import { buildAmroServiceBoundaryEnvelope, createAmroIsolationScope } from './anti-corruption-adapter';
 import {
+  buildAmroArchitectureDecisionPrioritiesEnvelope,
   buildAmroDevelopmentBlueprintEnvelope,
   buildAmroPhasePlanProgressEnvelope,
   buildAmroSequentialImplementationEnvelope,
@@ -62,6 +63,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     const phasePlan = buildAmroPhasePlanProgressEnvelope();
     const sequentialImplementation = buildAmroSequentialImplementationEnvelope();
     const developmentBlueprint = buildAmroDevelopmentBlueprintEnvelope();
+    const architectureDecisionPriorities = buildAmroArchitectureDecisionPrioritiesEnvelope();
 
     return res.status(200).json({
       version: 'v2',
@@ -77,6 +79,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         phasePlan,
         sequentialImplementation,
         developmentBlueprint,
+        architectureDecisionPriorities,
       },
       correlationId: ctx.correlationId,
     });

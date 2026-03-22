@@ -180,7 +180,16 @@ const DebugConsole = lazy(() => import("./pages/dashboard/DebugConsole"));
 const Commodities = lazy(() => import("./pages/dashboard/Commodities"));
 const SalesPlaceholder = lazy(() => import("./pages/dashboard/SalesPlaceholder"));
 const SalesCommandCenter = lazy(() => import("./pages/dashboard/SalesCommandCenter"));
-const AmroHub = lazy(() => import("./features/module-amro").then((module) => ({ default: module.AmroHubVerticalPage })));
+const AmroOverview = lazy(() => import("./features/module-amro").then((module) => ({ default: module.AmroOverviewPage })));
+const AmroWorkPackages = lazy(() => import("./features/module-amro").then((module) => ({ default: module.AmroWorkPackagesPage })));
+const AmroTaskExecution = lazy(() => import("./features/module-amro").then((module) => ({ default: module.AmroTaskExecutionPage })));
+const AmroScheduling = lazy(() => import("./features/module-amro").then((module) => ({ default: module.AmroSchedulingPage })));
+const AmroParts = lazy(() => import("./features/module-amro").then((module) => ({ default: module.AmroPartsPage })));
+const AmroCompliance = lazy(() => import("./features/module-amro").then((module) => ({ default: module.AmroCompliancePage })));
+const AmroCertification = lazy(() => import("./features/module-amro").then((module) => ({ default: module.AmroCertificationPage })));
+const AmroAudit = lazy(() => import("./features/module-amro").then((module) => ({ default: module.AmroAuditPage })));
+const AmroIntegration = lazy(() => import("./features/module-amro").then((module) => ({ default: module.AmroIntegrationPage })));
+const AmroIntelligence = lazy(() => import("./features/module-amro").then((module) => ({ default: module.AmroIntelligencePage })));
 const MigrationBaselineDashboard = lazy(() => import("./pages/dashboard/MigrationBaselineDashboard"));
 
 // Initialize plugins at startup
@@ -825,9 +834,16 @@ const App = () => (
             <Route path="/dashboard/log-test" element={<ProtectedRoute><LogTestPage /></ProtectedRoute>} />
             <Route path="/dashboard/debug-console" element={<ProtectedRoute><DebugConsole /></ProtectedRoute>} />
             <Route path="/dashboard/amro" element={<Navigate to="/dashboard/amro/overview" replace />} />
-            <Route path="/dashboard/amro/overview" element={<ProtectedRoute requiredDomainCode="AMRO"><AmroHub /></ProtectedRoute>} />
-            <Route path="/dashboard/amro/work-packages" element={<ProtectedRoute requiredDomainCode="AMRO"><AmroHub /></ProtectedRoute>} />
-            <Route path="/dashboard/amro/scheduling" element={<ProtectedRoute requiredDomainCode="AMRO"><AmroHub /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/overview" element={<ProtectedRoute requiredDomainCode="AMRO"><AmroOverview /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/work-packages" element={<ProtectedRoute requiredDomainCode="AMRO"><AmroWorkPackages /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/task-execution" element={<ProtectedRoute requiredDomainCode="AMRO"><AmroTaskExecution /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/scheduling" element={<ProtectedRoute requiredDomainCode="AMRO"><AmroScheduling /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/parts" element={<ProtectedRoute requiredDomainCode="AMRO"><AmroParts /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/compliance" element={<ProtectedRoute requiredDomainCode="AMRO"><AmroCompliance /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/certification" element={<ProtectedRoute requiredDomainCode="AMRO"><AmroCertification /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/audit" element={<ProtectedRoute requiredDomainCode="AMRO"><AmroAudit /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/integration" element={<ProtectedRoute requiredDomainCode="AMRO"><AmroIntegration /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/intelligence" element={<ProtectedRoute requiredDomainCode="AMRO"><AmroIntelligence /></ProtectedRoute>} />
             <Route path="/dashboard/amro/changes" element={<Navigate to="/dashboard/amro/work-packages" replace />} />
             
             {/* Sales Dashboard Routes */}

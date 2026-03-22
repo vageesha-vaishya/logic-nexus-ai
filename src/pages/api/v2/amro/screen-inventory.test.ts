@@ -66,7 +66,7 @@ describe('/api/v2/amro/screen-inventory', () => {
     vi.mocked(resolveGatewayCompatibility).mockReturnValue({ apiVersion: 'v2', compatMode: 'v2-shadow' });
   });
 
-  it('returns screen inventory rows for AMRO section 16.1', async () => {
+  it('returns screen inventory rows and UI/UX mapping matrix for AMRO sections 16.1 and 26.2', async () => {
     process.env.AMRO_SCREEN_INVENTORY_V2_ENABLED = 'true';
     const req: ApiRequest = {
       method: 'GET',
@@ -84,10 +84,25 @@ describe('/api/v2/amro/screen-inventory', () => {
     expect((res.jsonBody as any)?.mode).toBe('screen-inventory');
     expect((res.jsonBody as any)?.data?.screenInventory?.summary?.totalScreens).toBe(12);
     expect((res.jsonBody as any)?.data?.screenInventory?.summary?.layoutContractScreens).toBe(4);
+    expect((res.jsonBody as any)?.data?.screenInventory?.summary?.mappingMatrixModules).toBe(10);
     expect((res.jsonBody as any)?.data?.screenInventory?.summary?.accessibilityAreas).toBe(5);
     expect((res.jsonBody as any)?.data?.screenInventory?.screens?.[0]?.screenId).toBe('SCR-AMRO-001');
     expect((res.jsonBody as any)?.data?.screenInventory?.screens?.[11]?.screenName).toBe('Forecast Recommendation Hub');
     expect((res.jsonBody as any)?.data?.screenInventory?.layoutContracts?.[0]?.screenId).toBe('SCR-AMRO-001');
+    expect((res.jsonBody as any)?.data?.screenInventory?.uiUxMappingMatrix?.[0]).toEqual({
+      moduleId: 'MOD-AMRO-01',
+      primaryScreens: ['SCR-AMRO-001 Overview Dashboard'],
+      wireframeReferences: ['5.3.1'],
+      userFlowReferences: ['5.4.1', '17.1'],
+      interfaceSpecifications: ['16.2 dashboard layout contract', '16.3 behavior rules'],
+    });
+    expect((res.jsonBody as any)?.data?.screenInventory?.uiUxMappingMatrix?.[9]).toEqual({
+      moduleId: 'MOD-AMRO-10',
+      primaryScreens: ['SCR-AMRO-010 Audit Replay Timeline'],
+      wireframeReferences: ['5.3.3 activity/audit context'],
+      userFlowReferences: ['17.3 gate rationale path'],
+      interfaceSpecifications: ['19.2 API-AMRO-014 replay interface requirements'],
+    });
     expect((res.jsonBody as any)?.data?.screenInventory?.behaviorRules?.stableActionOrder).toEqual([
       'search',
       'filter',

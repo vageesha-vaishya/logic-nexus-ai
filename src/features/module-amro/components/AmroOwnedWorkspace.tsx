@@ -46,6 +46,29 @@ const amroDetailTabSwitchBenchmark = { targetMs: 250, hardLimitMs: 500 };
 const amroTaskStepSubmitBenchmark = { targetMs: 400, hardLimitMs: 800 };
 
 type AmroUxRole = 'technician' | 'engineer' | 'inspector' | 'planner' | 'management';
+type AmroWorkspaceModuleKey =
+  | 'overview'
+  | 'work-packages'
+  | 'task-execution'
+  | 'scheduling'
+  | 'parts'
+  | 'compliance'
+  | 'certification'
+  | 'audit'
+  | 'integration'
+  | 'intelligence';
+
+type AmroOwnedWorkspaceProps = {
+  moduleKey?: AmroWorkspaceModuleKey;
+};
+
+type AmroModuleAction = {
+  id: string;
+  label: string;
+  onClick: () => void;
+  disabled: boolean;
+  disabledReason: string;
+};
 
 type AmroRoleVariant = {
   primaryViews: string;
@@ -81,7 +104,7 @@ const amroRoleVariants: Record<AmroUxRole, AmroRoleVariant> = {
   },
 };
 
-export function AmroOwnedWorkspace() {
+export function AmroOwnedWorkspace({ moduleKey }: AmroOwnedWorkspaceProps) {
   const state = useAmroWorkspaceState();
   const [newWorkPackageTitle, setNewWorkPackageTitle] = useState('');
   const [savedViewName, setSavedViewName] = useState('');
@@ -125,6 +148,235 @@ export function AmroOwnedWorkspace() {
   const canDirectTaskExecution = activeUxRole !== 'management';
   const canRunRegulatoryFinalSignOff = activeUxRole !== 'engineer';
   const canRunCertifyingRelease = activeUxRole !== 'planner';
+  const isScopedToModule = Boolean(moduleKey);
+  const showOverviewModule = !moduleKey || moduleKey === 'overview';
+  const showWorkPackagesModule = !moduleKey || moduleKey === 'work-packages';
+  const showTaskExecutionModule = !moduleKey || moduleKey === 'task-execution';
+  const showSchedulingModule = !moduleKey || moduleKey === 'scheduling';
+  const showPartsModule = !moduleKey || moduleKey === 'parts';
+  const showComplianceModule = !moduleKey || moduleKey === 'compliance';
+  const showCertificationModule = !moduleKey || moduleKey === 'certification';
+  const showAuditModule = !moduleKey || moduleKey === 'audit';
+  const showIntegrationModule = !moduleKey || moduleKey === 'integration';
+  const showIntelligenceModule = !moduleKey || moduleKey === 'intelligence';
+  const moduleActionBarTitle = moduleKey
+    ? moduleKey.replace(/-/g, ' ').replace(/\b\w/g, (value) => value.toUpperCase())
+    : 'AMRO';
+  const selectedTaskId = selectedTask?.id || '';
+  const moduleActions: AmroModuleAction[] = moduleKey === 'overview'
+    ? [
+        {
+          id: 'overview-refresh',
+          label: 'Refresh Workspace',
+          onClick: state.refreshWorkPackages,
+          disabled: state.loadingWorkPackages,
+          disabledReason: state.loadingWorkPackages ? 'Work package refresh is already running.' : 'Ready.',
+        },
+        {
+          id: 'overview-anomalies',
+          label: 'Detect Anomalies',
+          onClick: state.detectComplianceAnomalies,
+          disabled: false,
+          disabledReason: 'Ready.',
+        },
+        {
+          id: 'overview-compliance-gate',
+          label: 'Load Compliance Gate',
+          onClick: state.loadComplianceGateExplainability,
+          disabled: !state.selectedWorkPackageId,
+          disabledReason: state.selectedWorkPackageId ? 'Ready.' : 'Select a work package first.',
+        },
+      ]
+    : moduleKey === 'work-packages'
+      ? [
+          {
+            id: 'work-packages-create',
+            label: 'Create Work Package',
+            onClick: () => void handleCreateWorkPackage(),
+            disabled: !newWorkPackageTitle.trim() || !state.canCreateWorkPackage,
+            disabledReason: !state.canCreateWorkPackage ? 'Current role cannot create work packages.' : !newWorkPackageTitle.trim() ? 'Enter a work package title first.' : 'Ready.',
+          },
+          {
+            id: 'work-packages-advance',
+            label: 'Advance Lifecycle',
+            onClick: () => void state.advanceWorkPackageLifecycle(),
+            disabled: !state.selectedWorkPackageId || !state.canAdvanceLifecycle,
+            disabledReason: !state.selectedWorkPackageId ? 'Select a work package first.' : !state.canAdvanceLifecycle ? 'Lifecycle transition is not allowed for current stage.' : 'Ready.',
+          },
+          {
+            id: 'work-packages-delete',
+            label: 'Delete Work Package',
+            onClick: () => void state.deleteSelectedWorkPackage(),
+            disabled: !state.selectedWorkPackageId || !state.canDeleteWorkPackage,
+            disabledReason: !state.selectedWorkPackageId ? 'Select a work package first.' : !state.canDeleteWorkPackage ? 'Current role cannot delete work packages.' : 'Ready.',
+          },
+        ]
+      : moduleKey === 'task-execution'
+        ? [
+            {
+              id: 'task-execution-start',
+              label: 'Start Task Step',
+              onClick: () => void trackTaskStepSubmitInteraction(selectedTaskId, 'start'),
+              disabled: !selectedTaskId,
+              disabledReason: selectedTaskId ? 'Ready.' : 'Select a work package with tasks first.',
+            },
+            {
+              id: 'task-execution-evidence',
+              label: 'Upload Evidence',
+              onClick: () => void state.uploadTaskEvidence(selectedTaskId),
+              disabled: !selectedTaskId,
+              disabledReason: selectedTaskId ? 'Ready.' : 'Select a work package with tasks first.',
+            },
+            {
+              id: 'task-execution-signature',
+              label: 'Submit Signature',
+              onClick: () => void state.submitTaskSignature(selectedTaskId),
+              disabled: !selectedTaskId || !state.canSignOff,
+              disabledReason: !selectedTaskId ? 'Select a work package with tasks first.' : !state.canSignOff ? 'Selected certifier does not meet sign-off authority.' : 'Ready.',
+            },
+          ]
+        : moduleKey === 'scheduling'
+          ? [
+              {
+                id: 'scheduling-assign',
+                label: 'Assign Next Slot',
+                onClick: () => void state.assignSelectedWorkPackageToNextSlot(),
+                disabled: !state.selectedWorkPackageId,
+                disabledReason: state.selectedWorkPackageId ? 'Ready.' : 'Select a work package first.',
+              },
+              {
+                id: 'scheduling-refresh-optimization',
+                label: 'Refresh Optimization',
+                onClick: () => void state.fetchScheduleOptimizationRecommendations(),
+                disabled: false,
+                disabledReason: 'Ready.',
+              },
+            ]
+          : moduleKey === 'parts'
+            ? [
+                {
+                  id: 'parts-build-allocation',
+                  label: 'Build Allocation',
+                  onClick: () => void state.reservePartsAllocationForSelectedWorkPackage(),
+                  disabled: !state.selectedWorkPackageId,
+                  disabledReason: state.selectedWorkPackageId ? 'Ready.' : 'Select a work package first.',
+                },
+                {
+                  id: 'parts-run-optimization',
+                  label: 'Run Inventory Optimization',
+                  onClick: () => void state.runInventoryOptimizationModel(),
+                  disabled: !state.selectedWorkPackageId,
+                  disabledReason: state.selectedWorkPackageId ? 'Ready.' : 'Select a work package first.',
+                },
+                {
+                  id: 'parts-sync-procurement',
+                  label: 'Sync ASN + ERP',
+                  onClick: () => void state.syncSupplierAsnAndErpProcurement(),
+                  disabled: false,
+                  disabledReason: 'Ready.',
+                },
+              ]
+            : moduleKey === 'compliance'
+              ? [
+                  {
+                    id: 'compliance-gate',
+                    label: 'Load Compliance Gate',
+                    onClick: () => void state.loadComplianceGateExplainability(),
+                    disabled: !state.selectedWorkPackageId,
+                    disabledReason: state.selectedWorkPackageId ? 'Ready.' : 'Select a work package first.',
+                  },
+                  {
+                    id: 'compliance-replay',
+                    label: 'Load Audit Replay',
+                    onClick: () => void state.loadAuditReplayTimeline(),
+                    disabled: !state.selectedWorkPackageId,
+                    disabledReason: state.selectedWorkPackageId ? 'Ready.' : 'Select a work package first.',
+                  },
+                  {
+                    id: 'compliance-anomaly',
+                    label: 'Detect Anomalies',
+                    onClick: () => void state.detectComplianceAnomalies(),
+                    disabled: false,
+                    disabledReason: 'Ready.',
+                  },
+                ]
+              : moduleKey === 'certification'
+                ? [
+                    {
+                      id: 'certification-validate',
+                      label: 'Validate Privilege',
+                      onClick: () => void state.validateCertifyingPrivilege(),
+                      disabled: false,
+                      disabledReason: 'Ready.',
+                    },
+                    {
+                      id: 'certification-approve',
+                      label: 'Approve Decision',
+                      onClick: () => void state.submitCertificationDecision('approve'),
+                      disabled: !state.selectedWorkPackageId,
+                      disabledReason: state.selectedWorkPackageId ? 'Ready.' : 'Select a work package first.',
+                    },
+                    {
+                      id: 'certification-deferral',
+                      label: 'Run Expiry Automation',
+                      onClick: () => void state.runExpiryWarningAndSuspension(),
+                      disabled: false,
+                      disabledReason: 'Ready.',
+                    },
+                  ]
+                : moduleKey === 'audit'
+                  ? [
+                      {
+                        id: 'audit-replay',
+                        label: 'Load Audit Replay',
+                        onClick: () => void state.loadAuditReplayTimeline(),
+                        disabled: !state.selectedWorkPackageId,
+                        disabledReason: state.selectedWorkPackageId ? 'Ready.' : 'Select a work package first.',
+                      },
+                      {
+                        id: 'audit-anomaly',
+                        label: 'Detect Anomalies',
+                        onClick: () => void state.detectComplianceAnomalies(),
+                        disabled: false,
+                        disabledReason: 'Ready.',
+                      },
+                    ]
+                  : moduleKey === 'integration'
+                    ? [
+                        {
+                          id: 'integration-refresh',
+                          label: 'Refresh Workspace',
+                          onClick: state.refreshWorkPackages,
+                          disabled: state.loadingWorkPackages,
+                          disabledReason: state.loadingWorkPackages ? 'Work package refresh is already running.' : 'Ready.',
+                        },
+                        {
+                          id: 'integration-audit-replay',
+                          label: 'Open Replay Feed',
+                          onClick: () => void state.loadAuditReplayTimeline(),
+                          disabled: !state.selectedWorkPackageId,
+                          disabledReason: state.selectedWorkPackageId ? 'Ready.' : 'Select a work package first.',
+                        },
+                      ]
+                    : moduleKey === 'intelligence'
+                      ? [
+                          {
+                            id: 'intelligence-optimization',
+                            label: 'Run Inventory Optimization',
+                            onClick: () => void state.runInventoryOptimizationModel(),
+                            disabled: !state.selectedWorkPackageId,
+                            disabledReason: state.selectedWorkPackageId ? 'Ready.' : 'Select a work package first.',
+                          },
+                          {
+                            id: 'intelligence-anomalies',
+                            label: 'Detect Anomalies',
+                            onClick: () => void state.detectComplianceAnomalies(),
+                            disabled: false,
+                            disabledReason: 'Ready.',
+                          },
+                        ]
+                      : [];
+  const disabledModuleActions = moduleActions.filter((action) => action.disabled);
   const nowEpoch = Date.now();
   const fleetOptions = ['all', ...Array.from(new Set(state.assets.map((asset) => asset.assetTag)))];
   const stationOptions = ['all', ...Array.from(new Set(state.scheduleBoardRows.map((row) => row.station_code)))];
@@ -364,6 +616,35 @@ export function AmroOwnedWorkspace() {
       <div className="rounded-md border bg-muted/20 px-3 py-2 text-xs" role="status" aria-live="polite">
         Workspace status: {dataFreshnessLabel}. Sync health: {syncHealthLabel}.
       </div>
+      {moduleKey ? (
+        <Card data-amro-owned-surface="module-action-bar">
+          <CardHeader className="pb-2">
+            <CardTitle>{moduleActionBarTitle} Module Actions</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex flex-wrap gap-2">
+              {moduleActions.map((action) => (
+                <Button key={action.id} variant={action.disabled ? 'outline' : 'secondary'} size="sm" onClick={action.onClick} disabled={action.disabled}>
+                  {action.label}
+                </Button>
+              ))}
+            </div>
+            <div className="rounded-md border p-2 text-xs">
+              {disabledModuleActions.length > 0 ? (
+                disabledModuleActions.map((action) => (
+                  <p key={`${action.id}-reason`} className="text-muted-foreground">
+                    {action.label}: {action.disabledReason}
+                  </p>
+                ))
+              ) : (
+                <p className="text-muted-foreground">All module actions are ready.</p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+      {!isScopedToModule ? (
+        <>
       <Card data-amro-boundary="tenant-franchise-isolation">
         <CardHeader className="pb-2">
           <CardTitle>AMRO Bounded Context Boundary</CardTitle>
@@ -504,7 +785,10 @@ export function AmroOwnedWorkspace() {
           </div>
         </CardContent>
       </Card>
+        </>
+      ) : null}
 
+      {showOverviewModule ? (
       <Card data-amro-screen="SCR-AMRO-001" role="region" aria-label="SCR-AMRO-001 Overview Dashboard">
         <CardHeader className="pb-2">
           <CardTitle>SCR-AMRO-001 Overview Dashboard</CardTitle>
@@ -598,7 +882,9 @@ export function AmroOwnedWorkspace() {
           </div>
         </CardContent>
       </Card>
+      ) : null}
 
+      {!isScopedToModule ? (
       <Card data-amro-owned-surface="asset-registry-configuration-state">
         <CardHeader className="pb-2">
           <CardTitle>Asset Registry and Configuration State</CardTitle>
@@ -615,7 +901,9 @@ export function AmroOwnedWorkspace() {
           ))}
         </CardContent>
       </Card>
+      ) : null}
 
+      {showWorkPackagesModule ? (
       <Card data-amro-owned-surface="work-package-task-lifecycle-orchestration">
         <CardHeader className="pb-2">
           <CardTitle>Work Package and Task Lifecycle Orchestration</CardTitle>
@@ -1001,7 +1289,9 @@ export function AmroOwnedWorkspace() {
           </div>
         </CardContent>
       </Card>
+      ) : null}
 
+      {showTaskExecutionModule ? (
       <Card data-amro-screen="SCR-AMRO-005" role="region" aria-label="SCR-AMRO-005 Task Execution Card">
         <CardHeader className="pb-2">
           <CardTitle>SCR-AMRO-005 Task Execution Card</CardTitle>
@@ -1041,7 +1331,9 @@ export function AmroOwnedWorkspace() {
           </div>
         </CardContent>
       </Card>
+      ) : null}
 
+      {showSchedulingModule ? (
       <Card data-amro-screen="SCR-AMRO-006" data-amro-owned-surface="scheduling-board-slot-timeline" role="region" aria-label="SCR-AMRO-006 Scheduling Board">
         <CardHeader className="pb-2">
           <CardTitle>SCR-AMRO-006 Scheduling Board</CardTitle>
@@ -1100,7 +1392,10 @@ export function AmroOwnedWorkspace() {
           </div>
         </CardContent>
       </Card>
+      ) : null}
 
+      {showCertificationModule ? (
+        <>
       <Card data-amro-owned-surface="qualification-authority-validation" data-amro-boundary="signoff-authority-control">
         <CardHeader className="pb-2">
           <CardTitle>Qualification and Authority Validation</CardTitle>
@@ -1290,7 +1585,10 @@ export function AmroOwnedWorkspace() {
           ) : null}
         </CardContent>
       </Card>
+        </>
+      ) : null}
 
+      {showComplianceModule || showAuditModule ? (
       <Card data-amro-owned-surface="compliance-evidence-controls" data-amro-boundary="immutable-evidence-chain">
         <CardHeader className="pb-2">
           <CardTitle>Compliance and Evidence Controls</CardTitle>
@@ -1344,8 +1642,11 @@ export function AmroOwnedWorkspace() {
           ))}
         </CardContent>
       </Card>
+      ) : null}
 
+      {showPartsModule || showIntelligenceModule ? (
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        {showPartsModule ? (
         <Card data-amro-screen="SCR-AMRO-007" data-amro-owned-surface="materials-repair-loop-orchestration" role="region" aria-label="SCR-AMRO-007 Materials Reservation Panel">
           <CardHeader className="pb-2">
             <CardTitle>SCR-AMRO-007 Materials Reservation Panel</CardTitle>
@@ -1400,7 +1701,9 @@ export function AmroOwnedWorkspace() {
             ))}
           </CardContent>
         </Card>
+        ) : null}
 
+        {showIntelligenceModule ? (
         <Card data-amro-screen="SCR-AMRO-012" data-amro-owned-surface="predictive-maintenance-digital-twin" role="region" aria-label="SCR-AMRO-012 Forecast Recommendation Hub">
           <CardHeader className="pb-2">
             <CardTitle>SCR-AMRO-012 Forecast Recommendation Hub</CardTitle>
@@ -1421,7 +1724,10 @@ export function AmroOwnedWorkspace() {
             ))}
           </CardContent>
         </Card>
+        ) : null}
       </div>
+      ) : null}
+      {showIntegrationModule ? (
       <Card data-amro-screen="SCR-AMRO-011" role="region" aria-label="SCR-AMRO-011 Integration Monitor Console">
         <CardHeader className="pb-2">
           <CardTitle>SCR-AMRO-011 Integration Monitor Console</CardTitle>
@@ -1440,6 +1746,8 @@ export function AmroOwnedWorkspace() {
           </div>
         </CardContent>
       </Card>
+      ) : null}
+      {showComplianceModule ? (
       <Dialog open={state.complianceGateModalOpen} onOpenChange={state.setComplianceGateModalOpen}>
         <DialogContent>
           <DialogHeader>
@@ -1469,6 +1777,7 @@ export function AmroOwnedWorkspace() {
           )}
         </DialogContent>
       </Dialog>
+      ) : null}
       <Dialog open={closureConfirmOpen} onOpenChange={setClosureConfirmOpen}>
         <DialogContent>
           <DialogHeader>

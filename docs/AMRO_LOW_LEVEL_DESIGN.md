@@ -2242,6 +2242,96 @@ Performance Targets:
   - p95 <= 450ms, throughput 40 req/s per tenant
 ```
 
+```text
+Component Type: Module API
+Component Name: GET /api/v2/amro/overview-kpi?interface=load-kpi-dashboard
+Purpose: Provide CRUD dashboard landing aggregates and scoped overview rows across AMRO modules for Management and Planner personas.
+Input Contract:
+  - date_range | string(ISO start|end) | required
+  - station_ids | string[] | optional
+  - fleet_ids | string[] | optional
+  - regulator_profile | string | optional
+  - planner_id | string | optional
+  - engineer_id | string | optional
+Output Contract:
+  - executive_summary | object(active_work_packages, overdue_tasks, compliance_status_pct, forecast_accuracy_pct)
+  - work_package_overview | object[](work_package_id, title, status, planner_id, engineer_id, due_at, progress_pct)
+  - materials_reservation_alerts | object[]
+  - compliance_gate_status | object[]
+  - integration_monitor | object(status, failed_attempts, failure_rate_pct, recent_failures[])
+Authorization:
+  - authenticated AMRO domain tenant or franchise scope with active AMRO domain assignment
+Data Dependencies:
+  - work_package_master
+  - materials_inventory
+  - compliance_gates
+  - integration_logs
+  - forecast_recommendations
+Failure Modes:
+  - 400 invalid date_range or unsupported interface
+  - 401 missing or malformed authorization
+  - 403 unauthorized AMRO domain access
+Performance Targets:
+  - p95 <= 450ms, throughput 40 req/s per tenant
+```
+
+```text
+Component Type: Module API
+Component Name: GET /api/v2/amro/overview-kpi?interface=load-operational-trends
+Purpose: Load operational trend datasets required by module CRUD monitoring widgets for task execution, scheduling, certification, audit, and forecast.
+Input Contract:
+  - metric_key | enum(open_work_packages,schedule_adherence,aog_count,compliance_risk,parts_fill_rate) | required
+  - window | enum(7d,30d,90d) | required
+  - compare_window | string(<N>d) within policy max | required
+Output Contract:
+  - time_series | object[](date,value)
+  - task_execution_monitor | object(technician_count, completed_tasks, average_productivity_pct, mobile_completion_rate_pct)
+  - scheduling_board_snapshot | object(upcoming_slots[], resource_utilization_pct)
+  - certification_decision_queue | object[]
+  - audit_timeline | object[]
+  - forecast_recommendation_hub | object[]
+Authorization:
+  - authenticated AMRO domain tenant or franchise scope with active AMRO domain assignment
+Data Dependencies:
+  - task_execution_status
+  - scheduling_board_data
+  - certification_records
+  - audit_trails
+  - forecast_recommendations
+Failure Modes:
+  - 400 metric_key allow-list violation
+  - 400 window validation failure
+  - 400 compare_window exceeds policy maximum
+  - 403 unauthorized AMRO domain access
+Performance Targets:
+  - p95 <= 500ms, throughput 30 req/s per tenant
+```
+
+```text
+Component Type: Module API
+Component Name: POST /api/v2/amro/overview-kpi?interface=export-kpi-snapshot
+Purpose: Export selected overview dashboard widgets for CRUD operational reporting.
+Input Contract:
+  - format | enum(csv,pdf) | required
+  - date_range | string(ISO start|end) | required
+  - selected_widgets | enum[](kpi_cards,risk_heatmap,trend_lines,anomaly_flags) | required min:1
+Output Contract:
+  - export_job_id | string
+  - download_url | string
+  - generated_at | string(ISO timestamp)
+  - policy | object(row_cap, projected_rows, exported_rows, row_cap_applied)
+Authorization:
+  - platform_admin or tenant role with dashboards.manage or reports.manage
+Data Dependencies:
+  - overview-kpi aggregation projection
+Failure Modes:
+  - 400 invalid format
+  - 400 unsupported or empty selected_widgets
+  - 403 unauthorized permission scope
+Performance Targets:
+  - p95 <= 350ms, throughput 50 req/s per tenant
+```
+
 ---
 
 **Document End**  
