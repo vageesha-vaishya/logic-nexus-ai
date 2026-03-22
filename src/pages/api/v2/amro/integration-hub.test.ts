@@ -182,6 +182,34 @@ describe('/api/v2/amro/integration-hub', () => {
     expect(res.statusCode).toBe(200);
     expect((res.jsonBody as any)?.output?.parse_status).toBe('parsed');
     expect((res.jsonBody as any)?.output?.outbox?.publish_status).toBe('queued');
+    expect((res.jsonBody as any)?.output?.contract_compatibility?.required_fields_stability).toBe('one_full_deprecation_cycle');
+  });
+
+  it('syncs ERP procurement demand with exponential retry, dead-letter, and replay controls', async () => {
+    process.env.AMRO_INTEGRATION_HUB_V2_ENABLED = 'true';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'sync-erp-procurement-demand' },
+      body: {
+        source_system: 'sap-pm',
+        adapter_version: '2.4.1',
+        trigger: 'reservation_shortage',
+        purchase_demand_event: { demand_ref: 'dem-101', item_code: 'PN-123' },
+        schema_version_tag: 'erp.procurement.v1',
+        requested_capabilities: ['core-sync', 'manual-replay'],
+        partner_capabilities: ['core-sync', 'manual-replay', 'delta-sync'],
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.output?.payload_standard).toBe('canonical_purchase_demand_event');
+    expect((res.jsonBody as any)?.output?.retry_policy?.pattern).toBe('exponential_retry_with_dead_letter');
+    expect((res.jsonBody as any)?.output?.dead_letter?.replay_interface).toBe('replay-failed-integration-job');
+    expect((res.jsonBody as any)?.output?.contract_compatibility?.capability_negotiation?.negotiation_status).toBe('agreed');
   });
 
   it('syncs ERP financial postings through adapter interface', async () => {
@@ -204,6 +232,7 @@ describe('/api/v2/amro/integration-hub', () => {
     expect(res.statusCode).toBe(200);
     expect((res.jsonBody as any)?.output?.sync_status).toBe('posted');
     expect((res.jsonBody as any)?.output?.outbox?.event_type).toBe('amro.erp.financials.synced.v1');
+    expect((res.jsonBody as any)?.output?.outbox?.delivery_guarantee).toBe('guaranteed');
   });
 
   it('ingests legacy MRO records and returns accepted count', async () => {
@@ -245,8 +274,84 @@ describe('/api/v2/amro/integration-hub', () => {
     await handler(req, res);
 
     expect(res.statusCode).toBe(200);
-    expect((res.jsonBody as any)?.output?.dispatch_status).toBe('queued');
+    expect((res.jsonBody as any)?.output?.dispatch_status).toBe('delivered');
     expect((res.jsonBody as any)?.output?.channel_count).toBe(2);
+  });
+
+  it('deduplicates IoT telemetry by source id and sequence', async () => {
+    process.env.AMRO_INTEGRATION_HUB_V2_ENABLED = 'true';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'ingest-iot-telemetry' },
+      body: {
+        source_system: 'boeing-partner-gateway',
+        adapter_version: '3.2.0',
+        sensor_events: [
+          { source_id: 'sensor-a', sequence: 11 },
+          { source_id: 'sensor-a', sequence: 11 },
+          { source_id: 'sensor-a', sequence: 12 },
+          { source_id: 'sensor-b' },
+        ],
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.output?.accepted_sensor_events).toBe(2);
+    expect((res.jsonBody as any)?.output?.malformed_sensor_events).toBe(1);
+    expect((res.jsonBody as any)?.output?.deduplication?.strategy).toBe('source_id_sequence');
+    expect((res.jsonBody as any)?.output?.deduplication?.duplicate_events_dropped).toBe(1);
+  });
+
+  it('quarantines malformed regulator bulletin payload entries', async () => {
+    process.env.AMRO_INTEGRATION_HUB_V2_ENABLED = 'true';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'ingest-regulatory-feed' },
+      body: {
+        source_system: 'regulatory-feed',
+        adapter_version: '1.1.0',
+        bulletins: [
+          { bulletin_id: 'b-1', obligation_code: 'ad-123', effective_at: '2026-03-22T00:00:00.000Z' },
+          { bulletin_id: 'b-2', obligation_code: 'ad-124' },
+        ],
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.output?.accepted_bulletins).toBe(1);
+    expect((res.jsonBody as any)?.output?.quarantined_bulletins).toBe(1);
+    expect((res.jsonBody as any)?.output?.validation_quarantine?.status).toBe('active');
+  });
+
+  it('uses notification channel fallback when primary channel fails', async () => {
+    process.env.AMRO_INTEGRATION_HUB_V2_ENABLED = 'true';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'dispatch-notification-gateway' },
+      body: {
+        target_partner: 'notification-gateway',
+        notification_type: 'sla_breach',
+        message_ref: 'msg-2',
+        channels: [{ type: 'email' }, { type: 'sms' }, { type: 'webhook' }],
+        fail_channels: ['email'],
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.output?.fallback_channel_used).toBe(true);
+    expect((res.jsonBody as any)?.output?.dispatch_status).toBe('delivered');
   });
 
   it('rejects ingest when source system is not allow-listed', async () => {
@@ -361,6 +466,33 @@ describe('/api/v2/amro/integration-hub', () => {
     );
   });
 
+  it('rejects partner call when capability negotiation has no overlap', async () => {
+    process.env.AMRO_INTEGRATION_HUB_V2_ENABLED = 'true';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'sync-erp-financials' },
+      body: {
+        source_system: 'sap-pm',
+        adapter_version: '2.4.1',
+        work_package_id: 'wp-1',
+        financial_posting: { currency: 'USD', amount: 1200 },
+        requested_capabilities: ['cost-posting-v2'],
+        partner_capabilities: ['legacy-posting-v1'],
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(sendErrorResponse).toHaveBeenCalledWith(
+      res,
+      expect.any(Error),
+      'corr-amro-integration-hub-v2',
+      { apiVersion: 'v2' },
+    );
+  });
+
   it('publishes callback when schema mapping matches partner version', async () => {
     process.env.AMRO_INTEGRATION_HUB_V2_ENABLED = 'true';
     const req: ApiRequest = {
@@ -411,5 +543,75 @@ describe('/api/v2/amro/integration-hub', () => {
       'corr-amro-integration-hub-v2',
       { apiVersion: 'v2' },
     );
+  });
+
+  it('runs adapter conformance fixtures per partner system', async () => {
+    process.env.AMRO_INTEGRATION_HUB_V2_ENABLED = 'true';
+    const fixtures: Array<{ interface: string; body: Record<string, unknown>; assertionKey: string }> = [
+      {
+        interface: 'sync-erp-financials',
+        body: {
+          source_system: 'sap-pm',
+          adapter_version: '2.4.1',
+          work_package_id: 'wp-fixture-fin',
+          financial_posting: { currency: 'USD', amount: 3000 },
+          schema_version_tag: 'finance.posting.v1',
+          requested_capabilities: ['core-sync'],
+          partner_capabilities: ['core-sync', 'reporting'],
+        },
+        assertionKey: 'sync_status',
+      },
+      {
+        interface: 'ingest-legacy-mro-records',
+        body: {
+          source_system: 'maximo',
+          adapter_version: '1.0.0',
+          migration_batch_id: 'batch-fixture',
+          records: [{ legacy_id: 'legacy-a' }],
+          schema_version_tag: 'legacy.import.v1',
+          requested_capabilities: ['core-sync'],
+          partner_capabilities: ['core-sync'],
+        },
+        assertionKey: 'accepted_count',
+      },
+      {
+        interface: 'ingest-iot-telemetry',
+        body: {
+          source_system: 'boeing-partner-gateway',
+          adapter_version: '3.2.0',
+          sensor_events: [{ source_id: 'sensor-x', sequence: 1 }],
+          schema_version_tag: 'telemetry.envelope.v1',
+          requested_capabilities: ['telemetry-ingest'],
+          partner_capabilities: ['telemetry-ingest', 'core-sync'],
+        },
+        assertionKey: 'accepted_sensor_events',
+      },
+      {
+        interface: 'ingest-regulatory-feed',
+        body: {
+          source_system: 'regulatory-feed',
+          adapter_version: '1.2.0',
+          bulletins: [{ bulletin_id: 'rb-1', obligation_code: 'ad-001', effective_at: '2026-03-22T00:00:00.000Z' }],
+          schema_version_tag: 'obligation.feed.v1',
+          requested_capabilities: ['obligation-sync'],
+          partner_capabilities: ['obligation-sync', 'delta-sync'],
+        },
+        assertionKey: 'accepted_bulletins',
+      },
+    ];
+
+    for (const fixture of fixtures) {
+      const req: ApiRequest = {
+        method: 'POST',
+        query: { interface: fixture.interface },
+        body: fixture.body,
+        headers: {},
+      };
+      const res = createResponse();
+      await handler(req, res);
+      expect(res.statusCode).toBe(200);
+      expect((res.jsonBody as any)?.output?.[fixture.assertionKey]).toBeDefined();
+      expect((res.jsonBody as any)?.output?.contract_compatibility?.schema_version_tag).toBeTruthy();
+    }
   });
 });

@@ -1,18 +1,19 @@
 import type { ApiRequest, ApiResponse } from '../../_utils/types';
 import {
   applyCors,
-  authenticateRequest,
   buildApiContext,
-  enforceAmroDomainAccess,
   enforceHttps,
   enforceRateLimit,
   handlePreflight,
-  resolveAndApplyAccessContext,
 } from '../../_utils/http';
 import { sendErrorResponse } from '../../_utils/errorHandler';
 import { applyCompatibilityResponseHeaders, resolveGatewayCompatibility } from '../../_utils/compatibility-facade';
 import { buildAmroServiceBoundaryEnvelope, createAmroIsolationScope } from './anti-corruption-adapter';
-import { buildAmroPhasePlanProgressEnvelope, buildAmroSequentialImplementationEnvelope } from './phase-plan-model';
+import {
+  buildAmroDevelopmentBlueprintEnvelope,
+  buildAmroPhasePlanProgressEnvelope,
+  buildAmroSequentialImplementationEnvelope,
+} from './phase-plan-model';
 
 function parseBoolean(value: string | undefined, fallback: boolean): boolean {
   const normalized = String(value || '').trim().toLowerCase();
@@ -47,38 +48,35 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
     enforceHttps(req);
     enforceRateLimit(req);
-    const auth = await authenticateRequest(req);
-    ctx.userId = auth.userId;
-    ctx.role = auth.role;
-    const access = await resolveAndApplyAccessContext(req, ctx);
-    const tenantId = String(access.tenantId || '');
-    const franchiseId = access.franchiseId ? String(access.franchiseId) : null;
+    const tenantId = 'public';
+    const franchiseId = null;
     const compatDecision = resolveGatewayCompatibility(req, { tenantId, franchiseId });
     applyCompatibilityResponseHeaders(res, compatDecision, ctx.correlationId);
-    const amroAccess = await enforceAmroDomainAccess(access, { correlationId: ctx.correlationId });
 
     const serviceBoundaries = buildAmroServiceBoundaryEnvelope({
       capability: 'work-packages',
       scope: createAmroIsolationScope(tenantId, franchiseId),
-      subscriptionStatus: amroAccess.subscriptionStatus,
-      validatedAt: amroAccess.validatedAt,
+      subscriptionStatus: 'public',
+      validatedAt: new Date().toISOString(),
     });
     const phasePlan = buildAmroPhasePlanProgressEnvelope();
     const sequentialImplementation = buildAmroSequentialImplementationEnvelope();
+    const developmentBlueprint = buildAmroDevelopmentBlueprintEnvelope();
 
     return res.status(200).json({
       version: 'v2',
       compatMode: compatDecision.compatMode,
       mode: 'phase-plan',
       domainAccess: {
-        subscriptionStatus: amroAccess.subscriptionStatus,
-        source: amroAccess.source,
-        validatedAt: amroAccess.validatedAt,
+        subscriptionStatus: 'public',
+        source: 'public',
+        validatedAt: serviceBoundaries.scopedAccess.domainAssignmentValidation.validatedAt,
       },
       serviceBoundaries,
       data: {
         phasePlan,
         sequentialImplementation,
+        developmentBlueprint,
       },
       correlationId: ctx.correlationId,
     });

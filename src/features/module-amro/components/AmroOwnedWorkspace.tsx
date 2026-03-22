@@ -8,7 +8,7 @@ import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAmroWorkspaceState } from '../hooks/useAmroWorkspaceState';
 import type { AmroAuthorityLevel, AmroAssetType } from '../workspace/amroWorkspaceModel';
 
@@ -40,6 +40,10 @@ const amroWorkspaceViewStorageKey = 'amro.workspace.view';
 const amroWorkspaceThemeStorageKey = 'amro.workspace.theme';
 const amroWorkPackagePageSizeStorageKey = 'amro.workspace.work-package-page-size';
 const amroWorkspaceLocaleStorageKey = 'amro.workspace.locale';
+const amroDashboardLoadBenchmark = { targetMs: 1000, hardLimitMs: 1500 };
+const amroWorkPackageFilterApplyBenchmark = { targetMs: 500, hardLimitMs: 900 };
+const amroDetailTabSwitchBenchmark = { targetMs: 250, hardLimitMs: 500 };
+const amroTaskStepSubmitBenchmark = { targetMs: 400, hardLimitMs: 800 };
 
 type AmroUxRole = 'technician' | 'engineer' | 'inspector' | 'planner' | 'management';
 
@@ -99,6 +103,9 @@ export function AmroOwnedWorkspace() {
   const [overrideRationale, setOverrideRationale] = useState('');
   const [deferralConfirmOpen, setDeferralConfirmOpen] = useState(false);
   const [deferralRationale, setDeferralRationale] = useState('');
+  const workspaceLoadStartedAtRef = useRef(typeof performance !== 'undefined' ? performance.now() : Date.now());
+  const workspaceLoadMetricPublishedRef = useRef(false);
+  const filterApplyStartedAtRef = useRef<number | null>(null);
   const hasUnsavedDetailChanges = detailDraft.trim() !== lastSavedDetailDraft.trim();
   const activeUxRole: AmroUxRole = state.activeRole === 'technician'
     ? 'technician'
@@ -153,6 +160,79 @@ export function AmroOwnedWorkspace() {
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(new Date(value));
+
+  const emitPerformanceMetric = (
+    metricName: string,
+    durationMs: number,
+    targetMs: number,
+    hardLimitMs: number,
+    metadata: Record<string, unknown> = {},
+  ) => {
+    if (typeof window === 'undefined') return;
+    const roundedDurationMs = Number(durationMs.toFixed(2));
+    const status = roundedDurationMs <= targetMs ? 'target_met' : roundedDurationMs <= hardLimitMs ? 'target_at_risk' : 'hard_limit_breached';
+    window.dispatchEvent(new CustomEvent('amro:performance-metric', {
+      detail: {
+        metricName,
+        durationMs: roundedDurationMs,
+        targetMs,
+        hardLimitMs,
+        status,
+        metadata,
+      },
+    }));
+    if (status === 'hard_limit_breached') {
+      window.dispatchEvent(new CustomEvent('amro:performance-alert', {
+        detail: {
+          metricName,
+          durationMs: roundedDurationMs,
+          hardLimitMs,
+          metadata,
+        },
+      }));
+    }
+  };
+
+  const startFilterApplyTimer = (trigger: string) => {
+    filterApplyStartedAtRef.current = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    if (typeof window === 'undefined') return;
+    window.dispatchEvent(new CustomEvent('amro:performance-trace', {
+      detail: {
+        interaction: 'work_package_filter_apply',
+        trigger,
+        startedAt: new Date().toISOString(),
+      },
+    }));
+  };
+
+  const trackTaskStepSubmitInteraction = async (taskId: string, action: 'start' | 'complete' | 'block' | 'reopen') => {
+    const startedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    await state.updateTaskExecutionStatus(taskId, action);
+    const completedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    emitPerformanceMetric('task_step_submit_online', completedAt - startedAt, amroTaskStepSubmitBenchmark.targetMs, amroTaskStepSubmitBenchmark.hardLimitMs, { action });
+  };
+
+  const handleDetailTabChange = (nextTab: string) => {
+    const startedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    setDetailTab(nextTab);
+    const completedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    emitPerformanceMetric('detail_tab_switch', completedAt - startedAt, amroDetailTabSwitchBenchmark.targetMs, amroDetailTabSwitchBenchmark.hardLimitMs, { tab: nextTab });
+  };
+
+  const handleStatusFilterChange = (value: string) => {
+    startFilterApplyTimer('status');
+    state.setWorkPackageStatusFilter(value);
+  };
+
+  const handleSearchFilterChange = (value: string) => {
+    startFilterApplyTimer('search');
+    state.setWorkPackageSearch(value);
+  };
+
+  const handleSavedViewChange = (value: string) => {
+    startFilterApplyTimer('saved_view');
+    state.setSelectedSavedViewId(value);
+  };
 
   const handleCreateWorkPackage = async () => {
     const ok = await state.createWorkPackage(newWorkPackageTitle);
@@ -249,6 +329,36 @@ export function AmroOwnedWorkspace() {
     setWorkPackagePage(workPackageTotalPages);
   }, [workPackagePage, workPackageTotalPages]);
 
+  useEffect(() => {
+    if (state.loadingWorkPackages || workspaceLoadMetricPublishedRef.current) return;
+    const completedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    emitPerformanceMetric(
+      'overview_dashboard_initial_load',
+      completedAt - workspaceLoadStartedAtRef.current,
+      amroDashboardLoadBenchmark.targetMs,
+      amroDashboardLoadBenchmark.hardLimitMs,
+      { workPackageCount: state.workPackages.length },
+    );
+    workspaceLoadMetricPublishedRef.current = true;
+  }, [state.loadingWorkPackages, state.workPackages.length]);
+
+  useEffect(() => {
+    if (state.loadingWorkPackages || filterApplyStartedAtRef.current === null) return;
+    const completedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    emitPerformanceMetric(
+      'work_package_list_filter_apply',
+      completedAt - filterApplyStartedAtRef.current,
+      amroWorkPackageFilterApplyBenchmark.targetMs,
+      amroWorkPackageFilterApplyBenchmark.hardLimitMs,
+      {
+        statusFilter: state.workPackageStatusFilter,
+        searchFilterLength: state.workPackageSearch.length,
+        savedViewId: state.selectedSavedViewId || null,
+      },
+    );
+    filterApplyStartedAtRef.current = null;
+  }, [state.loadingWorkPackages, state.selectedSavedViewId, state.workPackageSearch, state.workPackageStatusFilter]);
+
   return (
     <section className="space-y-4" aria-label="AMRO workspace">
       <div className="rounded-md border bg-muted/20 px-3 py-2 text-xs" role="status" aria-live="polite">
@@ -288,8 +398,8 @@ export function AmroOwnedWorkspace() {
               ))}
             </div>
             <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-4">
-              <Input value={state.workPackageSearch} onChange={(event) => state.setWorkPackageSearch(event.target.value)} placeholder="Search" />
-              <Select value={state.workPackageStatusFilter} onValueChange={state.setWorkPackageStatusFilter}>
+              <Input value={state.workPackageSearch} onChange={(event) => handleSearchFilterChange(event.target.value)} placeholder="Search" />
+              <Select value={state.workPackageStatusFilter} onValueChange={handleStatusFilterChange}>
                 <SelectTrigger>
                   <SelectValue placeholder="Filter" />
                 </SelectTrigger>
@@ -621,7 +731,7 @@ export function AmroOwnedWorkspace() {
           <div className="grid grid-cols-1 gap-3 md:grid-cols-4" data-amro-screen="SCR-AMRO-003" role="region" aria-label="SCR-AMRO-003 Work Package Create Drawer">
             <div className="space-y-1">
               <Label>Status Filter</Label>
-              <Select value={state.workPackageStatusFilter} onValueChange={state.setWorkPackageStatusFilter}>
+              <Select value={state.workPackageStatusFilter} onValueChange={handleStatusFilterChange}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -636,11 +746,11 @@ export function AmroOwnedWorkspace() {
             </div>
             <div className="space-y-1">
               <Label>Search</Label>
-              <Input value={state.workPackageSearch} onChange={(event) => state.setWorkPackageSearch(event.target.value)} placeholder="Search code or id" />
+              <Input value={state.workPackageSearch} onChange={(event) => handleSearchFilterChange(event.target.value)} placeholder="Search code or id" />
             </div>
             <div className="space-y-1">
               <Label>Saved View</Label>
-              <Select value={state.selectedSavedViewId} onValueChange={state.setSelectedSavedViewId}>
+              <Select value={state.selectedSavedViewId} onValueChange={handleSavedViewChange}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -709,7 +819,7 @@ export function AmroOwnedWorkspace() {
           </div>
           <div className="grid grid-cols-1 gap-3 xl:grid-cols-3" data-amro-screen="SCR-AMRO-004" role="region" aria-label="SCR-AMRO-004 Work Package Detail Sheet">
             <div className="xl:col-span-2">
-              <Tabs value={detailTab} onValueChange={setDetailTab}>
+              <Tabs value={detailTab} onValueChange={handleDetailTabChange}>
             <TabsList className="grid w-full grid-cols-7">
               <TabsTrigger value="overview">Overview</TabsTrigger>
               <TabsTrigger value="tasks">Tasks</TabsTrigger>
@@ -761,13 +871,13 @@ export function AmroOwnedWorkspace() {
                     {task.lifecycleStage} · {task.assignedRole}
                   </p>
                   <div className="mt-2 flex flex-wrap gap-2">
-                    <Button variant="outline" size="sm" onClick={() => state.updateTaskExecutionStatus(task.id, 'start')} aria-label={`Start task ${task.id}`}>
+                    <Button variant="outline" size="sm" onClick={() => void trackTaskStepSubmitInteraction(task.id, 'start')} aria-label={`Start task ${task.id}`}>
                       Start
                     </Button>
-                    <Button variant="outline" size="sm" onClick={() => state.updateTaskExecutionStatus(task.id, 'complete')} aria-label={`Complete task ${task.id}`}>
+                    <Button variant="outline" size="sm" onClick={() => void trackTaskStepSubmitInteraction(task.id, 'complete')} aria-label={`Complete task ${task.id}`}>
                       Complete
                     </Button>
-                    <Button variant="outline" size="sm" onClick={() => state.updateTaskExecutionStatus(task.id, 'block')} aria-label={`Block task ${task.id}`}>
+                    <Button variant="outline" size="sm" onClick={() => void trackTaskStepSubmitInteraction(task.id, 'block')} aria-label={`Block task ${task.id}`}>
                       Block
                     </Button>
                     <Button variant="outline" size="sm" onClick={() => state.uploadTaskEvidence(task.id)} aria-label={`Upload evidence for task ${task.id}`}>

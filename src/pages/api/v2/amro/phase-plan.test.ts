@@ -3,26 +3,20 @@ import type { ApiRequest, ApiResponse } from '../../_utils/types';
 import handler from './phase-plan';
 import {
   applyCors,
-  authenticateRequest,
   buildApiContext,
-  enforceAmroDomainAccess,
   enforceHttps,
   enforceRateLimit,
   handlePreflight,
-  resolveAndApplyAccessContext,
 } from '../../_utils/http';
 import { sendErrorResponse } from '../../_utils/errorHandler';
 import { applyCompatibilityResponseHeaders, resolveGatewayCompatibility } from '../../_utils/compatibility-facade';
 
 vi.mock('../../_utils/http', () => ({
   applyCors: vi.fn(),
-  authenticateRequest: vi.fn(),
   buildApiContext: vi.fn(),
-  enforceAmroDomainAccess: vi.fn(),
   enforceHttps: vi.fn(),
   enforceRateLimit: vi.fn(),
   handlePreflight: vi.fn(),
-  resolveAndApplyAccessContext: vi.fn(),
 }));
 
 vi.mock('../../_utils/errorHandler', () => ({
@@ -70,25 +64,6 @@ describe('/api/v2/amro/phase-plan', () => {
       adminOverrideEnabled: false,
     } as any);
     vi.mocked(resolveGatewayCompatibility).mockReturnValue({ apiVersion: 'v2', compatMode: 'v2-shadow' });
-    vi.mocked(authenticateRequest).mockResolvedValue({
-      userId: 'user-1',
-      role: 'tenant_admin',
-      permissions: ['dashboards.view'],
-    } as any);
-    vi.mocked(resolveAndApplyAccessContext).mockResolvedValue({
-      userId: 'user-1',
-      tenantId: 'tenant-1',
-      franchiseId: 'fr-1',
-      isPlatformAdmin: false,
-      adminOverrideEnabled: false,
-    } as any);
-    vi.mocked(enforceAmroDomainAccess).mockResolvedValue({
-      isAuthorized: true,
-      subscriptionStatus: 'active',
-      graceUntil: null,
-      source: 'database',
-      validatedAt: '2026-03-21T00:00:00.000Z',
-    } as any);
   });
 
   it('returns AMRO phase-wise implementation matrix and progress summary', async () => {
@@ -113,6 +88,10 @@ describe('/api/v2/amro/phase-plan', () => {
     expect((res.jsonBody as any)?.data?.phasePlan?.summary?.completedPhases).toBe(1);
     expect((res.jsonBody as any)?.data?.sequentialImplementation?.strictOrder).toEqual(['M1', 'M2', 'M3', 'M4', 'M5', 'M6', 'M7', 'M8', 'M9', 'M10']);
     expect((res.jsonBody as any)?.data?.sequentialImplementation?.milestones?.length).toBe(10);
+    expect((res.jsonBody as any)?.data?.developmentBlueprint?.deliverySequence?.length).toBe(7);
+    expect((res.jsonBody as any)?.data?.developmentBlueprint?.moduleCompletionChecklist?.summary?.totalChecks).toBe(7);
+    expect((res.jsonBody as any)?.domainAccess?.subscriptionStatus).toBe('public');
+    expect((res.jsonBody as any)?.serviceBoundaries?.scopedAccess?.tenant_id).toBe('public');
     expect(applyCompatibilityResponseHeaders).toHaveBeenCalled();
   });
 

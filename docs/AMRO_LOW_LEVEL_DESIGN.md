@@ -1474,6 +1474,13 @@ All database implementation and review activities must treat this section as nor
 | `public.staff_qualifications` | Certification and authority records | 200-50,000 | `id` | RLS enabled; tenant-isolated; certifier authority controls |
 | `public.maintenance_events` | Operational maintenance event stream | 50,000-5,000,000 | `id` | RLS enabled; tenant-isolated; performed-by user required |
 | `public.work_package_materials` | Parts/material demand, reservation, and sourcing lines | 5,000-750,000 | `id` | RLS enabled; tenant-isolated; material lifecycle status controls |
+| `public.work_package_templates` | Reusable work-package scope and task templates | 500-250,000 | `id` | RLS enabled; tenant/franchise-scoped business key uniqueness |
+| `public.task_evidence` | Structured evidence metadata and integrity records | 100,000-30,000,000 | `(id, captured_at)` | RLS enabled; append-only trigger; monthly partitions |
+| `public.policy_snapshots` | Immutable policy version captures for decision replay | 5,000-1,000,000 | `id` | RLS enabled; append-only trigger; policy key uniqueness |
+| `public.sync_conflicts` | Offline/online merge conflict cockpit and resolutions | 1,000-2,000,000 | `id` | RLS enabled; active-conflict partial index |
+| `public.regulator_dossiers` | Regulator release dossiers and evidence bundles | 500-500,000 | `id` | RLS enabled; regulator dossier business uniqueness |
+| `public.forecast_features` | ML feature snapshots for explainable recommendations | 100,000-50,000,000 | `id` | RLS enabled; tenant-asset inference uniqueness |
+| `public.forecast_decisions` | Recommendation acceptance and outcome feedback loop | 10,000-10,000,000 | `id` | RLS enabled; one decision per recommendation per scope |
 | `mro_audit.records` | Immutable hash-linked audit evidence records | 100,000-20,000,000 | `id` | RLS enabled; immutable trigger blocks update/delete |
 | `mro_audit.trails` | Immutable replay timeline trail for compliance events | 100,000-20,000,000 | `id` | RLS enabled; immutable trigger blocks update/delete |
 
@@ -1800,6 +1807,200 @@ All database implementation and review activities must treat this section as nor
 
 - Indexes: `idx_mro_audit_trails_tenant_id`, `idx_mro_audit_trails_tenant_created`, `idx_mro_audit_trails_entity`, `idx_mro_audit_trails_created_at`, `idx_mro_audit_trails_timestamp`, `idx_mro_audit_trails_event_type`
 
+#### 28.2.10 `public.work_package_templates`
+
+- Namespace prefix: `public`
+- Purpose: Reusable planning templates for standardized work-package scope and task decomposition.
+- Estimated row count: 500-250,000 per active tenant per 12 months.
+- Primary key: `id`
+- Security considerations: Tenant/franchise isolation with RLS; template activation index supports live planning retrieval.
+
+| Column | Type | Nullable | Default | Constraints |
+|---|---|---|---|---|
+| `id` | `uuid` | No | `gen_random_uuid()` | Primary key |
+| `tenant_id` | `uuid` | No | — | FK -> `public.tenants(id)` ON DELETE CASCADE |
+| `franchise_id` | `uuid` | Yes | — | FK -> `public.franchises(id)` ON DELETE SET NULL |
+| `template_code` | `text` | No | — | Business identifier |
+| `version` | `integer` | No | — | Check `version > 0` |
+| `active` | `boolean` | No | `true` | Active-state selector |
+| `template_name` | `text` | No | — | — |
+| `maintenance_type` | `maintenance_type` | No | — | Domain-constrained |
+| `scope_json` | `jsonb` | No | `'[]'::jsonb` | Structured scope definition |
+| `tasks_json` | `jsonb` | No | `'[]'::jsonb` | Structured task definition |
+| `policy_snapshot_id` | `uuid` | Yes | — | FK -> `public.policy_snapshots(id)` ON DELETE SET NULL |
+| `created_at` | `timestamptz` | No | `now()` | — |
+| `updated_at` | `timestamptz` | No | `now()` | — |
+| `created_by` | `uuid` | Yes | — | FK -> `auth.users(id)` ON DELETE SET NULL |
+| `updated_by` | `uuid` | Yes | — | FK -> `auth.users(id)` ON DELETE SET NULL |
+| `deleted_at` | `timestamptz` | Yes | — | Soft delete marker |
+
+- Unique constraints: `(tenant_id, COALESCE(franchise_id, zero_uuid), template_code, version)`
+- Indexes: `idx_work_package_templates_tenant_active`, `uq_work_package_templates_tenant_franchise_code_version`
+
+#### 28.2.11 `public.task_evidence`
+
+- Namespace prefix: `public`
+- Purpose: Immutable structured evidence metadata for execution proof and integrity verification.
+- Estimated row count: 100,000-30,000,000 per active tenant per 12 months.
+- Primary key: `(id, captured_at)`
+- Security considerations: Append-only enforced by trigger; partitioned monthly by `captured_at`; checksum-based deduplication key.
+
+| Column | Type | Nullable | Default | Constraints |
+|---|---|---|---|---|
+| `id` | `uuid` | No | `gen_random_uuid()` | Composite primary key part |
+| `tenant_id` | `uuid` | No | — | FK -> `public.tenants(id)` ON DELETE CASCADE |
+| `franchise_id` | `uuid` | Yes | — | FK -> `public.franchises(id)` ON DELETE SET NULL |
+| `task_id` | `uuid` | No | — | FK -> `public.tasks(id)` ON DELETE CASCADE |
+| `maintenance_event_id` | `uuid` | Yes | — | FK -> `public.maintenance_events(id)` ON DELETE SET NULL |
+| `evidence_type` | `text` | No | — | Evidence classification |
+| `uri` | `text` | No | — | Evidence URI |
+| `checksum` | `text` | No | — | Integrity hash |
+| `metadata` | `jsonb` | No | `'{}'::jsonb` | Structured metadata |
+| `captured_at` | `timestamptz` | No | `now()` | Composite primary key part; partition key |
+| `captured_by` | `uuid` | Yes | — | FK -> `auth.users(id)` ON DELETE SET NULL |
+| `created_at` | `timestamptz` | No | `now()` | — |
+| `created_by` | `uuid` | Yes | — | FK -> `auth.users(id)` ON DELETE SET NULL |
+
+- Unique constraints: `(tenant_id, COALESCE(franchise_id, zero_uuid), task_id, evidence_type, checksum, captured_at)`
+- Indexes: `idx_task_evidence_tenant_task_captured_desc`, `uq_task_evidence_tenant_franchise_task_integrity`
+
+#### 28.2.12 `public.policy_snapshots`
+
+- Namespace prefix: `public`
+- Purpose: Immutable policy version snapshots for replayable gate/transition decisions.
+- Estimated row count: 5,000-1,000,000 per active tenant per 12 months.
+- Primary key: `id`
+- Security considerations: Append-only enforced by trigger; referenced by compliance, certification, templates, and forecast decisions.
+
+| Column | Type | Nullable | Default | Constraints |
+|---|---|---|---|---|
+| `id` | `uuid` | No | `gen_random_uuid()` | Primary key |
+| `tenant_id` | `uuid` | No | — | FK -> `public.tenants(id)` ON DELETE CASCADE |
+| `franchise_id` | `uuid` | Yes | — | FK -> `public.franchises(id)` ON DELETE SET NULL |
+| `policy_type` | `text` | No | — | Policy classification |
+| `version` | `integer` | No | — | Check `version > 0` |
+| `policy_key` | `text` | No | — | Scope-local business identifier |
+| `rules_json` | `jsonb` | No | — | Full policy payload |
+| `effective_at` | `timestamptz` | No | — | Effective timestamp |
+| `superseded_at` | `timestamptz` | Yes | — | Supersession marker |
+| `checksum` | `text` | No | — | Content integrity hash |
+| `created_at` | `timestamptz` | No | `now()` | — |
+| `created_by` | `uuid` | Yes | — | FK -> `auth.users(id)` ON DELETE SET NULL |
+
+- Unique constraints: `(tenant_id, COALESCE(franchise_id, zero_uuid), policy_type, version)`, `(tenant_id, COALESCE(franchise_id, zero_uuid), policy_key)`
+- Indexes: `idx_policy_snapshots_tenant_effective_at`, `uq_policy_snapshots_tenant_franchise_type_version`, `uq_policy_snapshots_tenant_franchise_policy_key`
+
+#### 28.2.13 `public.sync_conflicts`
+
+- Namespace prefix: `public`
+- Purpose: Conflict-cockpit records for offline/online merge issues and adjudication outcomes.
+- Estimated row count: 1,000-2,000,000 per active tenant per 12 months.
+- Primary key: `id`
+- Security considerations: Tenant-scoped conflict references; partial active index accelerates unresolved queue operations.
+
+| Column | Type | Nullable | Default | Constraints |
+|---|---|---|---|---|
+| `id` | `uuid` | No | `gen_random_uuid()` | Primary key |
+| `tenant_id` | `uuid` | No | — | FK -> `public.tenants(id)` ON DELETE CASCADE |
+| `franchise_id` | `uuid` | Yes | — | FK -> `public.franchises(id)` ON DELETE SET NULL |
+| `entity_type` | `text` | No | — | Conflict entity type |
+| `entity_id` | `uuid` | No | — | Conflict entity ID |
+| `conflict_ref` | `text` | No | — | Scoped business conflict reference |
+| `conflict_class` | `text` | No | — | Conflict category |
+| `local_payload` | `jsonb` | No | `'{}'::jsonb` | Offline payload |
+| `remote_payload` | `jsonb` | No | `'{}'::jsonb` | Server payload |
+| `resolution` | `text` | No | `'pending'` | Check-limited lifecycle state |
+| `detected_at` | `timestamptz` | No | `now()` | Detection timestamp |
+| `resolved_at` | `timestamptz` | Yes | — | Resolution timestamp |
+| `resolved_by` | `uuid` | Yes | — | FK -> `auth.users(id)` ON DELETE SET NULL |
+| `created_at` | `timestamptz` | No | `now()` | — |
+| `updated_at` | `timestamptz` | No | `now()` | — |
+| `created_by` | `uuid` | Yes | — | FK -> `auth.users(id)` ON DELETE SET NULL |
+| `updated_by` | `uuid` | Yes | — | FK -> `auth.users(id)` ON DELETE SET NULL |
+| `deleted_at` | `timestamptz` | Yes | — | Soft delete marker |
+
+- Unique constraints: `(tenant_id, COALESCE(franchise_id, zero_uuid), conflict_ref)`
+- Indexes: `idx_sync_conflicts_active_resolution`, `uq_sync_conflicts_tenant_franchise_conflict_ref`
+
+#### 28.2.14 `public.regulator_dossiers`
+
+- Namespace prefix: `public`
+- Purpose: Compliance dossier bundles for regulator submissions and export packets.
+- Estimated row count: 500-500,000 per active tenant per 12 months.
+- Primary key: `id`
+- Security considerations: Dossiers inherit tenant scope and work-package linkage; regulator reference uniqueness prevents duplicate packet IDs.
+
+| Column | Type | Nullable | Default | Constraints |
+|---|---|---|---|---|
+| `id` | `uuid` | No | `gen_random_uuid()` | Primary key |
+| `tenant_id` | `uuid` | No | — | FK -> `public.tenants(id)` ON DELETE CASCADE |
+| `franchise_id` | `uuid` | Yes | — | FK -> `public.franchises(id)` ON DELETE SET NULL |
+| `work_package_id` | `uuid` | No | — | FK -> `public.work_packages(id)` ON DELETE CASCADE |
+| `regulator_code` | `text` | No | — | Regulator authority code |
+| `dossier_ref` | `text` | No | — | Dossier identifier |
+| `dossier_uri` | `text` | Yes | — | External URI |
+| `manifest_json` | `jsonb` | No | `'{}'::jsonb` | Submission manifest |
+| `status` | `text` | No | `'draft'` | Check-limited lifecycle state |
+| `submitted_at` | `timestamptz` | Yes | — | Submission timestamp |
+| `created_at` | `timestamptz` | No | `now()` | — |
+| `updated_at` | `timestamptz` | No | `now()` | — |
+| `created_by` | `uuid` | Yes | — | FK -> `auth.users(id)` ON DELETE SET NULL |
+| `updated_by` | `uuid` | Yes | — | FK -> `auth.users(id)` ON DELETE SET NULL |
+| `deleted_at` | `timestamptz` | Yes | — | Soft delete marker |
+
+- Unique constraints: `(tenant_id, COALESCE(franchise_id, zero_uuid), regulator_code, dossier_ref)`
+- Indexes: `idx_regulator_dossiers_tenant_work_package`, `uq_regulator_dossiers_tenant_franchise_regulator_ref`
+
+#### 28.2.15 `public.forecast_features`
+
+- Namespace prefix: `public`
+- Purpose: Feature snapshots used to explain and replay model recommendations.
+- Estimated row count: 100,000-50,000,000 per active tenant per 12 months.
+- Primary key: `id`
+- Security considerations: Tenant-isolated feature vectors; high-write telemetry patterns indexed by tenant/asset/time.
+
+| Column | Type | Nullable | Default | Constraints |
+|---|---|---|---|---|
+| `id` | `uuid` | No | `gen_random_uuid()` | Primary key |
+| `tenant_id` | `uuid` | No | — | FK -> `public.tenants(id)` ON DELETE CASCADE |
+| `franchise_id` | `uuid` | Yes | — | FK -> `public.franchises(id)` ON DELETE SET NULL |
+| `asset_id` | `uuid` | No | — | FK -> `public.aircraft(id)` ON DELETE CASCADE |
+| `feature_vector` | `jsonb` | No | — | Feature payload |
+| `inference_time` | `timestamptz` | No | — | Inference timestamp |
+| `feature_hash` | `text` | No | — | Feature payload checksum |
+| `model_version` | `text` | No | — | Model version label |
+| `created_at` | `timestamptz` | No | `now()` | — |
+| `created_by` | `uuid` | Yes | — | FK -> `auth.users(id)` ON DELETE SET NULL |
+
+- Unique constraints: `(tenant_id, COALESCE(franchise_id, zero_uuid), asset_id, inference_time)`
+- Indexes: `idx_forecast_features_tenant_asset_time_desc`, `uq_forecast_features_tenant_franchise_asset_inference`
+
+#### 28.2.16 `public.forecast_decisions`
+
+- Namespace prefix: `public`
+- Purpose: Captures acceptance and measured outcomes for forecast recommendations.
+- Estimated row count: 10,000-10,000,000 per active tenant per 12 months.
+- Primary key: `id`
+- Security considerations: Decision feedback is tenant-scoped and references immutable policy snapshot for replay.
+
+| Column | Type | Nullable | Default | Constraints |
+|---|---|---|---|---|
+| `id` | `uuid` | No | `gen_random_uuid()` | Primary key |
+| `tenant_id` | `uuid` | No | — | FK -> `public.tenants(id)` ON DELETE CASCADE |
+| `franchise_id` | `uuid` | Yes | — | FK -> `public.franchises(id)` ON DELETE SET NULL |
+| `recommendation_id` | `uuid` | No | — | FK -> `public.forecast_outputs(id)` ON DELETE CASCADE |
+| `policy_snapshot_id` | `uuid` | Yes | — | FK -> `public.policy_snapshots(id)` ON DELETE RESTRICT |
+| `accepted` | `boolean` | No | — | Decision outcome |
+| `outcome_metric` | `numeric(10,2)` | Yes | — | Quantified outcome |
+| `outcome_notes` | `text` | Yes | — | Outcome rationale |
+| `decided_at` | `timestamptz` | No | `now()` | Decision timestamp |
+| `decided_by` | `uuid` | Yes | — | FK -> `auth.users(id)` ON DELETE SET NULL |
+| `created_at` | `timestamptz` | No | `now()` | — |
+| `created_by` | `uuid` | Yes | — | FK -> `auth.users(id)` ON DELETE SET NULL |
+
+- Unique constraints: `(tenant_id, COALESCE(franchise_id, zero_uuid), recommendation_id)`
+- Indexes: `idx_forecast_decisions_tenant_decided_at_desc`, `uq_forecast_decisions_tenant_franchise_recommendation`
+
 ### 28.3 Supporting Schema Components
 
 - Domains in `public` schema:
@@ -1810,6 +2011,10 @@ All database implementation and review activities must treat this section as nor
 - Immutability triggers:
   - `audit_records_immutable`
   - `audit_trails_immutable`
+  - `trg_amro_policy_snapshots_immutable`
+  - `trg_amro_task_evidence_immutable`
+- Additional immutability function:
+  - `public.amro_prevent_mutation_on_immutable()` blocks update/delete on append-only AMRO tables.
 - Security posture:
   - RLS is enabled across all AMRO operational and audit tables.
   - Access is controlled by platform-admin and tenant-scoped policies using `public.user_roles`.

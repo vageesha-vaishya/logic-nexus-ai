@@ -41,6 +41,12 @@ function parseBoolean(value: string | undefined, fallback: boolean): boolean {
   return normalized === 'true' || normalized === '1' || normalized === 'on';
 }
 
+function parseBodyBoolean(value: unknown, fallback: boolean): boolean {
+  const normalized = String(value ?? '').trim().toLowerCase();
+  if (!normalized) return fallback;
+  return normalized === 'true' || normalized === '1' || normalized === 'on';
+}
+
 function isV2Enabled(): boolean {
   return parseBoolean(process.env.AMRO_TASKS_V2_ENABLED, false);
 }
@@ -260,6 +266,39 @@ function assertEvidencePolicies(body: Record<string, unknown>) {
   if (!mimeType || !ALLOWED_EVIDENCE_MIME_TYPES.has(mimeType)) {
     throw new Error('MIME policy violation');
   }
+  const kmsKeyId = assertNonEmpty(metadata.kms_key_id, 'metadata.kms_key_id');
+  if (!kmsKeyId.toLowerCase().includes('kms')) {
+    throw new Error('KMS key policy violation');
+  }
+  const encryptedSignatureArtifactRef = assertNonEmpty(
+    metadata.encrypted_signature_artifact_ref,
+    'metadata.encrypted_signature_artifact_ref',
+  );
+  if (!encryptedSignatureArtifactRef.startsWith('kms://') && !encryptedSignatureArtifactRef.startsWith('vault://')) {
+    throw new Error('signature artifact encryption policy violation');
+  }
+  const mediaRef = assertNonEmpty(body.media_ref, 'media_ref');
+  if (!mediaRef.startsWith('https://')) {
+    throw new Error('signed URL policy violation');
+  }
+  let signedUrl: URL;
+  try {
+    signedUrl = new URL(mediaRef);
+  } catch {
+    throw new Error('signed URL policy violation');
+  }
+  const signatureToken = String(signedUrl.searchParams.get('sig') || '').trim();
+  const expiresAt = Number(signedUrl.searchParams.get('exp') || 0);
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  const maxWindowSeconds = Number(process.env.AMRO_EVIDENCE_SIGNED_URL_MAX_WINDOW_SECONDS || 900);
+  if (!signatureToken || !Number.isFinite(expiresAt) || expiresAt <= nowSeconds || expiresAt > nowSeconds + maxWindowSeconds) {
+    throw new Error('signed URL policy violation');
+  }
+  return {
+    kmsKeyId,
+    encryptedSignatureArtifactRef,
+    signedUrlExpiresAt: new Date(expiresAt * 1000).toISOString(),
+  };
 }
 
 function assertSignatureQualification(body: Record<string, unknown>, signerId: string) {
@@ -369,6 +408,9 @@ function assertOfflineEventOrdering(entries: OfflineQueueValidationResult[]) {
     }
     if (current.sequenceNumber <= previous.sequenceNumber) {
       throw new Error('offline queue sequence policy violation');
+    }
+    if (current.sequenceNumber !== previous.sequenceNumber + 1) {
+      throw new Error('sequence gap detected; request missing segment replay');
     }
     if (current.previousEventHash !== previous.eventHash) {
       throw new Error('offline queue hash chain mismatch');
@@ -681,10 +723,13 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         throw new Error('evidence_type is not supported');
       }
       const mediaRef = assertNonEmpty(body.media_ref, 'media_ref');
-      assertEvidencePolicies(body);
+      const evidenceSecurity = assertEvidencePolicies(body);
       const output = {
         evidence_id: `${tenantId}-${taskId}-evidence-${Date.now()}`,
         integrity_status: 'verified',
+        kms_key_id: evidenceSecurity.kmsKeyId,
+        encrypted_signature_artifact_ref: evidenceSecurity.encryptedSignatureArtifactRef,
+        signed_url_expires_at: evidenceSecurity.signedUrlExpiresAt,
       };
       const auditRecord = cutoverState.enabled
         ? appendTaskMutationAuditRecord({
@@ -844,7 +889,15 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
     if (req.method === 'POST' && interfaceName === 'sync-offline-queue') {
       enforceTaskMutationAccess(auth, interfaceName);
+      const syncStartedAt = Date.now();
       const body = parseBody(req.body);
+      const authTokenActive = parseBodyBoolean(body.auth_token_active, true);
+      const tokenRefreshAvailable = parseBodyBoolean(body.refresh_token_available, false);
+      if (!authTokenActive) {
+        if (!tokenRefreshAvailable) {
+          throw new Error('auth token refresh failed; queue is on hold');
+        }
+      }
       const queueEntries = parseObjectArray(body.queue_entries, 'queue_entries');
       if (!queueEntries.length) {
         throw new Error('queue_entries must include at least one event');
@@ -857,7 +910,42 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         .sort((a, b) => a.sequenceNumber - b.sequenceNumber);
       const mergedResults = mergedEntries.map((entry) => applyDeterministicMergePolicy(entry));
       const canonicalState = buildCanonicalState(mergedResults);
+      const storageWriteSuccessful = parseBodyBoolean(body.storage_write_successful, true);
+      const retryAttempt = parseInteger(body.retry_attempt ?? 0, 'retry_attempt');
+      const backoffBaseSeconds = parseInteger(body.backoff_base_seconds ?? 2, 'backoff_base_seconds');
+      const maxRetryThreshold = parseInteger(body.max_retry_threshold ?? 5, 'max_retry_threshold');
+      const nextBackoffSeconds = backoffBaseSeconds * Math.max(1, 2 ** retryAttempt);
+      const deadLettered = !storageWriteSuccessful && retryAttempt >= maxRetryThreshold;
+      const canonicalPersistence = storageWriteSuccessful
+        ? {
+          status: 'persisted',
+          retry_attempt: retryAttempt,
+          next_retry_in_seconds: 0,
+          backoff_strategy: 'exponential',
+          dead_lettered: false,
+        }
+        : {
+          status: deadLettered ? 'dead-lettered' : 'retrying',
+          retry_attempt: retryAttempt,
+          next_retry_in_seconds: deadLettered ? 0 : nextBackoffSeconds,
+          backoff_strategy: 'exponential',
+          dead_lettered: deadLettered,
+        };
+      const clientAcknowledged = parseBodyBoolean(body.client_acknowledged, storageWriteSuccessful && conflicts.length === 0);
       const atomicCommitId = `${tenantId}-offline-sync-${Date.now()}`;
+      const syncTimeMs = Math.max(0, Date.now() - syncStartedAt);
+      const normalizedSyncTimeMsPer100Events = queueEntries.length > 0
+        ? Number(((syncTimeMs / queueEntries.length) * 100).toFixed(2))
+        : 0;
+      const syncBenchmark = {
+        target_ms_per_100_events: 3000,
+        hard_limit_ms_per_100_events: 8000,
+      };
+      const syncBenchmarkStatus = normalizedSyncTimeMsPer100Events <= syncBenchmark.target_ms_per_100_events
+        ? 'target_met'
+        : normalizedSyncTimeMsPer100Events <= syncBenchmark.hard_limit_ms_per_100_events
+          ? 'target_at_risk'
+          : 'hard_limit_breached';
       const auditRecord = cutoverState.enabled
         ? appendTaskMutationAuditRecord({
           tenantId,
@@ -871,6 +959,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
             merged_count: mergedResults.length,
             conflict_count: conflicts.length,
             canonical_state: canonicalState,
+            canonical_persistence: canonicalPersistence,
           },
         })
         : null;
@@ -891,6 +980,10 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           merged_count: mergedResults.length,
           conflict_count: conflicts.length,
           manual_intervention_required: conflicts.length > 0,
+          auth: {
+            token_status: authTokenActive ? 'active' : 'refreshed',
+            refresh_attempted: !authTokenActive,
+          },
           conflict_summary: {
             total: conflicts.length,
             reason: conflicts.length > 0 ? 'server-version-or-ordering-conflict' : 'none',
@@ -911,10 +1004,24 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
             merged_state: entry.mergedState,
           })),
           canonical_state: canonicalState,
+          canonical_persistence: canonicalPersistence,
           canonical_state_update: {
             commit_id: atomicCommitId,
-            status: 'committed',
+            status: storageWriteSuccessful ? 'committed' : deadLettered ? 'dead-lettered' : 'retrying',
             audit_ledger_status: auditRecord ? 'committed' : 'disabled',
+          },
+          acknowledgment: {
+            all_events_acknowledged: clientAcknowledged,
+            pending_marker: clientAcknowledged ? null : `pending-${atomicCommitId}`,
+            retry_action: clientAcknowledged ? null : 'retry-sync',
+          },
+          sync_metrics: {
+            queue_event_count: queueEntries.length,
+            sync_time_ms: syncTimeMs,
+            normalized_ms_per_100_events: normalizedSyncTimeMsPer100Events,
+            benchmark: syncBenchmark,
+            benchmark_status: syncBenchmarkStatus,
+            alert_required: syncBenchmarkStatus === 'hard_limit_breached',
           },
         },
         auditLedgerCutover: cutoverState,

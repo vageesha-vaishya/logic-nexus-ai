@@ -320,6 +320,50 @@ describe('/api/v2/amro/work-packages', () => {
     expect(Array.isArray((res.jsonBody as any)?.savedViews)).toBe(true);
   });
 
+  it('returns API-AMRO-001 response contract fields for list query', async () => {
+    process.env.AMRO_WORK_PACKAGES_V2_ENABLED = 'true';
+    const req: ApiRequest = {
+      method: 'GET',
+      query: {
+        status: 'blocked',
+        station: 'tenant-1:station-1',
+        aircraft_id: 'tenant-1:aircraft-1',
+        due_before: '2026-03-30T00:00:00.000Z',
+        page: '1',
+        page_size: '10',
+        sort: 'planned_end:asc',
+      },
+      headers: { 'x-api-version': 'v2' },
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(Array.isArray((res.jsonBody as any)?.items)).toBe(true);
+    expect((res.jsonBody as any)?.pagination?.page).toBe(1);
+    expect((res.jsonBody as any)?.kpi_snapshot).toBeTruthy();
+    expect((res.jsonBody as any)?.applied_filters?.station).toBe('tenant-1:station-1');
+    expect((res.jsonBody as any)?.api_guardrails?.p95_target_ms).toBe(300);
+  });
+
+  it('returns AMRO_FILTER_VALIDATION_FAILED for invalid list filters', async () => {
+    process.env.AMRO_WORK_PACKAGES_V2_ENABLED = 'true';
+    const req: ApiRequest = {
+      method: 'GET',
+      query: {
+        page: '0',
+      },
+      headers: { 'x-api-version': 'v2' },
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(422);
+    expect((res.jsonBody as any)?.code).toBe('AMRO_FILTER_VALIDATION_FAILED');
+  });
+
   it('blocks transition when policy matrix disallows target status for current role', async () => {
     process.env.AMRO_WORK_PACKAGES_V2_ENABLED = 'true';
     vi.mocked(authenticateRequest).mockResolvedValue({
@@ -378,6 +422,39 @@ describe('/api/v2/amro/work-packages', () => {
     expect((res.jsonBody as any)?.interface).toBe('transition-work-package');
     expect((res.jsonBody as any)?.output?.published_events?.[0]?.event_type).toBe('amro.work_package.lifecycle.closed.v1');
     expect((res.jsonBody as any)?.closure?.lifecycle_event_published).toBe(true);
+    expect((res.jsonBody as any)?.output?.commit_decision?.successful).toBe(true);
+  });
+
+  it('rolls back closure commit and queues retry alert when commit fails', async () => {
+    process.env.AMRO_WORK_PACKAGES_V2_ENABLED = 'true';
+    vi.mocked(authenticateRequest).mockResolvedValue({
+      userId: 'user-1',
+      role: 'inspector',
+      permissions: ['dashboards.view', 'reports.manage'],
+    } as any);
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'transition-work-package' },
+      body: {
+        work_package_id: 'wp-closure-rollback-001',
+        current_status: 'in_progress',
+        target_status: 'completed',
+        reason_code: 'all-gates-passed',
+        actor_signature: 'sig-closure-rollback-001',
+        audit_chain_write_successful: false,
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(409);
+    expect((res.jsonBody as any)?.interface).toBe('transition-work-package');
+    expect((res.jsonBody as any)?.output?.updated_status).toBe('in_progress');
+    expect((res.jsonBody as any)?.output?.commit_decision?.rollback_status).toBe('completed');
+    expect((res.jsonBody as any)?.output?.commit_decision?.retry_queue?.status).toBe('queued');
+    expect((res.jsonBody as any)?.output?.commit_decision?.alert?.code).toBe('closure-commit-failed');
   });
 
   it('clones template only when template is active and tenant-visible', async () => {

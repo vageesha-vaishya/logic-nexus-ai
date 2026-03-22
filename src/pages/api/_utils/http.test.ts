@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { authenticateRequest, enforceAdminOverrideScope, enforceAmroDomainAccess, enforceDomainAccess, resolveAndApplyAccessContext, resolveUserAccessProfile, type UserAccessProfile } from './http';
+import { authenticateRequest, enforceAdminOverrideScope, enforceAmroDomainAccess, enforceDomainAccess, enforceHttps, resolveAndApplyAccessContext, resolveUserAccessProfile, type UserAccessProfile } from './http';
 import { getSupabaseAdminClient } from './supabaseAdmin';
 
 vi.mock('./supabaseAdmin', () => ({
@@ -55,6 +55,12 @@ function createMockRequest(headers: Record<string, string> = {}) {
     method: 'GET',
     query: {},
   } as any;
+}
+
+function createMockJwt(payload: Record<string, unknown>) {
+  const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
+  const body = Buffer.from(JSON.stringify(payload)).toString('base64url');
+  return `${header}.${body}.signature`;
 }
 
 describe('http domain and scope guards', () => {
@@ -407,6 +413,82 @@ describe('http domain and scope guards', () => {
         })
       )
     ).rejects.toThrow('Unauthorized');
+  });
+
+  it('rejects expired JWT during authentication', async () => {
+    const supabaseMock = {
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: {
+            user: {
+              id: 'user-expired',
+              email: 'user@example.com',
+              app_metadata: { role: 'tenant_admin', permissions: ['dashboards.view'] },
+            },
+          },
+          error: null,
+        }),
+      },
+    } as any;
+    vi.mocked(getSupabaseAdminClient).mockReturnValue(supabaseMock);
+    const expiredToken = createMockJwt({
+      sub: 'user-expired',
+      iat: Math.floor(Date.now() / 1000) - 1200,
+      exp: Math.floor(Date.now() / 1000) - 60,
+      jti: 'expired-jti',
+    });
+
+    await expect(
+      authenticateRequest(
+        createMockRequest({
+          authorization: `Bearer ${expiredToken}`,
+        })
+      )
+    ).rejects.toThrow('Unauthorized');
+  });
+
+  it('rejects replayed token rotation id on mutation request', async () => {
+    const supabaseMock = {
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: {
+            user: {
+              id: 'user-rotation',
+              email: 'rotation@example.com',
+              app_metadata: { role: 'tenant_admin', permissions: ['dashboards.manage'] },
+            },
+          },
+          error: null,
+        }),
+      },
+    } as any;
+    vi.mocked(getSupabaseAdminClient).mockReturnValue(supabaseMock);
+    const token = createMockJwt({
+      sub: 'user-rotation',
+      iat: Math.floor(Date.now() / 1000) - 10,
+      exp: Math.floor(Date.now() / 1000) + 600,
+      jti: 'rotation-jti-1',
+    });
+    const request = {
+      headers: {
+        authorization: `Bearer ${token}`,
+      },
+      method: 'POST',
+      query: {},
+      body: {},
+    } as any;
+
+    await expect(authenticateRequest(request)).resolves.toBeTruthy();
+    await expect(authenticateRequest(request)).rejects.toThrow('Unauthorized');
+  });
+
+  it('blocks traversal signature in request firewall', () => {
+    expect(() => enforceHttps({
+      headers: {},
+      method: 'GET',
+      query: {},
+      url: '/api/v2/amro/tasks/../../etc/passwd',
+    } as any)).toThrow('WAF policy violation');
   });
 
   it('authorizes AMRO tenant assignment and writes audit trail', async () => {

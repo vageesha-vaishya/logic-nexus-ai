@@ -213,6 +213,10 @@ describe('/api/v2/amro/certification', () => {
         work_package_id: 'wp-100',
         decision: 'approve',
         unresolved_blockers: ['none'],
+        compliance_gate: {
+          decision: 'pass',
+          evaluation_id: 'comp-eval-001',
+        },
         signatures: [
           { signer_id: 'cert-a', signer_credential_id: 'cred-a', signed_at: '2026-03-20T10:05:00.000Z', mandatory: true, signature: 'sig-a' },
           { signer_id: 'cert-b', signer_credential_id: 'cred-b', signed_at: '2026-03-20T10:06:00.000Z', mandatory: true, signature: 'sig-b' },
@@ -228,7 +232,43 @@ describe('/api/v2/amro/certification', () => {
     expect((res.jsonBody as any)?.output?.action_status).toBe('approved');
     expect((res.jsonBody as any)?.output?.blockers).toEqual([]);
     expect((res.jsonBody as any)?.output?.non_repudiation?.signature_bundle_hash).toBeTruthy();
+    expect((res.jsonBody as any)?.output?.compliance_gate?.decision).toBe('pass');
+    expect((res.jsonBody as any)?.output?.transactional_commit?.commit_successful).toBe(true);
+    expect((res.jsonBody as any)?.output?.release_artifact_storage?.storage_status).toBe('stored');
+    expect((res.jsonBody as any)?.output?.security_critical_flow?.signed_release_artifact_storage).toBe('stored');
     expect((res.jsonBody as any)?.output?.actor_attribution?.actor_id).toBe('user-1');
+  });
+
+  it('rejects approval when compliance gate evaluator is not pass', async () => {
+    process.env.AMRO_CERTIFICATION_V2_ENABLED = 'true';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'submit-certification-decision' },
+      body: {
+        work_package_id: 'wp-100',
+        decision: 'approve',
+        unresolved_blockers: ['none'],
+        compliance_gate: {
+          decision: 'fail',
+          evaluation_id: 'comp-eval-002',
+        },
+        signatures: [
+          { signer_id: 'cert-a', mandatory: true, signature: 'sig-a' },
+          { signer_id: 'cert-b', mandatory: true, signature: 'sig-b' },
+        ],
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(sendErrorResponse).toHaveBeenCalledWith(
+      res,
+      expect.any(Error),
+      'corr-amro-certification-v2',
+      { apiVersion: 'v2' },
+    );
   });
 
   it('rejects approval decision when unresolved blockers remain', async () => {
@@ -240,6 +280,10 @@ describe('/api/v2/amro/certification', () => {
         work_package_id: 'wp-100',
         decision: 'approve',
         unresolved_blockers: ['open-ad-2026-001'],
+        compliance_gate: {
+          decision: 'pass',
+          evaluation_id: 'comp-eval-003',
+        },
         signatures: [
           { signer_id: 'cert-a', mandatory: true, signature: 'sig-a' },
           { signer_id: 'cert-b', mandatory: true, signature: 'sig-b' },

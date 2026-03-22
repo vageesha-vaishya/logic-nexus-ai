@@ -5,6 +5,8 @@
 
 import express, { Express, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
+import { existsSync, readFileSync } from 'node:fs';
+import path from 'node:path';
 import { authMiddleware } from './middleware/auth.middleware';
 import workOrdersRoutes from './routes/work-orders.routes';
 import { ErrorResponse } from './types/amro.types';
@@ -12,6 +14,19 @@ import { logger } from './utils/logger';
 import { amroEventsProducer } from './events/amro-events.producer';
 
 const app: Express = express();
+
+function resolveContractsDir(): string {
+  const candidates = [
+    path.resolve(process.cwd(), 'src/pages/api/v2/amro/contracts'),
+    path.resolve(process.cwd(), '..', 'src/pages/api/v2/amro/contracts'),
+    path.resolve(process.cwd(), '..', '..', 'src/pages/api/v2/amro/contracts'),
+  ];
+  const matched = candidates.find((candidate) => existsSync(candidate));
+  if (!matched) {
+    throw new Error('AMRO contract artifacts directory not found');
+  }
+  return matched;
+}
 
 // ============================================================================
 // MIDDLEWARE
@@ -82,6 +97,123 @@ app.get('/', (_req: Request, res: Response) => {
     name: 'AMRO API Service',
     version: '0.1.0',
     description: 'Asset Maintenance, Repair, and Overhaul backend service',
+  });
+});
+
+app.get('/api/v2/amro/contracts/:artifact', (req: Request, res: Response) => {
+  const artifact = String(req.params.artifact || '').trim();
+  const allowedArtifacts = new Set([
+    'openapi-3.1.yaml',
+    'asyncapi-2.6.yaml',
+    'amro-v1.proto',
+    'amro-subgraph.graphql',
+  ]);
+  if (!allowedArtifacts.has(artifact)) {
+    res.status(404).json({
+      error: 'Not Found',
+      code: 'NOT_FOUND',
+      statusCode: 404,
+      path: req.path,
+    } as ErrorResponse);
+    return;
+  }
+
+  const contentTypeByArtifact: Record<string, string> = {
+    'openapi-3.1.yaml': 'application/yaml; charset=utf-8',
+    'asyncapi-2.6.yaml': 'application/yaml; charset=utf-8',
+    'amro-v1.proto': 'application/protobuf; charset=utf-8',
+    'amro-subgraph.graphql': 'application/graphql; charset=utf-8',
+  };
+  const contractsDir = resolveContractsDir();
+  const filePath = path.join(contractsDir, artifact);
+  const content = readFileSync(filePath, 'utf8');
+  res.setHeader('Content-Type', contentTypeByArtifact[artifact] || 'text/plain; charset=utf-8');
+  res.setHeader('Cache-Control', 'public, max-age=300');
+  res.status(200).send(content);
+});
+
+app.get('/api/v2/amro/phase-plan', (req: Request, res: Response) => {
+  const requestId = req.header('x-request-id') || crypto.randomUUID();
+  res.status(200).json({
+    version: 'v2',
+    mode: 'phase-plan',
+    requestId,
+    domainAccess: {
+      subscriptionStatus: 'public',
+      source: 'public',
+      validatedAt: new Date().toISOString(),
+    },
+  });
+});
+
+app.get('/api/v2/amro/phase-1-readiness', (req: Request, res: Response) => {
+  const requestId = req.header('x-request-id') || crypto.randomUUID();
+  res.status(200).json({
+    version: 'v2',
+    mode: 'phase-1-readiness',
+    requestId,
+    domainAccess: {
+      subscriptionStatus: 'public',
+      source: 'public',
+      validatedAt: new Date().toISOString(),
+    },
+  });
+});
+
+app.get('/api/v2/amro/module-catalog', (req: Request, res: Response) => {
+  const requestId = req.header('x-request-id') || crypto.randomUUID();
+  res.status(200).json({
+    version: 'v2',
+    mode: 'module-catalog',
+    requestId,
+    domainAccess: {
+      subscriptionStatus: 'public',
+      source: 'public',
+      validatedAt: new Date().toISOString(),
+    },
+  });
+});
+
+app.get('/api/v2/amro/screen-inventory', (req: Request, res: Response) => {
+  const requestId = req.header('x-request-id') || crypto.randomUUID();
+  res.status(200).json({
+    version: 'v2',
+    mode: 'screen-inventory',
+    requestId,
+    domainAccess: {
+      subscriptionStatus: 'public',
+      source: 'public',
+      validatedAt: new Date().toISOString(),
+    },
+  });
+});
+
+app.get('/api/v2/amro/migration-plan', (req: Request, res: Response) => {
+  const requestId = req.header('x-request-id') || crypto.randomUUID();
+  res.status(200).json({
+    version: 'v2',
+    mode: 'migration-plan',
+    requestId,
+    domainAccess: {
+      subscriptionStatus: 'public',
+      source: 'public',
+      validatedAt: new Date().toISOString(),
+    },
+  });
+});
+
+app.get('/api/v2/amro/health', (req: Request, res: Response) => {
+  const requestId = req.header('x-request-id') || crypto.randomUUID();
+  res.status(200).json({
+    version: 'v2',
+    mode: 'health',
+    status: 'ok',
+    requestId,
+    domainAccess: {
+      subscriptionStatus: 'public',
+      source: 'public',
+      validatedAt: new Date().toISOString(),
+    },
   });
 });
 

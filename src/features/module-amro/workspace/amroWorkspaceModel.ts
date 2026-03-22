@@ -1,6 +1,6 @@
 export type AmroAssetType = 'aircraft' | 'engine' | 'serialized_component' | 'heavy_asset';
 
-export type AmroWorkPackageLifecycleStage = 'create' | 'plan' | 'schedule' | 'execute' | 'close';
+export type AmroWorkPackageLifecycleStage = 'create' | 'plan' | 'schedule' | 'execute' | 'blocked' | 'close';
 
 export type AmroAuthorityLevel = 'technician' | 'supervisor' | 'engineering' | 'qa' | 'compliance';
 
@@ -85,6 +85,12 @@ export function canTransitionWorkPackageLifecycle(
   current: AmroWorkPackageLifecycleStage,
   next: AmroWorkPackageLifecycleStage
 ): boolean {
+  if (next === 'blocked') {
+    return current !== 'close';
+  }
+  if (current === 'blocked') {
+    return next === 'blocked' || next === 'execute' || next === 'close';
+  }
   const currentIndex = lifecycleOrder.indexOf(current);
   const nextIndex = lifecycleOrder.indexOf(next);
   if (currentIndex < 0 || nextIndex < 0) return false;
@@ -94,6 +100,7 @@ export function canTransitionWorkPackageLifecycle(
 export function getNextWorkPackageLifecycleStage(
   current: AmroWorkPackageLifecycleStage
 ): AmroWorkPackageLifecycleStage {
+  if (current === 'blocked') return 'execute';
   const currentIndex = lifecycleOrder.indexOf(current);
   if (currentIndex < 0 || currentIndex === lifecycleOrder.length - 1) return 'close';
   return lifecycleOrder[currentIndex + 1];

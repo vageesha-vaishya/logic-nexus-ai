@@ -113,6 +113,21 @@ function parseObjectArray(value: unknown, fieldName: string): Array<Record<strin
   return value.map((entry) => parseBody(entry));
 }
 
+function parseStringArray(value: unknown, fieldName: string): string[] {
+  if (!Array.isArray(value)) {
+    throw new Error(`${fieldName} must be an array`);
+  }
+  const normalized = value.map((entry) => assertNonEmpty(entry, `${fieldName}[]`));
+  return Array.from(new Set(normalized));
+}
+
+function parseOptionalStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return Array.from(new Set(value.map((entry) => String(entry || '').trim()).filter(Boolean)));
+}
+
 function assertAllowlistedSource(sourceSystem: string) {
   if (!ALLOWLISTED_SOURCES.has(sourceSystem)) {
     throw new Error('Source must be allow-listed');
@@ -168,6 +183,31 @@ function assertMappingContract(body: Record<string, unknown>) {
   }
 }
 
+function resolvePartnerContractCompatibility(body: Record<string, unknown>, fallbackSchemaVersionTag: string) {
+  const schemaVersionTag = String(body.schema_version_tag || '').trim() || fallbackSchemaVersionTag;
+  const requestedCapabilities = parseOptionalStringArray(body.requested_capabilities);
+  const partnerCapabilities = parseOptionalStringArray(body.partner_capabilities);
+  const requested = requestedCapabilities.length ? requestedCapabilities : ['core-sync'];
+  const partner = partnerCapabilities.length ? partnerCapabilities : ['core-sync'];
+  const agreedCapabilities = requested.filter((capability) => partner.includes(capability));
+  if (agreedCapabilities.length === 0) {
+    throw new Error('Capability negotiation failed: no shared capabilities');
+  }
+  const usesLegacyFallback = !String(body.schema_version_tag || '').trim() || requestedCapabilities.length === 0 || partnerCapabilities.length === 0;
+  return {
+    policy_version: 'amro.integration.contract.compatibility.v1',
+    required_fields_stability: 'one_full_deprecation_cycle',
+    additive_changes_only: true,
+    schema_version_tag: schemaVersionTag,
+    capability_negotiation: {
+      requested_capabilities: requested,
+      partner_capabilities: partner,
+      agreed_capabilities: agreedCapabilities,
+      negotiation_status: usesLegacyFallback ? 'legacy_fallback' : 'agreed',
+    },
+  } as const;
+}
+
 function resolveAdapterCatalogEntry(sourceSystem: string) {
   const normalized = sourceSystem.trim().toLowerCase();
   const matched = EXTERNAL_ADAPTER_CATALOG.find((entry) => entry.systems.includes(normalized));
@@ -206,6 +246,17 @@ function buildAdapterOutboxPayload(tenantId: string, sourceSystem: string, adapt
       consumers: ['analytics', 'downstream-consumers'],
     },
   };
+}
+
+function buildExponentialRetryPlan() {
+  return {
+    pattern: 'exponential_retry_with_dead_letter',
+    base_delay_ms: 1000,
+    max_attempts: 5,
+    backoff_multiplier: 2,
+    dead_letter_enabled: true,
+    manual_replay_interface: 'replay-failed-integration-job',
+  } as const;
 }
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {
@@ -298,9 +349,10 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     if (interfaceName === 'ingest-partner-payload') {
       const sourceSystem = assertNonEmpty(body.source_system, 'source_system').toLowerCase();
       assertAllowlistedSource(sourceSystem);
-      assertNonEmpty(body.adapter_version, 'adapter_version');
+      const adapterVersion = assertNonEmpty(body.adapter_version, 'adapter_version');
       assertNonEmpty(body.payload, 'payload');
       assertIdempotencyForMutatingEvents(body);
+      const contractCompatibility = resolvePartnerContractCompatibility(body, adapterVersion);
       const ingestionId = `${tenantId}-ingestion-${Date.now()}`;
       const canonicalEventId = `${sourceSystem}-${Date.now()}`;
       const adapter = resolveAdapterCatalogEntry(sourceSystem);
@@ -332,9 +384,10 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           adapter,
           parse_status: 'parsed',
           normalizer: {
-            source_schema: `${sourceSystem}:${body.adapter_version}`,
+            source_schema: `${sourceSystem}:${adapterVersion}`,
             canonical_model: 'amro.canonical.event.v1',
           },
+          contract_compatibility: contractCompatibility,
           deduplication: {
             idempotency_key: String(body.idempotency_key || ''),
             source_hash: `${tenantId}:${sourceSystem}:${canonicalEventId}`,
@@ -364,12 +417,61 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       });
     }
 
+    if (interfaceName === 'sync-erp-procurement-demand') {
+      const sourceSystem = assertNonEmpty(body.source_system, 'source_system').toLowerCase();
+      assertAllowlistedSource(sourceSystem);
+      const adapterVersion = assertNonEmpty(body.adapter_version, 'adapter_version');
+      const trigger = assertNonEmpty(body.trigger, 'trigger').toLowerCase();
+      if (trigger !== 'reservation_shortage' && trigger !== 'planned_demand') {
+        throw new Error('trigger must be reservation_shortage or planned_demand');
+      }
+      const purchaseDemandEvent = parseBody(body.purchase_demand_event);
+      const demandReference = assertNonEmpty(purchaseDemandEvent.demand_ref, 'purchase_demand_event.demand_ref');
+      const contractCompatibility = resolvePartnerContractCompatibility(body, adapterVersion);
+      const sync = buildAdapterOutboxPayload(tenantId, sourceSystem, adapterVersion, 'amro.erp.procurement.demand.synced.v1');
+      const retryPolicy = buildExponentialRetryPlan();
+      return res.status(200).json({
+        version: 'v2',
+        interface: interfaceName,
+        correlationId: ctx.correlationId,
+        output: {
+          trigger,
+          payload_standard: 'canonical_purchase_demand_event',
+          demand_reference: demandReference,
+          canonical_event_id: sync.canonicalEventId,
+          normalizer: sync.normalizer,
+          contract_compatibility: contractCompatibility,
+          retry_policy: retryPolicy,
+          dead_letter: {
+            queue: 'amro.integration.dlq',
+            status: 'armed',
+            replay_interface: retryPolicy.manual_replay_interface,
+          },
+          manual_replay: {
+            enabled: true,
+            interface: retryPolicy.manual_replay_interface,
+          },
+          domain_transaction: sync.domain_transaction,
+          outbox: sync.outbox,
+        },
+        domainAccess: {
+          subscriptionStatus: amroAccess.subscriptionStatus,
+          source: amroAccess.source,
+          validatedAt: amroAccess.validatedAt,
+        },
+        serviceBoundaries,
+        endpointRollout: rolloutState,
+        auditLedgerCutover: cutoverState,
+      });
+    }
+
     if (interfaceName === 'sync-erp-financials') {
       const sourceSystem = assertNonEmpty(body.source_system, 'source_system').toLowerCase();
       assertAllowlistedSource(sourceSystem);
       const adapterVersion = assertNonEmpty(body.adapter_version, 'adapter_version');
       const workPackageId = assertNonEmpty(body.work_package_id, 'work_package_id');
       assertNonEmpty(body.financial_posting, 'financial_posting');
+      const contractCompatibility = resolvePartnerContractCompatibility(body, adapterVersion);
       const adapter = resolveAdapterCatalogEntry(sourceSystem);
       const sync = buildAdapterOutboxPayload(tenantId, sourceSystem, adapterVersion, 'amro.erp.financials.synced.v1');
       return res.status(200).json({
@@ -382,9 +484,14 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           sync_status: 'posted',
           canonical_event_id: sync.canonicalEventId,
           normalizer: sync.normalizer,
+          contract_compatibility: contractCompatibility,
           deduplication: sync.deduplication,
           domain_transaction: sync.domain_transaction,
-          outbox: sync.outbox,
+          outbox: {
+            ...sync.outbox,
+            delivery_guarantee: 'guaranteed',
+            acknowledgement_required: true,
+          },
         },
         domainAccess: {
           subscriptionStatus: amroAccess.subscriptionStatus,
@@ -403,6 +510,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       const adapterVersion = assertNonEmpty(body.adapter_version, 'adapter_version');
       const migrationBatchId = assertNonEmpty(body.migration_batch_id, 'migration_batch_id');
       const records = parseObjectArray(body.records, 'records');
+      const contractCompatibility = resolvePartnerContractCompatibility(body, adapterVersion);
       const sync = buildAdapterOutboxPayload(tenantId, sourceSystem, adapterVersion, 'amro.legacy.records.ingested.v1');
       return res.status(200).json({
         version: 'v2',
@@ -413,6 +521,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           accepted_count: records.length,
           canonical_event_id: sync.canonicalEventId,
           normalizer: sync.normalizer,
+          contract_compatibility: contractCompatibility,
           deduplication: sync.deduplication,
           domain_transaction: sync.domain_transaction,
           outbox: sync.outbox,
@@ -433,16 +542,42 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       assertAllowlistedSource(sourceSystem);
       const adapterVersion = assertNonEmpty(body.adapter_version, 'adapter_version');
       const sensorEvents = parseObjectArray(body.sensor_events, 'sensor_events');
+      const contractCompatibility = resolvePartnerContractCompatibility(body, adapterVersion);
+      const seenSequenceKeys = new Set<string>();
+      let malformedCount = 0;
+      let duplicateCount = 0;
+      let acceptedCount = 0;
+      for (const event of sensorEvents) {
+        const sourceId = String(event.source_id || '').trim();
+        const sequence = Number(event.sequence);
+        if (!sourceId || !Number.isInteger(sequence) || sequence < 0) {
+          malformedCount += 1;
+          continue;
+        }
+        const dedupKey = `${sourceId}:${sequence}`;
+        if (seenSequenceKeys.has(dedupKey)) {
+          duplicateCount += 1;
+          continue;
+        }
+        seenSequenceKeys.add(dedupKey);
+        acceptedCount += 1;
+      }
       const sync = buildAdapterOutboxPayload(tenantId, sourceSystem, adapterVersion, 'amro.iot.telemetry.ingested.v1');
       return res.status(200).json({
         version: 'v2',
         interface: interfaceName,
         correlationId: ctx.correlationId,
         output: {
-          accepted_sensor_events: sensorEvents.length,
+          accepted_sensor_events: acceptedCount,
+          malformed_sensor_events: malformedCount,
           canonical_event_id: sync.canonicalEventId,
           normalizer: sync.normalizer,
-          deduplication: sync.deduplication,
+          contract_compatibility: contractCompatibility,
+          deduplication: {
+            ...sync.deduplication,
+            strategy: 'source_id_sequence',
+            duplicate_events_dropped: duplicateCount,
+          },
           domain_transaction: sync.domain_transaction,
           outbox: sync.outbox,
         },
@@ -462,18 +597,44 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       assertAllowlistedSource(sourceSystem);
       const adapterVersion = assertNonEmpty(body.adapter_version, 'adapter_version');
       const bulletins = parseObjectArray(body.bulletins, 'bulletins');
+      const contractCompatibility = resolvePartnerContractCompatibility(body, adapterVersion);
+      const validBulletins: Array<Record<string, unknown>> = [];
+      const quarantine: Array<{ bulletin_id: string; reason: string }> = [];
+      for (const bulletin of bulletins) {
+        const bulletinId = String(bulletin.bulletin_id || '').trim();
+        const obligationCode = String(bulletin.obligation_code || '').trim();
+        const effectiveAt = String(bulletin.effective_at || '').trim();
+        if (!bulletinId || !obligationCode || !effectiveAt) {
+          quarantine.push({
+            bulletin_id: bulletinId || 'unknown',
+            reason: 'missing_required_fields',
+          });
+          continue;
+        }
+        validBulletins.push(bulletin);
+      }
       const sync = buildAdapterOutboxPayload(tenantId, sourceSystem, adapterVersion, 'amro.regulatory.feed.ingested.v1');
       return res.status(200).json({
         version: 'v2',
         interface: interfaceName,
         correlationId: ctx.correlationId,
         output: {
-          accepted_bulletins: bulletins.length,
+          accepted_bulletins: validBulletins.length,
+          quarantined_bulletins: quarantine.length,
+          quarantine,
           canonical_event_id: sync.canonicalEventId,
           normalizer: sync.normalizer,
+          contract_compatibility: contractCompatibility,
+          validation_quarantine: {
+            status: quarantine.length > 0 ? 'active' : 'clear',
+            queue: 'amro.regulatory.validation.quarantine',
+          },
           deduplication: sync.deduplication,
           domain_transaction: sync.domain_transaction,
-          outbox: sync.outbox,
+          outbox: {
+            ...sync.outbox,
+            publish_status: validBulletins.length > 0 ? 'queued' : 'skipped',
+          },
         },
         domainAccess: {
           subscriptionStatus: amroAccess.subscriptionStatus,
@@ -491,6 +652,18 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       const notificationType = assertNonEmpty(body.notification_type, 'notification_type');
       const messageRef = assertNonEmpty(body.message_ref, 'message_ref');
       const channels = parseObjectArray(body.channels, 'channels');
+      const contractCompatibility = resolvePartnerContractCompatibility(body, 'notification.command.v1');
+      const failedChannelTypes = new Set(parseOptionalStringArray(body.fail_channels).map((entry) => entry.toLowerCase()));
+      const attempts = channels.map((channel, index) => {
+        const channelType = String(channel.type || '').trim().toLowerCase() || `channel-${index + 1}`;
+        const status = failedChannelTypes.has(channelType) ? 'failed' : 'delivered';
+        return {
+          attempt: index + 1,
+          channel: channelType,
+          status,
+        };
+      });
+      const deliveredAttempt = attempts.find((attempt) => attempt.status === 'delivered');
       return res.status(200).json({
         version: 'v2',
         interface: interfaceName,
@@ -500,7 +673,11 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           notification_type: notificationType,
           message_ref: messageRef,
           channel_count: channels.length,
-          dispatch_status: 'queued',
+          contract_compatibility: contractCompatibility,
+          retry_strategy: 'retry_with_channel_fallback',
+          channel_attempts: attempts,
+          fallback_channel_used: Boolean(deliveredAttempt && deliveredAttempt.attempt > 1),
+          dispatch_status: deliveredAttempt ? 'delivered' : 'failed',
           callback_id: `${tenantId}-${targetPartner}-notify-${Date.now()}`,
         },
         domainAccess: {
@@ -548,6 +725,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       const eventType = assertNonEmpty(body.event_type, 'event_type');
       const payloadRef = assertNonEmpty(body.payload_ref, 'payload_ref');
       assertMappingContract(body);
+      const contractCompatibility = resolvePartnerContractCompatibility(body, 'outbound.callback.v1');
       const attemptLog = parseObjectArray(body.attempt_log || [{ attempt: 1, status: 'queued' }], 'attempt_log');
       return res.status(200).json({
         version: 'v2',
@@ -557,6 +735,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           callback_id: `${tenantId}-${targetPartner}-callback-${Date.now()}`,
           delivery_status: 'queued',
           publish_status: 'dispatched',
+          contract_compatibility: contractCompatibility,
           attempt_log: attemptLog.length ? attemptLog : [{ attempt: 1, status: 'queued', event_type: eventType, payload_ref: payloadRef }],
         },
         domainAccess: {
@@ -571,7 +750,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     }
 
     return res.status(400).json({
-      error: 'Unsupported interface. Use list-external-adapters, ingest-partner-payload, sync-erp-financials, ingest-legacy-mro-records, ingest-iot-telemetry, ingest-regulatory-feed, dispatch-notification-gateway, replay-failed-integration-job, or publish-outbound-callback.',
+      error: 'Unsupported interface. Use list-external-adapters, ingest-partner-payload, sync-erp-procurement-demand, sync-erp-financials, ingest-legacy-mro-records, ingest-iot-telemetry, ingest-regulatory-feed, dispatch-notification-gateway, replay-failed-integration-job, or publish-outbound-callback.',
       correlationId: ctx.correlationId,
       version: 'v2',
     });

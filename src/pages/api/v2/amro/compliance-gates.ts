@@ -41,6 +41,10 @@ function parseBoolean(value: string | undefined, fallback: boolean): boolean {
   return normalized === 'true' || normalized === '1' || normalized === 'on';
 }
 
+function parseBodyBoolean(value: unknown, fallback: boolean): boolean {
+  return parseBoolean(String(value ?? ''), fallback);
+}
+
 function isV2Enabled(): boolean {
   return parseBoolean(process.env.AMRO_COMPLIANCE_GATES_V2_ENABLED, false);
 }
@@ -229,16 +233,81 @@ function getRegulatorComplianceProfile(profile: 'faa' | 'easa' | 'caac') {
   return REGULATOR_COMPLIANCE_PROFILES[profile];
 }
 
-function resolveComplianceDecision(requiredObligations: Array<Record<string, unknown>>) {
-  const blockers = requiredObligations
+function resolveComplianceDecision(requiredObligations: Array<Record<string, unknown>>, options: {
+  melCdlWindowValid: boolean;
+  deferralAuthorityValid: boolean;
+  assignedActorPrivilegesValid: boolean;
+  evidenceComplete: boolean;
+  policySnapshotActive: boolean;
+}) {
+  const mandatoryDirectiveBlockers = requiredObligations
     .filter((obligation) => obligation.fulfilled !== true)
     .map((obligation) => ({
       obligation_id: String(obligation.obligation_id || ''),
       reason: String(obligation.reason || 'obligation not fulfilled'),
     }))
     .filter((blocker) => blocker.obligation_id);
+  const blockers = [
+    ...mandatoryDirectiveBlockers,
+    ...(options.melCdlWindowValid && options.deferralAuthorityValid ? [] : [{
+      obligation_id: 'mel-cdl-deferral',
+      reason: 'MEL/CDL deferral validation failed',
+    }]),
+    ...(options.assignedActorPrivilegesValid ? [] : [{
+      obligation_id: 'qualification-validity',
+      reason: 'Assigned actor privileges do not satisfy release requirements',
+    }]),
+    ...(options.evidenceComplete ? [] : [{
+      obligation_id: 'evidence-completeness',
+      reason: 'Mandatory signatures or attachments are missing',
+    }]),
+    ...(options.policySnapshotActive ? [] : [{
+      obligation_id: 'policy-versioning',
+      reason: 'Policy snapshot is stale and requires refresh',
+    }]),
+  ];
   const decision = blockers.length === 0 ? 'pass' : 'fail';
-  return { decision, blockers };
+  return {
+    decision,
+    blockers,
+    rule_clusters: [
+      {
+        cluster: 'ad-sb-mandatory',
+        passed: mandatoryDirectiveBlockers.length === 0,
+        guidance: mandatoryDirectiveBlockers.length === 0
+          ? 'All mandatory directives are closed'
+          : 'Present unresolved directive IDs and required corrective actions',
+      },
+      {
+        cluster: 'mel-cdl-deferral',
+        passed: options.melCdlWindowValid && options.deferralAuthorityValid,
+        guidance: options.melCdlWindowValid && options.deferralAuthorityValid
+          ? 'Deferral policy remains valid'
+          : 'Use the allowed deferral path and resolve authority or expiry constraints',
+      },
+      {
+        cluster: 'qualification-validity',
+        passed: options.assignedActorPrivilegesValid,
+        guidance: options.assignedActorPrivilegesValid
+          ? 'Assigned actors meet privilege requirements'
+          : 'Assign certified alternate personnel and re-run gate',
+      },
+      {
+        cluster: 'evidence-completeness',
+        passed: options.evidenceComplete,
+        guidance: options.evidenceComplete
+          ? 'Signatures and attachments are complete'
+          : 'Show missing evidence checklist before release',
+      },
+      {
+        cluster: 'policy-versioning',
+        passed: options.policySnapshotActive,
+        guidance: options.policySnapshotActive
+          ? 'Active policy snapshot validated'
+          : 'Refresh policy snapshot and re-evaluate gate',
+      },
+    ],
+  };
 }
 
 function parseInteger(value: unknown, fieldName: string): number {
@@ -524,6 +593,13 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       const requiredObligations = obligationsRaw.map((entry) => (entry && typeof entry === 'object' ? entry as Record<string, unknown> : {}));
       const policyVersionSnapshot = assertNonEmpty(body.policy_version_snapshot, 'policy_version_snapshot');
       const decisionEvidence = assertNonEmpty(body.decision_evidence, 'decision_evidence');
+      const melCdlWindowValid = parseBodyBoolean(body.mel_cdl_window_valid, true);
+      const deferralAuthorityValid = parseBodyBoolean(body.deferral_authority_valid, true);
+      const assignedActorPrivilegesValid = parseBodyBoolean(body.assigned_actor_privileges_valid, true);
+      const mandatorySignaturesPresent = parseBodyBoolean(body.mandatory_signatures_present, true);
+      const mandatoryAttachmentsPresent = parseBodyBoolean(body.mandatory_attachments_present, true);
+      const policySnapshotActive = parseBodyBoolean(body.policy_snapshot_active, true);
+      const evidenceComplete = mandatorySignaturesPresent && mandatoryAttachmentsPresent;
       const actorAttribution = buildActorAttribution(ctx.userId, ctx.role);
       const evidenceLinkHash = buildEvidenceLinkHash({
         tenant_id: tenantId,
@@ -534,7 +610,13 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         decision_evidence: decisionEvidence,
         obligations: requiredObligations,
       });
-      const resolved = resolveComplianceDecision(requiredObligations);
+      const resolved = resolveComplianceDecision(requiredObligations, {
+        melCdlWindowValid,
+        deferralAuthorityValid,
+        assignedActorPrivilegesValid,
+        evidenceComplete,
+        policySnapshotActive,
+      });
       const auditRecord = cutoverState.enabled
         ? appendComplianceMutationAuditRecord({
           tenantId,
@@ -580,9 +662,13 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         output: {
           decision: resolved.decision,
           blockers: resolved.blockers,
+          rule_clusters: resolved.rule_clusters,
           rationale: resolved.decision === 'pass'
             ? 'All required obligations satisfied'
             : 'One or more obligations are unresolved',
+          operator_guidance: resolved.rule_clusters
+            .filter((cluster) => cluster.passed === false)
+            .map((cluster) => cluster.guidance),
           auditability: {
             traceability: {
               source_trigger: `${contextType}:${contextId}`,
@@ -892,7 +978,13 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         throw new Error('required_obligations must include at least one obligation');
       }
       const requiredObligations = obligationsRaw.map((entry) => (entry && typeof entry === 'object' ? entry as Record<string, unknown> : {}));
-      const decision = resolveComplianceDecision(requiredObligations);
+      const decision = resolveComplianceDecision(requiredObligations, {
+        melCdlWindowValid: true,
+        deferralAuthorityValid: true,
+        assignedActorPrivilegesValid: true,
+        evidenceComplete: true,
+        policySnapshotActive: true,
+      });
       return res.status(200).json({
         version: 'v2',
         interface: 'load-compliance-gate-explainability',
@@ -924,6 +1016,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
               { step: 'release-gate', status: decision.decision === 'pass' ? 'pass' : 'blocked' },
             ],
             blockers: decision.blockers,
+            rule_clusters: decision.rule_clusters,
           },
         },
       });

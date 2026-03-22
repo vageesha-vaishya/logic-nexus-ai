@@ -173,7 +173,7 @@ describe('/api/v2/amro/work-packages/[id] + transitions', () => {
     const req: ApiRequest = {
       method: 'POST',
       query: { id: 'wp-202' },
-      headers: {},
+      headers: { 'idempotency-key': 'idem-transition-202' },
       body: {
         current_status: 'planning',
         target_status: 'completed',
@@ -185,19 +185,15 @@ describe('/api/v2/amro/work-packages/[id] + transitions', () => {
 
     await transitionHandler(req, res);
 
-    expect(sendErrorResponse).toHaveBeenCalledWith(
-      res,
-      expect.any(Error),
-      'corr-amro-detail',
-      { apiVersion: 'v2' }
-    );
+    expect(res.statusCode).toBe(409);
+    expect((res.jsonBody as any)?.code).toBe('AMRO_TRANSITION_NOT_ALLOWED');
   });
 
   it('blocks transition when reason code is missing in API-AMRO-003 endpoint', async () => {
     const req: ApiRequest = {
       method: 'POST',
       query: { id: 'wp-204' },
-      headers: {},
+      headers: { 'idempotency-key': 'idem-transition-204' },
       body: {
         current_status: 'planning',
         target_status: 'scheduled',
@@ -220,11 +216,12 @@ describe('/api/v2/amro/work-packages/[id] + transitions', () => {
     const req: ApiRequest = {
       method: 'POST',
       query: { id: 'wp-303' },
-      headers: {},
+      headers: { 'idempotency-key': 'idem-transition-303' },
       body: {
         current_status: 'planning',
         target_status: 'scheduled',
         reason_code: 'resource-ready',
+        notes: 'ready to schedule',
         actor_signature: 'sig-777',
       },
     };
@@ -236,6 +233,8 @@ describe('/api/v2/amro/work-packages/[id] + transitions', () => {
     expect((res.jsonBody as any)?.interface).toBe('transition-work-package');
     expect((res.jsonBody as any)?.output?.to_status).toBe('scheduled');
     expect((res.jsonBody as any)?.output?.work_package_id).toBe('wp-303');
+    expect((res.jsonBody as any)?.output?.notes).toBe('ready to schedule');
+    expect((res.jsonBody as any)?.api_guardrails?.p95_target_ms).toBe(500);
   });
 
   it('passes create to transition flow for API-AMRO-001 and API-AMRO-003', async () => {
@@ -262,7 +261,7 @@ describe('/api/v2/amro/work-packages/[id] + transitions', () => {
     const transitionReq: ApiRequest = {
       method: 'POST',
       query: { id: createdWorkPackageId },
-      headers: {},
+      headers: { 'idempotency-key': 'idem-transition-e2e' },
       body: {
         current_status: 'planning',
         target_status: 'scheduled',
@@ -277,5 +276,46 @@ describe('/api/v2/amro/work-packages/[id] + transitions', () => {
     expect((transitionRes.jsonBody as any)?.output?.work_package_id).toBe(createdWorkPackageId);
     expect((transitionRes.jsonBody as any)?.output?.from_status).toBe('planning');
     expect((transitionRes.jsonBody as any)?.output?.to_status).toBe('scheduled');
+  });
+
+  it('returns AMRO_COMPLIANCE_GATE_FAILED when compliance gate is failed', async () => {
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { id: 'wp-777' },
+      headers: { 'idempotency-key': 'idem-transition-777' },
+      body: {
+        current_status: 'scheduled',
+        target_status: 'in_progress',
+        reason_code: 'gate-check',
+        actor_signature: 'signature-777',
+        compliance_gate: 'fail',
+      },
+    };
+    const res = createResponse();
+
+    await transitionHandler(req, res);
+
+    expect(res.statusCode).toBe(409);
+    expect((res.jsonBody as any)?.code).toBe('AMRO_COMPLIANCE_GATE_FAILED');
+  });
+
+  it('returns AMRO_IDEMPOTENCY_KEY_REQUIRED when idempotency header is missing', async () => {
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { id: 'wp-778' },
+      headers: {},
+      body: {
+        current_status: 'scheduled',
+        target_status: 'in_progress',
+        reason_code: 'gate-check',
+        actor_signature: 'signature-778',
+      },
+    };
+    const res = createResponse();
+
+    await transitionHandler(req, res);
+
+    expect(res.statusCode).toBe(422);
+    expect((res.jsonBody as any)?.code).toBe('AMRO_IDEMPOTENCY_KEY_REQUIRED');
   });
 });

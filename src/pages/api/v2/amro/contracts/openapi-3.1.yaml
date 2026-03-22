@@ -1061,6 +1061,7 @@ paths:
               [
                 list-external-adapters,
                 ingest-partner-payload,
+                sync-erp-procurement-demand,
                 sync-erp-financials,
                 ingest-legacy-mro-records,
                 ingest-iot-telemetry,
@@ -1093,6 +1094,29 @@ paths:
                     event_type:
                       type: string
                 - type: object
+                  required: [source_system, adapter_version, trigger, purchase_demand_event]
+                  properties:
+                    source_system:
+                      type: string
+                    adapter_version:
+                      type: string
+                    trigger:
+                      type: string
+                      enum: [reservation_shortage, planned_demand]
+                    purchase_demand_event:
+                      type: object
+                      additionalProperties: true
+                    schema_version_tag:
+                      type: string
+                    requested_capabilities:
+                      type: array
+                      items:
+                        type: string
+                    partner_capabilities:
+                      type: array
+                      items:
+                        type: string
+                - type: object
                   required: [source_system, adapter_version, work_package_id, financial_posting]
                   properties:
                     source_system:
@@ -1104,6 +1128,16 @@ paths:
                     financial_posting:
                       type: object
                       additionalProperties: true
+                    schema_version_tag:
+                      type: string
+                    requested_capabilities:
+                      type: array
+                      items:
+                        type: string
+                    partner_capabilities:
+                      type: array
+                      items:
+                        type: string
                 - type: object
                   required: [source_system, adapter_version, migration_batch_id, records]
                   properties:
@@ -1118,6 +1152,16 @@ paths:
                       items:
                         type: object
                         additionalProperties: true
+                    schema_version_tag:
+                      type: string
+                    requested_capabilities:
+                      type: array
+                      items:
+                        type: string
+                    partner_capabilities:
+                      type: array
+                      items:
+                        type: string
                 - type: object
                   required: [source_system, adapter_version, sensor_events]
                   properties:
@@ -1130,6 +1174,16 @@ paths:
                       items:
                         type: object
                         additionalProperties: true
+                    schema_version_tag:
+                      type: string
+                    requested_capabilities:
+                      type: array
+                      items:
+                        type: string
+                    partner_capabilities:
+                      type: array
+                      items:
+                        type: string
                 - type: object
                   required: [source_system, adapter_version, bulletins]
                   properties:
@@ -1142,6 +1196,16 @@ paths:
                       items:
                         type: object
                         additionalProperties: true
+                    schema_version_tag:
+                      type: string
+                    requested_capabilities:
+                      type: array
+                      items:
+                        type: string
+                    partner_capabilities:
+                      type: array
+                      items:
+                        type: string
                 - type: object
                   required: [target_partner, notification_type, message_ref, channels]
                   properties:
@@ -1156,6 +1220,16 @@ paths:
                       items:
                         type: object
                         additionalProperties: true
+                    schema_version_tag:
+                      type: string
+                    requested_capabilities:
+                      type: array
+                      items:
+                        type: string
+                    partner_capabilities:
+                      type: array
+                      items:
+                        type: string
                 - type: object
                   required: [job_id, replay_reason, requested_by]
                   properties:
@@ -1187,6 +1261,16 @@ paths:
                       items:
                         type: object
                         additionalProperties: true
+                    schema_version_tag:
+                      type: string
+                    requested_capabilities:
+                      type: array
+                      items:
+                        type: string
+                    partner_capabilities:
+                      type: array
+                      items:
+                        type: string
       responses:
         '200':
           description: Integration hub mutation response

@@ -3,26 +3,20 @@ import type { ApiRequest, ApiResponse } from '../../_utils/types';
 import handler from './health';
 import {
   applyCors,
-  authenticateRequest,
   buildApiContext,
-  enforceAmroDomainAccess,
   enforceHttps,
   enforceRateLimit,
   handlePreflight,
-  resolveAndApplyAccessContext,
 } from '../../_utils/http';
 import { sendErrorResponse } from '../../_utils/errorHandler';
 import { applyCompatibilityResponseHeaders, resolveGatewayCompatibility } from '../../_utils/compatibility-facade';
 
 vi.mock('../../_utils/http', () => ({
   applyCors: vi.fn(),
-  authenticateRequest: vi.fn(),
   buildApiContext: vi.fn(),
-  enforceAmroDomainAccess: vi.fn(),
   enforceHttps: vi.fn(),
   enforceRateLimit: vi.fn(),
   handlePreflight: vi.fn(),
-  resolveAndApplyAccessContext: vi.fn(),
 }));
 
 vi.mock('../../_utils/errorHandler', () => ({
@@ -70,25 +64,6 @@ describe('/api/v2/amro/health', () => {
       adminOverrideEnabled: false,
     } as any);
     vi.mocked(resolveGatewayCompatibility).mockReturnValue({ apiVersion: 'v2', compatMode: 'v2-shadow' });
-    vi.mocked(authenticateRequest).mockResolvedValue({
-      userId: 'user-1',
-      role: 'tenant_admin',
-      permissions: ['dashboards.view'],
-    } as any);
-    vi.mocked(resolveAndApplyAccessContext).mockResolvedValue({
-      userId: 'user-1',
-      tenantId: 'tenant-1',
-      franchiseId: 'fr-1',
-      isPlatformAdmin: false,
-      adminOverrideEnabled: false,
-    } as any);
-    vi.mocked(enforceAmroDomainAccess).mockResolvedValue({
-      isAuthorized: true,
-      subscriptionStatus: 'active',
-      graceUntil: null,
-      source: 'database',
-      validatedAt: '2026-03-22T00:00:00.000Z',
-    } as any);
   });
 
   it('returns AMRO health envelope and contract counts', async () => {
@@ -110,6 +85,8 @@ describe('/api/v2/amro/health', () => {
     expect((res.jsonBody as any)?.checks?.contracts?.restEndpointCount).toBeGreaterThan(0);
     expect((res.jsonBody as any)?.checks?.gaReadiness?.milestone).toBe('M10');
     expect((res.jsonBody as any)?.checks?.gaReadiness?.readyForGa).toBe(false);
+    expect((res.jsonBody as any)?.checks?.performance?.slo_alerting?.api_gateway?.availability_target_percent).toBe(99.95);
+    expect((res.jsonBody as any)?.checks?.performance?.capacity_planning?.target_concurrent_work_packages_per_region).toBe(25000);
     expect(applyCompatibilityResponseHeaders).toHaveBeenCalled();
   });
 
@@ -125,8 +102,8 @@ describe('/api/v2/amro/health', () => {
     await handler(req, res);
 
     expect(res.statusCode).toBe(200);
-    expect((res.jsonBody as any)?.serviceBoundaries?.scopedAccess?.tenant_id).toBe('tenant-1');
-    expect((res.jsonBody as any)?.serviceBoundaries?.scopedAccess?.franchise_id).toBe('fr-1');
+    expect((res.jsonBody as any)?.serviceBoundaries?.scopedAccess?.tenant_id).toBe('public');
+    expect((res.jsonBody as any)?.serviceBoundaries?.scopedAccess?.franchise_id).toBeNull();
     expect((res.jsonBody as any)?.serviceBoundaries?.capability).toBe('work-packages');
   });
 
@@ -166,6 +143,35 @@ describe('/api/v2/amro/health', () => {
     expect((res.jsonBody as any)?.checks?.gaReadiness?.status).toBe('completed');
     expect((res.jsonBody as any)?.checks?.gaReadiness?.readyForGa).toBe(true);
     expect((res.jsonBody as any)?.checks?.gaReadiness?.missingCriteria).toEqual([]);
+  });
+
+  it('marks SLO alerting states when observed metrics exceed thresholds', async () => {
+    process.env.AMRO_HEALTH_V2_ENABLED = 'true';
+    process.env.AMRO_SLO_API_GATEWAY_AVAILABILITY = '99.10';
+    process.env.AMRO_SLO_API_GATEWAY_5XX_RATE_PERCENT = '1.6';
+    process.env.AMRO_SLO_WORKFLOW_AVAILABILITY = '99.20';
+    process.env.AMRO_SLO_WORKFLOW_TRANSITION_FAILURE_PERCENT = '0.8';
+    process.env.AMRO_SLO_COMPLIANCE_AVAILABILITY = '99.80';
+    process.env.AMRO_SLO_COMPLIANCE_TIMEOUT_PERCENT = '0.4';
+    process.env.AMRO_SLO_MOBILE_SYNC_AVAILABILITY = '99.70';
+    process.env.AMRO_SLO_MOBILE_SYNC_BACKLOG_MINUTES = '16';
+    process.env.AMRO_CAPACITY_CONCURRENT_WORK_PACKAGES_PER_REGION = '31000';
+    const req: ApiRequest = {
+      method: 'GET',
+      query: {},
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.checks?.performance?.slo_alerting?.api_gateway?.availability_status).toBe('alert');
+    expect((res.jsonBody as any)?.checks?.performance?.slo_alerting?.api_gateway?.error_rate_status).toBe('alert');
+    expect((res.jsonBody as any)?.checks?.performance?.slo_alerting?.workflow_orchestration?.transition_failure_status).toBe('alert');
+    expect((res.jsonBody as any)?.checks?.performance?.slo_alerting?.compliance_gate_engine?.evaluation_timeout_status).toBe('alert');
+    expect((res.jsonBody as any)?.checks?.performance?.slo_alerting?.mobile_sync_service?.sync_backlog_age_status).toBe('alert');
+    expect((res.jsonBody as any)?.checks?.performance?.capacity_planning?.status).toBe('capacity_risk');
   });
 
   it('returns 404 when endpoint is disabled', async () => {

@@ -3,26 +3,20 @@ import type { ApiRequest, ApiResponse } from '../../_utils/types';
 import handler from './phase-1-readiness';
 import {
   applyCors,
-  authenticateRequest,
   buildApiContext,
-  enforceAmroDomainAccess,
   enforceHttps,
   enforceRateLimit,
   handlePreflight,
-  resolveAndApplyAccessContext,
 } from '../../_utils/http';
 import { sendErrorResponse } from '../../_utils/errorHandler';
 import { applyCompatibilityResponseHeaders, resolveGatewayCompatibility } from '../../_utils/compatibility-facade';
 
 vi.mock('../../_utils/http', () => ({
   applyCors: vi.fn(),
-  authenticateRequest: vi.fn(),
   buildApiContext: vi.fn(),
-  enforceAmroDomainAccess: vi.fn(),
   enforceHttps: vi.fn(),
   enforceRateLimit: vi.fn(),
   handlePreflight: vi.fn(),
-  resolveAndApplyAccessContext: vi.fn(),
 }));
 
 vi.mock('../../_utils/errorHandler', () => ({
@@ -70,25 +64,6 @@ describe('/api/v2/amro/phase-1-readiness', () => {
       adminOverrideEnabled: false,
     } as any);
     vi.mocked(resolveGatewayCompatibility).mockReturnValue({ apiVersion: 'v2', compatMode: 'v2-shadow' });
-    vi.mocked(authenticateRequest).mockResolvedValue({
-      userId: 'user-1',
-      role: 'tenant_admin',
-      permissions: ['dashboards.view'],
-    } as any);
-    vi.mocked(resolveAndApplyAccessContext).mockResolvedValue({
-      userId: 'user-1',
-      tenantId: 'tenant-1',
-      franchiseId: 'fr-1',
-      isPlatformAdmin: false,
-      adminOverrideEnabled: false,
-    } as any);
-    vi.mocked(enforceAmroDomainAccess).mockResolvedValue({
-      isAuthorized: true,
-      subscriptionStatus: 'active',
-      graceUntil: null,
-      source: 'database',
-      validatedAt: '2026-03-21T00:00:00.000Z',
-    } as any);
   });
 
   it('returns phase 1 readiness details and summary', async () => {
@@ -112,6 +87,8 @@ describe('/api/v2/amro/phase-1-readiness', () => {
     expect((res.jsonBody as any)?.data?.readiness?.deliverables?.length).toBe(13);
     expect((res.jsonBody as any)?.data?.readiness?.summary?.completed).toBe(1);
     expect((res.jsonBody as any)?.data?.readiness?.summary?.inProgress).toBe(1);
+    expect((res.jsonBody as any)?.domainAccess?.subscriptionStatus).toBe('public');
+    expect((res.jsonBody as any)?.serviceBoundaries?.scopedAccess?.tenant_id).toBe('public');
     expect(applyCompatibilityResponseHeaders).toHaveBeenCalled();
   });
 

@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   appendAmroAuditLedgerRecord,
+  replayAmroAuditTamperAlerts,
   replayAmroAuditLedgerRecords,
   resetAmroAuditLedgerStore,
+  validateAmroAuditLedgerIntegrity,
 } from './audit-ledger';
 
 describe('amro audit ledger', () => {
@@ -87,5 +89,60 @@ describe('amro audit ledger', () => {
 
     expect(filtered).toHaveLength(1);
     expect(filtered[0].recordId).toBe(latest.recordId);
+  });
+
+  it('records tamper alerts when hash chain is broken', () => {
+    appendAmroAuditLedgerRecord({
+      tenantId: 'tenant-1',
+      franchiseId: 'fr-1',
+      capability: 'tasks',
+      eventType: 'amro.audit.recorded.v1',
+      entityType: 'task',
+      entityId: 'task-1',
+      correlationId: 'corr-a-1',
+      action: 'module.write',
+      compatMode: 'v2-shadow',
+      sourceHash: 'hash-a1',
+      migrationBatchId: 'batch-1',
+      replayCheckpoint: 'checkpoint-a1',
+      context: {},
+    });
+    const second = appendAmroAuditLedgerRecord({
+      tenantId: 'tenant-1',
+      franchiseId: 'fr-1',
+      capability: 'tasks',
+      eventType: 'amro.audit.recorded.v1',
+      entityType: 'task',
+      entityId: 'task-2',
+      correlationId: 'corr-a-2',
+      action: 'module.write',
+      compatMode: 'v2-shadow',
+      sourceHash: 'hash-a2',
+      migrationBatchId: 'batch-1',
+      replayCheckpoint: 'checkpoint-a2',
+      context: {},
+    });
+    const latestRecord = replayAmroAuditLedgerRecords({
+      tenantId: 'tenant-1',
+      franchiseId: 'fr-1',
+      capability: 'tasks',
+      limit: 1,
+    })[0];
+    latestRecord.previousHash = 'forged-hash';
+
+    const integrity = validateAmroAuditLedgerIntegrity({
+      tenantId: 'tenant-1',
+      franchiseId: 'fr-1',
+      capability: 'tasks',
+    });
+    const alerts = replayAmroAuditTamperAlerts({
+      tenantId: 'tenant-1',
+      franchiseId: 'fr-1',
+      limit: 10,
+    });
+
+    expect(integrity.valid).toBe(false);
+    expect(alerts[0]?.recordId).toBe(second.recordId);
+    expect(alerts[0]?.actualPreviousHash).toBe('forged-hash');
   });
 });

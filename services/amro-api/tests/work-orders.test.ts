@@ -22,6 +22,65 @@ describe('AMRO API Health Check', () => {
   });
 });
 
+describe('AMRO API Contract Artifacts', () => {
+  it('should return OpenAPI contract without Authorization header', async () => {
+    const response = await request(app).get('/api/v2/amro/contracts/openapi-3.1.yaml');
+    expect(response.status).toBe(200);
+    expect(response.headers['content-type']).toContain('application/yaml');
+    expect(response.text).toContain('openapi: 3.1.0');
+  });
+
+  it('should return 404 for unknown contract artifact path', async () => {
+    const response = await request(app).get('/api/v2/amro/contracts/unknown-artifact.yaml');
+    expect(response.status).toBe(404);
+    expect(response.body.code).toBe('NOT_FOUND');
+  });
+});
+
+describe('AMRO Public Contract and Readiness APIs', () => {
+  it('should return phase plan without Authorization header', async () => {
+    const response = await request(app).get('/api/v2/amro/phase-plan');
+    expect(response.status).toBe(200);
+    expect(response.body.mode).toBe('phase-plan');
+    expect(response.body.domainAccess?.subscriptionStatus).toBe('public');
+  });
+
+  it('should return phase 1 readiness without Authorization header', async () => {
+    const response = await request(app).get('/api/v2/amro/phase-1-readiness');
+    expect(response.status).toBe(200);
+    expect(response.body.mode).toBe('phase-1-readiness');
+    expect(response.body.domainAccess?.subscriptionStatus).toBe('public');
+  });
+
+  it('should return module catalog without Authorization header', async () => {
+    const response = await request(app).get('/api/v2/amro/module-catalog');
+    expect(response.status).toBe(200);
+    expect(response.body.mode).toBe('module-catalog');
+    expect(response.body.domainAccess?.subscriptionStatus).toBe('public');
+  });
+
+  it('should return screen inventory without Authorization header', async () => {
+    const response = await request(app).get('/api/v2/amro/screen-inventory');
+    expect(response.status).toBe(200);
+    expect(response.body.mode).toBe('screen-inventory');
+    expect(response.body.domainAccess?.subscriptionStatus).toBe('public');
+  });
+
+  it('should return migration plan without Authorization header', async () => {
+    const response = await request(app).get('/api/v2/amro/migration-plan');
+    expect(response.status).toBe(200);
+    expect(response.body.mode).toBe('migration-plan');
+    expect(response.body.domainAccess?.subscriptionStatus).toBe('public');
+  });
+
+  it('should return contract health without Authorization header', async () => {
+    const response = await request(app).get('/api/v2/amro/health');
+    expect(response.status).toBe(200);
+    expect(response.body.mode).toBe('health');
+    expect(response.body.domainAccess?.subscriptionStatus).toBe('public');
+  });
+});
+
 describe('Authentication Middleware', () => {
   it('should return 401 when Authorization header is missing', async () => {
     const response = await request(app).get('/api/v1/work-packages');

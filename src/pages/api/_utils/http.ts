@@ -4,8 +4,13 @@ import { getSupabaseAdminClient } from './supabaseAdmin';
 import { logger } from '@/lib/logger';
 
 const rateStore = new Map<string, { count: number; resetAt: number }>();
+const mutationStore = new Map<string, { count: number; targets: Set<string>; resetAt: number }>();
+const tokenReplayStore = new Map<string, number>();
 const RATE_LIMIT = 100;
 const WINDOW_MS = 60_000;
+const MUTATION_RATE_LIMIT = 40;
+const MUTATION_TARGET_LIMIT = 20;
+const MAX_ACCESS_TOKEN_TTL_SECONDS = 900;
 const DEFAULT_EMERGENCY_BLOCKED_EMAILS = ['bahuguna.vimal001@gmail.com'];
 const ALLOW_GLOBAL_PLATFORM_SCOPE = String(process.env.ALLOW_GLOBAL_PLATFORM_SCOPE || '').trim().toLowerCase() === 'true';
 const AMRO_DOMAIN_CODE = 'AMRO';
@@ -227,6 +232,92 @@ type CorsOptions = {
   methods?: string[];
 };
 
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  const segments = token.split('.');
+  if (segments.length < 2) return null;
+  try {
+    const payloadSegment = segments[1] || '';
+    const payloadJson = Buffer.from(payloadSegment, 'base64url').toString('utf8');
+    const parsed = JSON.parse(payloadJson);
+    return parsed && typeof parsed === 'object' ? parsed as Record<string, unknown> : null;
+  } catch {
+    return null;
+  }
+}
+
+function parseUnixSeconds(value: unknown): number | null {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  return parsed;
+}
+
+function enforceWafPolicy(req: ApiRequest): void {
+  const rawPath = String((req as any).url || (req as any).path || '').toLowerCase();
+  if (rawPath.includes('../') || rawPath.includes('..\\')) {
+    throw new Error('WAF policy violation');
+  }
+  const serialized = JSON.stringify({
+    query: (req as any).query || {},
+    body: (req as any).body || {},
+  }).toLowerCase();
+  const signatures = [
+    /(\bor\b|\band\b)\s+\d+=\d+/,
+    /union\s+select/,
+    /drop\s+table/,
+    /<script[\s>]/,
+    /javascript:/,
+    /%00/,
+    /\.\.\//,
+    /\.\.\\/,
+  ];
+  if (signatures.some((pattern) => pattern.test(serialized))) {
+    throw new Error('WAF policy violation');
+  }
+}
+
+function enforceSessionTokenPolicy(req: ApiRequest, token: string, userId: string): void {
+  const payload = decodeJwtPayload(token);
+  if (!payload) return;
+  const nowMs = Date.now();
+  const expSeconds = parseUnixSeconds(payload.exp);
+  const iatSeconds = parseUnixSeconds(payload.iat);
+  if (expSeconds && expSeconds * 1000 <= nowMs) {
+    throw new Error('Unauthorized');
+  }
+  if (expSeconds && iatSeconds && expSeconds - iatSeconds > MAX_ACCESS_TOKEN_TTL_SECONDS) {
+    throw new Error('Unauthorized');
+  }
+  const method = String(req.method || 'GET').toUpperCase();
+  if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') return;
+  const rotationHeader = parseHeaderValue(req.headers['x-token-rotation-id']).trim();
+  const jti = String(payload.jti || '').trim();
+  const rotationId = rotationHeader || jti;
+  if (!rotationId) {
+    throw new Error('Unauthorized');
+  }
+  const replayKey = `${userId}:${rotationId}`;
+  const existingExpiry = tokenReplayStore.get(replayKey);
+  if (existingExpiry && existingExpiry > nowMs) {
+    throw new Error('Unauthorized');
+  }
+  const maxExpiryMs = nowMs + MAX_ACCESS_TOKEN_TTL_SECONDS * 1000;
+  const tokenExpiryMs = expSeconds ? expSeconds * 1000 : maxExpiryMs;
+  tokenReplayStore.set(replayKey, Math.min(tokenExpiryMs, maxExpiryMs));
+}
+
+function getMutationTargetSignature(req: ApiRequest): string {
+  const query = (req as any).query || {};
+  const body = (req as any).body || {};
+  const segments = [
+    String(query.interface || '').trim(),
+    String(query.id || '').trim(),
+    String(body.task_id || '').trim(),
+    String(body.work_package_id || '').trim(),
+    String(body.action || '').trim(),
+  ].filter(Boolean);
+  return segments.join(':') || 'generic-mutation';
+}
+
 export function parseHeaderValue(value: string | string[] | undefined): string {
   if (Array.isArray(value)) return value[0] || '';
   return value || '';
@@ -288,9 +379,21 @@ export function applyCors(req: ApiRequest, res: ApiResponse, options: CorsOption
   res.setHeader('Access-Control-Allow-Methods', normalizedMethods.join(','));
   res.setHeader('Access-Control-Allow-Headers', 'Authorization,Content-Type,Cookie,x-csrf-token,x-tenant-id,x-domain-id,x-user-id,x-user-role,x-user-permissions,x-correlation-id');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
 }
 
 export function enforceHttps(req: ApiRequest): void {
+  enforceWafPolicy(req);
+  const tlsVersion = parseHeaderValue(req.headers['x-tls-version']).toLowerCase();
+  if (tlsVersion) {
+    const normalized = tlsVersion.startsWith('tlsv') ? tlsVersion.slice(4) : tlsVersion.replace('tls', '');
+    const parsed = Number(normalized);
+    if (Number.isFinite(parsed) && parsed < 1.2) {
+      throw new Error('HTTPS required');
+    }
+  }
   if (process.env.NODE_ENV !== 'production') return;
   const proto = parseHeaderValue(req.headers['x-forwarded-proto']).toLowerCase();
   if (proto && proto !== 'https') {
@@ -352,6 +455,28 @@ export function enforceRateLimit(req: ApiRequest, tenantId: string = ''): void {
   if (existing.count > RATE_LIMIT) {
     throw new ServiceUnavailableException('Rate limit exceeded. Try again later.');
   }
+
+  const method = String(req.method || 'GET').toUpperCase();
+  if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') {
+    return;
+  }
+
+  const mutationKey = `${ip}:${scope}:mutation`;
+  const mutationTarget = getMutationTargetSignature(req);
+  const mutationState = mutationStore.get(mutationKey);
+  if (!mutationState || mutationState.resetAt <= now) {
+    mutationStore.set(mutationKey, {
+      count: 1,
+      targets: new Set([mutationTarget]),
+      resetAt: now + WINDOW_MS,
+    });
+    return;
+  }
+  mutationState.count += 1;
+  mutationState.targets.add(mutationTarget);
+  if (mutationState.count > MUTATION_RATE_LIMIT || mutationState.targets.size > MUTATION_TARGET_LIMIT) {
+    throw new ServiceUnavailableException('Anomaly detection triggered for mutation traffic.');
+  }
 }
 
 export function sanitizeQueryId(value: unknown, fieldName: string): string {
@@ -386,6 +511,7 @@ export async function authenticateRequest(req: ApiRequest): Promise<{ userId: st
   if (error || !data?.user) {
     throw new Error('Unauthorized');
   }
+  enforceSessionTokenPolicy(req, token, data.user.id);
   const userEmail = String((data.user as any).email || '').trim().toLowerCase();
   if (isEmergencyBlockedPrincipal(data.user.id, userEmail)) {
     logger.error('[AccessControl] emergency user block enforced', {

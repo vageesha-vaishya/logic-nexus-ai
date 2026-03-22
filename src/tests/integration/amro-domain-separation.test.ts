@@ -36,7 +36,7 @@ describe('amro domain separation strategy', () => {
 
   it('contains bounded-context lifecycle and capability model rules', () => {
     const modelContent = read('src/features/module-amro/workspace/amroWorkspaceModel.ts');
-    expect(modelContent).toContain("'create' | 'plan' | 'schedule' | 'execute' | 'close'");
+    expect(modelContent).toContain("'create' | 'plan' | 'schedule' | 'execute' | 'blocked' | 'close'");
     expect(modelContent).toContain('canTransitionWorkPackageLifecycle');
     expect(modelContent).toContain('canPerformAuthoritySignOff');
     expect(modelContent).toContain('buildComplianceCoverage');

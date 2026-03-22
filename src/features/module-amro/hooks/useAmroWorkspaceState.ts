@@ -299,7 +299,8 @@ function mapStatusToLifecycle(status: string): AmroWorkPackageLifecycleStage {
   if (normalized === 'approved') return 'plan';
   if (normalized === 'planning') return 'create';
   if (normalized === 'scheduled') return 'schedule';
-  if (normalized === 'in_progress' || normalized === 'on_hold') return 'execute';
+  if (normalized === 'blocked' || normalized === 'on_hold') return 'blocked';
+  if (normalized === 'in_progress') return 'execute';
   if (normalized === 'completed' || normalized === 'closed' || normalized === 'cancelled') return 'close';
   return 'create';
 }
@@ -309,6 +310,7 @@ function mapLifecycleToStatus(stage: AmroWorkPackageLifecycleStage): string {
   if (stage === 'plan') return 'approved';
   if (stage === 'schedule') return 'scheduled';
   if (stage === 'execute') return 'in_progress';
+  if (stage === 'blocked') return 'blocked';
   return 'closed';
 }
 

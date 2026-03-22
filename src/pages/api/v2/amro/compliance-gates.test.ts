@@ -272,11 +272,42 @@ describe('/api/v2/amro/compliance-gates', () => {
     expect((res.jsonBody as any)?.interface).toBe('evaluate-compliance-gate');
     expect((res.jsonBody as any)?.output?.decision).toBe('fail');
     expect((res.jsonBody as any)?.output?.blockers?.length).toBe(1);
+    expect(Array.isArray((res.jsonBody as any)?.output?.rule_clusters)).toBe(true);
+    expect((res.jsonBody as any)?.output?.rule_clusters?.length).toBe(5);
     expect((res.jsonBody as any)?.output?.auditability?.evidence_link_hash).toBeTruthy();
     expect((res.jsonBody as any)?.output?.auditability?.actor_attribution?.actor_id).toBe('user-1');
     expect((res.jsonBody as any)?.auditLedgerCutover?.enabled).toBe(true);
     expect((res.jsonBody as any)?.auditLedger?.eventType).toBe('amro.audit.recorded.v1');
     expect((res.jsonBody as any)?.auditLedger?.recordId).toBeTruthy();
+  });
+
+  it('fails compliance evaluation when policy snapshot or qualification controls are invalid', async () => {
+    process.env.AMRO_COMPLIANCE_GATES_V2_ENABLED = 'true';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'evaluate-compliance-gate' },
+      body: {
+        context: { type: 'work_package', id: 'wp-qual-001' },
+        regulator_profile: 'EASA',
+        required_obligations: [{ obligation_id: 'obl-1', fulfilled: true }],
+        policy_version_snapshot: 'policy-v2026.03.21',
+        decision_evidence: 'evidence-hash-qual-001',
+        assigned_actor_privileges_valid: false,
+        mandatory_signatures_present: false,
+        policy_snapshot_active: false,
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.output?.decision).toBe('fail');
+    expect((res.jsonBody as any)?.output?.operator_guidance?.length).toBeGreaterThan(0);
+    expect((res.jsonBody as any)?.output?.blockers?.map((entry: any) => entry.obligation_id)).toEqual(
+      expect.arrayContaining(['qualification-validity', 'evidence-completeness', 'policy-versioning'])
+    );
   });
 
   it('evaluates pre-schedule gate and blocks unresolved obligations', async () => {

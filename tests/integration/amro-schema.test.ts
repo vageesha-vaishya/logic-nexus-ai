@@ -139,6 +139,13 @@ amroOperationalSchemaSuite('AMRO Operational Schema', () => {
         'webhook_outbox',
         'asset_health_signals',
         'forecast_outputs',
+        'work_package_templates',
+        'task_evidence',
+        'policy_snapshots',
+        'sync_conflicts',
+        'regulator_dossiers',
+        'forecast_features',
+        'forecast_decisions',
       ];
 
       for (const table of tables) {
@@ -159,11 +166,18 @@ amroOperationalSchemaSuite('AMRO Operational Schema', () => {
         { table: 'tasks', columns: 'sequence,procedure_reference,steps_json,qualifications_json,status,assigned_technician_id' },
         { table: 'parts_inventory', columns: 'part_number,serial_number,batch_number,condition_code,uom,quantity_on_hand,quantity_available,warehouse_location,expiry_date' },
         { table: 'compliance_obligations', columns: 'obligation_type,due_date,due_hours,due_cycles,regulator_code,status,aircraft_id' },
-        { table: 'compliance_records', columns: 'obligation_id,decision_status,approving_authority,approving_authority_profile_id,work_package_id' },
+        { table: 'compliance_records', columns: 'obligation_id,decision_status,approving_authority,approving_authority_profile_id,work_package_id,policy_snapshot_id' },
         { table: 'staff_qualifications', columns: 'technician_id,rating,scope,issuer_authority,valid_from,valid_to,can_certify_release' },
-        { table: 'certification_actions', columns: 'action_status,rejection_reason,policy_reference,signer_id,signature_method' },
+        { table: 'certification_actions', columns: 'action_status,rejection_reason,policy_reference,signer_id,signature_method,policy_snapshot_id' },
         { table: 'maintenance_events', columns: 'event_hash,previous_hash,signature,signature_method,task_id,created_at' },
         { table: 'task_qualification_requirements', columns: 'task_id,staff_qualification_id,is_mandatory' },
+        { table: 'work_package_templates', columns: 'template_code,version,active,template_name,scope_json,tasks_json,policy_snapshot_id' },
+        { table: 'task_evidence', columns: 'task_id,evidence_type,uri,checksum,captured_at' },
+        { table: 'policy_snapshots', columns: 'policy_type,version,policy_key,rules_json,effective_at,checksum' },
+        { table: 'sync_conflicts', columns: 'entity_type,entity_id,conflict_class,resolution,detected_at' },
+        { table: 'regulator_dossiers', columns: 'work_package_id,regulator_code,dossier_ref,status,manifest_json' },
+        { table: 'forecast_features', columns: 'asset_id,feature_vector,inference_time,feature_hash,model_version' },
+        { table: 'forecast_decisions', columns: 'recommendation_id,accepted,outcome_metric,decided_at,policy_snapshot_id' },
       ];
 
       for (const check of checks) {

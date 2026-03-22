@@ -72,7 +72,18 @@ type AmroAuditLedgerReplayFilter = {
   limit?: number;
 };
 
+export type AmroAuditLedgerTamperAlert = {
+  tenantId: string;
+  franchiseId: string | null;
+  recordId: string;
+  expectedPreviousHash: string | null;
+  actualPreviousHash: string | null;
+  detectedAt: string;
+  reason: 'hash_chain_mismatch';
+};
+
 const auditLedgerStore = new Map<string, AmroAuditLedgerRecord[]>();
+const auditTamperAlerts = new Map<string, AmroAuditLedgerTamperAlert[]>();
 
 function toStableJson(input: unknown): string {
   if (Array.isArray(input)) {
@@ -148,6 +159,63 @@ export function replayAmroAuditLedgerRecords(filter: AmroAuditLedgerReplayFilter
   return capabilityFiltered.slice(-limit).reverse();
 }
 
+export function validateAmroAuditLedgerIntegrity(filter: {
+  tenantId: string;
+  franchiseId: string | null;
+  capability?: AmroAuditLedgerCapability;
+}) {
+  const key = tenantScopeKey(filter.tenantId, filter.franchiseId);
+  const records = auditLedgerStore.get(key) || [];
+  const alerts: AmroAuditLedgerTamperAlert[] = [];
+  for (let index = 0; index < records.length; index += 1) {
+    const record = records[index];
+    const previous = records[index - 1] || null;
+    const expectedPreviousHash = previous?.chainHash || null;
+    if ((record?.previousHash || null) !== expectedPreviousHash) {
+      if (filter.capability && record.capability !== filter.capability) {
+        continue;
+      }
+      alerts.push({
+        tenantId: record.tenantId,
+        franchiseId: record.franchiseId,
+        recordId: record.recordId,
+        expectedPreviousHash,
+        actualPreviousHash: record.previousHash,
+        detectedAt: new Date().toISOString(),
+        reason: 'hash_chain_mismatch',
+      });
+    }
+  }
+  if (alerts.length > 0) {
+    const existing = auditTamperAlerts.get(key) || [];
+    const dedupe = new Set(existing.map((entry) => `${entry.recordId}:${entry.expectedPreviousHash || ''}:${entry.actualPreviousHash || ''}`));
+    for (const alert of alerts) {
+      const alertKey = `${alert.recordId}:${alert.expectedPreviousHash || ''}:${alert.actualPreviousHash || ''}`;
+      if (!dedupe.has(alertKey)) {
+        dedupe.add(alertKey);
+        existing.push(alert);
+      }
+    }
+    auditTamperAlerts.set(key, existing);
+  }
+  return {
+    valid: alerts.length === 0,
+    alerts,
+  };
+}
+
+export function replayAmroAuditTamperAlerts(filter: {
+  tenantId: string;
+  franchiseId: string | null;
+  limit?: number;
+}) {
+  const key = tenantScopeKey(filter.tenantId, filter.franchiseId);
+  const alerts = auditTamperAlerts.get(key) || [];
+  const limit = Math.max(1, Math.min(Number(filter.limit || 100), 500));
+  return alerts.slice(-limit).reverse();
+}
+
 export function resetAmroAuditLedgerStore() {
   auditLedgerStore.clear();
+  auditTamperAlerts.clear();
 }

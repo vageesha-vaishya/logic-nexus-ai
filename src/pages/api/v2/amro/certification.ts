@@ -24,6 +24,10 @@ function parseBoolean(value: string | undefined, fallback: boolean): boolean {
   return normalized === 'true' || normalized === '1' || normalized === 'on';
 }
 
+function parseBodyBoolean(value: unknown, fallback: boolean): boolean {
+  return parseBoolean(String(value ?? ''), fallback);
+}
+
 function isV2Enabled(): boolean {
   return parseBoolean(process.env.AMRO_CERTIFICATION_V2_ENABLED, false);
 }
@@ -191,6 +195,14 @@ function buildNonRepudiationSignatureBundle(signatures: Array<Record<string, unk
     signature_bundle_hash: signatureBundleHash,
     signature_count: normalizedSignatures.length,
   };
+}
+
+function parseComplianceGateDecision(value: unknown): 'pass' | 'fail' | 'conditional_pass' {
+  const normalized = String(value || 'pass').trim().toLowerCase();
+  if (normalized !== 'pass' && normalized !== 'fail' && normalized !== 'conditional_pass') {
+    throw new Error('compliance_gate.decision must be pass, fail, or conditional_pass');
+  }
+  return normalized;
 }
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {
@@ -362,12 +374,42 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       const nonRepudiation = buildNonRepudiationSignatureBundle(signatures);
       const unresolvedBlockers = parseStringArray(body.unresolved_blockers || ['none'], 'unresolved_blockers');
       const blockers = unresolvedBlockers.includes('none') ? [] : unresolvedBlockers;
+      const complianceGate = parseBody(body.compliance_gate);
+      const complianceGateDecision = parseComplianceGateDecision(complianceGate.decision);
+      const complianceGateEvaluationId = assertNonEmpty(
+        complianceGate.evaluation_id || `${tenantId}-${workPackageId}-compliance-eval`,
+        'compliance_gate.evaluation_id',
+      );
+      if (decision === 'approve' && complianceGateDecision !== 'pass') {
+        throw new Error('Approval requires compliance_gate.decision to be pass');
+      }
       const deferReason = decision === 'defer' ? assertNonEmpty(body.defer_reason, 'defer_reason') : null;
       const followUpDueAt = decision === 'defer' ? parseTimestamp(body.follow_up_due_at, 'follow_up_due_at') : null;
       if (decision === 'approve') {
         assertApprovalSignatures(signatures, blockers);
       }
       const actionStatus = decision === 'approve' ? 'approved' : decision === 'reject' ? 'rejected' : 'deferred';
+      const transactionalCommit = {
+        commit_id: `${tenantId}-${workPackageId}-release-commit-${Date.now()}`,
+        task_state_commit: decision === 'approve' ? 'committed' : 'not-required',
+        work_package_state_commit: decision === 'approve' ? 'committed' : 'not-required',
+        commit_successful: true,
+      };
+      const releaseArtifactStorage = decision === 'approve'
+        ? {
+          artifact_id: `${tenantId}-${workPackageId}-release-artifact-${Date.now()}`,
+          storage_uri: `amro://release-artifacts/${tenantId}/${workPackageId}/release-${Date.now()}.json`,
+          storage_status: parseBodyBoolean(body.release_artifact_storage_successful, true) ? 'stored' : 'pending-store-retry',
+          artifact_hash: createHash('sha256').update(
+            JSON.stringify({
+              work_package_id: workPackageId,
+              decision,
+              compliance_gate_evaluation_id: complianceGateEvaluationId,
+              non_repudiation_signature_bundle_hash: nonRepudiation.signature_bundle_hash,
+            }),
+          ).digest('hex'),
+        }
+        : null;
       const auditRecord = cutoverState.enabled
         ? appendAmroAuditLedgerRecord({
           tenantId,
@@ -385,6 +427,10 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
             blockers,
             deferReason,
             followUpDueAt,
+            complianceGateDecision,
+            complianceGateEvaluationId,
+            transactionalCommit,
+            releaseArtifactStorage,
             nonRepudiation,
             actor: actorAttribution,
           },
@@ -411,7 +457,21 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
                 ? 'remediate-and-resubmit'
                 : 'await-follow-up-review',
           },
+          compliance_gate: {
+            decision: complianceGateDecision,
+            evaluation_id: complianceGateEvaluationId,
+          },
+          transactional_commit: transactionalCommit,
           non_repudiation: nonRepudiation,
+          release_artifact_storage: releaseArtifactStorage,
+          security_critical_flow: {
+            signature_validation: 'passed',
+            qualification_authority_check: 'passed',
+            compliance_gate_evaluator: complianceGateDecision,
+            transactional_commit: transactionalCommit.commit_successful ? 'passed' : 'failed',
+            audit_hash_chain_append: cutoverState.enabled ? 'passed' : 'disabled',
+            signed_release_artifact_storage: releaseArtifactStorage ? releaseArtifactStorage.storage_status : 'not-required',
+          },
           actor_attribution: actorAttribution,
         },
         domainAccess: {

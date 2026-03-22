@@ -174,6 +174,7 @@ describe('AMRO 13.3 integration contracts', () => {
     expect(openApi).toContain('/api/v2/amro/forecast/recommendations:');
     expect(openApi).toContain('operationId: getAmroForecastRecommendations');
     expect(openApi).toContain('list-external-adapters');
+    expect(openApi).toContain('sync-erp-procurement-demand');
     expect(openApi).toContain('sync-erp-financials');
     expect(openApi).toContain('ingest-legacy-mro-records');
     expect(openApi).toContain('ingest-iot-telemetry');

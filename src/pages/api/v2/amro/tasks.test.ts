@@ -68,6 +68,11 @@ function buildOfflineEventHash(parts: Record<string, unknown>): string {
   return createHash('sha256').update(stable).digest('base64url');
 }
 
+function buildSignedMediaRef(name: string): string {
+  const exp = Math.floor(Date.now() / 1000) + 600;
+  return `https://evidence.logic-nexus.ai/amro/${name}?sig=test-signature&exp=${exp}`;
+}
+
 describe('/api/v2/amro/tasks', () => {
   const envBackup = { ...process.env };
 
@@ -313,11 +318,13 @@ describe('/api/v2/amro/tasks', () => {
       body: {
         task_id: 'task-001',
         evidence_type: 'photo',
-        media_ref: 's3://bucket/evidence/photo-001.jpg',
+        media_ref: buildSignedMediaRef('photo-001.jpg'),
         checksum: 'abc123def456ghi789',
         metadata: {
           media_size_bytes: 1024 * 1024,
           mime_type: 'image/jpeg',
+          kms_key_id: 'kms://amro/tenant-1/evidence',
+          encrypted_signature_artifact_ref: 'kms://amro/tenant-1/signature-artifacts/photo-001',
         },
       },
       headers: {},
@@ -339,11 +346,13 @@ describe('/api/v2/amro/tasks', () => {
       body: {
         task_id: 'task-001',
         evidence_type: 'photo',
-        media_ref: 's3://bucket/evidence/photo-001.jpg',
+        media_ref: buildSignedMediaRef('photo-001.jpg'),
         checksum: '',
         metadata: {
           media_size_bytes: 1024 * 1024,
           mime_type: 'image/jpeg',
+          kms_key_id: 'kms://amro/tenant-1/evidence',
+          encrypted_signature_artifact_ref: 'kms://amro/tenant-1/signature-artifacts/photo-001',
         },
       },
       headers: {},
@@ -438,6 +447,9 @@ describe('/api/v2/amro/tasks', () => {
     expect((res.jsonBody as any)?.output?.sync_status).toBe('merged');
     expect((res.jsonBody as any)?.output?.conflict_count).toBe(0);
     expect((res.jsonBody as any)?.output?.merged_count).toBe(1);
+    expect((res.jsonBody as any)?.output?.sync_metrics?.queue_event_count).toBe(1);
+    expect((res.jsonBody as any)?.output?.sync_metrics?.benchmark_status).toBe('target_met');
+    expect(typeof (res.jsonBody as any)?.output?.sync_metrics?.normalized_ms_per_100_events).toBe('number');
   });
 
   it('returns conflict payload when offline queue has stale client revision', async () => {
@@ -485,6 +497,70 @@ describe('/api/v2/amro/tasks', () => {
     expect((res.jsonBody as any)?.output?.sync_status).toBe('conflict');
     expect((res.jsonBody as any)?.output?.conflict_count).toBe(1);
     expect((res.jsonBody as any)?.output?.conflicts?.[0]?.resolution).toBe('manual-review-required');
+  });
+
+  it('applies exponential backoff and dead-letter handling when canonical persistence fails', async () => {
+    process.env.AMRO_TASKS_V2_ENABLED = 'true';
+    const eventHash = buildOfflineEventHash({
+      eventType: 'upload-evidence',
+      taskId: 'task-001',
+      localRevision: 7,
+      serverRevision: 7,
+      performedAt: '2026-03-21T09:32:00.000Z',
+      sequenceNumber: 7,
+      action: '',
+      stepId: '',
+      evidenceType: 'photo',
+      signerId: '',
+    });
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'sync-offline-queue' },
+      body: {
+        auth_token_active: false,
+        refresh_token_available: true,
+        storage_write_successful: false,
+        retry_attempt: 5,
+        max_retry_threshold: 5,
+        client_acknowledged: false,
+        queue_entries: [
+          {
+            event_type: 'upload-evidence',
+            task_id: 'task-001',
+            evidence_type: 'photo',
+            media_ref: buildSignedMediaRef('photo-007.jpg'),
+            checksum: 'abc123def456ghi007',
+            metadata: {
+              media_size_bytes: 2048,
+              mime_type: 'image/jpeg',
+              kms_key_id: 'kms://amro/tenant-1/evidence',
+              encrypted_signature_artifact_ref: 'kms://amro/tenant-1/signature-artifacts/photo-007',
+            },
+            local_revision: 7,
+            server_revision: 7,
+            sequence_number: 7,
+            performed_at: '2026-03-21T09:32:00.000Z',
+            event_hash: eventHash,
+            encrypted_payload_ref: 'enc://tenant-1/task-001/7/mockhash',
+            device_signature: 'device-sig-001',
+          },
+        ],
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.output?.auth?.token_status).toBe('refreshed');
+    expect((res.jsonBody as any)?.output?.canonical_persistence?.status).toBe('dead-lettered');
+    expect((res.jsonBody as any)?.output?.canonical_persistence?.dead_lettered).toBe(true);
+    expect((res.jsonBody as any)?.output?.canonical_state_update?.status).toBe('dead-lettered');
+    expect((res.jsonBody as any)?.output?.acknowledgment?.all_events_acknowledged).toBe(false);
+    expect((res.jsonBody as any)?.output?.acknowledgment?.retry_action).toBe('retry-sync');
+    expect((res.jsonBody as any)?.output?.sync_metrics?.benchmark_status).toBe('target_met');
+    expect((res.jsonBody as any)?.output?.sync_metrics?.alert_required).toBe(false);
   });
 
   it('rejects offline queue when hash chain ordering is invalid', async () => {
@@ -536,11 +612,13 @@ describe('/api/v2/amro/tasks', () => {
             event_type: 'upload-evidence',
             task_id: 'task-001',
             evidence_type: 'photo',
-            media_ref: 's3://bucket/evidence/photo-001.jpg',
+            media_ref: buildSignedMediaRef('photo-001.jpg'),
             checksum: 'abc123def456ghi789',
             metadata: {
               media_size_bytes: 2048,
               mime_type: 'image/jpeg',
+              kms_key_id: 'kms://amro/tenant-1/evidence',
+              encrypted_signature_artifact_ref: 'kms://amro/tenant-1/signature-artifacts/photo-001',
             },
             local_revision: 6,
             server_revision: 5,
@@ -604,11 +682,13 @@ describe('/api/v2/amro/tasks', () => {
       body: {
         task_id: 'task-001',
         evidence_type: 'photo',
-        media_ref: 's3://bucket/evidence/photo-001.jpg',
+        media_ref: buildSignedMediaRef('photo-001.jpg'),
         checksum: 'abc123def456ghi789',
         metadata: {
           media_size_bytes: 1024,
           mime_type: 'image/jpeg',
+          kms_key_id: 'kms://amro/tenant-1/evidence',
+          encrypted_signature_artifact_ref: 'kms://amro/tenant-1/signature-artifacts/photo-001',
         },
       },
       headers: {},

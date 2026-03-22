@@ -5,7 +5,8 @@ const repoRoot = process.cwd();
 const lldPath = path.resolve(repoRoot, 'docs/AMRO_LOW_LEVEL_DESIGN.md');
 const migrations = [
   path.resolve(repoRoot, 'supabase/migrations/20260319143000_create_amro_schema.sql'),
-  path.resolve(repoRoot, 'supabase/migrations/20260319143100_create_amro_audit_schema.sql')
+  path.resolve(repoRoot, 'supabase/migrations/20260319143100_create_amro_audit_schema.sql'),
+  path.resolve(repoRoot, 'supabase/migrations/20260322150000_amro_expanded_schema_controls.sql')
 ];
 const reportDir = path.resolve(repoRoot, 'artifacts/mro/analysis');
 const reportPath = path.resolve(reportDir, 'amro-db-docs-compliance-report.json');
@@ -23,6 +24,7 @@ const normalizeToken = (value) =>
 
 const normalizeType = (value) =>
   normalizeToken(value)
+    .replace(/\bpublic\./g, '')
     .replace(/\bwithout time zone\b/g, '')
     .replace(/\bwith time zone\b/g, 'tz')
     .replace(/\s+/g, ' ')
@@ -46,6 +48,9 @@ const parseActualTables = (sqlText) => {
     for (const rawLine of body.split('\n')) {
       const line = rawLine.trim();
       if (!line || line.startsWith('--')) {
+        continue;
+      }
+      if (/^(PRIMARY|CONSTRAINT|UNIQUE|CHECK|FOREIGN)\b/i.test(line)) {
         continue;
       }
       if (!/^[a-zA-Z_]\w*\s+/.test(line)) {

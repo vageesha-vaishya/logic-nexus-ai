@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  AMRO_DEVELOPMENT_DELIVERY_SEQUENCE,
   AMRO_PHASE_PLAN_MATRIX,
+  buildAmroDevelopmentBlueprintEnvelope,
   buildAmroGaReadinessEnvelope,
   buildAmroPhasePlanProgressEnvelope,
   buildAmroSequentialImplementationEnvelope,
@@ -22,6 +24,36 @@ describe('phase-plan-model', () => {
       label: 'P4 Integration and Scale',
       testScope: expect.stringContaining('DR validation tests'),
     });
+  });
+
+  it('builds the section 24 development blueprint delivery sequence and checklist summary', () => {
+    vi.stubEnv('AMRO_MODCHECK_IO_CONTRACTS_PASS', 'true');
+    vi.stubEnv('AMRO_MODCHECK_SCREEN_ROLE_PERMISSIONS_VALIDATED', 'true');
+    vi.stubEnv('AMRO_MODCHECK_WORKFLOW_ERROR_PATH_TESTS_PASS', 'true');
+    vi.stubEnv('AMRO_MODCHECK_API_ERROR_IDEMPOTENCY_VALIDATED', 'true');
+    vi.stubEnv('AMRO_MODCHECK_SCHEMA_INDEX_RLS_TESTS_PASS', 'false');
+    vi.stubEnv('AMRO_MODCHECK_SECURITY_AUDIT_EVIDENCE_VERIFIED', 'false');
+    vi.stubEnv('AMRO_MODCHECK_PERFORMANCE_BENCHMARKS_MET', 'false');
+
+    const blueprint = buildAmroDevelopmentBlueprintEnvelope();
+    expect(AMRO_DEVELOPMENT_DELIVERY_SEQUENCE.length).toBe(7);
+    expect(blueprint.deliverySequence[0]).toMatchObject({
+      id: 'S1',
+      sequence: 1,
+      dependencyGate: 'Security and architecture sign-off',
+    });
+    expect(blueprint.deliverySequence[6]).toMatchObject({
+      id: 'S7',
+      dependencyGate: 'End-to-end integration certification pass',
+    });
+    expect(blueprint.moduleCompletionChecklist.summary).toMatchObject({
+      totalChecks: 7,
+      satisfiedChecks: 4,
+      pendingChecks: 3,
+      completionRatio: 0.57,
+    });
+
+    vi.unstubAllEnvs();
   });
 
   it('resolves status from environment and builds progress summary', () => {

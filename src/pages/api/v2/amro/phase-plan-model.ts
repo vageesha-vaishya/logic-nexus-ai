@@ -2,12 +2,21 @@ export type AmroPhaseId = 'p0-foundation' | 'p1-core-workflows' | 'p2-compliance
 export type AmroPhaseStatus = 'not-started' | 'in-progress' | 'completed';
 export type AmroSequentialMilestoneId = 'M1' | 'M2' | 'M3' | 'M4' | 'M5' | 'M6' | 'M7' | 'M8' | 'M9' | 'M10';
 export type AmroSequentialMilestoneStatus = 'not-started' | 'in-progress' | 'completed';
+export type AmroDeliverySequenceId = 'S1' | 'S2' | 'S3' | 'S4' | 'S5' | 'S6' | 'S7';
 export type AmroSequentialPrerequisiteId =
   | 'architecture-security-scope-approved'
   | 'tenant-franchise-isolation-defined'
   | 'backward-compatibility-assessment-completed'
   | 'test-plan-prepared'
   | 'observability-baseline-available';
+export type AmroModuleCompletionChecklistId =
+  | 'io-contract-implemented'
+  | 'screen-role-permissions-validated'
+  | 'workflow-error-path-tests-covered'
+  | 'api-error-idempotency-validated'
+  | 'schema-indexes-rls-tests-passing'
+  | 'security-audit-evidence-verified'
+  | 'performance-benchmarks-met';
 
 export type AmroPhasePlanRow = {
   id: AmroPhaseId;
@@ -38,6 +47,19 @@ export type AmroSequentialMilestoneRule = {
   requiredDependencies: ReadonlyArray<AmroSequentialMilestoneId>;
   criteria: ReadonlyArray<AmroSequentialMilestoneCriteria>;
   status: AmroSequentialMilestoneStatus;
+};
+
+export type AmroDeliverySequenceRow = {
+  id: AmroDeliverySequenceId;
+  sequence: number;
+  deliverableGroup: string;
+  dependencyGate: string;
+};
+
+export type AmroModuleCompletionChecklistItem = {
+  id: AmroModuleCompletionChecklistId;
+  label: string;
+  satisfied: boolean;
 };
 
 export const AMRO_PHASE_PLAN_MATRIX: ReadonlyArray<AmroPhasePlanRow> = [
@@ -88,6 +110,51 @@ export const AMRO_PHASE_PLAN_MATRIX: ReadonlyArray<AmroPhasePlanRow> = [
   },
 ] as const;
 
+export const AMRO_DEVELOPMENT_DELIVERY_SEQUENCE: ReadonlyArray<AmroDeliverySequenceRow> = [
+  {
+    id: 'S1',
+    sequence: 1,
+    deliverableGroup: 'Core schema + RLS + IAM + audit primitives',
+    dependencyGate: 'Security and architecture sign-off',
+  },
+  {
+    id: 'S2',
+    sequence: 2,
+    deliverableGroup: 'Work package list/create/detail + transitions + role controls',
+    dependencyGate: 'API contract tests pass',
+  },
+  {
+    id: 'S3',
+    sequence: 3,
+    deliverableGroup: 'Scheduling board + materials reservations + shortage prevention',
+    dependencyGate: 'Inventory and calendar data quality pass',
+  },
+  {
+    id: 'S4',
+    sequence: 4,
+    deliverableGroup: 'Mobile task execution + offline queue + conflict cockpit',
+    dependencyGate: 'Sync reliability tests pass',
+  },
+  {
+    id: 'S5',
+    sequence: 5,
+    deliverableGroup: 'Compliance/certification gates + release workflow',
+    dependencyGate: 'Regulator profile validation pass',
+  },
+  {
+    id: 'S6',
+    sequence: 6,
+    deliverableGroup: 'Forecast recommendations + KPI intelligence integration',
+    dependencyGate: 'Model quality and explainability baseline pass',
+  },
+  {
+    id: 'S7',
+    sequence: 7,
+    deliverableGroup: 'ERP/IoT/regulator adapters + monitor console + replay',
+    dependencyGate: 'End-to-end integration certification pass',
+  },
+] as const;
+
 function parseStatus(value: string | undefined): AmroPhaseStatus {
   const normalized = String(value || '').trim().toLowerCase();
   if (normalized === 'completed') return 'completed';
@@ -106,6 +173,46 @@ function parseBoolean(value: string | undefined, fallback: boolean): boolean {
   const normalized = String(value || '').trim().toLowerCase();
   if (!normalized) return fallback;
   return normalized === 'true' || normalized === '1' || normalized === 'on';
+}
+
+export function resolveAmroModuleCompletionChecklist(): ReadonlyArray<AmroModuleCompletionChecklistItem> {
+  return [
+    {
+      id: 'io-contract-implemented',
+      label: 'Inputs and outputs implemented exactly per module IO contract',
+      satisfied: parseBoolean(process.env.AMRO_MODCHECK_IO_CONTRACTS_PASS, false),
+    },
+    {
+      id: 'screen-role-permissions-validated',
+      label: 'Screen-level interaction and role permissions validated',
+      satisfied: parseBoolean(process.env.AMRO_MODCHECK_SCREEN_ROLE_PERMISSIONS_VALIDATED, false),
+    },
+    {
+      id: 'workflow-error-path-tests-covered',
+      label: 'Workflow decision points and error paths covered by automated tests',
+      satisfied: parseBoolean(process.env.AMRO_MODCHECK_WORKFLOW_ERROR_PATH_TESTS_PASS, false),
+    },
+    {
+      id: 'api-error-idempotency-validated',
+      label: 'API contract, error model, and idempotency behavior validated',
+      satisfied: parseBoolean(process.env.AMRO_MODCHECK_API_ERROR_IDEMPOTENCY_VALIDATED, false),
+    },
+    {
+      id: 'schema-indexes-rls-tests-passing',
+      label: 'Schema constraints, indexes, and RLS tests passing',
+      satisfied: parseBoolean(process.env.AMRO_MODCHECK_SCHEMA_INDEX_RLS_TESTS_PASS, false),
+    },
+    {
+      id: 'security-audit-evidence-verified',
+      label: 'Security controls and audit evidence verified',
+      satisfied: parseBoolean(process.env.AMRO_MODCHECK_SECURITY_AUDIT_EVIDENCE_VERIFIED, false),
+    },
+    {
+      id: 'performance-benchmarks-met',
+      label: 'Performance benchmarks met under representative load',
+      satisfied: parseBoolean(process.env.AMRO_MODCHECK_PERFORMANCE_BENCHMARKS_MET, false),
+    },
+  ] as const;
 }
 
 export function resolveAmroPhasePlanStatuses(): Record<AmroPhaseId, AmroPhaseStatus> {
@@ -135,6 +242,23 @@ export function buildAmroPhasePlanProgressEnvelope() {
       inProgressPhases: inProgressCount,
       notStartedPhases: rows.length - completedCount - inProgressCount,
       completionRatio,
+    },
+  };
+}
+
+export function buildAmroDevelopmentBlueprintEnvelope() {
+  const checklist = resolveAmroModuleCompletionChecklist();
+  const satisfiedChecks = checklist.filter((item) => item.satisfied).length;
+  return {
+    deliverySequence: AMRO_DEVELOPMENT_DELIVERY_SEQUENCE,
+    moduleCompletionChecklist: {
+      items: checklist,
+      summary: {
+        totalChecks: checklist.length,
+        satisfiedChecks,
+        pendingChecks: checklist.length - satisfiedChecks,
+        completionRatio: Number((satisfiedChecks / checklist.length).toFixed(2)),
+      },
     },
   };
 }
@@ -221,6 +345,7 @@ const AMRO_CERTIFICATION_INTERFACE_MILESTONES: Readonly<Record<string, AmroSeque
 const AMRO_INTEGRATION_HUB_INTERFACE_MILESTONES: Readonly<Record<string, AmroSequentialMilestoneId>> = {
   'list-external-adapters': 'M7',
   'ingest-partner-payload': 'M7',
+  'sync-erp-procurement-demand': 'M7',
   'sync-erp-financials': 'M7',
   'ingest-legacy-mro-records': 'M7',
   'ingest-iot-telemetry': 'M7',
