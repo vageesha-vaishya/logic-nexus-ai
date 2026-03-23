@@ -1,10 +1,22 @@
+import { createClient } from '@supabase/supabase-js';
 import { getCorsHeaders } from '../_shared/cors.ts';
-import { requireAuth } from '../_shared/auth.ts';
-import { serveWithLogger } from '../_shared/logger.ts';
+declare const Deno: any;
 
 const parsePositiveInteger = (value: unknown) => {
   const parsed = Number.parseInt(String(value ?? '').trim(), 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+};
+
+const jsonHeaders = (headers: HeadersInit) => ({
+  ...headers,
+  'Content-Type': 'application/json',
+});
+
+const extractBearerToken = (authHeader: string | null) => {
+  if (!authHeader) return null;
+  const [scheme, token] = authHeader.trim().split(/\s+/, 2);
+  if (!scheme || !token || !/^bearer$/i.test(scheme)) return null;
+  return token.trim() || null;
 };
 
 const resolveTenantMaxUsers = async (supabaseAdmin: any, tenantId: string) => {
@@ -74,7 +86,7 @@ const countFranchiseUsers = async (supabaseAdmin: any, franchiseId: string) => {
   return new Set((data || []).map((row: any) => row.user_id)).size;
 };
 
-serveWithLogger(async (req, logger, supabaseAdmin) => {
+Deno.serve(async (req: Request) => {
   const headers = getCorsHeaders(req);
 
   if (req.method === 'OPTIONS') {
@@ -82,10 +94,25 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
   }
 
   try {
-    // Auth validation
-    const { user, error: authError } = await requireAuth(req);
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    if (!supabaseUrl || !serviceRoleKey) {
+      return new Response(
+        JSON.stringify({ error: 'Missing required Supabase environment configuration' }),
+        { status: 500, headers: jsonHeaders(headers) },
+      );
+    }
+
+    const token = extractBearerToken(req.headers.get('Authorization'));
+    if (!token) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: jsonHeaders(headers) });
+    }
+
+    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
+    const { data: authUserData, error: authError } = await supabaseAdmin.auth.getUser(token);
+    const user = authUserData?.user ?? null;
     if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...headers, 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: jsonHeaders(headers) });
     }
 
     const body = await req.json();
@@ -97,8 +124,8 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
       .eq('user_id', user.id);
 
     if (requesterRolesError) {
-      logger.error('Failed to resolve requester roles', { error: requesterRolesError, userId: user.id });
-      return new Response(JSON.stringify({ error: 'Forbidden: cannot resolve requester role scope' }), { status: 403, headers: { ...headers, 'Content-Type': 'application/json' } });
+      console.error('Failed to resolve requester roles', { error: requesterRolesError, userId: user.id });
+      return new Response(JSON.stringify({ error: 'Forbidden: cannot resolve requester role scope' }), { status: 403, headers: jsonHeaders(headers) });
     }
 
     const roles = requesterRoles || [];
@@ -115,12 +142,12 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
       const isFranchiseAdmin = franchiseAdminRoles.length > 0;
 
       if (!isTenantAdmin && !isFranchiseAdmin) {
-        return new Response(JSON.stringify({ error: 'Forbidden: admin role required' }), { status: 403, headers: { ...headers, 'Content-Type': 'application/json' } });
+        return new Response(JSON.stringify({ error: 'Forbidden: admin role required' }), { status: 403, headers: jsonHeaders(headers) });
       }
 
       if (isTenantAdmin) {
         if (targetRole !== 'franchise_admin' && targetRole !== 'user') {
-          return new Response(JSON.stringify({ error: 'Forbidden: tenant admin can only create franchise_admin or user' }), { status: 403, headers: { ...headers, 'Content-Type': 'application/json' } });
+          return new Response(JSON.stringify({ error: 'Forbidden: tenant admin can only create franchise_admin or user' }), { status: 403, headers: jsonHeaders(headers) });
         }
 
         const allowedTenantIds = new Set(
@@ -130,7 +157,7 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
         );
 
         if (allowedTenantIds.size === 0) {
-          return new Response(JSON.stringify({ error: 'Forbidden: tenant admin has no tenant scope' }), { status: 403, headers: { ...headers, 'Content-Type': 'application/json' } });
+          return new Response(JSON.stringify({ error: 'Forbidden: tenant admin has no tenant scope' }), { status: 403, headers: jsonHeaders(headers) });
         }
 
         if (!finalTenantId) {
@@ -138,16 +165,16 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
         }
 
         if (!finalTenantId || !allowedTenantIds.has(finalTenantId)) {
-          return new Response(JSON.stringify({ error: 'Forbidden: target tenant outside admin scope' }), { status: 403, headers: { ...headers, 'Content-Type': 'application/json' } });
+          return new Response(JSON.stringify({ error: 'Forbidden: target tenant outside admin scope' }), { status: 403, headers: jsonHeaders(headers) });
         }
       } else if (isFranchiseAdmin) {
         if (targetRole !== 'user') {
-          return new Response(JSON.stringify({ error: 'Forbidden: franchise admin can only create user role' }), { status: 403, headers: { ...headers, 'Content-Type': 'application/json' } });
+          return new Response(JSON.stringify({ error: 'Forbidden: franchise admin can only create user role' }), { status: 403, headers: jsonHeaders(headers) });
         }
 
         const adminScope = franchiseAdminRoles[0];
         if (!adminScope?.tenant_id || !adminScope?.franchise_id) {
-          return new Response(JSON.stringify({ error: 'Forbidden: franchise admin has invalid scope' }), { status: 403, headers: { ...headers, 'Content-Type': 'application/json' } });
+          return new Response(JSON.stringify({ error: 'Forbidden: franchise admin has invalid scope' }), { status: 403, headers: jsonHeaders(headers) });
         }
 
         finalTenantId = adminScope.tenant_id;
@@ -156,13 +183,13 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
 
       if (targetRole === 'franchise_admin' || targetRole === 'user') {
         if (!finalTenantId) {
-          return new Response(JSON.stringify({ error: 'Tenant is required for this role' }), { status: 400, headers: { ...headers, 'Content-Type': 'application/json' } });
+          return new Response(JSON.stringify({ error: 'Tenant is required for this role' }), { status: 400, headers: jsonHeaders(headers) });
         }
       }
 
       if (targetRole === 'franchise_admin') {
         if (!finalFranchiseId) {
-          return new Response(JSON.stringify({ error: 'Franchise is required for franchise_admin role' }), { status: 400, headers: { ...headers, 'Content-Type': 'application/json' } });
+          return new Response(JSON.stringify({ error: 'Franchise is required for franchise_admin role' }), { status: 400, headers: jsonHeaders(headers) });
         }
       }
     }
@@ -175,12 +202,12 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
         .maybeSingle();
 
       if (franchiseScopeError) {
-        logger.error('Failed to validate franchise scope', { error: franchiseScopeError, franchiseId: finalFranchiseId });
-        return new Response(JSON.stringify({ error: 'Unable to validate franchise scope' }), { status: 400, headers: { ...headers, 'Content-Type': 'application/json' } });
+        console.error('Failed to validate franchise scope', { error: franchiseScopeError, franchiseId: finalFranchiseId });
+        return new Response(JSON.stringify({ error: 'Unable to validate franchise scope' }), { status: 400, headers: jsonHeaders(headers) });
       }
 
       if (!franchiseScope || franchiseScope.tenant_id !== finalTenantId) {
-        return new Response(JSON.stringify({ error: 'Invalid tenant/franchise relationship' }), { status: 400, headers: { ...headers, 'Content-Type': 'application/json' } });
+        return new Response(JSON.stringify({ error: 'Invalid tenant/franchise relationship' }), { status: 400, headers: jsonHeaders(headers) });
       }
     }
 
@@ -189,7 +216,7 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
       if (tenantLimit) {
         const existingCount = await countTenantUsers(supabaseAdmin, finalTenantId);
         if (existingCount >= tenantLimit) {
-          return new Response(JSON.stringify({ error: `Tenant user limit reached (${tenantLimit})` }), { status: 400, headers: { ...headers, 'Content-Type': 'application/json' } });
+          return new Response(JSON.stringify({ error: `Tenant user limit reached (${tenantLimit})` }), { status: 400, headers: jsonHeaders(headers) });
         }
       }
     }
@@ -199,14 +226,13 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
       if (franchiseLimit) {
         const existingCount = await countFranchiseUsers(supabaseAdmin, finalFranchiseId);
         if (existingCount >= franchiseLimit) {
-          return new Response(JSON.stringify({ error: `Franchise user limit reached (${franchiseLimit})` }), { status: 400, headers: { ...headers, 'Content-Type': 'application/json' } });
+          return new Response(JSON.stringify({ error: `Franchise user limit reached (${franchiseLimit})` }), { status: 400, headers: jsonHeaders(headers) });
         }
       }
     }
 
-    logger.info('Creating new user', { email, role, tenant_id, franchise_id });
+    console.log('Creating new user', { email, role, tenant_id, franchise_id });
 
-    // Create auth user
     const { data: authData, error: createError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
@@ -215,19 +241,13 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
     });
 
     if (createError) {
-      logger.error('Failed to create auth user', { error: createError, code: createError.status });
-
-      // Check for JWT/Auth specific errors
-      if (createError.message?.includes('JWT') || createError.status === 401) {
-         logger.error('JWT/Auth Error detected during user creation. Check Service Role Key.');
-      }
+      console.error('Failed to create auth user', { error: createError, code: createError.status });
 
       throw createError;
     }
 
-    logger.info('Auth user created', { userId: authData.user.id });
+    console.log('Auth user created', { userId: authData.user.id });
 
-    // Update profile
     const { error: profileError } = await supabaseAdmin
       .from('profiles')
       .update({
@@ -241,11 +261,10 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
       .eq('id', authData.user.id);
 
     if (profileError) {
-      logger.error('Failed to update profile', { error: profileError, userId: authData.user.id });
+      console.error('Failed to update profile', { error: profileError, userId: authData.user.id });
       throw profileError;
     }
 
-    // Assign role
     const { error: roleError } = await supabaseAdmin
       .from('user_roles')
       .insert({
@@ -256,33 +275,31 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
       });
 
     if (roleError) {
-      logger.error('Failed to assign role', { error: roleError, userId: authData.user.id, role });
+      console.error('Failed to assign role', { error: roleError, userId: authData.user.id, role });
       throw roleError;
     }
 
-    logger.info('User created successfully', { userId: authData.user.id });
+    console.log('User created successfully', { userId: authData.user.id });
 
     return new Response(
       JSON.stringify({ success: true, user: authData.user }),
       {
-        headers: { ...headers, 'Content-Type': 'application/json' },
+        headers: jsonHeaders(headers),
         status: 200,
       }
     );
 
   } catch (error: any) {
-    // Improved error handling to capture non-Error objects (like Supabase Auth errors)
     const errorMessage = error?.message || error?.toString() || 'An unknown error occurred';
     const errorContext = error?.context || {};
-    
-    logger.error('Unhandled error in create-user', { error: errorMessage, context: errorContext });
-    
+    console.error('Unhandled error in create-user', { error: errorMessage, context: errorContext });
+
     return new Response(
       JSON.stringify({ error: errorMessage, details: errorContext }),
       {
-        headers: { ...headers, 'Content-Type': 'application/json' },
+        headers: jsonHeaders(headers),
         status: 400,
       }
     );
   }
-}, "create-user");
+});

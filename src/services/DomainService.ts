@@ -455,7 +455,14 @@ export const DomainService = {
     scope: AuthorizedDomainScope = {},
   ): Promise<AuthorizedDomainsResponse> {
     const cacheBypass = forceRefresh ? '?refresh=1' : '';
-    const accessToken = await this.getSessionToken();
+    let accessToken = await this.getSessionToken();
+    if (!accessToken) {
+      const refreshSession = (supabase.auth as { refreshSession?: typeof supabase.auth.refreshSession }).refreshSession;
+      if (typeof refreshSession === 'function') {
+        const { data: refreshedSession } = await refreshSession.call(supabase.auth);
+        accessToken = refreshedSession?.session?.access_token || '';
+      }
+    }
     logger.debug('[DomainService] requesting authorized domains', {
       component: 'DomainService',
       forceRefresh,

@@ -40,6 +40,7 @@ type AmroPhasePlanUiRow = AmroPhasePlanRow & { status?: AmroPhaseStatus };
 type PersonaRole = 'platform_admin' | 'tenant_admin' | 'franchise_admin' | 'user';
 type AmroWorkspaceModuleKey =
   | 'overview'
+  | 'primary-users'
   | 'work-packages'
   | 'task-execution'
   | 'scheduling'
@@ -67,6 +68,7 @@ type AmroHubVerticalPageProps = {
 
 const AMRO_MODULE_PAGE_LABEL: Record<AmroModuleKey, string> = {
   overview: 'Overview',
+  'primary-users': 'Primary Users',
   'work-packages': 'Work Packages',
   'task-execution': 'Task Execution',
   scheduling: 'Scheduling',
@@ -988,6 +990,10 @@ export default function AmroHubVerticalPage({ moduleKey }: AmroHubVerticalPagePr
 
 export function AmroOverviewPage() {
   return <AmroHubVerticalPage moduleKey="overview" />;
+}
+
+export function AmroPrimaryUsersPage() {
+  return <AmroHubVerticalPage moduleKey="primary-users" />;
 }
 
 export function AmroWorkPackagesPage() {

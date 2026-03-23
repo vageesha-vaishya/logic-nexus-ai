@@ -8,6 +8,7 @@ import {
   enforceHttps,
   enforceRateLimit,
   handlePreflight,
+  logApiEvent,
   resolveAndApplyAccessContext,
 } from '../../_utils/http';
 import { sendErrorResponse } from '../../_utils/errorHandler';
@@ -18,6 +19,7 @@ import { enforceAmroSequentialMilestoneForOverviewKpiInterface } from './phase-p
 
 type KpiWindow = '7d' | '30d' | '90d';
 type JsonRecord = Record<string, unknown>;
+type OverviewPersona = 'management' | 'planner';
 
 const ALLOWED_METRIC_KEYS = new Set([
   'open_work_packages',
@@ -41,6 +43,21 @@ const TABLE_FALLBACK_CANDIDATES: Record<string, string[]> = {
   certification_records: ['certification_actions'],
   audit_trails: ['maintenance_events'],
 };
+
+function hasAnyPermission(permissions: string[], required: string[]): boolean {
+  return required.some((permission) => permissions.includes(permission));
+}
+
+function resolveOverviewPersona(role: string, permissions: string[]): OverviewPersona {
+  const normalizedRole = String(role || '').trim().toLowerCase();
+  if (normalizedRole === 'platform_admin' || normalizedRole === 'tenant_admin' || normalizedRole === 'franchise_admin') {
+    return 'management';
+  }
+  if (hasAnyPermission(permissions, ['dashboards.manage', 'reports.manage'])) {
+    return 'management';
+  }
+  return 'planner';
+}
 
 function getMaxCompareWindowDays(): number {
   return Number(process.env.AMRO_KPI_COMPARE_WINDOW_MAX_DAYS || 90);
@@ -471,6 +488,154 @@ function buildTrendSeriesFromTasks(rows: JsonRecord[], window: KpiWindow) {
   });
 }
 
+function resolveSnapshotPersona(persona: OverviewPersona): string {
+  return persona === 'planner' ? 'planner' : 'management';
+}
+
+function parseIsoDate(value: unknown): number {
+  if (!value) return Number.NaN;
+  const date = String(value).trim();
+  if (!date) return Number.NaN;
+  const normalized = date.includes('T') ? date : `${date}T00:00:00.000Z`;
+  const parsed = Date.parse(normalized);
+  return Number.isFinite(parsed) ? parsed : Number.NaN;
+}
+
+function selectLatestOverviewSnapshot(
+  rows: JsonRecord[],
+  persona: OverviewPersona,
+  franchiseId: string | null,
+  rangeFromIso: string,
+  rangeToIso: string,
+): JsonRecord | null {
+  const personaCandidate = resolveSnapshotPersona(persona);
+  const fromMs = parseIsoDate(rangeFromIso);
+  const toMs = parseIsoDate(rangeToIso);
+  const overlapRows = rows.filter((row) => {
+    const snapshotFrom = parseIsoDate(row.date_range_start);
+    const snapshotTo = parseIsoDate(row.date_range_end);
+    if (!Number.isFinite(snapshotFrom) || !Number.isFinite(snapshotTo)) return false;
+    const overlapsRange = Number.isFinite(fromMs) && Number.isFinite(toMs)
+      ? snapshotFrom <= toMs && snapshotTo >= fromMs
+      : true;
+    if (!overlapsRange) return false;
+    const rowFranchiseId = getStringValue(row, ['franchise_id'], '');
+    if (franchiseId && rowFranchiseId && rowFranchiseId !== franchiseId) return false;
+    return true;
+  });
+  const samePersona = overlapRows.filter(
+    (row) => getStringValue(row, ['persona'], '').toLowerCase() === personaCandidate,
+  );
+  const managementFallback = overlapRows.filter(
+    (row) => getStringValue(row, ['persona'], '').toLowerCase() === 'management',
+  );
+  const candidates = samePersona.length > 0 ? samePersona : managementFallback;
+  if (candidates.length === 0) return null;
+  return candidates
+    .slice()
+    .sort(
+      (left, right) => parseDateMs(getStringValue(right, ['snapshot_at', 'created_at'])) - parseDateMs(getStringValue(left, ['snapshot_at', 'created_at'])),
+    )[0] || null;
+}
+
+function mapRiskHeatmapFromSnapshot(
+  snapshot: JsonRecord | null,
+  defaultCells: Array<{ station: string; severity: string; score: number }>,
+  tenantId: string,
+): Array<{ station: string; severity: string; score: number }> {
+  if (!snapshot) return defaultCells;
+  const rawHeatmap = snapshot.risk_heatmap;
+  if (!rawHeatmap || typeof rawHeatmap !== 'object' || Array.isArray(rawHeatmap)) return defaultCells;
+  const objectEntries = Object.entries(rawHeatmap as Record<string, unknown>);
+  if (objectEntries.length === 0) return defaultCells;
+  const mapped = objectEntries
+    .map(([station, value]) => {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+      const bucket = value as Record<string, unknown>;
+      const critical = getNumericValue(bucket, ['critical'], 0);
+      const high = getNumericValue(bucket, ['high'], 0);
+      const medium = getNumericValue(bucket, ['medium'], 0);
+      const low = getNumericValue(bucket, ['low'], 0);
+      const weightedScore = Math.max(0, Math.min(100, critical * 25 + high * 15 + medium * 8 + low * 3));
+      const severity = critical > 0 || high >= 3
+        ? 'high'
+        : high > 0 || medium > 0
+          ? 'medium'
+          : 'low';
+      return {
+        station: station.includes(':') ? station : `${tenantId}:${station}`,
+        severity,
+        score: Math.round(weightedScore),
+      };
+    })
+    .filter((entry): entry is { station: string; severity: string; score: number } => Boolean(entry))
+    .slice(0, 12);
+  return mapped.length > 0 ? mapped : defaultCells;
+}
+
+function mapTrendLinesFromSnapshot(
+  snapshot: JsonRecord | null,
+  defaultLines: Array<{ metric_key: string; points: Array<{ date: string; value: number }> }>,
+  baseline: { openWorkPackages: number; complianceStatusPct: number; inProgressTasks: number; slaBreachCount: number },
+): Array<{ metric_key: string; points: Array<{ date: string; value: number }> }> {
+  if (!snapshot) return defaultLines;
+  const trendLines = Array.isArray(snapshot.trend_lines) ? snapshot.trend_lines : [];
+  if (trendLines.length === 0) return defaultLines;
+  const generated = trendLines
+    .map((entry) => {
+      if (!entry || typeof entry !== 'object') return null;
+      const trend = entry as JsonRecord;
+      const metricName = getStringValue(trend, ['metric_key', 'metric'], '').trim().toLowerCase();
+      if (!metricName) return null;
+      const slope = getNumericValue(trend, ['slope', 'delta', 'change_per_day'], 0);
+      const baseValue = metricName.includes('sla')
+        ? baseline.slaBreachCount
+        : metricName.includes('compliance')
+          ? baseline.complianceStatusPct
+          : metricName.includes('task')
+            ? baseline.inProgressTasks
+            : baseline.openWorkPackages;
+      const points = generateTimeSeries('30d').map((point, index) => ({
+        date: point.date,
+        value: Math.max(0, Math.round((baseValue + (slope * index * 10)) * 10) / 10),
+      }));
+      return {
+        metric_key: metricName,
+        points,
+      };
+    })
+    .filter((entry): entry is { metric_key: string; points: Array<{ date: string; value: number }> } => Boolean(entry));
+  return generated.length > 0 ? generated : defaultLines;
+}
+
+function mapAnomalyFlagsFromSnapshot(
+  snapshot: JsonRecord | null,
+  tenantId: string,
+): Array<{ id: string; metric_key: string; severity: string; message: string }> {
+  if (!snapshot || !Array.isArray(snapshot.anomaly_alerts)) return [];
+  return snapshot.anomaly_alerts
+    .map((entry, index) => {
+      if (!entry || typeof entry !== 'object') return null;
+      const anomaly = entry as JsonRecord;
+      const metric = getStringValue(anomaly, ['metric_key', 'metric'], 'operational_anomaly');
+      const count = getNumericValue(anomaly, ['count', 'event_count', 'alerts'], 1);
+      const severityRaw = getStringValue(anomaly, ['severity', 'risk'], '').toLowerCase();
+      const severity = ['critical', 'high', 'medium', 'low'].includes(severityRaw)
+        ? severityRaw
+        : count >= 3
+          ? 'high'
+          : 'medium';
+      return {
+        id: `${tenantId}-snapshot-anomaly-${index + 1}`,
+        metric_key: metric,
+        severity,
+        message: `${metric.replace(/_/g, ' ')} flagged ${Math.max(1, Math.round(count))} time(s)`,
+      };
+    })
+    .filter((entry): entry is { id: string; metric_key: string; severity: string; message: string } => Boolean(entry))
+    .slice(0, 6);
+}
+
 export default async function handler(req: ApiRequest, res: ApiResponse) {
   applyCors(req, res, { methods: ['GET', 'POST', 'OPTIONS'] });
   if (handlePreflight(req, res)) return;
@@ -524,6 +689,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     const scopeFleetIds = fleetIds.map((id) => `${tenantId}:${id}`);
     const plannerId = String(req.query.planner_id || '').trim() || null;
     const engineerId = String(req.query.engineer_id || '').trim() || null;
+    const persona = resolveOverviewPersona(auth.role, auth.permissions || []);
+    const effectivePlannerId = persona === 'planner' ? (plannerId || auth.userId || null) : plannerId;
 
     if (req.method === 'GET' && interfaceName === 'load-kpi-dashboard') {
       const dateRange = parseDateRange(req.query.date_range);
@@ -540,33 +707,84 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         complianceRows,
         integrationRows,
         forecastRows,
+        overviewSnapshotRows,
       ] = await Promise.all([
         fetchScopedRows('work_package_master', tenantId, 200, dataIssues),
         fetchScopedRows('materials_inventory', tenantId, 200, dataIssues),
         fetchScopedRows('compliance_gates', tenantId, 200, dataIssues),
         fetchScopedRows('integration_logs', tenantId, 200, dataIssues),
         fetchScopedRows('forecast_recommendations', tenantId, 200, dataIssues),
+        fetchScopedRows('amro_overview_kpi_snapshots', tenantId, 60, dataIssues),
       ]);
 
       const now = Date.now();
-      const activeWorkPackages = workPackageRows.filter((row) => !isResolvedStatus(resolveStatus(row))).length;
-      const overdueTasksApprox = workPackageRows.filter((row) => {
+      const snapshot = selectLatestOverviewSnapshot(overviewSnapshotRows, persona, franchiseId, dateRange.from, dateRange.to);
+      const activeWorkPackagesFromRows = workPackageRows.filter((row) => !isResolvedStatus(resolveStatus(row))).length;
+      const overdueTasksApproxFromRows = workPackageRows.filter((row) => {
         const dueMs = parseDateMs(getStringValue(row, ['due_at', 'planned_end_at', 'target_end_at']));
         const status = resolveStatus(row);
         return Number.isFinite(dueMs) && dueMs < now && !isResolvedStatus(status);
       }).length;
       const compliancePassed = complianceRows.filter((row) => ['passed', 'approved', 'resolved'].includes(resolveStatus(row))).length;
-      const compliancePct = complianceRows.length ? (compliancePassed / complianceRows.length) * 100 : 0;
+      const compliancePctFromRows = complianceRows.length ? (compliancePassed / complianceRows.length) * 100 : 0;
       const forecast = mapForecastRecommendations(forecastRows);
-      const workPackageOverview = mapWorkPackageOverview(workPackageRows, plannerId, engineerId);
+      const workPackageOverview = mapWorkPackageOverview(workPackageRows, effectivePlannerId, engineerId);
       const materialsAlerts = mapMaterialsAlerts(materialsRows);
       const complianceAttention = mapComplianceAttention(complianceRows);
       const integrationMonitor = mapIntegrationMonitor(integrationRows);
-      const riskHeatmapCells = complianceAttention.slice(0, 8).map((item, index) => ({
+      const scopedIntegrationMonitor = persona === 'management'
+        ? integrationMonitor
+        : {
+          status: integrationMonitor.status,
+          failed_attempts: integrationMonitor.failed_attempts,
+          failure_rate_pct: integrationMonitor.failure_rate_pct,
+          recent_failures: [],
+        };
+      const defaultRiskHeatmapCells = complianceAttention.slice(0, 8).map((item, index) => ({
         station: workPackageOverview[index]?.planner_id || scopeStationIds[index] || `${tenantId}:station-${index + 1}`,
         severity: item.status === 'failed' ? 'high' : item.status === 'blocked' ? 'medium' : 'low',
         score: item.status === 'failed' ? 90 : item.status === 'blocked' ? 65 : 30,
       }));
+      const snapshotOpenWorkPackages = snapshot ? Math.max(0, Math.round(getNumericValue(snapshot, ['open_work_packages'], activeWorkPackagesFromRows))) : activeWorkPackagesFromRows;
+      const snapshotOverdueTasks = snapshot ? Math.max(0, Math.round(getNumericValue(snapshot, ['sla_breach_count', 'deferred_items'], overdueTasksApproxFromRows))) : overdueTasksApproxFromRows;
+      const snapshotComplianceAlerts = snapshot ? Math.max(0, Math.round(getNumericValue(snapshot, ['compliance_alerts'], 0))) : 0;
+      const snapshotComplianceStatusPct = snapshot
+        ? Math.max(0, Math.min(100, Math.round(((snapshotOpenWorkPackages / Math.max(1, snapshotOpenWorkPackages + snapshotComplianceAlerts)) * 100) * 10) / 10))
+        : Math.round(compliancePctFromRows * 10) / 10;
+      const snapshotInProgressTasks = snapshot ? Math.max(0, Math.round(getNumericValue(snapshot, ['in_progress_tasks'], 0))) : 0;
+      const dashboardTrendLines = mapTrendLinesFromSnapshot(
+        snapshot,
+        [
+          { metric_key: 'open_work_packages', points: generateTimeSeries('30d').map((point) => ({ ...point, value: Math.max(0, snapshotOpenWorkPackages + point.value % 4) })) },
+          { metric_key: 'compliance_status_pct', points: generateTimeSeries('30d').map((point) => ({ ...point, value: Math.max(0, Math.min(100, Math.round(snapshotComplianceStatusPct + (point.value % 5) - 2))) })) },
+        ],
+        {
+          openWorkPackages: snapshotOpenWorkPackages,
+          complianceStatusPct: snapshotComplianceStatusPct,
+          inProgressTasks: snapshotInProgressTasks,
+          slaBreachCount: snapshotOverdueTasks,
+        },
+      );
+      const riskHeatmapCells = mapRiskHeatmapFromSnapshot(snapshot, defaultRiskHeatmapCells, tenantId);
+      const snapshotAnomalyFlags = mapAnomalyFlagsFromSnapshot(snapshot, tenantId);
+      const anomalyFlags = snapshotAnomalyFlags.length > 0
+        ? snapshotAnomalyFlags
+        : scopedIntegrationMonitor.recent_failures.slice(0, 3).map((failure, index) => ({
+          id: `${tenantId}-anomaly-${index + 1}`,
+          metric_key: 'integration_failures',
+          severity: failure.status === 'timeout' ? 'medium' : 'high',
+          message: failure.error_message || `Integration ${failure.integration_id} reported ${failure.status}`,
+        }));
+      if (dataIssues.length > 0) {
+        logApiEvent('warn', 'AMRO overview KPI data issues detected', {
+          correlationId: ctx.correlationId,
+          tenantId,
+          franchiseId,
+          interface: 'load-kpi-dashboard',
+          issueCount: dataIssues.length,
+          issues: dataIssues.slice(0, 10),
+        });
+      }
 
       return res.status(200).json({
         version: 'v2',
@@ -585,37 +803,34 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         },
         output: {
           executive_summary: {
-            active_work_packages: activeWorkPackages,
-            overdue_tasks: overdueTasksApprox,
-            compliance_status_pct: Math.round(compliancePct * 10) / 10,
+            active_work_packages: snapshotOpenWorkPackages,
+            overdue_tasks: snapshotOverdueTasks,
+            compliance_status_pct: snapshotComplianceStatusPct,
             forecast_accuracy_pct: forecast.forecast_accuracy_pct,
           },
           kpi_cards: [
-            { key: 'open_work_packages', label: 'Open Work Packages', value: activeWorkPackages, trend: activeWorkPackages > 0 ? '+2%' : '0%' },
-            { key: 'overdue_tasks', label: 'Overdue Tasks', value: overdueTasksApprox, trend: overdueTasksApprox > 0 ? '+1%' : '0%' },
-            { key: 'compliance_status_pct', label: 'Compliance Status %', value: Math.round(compliancePct * 10) / 10, trend: compliancePct >= 95 ? '+0.5%' : '-0.8%' },
+            { key: 'open_work_packages', label: 'Open Work Packages', value: snapshotOpenWorkPackages, trend: snapshotOpenWorkPackages > 0 ? '+2%' : '0%' },
+            { key: 'overdue_tasks', label: 'Overdue Tasks', value: snapshotOverdueTasks, trend: snapshotOverdueTasks > 0 ? '+1%' : '0%' },
+            { key: 'compliance_status_pct', label: 'Compliance Status %', value: snapshotComplianceStatusPct, trend: snapshotComplianceStatusPct >= 95 ? '+0.5%' : '-0.8%' },
             { key: 'forecast_accuracy_pct', label: 'Forecast Accuracy %', value: forecast.forecast_accuracy_pct, trend: forecast.forecast_accuracy_pct >= 90 ? '+1.2%' : '-0.4%' },
           ],
           risk_heatmap: {
             cells: riskHeatmapCells,
           },
-          trend_lines: [
-            { metric_key: 'open_work_packages', points: generateTimeSeries('30d').map((point) => ({ ...point, value: Math.max(0, activeWorkPackages + point.value % 4) })) },
-            { metric_key: 'compliance_status_pct', points: generateTimeSeries('30d').map((point) => ({ ...point, value: Math.max(0, Math.min(100, Math.round(compliancePct + (point.value % 5) - 2))) })) },
-          ],
-          anomaly_flags: integrationMonitor.recent_failures.slice(0, 3).map((failure, index) => ({
-            id: `${tenantId}-anomaly-${index + 1}`,
-            metric_key: 'integration_failures',
-            severity: failure.status === 'timeout' ? 'medium' : 'high',
-            message: failure.error_message || `Integration ${failure.integration_id} reported ${failure.status}`,
-          })),
+          trend_lines: dashboardTrendLines,
+          anomaly_flags: anomalyFlags,
           work_package_overview: workPackageOverview,
           materials_reservation_alerts: materialsAlerts,
           compliance_gate_status: complianceAttention,
-          integration_monitor: integrationMonitor,
+          integration_monitor: scopedIntegrationMonitor,
           screen_modules: {
             total_modules: 12,
             management_and_planner_landing: true,
+          },
+          role_scope: {
+            persona,
+            planner_id: effectivePlannerId,
+            restricted_sections: persona === 'management' ? [] : ['integration_monitor.recent_failures', 'anomaly_flags'],
           },
           data_issues: dataIssues,
           freshness_warning: freshnessWarning,
@@ -657,6 +872,9 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       const schedulingSnapshot = mapSchedulingSnapshot(schedulingRows);
       const certificationQueue = mapCertificationQueue(certificationRows);
       const auditTimeline = mapAuditTimeline(auditRows);
+      const scopedAuditTimeline = persona === 'management'
+        ? auditTimeline
+        : auditTimeline.map((item) => ({ ...item, actor: 'restricted' })).slice(0, 6);
       const forecast = mapForecastRecommendations(forecastRows);
 
       return res.status(200).json({
@@ -680,8 +898,12 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           task_execution_monitor: taskExecution,
           scheduling_board_snapshot: schedulingSnapshot,
           certification_decision_queue: certificationQueue,
-          audit_timeline: auditTimeline,
+          audit_timeline: scopedAuditTimeline,
           forecast_recommendation_hub: forecast.items,
+          role_scope: {
+            persona,
+            restricted_sections: persona === 'management' ? [] : ['audit_timeline.actor'],
+          },
           data_issues: dataIssues,
         },
       });

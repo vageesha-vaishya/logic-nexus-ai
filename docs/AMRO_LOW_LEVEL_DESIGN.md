@@ -2332,6 +2332,229 @@ Performance Targets:
   - p95 <= 350ms, throughput 50 req/s per tenant
 ```
 
+```text
+Component Type: Table
+Component Name: public.amro_overview_kpi_snapshots
+Purpose: Persist role-scoped overview KPI snapshots, risk heatmap payloads, and trend/anomaly cache objects.
+Estimated Row Count: 1,000-50,000 rows per tenant per year depending on snapshot cadence.
+Primary Key: id
+Foreign Keys:
+  - tenant_id -> public.tenants(id) ON DELETE CASCADE
+  - franchise_id -> public.franchises(id) ON DELETE SET NULL
+  - generated_by -> auth.users(id) ON DELETE SET NULL
+Unique Constraints:
+  - uq_amro_overview_kpi_snapshots_scope_persona_window(tenant_id, franchise_id, persona, date_range_start, date_range_end, snapshot_at)
+Check Constraints:
+  - persona in (management, planner, compliance_lead)
+  - date_range_end >= date_range_start
+  - open_work_packages >= 0
+  - in_progress_tasks >= 0
+  - deferred_items >= 0
+  - compliance_alerts >= 0
+  - aog_count >= 0
+  - sla_breach_count >= 0
+Defaults:
+  - id: gen_random_uuid()
+  - snapshot_at: now()
+  - created_at: now()
+  - open_work_packages: 0
+  - in_progress_tasks: 0
+  - deferred_items: 0
+  - compliance_alerts: 0
+  - aog_count: 0
+  - sla_breach_count: 0
+  - risk_heatmap: '{}'::jsonb
+  - trend_lines: '[]'::jsonb
+  - anomaly_alerts: '[]'::jsonb
+Indexes:
+  - uq_amro_overview_kpi_snapshots_scope_persona_window(tenant_id, franchise_id, persona, date_range_start, date_range_end, snapshot_at)
+  - idx_amro_overview_kpi_snapshots_tenant_snapshot_desc(tenant_id, snapshot_at DESC)
+Columns:
+  - id | uuid | nullable:no | default:gen_random_uuid()
+  - tenant_id | uuid | nullable:no | default:none
+  - franchise_id | uuid | nullable:yes | default:none
+  - persona | text | nullable:no | default:none
+  - date_range_start | date | nullable:no | default:none
+  - date_range_end | date | nullable:no | default:none
+  - snapshot_at | timestamptz | nullable:no | default:now()
+  - open_work_packages | integer | nullable:no | default:0
+  - in_progress_tasks | integer | nullable:no | default:0
+  - deferred_items | integer | nullable:no | default:0
+  - compliance_alerts | integer | nullable:no | default:0
+  - aog_count | integer | nullable:no | default:0
+  - sla_breach_count | integer | nullable:no | default:0
+  - risk_heatmap | jsonb | nullable:no | default:'{}'::jsonb
+  - trend_lines | jsonb | nullable:no | default:'[]'::jsonb
+  - anomaly_alerts | jsonb | nullable:no | default:'[]'::jsonb
+  - cache_fresh_until | timestamptz | nullable:yes | default:none
+  - generated_by | uuid | nullable:yes | default:none
+  - created_at | timestamptz | nullable:no | default:now()
+Security Considerations:
+  - RLS enabled with platform-admin override and tenant/franchise scope policy.
+  - Snapshot content remains tenant-isolated with franchise boundary enforcement.
+Implementation Notes:
+  - Migration: 20260323183000_amro_overview_dashboard_analytics.sql
+  - Used by AMRO overview KPI cache refresh and role-filtered dashboard rendering.
+```
+
+```text
+Component Type: Table
+Component Name: public.amro_sla_definitions
+Purpose: Store tenant/franchise SLA metric definitions, thresholds, and activation windows for dashboard and alert evaluation.
+Estimated Row Count: 200-5,000 rows per tenant.
+Primary Key: id
+Foreign Keys:
+  - tenant_id -> public.tenants(id) ON DELETE CASCADE
+  - franchise_id -> public.franchises(id) ON DELETE SET NULL
+  - created_by -> auth.users(id) ON DELETE SET NULL
+  - updated_by -> auth.users(id) ON DELETE SET NULL
+Unique Constraints:
+  - uq_amro_sla_definitions_scope_code(tenant_id, franchise_id, sla_code)
+Check Constraints:
+  - comparator in (gte, lte, eq)
+  - evaluation_window_minutes > 0
+  - effective_to is null or effective_to >= effective_from
+Defaults:
+  - id: gen_random_uuid()
+  - is_active: true
+  - effective_from: current_date
+  - metadata: '{}'::jsonb
+  - created_at: now()
+  - updated_at: now()
+Indexes:
+  - uq_amro_sla_definitions_scope_code(tenant_id, franchise_id, sla_code)
+  - idx_amro_sla_definitions_tenant_active(tenant_id, is_active) where is_active=true
+Columns:
+  - id | uuid | nullable:no | default:gen_random_uuid()
+  - tenant_id | uuid | nullable:no | default:none
+  - franchise_id | uuid | nullable:yes | default:none
+  - sla_code | text | nullable:no | default:none
+  - service_tier | text | nullable:no | default:none
+  - metric_key | text | nullable:no | default:none
+  - comparator | text | nullable:no | default:none
+  - target_value | numeric(12,4) | nullable:no | default:none
+  - evaluation_window_minutes | integer | nullable:no | default:none
+  - is_active | boolean | nullable:no | default:true
+  - effective_from | date | nullable:no | default:current_date
+  - effective_to | date | nullable:yes | default:none
+  - metadata | jsonb | nullable:no | default:'{}'::jsonb
+  - created_at | timestamptz | nullable:no | default:now()
+  - updated_at | timestamptz | nullable:no | default:now()
+  - created_by | uuid | nullable:yes | default:none
+  - updated_by | uuid | nullable:yes | default:none
+Security Considerations:
+  - RLS restricts visibility and mutation by tenant/franchise claims.
+  - Threshold changes remain auditable through created_by/updated_by lineage.
+Implementation Notes:
+  - Migration: 20260323183000_amro_overview_dashboard_analytics.sql
+  - Supports SLA breach counters in role-based KPI cards.
+```
+
+```text
+Component Type: Table
+Component Name: public.amro_operational_telemetry
+Purpose: Capture normalized telemetry streams for AMRO analytics, trend lines, and anomaly scoring.
+Estimated Row Count: 50,000-10,000,000 rows per tenant per year.
+Primary Key: id
+Foreign Keys:
+  - tenant_id -> public.tenants(id) ON DELETE CASCADE
+  - franchise_id -> public.franchises(id) ON DELETE SET NULL
+  - work_package_id -> public.work_packages(id) ON DELETE SET NULL
+  - aircraft_id -> public.aircraft(id) ON DELETE SET NULL
+Unique Constraints:
+  - uq_amro_operational_telemetry_scope_record_key(tenant_id, franchise_id, source_record_key)
+Check Constraints:
+  - none
+Defaults:
+  - id: gen_random_uuid()
+  - metadata: '{}'::jsonb
+  - created_at: now()
+Indexes:
+  - idx_amro_operational_telemetry_scope_metric_time(tenant_id, metric_key, recorded_at DESC)
+  - idx_amro_operational_telemetry_work_package(work_package_id)
+  - uq_amro_operational_telemetry_scope_record_key(tenant_id, franchise_id, source_record_key)
+Columns:
+  - id | uuid | nullable:no | default:gen_random_uuid()
+  - tenant_id | uuid | nullable:no | default:none
+  - franchise_id | uuid | nullable:yes | default:none
+  - work_package_id | uuid | nullable:yes | default:none
+  - aircraft_id | uuid | nullable:yes | default:none
+  - source_record_key | text | nullable:no | default:none
+  - telemetry_source | text | nullable:no | default:none
+  - metric_key | text | nullable:no | default:none
+  - metric_value | numeric(14,4) | nullable:no | default:none
+  - metric_unit | text | nullable:yes | default:none
+  - recorded_at | timestamptz | nullable:no | default:none
+  - seasonal_bucket | text | nullable:yes | default:none
+  - metadata | jsonb | nullable:no | default:'{}'::jsonb
+  - created_at | timestamptz | nullable:no | default:now()
+Security Considerations:
+  - RLS policy enforces tenant/franchise telemetry segregation.
+  - Source-level payload metadata remains scoped to authorized AMRO users.
+Implementation Notes:
+  - Migration: 20260323183000_amro_overview_dashboard_analytics.sql
+  - Supports trend and anomaly calculations for dashboard refresh.
+```
+
+```text
+Component Type: Table
+Component Name: public.amro_compliance_events
+Purpose: Capture compliance incidents and resolution lifecycle events for alerting, risk heatmaps, and governance evidence.
+Estimated Row Count: 1,000-100,000 rows per tenant per year.
+Primary Key: id
+Foreign Keys:
+  - tenant_id -> public.tenants(id) ON DELETE CASCADE
+  - franchise_id -> public.franchises(id) ON DELETE SET NULL
+  - obligation_id -> public.compliance_obligations(id) ON DELETE SET NULL
+  - work_package_id -> public.work_packages(id) ON DELETE SET NULL
+  - task_id -> public.tasks(id) ON DELETE SET NULL
+  - maintenance_event_id -> public.maintenance_events(id) ON DELETE SET NULL
+  - created_by -> auth.users(id) ON DELETE SET NULL
+  - updated_by -> auth.users(id) ON DELETE SET NULL
+Unique Constraints:
+  - uq_amro_compliance_events_scope_event_code(tenant_id, franchise_id, event_code)
+Check Constraints:
+  - severity in (low, medium, high, critical)
+  - event_status in (open, acknowledged, resolved, dismissed)
+Defaults:
+  - id: gen_random_uuid()
+  - event_status: open
+  - details: '{}'::jsonb
+  - detected_at: now()
+  - created_at: now()
+  - updated_at: now()
+Indexes:
+  - idx_amro_compliance_events_scope_detected_desc(tenant_id, detected_at DESC)
+  - idx_amro_compliance_events_scope_status_severity(tenant_id, event_status, severity)
+  - uq_amro_compliance_events_scope_event_code(tenant_id, franchise_id, event_code)
+Columns:
+  - id | uuid | nullable:no | default:gen_random_uuid()
+  - tenant_id | uuid | nullable:no | default:none
+  - franchise_id | uuid | nullable:yes | default:none
+  - obligation_id | uuid | nullable:yes | default:none
+  - work_package_id | uuid | nullable:yes | default:none
+  - task_id | uuid | nullable:yes | default:none
+  - maintenance_event_id | uuid | nullable:yes | default:none
+  - event_code | text | nullable:no | default:none
+  - event_type | text | nullable:no | default:none
+  - severity | text | nullable:no | default:none
+  - event_status | text | nullable:no | default:open
+  - summary | text | nullable:no | default:none
+  - details | jsonb | nullable:no | default:'{}'::jsonb
+  - detected_at | timestamptz | nullable:no | default:now()
+  - resolved_at | timestamptz | nullable:yes | default:none
+  - created_at | timestamptz | nullable:no | default:now()
+  - updated_at | timestamptz | nullable:no | default:now()
+  - created_by | uuid | nullable:yes | default:none
+  - updated_by | uuid | nullable:yes | default:none
+Security Considerations:
+  - RLS policies protect tenant/franchise event separation and regulator-sensitive data.
+  - Event mutation is role-guarded through tenant-scoped authorization.
+Implementation Notes:
+  - Migration: 20260323183000_amro_overview_dashboard_analytics.sql
+  - Feeds compliance alert counters and risk severity distribution visualizations.
+```
+
 ---
 
 **Document End**  

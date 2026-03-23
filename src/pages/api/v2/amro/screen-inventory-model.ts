@@ -25,7 +25,18 @@ export type AmroLayoutContractSection = {
 };
 
 export type AmroScreenLayoutContract = {
-  screenId: 'SCR-AMRO-001' | 'SCR-AMRO-002' | 'SCR-AMRO-004' | 'SCR-AMRO-005';
+  screenId:
+    | 'SCR-AMRO-001'
+    | 'SCR-AMRO-002'
+    | 'SCR-AMRO-003'
+    | 'SCR-AMRO-004'
+    | 'SCR-AMRO-005'
+    | 'SCR-AMRO-006'
+    | 'SCR-AMRO-007'
+    | 'SCR-AMRO-008'
+    | 'SCR-AMRO-009'
+    | 'SCR-AMRO-010'
+    | 'SCR-AMRO-011';
   screenName: string;
   sections: AmroLayoutContractSection[];
   guardrails?: string[];
@@ -204,6 +215,24 @@ export const AMRO_SCREEN_LAYOUT_CONTRACTS: ReadonlyArray<AmroScreenLayoutContrac
     ],
   },
   {
+    screenId: 'SCR-AMRO-003',
+    screenName: 'Work Package Create Drawer',
+    sections: [
+      {
+        region: 'Drawer header',
+        requirements: ['Template selector', 'Title', 'Priority', 'Maintenance type'],
+      },
+      {
+        region: 'Planning block',
+        requirements: ['Aircraft selector', 'Station', 'Planned start/end', 'Supervisor'],
+      },
+      {
+        region: 'Validation footer',
+        requirements: ['Draft save', 'Create package', 'Field-level errors', 'Permission hints'],
+      },
+    ],
+  },
+  {
     screenId: 'SCR-AMRO-004',
     screenName: 'Work Package Detail Sheet',
     sections: [
@@ -241,6 +270,116 @@ export const AMRO_SCREEN_LAYOUT_CONTRACTS: ReadonlyArray<AmroScreenLayoutContrac
       {
         region: 'Action row',
         requirements: ['Save offline', 'Submit', 'Request support', 'Disabled states linked to policy checks'],
+      },
+    ],
+  },
+  {
+    screenId: 'SCR-AMRO-006',
+    screenName: 'Scheduling Board',
+    sections: [
+      {
+        region: 'Board controls',
+        requirements: ['Date window', 'Station selector', 'Resource filter', 'Refresh optimization'],
+      },
+      {
+        region: 'Timeline board',
+        requirements: ['Slot cards', 'Drag and drop assignment', 'Conflict badges', 'Capacity overlays'],
+      },
+      {
+        region: 'Decision rail',
+        requirements: ['Replan suggestions', 'Constraint reasons', 'Apply recommendation'],
+      },
+    ],
+    guardrails: ['Conflict acknowledgement before publish', 'Role-scoped override actions'],
+  },
+  {
+    screenId: 'SCR-AMRO-007',
+    screenName: 'Materials Reservation Panel',
+    sections: [
+      {
+        region: 'Reservation header',
+        requirements: ['Part lookup', 'Stock status', 'Supplier ETA', 'Warehouse location'],
+      },
+      {
+        region: 'Reservation body',
+        requirements: ['Demand lines', 'Reserve quantity', 'Backorder options', 'Shortage indicators'],
+      },
+      {
+        region: 'Action footer',
+        requirements: ['Commit reservation', 'Release reservation', 'Sync procurement'],
+      },
+    ],
+  },
+  {
+    screenId: 'SCR-AMRO-008',
+    screenName: 'Compliance Gate Modal',
+    sections: [
+      {
+        region: 'Gate summary',
+        requirements: ['Gate status', 'Obligation coverage', 'Policy snapshot', 'Reviewer'],
+      },
+      {
+        region: 'Evidence review',
+        requirements: ['Evidence checklist', 'Exceptions panel', 'Decision rationale', 'Signature readiness'],
+      },
+      {
+        region: 'Decision controls',
+        requirements: ['Approve', 'Reject', 'Defer', 'Escalate'],
+      },
+    ],
+    guardrails: ['Dual confirmation for irreversible decisions', 'Mandatory rationale for reject/defer'],
+  },
+  {
+    screenId: 'SCR-AMRO-009',
+    screenName: 'Certification Decision Panel',
+    sections: [
+      {
+        region: 'Authority context',
+        requirements: ['Certifier profile', 'Authority scope', 'Expiry status', 'Regulator alignment'],
+      },
+      {
+        region: 'Decision matrix',
+        requirements: ['Action type', 'Policy match', 'Blocked reason codes', 'Escalation path'],
+      },
+      {
+        region: 'Completion controls',
+        requirements: ['Approve release', 'Defer release', 'Suspend authority'],
+      },
+    ],
+  },
+  {
+    screenId: 'SCR-AMRO-010',
+    screenName: 'Audit Replay Timeline',
+    sections: [
+      {
+        region: 'Replay filters',
+        requirements: ['Entity filters', 'Actor filters', 'Time range', 'Export target'],
+      },
+      {
+        region: 'Timeline stream',
+        requirements: ['Immutable event chain', 'Hash verification status', 'Event payload details'],
+      },
+      {
+        region: 'Export footer',
+        requirements: ['Replay export', 'Regulatory package generation', 'Security trail summary'],
+      },
+    ],
+  },
+  {
+    screenId: 'SCR-AMRO-011',
+    screenName: 'Integration Monitor Console',
+    sections: [
+      {
+        region: 'Job queue controls',
+        requirements: ['Source system filter', 'Status filter', 'Retry controls', 'Dead-letter review'],
+      },
+      {
+        region: 'Mapping inspector',
+        requirements: ['Source payload', 'Canonical mapping', 'Validation errors', 'Idempotency key'],
+      },
+      {
+        region: 'Operations footer',
+        requirements: ['Replay queue action', 'Webhook outbox status', 'Failure triage links'],
       },
     ],
   },

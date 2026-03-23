@@ -10,6 +10,7 @@ import {
   enforceHttps,
   enforceRateLimit,
   handlePreflight,
+  logApiEvent,
   resolveAndApplyAccessContext,
 } from '../../_utils/http';
 import { sendErrorResponse } from '../../_utils/errorHandler';
@@ -25,6 +26,7 @@ vi.mock('../../_utils/http', () => ({
   enforceHttps: vi.fn(),
   enforceRateLimit: vi.fn(),
   handlePreflight: vi.fn(),
+  logApiEvent: vi.fn(),
   resolveAndApplyAccessContext: vi.fn(),
 }));
 
@@ -109,6 +111,7 @@ describe('/api/v2/amro/overview-kpi', () => {
     process.env.AMRO_SEQ_M8_RECOMMENDATION_CONTRACT_EXPLAINABILITY_PASS = 'true';
     process.env.AMRO_SEQ_M8_LOW_CONFIDENCE_POLICY_TESTS_PASS = 'true';
     vi.mocked(enforceAnyPermission).mockImplementation(() => undefined);
+    vi.mocked(logApiEvent).mockImplementation(() => undefined);
     vi.mocked(handlePreflight).mockReturnValue(false);
     vi.mocked(buildApiContext).mockReturnValue({
       correlationId: 'corr-amro-overview-kpi',
@@ -287,6 +290,132 @@ describe('/api/v2/amro/overview-kpi', () => {
     expect((res.jsonBody as any)?.output).toHaveProperty('anomaly_flags');
   });
 
+  it('uses latest seeded overview snapshot values when operational tables are empty', async () => {
+    process.env.AMRO_OVERVIEW_KPI_V2_ENABLED = 'true';
+    const snapshotRows: Record<string, unknown[]> = {
+      amro_overview_kpi_snapshots: [
+        {
+          id: 'snap-1',
+          tenant_id: 'tenant-1',
+          franchise_id: 'fr-1',
+          persona: 'management',
+          date_range_start: '2026-03-01',
+          date_range_end: '2026-03-21',
+          snapshot_at: '2026-03-21T00:00:00.000Z',
+          open_work_packages: 38,
+          in_progress_tasks: 246,
+          deferred_items: 12,
+          compliance_alerts: 19,
+          sla_breach_count: 7,
+          risk_heatmap: {
+            station_blr: { medium: 6, high: 3 },
+            station_hyd: { medium: 4, high: 1 },
+          },
+          trend_lines: [{ metric: 'task_completion', slope: 0.16 }],
+          anomaly_alerts: [{ metric: 'engine_vibration', count: 2 }],
+        },
+      ],
+    };
+    vi.mocked(getSupabaseAdminClient).mockReturnValue({
+      from: vi.fn((tableName: string) => ({
+        select: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            limit: vi.fn(async () => ({
+              data: snapshotRows[tableName] || [],
+              error: null,
+            })),
+          })),
+        })),
+      })),
+    } as any);
+    const req: ApiRequest = {
+      method: 'GET',
+      query: {
+        interface: 'load-kpi-dashboard',
+        date_range: '2026-03-01T00:00:00.000Z:2026-03-21T00:00:00.000Z',
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.output?.executive_summary?.active_work_packages).toBe(38);
+    expect((res.jsonBody as any)?.output?.executive_summary?.overdue_tasks).toBe(7);
+    expect((res.jsonBody as any)?.output?.risk_heatmap?.cells?.[0]?.station).toContain('tenant-1:station_blr');
+    expect((res.jsonBody as any)?.output?.trend_lines?.[0]?.metric_key).toBe('task_completion');
+    expect((res.jsonBody as any)?.output?.anomaly_flags?.[0]?.metric_key).toBe('engine_vibration');
+  });
+
+  it('logs overview dashboard data issues when source tables fail', async () => {
+    process.env.AMRO_OVERVIEW_KPI_V2_ENABLED = 'true';
+    vi.mocked(getSupabaseAdminClient).mockReturnValue({
+      from: vi.fn(() => ({
+        select: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            limit: vi.fn(async () => ({
+              data: null,
+              error: {
+                code: 'XX000',
+                message: 'database connectivity failure',
+              },
+            })),
+          })),
+        })),
+      })),
+    } as any);
+    const req: ApiRequest = {
+      method: 'GET',
+      query: {
+        interface: 'load-kpi-dashboard',
+        date_range: '2026-03-01T00:00:00.000Z:2026-03-21T00:00:00.000Z',
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.output?.data_issues?.length).toBeGreaterThan(0);
+    expect(logApiEvent).toHaveBeenCalledWith(
+      'warn',
+      'AMRO overview KPI data issues detected',
+      expect.objectContaining({
+        correlationId: 'corr-amro-overview-kpi',
+        tenantId: 'tenant-1',
+        interface: 'load-kpi-dashboard',
+      }),
+    );
+  });
+
+  it('applies planner persona scoping for dashboard interface', async () => {
+    process.env.AMRO_OVERVIEW_KPI_V2_ENABLED = 'true';
+    vi.mocked(authenticateRequest).mockResolvedValue({
+      userId: 'planner-1',
+      role: 'user',
+      permissions: ['dashboards.view'],
+    } as any);
+    const req: ApiRequest = {
+      method: 'GET',
+      query: {
+        interface: 'load-kpi-dashboard',
+        date_range: '2026-03-01T00:00:00.000Z:2026-03-21T00:00:00.000Z',
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.output?.role_scope?.persona).toBe('planner');
+    expect((res.jsonBody as any)?.output?.role_scope?.planner_id).toBe('planner-1');
+    expect((res.jsonBody as any)?.output?.integration_monitor?.recent_failures).toEqual([]);
+    expect((res.jsonBody as any)?.output?.anomaly_flags).toEqual([]);
+  });
+
   it('uses fallback AMRO tables when overview aliases are missing from schema cache', async () => {
     process.env.AMRO_OVERVIEW_KPI_V2_ENABLED = 'true';
     const fallbackRows: Record<string, unknown[]> = {
@@ -451,6 +580,32 @@ describe('/api/v2/amro/overview-kpi', () => {
     expect((res.jsonBody as any)?.output).toHaveProperty('certification_decision_queue');
     expect((res.jsonBody as any)?.output).toHaveProperty('audit_timeline');
     expect((res.jsonBody as any)?.output).toHaveProperty('forecast_recommendation_hub');
+  });
+
+  it('redacts trend actor details for planner persona', async () => {
+    process.env.AMRO_OVERVIEW_KPI_V2_ENABLED = 'true';
+    vi.mocked(authenticateRequest).mockResolvedValue({
+      userId: 'planner-1',
+      role: 'user',
+      permissions: ['dashboards.view'],
+    } as any);
+    const req: ApiRequest = {
+      method: 'GET',
+      query: {
+        interface: 'load-operational-trends',
+        metric_key: 'schedule_adherence',
+        window: '7d',
+        compare_window: '30d',
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.output?.role_scope?.persona).toBe('planner');
+    expect((res.jsonBody as any)?.output?.audit_timeline?.[0]?.actor).toBe('restricted');
   });
 
   it('uses fallback operational tables when trend aliases are missing from schema cache', async () => {

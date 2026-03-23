@@ -1,0 +1,408 @@
+{
+  "generatedAt": "2026-03-23T16:13:01.209Z",
+  "tenant": {
+    "id": "157b8d12-c115-446e-a4dc-d12077751fe2",
+    "name": "Deccan Airways",
+    "slug": "deccan-airways"
+  },
+  "franchise": {
+    "id": "238040c6-5edc-4922-a78c-60757d9a2025",
+    "code": "DECCAN-FLY",
+    "name": "Deccan Fly"
+  },
+  "secondaryFranchise": {
+    "id": "ac0f06c0-3946-4ca7-8177-911886ee0e98",
+    "code": "DECCAN-FLY-HEAVY",
+    "name": "Deccan Fly Heavy"
+  },
+  "amroDomain": {
+    "id": "8ee000a3-93a6-4bbc-9914-5382bba02cbd",
+    "code": "amro"
+  },
+  "seedReferences": {
+    "aircraftId": "fd287a3b-ea9a-448b-b3fe-6d8754e08cce",
+    "componentId": "b33ee9df-6744-44cc-bc94-30dbed4f8bbb",
+    "workPackageId": "a7bc1688-0fa5-469c-980a-2a8d57d682a3",
+    "taskId": "e3277c08-bc65-41fc-8b92-2bf36b64289f",
+    "supplierId": "d83ee077-3c9a-4a41-8448-c3d4d4d3e4d1",
+    "partsInventoryId": "b17a753b-42d1-4598-b8de-06f5267016ea",
+    "maintenanceEventId": "2d66cb0c-6442-4945-a665-ce2862fff099",
+    "policySnapshotId": "832f7c83-f884-4f37-a596-6b8123e34c8c",
+    "taskEvidenceId": "a4b036dd-68e5-4694-b750-ed2be9282eab",
+    "taskEvidenceCapturedAt": "2026-03-23T16:12:08.844488+00:00",
+    "regulatorProfileId": "06b3e284-4bad-4283-8027-855e33f18927",
+    "complianceObligationId": "5bccbbfd-24c1-4ec5-bdd0-cd0c76e4f3ae",
+    "complianceRecordId": "43b5e7b4-7578-449c-97cb-8da2cd73445f",
+    "certificationActionId": "5c4e217d-f2c5-42ec-8836-c9aff5052581",
+    "integrationJobId": "8401e28b-d367-4571-bd14-b3062aba5a08",
+    "integrationMappingId": "406f03f6-c5f7-4bd9-a50a-87e92041530f",
+    "webhookOutboxId": "7b481813-1b38-48eb-8286-b251e8d50232",
+    "assetHealthSignalId": "03749f91-afc5-4a93-8e8d-ad5c8ab3965f",
+    "forecastOutputId": "8718197c-592c-4005-86f7-dc6a80c945d5",
+    "forecastFeatureId": "56b5d999-7faa-4346-8482-8d5baa390367",
+    "forecastDecisionId": "d9db47e1-8ee6-4d19-9aa3-2e230381690e",
+    "workPackageTemplateId": "f1e802ca-1c34-48ac-986c-3d503772bd68",
+    "syncConflictId": "43382dc4-9e76-4716-be28-59a50fee1d64",
+    "regulatorDossierId": "21e881e5-5a96-4d10-8dad-f3b7892c7eac",
+    "taskQualificationRequirementId": "6cb3b94d-d175-41f6-b466-977c5bcf5f5c",
+    "reservationId": "81304d0d-8220-4707-9a67-c0c41fc2a799",
+    "stockMovementId": "93f605c6-9405-4e98-88ac-1d7e171ed6e4",
+    "componentPositionId": "ace42c7a-27c7-4320-aac3-1f7d6e819c19",
+    "shiftCalendarId": "bb4da039-f749-4bad-bc24-93284b9a97b9",
+    "scheduleId": "c976b58f-2ff0-4701-b503-7f424d082953",
+    "scheduleConstraintId": "a8edfeed-782e-4d6a-8b0a-5afd38bb6043",
+    "workPackageMaterialId": "cc2475c4-504e-427d-90bc-fd0a023c806a",
+    "heavyPolicySnapshotId": "b1f3dc60-38e4-432d-9d0a-e94f16df6074",
+    "heavyAircraftId": "79cfbd85-9643-49d6-8d5f-0e257f0d584e",
+    "heavyWorkPackageId": "1884da45-ad40-402e-b32a-718bd5f7ba37",
+    "heavyTaskId": "4c4a2f73-c71a-4f70-9153-e44252aaf330",
+    "heavyRegulatorProfileId": "44af5765-4823-4b50-bafa-da9572757a36",
+    "heavyStaffQualificationId": "a864cc88-7d22-4340-9cad-0159fd7b0081",
+    "heavyComplianceObligationId": "0f5290d2-952b-4c76-a3ac-1df7e70eb6dd",
+    "heavyIntegrationJobId": "b191bcf5-0c79-42df-b654-2a97ca8d4b0d",
+    "heavyAssetHealthSignalId": "21927f75-b09f-4d29-a902-f71d1c8d9518",
+    "heavyForecastOutputId": "1a882cbe-c29e-4c98-9f46-33058e4e3ac8",
+    "overviewKpiSnapshotId": "0f352f1b-2d03-4b49-9926-2e23f1e818b9"
+  },
+  "analyticsSeedSummary": {
+    "skipped": false,
+    "missingTables": [],
+    "seededSlaDefinitions": 6,
+    "seededTelemetryRows": 50000,
+    "seededComplianceEvents": 1000,
+    "seededSnapshots": 3,
+    "sampleSnapshotId": "0f352f1b-2d03-4b49-9926-2e23f1e818b9"
+  },
+  "seededUsers": [
+    {
+      "key": "tenantAdmin",
+      "email": "deccan.tenant.admin@amro.local",
+      "userId": "8f8eb818-3d28-4e07-8160-86f4596efb58",
+      "role": "tenant_admin"
+    },
+    {
+      "key": "franchiseAdmin",
+      "email": "deccan.franchise.admin@amro.local",
+      "userId": "e0a7dba7-4d22-4b82-b99d-3c86126c3537",
+      "role": "franchise_admin"
+    },
+    {
+      "key": "heavyFranchiseAdmin",
+      "email": "deccan.heavy.franchise.admin@amro.local",
+      "userId": "840d5aec-3479-4d51-bf90-3fe99fd4d2a3",
+      "role": "franchise_admin"
+    },
+    {
+      "key": "planner",
+      "email": "deccan.planner@amro.local",
+      "userId": "2f37177f-0078-4ae1-a905-fd523b15be3d",
+      "role": "user"
+    },
+    {
+      "key": "technician",
+      "email": "deccan.technician@amro.local",
+      "userId": "c5e60a41-612e-4313-940d-36e9ffba3573",
+      "role": "user"
+    },
+    {
+      "key": "inspector",
+      "email": "deccan.inspector@amro.local",
+      "userId": "c2085ff6-ebfd-44a3-b858-4d709874a79a",
+      "role": "user"
+    },
+    {
+      "key": "compliance",
+      "email": "deccan.compliance@amro.local",
+      "userId": "e7436473-c915-4a4a-9895-d8bff7c259db",
+      "role": "user"
+    },
+    {
+      "key": "certifier",
+      "email": "deccan.certifier@amro.local",
+      "userId": "fc8385ca-aa1b-4028-881e-2f8bd7ac2bda",
+      "role": "user"
+    },
+    {
+      "key": "store",
+      "email": "deccan.store@amro.local",
+      "userId": "a976653a-a569-4d33-b814-02d8910e6edf",
+      "role": "user"
+    },
+    {
+      "key": "integration",
+      "email": "deccan.integration@amro.local",
+      "userId": "c79f6f1d-95be-4a03-9ae0-c4c0c1f4a532",
+      "role": "user"
+    },
+    {
+      "key": "management",
+      "email": "deccan.management@amro.local",
+      "userId": "3b524370-ed44-420b-8d8f-ef4e3080e63e",
+      "role": "user"
+    },
+    {
+      "key": "ops",
+      "email": "deccan.ops@amro.local",
+      "userId": "de1756eb-33c8-4535-951a-9b5315301bb8",
+      "role": "user"
+    }
+  ],
+  "crudVerification": [
+    {
+      "moduleId": "MOD-AMRO-01",
+      "moduleName": "Overview and KPI Intelligence",
+      "componentName": "Forecast outputs",
+      "table": "forecast_outputs",
+      "create": true,
+      "read": true,
+      "update": true,
+      "delete": true,
+      "failure": null
+    },
+    {
+      "moduleId": "MOD-AMRO-02",
+      "moduleName": "Work Package Management",
+      "componentName": "Work packages",
+      "table": "work_packages",
+      "create": true,
+      "read": true,
+      "update": true,
+      "delete": true,
+      "failure": null
+    },
+    {
+      "moduleId": "MOD-AMRO-03",
+      "moduleName": "Task Execution and Evidence",
+      "componentName": "Tasks",
+      "table": "tasks",
+      "create": true,
+      "read": true,
+      "update": true,
+      "delete": true,
+      "failure": null
+    },
+    {
+      "moduleId": "MOD-AMRO-04",
+      "moduleName": "Maintenance Scheduling",
+      "componentName": "Schedules",
+      "table": "schedules",
+      "create": true,
+      "read": true,
+      "update": true,
+      "delete": true,
+      "failure": null
+    },
+    {
+      "moduleId": "MOD-AMRO-05",
+      "moduleName": "Parts and Materials",
+      "componentName": "Suppliers",
+      "table": "suppliers",
+      "create": true,
+      "read": true,
+      "update": true,
+      "delete": true,
+      "failure": null
+    },
+    {
+      "moduleId": "MOD-AMRO-06",
+      "moduleName": "Compliance and Airworthiness",
+      "componentName": "Compliance obligations",
+      "table": "compliance_obligations",
+      "create": true,
+      "read": true,
+      "update": true,
+      "delete": true,
+      "failure": null
+    },
+    {
+      "moduleId": "MOD-AMRO-07",
+      "moduleName": "Certification and Authority",
+      "componentName": "Certification actions",
+      "table": "certification_actions",
+      "create": true,
+      "read": true,
+      "update": true,
+      "delete": true,
+      "failure": null
+    },
+    {
+      "moduleId": "MOD-AMRO-08",
+      "moduleName": "Integration and Partner Hub",
+      "componentName": "Integration jobs",
+      "table": "integration_jobs",
+      "create": true,
+      "read": true,
+      "update": true,
+      "delete": true,
+      "failure": null
+    },
+    {
+      "moduleId": "MOD-AMRO-09",
+      "moduleName": "Forecast and Reliability",
+      "componentName": "Asset health signals",
+      "table": "asset_health_signals",
+      "create": true,
+      "read": true,
+      "update": true,
+      "delete": true,
+      "failure": null
+    },
+    {
+      "moduleId": "MOD-AMRO-02",
+      "moduleName": "Work Package Management",
+      "componentName": "Work package templates",
+      "table": "work_package_templates",
+      "create": true,
+      "read": true,
+      "update": true,
+      "delete": true,
+      "failure": null
+    },
+    {
+      "moduleId": "MOD-AMRO-03",
+      "moduleName": "Task Execution and Evidence",
+      "componentName": "Task evidence",
+      "table": "task_evidence",
+      "create": true,
+      "read": true,
+      "update": "skipped",
+      "delete": "immutable",
+      "failure": null
+    },
+    {
+      "moduleId": "MOD-AMRO-05",
+      "moduleName": "Parts and Materials",
+      "componentName": "Part reservations",
+      "table": "reservations",
+      "create": true,
+      "read": true,
+      "update": true,
+      "delete": true,
+      "failure": null
+    },
+    {
+      "moduleId": "MOD-AMRO-06",
+      "moduleName": "Compliance and Airworthiness",
+      "componentName": "Compliance records",
+      "table": "compliance_records",
+      "create": true,
+      "read": true,
+      "update": true,
+      "delete": true,
+      "failure": null
+    },
+    {
+      "moduleId": "MOD-AMRO-07",
+      "moduleName": "Certification and Authority",
+      "componentName": "Staff qualifications",
+      "table": "staff_qualifications",
+      "create": true,
+      "read": true,
+      "update": true,
+      "delete": true,
+      "failure": null
+    },
+    {
+      "moduleId": "MOD-AMRO-08",
+      "moduleName": "Integration and Partner Hub",
+      "componentName": "Webhook outbox",
+      "table": "webhook_outbox",
+      "create": true,
+      "read": true,
+      "update": true,
+      "delete": true,
+      "failure": null
+    },
+    {
+      "moduleId": "MOD-AMRO-09",
+      "moduleName": "Forecast and Reliability",
+      "componentName": "Forecast features",
+      "table": "forecast_features",
+      "create": true,
+      "read": true,
+      "update": true,
+      "delete": true,
+      "failure": null
+    },
+    {
+      "moduleId": "MOD-AMRO-10",
+      "moduleName": "Audit and Evidence Ledger",
+      "table": "mro_audit.records",
+      "create": "skipped",
+      "read": "skipped",
+      "update": "immutable",
+      "delete": "immutable"
+    },
+    {
+      "moduleId": "MOD-AMRO-08",
+      "moduleName": "Integration and Partner Hub",
+      "componentName": "User domain assignments",
+      "table": "user_domain_assignments",
+      "create": true,
+      "read": true,
+      "update": true,
+      "delete": true,
+      "failure": null
+    }
+  ],
+  "crudFailures": [],
+  "scopeConsistencyChecks": [
+    {
+      "table": "tasks",
+      "tenantId": "157b8d12-c115-446e-a4dc-d12077751fe2",
+      "franchiseId": "ac0f06c0-3946-4ca7-8177-911886ee0e98",
+      "count": 10,
+      "isConsistent": true
+    },
+    {
+      "table": "work_packages",
+      "tenantId": "157b8d12-c115-446e-a4dc-d12077751fe2",
+      "franchiseId": "238040c6-5edc-4922-a78c-60757d9a2025",
+      "count": 20,
+      "isConsistent": true
+    },
+    {
+      "table": "policy_snapshots",
+      "tenantId": "157b8d12-c115-446e-a4dc-d12077751fe2",
+      "franchiseId": "238040c6-5edc-4922-a78c-60757d9a2025",
+      "count": 21,
+      "isConsistent": true
+    },
+    {
+      "table": "tasks",
+      "tenantId": "157b8d12-c115-446e-a4dc-d12077751fe2",
+      "franchiseId": "238040c6-5edc-4922-a78c-60757d9a2025",
+      "count": 20,
+      "isConsistent": true
+    },
+    {
+      "table": "work_packages",
+      "tenantId": "157b8d12-c115-446e-a4dc-d12077751fe2",
+      "franchiseId": "ac0f06c0-3946-4ca7-8177-911886ee0e98",
+      "count": 10,
+      "isConsistent": true
+    },
+    {
+      "table": "policy_snapshots",
+      "tenantId": "157b8d12-c115-446e-a4dc-d12077751fe2",
+      "franchiseId": "ac0f06c0-3946-4ca7-8177-911886ee0e98",
+      "count": 12,
+      "isConsistent": true
+    }
+  ],
+  "moduleAndScreenGapAudit": {
+    "missingModuleIds": [],
+    "missingScreenIds": [],
+    "missingLayoutContractIds": [],
+    "missingScreenInventoryCoverageAssertions": [],
+    "hasBlockingGaps": false
+  },
+  "verificationSummary": {
+    "moduleCoverageTarget": 10,
+    "screenCoverageTarget": 11,
+    "crudChecksExecuted": 18,
+    "crudFailures": 0,
+    "scopeConsistencyFailures": 0,
+    "hasBlockingGaps": false
+  }
+}

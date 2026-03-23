@@ -49,6 +49,7 @@ const amroTaskStepSubmitBenchmark = { targetMs: 400, hardLimitMs: 800 };
 type AmroUxRole = 'technician' | 'engineer' | 'inspector' | 'planner' | 'management';
 type AmroWorkspaceModuleKey =
   | 'overview'
+  | 'primary-users'
   | 'work-packages'
   | 'task-execution'
   | 'scheduling'
@@ -155,6 +156,7 @@ export function AmroOwnedWorkspace({ moduleKey }: AmroOwnedWorkspaceProps) {
   const canRunCertifyingRelease = activeUxRole !== 'planner';
   const isScopedToModule = Boolean(moduleKey);
   const showOverviewModule = !moduleKey || moduleKey === 'overview';
+  const showPrimaryUsersModule = !moduleKey || moduleKey === 'primary-users';
   const showWorkPackagesModule = !moduleKey || moduleKey === 'work-packages';
   const showTaskExecutionModule = !moduleKey || moduleKey === 'task-execution';
   const showSchedulingModule = !moduleKey || moduleKey === 'scheduling';
@@ -216,6 +218,23 @@ export function AmroOwnedWorkspace({ moduleKey }: AmroOwnedWorkspaceProps) {
             disabledReason: !state.selectedWorkPackageId ? 'Select a work package first.' : !state.canDeleteWorkPackage ? 'Current role cannot delete work packages.' : 'Ready.',
           },
         ]
+      : moduleKey === 'primary-users'
+        ? [
+            {
+              id: 'primary-users-refresh',
+              label: 'Refresh Workspace',
+              onClick: state.refreshWorkPackages,
+              disabled: state.loadingWorkPackages,
+              disabledReason: state.loadingWorkPackages ? 'Work package refresh is already running.' : 'Ready.',
+            },
+            {
+              id: 'primary-users-anomaly',
+              label: 'Detect Anomalies',
+              onClick: () => void state.detectComplianceAnomalies(),
+              disabled: false,
+              disabledReason: 'Ready.',
+            },
+          ]
       : moduleKey === 'task-execution'
         ? [
             {
@@ -1113,6 +1132,29 @@ export function AmroOwnedWorkspace({ moduleKey }: AmroOwnedWorkspaceProps) {
             <div className="rounded-md border p-2">⛔ Critical: compliance risk</div>
             <div className="rounded-md border p-2">■ Blocked: gate dependency</div>
             <div className="rounded-md border p-2">i Informational: advisory signal</div>
+          </div>
+        </CardContent>
+      </Card>
+      ) : null}
+
+      {showPrimaryUsersModule ? (
+      <Card data-amro-owned-surface="primary-users-management" role="region" aria-label="Primary Users Management">
+        <CardHeader className="pb-2">
+          <CardTitle>Primary Users Management</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid grid-cols-1 gap-2 text-xs md:grid-cols-5">
+            <div className="rounded-md border p-2">Management: KPI oversight and approvals</div>
+            <div className="rounded-md border p-2">Planner: package, capacity, and slot planning</div>
+            <div className="rounded-md border p-2">Engineer: task and material orchestration</div>
+            <div className="rounded-md border p-2">Technician: execution and evidence capture</div>
+            <div className="rounded-md border p-2">Compliance Lead: gates, replay, and dossier checks</div>
+          </div>
+          <div className="grid grid-cols-1 gap-2 text-xs md:grid-cols-4">
+            <div className="rounded-md border p-2">AMRO Authorized: {state.isAmroAuthorized ? 'Yes' : 'No'}</div>
+            <div className="rounded-md border p-2">Active Role: {state.activeRole}</div>
+            <div className="rounded-md border p-2">Create Scope: {state.canCreateWorkPackage ? 'Enabled' : 'Restricted'}</div>
+            <div className="rounded-md border p-2">Certifying Sign-off: {state.canSignOff ? 'Available' : 'Blocked'}</div>
           </div>
         </CardContent>
       </Card>

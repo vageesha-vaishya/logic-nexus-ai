@@ -83,12 +83,25 @@ describe('/api/v2/amro/screen-inventory', () => {
     expect(res.statusCode).toBe(200);
     expect((res.jsonBody as any)?.mode).toBe('screen-inventory');
     expect((res.jsonBody as any)?.data?.screenInventory?.summary?.totalScreens).toBe(12);
-    expect((res.jsonBody as any)?.data?.screenInventory?.summary?.layoutContractScreens).toBe(4);
+    expect((res.jsonBody as any)?.data?.screenInventory?.summary?.layoutContractScreens).toBe(11);
     expect((res.jsonBody as any)?.data?.screenInventory?.summary?.mappingMatrixModules).toBe(10);
     expect((res.jsonBody as any)?.data?.screenInventory?.summary?.accessibilityAreas).toBe(5);
     expect((res.jsonBody as any)?.data?.screenInventory?.screens?.[0]?.screenId).toBe('SCR-AMRO-001');
     expect((res.jsonBody as any)?.data?.screenInventory?.screens?.[11]?.screenName).toBe('Forecast Recommendation Hub');
+    expect((res.jsonBody as any)?.data?.screenInventory?.screens?.map((screen: any) => screen.screenId)).toEqual(
+      expect.arrayContaining([
+        'SCR-AMRO-002',
+        'SCR-AMRO-003',
+        'SCR-AMRO-004',
+        'SCR-AMRO-005',
+        'SCR-AMRO-006',
+        'SCR-AMRO-007',
+        'SCR-AMRO-008',
+        'SCR-AMRO-009',
+      ])
+    );
     expect((res.jsonBody as any)?.data?.screenInventory?.layoutContracts?.[0]?.screenId).toBe('SCR-AMRO-001');
+    expect((res.jsonBody as any)?.data?.screenInventory?.layoutContracts?.[10]?.screenId).toBe('SCR-AMRO-011');
     expect((res.jsonBody as any)?.data?.screenInventory?.uiUxMappingMatrix?.[0]).toEqual({
       moduleId: 'MOD-AMRO-01',
       primaryScreens: ['SCR-AMRO-001 Overview Dashboard'],
