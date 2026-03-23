@@ -67,6 +67,29 @@ describe('DomainService', () => {
       expect(result.isPlatformAdmin).toBe(false);
     });
 
+    it('should deduplicate duplicate domain rows from API payload', async () => {
+      const duplicatedDomain = { id: 'b14dcc8e-eb62-4935-b3ba-714136458085', code: 'AMRO', name: 'AMRO', description: null, is_active: true };
+      const mockFetch = vi.mocked(fetch);
+      mockFetch.mockResolvedValue({
+        ok: true,
+        headers: jsonHeaders,
+        json: async () => ({
+          data: {
+            domains: [duplicatedDomain, duplicatedDomain],
+            tenantDomainCount: 2,
+            tenantId: 'tenant-1',
+            isPlatformAdmin: false,
+          },
+        }),
+      } as unknown as Response);
+
+      const result = await DomainService.getAuthorizedDomains(true);
+
+      expect(result.domains).toHaveLength(1);
+      expect(result.domains[0].id).toBe('b14dcc8e-eb62-4935-b3ba-714136458085');
+      expect(result.domains[0].code).toBe('AMRO');
+    });
+
     it('should throw when API responds with an error', async () => {
       const mockFetch = vi.mocked(fetch);
       mockFetch.mockResolvedValue({
@@ -79,8 +102,34 @@ describe('DomainService', () => {
       await expect(DomainService.getAuthorizedDomains()).rejects.toThrow('Forbidden');
     });
 
-    it('should include correlation reference in thrown errors', async () => {
+    it('should return empty domains without calling API when session is missing', async () => {
+      (supabase.auth.getSession as any).mockResolvedValue({
+        data: {
+          session: null,
+        },
+      });
+
+      const result = await DomainService.getAuthorizedDomains();
+      expect(result.domains).toEqual([]);
+      expect(result.tenantDomainCount).toBe(0);
+      expect(result.tenantId).toBeNull();
+      expect(result.isPlatformAdmin).toBe(false);
+      expect(fetch).not.toHaveBeenCalled();
+    });
+
+    it('should fallback to client-side resolution on server errors', async () => {
       const mockFetch = vi.mocked(fetch);
+      const tenantAssignmentsChain = {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockResolvedValue({
+          data: [{ platform_domains: mockDomains[0] }],
+          error: null,
+        }),
+      };
+      (supabase.from as any).mockImplementation((table: string) => {
+        if (table === 'tenant_domain_assignments') return tenantAssignmentsChain;
+        throw new Error(`Unexpected table: ${table}`);
+      });
       mockFetch.mockResolvedValue({
         ok: false,
         status: 500,
@@ -88,7 +137,11 @@ describe('DomainService', () => {
         json: async () => ({ error: 'Internal Server Error', correlationId: 'corr-500' }),
       } as unknown as Response);
 
-      await expect(DomainService.getAuthorizedDomains()).rejects.toThrow('ref: corr-500');
+      const result = await DomainService.getAuthorizedDomains();
+      expect(result.domains).toEqual([mockDomains[0]]);
+      expect(result.tenantDomainCount).toBe(1);
+      expect(result.tenantId).toBeNull();
+      expect(result.isPlatformAdmin).toBe(false);
     });
 
     it('should fallback to client-side resolution when endpoint is unavailable', async () => {

@@ -137,6 +137,85 @@ describe('http domain and scope guards', () => {
     await expect(resolveAndApplyAccessContext(req, ctx)).rejects.toThrow('Forbidden');
   });
 
+  it('falls back to request headers when access profile tables are unavailable', async () => {
+    const rolesQuery = createSelectEqChain(
+      {
+        data: null,
+        error: { code: '42P01', message: 'relation "user_roles" does not exist' },
+      },
+      1
+    );
+    const preferenceQuery = createMaybeSingleChain({
+      data: null,
+      error: { code: '42P01', message: 'relation "user_preferences" does not exist' },
+    });
+    const supabaseMock = {
+      from: vi
+        .fn()
+        .mockReturnValueOnce(rolesQuery)
+        .mockReturnValueOnce(preferenceQuery),
+    } as any;
+    vi.mocked(getSupabaseAdminClient).mockReturnValue(supabaseMock);
+
+    const req = createMockRequest({
+      'x-tenant-id': 'tenant-1',
+      'x-franchise-id': 'fr-1',
+    });
+    const ctx = {
+      correlationId: 'corr-fallback-1',
+      tenantId: '',
+      franchiseId: '',
+      userId: 'user-1',
+      role: 'tenant_admin',
+      isPlatformAdmin: false,
+      adminOverrideEnabled: false,
+    };
+
+    const result = await resolveAndApplyAccessContext(req, ctx);
+    expect(result.roles).toEqual(['tenant_admin']);
+    expect(result.tenantId).toBe('tenant-1');
+    expect(result.franchiseId).toBe('fr-1');
+    expect(ctx.tenantId).toBe('tenant-1');
+    expect(ctx.franchiseId).toBe('fr-1');
+  });
+
+  it('keeps unresolved tenant scope when fallback has no tenant header', async () => {
+    const rolesQuery = createSelectEqChain(
+      {
+        data: null,
+        error: { code: '42P01', message: 'relation "user_roles" does not exist' },
+      },
+      1
+    );
+    const preferenceQuery = createMaybeSingleChain({
+      data: null,
+      error: { code: '42P01', message: 'relation "user_preferences" does not exist' },
+    });
+    const supabaseMock = {
+      from: vi
+        .fn()
+        .mockReturnValueOnce(rolesQuery)
+        .mockReturnValueOnce(preferenceQuery),
+    } as any;
+    vi.mocked(getSupabaseAdminClient).mockReturnValue(supabaseMock);
+
+    const req = createMockRequest();
+    const ctx = {
+      correlationId: 'corr-fallback-2',
+      tenantId: '',
+      franchiseId: '',
+      userId: 'user-1',
+      role: 'tenant_admin',
+      isPlatformAdmin: false,
+      adminOverrideEnabled: false,
+    };
+
+    const result = await resolveAndApplyAccessContext(req, ctx);
+    expect(result.roles).toEqual(['tenant_admin']);
+    expect(result.tenantId).toBeNull();
+    expect(ctx.tenantId).toBe('');
+  });
+
   it('blocks platform admin franchise spoof when override is enabled', () => {
     const access = buildAccess({
       isPlatformAdmin: true,
@@ -212,6 +291,34 @@ describe('http domain and scope guards', () => {
     const result = await enforceDomainAccess(buildAccess(), 'LOGISTICS');
     expect(result.authorizedDomainCodes).toEqual(['LOGISTICS']);
     expect(result.tenantDomainCount).toBe(1);
+  });
+
+  it('returns empty domain set when legacy fallback tables are unavailable', async () => {
+    const tenantAssignmentsQuery = createSelectEqChain(
+      {
+        data: null,
+        error: { code: '42P01', message: 'relation "tenant_domain_assignments" does not exist' },
+      },
+      2
+    );
+    const tenantQuery = createMaybeSingleChain({
+      data: null,
+      error: { code: '42P01', message: 'relation "tenants" does not exist' },
+    });
+
+    const supabaseMock = {
+      from: vi.fn((table: string) => {
+        if (table === 'tenant_domain_assignments') return tenantAssignmentsQuery;
+        if (table === 'tenants') return tenantQuery;
+        throw new Error(`Unexpected table: ${table}`);
+      }),
+    } as any;
+
+    vi.mocked(getSupabaseAdminClient).mockReturnValue(supabaseMock);
+
+    const result = await enforceDomainAccess(buildAccess());
+    expect(result.authorizedDomainCodes).toEqual([]);
+    expect(result.tenantDomainCount).toBe(0);
   });
 
   it('allows tenant-scoped platform admin through fallback domain resolution', async () => {
@@ -317,6 +424,39 @@ describe('http domain and scope guards', () => {
     vi.mocked(getSupabaseAdminClient).mockReturnValue(supabaseMock);
 
     await expect(enforceDomainAccess(buildAccess(), 'ECOMMERCE')).rejects.toThrow('Forbidden');
+  });
+
+  it('falls back to tenant domains when user assignments are empty', async () => {
+    const tenantQuery = createSelectEqChain(
+      {
+        data: [
+          { platform_domains: { code: 'LOGISTICS' } },
+          { platform_domains: { code: 'AMRO' } },
+        ],
+        error: null,
+      },
+      2
+    );
+    const userAssignmentQuery = createSelectEqChain(
+      {
+        data: [],
+        error: null,
+      },
+      3
+    );
+
+    const supabaseMock = {
+      from: vi
+        .fn()
+        .mockReturnValueOnce(tenantQuery)
+        .mockReturnValueOnce(userAssignmentQuery),
+    } as any;
+
+    vi.mocked(getSupabaseAdminClient).mockReturnValue(supabaseMock);
+
+    const result = await enforceDomainAccess(buildAccess(), 'AMRO');
+    expect(result.authorizedDomainCodes).toEqual(['LOGISTICS', 'AMRO']);
+    expect(result.tenantDomainCount).toBe(2);
   });
 
   it('allows tenant admin to access all tenant domains without user-level assignments', async () => {

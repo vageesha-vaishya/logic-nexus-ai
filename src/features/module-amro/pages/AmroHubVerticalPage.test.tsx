@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import AmroHubVerticalPage from './AmroHubVerticalPage';
+import { AmroOverviewPage, AmroWorkspaceDocumentationPage } from './AmroHubVerticalPage';
 
 const mockUseDomain = vi.fn();
 const mockUseAuth = vi.fn();
@@ -123,7 +126,7 @@ describe('AmroHubVerticalPage', () => {
     vi.unstubAllGlobals();
   });
 
-  it('renders AMRO integration contract links and active domain badge', () => {
+  it('renders operational overview layout with active domain badge', () => {
     mockUseDomain.mockReturnValue({ currentDomain: { code: 'AMRO' } });
     mockUseAuth.mockReturnValue({
       hasRole: vi.fn().mockImplementation((role: string) => role === 'tenant_admin'),
@@ -132,51 +135,16 @@ describe('AmroHubVerticalPage', () => {
 
     render(<AmroHubVerticalPage />);
 
-    expect(screen.getByText('AMRO Operations Overview')).toBeTruthy();
+    expect(screen.getByText('Operations Overview')).toBeTruthy();
     expect(screen.getByText('AMRO Domain Context Active')).toBeTruthy();
-    expect(screen.getByText('KPI Data Source: /api/v2/amro/overview-kpi')).toBeTruthy();
-    expect(screen.getByText('Critical KPI Metrics')).toBeTruthy();
-    expect(screen.getByText('Standard KPI Metrics')).toBeTruthy();
-    expect(screen.getByRole('region', { name: 'AMRO Dashboard CRUD Controls' })).toBeTruthy();
+    expect(screen.getByText('KPI Deck')).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'AMRO Overview Controls' })).toBeTruthy();
     expect(screen.getByText('Apply Dashboard Scope')).toBeTruthy();
     expect(screen.getByText('Clear Scope')).toBeTruthy();
-    expect(screen.getByText('AMRO Module CRUD Hub')).toBeTruthy();
-    expect(screen.getAllByText('Create').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Read').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Update').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Delete').length).toBeGreaterThan(0);
+    expect(screen.getByText('Work Package Overview Grid')).toBeTruthy();
+    expect(screen.getByText('Forecast Recommendation Hub')).toBeTruthy();
     expect(screen.getByText('Anomaly Flags')).toBeTruthy();
     expect(screen.getByText('Export KPI Snapshot')).toBeTruthy();
-    expect(screen.getByText('AMRO Integration Contracts')).toBeTruthy();
-    expect(screen.getByText('OpenAPI 3.1 Contract')).toBeTruthy();
-    expect(screen.getByText('GraphQL Subgraph Contract')).toBeTruthy();
-    expect(screen.getByText('gRPC Proto Contract')).toBeTruthy();
-    expect(screen.getByText('AsyncAPI Event Contract')).toBeTruthy();
-    expect(screen.getByText('Phase-Wise Plan API')).toBeTruthy();
-    expect(screen.getByText('Phase 1 Readiness API')).toBeTruthy();
-    expect(screen.getByText('Module Catalog API')).toBeTruthy();
-    expect(screen.getByText('Screen Inventory + UI/UX Contracts API')).toBeTruthy();
-    expect(screen.getByText('Migration Plan API')).toBeTruthy();
-    expect(screen.getByText('AMRO 15.1 Module Catalog')).toBeTruthy();
-    expect(screen.getByText('AMRO 16.1 Screen Inventory')).toBeTruthy();
-    expect(screen.getByText('AMRO 16.2 Per-Screen Layout Contracts')).toBeTruthy();
-    expect(screen.getByText('AMRO 16.3 UI/UX Behavior Rules')).toBeTruthy();
-    expect(screen.getByText('AMRO 16.4 Accessibility and Internationalization')).toBeTruthy();
-    expect(screen.getByText('Sticky top actions')).toBeTruthy();
-    expect(screen.getByText(/dual confirmation/i)).toBeTruthy();
-    expect(screen.getByText('Keyboard navigation')).toBeTruthy();
-    expect(screen.getAllByText('SCR-AMRO-001').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Forecast Recommendation Hub').length).toBeGreaterThan(0);
-    expect(screen.getByText('Overview and KPI Intelligence')).toBeTruthy();
-    expect(screen.getByText('Forecast and Reliability')).toBeTruthy();
-    expect(screen.getByText('Core UI Components & Basic Workflows')).toBeTruthy();
-    expect(screen.getByText('Establish AMRO domain routes and navigation')).toBeTruthy();
-    expect(screen.getAllByText('Overview Dashboard').length).toBeGreaterThan(0);
-    expect(screen.getByText('Role Controls')).toBeTruthy();
-    expect(screen.getByText('AMRO Phase-Wise Implementation Plan')).toBeTruthy();
-    expect(screen.getByText('Phase Plan Source: Fallback Model')).toBeTruthy();
-    expect(screen.getByText('P0 Foundation')).toBeTruthy();
-    expect(screen.getByText('P4 Integration and Scale')).toBeTruthy();
   });
 
   it('applies persona controls for user role and hides restricted actions', () => {
@@ -228,5 +196,73 @@ describe('AmroHubVerticalPage', () => {
     });
     expect(screen.getByText('Critical Refresh: 30s')).toBeTruthy();
     expect(screen.getByText('Standard Refresh: 300s')).toBeTruthy();
+  });
+
+  it('renders AMRO overview route through auth/domain guard with KPI cards and no error state', async () => {
+    mockUseDomain.mockReturnValue({
+      currentDomain: { code: 'AMRO' },
+      availableDomains: [{ id: 'domain-amro', code: 'AMRO', name: 'AMRO', description: null, is_active: true }],
+      isLoading: false,
+      setDomain: vi.fn(),
+      showDomainSelector: false,
+      tenantDomainCount: 1,
+      isPlatformAdmin: false,
+    });
+    mockUseAuth.mockReturnValue({
+      user: { id: 'user-1' },
+      loading: false,
+      hasRole: vi.fn().mockImplementation((role: string) => role === 'tenant_admin'),
+      hasPermission: vi.fn().mockReturnValue(true),
+      isPlatformAdmin: vi.fn().mockReturnValue(false),
+      session: { user: { id: 'user-1' } },
+      signIn: vi.fn(),
+      signOut: vi.fn(),
+      role: 'tenant_admin',
+      permissions: ['dashboards.view'],
+      refreshUserRole: vi.fn(),
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/dashboard/amro/overview']}>
+        <Routes>
+          <Route
+            path="/dashboard/amro/overview"
+            element={
+              <ProtectedRoute requiredDomainCode="AMRO">
+                <AmroOverviewPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/auth" element={<div>Auth Screen</div>} />
+          <Route path="/unauthorized" element={<div>Unauthorized Screen</div>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText('KPI Deck')).toBeTruthy();
+    expect(screen.getByText('Open Work Packages')).toBeTruthy();
+    expect(screen.getByText('Compliance Risk')).toBeTruthy();
+    expect(screen.queryByText('Overview Widget Error State')).toBeNull();
+    expect(screen.queryByText('Unauthorized Screen')).toBeNull();
+  });
+
+  it('renders workspace documentation route with search filtering and bookmarking controls', () => {
+    mockUseDomain.mockReturnValue({ currentDomain: { code: 'AMRO' } });
+    mockUseAuth.mockReturnValue({
+      hasRole: vi.fn().mockImplementation((role: string) => role === 'tenant_admin'),
+      isPlatformAdmin: vi.fn().mockReturnValue(false),
+    });
+    localStorage.setItem('amro.workspace.documentation.bookmarks', JSON.stringify(['openapi']));
+
+    render(<AmroWorkspaceDocumentationPage />);
+
+    expect(screen.getAllByText('Workspace Documentation').length).toBeGreaterThan(0);
+    expect(screen.getByPlaceholderText('Search references')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'All Categories' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Contracts' })).toBeTruthy();
+    expect(screen.getByText('Bookmarked References')).toBeTruthy();
+    expect(screen.getByText('AMRO Integration Contracts')).toBeTruthy();
+    expect(screen.getAllByText('AMRO 15.1 Module Catalog').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('AMRO 16.4 Accessibility and Internationalization').length).toBeGreaterThan(0);
   });
 });

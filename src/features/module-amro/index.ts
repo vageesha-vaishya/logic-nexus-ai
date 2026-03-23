@@ -9,5 +9,6 @@ export {
   AmroPartsPage,
   AmroSchedulingPage,
   AmroTaskExecutionPage,
+  AmroWorkspaceDocumentationPage,
   AmroWorkPackagesPage,
 } from './pages/AmroHubVerticalPage';

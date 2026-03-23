@@ -23,13 +23,14 @@ function applyCssVariables(branding: ResolvedTenantBranding | null) {
   root.style.setProperty('--tenant-brand-font', vars['--tenant-brand-font'] || 'Inter, system-ui, sans-serif');
 }
 
-function ensureStylesheet(hostname: string, domainCode: string, franchiseId: string) {
+function ensureStylesheet(hostname: string, domainCode: string, franchiseId: string, tenantId: string) {
   const id = 'tenant-branding-css-endpoint';
   const existing = document.getElementById(id) as HTMLLinkElement | null;
   const params = new URLSearchParams();
   if (hostname) params.set('hostname', hostname);
   if (domainCode) params.set('domain_code', domainCode);
   if (franchiseId) params.set('franchise_id', franchiseId);
+  if (tenantId) params.set('tenant_id', tenantId);
   const href = `/api/v1/tenant-branding.css${params.toString() ? `?${params.toString()}` : ''}`;
   if (existing) {
     if (existing.href.endsWith(href)) return;
@@ -81,11 +82,12 @@ export function TenantBrandingProvider({ children }: { children: React.ReactNode
         hostname,
         domainCode: currentDomain?.code || '',
         franchiseId: context?.franchiseId || '',
+        tenantId: context?.tenantId || '',
       });
       setBranding(data);
       applyCssVariables(data);
       applyFavicon(data);
-      ensureStylesheet(hostname, currentDomain?.code || '', context?.franchiseId || '');
+      ensureStylesheet(hostname, currentDomain?.code || '', context?.franchiseId || '', context?.tenantId || '');
     } catch (error) {
       logger.error('[TenantBrandingContext] failed to load branding', {
         component: 'TenantBrandingContext',

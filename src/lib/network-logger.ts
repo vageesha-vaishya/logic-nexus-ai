@@ -1,16 +1,62 @@
 import { logger } from './logger';
 import { debugStore } from './debug-store';
 
+const resolveRequestUrl = (resource: RequestInfo | URL): string => {
+  if (typeof resource === 'string') {
+    return resource;
+  }
+  if (resource instanceof URL) {
+    return resource.toString();
+  }
+  if (typeof Request !== 'undefined' && resource instanceof Request) {
+    return resource.url || resource.toString();
+  }
+  return String(resource);
+};
+
+const resolveSupabasePublicKey = (): string => {
+  const runtimeEnv =
+    typeof window !== 'undefined'
+      ? ((window as unknown as { __ENV__?: Record<string, unknown>; __APP_CONFIG__?: Record<string, unknown> }).__ENV__ ||
+        (window as unknown as { __APP_CONFIG__?: Record<string, unknown> }).__APP_CONFIG__ ||
+        {})
+      : {};
+
+  return String(
+    import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+      import.meta.env.VITE_SUPABASE_ANON_KEY ||
+      runtimeEnv.VITE_SUPABASE_PUBLISHABLE_KEY ||
+      runtimeEnv.VITE_SUPABASE_ANON_KEY ||
+      runtimeEnv.SUPABASE_ANON_KEY ||
+      '',
+  ).trim();
+};
+
+const ensureSupabaseRestHeaders = (headers: Headers, publicKey: string) => {
+  if (!publicKey) {
+    return;
+  }
+  const hasApiKey = Boolean(headers.get('apikey')?.trim());
+  if (!hasApiKey) {
+    headers.set('apikey', publicKey);
+  }
+  const hasAuthorization = Boolean(headers.get('Authorization')?.trim());
+  if (!hasAuthorization) {
+    headers.set('Authorization', `Bearer ${publicKey}`);
+  }
+};
+
 /**
  * Initialize network logger to intercept and log API requests.
  * Filters out requests to the logging endpoint itself to prevent infinite loops.
  */
 export const initNetworkLogger = () => {
   const originalFetch = window.fetch;
+  const supabasePublicKey = resolveSupabasePublicKey();
 
   window.fetch = async (...args) => {
     const [resource, config] = args;
-    const url = resource.toString();
+    const url = resolveRequestUrl(resource);
     const debugConfig = debugStore.getConfig();
 
     // CRITICAL: Avoid infinite loops by not logging requests to system_logs
@@ -30,6 +76,7 @@ export const initNetworkLogger = () => {
     // Inject Correlation ID into headers for distributed tracing
     // SKIP Supabase Edge Functions to avoid CORS preflight errors (X-Correlation-ID not allowed)
     const isSupabaseFunction = url.includes('/functions/v1/');
+    const isSupabaseRest = url.includes('.supabase.co/rest/v1/');
     const correlationId = logger.getCorrelationId();
     let newArgs = args;
     let requestHeaders: HeadersInit = {};
@@ -39,19 +86,34 @@ export const initNetworkLogger = () => {
       if (args.length > 1 && typeof args[1] === 'object') {
         const init = args[1] as RequestInit;
         const headers = new Headers(init.headers);
-        headers.set('X-Correlation-ID', correlationId);
+        if (isSupabaseRest) {
+          ensureSupabaseRestHeaders(headers, supabasePublicKey);
+        } else {
+          headers.set('X-Correlation-ID', correlationId);
+        }
         newArgs = [args[0], { ...init, headers }];
-        requestHeaders = init.headers || {};
+        requestHeaders = headers;
       } else if (args.length === 1 && typeof args[0] === 'object' && args[0] instanceof Request) {
           // Clone the request to modify headers
           const req = args[0] as Request;
           const headers = new Headers(req.headers);
-          headers.set('X-Correlation-ID', correlationId);
+          if (isSupabaseRest) {
+            ensureSupabaseRestHeaders(headers, supabasePublicKey);
+          } else {
+            headers.set('X-Correlation-ID', correlationId);
+          }
           newArgs = [new Request(req, { headers })];
-          requestHeaders = req.headers;
+          requestHeaders = headers;
       } else {
           // Simple url string case, add init object
-          newArgs = [args[0], { headers: { 'X-Correlation-ID': correlationId } }];
+          const headers = new Headers();
+          if (isSupabaseRest) {
+            ensureSupabaseRestHeaders(headers, supabasePublicKey);
+          } else {
+            headers.set('X-Correlation-ID', correlationId);
+          }
+          newArgs = [args[0], { headers }];
+          requestHeaders = headers;
       }
     }
 

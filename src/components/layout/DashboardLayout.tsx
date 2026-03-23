@@ -142,6 +142,10 @@ export function resolveBreadcrumbTrail(activeSurface: ActiveSurface | null): str
     .filter(Boolean);
 }
 
+const safelyRemoveRealtimeChannel = (channel: Parameters<typeof supabase.removeChannel>[0]) => {
+  void supabase.removeChannel(channel).catch(() => undefined);
+};
+
 function StickyActionsMount() {
   const { actions } = useStickyActions();
   return <StickyActionsBar left={actions.left} right={actions.right} />;
@@ -387,7 +391,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
     return () => {
       authSubscription.data.subscription.unsubscribe();
-      supabase.removeChannel(channel);
+      safelyRemoveRealtimeChannel(channel);
     };
   }, [context.franchiseId, context.tenantId, refreshProfile, user?.id]);
 

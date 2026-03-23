@@ -57,6 +57,63 @@ const CRM_ITEM_TITLES = new Set([
 const SALES_PRIORITY_ITEM_TITLES = ['Quotes', 'Quote Templates'];
 const GROUPS_STORAGE_KEY = 'sidebar:groups';
 const EXPANDED_ITEMS_STORAGE_KEY = 'sidebar:expandedItems';
+const AMRO_COLLAPSED_STORAGE_KEY = 'sidebar:amroCollapsed';
+const GROUP_THEME: Record<string, { heading: string; trigger: string; item: string; active: string; icon: string; iconActive: string; panel: string }> = {
+  crm: {
+    heading: 'text-violet-700 dark:text-violet-300',
+    trigger: 'hover:bg-violet-500/10 hover:text-violet-900 dark:hover:text-violet-100',
+    item: 'hover:bg-violet-500/10',
+    active: 'border-violet-500/30 bg-gradient-to-r from-violet-500/20 to-violet-500/5 text-violet-900 dark:text-violet-100',
+    icon: 'bg-violet-500/10 text-violet-700 dark:text-violet-300',
+    iconActive: 'bg-violet-500/20 text-violet-900 dark:text-violet-100',
+    panel: 'border-violet-500/10 bg-gradient-to-br from-violet-500/[0.06] via-transparent to-transparent',
+  },
+  sales: {
+    heading: 'text-blue-700 dark:text-blue-300',
+    trigger: 'hover:bg-blue-500/10 hover:text-blue-900 dark:hover:text-blue-100',
+    item: 'hover:bg-blue-500/10',
+    active: 'border-blue-500/30 bg-gradient-to-r from-blue-500/20 to-blue-500/5 text-blue-900 dark:text-blue-100',
+    icon: 'bg-blue-500/10 text-blue-700 dark:text-blue-300',
+    iconActive: 'bg-blue-500/20 text-blue-900 dark:text-blue-100',
+    panel: 'border-blue-500/10 bg-gradient-to-br from-blue-500/[0.06] via-transparent to-transparent',
+  },
+  financials: {
+    heading: 'text-emerald-700 dark:text-emerald-300',
+    trigger: 'hover:bg-emerald-500/10 hover:text-emerald-900 dark:hover:text-emerald-100',
+    item: 'hover:bg-emerald-500/10',
+    active: 'border-emerald-500/30 bg-gradient-to-r from-emerald-500/20 to-emerald-500/5 text-emerald-900 dark:text-emerald-100',
+    icon: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
+    iconActive: 'bg-emerald-500/20 text-emerald-900 dark:text-emerald-100',
+    panel: 'border-emerald-500/10 bg-gradient-to-br from-emerald-500/[0.06] via-transparent to-transparent',
+  },
+  logistics: {
+    heading: 'text-amber-700 dark:text-amber-300',
+    trigger: 'hover:bg-amber-500/10 hover:text-amber-900 dark:hover:text-amber-100',
+    item: 'hover:bg-amber-500/10',
+    active: 'border-amber-500/30 bg-gradient-to-r from-amber-500/20 to-amber-500/5 text-amber-900 dark:text-amber-100',
+    icon: 'bg-amber-500/10 text-amber-700 dark:text-amber-300',
+    iconActive: 'bg-amber-500/20 text-amber-900 dark:text-amber-100',
+    panel: 'border-amber-500/10 bg-gradient-to-br from-amber-500/[0.06] via-transparent to-transparent',
+  },
+  amro: {
+    heading: 'text-cyan-700 dark:text-cyan-300',
+    trigger: 'hover:bg-cyan-500/10 hover:text-cyan-900 dark:hover:text-cyan-100',
+    item: 'hover:bg-cyan-500/10',
+    active: 'border-cyan-500/30 bg-gradient-to-r from-cyan-500/20 to-cyan-500/5 text-cyan-900 dark:text-cyan-100',
+    icon: 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-300',
+    iconActive: 'bg-cyan-500/20 text-cyan-900 dark:text-cyan-100',
+    panel: 'border-cyan-500/10 bg-gradient-to-br from-cyan-500/[0.06] via-transparent to-transparent',
+  },
+  admin: {
+    heading: 'text-fuchsia-700 dark:text-fuchsia-300',
+    trigger: 'hover:bg-fuchsia-500/10 hover:text-fuchsia-900 dark:hover:text-fuchsia-100',
+    item: 'hover:bg-fuchsia-500/10',
+    active: 'border-fuchsia-500/30 bg-gradient-to-r from-fuchsia-500/20 to-fuchsia-500/5 text-fuchsia-900 dark:text-fuchsia-100',
+    icon: 'bg-fuchsia-500/10 text-fuchsia-700 dark:text-fuchsia-300',
+    iconActive: 'bg-fuchsia-500/20 text-fuchsia-900 dark:text-fuchsia-100',
+    panel: 'border-fuchsia-500/10 bg-gradient-to-br from-fuchsia-500/[0.06] via-transparent to-transparent',
+  },
+};
 
 const ROUTE_PREFETCHERS: Record<string, () => Promise<unknown>> = {
   '/dashboard': () => import('@/pages/dashboard/Dashboards'),
@@ -106,6 +163,23 @@ export function CommandCenterNav() {
       return saved ? JSON.parse(saved) : {};
     } catch {
       return {};
+    }
+  });
+  const [amroGroupCollapsed, setAmroGroupCollapsed] = useState<boolean>(() => {
+    const getStoredValue = () => {
+      const localValue = localStorage.getItem(AMRO_COLLAPSED_STORAGE_KEY);
+      if (localValue) return localValue;
+      const sessionValue = sessionStorage.getItem(AMRO_COLLAPSED_STORAGE_KEY);
+      if (sessionValue) {
+        localStorage.setItem(AMRO_COLLAPSED_STORAGE_KEY, sessionValue);
+      }
+      return sessionValue;
+    };
+    try {
+      const saved = getStoredValue();
+      return saved ? Boolean(JSON.parse(saved)) : false;
+    } catch {
+      return false;
     }
   });
   
@@ -158,6 +232,20 @@ export function CommandCenterNav() {
   });
 
   const toggleGroup = (group: string) => {
+    if (group === 'amro') {
+      setAmroGroupCollapsed((prevCollapsed) => {
+        const nextCollapsed = !prevCollapsed;
+        localStorage.setItem(AMRO_COLLAPSED_STORAGE_KEY, JSON.stringify(nextCollapsed));
+        setOpenGroups((prevGroups) => {
+          const nextGroups = { ...prevGroups, amro: !nextCollapsed };
+          localStorage.setItem(GROUPS_STORAGE_KEY, JSON.stringify(nextGroups));
+          return nextGroups;
+        });
+        return nextCollapsed;
+      });
+      return;
+    }
+
     setOpenGroups(prev => {
       const next = { ...prev, [group]: !prev[group] };
       if ((group === 'crm' || group === 'sales') && !prev[group]) {
@@ -279,20 +367,36 @@ export function CommandCenterNav() {
     })).filter(group => group.items.length > 0);
   }, [menuGroups, searchQuery]);
 
-  const getNavClass = ({ isActive }: { isActive: boolean }) =>
-    cn(
-      "flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors",
-      isActive ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground hover:bg-muted hover:text-foreground"
-    );
+  const getGroupTheme = (groupId: string) => GROUP_THEME[groupId] ?? GROUP_THEME.crm;
 
-  const renderMenuItem = (item: MenuItem) => {
+  const getNavClass = (groupId: string, isActive: boolean) => {
+    const theme = getGroupTheme(groupId);
+    if (collapsed) {
+      return cn(
+        "group/menu-link mx-auto flex h-10 w-10 items-center justify-center rounded-xl border text-sm transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar",
+        isActive
+          ? cn("font-semibold shadow-sm ring-1 ring-inset", theme.active)
+          : cn("border-transparent text-muted-foreground hover:text-foreground hover:scale-[1.03]", theme.item),
+      );
+    }
+
+    return cn(
+      "group/menu-link relative flex w-full items-center gap-2.5 rounded-lg border px-2.5 py-2.5 text-sm leading-5 transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar",
+      isActive
+        ? cn("font-semibold shadow-sm", theme.active)
+        : cn("border-transparent text-muted-foreground hover:text-foreground hover:translate-x-0.5", theme.item),
+    );
+  };
+
+  const renderMenuItem = (item: MenuItem, groupId: string) => {
+    const theme = getGroupTheme(groupId);
     const node = (
       <SidebarMenuItem key={item.url}>
         <SidebarMenuButton asChild tooltip={collapsed ? item.title : undefined}>
           <NavLink 
             to={item.url} 
             end={item.url === '/dashboard'} 
-            className={getNavClass}
+            className={({ isActive }) => getNavClass(groupId, isActive)}
             onClick={(e) => {
               if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
                 e.preventDefault();
@@ -303,8 +407,21 @@ export function CommandCenterNav() {
             onFocus={() => prefetchRoute(item.url)}
             aria-label={item.title}
           >
-            <item.icon className="h-4 w-4 shrink-0" />
-            {!collapsed && <span className="truncate">{item.title}</span>}
+            {({ isActive }) => (
+              <>
+                <span
+                  className={cn(
+                    "flex shrink-0 items-center justify-center rounded-md transition-all duration-200",
+                    collapsed ? "h-8 w-8" : "h-7 w-7",
+                    isActive ? theme.iconActive : theme.icon,
+                  )}
+                >
+                  <item.icon className={cn("shrink-0", collapsed ? "h-[18px] w-[18px]" : "h-4 w-4")} />
+                </span>
+                {!collapsed && <span className="truncate font-medium">{item.title}</span>}
+                {!collapsed && isActive && <span className="ml-auto h-2 w-2 rounded-full bg-current/80" />}
+              </>
+            )}
           </NavLink>
         </SidebarMenuButton>
       </SidebarMenuItem>
@@ -321,7 +438,7 @@ export function CommandCenterNav() {
   };
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-2 pb-2">
       {/* Search Bar - Only visible when expanded */}
       {!collapsed && (
         <div className="px-4 py-2">
@@ -330,7 +447,7 @@ export function CommandCenterNav() {
             <Input
               placeholder="Search modules..."
               aria-label="Search modules"
-              className="pl-8 h-9 bg-background/50 focus:bg-background transition-colors"
+              className="h-9 rounded-lg border-sidebar-border/60 bg-background/60 pl-8 transition-colors focus:bg-background"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -346,7 +463,9 @@ export function CommandCenterNav() {
         const hasActiveItem = group.items.some((item) =>
           item.url !== '/dashboard' && (location.pathname === item.url || location.pathname.startsWith(`${item.url}/`))
         );
-        const isOpen = isSearchActive || openGroups[group.id] || group.defaultOpen || hasActiveItem;
+        const isOpen = group.id === 'amro'
+          ? isSearchActive || group.defaultOpen || (!amroGroupCollapsed && (openGroups[group.id] || hasActiveItem))
+          : isSearchActive || openGroups[group.id] || group.defaultOpen || hasActiveItem;
         const isLowFrequencyGroup = group.id === 'logistics' || group.id === 'financials' || group.id === 'admin' || group.id === 'amro';
         const isExpanded = !!expandedItems[group.id];
         const visibleItems =
@@ -355,6 +474,8 @@ export function CommandCenterNav() {
             : group.items;
         const hiddenCount = group.items.length - visibleItems.length;
 
+        const theme = getGroupTheme(group.id);
+
         return (
           <Collapsible 
             key={group.id} 
@@ -362,24 +483,28 @@ export function CommandCenterNav() {
             onOpenChange={() => !isSearchActive && toggleGroup(group.id)}
             disabled={isSearchActive || group.defaultOpen} // Disable toggle if searching or if forced open
           >
-            <SidebarGroup>
+            <SidebarGroup className={cn("rounded-xl border px-1.5 py-1", collapsed ? "border-transparent bg-transparent" : theme.panel)}>
               <SidebarGroupLabel asChild>
                 {group.defaultOpen || isSearchActive ? (
-                  <div className={cn("flex w-full items-center justify-between px-2 py-1.5 text-xs font-semibold text-muted-foreground", collapsed && "hidden")}>
+                  <div className={cn("flex w-full items-center justify-between rounded-md px-2 py-1.5 text-xs font-semibold tracking-wide", theme.heading, collapsed && "hidden")}>
                     {group.label}
                   </div>
                 ) : (
                   <CollapsibleTrigger asChild>
                     <button
                       type="button"
-                      className="flex w-full items-center justify-between hover:text-foreground transition-colors group px-2 py-1.5 cursor-pointer"
+                      className={cn(
+                        "group flex w-full cursor-pointer items-center justify-between rounded-md px-2 py-1.5 text-xs font-semibold tracking-wide transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar",
+                        theme.heading,
+                        theme.trigger,
+                      )}
                       aria-label={`Toggle ${group.label} menu`}
                       aria-expanded={isOpen}
                     >
                       {!collapsed && (
                         <>
-                          <span className="text-xs font-semibold text-muted-foreground group-hover:text-foreground">{group.label}</span>
-                          <ChevronDown className={cn("h-3 w-3 text-muted-foreground transition-transform duration-200", !isOpen && "-rotate-90")} />
+                          <span>{group.label}</span>
+                          <ChevronDown className={cn("h-3.5 w-3.5 transition-transform duration-300 ease-out", !isOpen && "-rotate-90")} />
                         </>
                       )}
                     </button>
@@ -392,7 +517,7 @@ export function CommandCenterNav() {
               >
                 <SidebarGroupContent>
                   <SidebarMenu>
-                    {visibleItems.map(renderMenuItem)}
+                    {visibleItems.map((item) => renderMenuItem(item, group.id))}
                   </SidebarMenu>
                   {!isSearchActive && !collapsed && isLowFrequencyGroup && hiddenCount > 0 && (
                     <button

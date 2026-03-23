@@ -432,7 +432,14 @@ const initialPredictiveRecommendations: AmroPredictiveRecommendation[] = [
 
 export function useAmroWorkspaceState() {
   const { hasPermission, hasRole, isPlatformAdmin: isAuthPlatformAdmin, session } = useAuth();
-  const { currentDomain, availableDomains, setDomain, isPlatformAdmin: isDomainPlatformAdmin } = useDomain();
+  const {
+    currentDomain,
+    availableDomains,
+    setDomain,
+    refreshDomains,
+    isPlatformAdmin: isDomainPlatformAdmin,
+    isLoading: isDomainLoading = false,
+  } = useDomain();
   const token = session?.access_token || null;
   const apiBaseUrl = useMemo(() => getAmroApiBaseUrl(), []);
   const [assets, setAssets] = useState<AmroAssetRegistryRecord[]>(initialAssets);
@@ -476,6 +483,7 @@ export function useAmroWorkspaceState() {
   const [expiryAutomationSummary, setExpiryAutomationSummary] = useState<CertificationExpiryAutomationState | null>(null);
   const [competencyAnalytics, setCompetencyAnalytics] = useState<CertificationCompetencyAnalyticsState | null>(null);
   const [authorityCertificationTemplate, setAuthorityCertificationTemplate] = useState<CertificationTemplateState | null>(null);
+  const [domainRefreshAttempted, setDomainRefreshAttempted] = useState<boolean>(false);
 
   const authHeaders = useMemo(
     () =>
@@ -487,20 +495,22 @@ export function useAmroWorkspaceState() {
         : null,
     [token],
   );
-  const hasAmroDomainAssignment = useMemo(
-    () => availableDomains.some((domain) => String(domain.code || '').trim().toUpperCase() === 'AMRO'),
-    [availableDomains],
-  );
   const isAmroDomainActive = useMemo(
     () => String(currentDomain?.code || '').trim().toUpperCase() === 'AMRO',
     [currentDomain],
   );
+  const hasAmroDomainAssignment = useMemo(
+    () => isAmroDomainActive || availableDomains.some((domain) => String(domain.code || '').trim().toUpperCase() === 'AMRO'),
+    [availableDomains, isAmroDomainActive],
+  );
   const amroAccessErrorMessage = useMemo(
     () =>
-      hasAmroDomainAssignment
+      isDomainLoading
+        ? 'Resolving AMRO domain assignment...'
+        : hasAmroDomainAssignment
         ? 'AMRO domain context required - switch to AMRO domain'
         : 'Access denied - AMRO domain assignment required',
-    [hasAmroDomainAssignment],
+    [hasAmroDomainAssignment, isDomainLoading],
   );
   const hasAmroPermissionScope = useMemo(
     () =>
@@ -523,6 +533,24 @@ export function useAmroWorkspaceState() {
     () => hasAmroPermissionScope && hasAmroDomainAssignment && !isAmroDomainActive,
     [hasAmroDomainAssignment, hasAmroPermissionScope, isAmroDomainActive],
   );
+
+  useEffect(() => {
+    if (isDomainLoading || domainRefreshAttempted) {
+      return;
+    }
+    if (!token || !hasAmroPermissionScope || hasAmroDomainAssignment) {
+      return;
+    }
+    setDomainRefreshAttempted(true);
+    void refreshDomains(true);
+  }, [
+    domainRefreshAttempted,
+    hasAmroDomainAssignment,
+    hasAmroPermissionScope,
+    isDomainLoading,
+    refreshDomains,
+    token,
+  ]);
 
   const isApiTemporarilyUnavailable = useCallback(() => Date.now() < apiUnavailableUntil, [apiUnavailableUntil]);
 

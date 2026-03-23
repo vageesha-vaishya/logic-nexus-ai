@@ -76,8 +76,19 @@ describe('CommandCenterNav', () => {
     renderNav('/dashboard/amro/overview');
 
     expect(screen.getByRole('button', { name: 'Toggle AMRO menu' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'AMRO Overview' })).toHaveAttribute('aria-current', 'page');
-    expect(screen.getByRole('link', { name: 'AMRO Work Packages' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Overview' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('link', { name: 'Work Packages' })).toBeInTheDocument();
+  });
+
+  it('keeps icons visible and scaled when sidebar is collapsed', () => {
+    mockUseSidebar.mockReturnValue({ state: 'collapsed' });
+    sessionStorage.setItem('sidebar:groups', JSON.stringify({ amro: true }));
+    renderNav('/dashboard/amro/overview');
+
+    const overviewLink = screen.getByRole('link', { name: 'Overview' });
+    expect(overviewLink).toBeInTheDocument();
+    expect(overviewLink.querySelector('svg')).not.toBeNull();
+    expect(screen.queryByText('Work Packages')).not.toBeInTheDocument();
   });
 
   it('renders distinct CRM and Sales navigation sections', () => {
@@ -171,7 +182,7 @@ describe('CommandCenterNav', () => {
     renderNav('/dashboard');
 
     expect(screen.queryByRole('button', { name: 'Toggle AMRO menu' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'AMRO Overview' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Overview' })).not.toBeInTheDocument();
   });
 
   it('shows AMRO module for platform admin when domain list is temporarily unavailable', () => {
@@ -189,14 +200,28 @@ describe('CommandCenterNav', () => {
     renderNav('/dashboard');
 
     expect(screen.getByRole('button', { name: 'Toggle AMRO menu' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'AMRO Overview' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Overview' })).toBeInTheDocument();
   });
 
   it('keeps group expansion state persisted in local storage', () => {
     localStorage.setItem('sidebar:groups', JSON.stringify({ amro: true, logistics: false }));
     renderNav('/dashboard');
 
-    expect(screen.getByRole('link', { name: 'AMRO Overview' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Overview' })).toBeInTheDocument();
+  });
+
+  it('persists AMRO collapsed preference independently', async () => {
+    const user = userEvent.setup();
+    localStorage.setItem('sidebar:groups', JSON.stringify({ amro: true }));
+    renderNav('/dashboard/amro/overview');
+
+    const amroToggle = screen.getByRole('button', { name: 'Toggle AMRO menu' });
+    expect(amroToggle).toHaveAttribute('aria-expanded', 'true');
+
+    await user.click(amroToggle);
+    expect(amroToggle).toHaveAttribute('aria-expanded', 'false');
+    expect(localStorage.getItem('sidebar:amroCollapsed')).toBe('true');
+    expect(JSON.parse(localStorage.getItem('sidebar:groups') || '{}')).toMatchObject({ amro: false });
   });
 
   it('persists section state in local storage after refresh', () => {
@@ -246,7 +271,7 @@ describe('CommandCenterNav', () => {
 
     renderNav('/dashboard');
 
-    expect(screen.queryByRole('link', { name: 'AMRO Overview' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Overview' })).not.toBeInTheDocument();
   });
 
   it('keeps AMRO routes visible when RBAC fix flag is disabled', () => {
@@ -259,6 +284,6 @@ describe('CommandCenterNav', () => {
 
     renderNav('/dashboard');
 
-    expect(screen.getByRole('link', { name: 'AMRO Overview' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Overview' })).toBeInTheDocument();
   });
 });

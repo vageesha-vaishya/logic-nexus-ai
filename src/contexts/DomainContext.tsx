@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { DomainService, PlatformDomain } from '../services/DomainService';
 import { toast } from 'sonner';
 import { logger } from '@/lib/logger';
@@ -6,6 +6,7 @@ import { logger } from '@/lib/logger';
 interface DomainContextType {
   currentDomain: PlatformDomain | null;
   setDomain: (code: string) => Promise<void>;
+  refreshDomains: (forceRefresh?: boolean) => Promise<PlatformDomain[]>;
   availableDomains: PlatformDomain[];
   showDomainSelector: boolean;
   tenantDomainCount: number;
@@ -23,15 +24,11 @@ export function DomainContextProvider({ children }: { children: React.ReactNode 
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    loadDomains();
-  }, []);
-
-  const loadDomains = async () => {
+  const loadDomains = useCallback(async (forceRefresh = false): Promise<PlatformDomain[]> => {
     try {
       setIsLoading(true);
       logger.debug('Loading platform domains...', { component: 'DomainContext' });
-      const authorized = await DomainService.getAuthorizedDomains();
+      const authorized = await DomainService.getAuthorizedDomains(forceRefresh);
       const domains = authorized.domains;
       setAvailableDomains(domains);
       setTenantDomainCount(authorized.tenantDomainCount);
@@ -50,16 +47,26 @@ export function DomainContextProvider({ children }: { children: React.ReactNode 
       } else {
         logger.warn('No suitable platform domain found', { component: 'DomainContext' });
       }
+      return domains;
     } catch (error: any) {
       logger.error('Failed to load domains', { error: error.message, component: 'DomainContext' });
       toast.error(error?.message || 'Failed to load platform domains');
+      return [];
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    void loadDomains();
+  }, [loadDomains]);
 
   const setDomain = async (code: string) => {
-    const domain = availableDomains.find(d => d.code === code);
+    let domain = availableDomains.find(d => d.code === code);
+    if (!domain) {
+      const refreshedDomains = await loadDomains(true);
+      domain = refreshedDomains.find(d => d.code === code);
+    }
     if (domain) {
       setCurrentDomainState(domain);
       localStorage.setItem('active_domain_code', code);
@@ -74,6 +81,7 @@ export function DomainContextProvider({ children }: { children: React.ReactNode 
       value={{
         currentDomain,
         setDomain,
+        refreshDomains: loadDomains,
         availableDomains,
         showDomainSelector,
         tenantDomainCount,

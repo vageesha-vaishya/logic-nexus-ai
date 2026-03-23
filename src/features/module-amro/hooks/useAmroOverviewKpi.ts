@@ -223,22 +223,55 @@ async function requestOverview<TOutput>(url: string, init: RequestInit | undefin
     return headers;
   };
 
+  const parseEnvelope = async (response: Response): Promise<ApiEnvelope<TOutput>> => {
+    if (typeof response.text === 'function') {
+      const raw = await response.text();
+      if (!raw.trim()) {
+        return {};
+      }
+      try {
+        return JSON.parse(raw) as ApiEnvelope<TOutput>;
+      } catch {
+        throw new Error('Invalid JSON response payload');
+      }
+    }
+    if (typeof response.json === 'function') {
+      try {
+        return await response.json() as ApiEnvelope<TOutput>;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : '';
+        if (/unexpected end of json input/i.test(message)) {
+          return {};
+        }
+        throw error;
+      }
+    }
+    return {};
+  };
+
   const callWithToken = async (requestUrl: string) => {
     const response = await fetch(requestUrl, {
       ...init,
       headers: buildRequestHeaders(),
     });
-    const payload = await response.json() as ApiEnvelope<TOutput>;
+    const payload = await parseEnvelope(response);
     return { response, payload };
   };
 
-  let { response, payload } = await callWithToken(url);
+  let activeUrl = url;
+  let { response, payload } = await callWithToken(activeUrl);
   const isAuthHeaderRejection = response.status === 401
     && /missing or malformed authorization header/i.test(String(payload.error || ''));
   if (isAuthHeaderRejection) {
     const separator = url.includes('?') ? '&' : '?';
     const fallbackUrl = `${url}${separator}access_token=${encodeURIComponent(token)}`;
     const retried = await callWithToken(fallbackUrl);
+    activeUrl = fallbackUrl;
+    response = retried.response;
+    payload = retried.payload;
+  }
+  if (response.ok && !payload.error && !payload.output) {
+    const retried = await callWithToken(activeUrl);
     response = retried.response;
     payload = retried.payload;
   }
@@ -247,7 +280,7 @@ async function requestOverview<TOutput>(url: string, init: RequestInit | undefin
     throw new Error(payload.error || `Request failed with status ${response.status}`);
   }
   if (!payload.output) {
-    throw new Error('Missing output payload');
+    throw new Error('Empty response payload from AMRO KPI API');
   }
   return payload.output;
 }

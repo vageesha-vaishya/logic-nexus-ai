@@ -4,9 +4,45 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { DashboardLayout } from '../DashboardLayout';
 
+const {
+  mockSupabaseChannel,
+  mockSupabaseRemoveChannel,
+  mockSupabaseOnAuthStateChange,
+  mockSupabaseAuthUnsubscribe,
+} = vi.hoisted(() => {
+  const mockSupabaseAuthUnsubscribe = vi.fn();
+  const mockSupabaseOnAuthStateChange = vi.fn(() => ({
+    data: { subscription: { unsubscribe: mockSupabaseAuthUnsubscribe } },
+  }));
+  const mockChannelOn = vi.fn();
+  const channel = {
+    on: mockChannelOn,
+    subscribe: vi.fn(),
+  };
+  mockChannelOn.mockImplementation(() => channel);
+  const mockSupabaseChannel = vi.fn(() => channel);
+  const mockSupabaseRemoveChannel = vi.fn().mockResolvedValue('ok');
+  return {
+    mockSupabaseChannel,
+    mockSupabaseRemoveChannel,
+    mockSupabaseOnAuthStateChange,
+    mockSupabaseAuthUnsubscribe,
+  };
+});
+
 const mockUseAuth = vi.fn();
 const mockUseCRM = vi.fn();
 const mockUseAppFeatureFlag = vi.fn();
+
+vi.mock('@/integrations/supabase/client', () => ({
+  supabase: {
+    auth: {
+      onAuthStateChange: mockSupabaseOnAuthStateChange,
+    },
+    channel: mockSupabaseChannel,
+    removeChannel: mockSupabaseRemoveChannel,
+  },
+}));
 
 vi.mock('../AppSidebar', () => ({
   AppSidebar: () => <aside data-testid="app-sidebar" />,
@@ -79,6 +115,7 @@ vi.mock('@/components/ui/global-search', () => ({
 
 describe('DashboardLayout overflow behavior', () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     document.documentElement.removeAttribute('data-header-banner-visible');
     document.documentElement.removeAttribute('data-header-banner-content');
     mockUseAuth.mockReturnValue({
@@ -181,5 +218,29 @@ describe('DashboardLayout overflow behavior', () => {
     );
 
     expect(await screen.findByText('Legacy API Notification')).toBeInTheDocument();
+  });
+
+  it('cleans realtime channel safely when removeChannel rejects', () => {
+    mockSupabaseRemoveChannel.mockRejectedValueOnce(new Error('WebSocket is closed before the connection is established'));
+    mockUseAuth.mockReturnValue({
+      user: { id: 'user-1', email: 'admin@example.com', user_metadata: {} },
+      profile: { first_name: 'Admin', last_name: 'User', avatar_url: null },
+      roles: [{ role: 'platform_admin' }],
+      refreshProfile: vi.fn(),
+    });
+
+    const { unmount } = render(
+      <MemoryRouter initialEntries={['/dashboard/leads']}>
+        <DashboardLayout>
+          <div>Content</div>
+        </DashboardLayout>
+      </MemoryRouter>,
+    );
+
+    unmount();
+
+    expect(mockSupabaseChannel).toHaveBeenCalled();
+    expect(mockSupabaseAuthUnsubscribe).toHaveBeenCalled();
+    expect(mockSupabaseRemoveChannel).toHaveBeenCalled();
   });
 });

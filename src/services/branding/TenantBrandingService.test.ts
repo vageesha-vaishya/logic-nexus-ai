@@ -222,4 +222,89 @@ describe('TenantBrandingService.getResolvedBranding', () => {
     expect(result.tenantId).toBe('tenant-1');
     expect(result.companyName).toBe('Acme');
   });
+
+  it('includes explicit tenant scope in branding API request', async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({
+        data: {
+          tenantId: 'tenant-deccan',
+          tenantName: 'Deccan',
+          tenantSlug: 'deccan',
+          logoUrl: '',
+          faviconUrl: '',
+          companyName: 'Deccan',
+          primaryColor: '#2563EB',
+          secondaryColor: '#1D4ED8',
+          accentColor: '#F59E0B',
+          fontFamily: 'Inter, system-ui, sans-serif',
+          customCss: '',
+          whiteLabelEnabled: false,
+          headerText: '',
+          subHeaderText: '',
+          footerText: '',
+          disclaimerText: '',
+          metadata: {
+            domain: 'deccan.test',
+            hostname: 'localhost',
+            resolvedAt: '2026-03-23T00:00:00.000Z',
+          },
+        },
+      }),
+    } as any);
+
+    await TenantBrandingService.getResolvedBranding({
+      hostname: 'localhost',
+      franchiseId: 'fr-deccan-fly',
+      tenantId: 'tenant-deccan',
+    });
+
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const requestUrl = String((vi.mocked(fetch).mock.calls[0] || [])[0] || '');
+    expect(requestUrl).toContain('/api/v1/tenant-branding?');
+    expect(requestUrl).toContain('tenant_id=tenant-deccan');
+    expect(requestUrl).toContain('franchise_id=fr-deccan-fly');
+  });
+
+  it('uses explicit tenant scope for fallback without profile lookup', async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: false,
+      status: 404,
+      json: vi.fn().mockResolvedValue({ error: 'Not Found' }),
+    } as any);
+
+    const tenantSelectChain: any = {
+      eq: vi.fn(() => tenantSelectChain),
+      limit: vi.fn(() => tenantSelectChain),
+      maybeSingle: vi.fn().mockResolvedValue({
+        data: {
+          id: 'tenant-deccan',
+          name: 'Deccan',
+          slug: 'deccan',
+          domain: 'deccan.test',
+          logo_url: '',
+          branding_settings: {},
+          settings: {},
+        },
+        error: null,
+      }),
+    };
+
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'tenants') {
+        return { select: vi.fn(() => tenantSelectChain) };
+      }
+      throw new Error(`Unexpected table: ${table}`);
+    });
+
+    const result = await TenantBrandingService.getResolvedBranding({
+      hostname: 'localhost',
+      tenantId: 'tenant-deccan',
+    });
+
+    expect(result.tenantId).toBe('tenant-deccan');
+    expect((supabase.auth as any).getUser).not.toHaveBeenCalled();
+    expect(mockFrom).toHaveBeenCalledWith('tenants');
+    expect(mockFrom).not.toHaveBeenCalledWith('profiles');
+  });
 });

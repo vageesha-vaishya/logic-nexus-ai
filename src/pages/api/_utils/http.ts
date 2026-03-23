@@ -144,6 +144,14 @@ async function resolveTenantPrimaryDomainCode(supabase: any, tenantId: string): 
     .maybeSingle();
 
   if (tenantError) {
+    if (isMissingRelationError(tenantError) || isMissingColumnError(tenantError)) {
+      logger.warn('[DomainAccess] tenant fallback lookup unavailable; returning empty domain set', {
+        tenantId,
+        error: String(tenantError.message || ''),
+        code: String(tenantError.code || ''),
+      });
+      return [];
+    }
     throw new Error(`Failed to resolve tenant fallback domain: ${tenantError.message}`);
   }
 
@@ -161,6 +169,14 @@ async function resolveTenantPrimaryDomainCode(supabase: any, tenantId: string): 
     .maybeSingle();
 
   if (domainError) {
+    if (isMissingRelationError(domainError) || isMissingColumnError(domainError)) {
+      logger.warn('[DomainAccess] platform_domains lookup unavailable during fallback; returning empty domain set', {
+        tenantId,
+        error: String(domainError.message || ''),
+        code: String(domainError.code || ''),
+      });
+      return [];
+    }
     throw new Error(`Failed to resolve tenant fallback domain: ${domainError.message}`);
   }
 
@@ -225,6 +241,9 @@ async function resolveUserAssignedDomainCodes(
   }
 
   const assignedCodes = normalizeDomainCodes(data || []);
+  if (assignedCodes.length === 0) {
+    return tenantDomainCodes;
+  }
   return assignedCodes.filter((code) => tenantDomainCodes.includes(code));
 }
 
@@ -619,9 +638,43 @@ export function enforceAdminOverrideScope(
 }
 
 export async function resolveAndApplyAccessContext(req: ApiRequest, ctx: ApiContext): Promise<UserAccessProfile> {
-  const access = await resolveUserAccessProfile(ctx.userId);
   const requestedTenantId = parseHeaderValue(req.headers['x-tenant-id']).trim() || null;
   const requestedFranchiseId = parseHeaderValue(req.headers['x-franchise-id']).trim() || null;
+  const normalizedRole = String(ctx.role || '').trim().toLowerCase();
+  const fallbackRole = normalizedRole || 'user';
+  const isPlatformRole = fallbackRole === 'platform_admin' || fallbackRole === 'super_admin';
+
+  let access: UserAccessProfile;
+  try {
+    access = await resolveUserAccessProfile(ctx.userId);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '';
+    const recoverable = isMissingRelationError({ message })
+      || message.includes('schema cache')
+      || message.startsWith('Failed to resolve roles:')
+      || message.startsWith('Failed to resolve scope preference:');
+    if (!recoverable) {
+      throw error;
+    }
+    logger.warn('[AccessControl] access profile fallback applied due to unavailable role metadata store', {
+      correlationId: ctx.correlationId,
+      userId: ctx.userId,
+      role: fallbackRole,
+      tenantId: requestedTenantId,
+      franchiseId: requestedFranchiseId,
+      error: message,
+    });
+    access = {
+      userId: ctx.userId,
+      roles: [fallbackRole],
+      isPlatformAdmin: isPlatformRole,
+      tenantId: requestedTenantId,
+      franchiseId: requestedFranchiseId,
+      adminOverrideEnabled: false,
+      overrideTenantId: null,
+      overrideFranchiseId: null,
+    };
+  }
 
   enforceAdminOverrideScope(access, requestedTenantId, requestedFranchiseId);
 

@@ -13,8 +13,17 @@ describe('amro domain separation strategy', () => {
     const hubPage = read('src/features/module-amro/pages/AmroHubVerticalPage.tsx');
     expect(hubPage).toContain('DashboardLayout');
     expect(hubPage).toContain('data-amro-uiux="base-preserved"');
-    expect(hubPage).toContain('Open AMRO Domain Workspace Enhancements');
+    expect(hubPage).toContain('AMRO Scope Health');
     expect(hubPage).toContain('data-amro-base-surface="operations-overview"');
+  });
+
+  it('moves AMRO reference workspace to dedicated navigation route', () => {
+    const navigation = read('src/config/navigation.ts');
+    const appRoutes = read('src/App.tsx');
+    expect(navigation).toContain("name: 'Workspace Documentation'");
+    expect(navigation).toContain("path: '/dashboard/amro/workspace-documentation'");
+    expect(appRoutes).toContain('const AmroWorkspaceDocumentation');
+    expect(appRoutes).toContain('path="/dashboard/amro/workspace-documentation"');
   });
 
   it('implements all AMRO-owned bounded-context capability surfaces', () => {

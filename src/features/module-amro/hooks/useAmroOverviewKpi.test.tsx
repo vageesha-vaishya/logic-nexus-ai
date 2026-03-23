@@ -255,4 +255,96 @@ describe('useAmroOverviewKpi', () => {
     const calledUrls = fetchMock.mock.calls.map((call) => String(call[0]));
     expect(calledUrls.some((url) => url.includes('access_token=test-session-token'))).toBe(true);
   });
+
+  it('surfaces empty JSON payload as stable AMRO KPI error state', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      const search = new URL(url, 'http://localhost').searchParams;
+      const apiInterface = search.get('interface') || 'unknown';
+
+      if (apiInterface === 'load-kpi-dashboard') {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => {
+            throw new SyntaxError('Unexpected end of JSON input');
+          },
+        };
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          output: {
+            time_series: [],
+            variance: 0.5,
+            threshold_breaches: [],
+          },
+        }),
+      };
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { result } = renderHook(() => useAmroOverviewKpi());
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(result.current.error).toContain('Empty response payload from AMRO KPI API');
+  });
+
+  it('recovers from transient empty dashboard payload by retrying once', async () => {
+    const callCountByInterface: Record<string, number> = {};
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      const search = new URL(url, 'http://localhost').searchParams;
+      const apiInterface = search.get('interface') || 'unknown';
+      callCountByInterface[apiInterface] = (callCountByInterface[apiInterface] || 0) + 1;
+
+      if (apiInterface === 'load-kpi-dashboard') {
+        if (callCountByInterface[apiInterface] === 1) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => {
+              throw new SyntaxError('Unexpected end of JSON input');
+            },
+          };
+        }
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            output: {
+              kpi_cards: [{ key: 'open_work_packages', label: 'Open Work Packages', value: 4, trend: '+1%' }],
+              risk_heatmap: { cells: [] },
+              trend_lines: [],
+              anomaly_flags: [],
+              freshness_warning: null,
+            },
+          }),
+        };
+      }
+
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          output: {
+            time_series: [],
+            variance: 0.3,
+            threshold_breaches: [],
+          },
+        }),
+      };
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { result } = renderHook(() => useAmroOverviewKpi());
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(result.current.error).toBeNull();
+    expect(result.current.dashboard?.kpi_cards[0]?.label).toBe('Open Work Packages');
+    expect(callCountByInterface['load-kpi-dashboard']).toBe(2);
+  });
 });

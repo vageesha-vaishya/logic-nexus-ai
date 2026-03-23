@@ -51,8 +51,24 @@ export interface DomainConfigPayload {
   updated_at?: string;
 }
 
+function dedupeDomains(domains: PlatformDomain[]): PlatformDomain[] {
+  const seen = new Set<string>();
+  const unique: PlatformDomain[] = [];
+  for (const domain of domains) {
+    const idKey = String(domain.id || '').trim();
+    const codeKey = String(domain.code || '').trim().toUpperCase();
+    const key = idKey || codeKey;
+    if (!key || seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    unique.push(domain);
+  }
+  return unique;
+}
+
 function normalizeDomainRows(rows: any[]): PlatformDomain[] {
-  return (rows || [])
+  const mapped = (rows || [])
     .map((row: any) => row?.platform_domains || row)
     .filter((row: any) => row && row.code && row.is_active !== false)
     .map((row: any) => ({
@@ -62,9 +78,15 @@ function normalizeDomainRows(rows: any[]): PlatformDomain[] {
       description: row.description == null ? null : String(row.description),
       is_active: Boolean(row.is_active ?? true),
     }));
+  return dedupeDomains(mapped);
 }
 
 async function resolveTenantDomainsClientSide(): Promise<{ domains: PlatformDomain[]; tenantDomainCount: number }> {
+  const { data: sessionData } = await supabase.auth.getSession();
+  if (!sessionData?.session) {
+    return { domains: [], tenantDomainCount: 0 };
+  }
+
   const { data: tenantAssignmentRows, error: tenantAssignmentError } = await (supabase as any)
     .from('tenant_domain_assignments')
     .select('platform_domains!inner(id, code, name, description, is_active)')
@@ -116,7 +138,9 @@ async function resolveTenantDomainsClientSide(): Promise<{ domains: PlatformDoma
       normalizeDomainRows(userAssignmentRows || [])
         .map((domain) => domain.code.toUpperCase())
     );
-    tenantDomains = tenantDomains.filter((domain) => assignedCodes.has(domain.code.toUpperCase()));
+    if (assignedCodes.size > 0) {
+      tenantDomains = tenantDomains.filter((domain) => assignedCodes.has(domain.code.toUpperCase()));
+    }
   }
 
   return { domains: tenantDomains, tenantDomainCount };
@@ -280,6 +304,14 @@ export const DomainService = {
       forceRefresh,
       hasSessionToken: Boolean(accessToken),
     });
+    if (!accessToken) {
+      return {
+        domains: [],
+        tenantDomainCount: 0,
+        tenantId: null,
+        isPlatformAdmin: false,
+      };
+    }
     let response: Response;
     try {
       response = await fetch(`${DOMAIN_API_PATH}${cacheBypass}`, {
@@ -321,8 +353,22 @@ export const DomainService = {
         correlationId,
         message: parsedMessage,
       });
-      if (response.status === 404 || response.status === 405) {
-        return fallbackAuthorizedDomains(`endpoint-unavailable:${response.status}`);
+      const shouldFallback =
+        response.status === 401
+        || response.status === 404
+        || response.status === 405
+        || response.status >= 500;
+      if (shouldFallback) {
+        try {
+          return await fallbackAuthorizedDomains(`api-error:${response.status}`);
+        } catch (fallbackError) {
+          logger.error('[DomainService] fallback authorized domain resolution failed', {
+            component: 'DomainService',
+            status: response.status,
+            correlationId,
+            message: fallbackError instanceof Error ? fallbackError.message : 'unknown',
+          });
+        }
       }
       if (correlationId) {
         throw new Error(`${parsedMessage} (ref: ${correlationId})`);
@@ -353,7 +399,7 @@ export const DomainService = {
       return fallbackAuthorizedDomains('json-parse-failure');
     }
     const data = payload?.data || {};
-    const domains = Array.isArray(data.domains) ? data.domains : [];
+    const domains = dedupeDomains(Array.isArray(data.domains) ? data.domains : []);
     logger.info('[DomainService] authorized domains loaded', {
       component: 'DomainService',
       correlationId: typeof payload?.correlationId === 'string' ? payload.correlationId : null,
