@@ -709,6 +709,19 @@ export async function enforceDomainAccess(
     };
   }
 
+  const hasTenantWideDomainAccess = access.roles.some(
+    (role) => role === 'tenant_admin' || role === 'franchise_admin'
+  );
+  if (hasTenantWideDomainAccess) {
+    if (normalizedDomainCode && !tenantDomainCodes.includes(normalizedDomainCode)) {
+      throw new Error('Forbidden');
+    }
+    return {
+      authorizedDomainCodes: tenantDomainCodes,
+      tenantDomainCount: tenantDomainCodes.length,
+    };
+  }
+
   const authorizedDomainCodes = await resolveUserAssignedDomainCodes(
     supabase,
     access.userId,

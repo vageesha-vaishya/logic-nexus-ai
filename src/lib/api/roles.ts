@@ -28,6 +28,18 @@ type RoleAssignmentScope = {
 export class RoleService {
   constructor(private db: ScopedDataAccess) {}
 
+  private shouldFallbackRolePermissionSelect(error: any): boolean {
+    const code = String(error?.code || '').trim();
+    const message = String(error?.message || '').toLowerCase();
+    if (code === '42703' || code === 'PGRST204' || code === 'PGRST205') return true;
+    return (
+      message.includes('scope_level')
+      || message.includes('is_denied')
+      || message.includes('tenant_id')
+      || message.includes('franchise_id')
+    );
+  }
+
   private async getActorUserId(): Promise<string | null> {
     const ctxUserId = this.db.accessContext?.userId;
     if (ctxUserId) return ctxUserId;
@@ -91,11 +103,23 @@ export class RoleService {
    * Fetches the mapping of roles to permissions
    */
   async getRolePermissions(assignments?: RoleAssignmentScope[]) {
-    const { data, error } = await (this.db.client as any)
+    let data: any[] | null = null;
+    const scopedSelect = await (this.db.client as any)
       .from('auth_role_permissions')
       .select('role_id, permission_id, scope_level, tenant_id, franchise_id, is_denied');
-    
-    if (error) throw error;
+
+    if (scopedSelect.error) {
+      if (!this.shouldFallbackRolePermissionSelect(scopedSelect.error)) {
+        throw scopedSelect.error;
+      }
+      const legacySelect = await (this.db.client as any)
+        .from('auth_role_permissions')
+        .select('role_id, permission_id');
+      if (legacySelect.error) throw legacySelect.error;
+      data = legacySelect.data;
+    } else {
+      data = scopedSelect.data;
+    }
     
     const map: Record<string, string[]> = {};
     const deniedMap: Record<string, Set<string>> = {};

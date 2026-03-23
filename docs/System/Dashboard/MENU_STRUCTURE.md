@@ -2,27 +2,36 @@
 
 This document outlines the sidebar menu structure for the Logic Nexus AI application.
 
-## Sales Module
+## CRM Section
 
-The Sales module menu is ordered to follow the typical sales workflow:
+The CRM section is a collapsible accordion group in the side navigation:
 
-1. **Home**: Overview homepage
-2. **Leads**: Prospects to qualify
-3. **Tasks/Activities**: Activity management
-4. **Opportunities**: Deals and pipeline
-5. **Accounts**: Organizations and customers
-6. **Contacts**: People tied to accounts
-7. **Quotes**: Sales quotes and proposals
+1. **Leads**: Prospects to qualify
+2. **Tasks/Activities**: Activity management
+3. **Opportunities**: Deals and pipeline
+4. **Accounts**: Organizations and customers
+5. **Contacts**: People tied to accounts
 
-### Additional Items
-- Files
-- Campaigns
-- Dashboards
-- Reports
-- Chatter
-- Groups
-- Calendar
-- More
+## Sales Section
+
+The Sales section is a separate collapsible accordion group:
+
+1. **Quotes**: Sales quotes and proposals
+2. **Quote Templates**: Manage quote templates
+3. **Home**: Overview homepage
+4. **Files**: Documents and attachments
+5. **Campaigns**: Marketing campaigns
+6. **Migration Baseline**: Compatibility KPIs
+7. **CRM Workspace**: Integrated CRM workspace
+8. **Chatter**: Collaboration feed
+9. **Groups**: Team groups
+10. **Calendar**: Events and schedules
+11. **More**: Additional tools
+
+### Behavior
+- CRM and Sales are keyboard-accessible accordion groups.
+- Toggle state is persisted in browser local storage.
+- Deep links keep active menu highlighting when a section is reopened.
 
 ## Logistics Module
 
@@ -58,4 +67,4 @@ The Sales module menu is ordered to follow the typical sales workflow:
 ## Configuration
 
 The menu configuration is defined in `src/config/navigation.ts`.
-The rendering logic is located in `src/components/layout/AppSidebar.tsx`.
+The rendering logic is located in `src/components/navigation/CommandCenterNav.tsx`.

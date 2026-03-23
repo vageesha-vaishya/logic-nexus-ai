@@ -319,6 +319,37 @@ describe('http domain and scope guards', () => {
     await expect(enforceDomainAccess(buildAccess(), 'ECOMMERCE')).rejects.toThrow('Forbidden');
   });
 
+  it('allows tenant admin to access all tenant domains without user-level assignments', async () => {
+    const tenantQuery = createSelectEqChain(
+      {
+        data: [
+          { platform_domains: { code: 'LOGISTICS' } },
+          { platform_domains: { code: 'AMRO' } },
+        ],
+        error: null,
+      },
+      2
+    );
+
+    const supabaseMock = {
+      from: vi
+        .fn()
+        .mockReturnValueOnce(tenantQuery),
+    } as any;
+
+    vi.mocked(getSupabaseAdminClient).mockReturnValue(supabaseMock);
+
+    const result = await enforceDomainAccess(
+      buildAccess({
+        roles: ['tenant_admin'],
+      }),
+      'AMRO',
+    );
+
+    expect(result.authorizedDomainCodes).toEqual(['LOGISTICS', 'AMRO']);
+    expect(result.tenantDomainCount).toBe(2);
+  });
+
   it('keeps platform admin scoped to owned tenant when override has null tenant preference', async () => {
     const rolesQuery = createSelectEqChain(
       {

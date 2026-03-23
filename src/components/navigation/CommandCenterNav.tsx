@@ -46,6 +46,18 @@ interface MenuGroup {
   defaultOpen?: boolean;
 }
 
+const HIDDEN_SALES_ITEM_TITLES = new Set(['Dashboards', 'Reports']);
+const CRM_ITEM_TITLES = new Set([
+  'Leads',
+  'Tasks/Activities',
+  'Opportunities',
+  'Accounts',
+  'Contacts',
+]);
+const SALES_PRIORITY_ITEM_TITLES = ['Quotes', 'Quote Templates'];
+const GROUPS_STORAGE_KEY = 'sidebar:groups';
+const EXPANDED_ITEMS_STORAGE_KEY = 'sidebar:expandedItems';
+
 const ROUTE_PREFETCHERS: Record<string, () => Promise<unknown>> = {
   '/dashboard': () => import('@/pages/dashboard/Dashboards'),
   '/dashboard/leads/pipeline': () => import('@/pages/dashboard/LeadsPipeline'),
@@ -74,11 +86,23 @@ export function CommandCenterNav() {
   const { availableDomains, isPlatformAdmin } = useDomain();
   const { hasRole, hasPermission, isPlatformAdmin: isAuthPlatformAdmin } = useAuth();
   const { enabled: amroRbacFixEnabled } = useAppFeatureFlag(FEATURE_FLAGS.AMRO_RBAC_FIX_ENABLED, true);
-  const hasAmroDomain = isPlatformAdmin || availableDomains.some((domain) => String(domain.code || '').trim().toUpperCase() === 'AMRO');
+  const hasAmroDomain = isPlatformAdmin
+    || isAuthPlatformAdmin()
+    || hasRole('platform_admin')
+    || availableDomains.some((domain) => String(domain.code || '').trim().toUpperCase() === 'AMRO');
   const prefetchedRoutes = useRef(new Set<string>());
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>(() => {
+    const getStoredExpandedItems = () => {
+      const localValue = localStorage.getItem(EXPANDED_ITEMS_STORAGE_KEY);
+      if (localValue) return localValue;
+      const sessionValue = sessionStorage.getItem(EXPANDED_ITEMS_STORAGE_KEY);
+      if (sessionValue) {
+        localStorage.setItem(EXPANDED_ITEMS_STORAGE_KEY, sessionValue);
+      }
+      return sessionValue;
+    };
     try {
-      const saved = sessionStorage.getItem('sidebar:expandedItems');
+      const saved = getStoredExpandedItems();
       return saved ? JSON.parse(saved) : {};
     } catch {
       return {};
@@ -87,30 +111,60 @@ export function CommandCenterNav() {
   
   // Manage collapsible states with persistence
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
+    const defaults = {
+      crm: true,
+      sales: false,
+      logistics: false,
+      amro: false,
+      financials: false,
+      admin: false,
+    };
+
+    const normalizeStoredGroups = (value: unknown) => {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        return defaults;
+      }
+      const stored = value as Record<string, unknown>;
+      const legacySalesState = typeof stored.sales === 'boolean' ? stored.sales : defaults.sales;
+      const normalized: Record<string, boolean> = {
+        ...defaults,
+        ...Object.fromEntries(
+          Object.entries(stored).filter(([, groupOpen]) => typeof groupOpen === 'boolean')
+        ) as Record<string, boolean>,
+      };
+      if (typeof stored.crm !== 'boolean') {
+        normalized.crm = legacySalesState;
+        normalized.sales = defaults.sales;
+      }
+      return normalized;
+    };
+
+    const getStoredGroups = () => {
+      const localValue = localStorage.getItem(GROUPS_STORAGE_KEY);
+      if (localValue) return localValue;
+      const sessionValue = sessionStorage.getItem(GROUPS_STORAGE_KEY);
+      if (sessionValue) {
+        localStorage.setItem(GROUPS_STORAGE_KEY, sessionValue);
+      }
+      return sessionValue;
+    };
+
     try {
-      const saved = sessionStorage.getItem('sidebar:groups');
-      return saved ? JSON.parse(saved) : {
-        logistics: false,
-        amro: false,
-        financials: false,
-        admin: false,
-        sales: true, // Default open for core group
-      };
+      const saved = getStoredGroups();
+      return saved ? normalizeStoredGroups(JSON.parse(saved)) : defaults;
     } catch {
-      return {
-        logistics: false,
-        amro: false,
-        financials: false,
-        admin: false,
-        sales: true,
-      };
+      return defaults;
     }
   });
 
   const toggleGroup = (group: string) => {
     setOpenGroups(prev => {
       const next = { ...prev, [group]: !prev[group] };
-      sessionStorage.setItem('sidebar:groups', JSON.stringify(next));
+      if ((group === 'crm' || group === 'sales') && !prev[group]) {
+        const otherGroup = group === 'crm' ? 'sales' : 'crm';
+        next[otherGroup] = false;
+      }
+      localStorage.setItem(GROUPS_STORAGE_KEY, JSON.stringify(next));
       return next;
     });
   };
@@ -147,7 +201,7 @@ export function CommandCenterNav() {
   const toggleExpandedItems = (groupId: string) => {
     setExpandedItems((prev) => {
       const next = { ...prev, [groupId]: !prev[groupId] };
-      sessionStorage.setItem('sidebar:expandedItems', JSON.stringify(next));
+      localStorage.setItem(EXPANDED_ITEMS_STORAGE_KEY, JSON.stringify(next));
       return next;
     });
   };
@@ -170,7 +224,12 @@ export function CommandCenterNav() {
       }));
 
     // Sales & CRM
-    const salesItems = mapModuleItems('Sales').filter((item) => !['Dashboards', 'Reports'].includes(item.title));
+    const baseSalesItems = mapModuleItems('Sales').filter((item) => !HIDDEN_SALES_ITEM_TITLES.has(item.title));
+    const crmItems = baseSalesItems.filter((item) => CRM_ITEM_TITLES.has(item.title));
+    const salesItems = [
+      ...SALES_PRIORITY_ITEM_TITLES.flatMap((title) => baseSalesItems.filter((item) => item.title === title)),
+      ...baseSalesItems.filter((item) => !CRM_ITEM_TITLES.has(item.title) && !SALES_PRIORITY_ITEM_TITLES.includes(item.title)),
+    ];
 
     // Logistics
     const logisticsItems = mapModuleItems('Logistics');
@@ -197,7 +256,8 @@ export function CommandCenterNav() {
     ];
 
     return [
-      { id: 'sales', label: 'CRM & Sales', items: salesItems, defaultOpen: true as const },
+      { id: 'crm', label: 'CRM', items: crmItems },
+      { id: 'sales', label: 'Sales', items: salesItems },
       { id: 'financials', label: 'Financials', items: financialItems },
       { id: 'logistics', label: 'Logistics', items: logisticsItems },
       { id: 'amro', label: 'AMRO', items: amroItems },
@@ -283,7 +343,10 @@ export function CommandCenterNav() {
         // If searching, show flattened lists (always open)
         // If not searching, use collapsible behavior (except for first group usually)
         const isSearchActive = !!searchQuery.trim();
-        const isOpen = isSearchActive || openGroups[group.id] || group.defaultOpen;
+        const hasActiveItem = group.items.some((item) =>
+          item.url !== '/dashboard' && (location.pathname === item.url || location.pathname.startsWith(`${item.url}/`))
+        );
+        const isOpen = isSearchActive || openGroups[group.id] || group.defaultOpen || hasActiveItem;
         const isLowFrequencyGroup = group.id === 'logistics' || group.id === 'financials' || group.id === 'admin' || group.id === 'amro';
         const isExpanded = !!expandedItems[group.id];
         const visibleItems =
@@ -306,21 +369,27 @@ export function CommandCenterNav() {
                     {group.label}
                   </div>
                 ) : (
-                  <CollapsibleTrigger
-                    className="flex w-full items-center justify-between hover:text-foreground transition-colors group px-2 py-1.5 cursor-pointer"
-                    aria-label={`Toggle ${group.label} menu`}
-                    aria-expanded={isOpen}
-                  >
-                    {!collapsed && (
-                      <>
-                        <span className="text-xs font-semibold text-muted-foreground group-hover:text-foreground">{group.label}</span>
-                        <ChevronDown className={cn("h-3 w-3 text-muted-foreground transition-transform duration-200", !isOpen && "-rotate-90")} />
-                      </>
-                    )}
+                  <CollapsibleTrigger asChild>
+                    <button
+                      type="button"
+                      className="flex w-full items-center justify-between hover:text-foreground transition-colors group px-2 py-1.5 cursor-pointer"
+                      aria-label={`Toggle ${group.label} menu`}
+                      aria-expanded={isOpen}
+                    >
+                      {!collapsed && (
+                        <>
+                          <span className="text-xs font-semibold text-muted-foreground group-hover:text-foreground">{group.label}</span>
+                          <ChevronDown className={cn("h-3 w-3 text-muted-foreground transition-transform duration-200", !isOpen && "-rotate-90")} />
+                        </>
+                      )}
+                    </button>
                   </CollapsibleTrigger>
                 )}
               </SidebarGroupLabel>
-              <CollapsibleContent forceMount={isSearchActive || group.defaultOpen ? true : undefined}>
+              <CollapsibleContent
+                forceMount={isSearchActive || group.defaultOpen ? true : undefined}
+                className="overflow-hidden data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down"
+              >
                 <SidebarGroupContent>
                   <SidebarMenu>
                     {visibleItems.map(renderMenuItem)}

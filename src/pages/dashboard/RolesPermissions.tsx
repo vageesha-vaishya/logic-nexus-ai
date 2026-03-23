@@ -159,9 +159,14 @@ const roleService = useMemo(() => new RoleService(scopedDb), [scopedDb]);
 
   const selectedRoleData = roles.find(r => r.id === selectedRole);
   const currentPerms = rolePermissions[selectedRole || ''] || [];
+  const originalPerms = originalRolePermissions[selectedRole || ''] || [];
   const shipmentsMatrix = buildShipmentsMatrix(currentPerms);
   const conflicts = detectConflicts(currentPerms);
-  const sensitive = isSensitiveChange([], currentPerms);
+  const hasBlockerConflicts = conflicts.some((conflict) => conflict.severity === 'blocker');
+  const hasWarningConflicts = conflicts.some((conflict) => conflict.severity !== 'blocker');
+  const sensitive = isSensitiveChange(originalPerms, currentPerms);
+  const requiresJustification = hasWarningConflicts || sensitive;
+  const trimmedJustification = justification.trim();
 
   return (
     <DashboardLayout>
@@ -200,7 +205,7 @@ const roleService = useMemo(() => new RoleService(scopedDb), [scopedDb]);
               <RotateCcw className="mr-2 h-4 w-4" />
               Reset
             </Button>
-            <Button onClick={handleSave} disabled={!modified || isSaving || (conflicts.length > 0 && !justification)}>
+            <Button onClick={handleSave} disabled={!modified || isSaving || hasBlockerConflicts || (requiresJustification && !trimmedJustification)}>
               <Save className="mr-2 h-4 w-4" />
               {isSaving ? 'Saving...' : 'Save Changes'}
             </Button>
@@ -320,7 +325,7 @@ const roleService = useMemo(() => new RoleService(scopedDb), [scopedDb]);
               </CardHeader>
               <Separator />
               <CardContent className="flex-1 overflow-hidden p-0">
-                {conflicts.length > 0 && (
+                {(conflicts.length > 0 || sensitive) && (
                   <div className="m-4 p-3 rounded-md border border-destructive/40 bg-destructive/10">
                     <p className="text-sm font-semibold flex items-center gap-2">
                       <AlertTriangle className="h-4 w-4 text-destructive" />
@@ -328,11 +333,16 @@ const roleService = useMemo(() => new RoleService(scopedDb), [scopedDb]);
                     </p>
                     <ul className="mt-2 text-sm list-disc list-inside">
                       {conflicts.map(c => <li key={c.code}>{c.message}</li>)}
+                      {sensitive && <li key="SENSITIVE_CHANGE_JUSTIFICATION">Sensitive permission escalation detected. Justification is required to save.</li>}
                     </ul>
-                    <div className="mt-3 grid gap-2">
-                      <label className="text-sm font-medium">Justification (Required to Save)</label>
-                      <Input value={justification} onChange={e => setJustification(e.target.value)} placeholder="Provide justification for overriding warnings" />
-                    </div>
+                    {hasBlockerConflicts ? (
+                      <p className="mt-3 text-sm font-medium">Resolve separation-of-duties blockers before saving.</p>
+                    ) : (
+                      <div className="mt-3 grid gap-2">
+                        <label className="text-sm font-medium">Justification (Required to Save)</label>
+                        <Input value={justification} onChange={e => setJustification(e.target.value)} placeholder="Provide justification for overriding warnings" />
+                      </div>
+                    )}
                   </div>
                 )}
                 <Tabs defaultValue="all" className="h-full flex flex-col">

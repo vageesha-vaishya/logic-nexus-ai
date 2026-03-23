@@ -1,4 +1,5 @@
-export type Conflict = { code: string; message: string };
+export type ConflictSeverity = 'warning' | 'blocker';
+export type Conflict = { code: string; message: string; severity: ConflictSeverity };
 
 export function buildShipmentsMatrix(perms: string[]) {
   const has = (p: string) => perms.includes(p);
@@ -32,16 +33,16 @@ export function detectConflicts(perms: string[]): Conflict[] {
   const conflicts: Conflict[] = [];
   const has = (p: string) => perms.includes(p);
   if (has('shipments.delete') && !has('shipments.view')) {
-    conflicts.push({ code: 'DELETE_WITHOUT_VIEW', message: 'Delete requires view for shipments.' });
+    conflicts.push({ code: 'DELETE_WITHOUT_VIEW', message: 'Delete requires view for shipments.', severity: 'warning' });
   }
   if (has('shipments.edit') && !has('shipments.view')) {
-    conflicts.push({ code: 'EDIT_WITHOUT_VIEW', message: 'Edit requires view for shipments.' });
+    conflicts.push({ code: 'EDIT_WITHOUT_VIEW', message: 'Edit requires view for shipments.', severity: 'warning' });
   }
   if (has('shipments.approvals.manage') && has('shipments.create')) {
-    conflicts.push({ code: 'SOD_CREATE_APPROVE', message: 'Separation of duties: cannot both create and approve shipments.' });
+    conflicts.push({ code: 'SOD_CREATE_APPROVE', message: 'Separation of duties: cannot both create and approve shipments.', severity: 'blocker' });
   }
   if (has('shipments.config.manage') && has('shipments.audit.manage')) {
-    conflicts.push({ code: 'SOD_CONFIG_AUDIT', message: 'Separation of duties: config and audit should not be combined.' });
+    conflicts.push({ code: 'SOD_CONFIG_AUDIT', message: 'Separation of duties: config and audit should not be combined.', severity: 'blocker' });
   }
   return conflicts;
 }
