@@ -4,13 +4,29 @@
  */
 
 import dotenv from 'dotenv';
-import { initializeTracing } from './instrumentation/tracer-provider';
-import app from './app';
-import { logger } from './utils/logger';
-import { amroEventsProducer } from './events/amro-events.producer';
+import { existsSync } from 'node:fs';
+import path from 'node:path';
 
-// Load environment variables
-dotenv.config();
+function loadEnvironment(): void {
+  const projectRoot = path.resolve(process.cwd(), '..', '..');
+  const envFileOverride = String(process.env.AMRO_ENV_FILE || '').trim();
+  const envCandidates = [
+    envFileOverride,
+    path.resolve(process.cwd(), '.env'),
+    path.resolve(process.cwd(), '.env.local'),
+    path.resolve(projectRoot, '.env'),
+    path.resolve(projectRoot, '.env.local'),
+    path.resolve(projectRoot, '.env local docker'),
+  ].filter(Boolean);
+  for (const candidate of envCandidates) {
+    if (!existsSync(candidate)) {
+      continue;
+    }
+    dotenv.config({ path: candidate, override: false });
+  }
+}
+
+loadEnvironment();
 
 const PORT = process.env.PORT || 3001;
 const NODE_ENV = process.env.NODE_ENV || 'development';
@@ -18,7 +34,12 @@ const NODE_ENV = process.env.NODE_ENV || 'development';
 // Initialize Kafka producer and start server
 async function startServer() {
   try {
-    // Initialize OpenTelemetry tracing
+    const [{ initializeTracing }, { default: app }, { logger }, { amroEventsProducer }] = await Promise.all([
+      import('./instrumentation/tracer-provider'),
+      import('./app'),
+      import('./utils/logger'),
+      import('./events/amro-events.producer'),
+    ]);
     await initializeTracing();
     logger.info('OpenTelemetry tracing initialized');
 
@@ -56,7 +77,7 @@ async function startServer() {
 
     return server;
   } catch (error) {
-    logger.error('Failed to start server:', error);
+    console.error('Failed to start server:', error);
     process.exit(1);
   }
 }
@@ -65,13 +86,13 @@ const server = startServer();
 
 // Handle uncaught exceptions
 process.on('uncaughtException', (err) => {
-  logger.error('Uncaught exception:', err);
+  console.error('Uncaught exception:', err);
   process.exit(1);
 });
 
 // Handle unhandled rejections
 process.on('unhandledRejection', (reason: any) => {
-  logger.error('Unhandled rejection:', reason);
+  console.error('Unhandled rejection:', reason);
   process.exit(1);
 });
 

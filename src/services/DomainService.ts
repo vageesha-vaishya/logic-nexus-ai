@@ -17,6 +17,11 @@ export interface AuthorizedDomainsResponse {
   isPlatformAdmin: boolean;
 }
 
+export interface AuthorizedDomainScope {
+  tenantId?: string | null;
+  franchiseId?: string | null;
+}
+
 export interface DomainTenantOption {
   id: string;
   name: string;
@@ -37,6 +42,10 @@ export interface DomainAssignmentAuditLog {
 let domainCache: PlatformDomain[] | null = null;
 let cacheTimestamp: number = 0;
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const DOMAIN_API_UNAVAILABLE_RETRY_MS = 30_000;
+let domainApiUnavailableUntil = 0;
+const DOMAIN_ASSIGNMENT_API_UNAVAILABLE_RETRY_MS = 30_000;
+let domainAssignmentApiUnavailableUntil = 0;
 const DOMAIN_API_PATH = '/api/v1/platform-domains';
 const DOMAIN_ASSIGNMENT_API_PATH = '/api/v1/domain-assignments';
 const DOMAIN_CONFIG_API_PATH = '/api/v1/domain-config';
@@ -81,10 +90,107 @@ function normalizeDomainRows(rows: any[]): PlatformDomain[] {
   return dedupeDomains(mapped);
 }
 
-async function resolveTenantDomainsClientSide(): Promise<{ domains: PlatformDomain[]; tenantDomainCount: number }> {
+function isNetworkConnectivityError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  const normalized = error.message.toLowerCase();
+  return normalized.includes('failed to fetch') || normalized.includes('networkerror') || normalized.includes('econnrefused');
+}
+
+function toErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+  const message = typeof (error as { message?: unknown })?.message === 'string'
+    ? String((error as { message?: string }).message).trim()
+    : '';
+  if (message) {
+    return message;
+  }
+  return fallback;
+}
+
+function formatDomainDeleteError(error: unknown): string {
+  const fallback = 'Failed to delete domain';
+  const rawMessage = toErrorMessage(error, fallback);
+  const code = String((error as { code?: unknown })?.code || '').toUpperCase();
+  const normalized = rawMessage.toLowerCase();
+  const isReferenceConstraint =
+    code === '23503'
+    || normalized.includes('foreign key')
+    || normalized.includes('still referenced')
+    || normalized.includes('violates foreign key constraint');
+  if (isReferenceConstraint) {
+    return 'Cannot delete domain because it is assigned or referenced by existing records';
+  }
+  return rawMessage;
+}
+
+function isDomainApiTemporarilyUnavailable(): boolean {
+  return Date.now() < domainApiUnavailableUntil;
+}
+
+function markDomainApiTemporarilyUnavailable() {
+  domainApiUnavailableUntil = Date.now() + DOMAIN_API_UNAVAILABLE_RETRY_MS;
+}
+
+function isDomainAssignmentApiTemporarilyUnavailable(): boolean {
+  return Date.now() < domainAssignmentApiUnavailableUntil;
+}
+
+function markDomainAssignmentApiTemporarilyUnavailable() {
+  domainAssignmentApiUnavailableUntil = Date.now() + DOMAIN_ASSIGNMENT_API_UNAVAILABLE_RETRY_MS;
+}
+
+async function resolveClientSidePlatformAdminState(): Promise<boolean> {
+  const { data: userData } = await supabase.auth.getUser();
+  const userId = userData?.user?.id || '';
+  if (!userId) {
+    return false;
+  }
+  const { data, error } = await (supabase as any)
+    .from('user_roles')
+    .select('role')
+    .eq('user_id', userId)
+    .eq('role', 'platform_admin')
+    .limit(1);
+  if (error && (error as any)?.code !== '42P01') {
+    const message = String((error as any)?.message || '').toLowerCase();
+    const recoverable =
+      message.includes('no api key')
+      || message.includes('invalid api key')
+      || message.includes('jwt')
+      || message.includes('unauthorized')
+      || message.includes('forbidden');
+    if (recoverable) {
+      logger.warn('[DomainService] unable to resolve platform_admin via user_roles, defaulting false', {
+        component: 'DomainService',
+        message: (error as any)?.message || 'unknown',
+      });
+      return false;
+    }
+    throw error;
+  }
+  return Array.isArray(data) && data.length > 0;
+}
+
+async function loadActivePlatformDomainsClientSide(): Promise<PlatformDomain[]> {
+  const { data, error } = await (supabase as any)
+    .from('platform_domains')
+    .select('id, code, name, description, is_active')
+    .eq('is_active', true)
+    .order('name');
+  if (error) {
+    throw error;
+  }
+  return normalizeDomainRows(data || []);
+}
+
+async function resolveTenantDomainsClientSide(): Promise<{ domains: PlatformDomain[]; tenantDomainCount: number; isPlatformAdmin: boolean }> {
   const { data: sessionData } = await supabase.auth.getSession();
   if (!sessionData?.session) {
-    return { domains: [], tenantDomainCount: 0 };
+    return { domains: [], tenantDomainCount: 0, isPlatformAdmin: false };
   }
 
   const { data: tenantAssignmentRows, error: tenantAssignmentError } = await (supabase as any)
@@ -113,14 +219,36 @@ async function resolveTenantDomainsClientSide(): Promise<{ domains: PlatformDoma
   }
 
   const tenantDomainCount = tenantDomains.length;
+  const isPlatformAdmin = await resolveClientSidePlatformAdminState();
+  if (isPlatformAdmin) {
+    if (tenantDomains.length <= 1) {
+      try {
+        const allDomains = await loadActivePlatformDomainsClientSide();
+        if (allDomains.length > tenantDomains.length) {
+          tenantDomains = allDomains;
+        }
+      } catch (error) {
+        logger.warn('[DomainService] failed to hydrate active domains for platform admin fallback', {
+          component: 'DomainService',
+          message: error instanceof Error ? error.message : 'unknown',
+        });
+      }
+    }
+    return {
+      domains: tenantDomains,
+      tenantDomainCount: Math.max(tenantDomainCount, tenantDomains.length),
+      isPlatformAdmin,
+    };
+  }
+
   if (tenantDomainCount <= 1) {
-    return { domains: tenantDomains, tenantDomainCount };
+    return { domains: tenantDomains, tenantDomainCount, isPlatformAdmin };
   }
 
   const { data: userData } = await supabase.auth.getUser();
   const userId = userData?.user?.id || '';
   if (!userId) {
-    return { domains: tenantDomains, tenantDomainCount };
+    return { domains: tenantDomains, tenantDomainCount, isPlatformAdmin };
   }
 
   const { data: userAssignmentRows, error: userAssignmentError } = await (supabase as any)
@@ -143,7 +271,7 @@ async function resolveTenantDomainsClientSide(): Promise<{ domains: PlatformDoma
     }
   }
 
-  return { domains: tenantDomains, tenantDomainCount };
+  return { domains: tenantDomains, tenantDomainCount, isPlatformAdmin };
 }
 
 async function fallbackAuthorizedDomains(reason: string): Promise<AuthorizedDomainsResponse> {
@@ -151,12 +279,12 @@ async function fallbackAuthorizedDomains(reason: string): Promise<AuthorizedDoma
     component: 'DomainService',
     reason,
   });
-  const { domains, tenantDomainCount } = await resolveTenantDomainsClientSide();
+  const { domains, tenantDomainCount, isPlatformAdmin } = await resolveTenantDomainsClientSide();
   return {
     domains,
     tenantDomainCount,
     tenantId: null,
-    isPlatformAdmin: false,
+    isPlatformAdmin,
   };
 }
 
@@ -170,16 +298,27 @@ export const DomainService = {
     method: 'POST' | 'DELETE',
     payload: { domainId: string; tenantIds: string[]; batchId?: string },
   ): Promise<{ data?: any; correlationId?: string; error?: string }> {
+    if (isDomainAssignmentApiTemporarilyUnavailable()) {
+      throw new Error('Domain assignment API temporarily unavailable');
+    }
     const accessToken = await this.getSessionToken();
-    const response = await fetch(DOMAIN_ASSIGNMENT_API_PATH, {
-      method,
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-      },
-      body: JSON.stringify(payload),
-    });
+    let response: Response;
+    try {
+      response = await fetch(DOMAIN_ASSIGNMENT_API_PATH, {
+        method,
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        },
+        body: JSON.stringify(payload),
+      });
+    } catch (error) {
+      if (isNetworkConnectivityError(error)) {
+        markDomainAssignmentApiTemporarilyUnavailable();
+      }
+      throw error;
+    }
 
     const contentType = response.headers.get('content-type') || '';
     let body: any = {};
@@ -258,6 +397,9 @@ export const DomainService = {
     batchId?: string;
     limit?: number;
   }): Promise<DomainAssignmentAuditLog[]> {
+    if (isDomainAssignmentApiTemporarilyUnavailable()) {
+      return [];
+    }
     const accessToken = await this.getSessionToken();
     const params = new URLSearchParams();
     if (filters?.tenantId) params.set('tenant_id', filters.tenantId);
@@ -265,14 +407,23 @@ export const DomainService = {
     if (filters?.batchId) params.set('batch_id', filters.batchId);
     if (filters?.limit) params.set('limit', String(filters.limit));
     const queryString = params.toString();
-    const response = await fetch(`${DOMAIN_ASSIGNMENT_API_PATH}${queryString ? `?${queryString}` : ''}`, {
-      method: 'GET',
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-      },
-    });
+    let response: Response;
+    try {
+      response = await fetch(`${DOMAIN_ASSIGNMENT_API_PATH}${queryString ? `?${queryString}` : ''}`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        },
+      });
+    } catch (error) {
+      if (isNetworkConnectivityError(error)) {
+        markDomainAssignmentApiTemporarilyUnavailable();
+        return [];
+      }
+      throw error;
+    }
 
     const contentType = response.headers.get('content-type') || '';
     let body: any = {};
@@ -283,6 +434,9 @@ export const DomainService = {
     }
 
     if (!response.ok) {
+      if (response.status === 404 || response.status === 405) {
+        return [];
+      }
       const parsedError = typeof body?.error === 'string' && body.error.trim()
         ? body.error
         : `Domain audit request failed (${response.status})`;
@@ -296,7 +450,10 @@ export const DomainService = {
     return rows as DomainAssignmentAuditLog[];
   },
 
-  async getAuthorizedDomains(forceRefresh = false): Promise<AuthorizedDomainsResponse> {
+  async getAuthorizedDomains(
+    forceRefresh = false,
+    scope: AuthorizedDomainScope = {},
+  ): Promise<AuthorizedDomainsResponse> {
     const cacheBypass = forceRefresh ? '?refresh=1' : '';
     const accessToken = await this.getSessionToken();
     logger.debug('[DomainService] requesting authorized domains', {
@@ -312,14 +469,21 @@ export const DomainService = {
         isPlatformAdmin: false,
       };
     }
+    if (isDomainApiTemporarilyUnavailable()) {
+      return fallbackAuthorizedDomains('network-cooldown-active');
+    }
     let response: Response;
     try {
+      const tenantIdHeader = typeof scope.tenantId === 'string' ? scope.tenantId.trim() : '';
+      const franchiseIdHeader = typeof scope.franchiseId === 'string' ? scope.franchiseId.trim() : '';
       response = await fetch(`${DOMAIN_API_PATH}${cacheBypass}`, {
         method: 'GET',
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
           ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+          ...(tenantIdHeader ? { 'x-tenant-id': tenantIdHeader } : {}),
+          ...(franchiseIdHeader ? { 'x-franchise-id': franchiseIdHeader } : {}),
         },
       });
     } catch (error) {
@@ -327,6 +491,9 @@ export const DomainService = {
         component: 'DomainService',
         message: error instanceof Error ? error.message : 'unknown',
       });
+      if (isNetworkConnectivityError(error)) {
+        markDomainApiTemporarilyUnavailable();
+      }
       return fallbackAuthorizedDomains('network-request-failure');
     }
 
@@ -399,21 +566,37 @@ export const DomainService = {
       return fallbackAuthorizedDomains('json-parse-failure');
     }
     const data = payload?.data || {};
-    const domains = dedupeDomains(Array.isArray(data.domains) ? data.domains : []);
+    let domains = dedupeDomains(Array.isArray(data.domains) ? data.domains : []);
+    const isPlatformAdmin = Boolean(data.isPlatformAdmin);
+    if (isPlatformAdmin) {
+      try {
+        const allDomains = await loadActivePlatformDomainsClientSide();
+        if (allDomains.length > domains.length) {
+          domains = allDomains;
+        }
+      } catch (error) {
+        logger.warn('[DomainService] failed to hydrate active domains for platform admin API response', {
+          component: 'DomainService',
+          message: error instanceof Error ? error.message : 'unknown',
+        });
+      }
+    }
     logger.info('[DomainService] authorized domains loaded', {
       component: 'DomainService',
       correlationId: typeof payload?.correlationId === 'string' ? payload.correlationId : null,
       count: domains.length,
       tenantDomainCount: Number(data.tenantDomainCount || 0),
       tenantId: typeof data.tenantId === 'string' ? data.tenantId : null,
-      isPlatformAdmin: Boolean(data.isPlatformAdmin),
+      isPlatformAdmin,
     });
 
     return {
       domains: domains as PlatformDomain[],
-      tenantDomainCount: Number(data.tenantDomainCount || 0),
+      tenantDomainCount: isPlatformAdmin
+        ? Math.max(Number(data.tenantDomainCount || 0), domains.length)
+        : Number(data.tenantDomainCount || 0),
       tenantId: typeof data.tenantId === 'string' ? data.tenantId : null,
-      isPlatformAdmin: Boolean(data.isPlatformAdmin),
+      isPlatformAdmin,
     };
   },
 
@@ -562,7 +745,9 @@ export const DomainService = {
       .delete()
       .eq('id', id);
 
-    if (error) throw error;
+    if (error) {
+      throw new Error(formatDomainDeleteError(error));
+    }
     this.invalidateCache();
   },
 
@@ -572,5 +757,6 @@ export const DomainService = {
   invalidateCache() {
     domainCache = null;
     cacheTimestamp = 0;
+    domainApiUnavailableUntil = 0;
   }
 };

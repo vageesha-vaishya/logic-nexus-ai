@@ -11,6 +11,7 @@ import {
   handlePreflight,
   resolveAndApplyAccessContext,
 } from '../_utils/http';
+import { getSupabaseAdminClient } from '../_utils/supabaseAdmin';
 import { getCachedJson, setCachedJson } from '../_utils/redisCache';
 
 vi.mock('../_utils/http', () => ({
@@ -100,5 +101,39 @@ describe('/api/v1/platform-domains cache behavior', () => {
     expect(enforceHttps).toHaveBeenCalledWith(req);
     expect(res.statusCode).toBe(200);
     expect(setCachedJson).not.toHaveBeenCalled();
+  });
+
+  it('bypasses cache when refresh is requested', async () => {
+    vi.mocked(getCachedJson).mockResolvedValue({
+      domains: [{ id: 'd-stale', code: 'STALE', name: 'Stale', description: null, is_active: true }],
+      tenantDomainCount: 1,
+      tenantId: 'tenant-1',
+      isPlatformAdmin: false,
+    } as any);
+    const fromChain = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      in: vi.fn().mockReturnThis(),
+      order: vi.fn().mockResolvedValue({
+        data: [{ id: 'd-1', code: 'LOGISTICS', name: 'Logistics', description: null, is_active: true }],
+        error: null,
+      }),
+    };
+    vi.mocked(getSupabaseAdminClient).mockReturnValue({
+      from: vi.fn().mockReturnValue(fromChain),
+    } as any);
+
+    const req: ApiRequest = { method: 'GET', query: { refresh: '1' }, headers: {} };
+    const res = createResponse();
+    await handler(req, res);
+
+    expect(getCachedJson).not.toHaveBeenCalled();
+    expect(setCachedJson).not.toHaveBeenCalled();
+    expect(res.statusCode).toBe(200);
+    expect(res.jsonBody).toEqual(expect.objectContaining({
+      data: expect.objectContaining({
+        domains: [{ id: 'd-1', code: 'LOGISTICS', name: 'Logistics', description: null, is_active: true }],
+      }),
+    }));
   });
 });

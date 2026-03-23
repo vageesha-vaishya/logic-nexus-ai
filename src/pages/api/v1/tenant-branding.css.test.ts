@@ -199,6 +199,25 @@ describe('GET /api/v1/tenant-branding.css', () => {
     expect(res.endedWith).toBeUndefined();
   });
 
+  it('returns empty stylesheet when platform admin has no tenant scope', async () => {
+    vi.mocked(resolveAndApplyAccessContext).mockResolvedValue({
+      tenantId: null,
+      isPlatformAdmin: true,
+    } as any);
+    const req: ApiRequest = {
+      method: 'GET',
+      query: {},
+      headers: { host: 'portal.acme.com:443' },
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.endedWith).toBe(':root{}');
+    expect(getSupabaseAdminClient).not.toHaveBeenCalled();
+  });
+
   it('delegates failures to sendErrorResponse', async () => {
     vi.mocked(authenticateRequest).mockRejectedValue(new Error('Unauthorized'));
     const req: ApiRequest = {

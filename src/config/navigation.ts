@@ -151,6 +151,7 @@ export const APP_MENU: MenuModule[] = [
       { name: 'Subscription', path: '/dashboard/settings/subscription', icon: CreditCard, description: 'Manage plan and usage', roles: ['platform_admin'] },
       { name: 'Data Management', path: '/dashboard/settings/data-management', icon: Cog, description: 'Database options and quote numbering', roles: ['platform_admin'] },
       { name: 'Database Export', path: '/dashboard/settings/database-export', icon: Database, description: 'Export tables and backups', roles: ['platform_admin'] },
+      { name: 'Business Domain Assignments', path: '/dashboard/settings/domains', icon: Globe, description: 'Assign business domains to tenants', roles: ['platform_admin'] },
       { name: 'Master Data (Geography)', path: '/dashboard/settings/master-data', icon: Globe, description: 'Continents, countries, states, cities', roles: ['platform_admin'] },
       { name: 'Master Data (Subscription Plans)', path: '/dashboard/settings/master-data-subscription-plans', icon: DollarSign, description: 'Subscription plan catalog and metadata', roles: ['platform_admin'] },
       { name: 'Master Data (HTS Codes)', path: '/dashboard/settings/master-data-hts', icon: FileText, description: 'HTS/Schedule B codes manager', roles: ['platform_admin'] },

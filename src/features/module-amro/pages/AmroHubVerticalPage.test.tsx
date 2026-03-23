@@ -198,6 +198,27 @@ describe('AmroHubVerticalPage', () => {
     expect(screen.getByText('Standard Refresh: 300s')).toBeTruthy();
   });
 
+  it('auto-switches to AMRO domain when tenant assignments include AMRO', () => {
+    const setDomain = vi.fn(async () => undefined);
+    mockUseDomain.mockReturnValue({
+      currentDomain: { code: 'LOGISTICS' },
+      availableDomains: [
+        { id: 'domain-logistics', code: 'LOGISTICS', name: 'Logistics', description: null, is_active: true },
+        { id: 'domain-amro', code: 'AMRO', name: 'AMRO', description: null, is_active: true },
+      ],
+      isLoading: false,
+      setDomain,
+    });
+    mockUseAuth.mockReturnValue({
+      hasRole: vi.fn().mockImplementation((role: string) => role === 'tenant_admin'),
+      isPlatformAdmin: vi.fn().mockReturnValue(true),
+    });
+
+    render(<AmroHubVerticalPage />);
+
+    expect(setDomain).toHaveBeenCalledWith('AMRO');
+  });
+
   it('renders AMRO overview route through auth/domain guard with KPI cards and no error state', async () => {
     mockUseDomain.mockReturnValue({
       currentDomain: { code: 'AMRO' },

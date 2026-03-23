@@ -62,6 +62,18 @@ function ensurePayload(input: DomainAssignmentInput): DomainAssignmentInput {
   };
 }
 
+function isMissingDomainAuditSchemaError(error: unknown): boolean {
+  const code = String((error as any)?.code || '').toUpperCase();
+  const message = String((error as any)?.message || '').toLowerCase();
+  if (code === '42P01' || code === '42703') {
+    return true;
+  }
+  return message.includes('domain_audit_log') && (
+    message.includes('does not exist')
+    || message.includes('undefined column')
+  );
+}
+
 export class DomainAssignmentService {
   constructor(
     private readonly supabase: SupabaseAdmin,
@@ -225,6 +237,13 @@ export class DomainAssignmentService {
 
     const { data, error } = await query;
     if (error) {
+      if (isMissingDomainAuditSchemaError(error)) {
+        logger.warn('[DomainAssignmentService] domain audit history unavailable, returning empty list', {
+          message: (error as any)?.message || 'unknown',
+          code: (error as any)?.code || null,
+        });
+        return [];
+      }
       throw new Error(error.message);
     }
     return (data || []) as DomainAuditLog[];
@@ -246,6 +265,15 @@ export class DomainAssignmentService {
 
     const { error } = await this.supabase.from('domain_audit_log').insert(rows);
     if (error) {
+      if (isMissingDomainAuditSchemaError(error)) {
+        logger.warn('[DomainAssignmentService] domain audit write skipped due to unavailable schema', {
+          message: (error as any)?.message || 'unknown',
+          code: (error as any)?.code || null,
+          batchId: payload.batchId,
+          domainId: payload.domainId,
+        });
+        return;
+      }
       throw new Error(error.message);
     }
   }

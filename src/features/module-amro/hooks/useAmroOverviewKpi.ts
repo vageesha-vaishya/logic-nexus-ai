@@ -184,13 +184,98 @@ const DEFAULT_TRENDS_REQUEST: TrendsRequest = {
 };
 const CRITICAL_REFRESH_MS = 30_000;
 const STANDARD_REFRESH_MS = 300_000;
+const API_UNAVAILABLE_RETRY_MS = 30_000;
+const API_UNAVAILABLE_MESSAGE = 'AMRO API is temporarily unavailable. Retrying shortly.';
 const CRITICAL_METRIC_KEYS = new Set(['overdue_tasks', 'compliance_status_pct', 'integration_failures', 'aog_count']);
+const KPI_FALLBACK_DATA_ISSUE = 'Live AMRO KPI API is unavailable. Showing scoped fallback snapshot.';
+const TRENDS_FALLBACK_DATA_ISSUE = 'Live AMRO trends API is unavailable. Showing fallback trend telemetry.';
+let globalApiUnavailableUntil = 0;
+
+export function __resetAmroOverviewKpiCooldownForTests() {
+  globalApiUnavailableUntil = 0;
+}
 
 function buildIsoRange(days: number): string {
   const end = new Date();
   const start = new Date(end);
   start.setDate(start.getDate() - days);
   return `${start.toISOString()}|${end.toISOString()}`;
+}
+
+function isNetworkConnectivityError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  const normalized = error.message.toLowerCase();
+  return normalized.includes('failed to fetch') || normalized.includes('networkerror') || normalized.includes('econnrefused');
+}
+
+function isSessionAuthError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  const normalized = error.message.toLowerCase();
+  return normalized.includes('unauthorized') || normalized.includes('missing active session token');
+}
+
+function buildFallbackDashboard(request: DashboardRequest): DashboardOutput {
+  return {
+    executive_summary: {
+      active_work_packages: 0,
+      overdue_tasks: 0,
+      compliance_status_pct: 0,
+      forecast_accuracy_pct: 0,
+    },
+    kpi_cards: [
+      { key: 'open_work_packages', label: 'Open Work Packages', value: 0, trend: 'N/A' },
+      { key: 'overdue_tasks', label: 'Overdue Tasks', value: 0, trend: 'N/A' },
+      { key: 'compliance_risk', label: 'Compliance Risk', value: 0, trend: 'N/A' },
+      { key: 'aog_count', label: 'AOG Count', value: 0, trend: 'N/A' },
+    ],
+    risk_heatmap: { cells: [] },
+    trend_lines: [],
+    anomaly_flags: [],
+    work_package_overview: [],
+    materials_reservation_alerts: [],
+    compliance_gate_status: [],
+    integration_monitor: {
+      status: 'degraded',
+      failed_attempts: 0,
+      failure_rate_pct: 100,
+      recent_failures: [],
+    },
+    screen_modules: {
+      total_modules: 1,
+      management_and_planner_landing: true,
+    },
+    data_issues: [
+      KPI_FALLBACK_DATA_ISSUE,
+      `Scope: ${(request.stationIds || DEFAULT_STATION_IDS).join(',')} / ${(request.fleetIds || DEFAULT_FLEET_IDS).join(',')}`,
+    ],
+    freshness_warning: API_UNAVAILABLE_MESSAGE,
+  };
+}
+
+function buildFallbackTrends(): TrendOutput {
+  return {
+    time_series: [],
+    variance: 0,
+    threshold_breaches: [],
+    task_execution_monitor: {
+      technician_count: 0,
+      completed_tasks: 0,
+      average_productivity_pct: 0,
+      mobile_completion_rate_pct: 0,
+    },
+    scheduling_board_snapshot: {
+      upcoming_slots: [],
+      resource_utilization_pct: 0,
+    },
+    certification_decision_queue: [],
+    audit_timeline: [],
+    forecast_recommendation_hub: [],
+    data_issues: [TRENDS_FALLBACK_DATA_ISSUE],
+  };
 }
 
 async function requestOverview<TOutput>(url: string, init: RequestInit | undefined, scope: AmroRequestScope): Promise<TOutput> {
@@ -296,6 +381,16 @@ export function useAmroOverviewKpi(scope: AmroRequestScope = {}) {
   const [lastTrendsRefreshAt, setLastTrendsRefreshAt] = useState<string | null>(null);
   const dashboardRequestRef = useRef<DashboardRequest>(DEFAULT_DASHBOARD_REQUEST);
   const trendsRequestRef = useRef<TrendsRequest>(DEFAULT_TRENDS_REQUEST);
+  const apiUnavailableUntilRef = useRef<number>(0);
+  const isApiTemporarilyUnavailable = useCallback(
+    () => Date.now() < Math.max(apiUnavailableUntilRef.current, globalApiUnavailableUntil),
+    [],
+  );
+  const markApiTemporarilyUnavailable = useCallback(() => {
+    const unavailableUntil = Date.now() + API_UNAVAILABLE_RETRY_MS;
+    apiUnavailableUntilRef.current = unavailableUntil;
+    globalApiUnavailableUntil = Math.max(globalApiUnavailableUntil, unavailableUntil);
+  }, []);
   const normalizedScope = useMemo(
     () => ({
       tenantId: scope.tenantId?.trim() || undefined,
@@ -308,6 +403,12 @@ export function useAmroOverviewKpi(scope: AmroRequestScope = {}) {
 
   const loadDashboard = useCallback(async (request: DashboardRequest) => {
     dashboardRequestRef.current = request;
+    if (isApiTemporarilyUnavailable()) {
+      const fallback = buildFallbackDashboard(request);
+      setDashboard(fallback);
+      setLastDashboardRefreshAt(new Date().toISOString());
+      return fallback;
+    }
     const params = new URLSearchParams({
       interface: 'load-kpi-dashboard',
       date_range: request.dateRange,
@@ -321,45 +422,87 @@ export function useAmroOverviewKpi(scope: AmroRequestScope = {}) {
     if (request.engineerId) {
       params.set('engineer_id', request.engineerId);
     }
-    const output = await requestOverview<DashboardOutput>(`${AMRO_OVERVIEW_KPI_PATH}?${params.toString()}`, undefined, normalizedScope);
+    let output: DashboardOutput;
+    try {
+      output = await requestOverview<DashboardOutput>(`${AMRO_OVERVIEW_KPI_PATH}?${params.toString()}`, undefined, normalizedScope);
+    } catch (error) {
+      if (isNetworkConnectivityError(error) || isSessionAuthError(error)) {
+        markApiTemporarilyUnavailable();
+        const fallback = buildFallbackDashboard(request);
+        setDashboard(fallback);
+        setLastDashboardRefreshAt(new Date().toISOString());
+        return fallback;
+      }
+      throw error;
+    }
     setDashboard(output);
     setLastDashboardRefreshAt(new Date().toISOString());
     return output;
-  }, [normalizedScope]);
+  }, [isApiTemporarilyUnavailable, markApiTemporarilyUnavailable, normalizedScope]);
 
   const loadTrends = useCallback(async (request: TrendsRequest) => {
     trendsRequestRef.current = request;
+    if (isApiTemporarilyUnavailable()) {
+      const fallback = buildFallbackTrends();
+      setTrends(fallback);
+      setLastTrendsRefreshAt(new Date().toISOString());
+      return fallback;
+    }
     const params = new URLSearchParams({
       interface: 'load-operational-trends',
       metric_key: request.metricKey,
       window: request.window,
       compare_window: request.compareWindow,
     });
-    const output = await requestOverview<TrendOutput>(`${AMRO_OVERVIEW_KPI_PATH}?${params.toString()}`, undefined, normalizedScope);
+    let output: TrendOutput;
+    try {
+      output = await requestOverview<TrendOutput>(`${AMRO_OVERVIEW_KPI_PATH}?${params.toString()}`, undefined, normalizedScope);
+    } catch (error) {
+      if (isNetworkConnectivityError(error) || isSessionAuthError(error)) {
+        markApiTemporarilyUnavailable();
+        const fallback = buildFallbackTrends();
+        setTrends(fallback);
+        setLastTrendsRefreshAt(new Date().toISOString());
+        return fallback;
+      }
+      throw error;
+    }
     setTrends(output);
     setLastTrendsRefreshAt(new Date().toISOString());
     return output;
-  }, [normalizedScope]);
+  }, [isApiTemporarilyUnavailable, markApiTemporarilyUnavailable, normalizedScope]);
 
   const exportSnapshot = useCallback(async (request?: Partial<ExportRequest>) => {
     setExporting(true);
     setError(null);
     try {
-      const output = await requestOverview<ExportOutput>(`${AMRO_OVERVIEW_KPI_PATH}?interface=export-kpi-snapshot`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          format: request?.format || 'pdf',
-          date_range: request?.dateRange || buildIsoRange(30),
-          selected_widgets: request?.selectedWidgets || DEFAULT_WIDGETS,
-        }),
-      }, normalizedScope);
+      if (isApiTemporarilyUnavailable()) {
+        throw new Error(API_UNAVAILABLE_MESSAGE);
+      }
+      let output: ExportOutput;
+      try {
+        output = await requestOverview<ExportOutput>(`${AMRO_OVERVIEW_KPI_PATH}?interface=export-kpi-snapshot`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            format: request?.format || 'pdf',
+            date_range: request?.dateRange || buildIsoRange(30),
+            selected_widgets: request?.selectedWidgets || DEFAULT_WIDGETS,
+          }),
+        }, normalizedScope);
+      } catch (error) {
+        if (isNetworkConnectivityError(error)) {
+          markApiTemporarilyUnavailable();
+          throw new Error(API_UNAVAILABLE_MESSAGE);
+        }
+        throw error;
+      }
       setLastExport(output);
       return output;
     } finally {
       setExporting(false);
     }
-  }, [normalizedScope]);
+  }, [isApiTemporarilyUnavailable, markApiTemporarilyUnavailable, normalizedScope]);
 
   const refreshAll = useCallback(async () => {
     setError(null);
@@ -400,6 +543,9 @@ export function useAmroOverviewKpi(scope: AmroRequestScope = {}) {
 
   useEffect(() => {
     const criticalRefreshId = window.setInterval(() => {
+      if (isApiTemporarilyUnavailable()) {
+        return;
+      }
       void loadDashboard(dashboardRequestRef.current).catch((err) => {
         setError(err instanceof Error ? err.message : 'Failed to refresh AMRO KPI dashboard');
       });
@@ -407,10 +553,13 @@ export function useAmroOverviewKpi(scope: AmroRequestScope = {}) {
     return () => {
       window.clearInterval(criticalRefreshId);
     };
-  }, [loadDashboard]);
+  }, [isApiTemporarilyUnavailable, loadDashboard]);
 
   useEffect(() => {
     const standardRefreshId = window.setInterval(() => {
+      if (isApiTemporarilyUnavailable()) {
+        return;
+      }
       void loadTrends(trendsRequestRef.current).catch((err) => {
         setError(err instanceof Error ? err.message : 'Failed to refresh AMRO operational trends');
       });
@@ -418,7 +567,7 @@ export function useAmroOverviewKpi(scope: AmroRequestScope = {}) {
     return () => {
       window.clearInterval(standardRefreshId);
     };
-  }, [loadTrends]);
+  }, [isApiTemporarilyUnavailable, loadTrends]);
 
   const state = useMemo(() => ({
     dashboard,

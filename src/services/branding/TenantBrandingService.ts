@@ -3,7 +3,36 @@ import { resolveTenantBranding, type ResolvedTenantBranding, type TenantBranding
 import type { BrandingSettings } from '@/services/quotation/QuotationConfigurationService';
 
 const BRANDING_API_PATH = '/api/v1/tenant-branding';
+const BRANDING_API_UNAVAILABLE_RETRY_MS = 30_000;
+let brandingApiUnavailableUntil = 0;
 type TenantBrandingRequestQuery = TenantBrandingQuery & { tenantId?: string };
+
+function isNetworkConnectivityError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  const normalized = error.message.toLowerCase();
+  return normalized.includes('failed to fetch') || normalized.includes('networkerror') || normalized.includes('econnrefused');
+}
+
+function isBrandingApiTemporarilyUnavailable(): boolean {
+  return Date.now() < brandingApiUnavailableUntil;
+}
+
+function markBrandingApiTemporarilyUnavailable() {
+  brandingApiUnavailableUntil = Date.now() + BRANDING_API_UNAVAILABLE_RETRY_MS;
+}
+
+export function shouldUseTenantBrandingStylesheetEndpoint(): boolean {
+  if (typeof window === 'undefined') {
+    return true;
+  }
+  const hostname = window.location.hostname.toLowerCase();
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    return false;
+  }
+  return !isBrandingApiTemporarilyUnavailable();
+}
 
 async function updateBrandingDirectly(brandingSettings: BrandingSettings, tenantId: string): Promise<BrandingSettings> {
   const { data: existingTenant, error: readError } = await supabase
@@ -86,6 +115,9 @@ async function resolveBrandingDirectly(query: TenantBrandingRequestQuery): Promi
 
 export const TenantBrandingService = {
   async getResolvedBranding(query: TenantBrandingRequestQuery = {}): Promise<ResolvedTenantBranding> {
+    if (isBrandingApiTemporarilyUnavailable()) {
+      return await resolveBrandingDirectly(query);
+    }
     const { data: sessionData } = await supabase.auth.getSession();
     const accessToken = sessionData?.session?.access_token || '';
     const search = new URLSearchParams();
@@ -119,7 +151,10 @@ export const TenantBrandingService = {
       }
       const payload = await response.json();
       return payload?.data as ResolvedTenantBranding;
-    } catch {
+    } catch (error) {
+      if (isNetworkConnectivityError(error)) {
+        markBrandingApiTemporarilyUnavailable();
+      }
       return await resolveBrandingDirectly(query);
     }
   },

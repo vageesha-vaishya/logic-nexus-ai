@@ -26,11 +26,7 @@ function normalizeHostname(raw: unknown): string {
 function resolveTargetTenantId(req: ApiRequest, access: { isPlatformAdmin: boolean; tenantId: string | null }): string {
   const requestedTenantId = sanitizeQueryId(req.query.tenant_id, 'tenant_id');
   if (access.isPlatformAdmin) {
-    const targetTenantId = requestedTenantId || access.tenantId || '';
-    if (!targetTenantId) {
-      throw new Error('Tenant scope required');
-    }
-    return targetTenantId;
+    return requestedTenantId || access.tenantId || '';
   }
   if (!access.tenantId) {
     throw new Error('Tenant scope required');
@@ -61,6 +57,12 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     ctx.role = auth.role;
     const access = await resolveAndApplyAccessContext(req, ctx);
     const targetTenantId = resolveTargetTenantId(req, access);
+    if (!targetTenantId) {
+      res.setHeader('Content-Type', 'text/css; charset=utf-8');
+      res.setHeader('Cache-Control', 'public, max-age=60');
+      res.status(200).end(':root{}');
+      return;
+    }
     enforceRateLimit(req, targetTenantId);
 
     const requestedDomainCode = sanitizeQueryId(req.query.domain_code, 'domain_code').toUpperCase();
@@ -103,8 +105,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     const css = buildTenantBrandingStylesheet(branding);
     res.setHeader('Content-Type', 'text/css; charset=utf-8');
     res.setHeader('Cache-Control', 'public, max-age=300');
-    res.status(200);
-    res.end(css);
+    res.status(200).end(css);
     return;
   } catch (error) {
     sendErrorResponse(res, error, ctx.correlationId);

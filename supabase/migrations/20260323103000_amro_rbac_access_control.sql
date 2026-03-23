@@ -39,6 +39,15 @@ SET
   category = EXCLUDED.category,
   description = EXCLUDED.description;
 
+INSERT INTO public.auth_roles (id, label, description, level, can_manage_scopes, is_system)
+VALUES
+  ('platform_admin', 'Platform Administrator', 'Full system access with global visibility', 0, '{global,tenant,franchisee}', true),
+  ('super_admin', 'Super Administrator', 'Extended global administration privileges', 0, '{global,tenant,franchisee}', true),
+  ('tenant_admin', 'Tenant Administrator', 'Tenant-level administration', 1, '{tenant,franchisee}', true),
+  ('franchise_admin', 'Franchise Administrator', 'Franchise-level administration', 2, '{franchisee}', true),
+  ('user', 'Standard User', 'Standard operational access', 3, '{}', true)
+ON CONFLICT (id) DO NOTHING;
+
 INSERT INTO public.auth_role_permissions (role_id, permission_id, scope_level, is_denied)
 VALUES
   ('platform_admin', 'view_amro_dashboard', 'global', false),

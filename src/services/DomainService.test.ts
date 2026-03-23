@@ -9,6 +9,7 @@ vi.mock('@/integrations/supabase/client', () => ({
     from: vi.fn(),
     auth: {
       getSession: vi.fn(),
+      getUser: vi.fn(),
     },
   },
 }));
@@ -27,6 +28,13 @@ describe('DomainService', () => {
       data: {
         session: {
           access_token: 'session-token',
+        },
+      },
+    });
+    (supabase.auth.getUser as any).mockResolvedValue({
+      data: {
+        user: {
+          id: 'user-1',
         },
       },
     });
@@ -65,6 +73,48 @@ describe('DomainService', () => {
       expect(result.tenantDomainCount).toBe(2);
       expect(result.tenantId).toBe('tenant-1');
       expect(result.isPlatformAdmin).toBe(false);
+    });
+
+    it('should pass selected tenant and franchise scope headers to API', async () => {
+      const mockFetch = vi.mocked(fetch);
+      mockFetch.mockResolvedValue({
+        ok: true,
+        headers: jsonHeaders,
+        json: async () => ({
+          data: {
+            domains: mockDomains,
+            tenantDomainCount: 2,
+            tenantId: 'tenant-deccan',
+            isPlatformAdmin: true,
+          },
+        }),
+      } as unknown as Response);
+
+      const platformDomainsChain = {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        order: vi.fn().mockResolvedValue({ data: mockDomains, error: null }),
+      };
+      (supabase.from as any).mockImplementation((table: string) => {
+        if (table === 'platform_domains') return platformDomainsChain;
+        throw new Error(`Unexpected table: ${table}`);
+      });
+
+      await DomainService.getAuthorizedDomains(true, {
+        tenantId: 'tenant-deccan',
+        franchiseId: 'franchise-deccan-fly',
+      });
+
+      expect(fetch).toHaveBeenCalledWith(
+        '/api/v1/platform-domains?refresh=1',
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            Authorization: 'Bearer session-token',
+            'x-tenant-id': 'tenant-deccan',
+            'x-franchise-id': 'franchise-deccan-fly',
+          }),
+        }),
+      );
     });
 
     it('should deduplicate duplicate domain rows from API payload', async () => {
@@ -128,6 +178,13 @@ describe('DomainService', () => {
       };
       (supabase.from as any).mockImplementation((table: string) => {
         if (table === 'tenant_domain_assignments') return tenantAssignmentsChain;
+        if (table === 'user_roles') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            limit: vi.fn().mockResolvedValue({ data: [], error: null }),
+          };
+        }
         throw new Error(`Unexpected table: ${table}`);
       });
       mockFetch.mockResolvedValue({
@@ -156,6 +213,13 @@ describe('DomainService', () => {
 
       (supabase.from as any).mockImplementation((table: string) => {
         if (table === 'tenant_domain_assignments') return tenantAssignmentsChain;
+        if (table === 'user_roles') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            limit: vi.fn().mockResolvedValue({ data: [], error: null }),
+          };
+        }
         throw new Error(`Unexpected table: ${table}`);
       });
 
@@ -186,6 +250,13 @@ describe('DomainService', () => {
 
       (supabase.from as any).mockImplementation((table: string) => {
         if (table === 'tenant_domain_assignments') return tenantAssignmentsChain;
+        if (table === 'user_roles') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            limit: vi.fn().mockResolvedValue({ data: [], error: null }),
+          };
+        }
         throw new Error(`Unexpected table: ${table}`);
       });
 
@@ -200,6 +271,126 @@ describe('DomainService', () => {
       expect(result.domains).toEqual([mockDomains[0]]);
       expect(result.tenantDomainCount).toBe(1);
       expect(result.isPlatformAdmin).toBe(false);
+    });
+
+    it('should short-circuit repeated network failures during cooldown window', async () => {
+      const mockFetch = vi.mocked(fetch);
+      const tenantAssignmentsChain = {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockResolvedValue({
+          data: [{ platform_domains: mockDomains[0] }],
+          error: null,
+        }),
+      };
+
+      (supabase.from as any).mockImplementation((table: string) => {
+        if (table === 'tenant_domain_assignments') return tenantAssignmentsChain;
+        if (table === 'user_roles') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            limit: vi.fn().mockResolvedValue({ data: [], error: null }),
+          };
+        }
+        throw new Error(`Unexpected table: ${table}`);
+      });
+
+      mockFetch.mockRejectedValue(new Error('Failed to fetch'));
+
+      const first = await DomainService.getAuthorizedDomains();
+      const second = await DomainService.getAuthorizedDomains();
+
+      expect(first.domains).toEqual([mockDomains[0]]);
+      expect(second.domains).toEqual([mockDomains[0]]);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('should expose active domains for platform admin during fallback resolution', async () => {
+      const mockFetch = vi.mocked(fetch);
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 500,
+        headers: jsonHeaders,
+        json: async () => ({ error: 'Internal Server Error' }),
+      } as unknown as Response);
+
+      const tenantAssignmentsChain = {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockResolvedValue({
+          data: [{ platform_domains: mockDomains[0] }],
+          error: null,
+        }),
+      };
+      const userRolesChain = {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockResolvedValue({
+          data: [{ role: 'platform_admin' }],
+          error: null,
+        }),
+      };
+      const platformDomainsChain = {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        order: vi.fn().mockResolvedValue({
+          data: [
+            { id: '1', code: 'LOGISTICS', name: 'Logistics', description: 'Logistics domain', is_active: true },
+            { id: '3', code: 'AMRO', name: 'AMRO', description: 'AMRO domain', is_active: true },
+          ],
+          error: null,
+        }),
+      };
+      (supabase.from as any).mockImplementation((table: string) => {
+        if (table === 'tenant_domain_assignments') return tenantAssignmentsChain;
+        if (table === 'user_roles') return userRolesChain;
+        if (table === 'platform_domains') return platformDomainsChain;
+        throw new Error(`Unexpected table: ${table}`);
+      });
+
+      const result = await DomainService.getAuthorizedDomains();
+
+      expect(result.isPlatformAdmin).toBe(true);
+      expect(result.domains.map((domain) => domain.code.toUpperCase())).toEqual(['LOGISTICS', 'AMRO']);
+      expect(result.tenantDomainCount).toBe(2);
+    });
+
+    it('should hydrate full active domain list for platform admin API responses', async () => {
+      const mockFetch = vi.mocked(fetch);
+      mockFetch.mockResolvedValue({
+        ok: true,
+        headers: jsonHeaders,
+        json: async () => ({
+          data: {
+            domains: [{ id: '1', code: 'LOGISTICS', name: 'Logistics', description: null, is_active: true }],
+            tenantDomainCount: 1,
+            tenantId: 'tenant-deccan',
+            isPlatformAdmin: true,
+          },
+        }),
+      } as unknown as Response);
+
+      const platformDomainsChain = {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        order: vi.fn().mockResolvedValue({
+          data: [
+            { id: '1', code: 'LOGISTICS', name: 'Logistics', description: null, is_active: true },
+            { id: '2', code: 'AMRO', name: 'AMRO', description: null, is_active: true },
+            { id: '3', code: 'FINANCE', name: 'Finance', description: null, is_active: true },
+          ],
+          error: null,
+        }),
+      };
+      (supabase.from as any).mockImplementation((table: string) => {
+        if (table === 'platform_domains') return platformDomainsChain;
+        throw new Error(`Unexpected table: ${table}`);
+      });
+
+      const result = await DomainService.getAuthorizedDomains();
+
+      expect(result.isPlatformAdmin).toBe(true);
+      expect(result.domains.map((domain) => domain.code.toUpperCase())).toEqual(['LOGISTICS', 'AMRO', 'FINANCE']);
+      expect(result.tenantDomainCount).toBe(3);
     });
   });
 
@@ -379,6 +570,35 @@ describe('DomainService', () => {
       expect(mockChain.delete).toHaveBeenCalled();
       expect(mockChain.eq).toHaveBeenCalledWith('id', '1');
       expect(spyInvalidate).toHaveBeenCalled();
+    });
+
+    it('should throw explicit message when delete fails with structured error object', async () => {
+      const mockChain = {
+        delete: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockResolvedValue({ error: { message: 'permission denied for table platform_domains' } }),
+      };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (supabase.from as any).mockReturnValue(mockChain);
+
+      await expect(DomainService.deleteDomain('1')).rejects.toThrow('permission denied for table platform_domains');
+    });
+
+    it('should map foreign key constraint errors to friendly delete guidance', async () => {
+      const mockChain = {
+        delete: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockResolvedValue({
+          error: {
+            message: 'update or delete on table "platform_domains" violates foreign key constraint',
+            code: '23503',
+          },
+        }),
+      };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (supabase.from as any).mockReturnValue(mockChain);
+
+      await expect(DomainService.deleteDomain('1')).rejects.toThrow(
+        'Cannot delete domain because it is assigned or referenced by existing records',
+      );
     });
   });
 

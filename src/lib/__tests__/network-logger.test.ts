@@ -95,4 +95,25 @@ describe('network-logger', () => {
     expect(patchedRequest.headers.get('Authorization')).toBe('Bearer user_jwt_token');
     expect(patchedRequest.headers.get('X-Correlation-ID')).toBeNull();
   });
+
+  it('preserves Request headers when fetch receives Request plus init', async () => {
+    const baseFetch = vi.fn().mockResolvedValue(new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } }));
+    window.fetch = baseFetch as unknown as typeof window.fetch;
+
+    const { initNetworkLogger } = await import('@/lib/network-logger');
+    initNetworkLogger();
+
+    const request = new Request('https://project.supabase.co/rest/v1/user_roles?select=role', {
+      method: 'GET',
+      headers: {
+        Authorization: 'Bearer user_jwt_token',
+      },
+    });
+    await window.fetch(request, { method: 'GET' });
+
+    const [patchedRequest, patchedInit] = baseFetch.mock.calls[0] as [Request, RequestInit];
+    const headers = new Headers(patchedInit.headers || patchedRequest.headers);
+    expect(headers.get('Authorization')).toBe('Bearer user_jwt_token');
+    expect(headers.get('apikey')).toBeTruthy();
+  });
 });

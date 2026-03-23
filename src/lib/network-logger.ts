@@ -85,7 +85,16 @@ export const initNetworkLogger = () => {
       // Handle different fetch arguments (resource, init)
       if (args.length > 1 && typeof args[1] === 'object') {
         const init = args[1] as RequestInit;
-        const headers = new Headers(init.headers);
+        const requestHeadersSource =
+          args[0] instanceof Request
+            ? args[0].headers
+            : undefined;
+        const headers = new Headers(requestHeadersSource || init.headers);
+        if (init.headers) {
+          new Headers(init.headers).forEach((value, key) => {
+            headers.set(key, value);
+          });
+        }
         if (isSupabaseRest) {
           ensureSupabaseRestHeaders(headers, supabasePublicKey);
         } else {

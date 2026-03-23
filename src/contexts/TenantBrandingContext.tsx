@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { useCRM } from '@/hooks/useCRM';
 import { useDomain } from '@/contexts/DomainContext';
-import { TenantBrandingService } from '@/services/branding/TenantBrandingService';
+import { TenantBrandingService, shouldUseTenantBrandingStylesheetEndpoint } from '@/services/branding/TenantBrandingService';
 import type { ResolvedTenantBranding } from '@/services/branding/brandingResolver';
 import { buildTenantBrandingCssVariables } from '@/services/branding/brandingResolver';
 import { logger } from '@/lib/logger';
@@ -25,6 +25,13 @@ function applyCssVariables(branding: ResolvedTenantBranding | null) {
 
 function ensureStylesheet(hostname: string, domainCode: string, franchiseId: string, tenantId: string) {
   const id = 'tenant-branding-css-endpoint';
+  if (!shouldUseTenantBrandingStylesheetEndpoint()) {
+    const existing = document.getElementById(id) as HTMLLinkElement | null;
+    if (existing) {
+      existing.remove();
+    }
+    return;
+  }
   const existing = document.getElementById(id) as HTMLLinkElement | null;
   const params = new URLSearchParams();
   if (hostname) params.set('hostname', hostname);

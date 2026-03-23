@@ -288,6 +288,9 @@ export default function Settings() {
                     <Button className="whitespace-nowrap" variant="outline" onClick={() => navigate('/dashboard/settings/database-export')}>
                       Database Export
                     </Button>
+                    <Button className="whitespace-nowrap" variant="outline" onClick={() => navigate('/dashboard/settings/domains')}>
+                      Business Domain Assignments
+                    </Button>
                   </div>
                 </CardContent>
               </Card>

@@ -59,6 +59,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     });
     enforceRateLimit(req, access.tenantId || '');
     const requestedDomainCode = typeof req.query.domain_code === 'string' ? req.query.domain_code : null;
+    const refreshRequested = String(req.query.refresh || '').trim() === '1';
     const domainAccess = await enforceDomainAccess(access, requestedDomainCode);
     const cacheKey = [
       'platform-domains',
@@ -67,13 +68,15 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       requestedDomainCode || 'all',
       domainAccess.authorizedDomainCodes.join(','),
     ].join(':');
-    const cached = await getCachedJson<AuthorizedDomainsPayload>(cacheKey);
-    if (cached) {
-      return res.status(200).json({
-        data: cached,
-        correlationId: ctx.correlationId,
-        version: 'v1',
-      });
+    if (!refreshRequested) {
+      const cached = await getCachedJson<AuthorizedDomainsPayload>(cacheKey);
+      if (cached) {
+        return res.status(200).json({
+          data: cached,
+          correlationId: ctx.correlationId,
+          version: 'v1',
+        });
+      }
     }
     const supabase = getSupabaseAdminClient();
 
@@ -119,7 +122,9 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       tenantId: access.tenantId,
       isPlatformAdmin: access.isPlatformAdmin,
     };
-    await setCachedJson(cacheKey, responsePayload, 120);
+    if (!refreshRequested) {
+      await setCachedJson(cacheKey, responsePayload, 120);
+    }
 
     return res.status(200).json({
       data: responsePayload,

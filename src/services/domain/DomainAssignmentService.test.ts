@@ -147,4 +147,76 @@ describe('DomainAssignmentService', () => {
     expect(query.eq).toHaveBeenCalledWith('tenant_id', 'tenant-1');
     expect(result).toEqual(rows);
   });
+
+  it('returns empty audit history when audit table is unavailable', async () => {
+    const query = {
+      select: vi.fn().mockReturnThis(),
+      order: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      then: (resolve: any) => resolve({
+        data: null,
+        error: { message: 'relation "domain_audit_log" does not exist', code: '42P01' },
+      }),
+    } as any;
+
+    from.mockReturnValue(query);
+    const service = new DomainAssignmentService(supabase);
+    const result = await service.listAuditHistory({ limit: 50 });
+
+    expect(result).toEqual([]);
+  });
+
+  it('completes tenant assignment when audit table is unavailable', async () => {
+    const selectQuery = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      in: vi.fn().mockResolvedValue({
+        data: [],
+        error: null,
+      }),
+    };
+    const upsert = vi.fn().mockResolvedValue({ error: null });
+    const insert = vi.fn().mockResolvedValue({
+      error: { message: 'relation "domain_audit_log" does not exist', code: '42P01' },
+    });
+
+    from.mockImplementation((table: string) => {
+      if (table === 'domain_tenant') {
+        return {
+          ...selectQuery,
+          upsert,
+        };
+      }
+      if (table === 'domain_audit_log') {
+        return { insert };
+      }
+      if (table === 'platform_domains') {
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          limit: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({ data: { code: 'LOGISTICS' }, error: null }),
+        };
+      }
+      return {};
+    });
+
+    const service = new DomainAssignmentService(supabase, isolationService);
+    const result = await service.assignTenants({
+      domainId: 'domain-1',
+      tenantIds: ['tenant-1'],
+      actorUserId: 'user-1',
+      batchId: 'batch-3',
+    });
+
+    expect(result).toEqual({
+      batchId: 'batch-3',
+      domainId: 'domain-1',
+      attempted: 1,
+      assigned: 1,
+      reactivated: 0,
+      skipped: 0,
+    });
+  });
 });

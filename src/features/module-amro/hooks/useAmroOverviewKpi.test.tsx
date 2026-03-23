@@ -1,6 +1,6 @@
 import { renderHook, waitFor, act } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { useAmroOverviewKpi } from './useAmroOverviewKpi';
+import { __resetAmroOverviewKpiCooldownForTests, useAmroOverviewKpi } from './useAmroOverviewKpi';
 
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: {
@@ -26,6 +26,7 @@ vi.mock('@/integrations/supabase/client', () => ({
 describe('useAmroOverviewKpi', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    __resetAmroOverviewKpiCooldownForTests();
   });
 
   it('loads dashboard and trends from the overview KPI endpoint', async () => {
@@ -156,6 +157,43 @@ describe('useAmroOverviewKpi', () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     expect(result.current.error).toContain('Forbidden');
+  });
+
+  it('uses fallback KPI snapshot after network connectivity failure', async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new Error('Failed to fetch'));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { result } = renderHook(() => useAmroOverviewKpi());
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(result.current.error).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(result.current.dashboard?.kpi_cards[0]?.label).toBe('Open Work Packages');
+    expect(result.current.dashboard?.data_issues?.[0]).toContain('fallback snapshot');
+    expect(result.current.trends?.data_issues?.[0]).toContain('fallback trend telemetry');
+
+    await act(async () => {
+      await result.current.refreshAll();
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('reuses outage cooldown across hook remounts to prevent proxy retry storms', async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new Error('ECONNREFUSED'));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const first = renderHook(() => useAmroOverviewKpi());
+    await waitFor(() => expect(first.result.current.loading).toBe(false));
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    first.unmount();
+
+    const second = renderHook(() => useAmroOverviewKpi());
+    await waitFor(() => expect(second.result.current.loading).toBe(false));
+    expect(second.result.current.error).toBeNull();
+    expect(second.result.current.dashboard?.data_issues?.[0]).toContain('fallback snapshot');
+    expect(second.result.current.trends?.data_issues?.[0]).toContain('fallback trend telemetry');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it('maps metric tiers and refreshes dashboard plus trends on demand', async () => {

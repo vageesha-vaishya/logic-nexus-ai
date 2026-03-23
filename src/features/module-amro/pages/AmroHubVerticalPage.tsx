@@ -536,18 +536,31 @@ function AmroWorkspaceDocumentationReference({
 }
 
 export default function AmroHubVerticalPage({ moduleKey }: AmroHubVerticalPageProps = {}) {
-  const { currentDomain } = useDomain();
+  const {
+    currentDomain,
+    availableDomains = [],
+    isLoading: isDomainLoading = false,
+    setDomain,
+  } = useDomain();
   const { hasRole, isPlatformAdmin } = useAuth();
   const { context } = useCRM();
-  const isAmroDomainActive = currentDomain?.code === 'AMRO';
+  const hasAmroDomainAssigned = useMemo(
+    () => availableDomains.some((domain) => String(domain.code || '').trim().toUpperCase() === 'AMRO'),
+    [availableDomains],
+  );
+  const isAmroDomainActive = String(currentDomain?.code || '').trim().toUpperCase() === 'AMRO';
+  const effectiveDomainCode = useMemo(
+    () => (hasAmroDomainAssigned ? 'AMRO' : currentDomain?.code || null),
+    [currentDomain?.code, hasAmroDomainAssigned],
+  );
   const overviewScope = useMemo(
     () => ({
       tenantId: context.tenantId,
       franchiseId: context.franchiseId,
       userId: context.userId,
-      domainCode: currentDomain?.code || null,
+      domainCode: effectiveDomainCode,
     }),
-    [context.franchiseId, context.tenantId, context.userId, currentDomain?.code],
+    [context.franchiseId, context.tenantId, context.userId, effectiveDomainCode],
   );
   const {
     dashboard,
@@ -570,6 +583,14 @@ export default function AmroHubVerticalPage({ moduleKey }: AmroHubVerticalPagePr
   const [engineerFilter, setEngineerFilter] = useState<string>('');
   const isWorkspaceDocumentationRoute = moduleKey === 'workspace-documentation';
   const modulePageLabel = moduleKey ? AMRO_MODULE_PAGE_LABEL[moduleKey] : 'Operations Overview';
+
+  useEffect(() => {
+    if (isDomainLoading || isAmroDomainActive || !hasAmroDomainAssigned) {
+      return;
+    }
+    void setDomain('AMRO');
+  }, [hasAmroDomainAssigned, isAmroDomainActive, isDomainLoading, setDomain]);
+
   const activePersona = useMemo<PersonaRole>(() => {
     if (isPlatformAdmin()) return 'platform_admin';
     if (hasRole('tenant_admin')) return 'tenant_admin';

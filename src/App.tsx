@@ -727,6 +727,30 @@ const App = () => (
               path="/dashboard/settings/domains/:id" 
               element={<ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required"><PlatformDomainDetail /></ProtectedRoute>} 
             />
+            <Route
+              path="/dashboard/platform-domains"
+              element={
+                <ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required">
+                  <PlatformDomains />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard/platform-domains/:id"
+              element={
+                <ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required">
+                  <PlatformDomainDetail />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard/business-domain-assignments"
+              element={
+                <ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required">
+                  <PlatformDomains />
+                </ProtectedRoute>
+              }
+            />
             <Route 
               path="/dashboard/settings/database-export" 
               element={<ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required"><DatabaseExport /></ProtectedRoute>} 

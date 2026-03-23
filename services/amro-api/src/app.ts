@@ -30,13 +30,6 @@ function resolveContractsDir(): string {
   return matched;
 }
 
-const supabaseUrl = String(
-  process.env.AMRO_SUPABASE_URL ||
-    process.env.SUPABASE_URL ||
-    process.env.VITE_SUPABASE_URL ||
-    '',
-).replace(/\/$/, '');
-const supabaseServiceKey = process.env.AMRO_SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
 const TABLE_FALLBACK_CANDIDATES: Record<string, string[]> = {
   work_package_master: ['work_packages'],
   materials_inventory: ['parts_inventory', 'work_package_materials'],
@@ -59,11 +52,28 @@ function isOverviewKpiEnabled(): boolean {
   return parseFlag(process.env.AMRO_OVERVIEW_KPI_V2_ENABLED, true);
 }
 
+function resolveSupabaseCredentials(): { url: string; serviceKey: string } {
+  const url = String(
+    process.env.AMRO_SUPABASE_URL ||
+      process.env.SUPABASE_URL ||
+      process.env.VITE_SUPABASE_URL ||
+      '',
+  ).replace(/\/$/, '');
+  const serviceKey = String(
+    process.env.AMRO_SUPABASE_SERVICE_ROLE_KEY ||
+      process.env.SUPABASE_SERVICE_ROLE_KEY ||
+      process.env.SUPABASE_SERVICE_KEY ||
+      '',
+  ).trim();
+  return { url, serviceKey };
+}
+
 function getSupabaseAdminClient(): SupabaseClient {
-  if (!supabaseUrl || !supabaseServiceKey) {
+  const { url, serviceKey } = resolveSupabaseCredentials();
+  if (!url || !serviceKey) {
     throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY environment variables');
   }
-  return createClient(supabaseUrl, supabaseServiceKey);
+  return createClient(url, serviceKey);
 }
 
 function parseDateMs(value: unknown): number {

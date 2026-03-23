@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { DomainSwitcher } from './DomainSwitcher';
 
@@ -54,6 +54,10 @@ describe('DomainSwitcher', () => {
     } as any);
 
     render(<DomainSwitcher />);
-    expect(screen.getByRole('combobox')).toBeInTheDocument();
+    const trigger = screen.getByRole('combobox');
+    expect(trigger).toBeInTheDocument();
+    fireEvent.click(trigger);
+    expect(screen.getAllByText('Logistics').length).toBeGreaterThan(0);
+    expect(screen.getByText('E-Commerce')).toBeInTheDocument();
   });
 });
