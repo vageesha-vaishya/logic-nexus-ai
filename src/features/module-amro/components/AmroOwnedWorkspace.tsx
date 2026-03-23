@@ -34,6 +34,7 @@ const certificationAuthorityProfileOptions = ['FAA', 'EASA', 'CAAC'] as const;
 const workspaceViewModes = ['kanban', 'card', 'grid', 'list'] as const;
 const amroHeaderActionOrder = ['Search', 'Filter', 'View', 'Create', 'Refresh', 'Import/Export', 'Theme'] as const;
 const workspaceThemeOptions = ['Azure Sky', 'Hangar Dark', 'Maintenance Slate'] as const;
+const overviewDateRangeOptions = ['7d', '30d', '90d'] as const;
 const workPackagePageSizes = [10, 25, 50] as const;
 const workspaceLocaleOptions = ['en-US', 'en-GB', 'fr-FR', 'de-DE'] as const;
 const amroWorkspaceViewStorageKey = 'amro.workspace.view';
@@ -114,6 +115,7 @@ export function AmroOwnedWorkspace({ moduleKey }: AmroOwnedWorkspaceProps) {
   const [workspaceViewMode, setWorkspaceViewMode] = useState<(typeof workspaceViewModes)[number]>('kanban');
   const [workspaceTheme, setWorkspaceTheme] = useState<(typeof workspaceThemeOptions)[number]>('Azure Sky');
   const [workspaceLocale, setWorkspaceLocale] = useState<(typeof workspaceLocaleOptions)[number]>('en-US');
+  const [overviewDateRange, setOverviewDateRange] = useState<(typeof overviewDateRangeOptions)[number]>('30d');
   const [workPackagePageSize, setWorkPackagePageSize] = useState<number>(workPackagePageSizes[0]);
   const [workPackagePage, setWorkPackagePage] = useState(1);
   const [workPackageSortField, setWorkPackageSortField] = useState<'packageNumber' | 'lifecycleStage'>('packageNumber');
@@ -126,6 +128,9 @@ export function AmroOwnedWorkspace({ moduleKey }: AmroOwnedWorkspaceProps) {
   const [overrideRationale, setOverrideRationale] = useState('');
   const [deferralConfirmOpen, setDeferralConfirmOpen] = useState(false);
   const [deferralRationale, setDeferralRationale] = useState('');
+  const [lastInteractionMessage, setLastInteractionMessage] = useState('Ready for module actions.');
+  const [busyWorkPackageActionId, setBusyWorkPackageActionId] = useState<string | null>(null);
+  const [lastWorkspaceExportAt, setLastWorkspaceExportAt] = useState<string | null>(null);
   const workspaceLoadStartedAtRef = useRef(typeof performance !== 'undefined' ? performance.now() : Date.now());
   const workspaceLoadMetricPublishedRef = useRef(false);
   const filterApplyStartedAtRef = useRef<number | null>(null);
@@ -182,7 +187,7 @@ export function AmroOwnedWorkspace({ moduleKey }: AmroOwnedWorkspaceProps) {
         {
           id: 'overview-compliance-gate',
           label: 'Load Compliance Gate',
-          onClick: state.loadComplianceGateExplainability,
+          onClick: () => void handleOpenComplianceGate(),
           disabled: !state.selectedWorkPackageId,
           disabledReason: state.selectedWorkPackageId ? 'Ready.' : 'Select a work package first.',
         },
@@ -281,7 +286,7 @@ export function AmroOwnedWorkspace({ moduleKey }: AmroOwnedWorkspaceProps) {
                   {
                     id: 'compliance-gate',
                     label: 'Load Compliance Gate',
-                    onClick: () => void state.loadComplianceGateExplainability(),
+                    onClick: () => void handleOpenComplianceGate(),
                     disabled: !state.selectedWorkPackageId,
                     disabledReason: state.selectedWorkPackageId ? 'Ready.' : 'Select a work package first.',
                   },
@@ -376,7 +381,11 @@ export function AmroOwnedWorkspace({ moduleKey }: AmroOwnedWorkspaceProps) {
                           },
                         ]
                       : [];
-  const disabledModuleActions = moduleActions.filter((action) => action.disabled);
+  const moduleActionStates = moduleActions.map((action) => ({
+    ...action,
+    stateLabel: action.disabled ? 'disabled' : 'enabled',
+    stateReason: action.disabled ? action.disabledReason : 'Ready.',
+  }));
   const nowEpoch = Date.now();
   const fleetOptions = ['all', ...Array.from(new Set(state.assets.map((asset) => asset.assetTag)))];
   const stationOptions = ['all', ...Array.from(new Set(state.scheduleBoardRows.map((row) => row.station_code)))];
@@ -395,6 +404,15 @@ export function AmroOwnedWorkspace({ moduleKey }: AmroOwnedWorkspaceProps) {
   });
   const workPackageTotalPages = Math.max(1, Math.ceil(sortedWorkPackages.length / workPackagePageSize));
   const pagedWorkPackages = sortedWorkPackages.slice((workPackagePage - 1) * workPackagePageSize, workPackagePage * workPackagePageSize);
+  const hasAnyWorkPackages = state.workPackages.length > 0;
+  const hasVisibleWorkPackages = pagedWorkPackages.length > 0;
+  const hasActiveScopeFilters = state.workPackageStatusFilter !== 'all'
+    || state.workPackageSearch.trim().length > 0
+    || state.selectedSavedViewId !== 'default-all'
+    || selectedFleetFilter !== 'all'
+    || selectedStationFilter !== 'all';
+  const isFilterScopedEmpty = hasAnyWorkPackages && filteredWorkPackages.length === 0;
+  const isWorkspaceEmpty = !state.loadingWorkPackages && !hasVisibleWorkPackages;
   const predictiveRiskSegments = state.predictiveRecommendations.reduce(
     (summary, recommendation) => {
       if (recommendation.riskScore >= 80) summary.high += 1;
@@ -464,6 +482,170 @@ export function AmroOwnedWorkspace({ moduleKey }: AmroOwnedWorkspaceProps) {
     emitPerformanceMetric('task_step_submit_online', completedAt - startedAt, amroTaskStepSubmitBenchmark.targetMs, amroTaskStepSubmitBenchmark.hardLimitMs, { action });
   };
 
+  const publishWorkspaceExport = (scope: string, payload: Record<string, unknown>) => {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('amro:workspace-export', {
+        detail: {
+          scope,
+          payload,
+          exportedAt: new Date().toISOString(),
+        },
+      }));
+    }
+    const exportedAtLabel = new Date().toISOString();
+    setLastWorkspaceExportAt(exportedAtLabel);
+    setLastInteractionMessage(`Export prepared for ${scope} at ${formatDateTime(exportedAtLabel)}.`);
+  };
+
+  const handleOverviewDateRangeCycle = () => {
+    const currentIndex = overviewDateRangeOptions.indexOf(overviewDateRange);
+    const nextRange = overviewDateRangeOptions[(currentIndex + 1) % overviewDateRangeOptions.length];
+    setOverviewDateRange(nextRange);
+    setLastInteractionMessage(`Overview date range switched to ${nextRange}.`);
+  };
+
+  const handleOpenComplianceGate = async () => {
+    const ok = await state.loadComplianceGateExplainability();
+    if (ok) {
+      state.setComplianceGateModalOpen(true);
+      setLastInteractionMessage('Compliance gate explainability loaded.');
+      return;
+    }
+    setLastInteractionMessage('Unable to load compliance gate explainability.');
+  };
+
+  const handleOpenWorkPackage = (workPackageId: string, packageNumber: string) => {
+    state.setSelectedWorkPackageId(workPackageId);
+    setLastInteractionMessage(`Opened work package ${packageNumber}.`);
+  };
+
+  const handleScheduleWorkPackage = async (workPackageId: string, packageNumber: string) => {
+    state.setSelectedWorkPackageId(workPackageId);
+    setBusyWorkPackageActionId(`schedule-${workPackageId}`);
+    const ok = await state.assignSelectedWorkPackageToNextSlot();
+    setBusyWorkPackageActionId(null);
+    setLastInteractionMessage(ok ? `Scheduled work package ${packageNumber}.` : `Unable to schedule work package ${packageNumber}.`);
+  };
+
+  const handleHoldWorkPackage = async (workPackageId: string, packageNumber: string) => {
+    state.setSelectedWorkPackageId(workPackageId);
+    setBusyWorkPackageActionId(`hold-${workPackageId}`);
+    const ok = await state.advanceWorkPackageLifecycle();
+    setBusyWorkPackageActionId(null);
+    setLastInteractionMessage(ok ? `Lifecycle transition submitted for ${packageNumber}.` : `Lifecycle transition failed for ${packageNumber}.`);
+  };
+
+  const handleCloneWorkPackage = async (packageNumber: string) => {
+    setBusyWorkPackageActionId(`clone-${packageNumber}`);
+    const ok = await state.createWorkPackage(`${packageNumber} Clone`);
+    setBusyWorkPackageActionId(null);
+    setLastInteractionMessage(ok ? `Cloned from ${packageNumber}.` : `Clone failed for ${packageNumber}.`);
+  };
+
+  const handleWorkPackageExport = (workPackageId: string, packageNumber: string) => {
+    publishWorkspaceExport('work-package', {
+      workPackageId,
+      packageNumber,
+      moduleKey: moduleKey || 'amro',
+      view: workspaceViewMode,
+      theme: workspaceTheme,
+    });
+  };
+
+  const handleWorkspaceImportExport = () => {
+    publishWorkspaceExport('workspace-shell', {
+      moduleKey: moduleKey || 'amro',
+      view: workspaceViewMode,
+      theme: workspaceTheme,
+      locale: workspaceLocale,
+      visibleWorkPackages: pagedWorkPackages.length,
+    });
+  };
+
+  const handleWorkspaceThemeCycle = () => {
+    const currentIndex = workspaceThemeOptions.indexOf(workspaceTheme);
+    const nextTheme = workspaceThemeOptions[(currentIndex + 1) % workspaceThemeOptions.length];
+    setWorkspaceTheme(nextTheme);
+    setLastInteractionMessage(`Workspace theme switched to ${nextTheme}.`);
+  };
+
+  const handleBulkWorkPackageAction = async () => {
+    if (!state.selectedWorkPackageId) {
+      setLastInteractionMessage('Select a work package before running bulk actions.');
+      return;
+    }
+    const ok = await state.advanceWorkPackageLifecycle();
+    setLastInteractionMessage(ok ? 'Bulk action completed for selected work package.' : 'Bulk action failed for selected work package.');
+  };
+
+  const handleStickyAssignAction = async () => {
+    if (!state.selectedWorkPackage) {
+      setLastInteractionMessage('Select a work package before assigning.');
+      return;
+    }
+    await handleScheduleWorkPackage(state.selectedWorkPackage.id, state.selectedWorkPackage.packageNumber);
+  };
+
+  const handleStickyScheduleAction = async () => {
+    if (!state.selectedWorkPackage) {
+      setLastInteractionMessage('Select a work package before scheduling.');
+      return;
+    }
+    await handleScheduleWorkPackage(state.selectedWorkPackage.id, state.selectedWorkPackage.packageNumber);
+  };
+
+  const handleStickyGateCheckAction = async () => {
+    if (!state.selectedWorkPackageId) {
+      setLastInteractionMessage('Select a work package before running compliance gate checks.');
+      return;
+    }
+    await handleOpenComplianceGate();
+  };
+
+  const handleStickyHoldAction = async () => {
+    if (!state.selectedWorkPackage) {
+      setLastInteractionMessage('Select a work package before placing hold transition.');
+      return;
+    }
+    await handleHoldWorkPackage(state.selectedWorkPackage.id, state.selectedWorkPackage.packageNumber);
+  };
+
+  const handleEscalateAction = (target: 'engineering' | 'compliance') => {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('amro:escalation-requested', {
+        detail: {
+          target,
+          workPackageId: state.selectedWorkPackageId || null,
+          requestedAt: new Date().toISOString(),
+        },
+      }));
+    }
+    setLastInteractionMessage(`Escalation request submitted to ${target}.`);
+  };
+
+  const handleDragHandleInteraction = (packageNumber: string) => {
+    setLastInteractionMessage(`Drag interaction registered for ${packageNumber}.`);
+  };
+
+  const handleIntegrationRefresh = () => {
+    void state.refreshWorkPackages();
+    void state.loadAuditReplayTimeline();
+    setLastInteractionMessage('Integration monitor refreshed with latest workspace and replay feed.');
+  };
+
+  const handleIntegrationReplayConsole = () => {
+    void state.loadAuditReplayTimeline();
+    setLastInteractionMessage('Replay console feed loaded.');
+  };
+
+  const handleIntegrationExportSnapshot = () => {
+    publishWorkspaceExport('integration-monitor', {
+      replayEventCount: state.complianceAuditReplay?.eventCount || 0,
+      anomalyCount: state.complianceAnomalyAlerts.length,
+      moduleKey: moduleKey || 'integration',
+    });
+  };
+
   const handleDetailTabChange = (nextTab: string) => {
     const startedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
     setDetailTab(nextTab);
@@ -484,6 +666,26 @@ export function AmroOwnedWorkspace({ moduleKey }: AmroOwnedWorkspaceProps) {
   const handleSavedViewChange = (value: string) => {
     startFilterApplyTimer('saved_view');
     state.setSelectedSavedViewId(value);
+  };
+
+  const handleResetWorkPackageScope = () => {
+    setSelectedFleetFilter('all');
+    setSelectedStationFilter('all');
+    state.setSelectedSavedViewId('default-all');
+    state.setWorkPackageStatusFilter('all');
+    state.setWorkPackageSearch('');
+    setWorkPackagePage(1);
+    setLastInteractionMessage('Work package scope reset to defaults.');
+  };
+
+  const handleRetryWorkspaceLoad = () => {
+    void state.refreshWorkPackages();
+    setLastInteractionMessage('Work package refresh requested.');
+  };
+
+  const handleCreateStarterWorkPackage = async () => {
+    const ok = await state.createWorkPackage('Starter Work Package');
+    setLastInteractionMessage(ok ? 'Starter work package created.' : 'Unable to create starter work package.');
   };
 
   const handleCreateWorkPackage = async () => {
@@ -616,6 +818,19 @@ export function AmroOwnedWorkspace({ moduleKey }: AmroOwnedWorkspaceProps) {
       <div className="rounded-md border bg-muted/20 px-3 py-2 text-xs" role="status" aria-live="polite">
         Workspace status: {dataFreshnessLabel}. Sync health: {syncHealthLabel}.
       </div>
+      <div className="rounded-md border px-3 py-2 text-xs" role="status" aria-live="polite">
+        Interaction status: {lastInteractionMessage}
+      </div>
+      {state.loadingWorkPackages ? (
+        <div className="rounded-md border px-3 py-2 text-xs text-muted-foreground" role="status" aria-live="polite">
+          Loading latest AMRO workspace data...
+        </div>
+      ) : null}
+      {state.workPackagesError ? (
+        <div className="rounded-md border border-destructive/50 px-3 py-2 text-xs text-destructive" role="alert">
+          {state.workPackagesError}
+        </div>
+      ) : null}
       {moduleKey ? (
         <Card data-amro-owned-surface="module-action-bar">
           <CardHeader className="pb-2">
@@ -630,10 +845,10 @@ export function AmroOwnedWorkspace({ moduleKey }: AmroOwnedWorkspaceProps) {
               ))}
             </div>
             <div className="rounded-md border p-2 text-xs">
-              {disabledModuleActions.length > 0 ? (
-                disabledModuleActions.map((action) => (
+              {moduleActionStates.length > 0 ? (
+                moduleActionStates.map((action) => (
                   <p key={`${action.id}-reason`} className="text-muted-foreground">
-                    {action.label}: {action.disabledReason}
+                    {action.label} ({action.stateLabel}): {action.stateReason}
                   </p>
                 ))
               ) : (
@@ -712,8 +927,8 @@ export function AmroOwnedWorkspace({ moduleKey }: AmroOwnedWorkspaceProps) {
               <Button variant="outline" onClick={state.refreshWorkPackages} disabled={state.loadingWorkPackages}>
                 {state.loadingWorkPackages ? 'Refreshing...' : 'Refresh'}
               </Button>
-              <Button variant="outline">Import/Export</Button>
-              <Button variant="outline">Theme</Button>
+              <Button variant="outline" onClick={handleWorkspaceImportExport}>Import/Export</Button>
+              <Button variant="outline" onClick={handleWorkspaceThemeCycle}>Theme</Button>
             </div>
           </div>
           <div className="grid grid-cols-1 gap-3 xl:grid-cols-[2fr_1fr]">
@@ -795,8 +1010,8 @@ export function AmroOwnedWorkspace({ moduleKey }: AmroOwnedWorkspaceProps) {
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="grid grid-cols-2 gap-2 md:grid-cols-8">
-            <Button variant="outline" size="sm">Date Range</Button>
-            <Button variant="outline" size="sm">Regulator</Button>
+            <Button variant="outline" size="sm" onClick={handleOverviewDateRangeCycle}>Date Range</Button>
+            <Button variant="outline" size="sm" onClick={() => void state.loadRegulatorProfilePack()}>Regulator</Button>
             <Select value={selectedFleetFilter} onValueChange={setSelectedFleetFilter}>
               <SelectTrigger aria-label="Fleet filter">
                 <SelectValue placeholder="Fleet filter" />
@@ -817,8 +1032,27 @@ export function AmroOwnedWorkspace({ moduleKey }: AmroOwnedWorkspaceProps) {
                 ))}
               </SelectContent>
             </Select>
-            <Button variant="outline" size="sm">Export</Button>
-            <Button variant="outline" size="sm" onClick={state.refreshWorkPackages}>Refresh</Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => publishWorkspaceExport('overview-dashboard', {
+                dateRange: overviewDateRange,
+                fleet: selectedFleetFilter,
+                station: selectedStationFilter,
+              })}
+            >
+              Export
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                void state.refreshWorkPackages();
+                setLastInteractionMessage('Overview dashboard refresh requested.');
+              }}
+            >
+              Refresh
+            </Button>
             <Select value={workspaceTheme} onValueChange={(value) => setWorkspaceTheme(value as (typeof workspaceThemeOptions)[number])}>
               <SelectTrigger aria-label="Theme selector">
                 <SelectValue />
@@ -926,38 +1160,113 @@ export function AmroOwnedWorkspace({ moduleKey }: AmroOwnedWorkspaceProps) {
               </Button>
             </div>
             <div className="mt-2 space-y-2">
-              {pagedWorkPackages.map((workPackage) => (
-                <div
-                  key={`list-${workPackage.id}`}
-                  className={`rounded-md border p-2 text-xs ${
-                    (state.scheduleBoardRows.find((row) => row.work_package_id === workPackage.id)?.slot_end
-                    && new Date(state.scheduleBoardRows.find((row) => row.work_package_id === workPackage.id)?.slot_end || nowEpoch).getTime() < nowEpoch)
-                      ? 'border-destructive/40 bg-destructive/5'
-                      : ''
-                  }`}
-                >
-                  <div className="grid grid-cols-2 gap-2 md:grid-cols-8">
-                    <span>{workPackage.packageNumber}</span>
-                    <span>{workPackage.assetId}</span>
-                    <span>normal</span>
-                    <span>line</span>
-                    <span>{state.scheduleBoardRows.find((row) => row.work_package_id === workPackage.id)?.station_code || 'N/A'}</span>
-                    <span>{state.scheduleBoardRows.find((row) => row.work_package_id === workPackage.id)?.slot_end || 'TBD'}</span>
-                    <span><Badge variant="outline">{workPackage.lifecycleStage}</Badge></span>
-                    <span>{activeUxRole}</span>
-                  </div>
+              {isWorkspaceEmpty ? (
+                <div className="rounded-md border border-dashed p-3 text-xs">
+                  <p className="font-medium">
+                    {state.workPackagesError
+                      ? 'Unable to load AMRO work packages.'
+                      : isFilterScopedEmpty
+                        ? 'No work packages match the current scope.'
+                        : 'No AMRO work packages are available yet.'}
+                  </p>
+                  <p className="mt-1 text-muted-foreground">
+                    {state.workPackagesError
+                      ? 'Retry workspace refresh or reset scope filters to recover.'
+                      : isFilterScopedEmpty
+                        ? 'Clear dashboard scope or filters to restore list visibility.'
+                        : 'Create a starter package to initialize the module surfaces.'}
+                  </p>
                   <div className="mt-2 flex flex-wrap gap-2">
-                    <Button variant="outline" size="sm" aria-label={`Open work package ${workPackage.packageNumber}`}>Open</Button>
-                    <Button variant="outline" size="sm" aria-label={`Schedule work package ${workPackage.packageNumber}`}>Schedule</Button>
-                    <Button variant="outline" size="sm" aria-label={`Hold work package ${workPackage.packageNumber}`}>Hold</Button>
-                    <Button variant="outline" size="sm" aria-label={`Clone work package ${workPackage.packageNumber}`}>Clone</Button>
-                    <Button variant="outline" size="sm" aria-label={`Export work package ${workPackage.packageNumber}`}>Export</Button>
-                    <Button variant="outline" size="sm" aria-label={`Drag handle for ${workPackage.packageNumber}`}>
-                      Drag Handle
+                    <Button variant="outline" size="sm" onClick={handleRetryWorkspaceLoad} disabled={state.loadingWorkPackages}>
+                      {state.loadingWorkPackages ? 'Refreshing...' : 'Retry Refresh'}
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={handleResetWorkPackageScope} disabled={!hasActiveScopeFilters}>
+                      Clear Scope
+                    </Button>
+                    <Button size="sm" onClick={() => void handleCreateStarterWorkPackage()} disabled={!state.canCreateWorkPackage}>
+                      Create Starter Package
                     </Button>
                   </div>
                 </div>
-              ))}
+              ) : (
+                pagedWorkPackages.map((workPackage) => (
+                  <div
+                    key={`list-${workPackage.id}`}
+                    className={`rounded-md border p-2 text-xs ${
+                      (state.scheduleBoardRows.find((row) => row.work_package_id === workPackage.id)?.slot_end
+                      && new Date(state.scheduleBoardRows.find((row) => row.work_package_id === workPackage.id)?.slot_end || nowEpoch).getTime() < nowEpoch)
+                        ? 'border-destructive/40 bg-destructive/5'
+                        : ''
+                    }`}
+                  >
+                    <div className="grid grid-cols-2 gap-2 md:grid-cols-8">
+                      <span>{workPackage.packageNumber}</span>
+                      <span>{workPackage.assetId}</span>
+                      <span>normal</span>
+                      <span>line</span>
+                      <span>{state.scheduleBoardRows.find((row) => row.work_package_id === workPackage.id)?.station_code || 'N/A'}</span>
+                      <span>{state.scheduleBoardRows.find((row) => row.work_package_id === workPackage.id)?.slot_end || 'TBD'}</span>
+                      <span><Badge variant="outline">{workPackage.lifecycleStage}</Badge></span>
+                      <span>{activeUxRole}</span>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        aria-label={`Open work package ${workPackage.packageNumber}`}
+                        onClick={() => handleOpenWorkPackage(workPackage.id, workPackage.packageNumber)}
+                        disabled={busyWorkPackageActionId !== null}
+                      >
+                        Open
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        aria-label={`Schedule work package ${workPackage.packageNumber}`}
+                        onClick={() => void handleScheduleWorkPackage(workPackage.id, workPackage.packageNumber)}
+                        disabled={busyWorkPackageActionId !== null}
+                      >
+                        Schedule
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        aria-label={`Hold work package ${workPackage.packageNumber}`}
+                        onClick={() => void handleHoldWorkPackage(workPackage.id, workPackage.packageNumber)}
+                        disabled={busyWorkPackageActionId !== null}
+                      >
+                        Hold
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        aria-label={`Clone work package ${workPackage.packageNumber}`}
+                        onClick={() => void handleCloneWorkPackage(workPackage.packageNumber)}
+                        disabled={busyWorkPackageActionId !== null}
+                      >
+                        Clone
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        aria-label={`Export work package ${workPackage.packageNumber}`}
+                        onClick={() => handleWorkPackageExport(workPackage.id, workPackage.packageNumber)}
+                        disabled={busyWorkPackageActionId !== null}
+                      >
+                        Export
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        aria-label={`Drag handle for ${workPackage.packageNumber}`}
+                        onClick={() => handleDragHandleInteraction(workPackage.packageNumber)}
+                      >
+                        Drag Handle
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
             <div className="mt-2 grid grid-cols-1 gap-3 md:grid-cols-3">
               <div className="rounded-md border p-2 text-xs">
@@ -986,16 +1295,24 @@ export function AmroOwnedWorkspace({ moduleKey }: AmroOwnedWorkspaceProps) {
                       ))}
                     </SelectContent>
                   </Select>
-                  <Button variant="outline" size="sm">Bulk Actions</Button>
+                  <Button variant="outline" size="sm" onClick={() => void handleBulkWorkPackageAction()}>Bulk Actions</Button>
                   <Badge variant="outline">Export state: ready</Badge>
                 </div>
               </div>
             </div>
             <div className="mt-2 flex flex-wrap gap-2">
-              <Button variant="outline" size="sm">Assign</Button>
-              <Button variant="outline" size="sm">Shift Window</Button>
-              <Button variant="outline" size="sm" disabled={!canEditPartsAllocation}>Material Reserve</Button>
-              <Button variant="outline" size="sm">Compliance Precheck</Button>
+              <Button variant="outline" size="sm" onClick={() => void state.assignSelectedWorkPackageToNextSlot()}>
+                Assign
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => void state.fetchScheduleOptimizationRecommendations()}>
+                Shift Window
+              </Button>
+              <Button variant="outline" size="sm" disabled={!canEditPartsAllocation} onClick={() => void state.reservePartsAllocationForSelectedWorkPackage()}>
+                Material Reserve
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => void handleOpenComplianceGate()}>
+                Compliance Precheck
+              </Button>
             </div>
           </div>
           {state.workPackagesError ? (
@@ -1107,7 +1424,8 @@ export function AmroOwnedWorkspace({ moduleKey }: AmroOwnedWorkspaceProps) {
           </div>
           <div className="grid grid-cols-1 gap-3 xl:grid-cols-3" data-amro-screen="SCR-AMRO-004" role="region" aria-label="SCR-AMRO-004 Work Package Detail Sheet">
             <div className="xl:col-span-2">
-              <Tabs value={detailTab} onValueChange={handleDetailTabChange}>
+              {state.selectedWorkPackage ? (
+                <Tabs value={detailTab} onValueChange={handleDetailTabChange}>
             <TabsList className="grid w-full grid-cols-7">
               <TabsTrigger value="overview">Overview</TabsTrigger>
               <TabsTrigger value="tasks">Tasks</TabsTrigger>
@@ -1124,10 +1442,10 @@ export function AmroOwnedWorkspace({ moduleKey }: AmroOwnedWorkspaceProps) {
                   Sticky actions: Assign | Schedule | Run gate check | Hold | Close
                 </p>
                 <div className="mt-2 flex flex-wrap gap-2">
-                  <Button variant="outline" size="sm" aria-label="Assign work package">Assign</Button>
-                  <Button variant="outline" size="sm" aria-label="Schedule work package">Schedule</Button>
-                  <Button variant="outline" size="sm" aria-label="Run compliance gate check">Gate Check</Button>
-                  <Button variant="outline" size="sm" aria-label="Hold work package">Hold</Button>
+                  <Button variant="outline" size="sm" aria-label="Assign work package" onClick={() => void handleStickyAssignAction()}>Assign</Button>
+                  <Button variant="outline" size="sm" aria-label="Schedule work package" onClick={() => void handleStickyScheduleAction()}>Schedule</Button>
+                  <Button variant="outline" size="sm" aria-label="Run compliance gate check" onClick={() => void handleStickyGateCheckAction()}>Gate Check</Button>
+                  <Button variant="outline" size="sm" aria-label="Hold work package" onClick={() => void handleStickyHoldAction()}>Hold</Button>
                   <Button size="sm" disabled={!canRunWorkPackageClosure} onClick={() => setClosureConfirmOpen(true)} aria-label="Close work package with confirmation">
                     Close
                   </Button>
@@ -1220,7 +1538,7 @@ export function AmroOwnedWorkspace({ moduleKey }: AmroOwnedWorkspaceProps) {
                 <Button variant="outline" size="sm" onClick={state.evaluateMelCdlDeferral} disabled={!state.selectedWorkPackageId}>
                   Evaluate MEL/CDL
                 </Button>
-                <Button variant="outline" size="sm" onClick={state.loadComplianceGateExplainability} disabled={!state.selectedWorkPackageId}>
+                <Button variant="outline" size="sm" onClick={() => void handleOpenComplianceGate()} disabled={!state.selectedWorkPackageId}>
                   Open Gate Modal
                 </Button>
                 <Button variant="outline" size="sm" onClick={state.loadAuditReplayTimeline}>
@@ -1270,6 +1588,31 @@ export function AmroOwnedWorkspace({ moduleKey }: AmroOwnedWorkspaceProps) {
               <div className="rounded-md border p-2 text-xs">Audit evidence and replay entries mapped to work package lifecycle transitions.</div>
             </TabsContent>
           </Tabs>
+              ) : (
+                <div className="rounded-md border border-dashed p-3 text-xs">
+                  <p className="font-medium">No work package selected for the detail sheet.</p>
+                  <p className="mt-1 text-muted-foreground">Select a row from SCR-AMRO-002 or create a starter package to unlock detail tabs.</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        if (!state.workPackages[0]) return;
+                        handleOpenWorkPackage(state.workPackages[0].id, state.workPackages[0].packageNumber);
+                      }}
+                      disabled={!state.workPackages[0]}
+                    >
+                      Select First Package
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={handleRetryWorkspaceLoad} disabled={state.loadingWorkPackages}>
+                      {state.loadingWorkPackages ? 'Refreshing...' : 'Retry Refresh'}
+                    </Button>
+                    <Button size="sm" onClick={() => void handleCreateStarterWorkPackage()} disabled={!state.canCreateWorkPackage}>
+                      Create Starter Package
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
             <div className="space-y-2 rounded-md border p-3 text-xs">
               <p className="font-medium">Side Panel</p>
@@ -1277,8 +1620,8 @@ export function AmroOwnedWorkspace({ moduleKey }: AmroOwnedWorkspaceProps) {
               <p className="text-muted-foreground">Signature state: {state.canSignOff ? 'Ready for certifying signature' : 'Signature not permitted for current authority'}</p>
               <p className="text-muted-foreground">Pending blockers: {state.complianceAnomalyAlerts.length}</p>
               <div className="flex flex-wrap gap-2">
-                <Button variant="outline" size="sm">Escalate to Engineering</Button>
-                <Button variant="outline" size="sm">Escalate to Compliance</Button>
+                <Button variant="outline" size="sm" onClick={() => handleEscalateAction('engineering')}>Escalate to Engineering</Button>
+                <Button variant="outline" size="sm" onClick={() => handleEscalateAction('compliance')}>Escalate to Compliance</Button>
               </div>
               <div className="flex flex-wrap gap-2 pt-1">
                 <Badge variant="secondary">enabled</Badge>
@@ -1312,20 +1655,108 @@ export function AmroOwnedWorkspace({ moduleKey }: AmroOwnedWorkspaceProps) {
             </div>
             <p className="mt-2 text-xs text-muted-foreground">Offline Sync Status: {mobileQueuedEvents > 0 ? 'Queued events pending upload' : 'All events synced'}</p>
             <div className="mt-2 flex flex-wrap gap-2">
-              <Button size="sm" variant="outline" className="h-11 min-w-[120px]" aria-label="Capture photo evidence">Photo</Button>
-              <Button size="sm" variant="outline" className="h-11 min-w-[120px]" aria-label="Upload evidence packet">Upload</Button>
-              <Button size="sm" variant="outline" className="h-11 min-w-[120px]" aria-label="Add note evidence">Note</Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-11 min-w-[120px]"
+                aria-label="Capture photo evidence"
+                onClick={() => {
+                  if (!selectedTaskId) return;
+                  void state.uploadTaskEvidence(selectedTaskId);
+                }}
+              >
+                Photo
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-11 min-w-[120px]"
+                aria-label="Upload evidence packet"
+                onClick={() => {
+                  if (!selectedTaskId) return;
+                  void state.uploadTaskEvidence(selectedTaskId);
+                }}
+              >
+                Upload
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-11 min-w-[120px]"
+                aria-label="Add note evidence"
+                onClick={() => {
+                  if (!selectedTaskId) return;
+                  void state.uploadTaskEvidence(selectedTaskId);
+                }}
+              >
+                Note
+              </Button>
             </div>
             <div className="mt-2 flex flex-wrap gap-2">
-              <Button size="sm" variant="outline" className="h-11 min-w-[120px]" aria-label="Sign using PIN">PIN</Button>
-              <Button size="sm" variant="outline" className="h-11 min-w-[120px]" aria-label="Sign using digital certificate">Digital Cert</Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-11 min-w-[120px]"
+                aria-label="Sign using PIN"
+                onClick={() => {
+                  if (!selectedTaskId) return;
+                  void state.submitTaskSignature(selectedTaskId);
+                }}
+              >
+                PIN
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-11 min-w-[120px]"
+                aria-label="Sign using digital certificate"
+                onClick={() => {
+                  if (!selectedTaskId) return;
+                  void state.submitTaskSignature(selectedTaskId);
+                }}
+              >
+                Digital Cert
+              </Button>
             </div>
             <p className="mt-2 text-xs text-muted-foreground">Integrity status: evidence hash chain verified</p>
             <p className="mt-2 text-xs text-muted-foreground">Sync Queue: {mobileQueuedEvents} queued events</p>
             <div className="mt-2 flex flex-wrap gap-2">
-              <Button size="sm" variant="outline" className="h-11 min-w-[140px]" aria-label="Save signed task event to offline queue">Save Offline</Button>
-              <Button size="sm" disabled={!canDirectTaskExecution} className="h-11 min-w-[140px]" aria-label="Submit task actions">Submit</Button>
-              <Button size="sm" variant="outline" className="h-11 min-w-[140px]" aria-label="Request execution support">Request Support</Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-11 min-w-[140px]"
+                aria-label="Save signed task event to offline queue"
+                onClick={() => {
+                  if (!selectedTaskId) return;
+                  void trackTaskStepSubmitInteraction(selectedTaskId, 'start');
+                }}
+              >
+                Save Offline
+              </Button>
+              <Button
+                size="sm"
+                disabled={!canDirectTaskExecution}
+                className="h-11 min-w-[140px]"
+                aria-label="Submit task actions"
+                onClick={() => {
+                  if (!selectedTaskId) return;
+                  void trackTaskStepSubmitInteraction(selectedTaskId, 'complete');
+                }}
+              >
+                Submit
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-11 min-w-[140px]"
+                aria-label="Request execution support"
+                onClick={() => {
+                  if (!selectedTaskId) return;
+                  void trackTaskStepSubmitInteraction(selectedTaskId, 'block');
+                }}
+              >
+                Request Support
+              </Button>
             </div>
             {!canDirectTaskExecution ? <p className="text-xs text-muted-foreground">{taskActionDisabledReason}</p> : null}
           </div>
@@ -1740,9 +2171,9 @@ export function AmroOwnedWorkspace({ moduleKey }: AmroOwnedWorkspaceProps) {
             <div className="rounded-md border p-2">Dead-letter queue: 0</div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm">Refresh Integration Status</Button>
-            <Button variant="outline" size="sm">Open Replay Console</Button>
-            <Button variant="outline" size="sm">Export Incident Snapshot</Button>
+            <Button variant="outline" size="sm" onClick={handleIntegrationRefresh}>Refresh Integration Status</Button>
+            <Button variant="outline" size="sm" onClick={handleIntegrationReplayConsole}>Open Replay Console</Button>
+            <Button variant="outline" size="sm" onClick={handleIntegrationExportSnapshot}>Export Incident Snapshot</Button>
           </div>
         </CardContent>
       </Card>

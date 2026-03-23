@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { useDomain } from '@/contexts/DomainContext';
 import type {
   AmroAssetRegistryRecord,
   AmroAuthorityLevel,
@@ -291,7 +292,9 @@ function getAmroApiBaseUrl(): string {
       : {};
   const rawBase = String(import.meta.env.VITE_AMRO_API_BASE_URL || runtimeEnv.VITE_AMRO_API_BASE_URL || '/api/amro').trim();
   const normalizedBase = rawBase === '' || rawBase === '/' ? '/api/amro' : rawBase;
-  return normalizedBase.replace(/\/$/, '');
+  const withoutTrailingSlash = normalizedBase.replace(/\/$/, '');
+  const withoutLegacyProxyPrefix = withoutTrailingSlash.replace(/\/api\/amro$/i, '').replace(/\/api$/i, '');
+  return withoutLegacyProxyPrefix === '/' ? '' : withoutLegacyProxyPrefix;
 }
 
 function mapStatusToLifecycle(status: string): AmroWorkPackageLifecycleStage {
@@ -428,7 +431,8 @@ const initialPredictiveRecommendations: AmroPredictiveRecommendation[] = [
 ];
 
 export function useAmroWorkspaceState() {
-  const { hasPermission, hasRole, isPlatformAdmin, session } = useAuth();
+  const { hasPermission, hasRole, isPlatformAdmin: isAuthPlatformAdmin, session } = useAuth();
+  const { currentDomain, availableDomains, setDomain, isPlatformAdmin: isDomainPlatformAdmin } = useDomain();
   const token = session?.access_token || null;
   const apiBaseUrl = useMemo(() => getAmroApiBaseUrl(), []);
   const [assets, setAssets] = useState<AmroAssetRegistryRecord[]>(initialAssets);
@@ -483,6 +487,42 @@ export function useAmroWorkspaceState() {
         : null,
     [token],
   );
+  const hasAmroDomainAssignment = useMemo(
+    () => availableDomains.some((domain) => String(domain.code || '').trim().toUpperCase() === 'AMRO'),
+    [availableDomains],
+  );
+  const isAmroDomainActive = useMemo(
+    () => String(currentDomain?.code || '').trim().toUpperCase() === 'AMRO',
+    [currentDomain],
+  );
+  const amroAccessErrorMessage = useMemo(
+    () =>
+      hasAmroDomainAssignment
+        ? 'AMRO domain context required - switch to AMRO domain'
+        : 'Access denied - AMRO domain assignment required',
+    [hasAmroDomainAssignment],
+  );
+  const hasAmroPermissionScope = useMemo(
+    () =>
+      isAuthPlatformAdmin() ||
+      isDomainPlatformAdmin ||
+      hasRole('tenant_admin') ||
+      hasRole('franchise_admin') ||
+      hasPermission('*') ||
+      hasPermission('dashboards.view') ||
+      hasPermission('dashboards.manage') ||
+      hasPermission('reports.view') ||
+      hasPermission('reports.manage'),
+    [hasPermission, hasRole, isAuthPlatformAdmin, isDomainPlatformAdmin],
+  );
+  const hasAmroAccess = useMemo(
+    () => hasAmroPermissionScope && hasAmroDomainAssignment && isAmroDomainActive,
+    [hasAmroDomainAssignment, hasAmroPermissionScope, isAmroDomainActive],
+  );
+  const isAwaitingAmroDomainActivation = useMemo(
+    () => hasAmroPermissionScope && hasAmroDomainAssignment && !isAmroDomainActive,
+    [hasAmroDomainAssignment, hasAmroPermissionScope, isAmroDomainActive],
+  );
 
   const isApiTemporarilyUnavailable = useCallback(() => Date.now() < apiUnavailableUntil, [apiUnavailableUntil]);
 
@@ -490,6 +530,15 @@ export function useAmroWorkspaceState() {
     setApiUnavailableUntil(Date.now() + 30000);
     setRealtimeConnected(false);
   }, []);
+
+  useEffect(() => {
+    if (!isAwaitingAmroDomainActivation) {
+      return;
+    }
+    void setDomain('AMRO').catch(() => {
+      setWorkPackagesError('AMRO domain context required - switch to AMRO domain');
+    });
+  }, [isAwaitingAmroDomainActivation, setDomain]);
 
   const mapWorkPackageRecord = useCallback((item: { id: string; packageNumber: string; status: string; assetId: string }) => ({
     id: item.id,
@@ -503,6 +552,12 @@ export function useAmroWorkspaceState() {
     if (!authHeaders) {
       setWorkPackages([]);
       setSelectedWorkPackageId('');
+      return;
+    }
+    if (!hasAmroAccess) {
+      setWorkPackagesError(
+        isAwaitingAmroDomainActivation ? 'Switching to AMRO domain context...' : amroAccessErrorMessage,
+      );
       return;
     }
     if (isApiTemporarilyUnavailable()) {
@@ -597,12 +652,21 @@ export function useAmroWorkspaceState() {
     mapWorkPackageRecord,
     markApiTemporarilyUnavailable,
     selectedSavedViewId,
+    hasAmroAccess,
+    amroAccessErrorMessage,
     workPackageSearch,
     workPackageStatusFilter,
+    isAwaitingAmroDomainActivation,
   ]);
 
   const fetchModuleSurfaces = useCallback(async () => {
     if (!authHeaders) {
+      return;
+    }
+    if (!hasAmroAccess) {
+      setWorkPackagesError(
+        isAwaitingAmroDomainActivation ? 'Switching to AMRO domain context...' : amroAccessErrorMessage,
+      );
       return;
     }
     if (isApiTemporarilyUnavailable()) {
@@ -768,11 +832,17 @@ export function useAmroWorkspaceState() {
       }
       setWorkPackagesError(error instanceof Error ? error.message : 'Failed to load AMRO module data');
     }
-  }, [apiBaseUrl, authHeaders, isApiTemporarilyUnavailable, markApiTemporarilyUnavailable, selectedWorkPackageId]);
+  }, [apiBaseUrl, amroAccessErrorMessage, authHeaders, hasAmroAccess, isApiTemporarilyUnavailable, isAwaitingAmroDomainActivation, markApiTemporarilyUnavailable, selectedWorkPackageId]);
 
   const fetchTasksForWorkPackage = useCallback(
     async (workPackageId: string) => {
       if (!authHeaders || !workPackageId) {
+        return;
+      }
+      if (!hasAmroAccess) {
+        setWorkPackagesError(
+          isAwaitingAmroDomainActivation ? 'Switching to AMRO domain context...' : amroAccessErrorMessage,
+        );
         return;
       }
       if (isApiTemporarilyUnavailable()) {
@@ -830,12 +900,18 @@ export function useAmroWorkspaceState() {
         setWorkPackagesError(error instanceof Error ? error.message : 'Failed to load tasks');
       }
     },
-    [apiBaseUrl, authHeaders, isApiTemporarilyUnavailable, markApiTemporarilyUnavailable],
+    [apiBaseUrl, amroAccessErrorMessage, authHeaders, hasAmroAccess, isApiTemporarilyUnavailable, isAwaitingAmroDomainActivation, markApiTemporarilyUnavailable],
   );
 
   const fetchScheduleBoard = useCallback(async () => {
     if (!authHeaders) {
       setScheduleBoardRows([]);
+      return;
+    }
+    if (!hasAmroAccess) {
+      setWorkPackagesError(
+        isAwaitingAmroDomainActivation ? 'Switching to AMRO domain context...' : amroAccessErrorMessage,
+      );
       return;
     }
     if (isApiTemporarilyUnavailable()) {
@@ -858,7 +934,7 @@ export function useAmroWorkspaceState() {
       }
       setWorkPackagesError(error instanceof Error ? error.message : 'Failed to load scheduling board');
     }
-  }, [apiBaseUrl, authHeaders, isApiTemporarilyUnavailable, markApiTemporarilyUnavailable]);
+  }, [apiBaseUrl, amroAccessErrorMessage, authHeaders, hasAmroAccess, isApiTemporarilyUnavailable, isAwaitingAmroDomainActivation, markApiTemporarilyUnavailable]);
 
   useEffect(() => {
     void fetchWorkPackages();
@@ -881,6 +957,10 @@ export function useAmroWorkspaceState() {
 
   useEffect(() => {
     if (!token) {
+      setRealtimeConnected(false);
+      return;
+    }
+    if (!hasAmroAccess) {
       setRealtimeConnected(false);
       return;
     }
@@ -919,6 +999,7 @@ export function useAmroWorkspaceState() {
     fetchTasksForWorkPackage,
     fetchWorkPackages,
     isApiTemporarilyUnavailable,
+    hasAmroAccess,
     hasV1WorkPackageConnectivity,
     markApiTemporarilyUnavailable,
     selectedWorkPackageId,
@@ -960,10 +1041,7 @@ export function useAmroWorkspaceState() {
     [qualifications, selectedQualificationId]
   );
 
-  const isAmroAuthorized = useMemo(() => {
-    if (isPlatformAdmin()) return true;
-    return hasPermission('*') || hasRole('tenant_admin') || hasRole('franchise_admin');
-  }, [hasPermission, hasRole, isPlatformAdmin]);
+  const isAmroAuthorized = hasAmroAccess;
 
   const activeRole = useMemo(() => {
     if (hasRole('tenant_admin')) return 'tenant_admin';
@@ -980,8 +1058,8 @@ export function useAmroWorkspaceState() {
   );
 
   const canDeleteWorkPackage = useMemo(
-    () => isPlatformAdmin() || hasRole('tenant_admin') || hasPermission('dashboards.manage'),
-    [hasPermission, hasRole, isPlatformAdmin],
+    () => isAuthPlatformAdmin() || isDomainPlatformAdmin || hasRole('tenant_admin') || hasPermission('dashboards.manage'),
+    [hasPermission, hasRole, isAuthPlatformAdmin, isDomainPlatformAdmin],
   );
 
   const canAdvanceLifecycle = useMemo(() => {

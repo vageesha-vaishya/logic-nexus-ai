@@ -87,6 +87,31 @@ describe('ProtectedRoute', () => {
     expect(screen.queryByText('Private Dashboard')).not.toBeInTheDocument();
   });
 
+  it('renders children without permission checks when no required permissions are provided', async () => {
+    vi.mocked(authHooks.useAuth).mockReturnValue({
+      user: { id: 'user-150' },
+      loading: false,
+      hasRole: vi.fn().mockReturnValue(false),
+      hasPermission: vi.fn().mockReturnValue(false),
+      isPlatformAdmin: vi.fn().mockReturnValue(false),
+      session: { user: { id: 'user-150' } },
+      signIn: vi.fn(),
+      signOut: vi.fn(),
+      role: 'user',
+      permissions: [],
+      refreshUserRole: vi.fn(),
+    } as any);
+
+    renderRoute(
+      <ProtectedRoute>
+        <div>Workspace Home</div>
+      </ProtectedRoute>
+    );
+
+    expect(await screen.findByText('Workspace Home')).toBeInTheDocument();
+    expect(screen.queryByText('Unauthorized Screen')).not.toBeInTheDocument();
+  });
+
   it('renders children when user is authenticated and authorized', async () => {
     vi.mocked(authHooks.useAuth).mockReturnValue({
       user: { id: 'user-200' },

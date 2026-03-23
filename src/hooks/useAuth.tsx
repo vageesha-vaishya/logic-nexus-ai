@@ -181,8 +181,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const sda = new ScopedDataAccess(supabase, systemContext);
       const roleService = new RoleService(sda);
 
+      const rolesResult = await Promise.race([
+        fetchUserRoles(currentUser.id),
+        timeout(5000, [], 'userRoles')
+      ]) as any[];
+
+      setRoles(rolesResult);
+
       const dynamicMapPromise = Promise.race([
-        roleService.getRolePermissions().catch((e) => {
+        roleService.getRolePermissions(rolesResult).catch((e) => {
           logger.warn('Failed to load dynamic permissions', { error: e, component: 'AuthProvider' });
           return {} as Record<string, string[]>;
         }),
@@ -201,13 +208,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         fetchPlatformAdminAccess(),
         timeout(5000, false, 'platformAdminAccess'),
       ]);
-
-      const rolesResult = await Promise.race([
-        fetchUserRoles(currentUser.id),
-        timeout(5000, [], 'userRoles')
-      ]) as any[];
-
-      setRoles(rolesResult);
 
       const [profileResult, customPermsResult, dynamicMapResult, hierarchyResult, platformAdminResult] = await Promise.all([
         profilePromise,

@@ -280,14 +280,23 @@ export const DomainService = {
       forceRefresh,
       hasSessionToken: Boolean(accessToken),
     });
-    const response = await fetch(`${DOMAIN_API_PATH}${cacheBypass}`, {
-      method: 'GET',
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-      },
-    });
+    let response: Response;
+    try {
+      response = await fetch(`${DOMAIN_API_PATH}${cacheBypass}`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        },
+      });
+    } catch (error) {
+      logger.error('[DomainService] authorized domains network request failed', {
+        component: 'DomainService',
+        message: error instanceof Error ? error.message : 'unknown',
+      });
+      return fallbackAuthorizedDomains('network-request-failure');
+    }
 
     const contentType = response.headers.get('content-type') || '';
 
@@ -312,6 +321,9 @@ export const DomainService = {
         correlationId,
         message: parsedMessage,
       });
+      if (response.status === 404 || response.status === 405) {
+        return fallbackAuthorizedDomains(`endpoint-unavailable:${response.status}`);
+      }
       if (correlationId) {
         throw new Error(`${parsedMessage} (ref: ${correlationId})`);
       }

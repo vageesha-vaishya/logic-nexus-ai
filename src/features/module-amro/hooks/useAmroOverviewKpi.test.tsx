@@ -54,7 +54,12 @@ describe('useAmroOverviewKpi', () => {
       });
     vi.stubGlobal('fetch', fetchMock);
 
-    const { result } = renderHook(() => useAmroOverviewKpi());
+    const { result } = renderHook(() => useAmroOverviewKpi({
+      tenantId: 'tenant-1',
+      franchiseId: 'franchise-1',
+      userId: 'user-1',
+      domainCode: 'AMRO',
+    }));
 
     await waitFor(() => expect(result.current.loading).toBe(false));
 
@@ -63,6 +68,10 @@ describe('useAmroOverviewKpi', () => {
     expect(String(fetchMock.mock.calls[0][0])).toContain('interface=load-kpi-dashboard');
     expect(String(fetchMock.mock.calls[1][0])).toContain('interface=load-operational-trends');
     expect(new Headers((fetchMock.mock.calls[0][1] as RequestInit).headers).get('Authorization')).toBe('Bearer test-session-token');
+    expect(new Headers((fetchMock.mock.calls[0][1] as RequestInit).headers).get('x-tenant-id')).toBe('tenant-1');
+    expect(new Headers((fetchMock.mock.calls[0][1] as RequestInit).headers).get('x-franchise-id')).toBe('franchise-1');
+    expect(new Headers((fetchMock.mock.calls[0][1] as RequestInit).headers).get('x-user-id')).toBe('user-1');
+    expect(new Headers((fetchMock.mock.calls[0][1] as RequestInit).headers).get('x-domain-id')).toBe('AMRO');
     expect(result.current.dashboard?.kpi_cards[0]?.label).toBe('Open Work Packages');
     expect(result.current.trends?.variance).toBe(2.1);
   });

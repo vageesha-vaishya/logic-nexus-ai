@@ -3,9 +3,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAmroWorkspaceState } from './useAmroWorkspaceState';
 
 const mockUseAuth = vi.fn();
+const mockUseDomain = vi.fn();
 
 vi.mock('@/hooks/useAuth', () => ({
   useAuth: () => mockUseAuth(),
+}));
+
+vi.mock('@/contexts/DomainContext', () => ({
+  useDomain: () => mockUseDomain(),
 }));
 
 class MockEventSource {
@@ -42,6 +47,13 @@ describe('useAmroWorkspaceState realtime schedule connectivity', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     MockEventSource.instances = [];
+    (window as unknown as { __ENV__?: Record<string, unknown> }).__ENV__ = {};
+    mockUseDomain.mockReturnValue({
+      currentDomain: { code: 'AMRO', name: 'AMRO' },
+      availableDomains: [{ code: 'AMRO', name: 'AMRO' }],
+      setDomain: vi.fn(),
+      isPlatformAdmin: false,
+    });
     vi.stubGlobal('EventSource', MockEventSource as unknown as typeof EventSource);
     mockUseAuth.mockReturnValue({
       session: { access_token: 'token-abc' },
@@ -173,6 +185,95 @@ describe('useAmroWorkspaceState realtime schedule connectivity', () => {
 
     await waitFor(() => expect(result.current.realtimeConnected).toBe(false));
     expect(source.close).toHaveBeenCalled();
+  });
+
+  it('normalizes AMRO proxy base and avoids duplicated /api/amro/api/v1 paths', async () => {
+    (window as unknown as { __ENV__?: Record<string, unknown> }).__ENV__ = {
+      VITE_AMRO_API_BASE_URL: '/api/amro',
+    };
+    const fetchMock = vi.mocked(fetch);
+
+    renderHook(() => useAmroWorkspaceState());
+
+    await waitFor(() => {
+      expect(
+        fetchMock.mock.calls.some((call) => String(call[0]).includes('/api/v1/compliance/summary')),
+      ).toBe(true);
+    });
+
+    expect(fetchMock.mock.calls.some((call) => String(call[0]).includes('/api/amro/api/v1'))).toBe(false);
+  });
+
+  it('blocks AMRO API calls when user has no AMRO access scope', async () => {
+    mockUseDomain.mockReturnValue({
+      currentDomain: { code: 'LOGISTICS', name: 'Logistics' },
+      availableDomains: [{ code: 'LOGISTICS', name: 'Logistics' }],
+      setDomain: vi.fn(),
+      isPlatformAdmin: false,
+    });
+    mockUseAuth.mockReturnValue({
+      session: { access_token: 'token-abc' },
+      hasPermission: () => false,
+      hasRole: () => false,
+      isPlatformAdmin: () => false,
+    });
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL) => jsonResponse({ data: [] }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { result } = renderHook(() => useAmroWorkspaceState());
+
+    await waitFor(() => expect(result.current.workPackagesError).toBe('Access denied - AMRO domain assignment required'));
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('blocks materials request when AMRO domain exists but is not active', async () => {
+    const setDomain = vi.fn(async () => undefined);
+    mockUseDomain.mockReturnValue({
+      currentDomain: { code: 'LOGISTICS', name: 'Logistics' },
+      availableDomains: [
+        { code: 'LOGISTICS', name: 'Logistics' },
+        { code: 'AMRO', name: 'AMRO' },
+      ],
+      setDomain,
+      isPlatformAdmin: false,
+    });
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL) => jsonResponse({ data: [] }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { result } = renderHook(() => useAmroWorkspaceState());
+
+    await waitFor(() =>
+      expect(result.current.workPackagesError).toBe('Switching to AMRO domain context...'),
+    );
+    expect(setDomain).toHaveBeenCalledWith('AMRO');
+    expect(fetchMock.mock.calls.some((call) => String(call[0]).includes('/materials'))).toBe(false);
+  });
+
+  it('auto-switches to AMRO when domain context marks user as platform admin', async () => {
+    const setDomain = vi.fn(async () => undefined);
+    mockUseAuth.mockReturnValue({
+      session: { access_token: 'token-abc' },
+      hasPermission: () => false,
+      hasRole: () => false,
+      isPlatformAdmin: () => false,
+    });
+    mockUseDomain.mockReturnValue({
+      currentDomain: { code: 'LOGISTICS', name: 'Logistics' },
+      availableDomains: [
+        { code: 'LOGISTICS', name: 'Logistics' },
+        { code: 'AMRO', name: 'AMRO' },
+      ],
+      setDomain,
+      isPlatformAdmin: true,
+    });
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL) => jsonResponse({ data: [] }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { result } = renderHook(() => useAmroWorkspaceState());
+
+    await waitFor(() => expect(result.current.workPackagesError).toBe('Switching to AMRO domain context...'));
+    expect(setDomain).toHaveBeenCalledWith('AMRO');
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('loads certification workflow states through certification interfaces', async () => {

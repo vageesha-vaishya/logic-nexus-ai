@@ -1,5 +1,5 @@
 // Permission slugs modeled after Salesforce-style modules and actions
-export type AppRole = 'platform_admin' | 'tenant_admin' | 'franchise_admin' | 'user';
+export type AppRole = 'platform_admin' | 'super_admin' | 'tenant_admin' | 'franchise_admin' | 'user';
 export const PLATFORM_ADMIN_ROLE: AppRole = 'platform_admin';
 
 export type Permission =
@@ -78,7 +78,12 @@ export type Permission =
   | 'service_type_mappings.view' | 'service_type_mappings.create' | 'service_type_mappings.edit' | 'service_type_mappings.delete'
   | 'ports_locations.view' | 'ports_locations.create' | 'ports_locations.edit' | 'ports_locations.delete'
   | 'consignees.view' | 'consignees.create' | 'consignees.edit' | 'consignees.delete'
-  | 'transfers.view' | 'transfers.create' | 'transfers.approve' | 'transfers.reject';
+  | 'transfers.view' | 'transfers.create' | 'transfers.approve' | 'transfers.reject'
+  | 'view_amro_dashboard'
+  | 'create_maintenance_request'
+  | 'edit_aircraft_records'
+  | 'delete_flight_logs'
+  | 'approve_work_orders';
 
 
 export const ROLE_PERMISSIONS: Record<
@@ -112,6 +117,35 @@ export const ROLE_PERMISSIONS: Record<
     'shipments.reports.view','shipments.reports.manage',
     'shipments.config.manage',
     'shipments.audit.view','shipments.audit.manage',
+    'view_amro_dashboard','create_maintenance_request','edit_aircraft_records','delete_flight_logs','approve_work_orders',
+  ],
+  super_admin: [
+    '*',
+    'leads.view','leads.create','leads.edit','leads.delete','leads.convert','leads.assign','leads.import_export',
+    'accounts.view','accounts.create','accounts.edit','accounts.delete',
+    'contacts.view','contacts.create','contacts.edit','contacts.delete',
+    'opportunities.view','opportunities.create','opportunities.edit','opportunities.delete',
+    'quotes.view','quotes.create','quotes.edit','quotes.delete','quotes.import_export','quotes.analytics','quotes.export_sensitive','quotes.templates.manage','import_quotation','export_quotation','export_quotation_sensitive',
+    'transfers.view', 'transfers.create', 'transfers.approve', 'transfers.reject',
+    'activities.view','activities.create','activities.edit','activities.delete','activities.complete',
+    'campaigns.view','campaigns.manage',
+    'files.view','files.manage',
+    'dashboards.view','dashboards.manage',
+    'reports.view','reports.manage',
+    'chatter.view','chatter.post','chatter.moderate',
+    'groups.view','groups.manage',
+    'calendar.view','calendar.manage',
+    'email.manage',
+    'admin.tenants.manage','admin.franchises.manage','admin.users.manage','admin.lead_routing.manage','admin.lead_assignment.manage','admin.settings.manage',
+    'domains.assign','domains.revoke','domains.audit.view',
+    'shipments.view','shipments.create','shipments.edit','shipments.delete',
+    'vendors.view','vendors.create','vendors.edit','vendors.delete',
+    'warehouses.view','warehouses.create','warehouses.edit','warehouses.delete',
+    'shipments.approvals.view','shipments.approvals.manage',
+    'shipments.reports.view','shipments.reports.manage',
+    'shipments.config.manage',
+    'shipments.audit.view','shipments.audit.manage',
+    'view_amro_dashboard','create_maintenance_request','edit_aircraft_records','delete_flight_logs','approve_work_orders',
   ],
   tenant_admin: [
     // Admin within tenant
@@ -138,6 +172,7 @@ export const ROLE_PERMISSIONS: Record<
     'shipments.reports.view','shipments.reports.manage',
     'shipments.config.manage',
     'shipments.audit.view',
+    'view_amro_dashboard','create_maintenance_request','edit_aircraft_records','approve_work_orders',
   ],
   franchise_admin: [
     // Admin within franchise
@@ -159,6 +194,7 @@ export const ROLE_PERMISSIONS: Record<
     'shipments.view','shipments.create','shipments.edit',
     'shipments.approvals.view',
     'shipments.reports.view',
+    'view_amro_dashboard','create_maintenance_request','edit_aircraft_records',
   ],
   user: [
     // Typical sales user
@@ -177,6 +213,7 @@ export const ROLE_PERMISSIONS: Record<
     'calendar.view',
     'email.manage',
     'shipments.view',
+    'view_amro_dashboard',
   ],
 };
 

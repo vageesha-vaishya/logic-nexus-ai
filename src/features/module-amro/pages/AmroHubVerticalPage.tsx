@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/hooks/useAuth';
+import { useCRM } from '@/hooks/useCRM';
 import { useDomain } from '@/contexts/DomainContext';
 import {
   AMRO_ASYNCAPI_SPEC_PATH,
@@ -101,7 +102,17 @@ function getAmroModuleRoutePath(moduleName: string) {
 export default function AmroHubVerticalPage({ moduleKey }: AmroHubVerticalPageProps = {}) {
   const { currentDomain } = useDomain();
   const { hasRole, isPlatformAdmin } = useAuth();
+  const { context } = useCRM();
   const isAmroDomainActive = currentDomain?.code === 'AMRO';
+  const overviewScope = useMemo(
+    () => ({
+      tenantId: context.tenantId,
+      franchiseId: context.franchiseId,
+      userId: context.userId,
+      domainCode: currentDomain?.code || null,
+    }),
+    [context.franchiseId, context.tenantId, context.userId, currentDomain?.code],
+  );
   const {
     dashboard,
     trends,
@@ -116,7 +127,7 @@ export default function AmroHubVerticalPage({ moduleKey }: AmroHubVerticalPagePr
     lastDashboardRefreshAt,
     lastTrendsRefreshAt,
     loadDashboard,
-  } = useAmroOverviewKpi();
+  } = useAmroOverviewKpi(overviewScope);
   const [phasePlanRows, setPhasePlanRows] = useState<AmroPhasePlanUiRow[]>([...AMRO_PHASE_PLAN_MATRIX]);
   const [phasePlanSource, setPhasePlanSource] = useState<'api' | 'fallback'>('fallback');
   const [plannerFilter, setPlannerFilter] = useState<string>('');

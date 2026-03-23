@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import AmroHubVerticalPage from './AmroHubVerticalPage';
 
 const mockUseDomain = vi.fn();
 const mockUseAuth = vi.fn();
+const mockLoadDashboard = vi.fn();
 
 vi.mock('@/components/layout/DashboardLayout', () => ({
   DashboardLayout: ({ children }: { children: React.ReactNode }) => <div data-testid="dashboard-layout">{children}</div>,
@@ -79,12 +80,12 @@ vi.mock('../hooks/useAmroOverviewKpi', () => ({
     loading: false,
     exporting: false,
     error: null,
-    refreshCadence: { criticalMs: 60000, standardMs: 300000 },
+    refreshCadence: { criticalMs: 30000, standardMs: 300000 },
     getMetricTier: (metricKey: string) => (metricKey === 'compliance_risk' || metricKey === 'aog_count' ? 'critical' : 'standard'),
     refreshAll: vi.fn(),
     lastDashboardRefreshAt: '2026-03-22T00:00:00.000Z',
     lastTrendsRefreshAt: '2026-03-22T00:00:00.000Z',
-    loadDashboard: vi.fn(),
+    loadDashboard: mockLoadDashboard,
     loadTrends: vi.fn(),
     exportSnapshot: vi.fn(),
   }),
@@ -98,9 +99,24 @@ vi.mock('@/hooks/useAuth', () => ({
   useAuth: () => mockUseAuth(),
 }));
 
+vi.mock('@/hooks/useCRM', () => ({
+  useCRM: () => ({
+    context: {
+      tenantId: 'tenant-1',
+      franchiseId: 'franchise-1',
+      userId: 'user-1',
+    },
+  }),
+}));
+
 describe('AmroHubVerticalPage', () => {
   beforeEach(() => {
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('phase-plan-unavailable')));
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: false,
+      json: async () => ({}),
+    }));
+    mockLoadDashboard.mockReset();
+    mockLoadDashboard.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -174,5 +190,43 @@ describe('AmroHubVerticalPage', () => {
 
     expect(screen.getByText('Role Controls: anomaly intelligence is hidden for user persona.')).toBeTruthy();
     expect(screen.getByText('Export restricted to tenant/platform admin persona')).toBeTruthy();
+  });
+
+  it('applies and clears dashboard scope filters with planner and engineer values', () => {
+    mockUseDomain.mockReturnValue({ currentDomain: { code: 'AMRO' } });
+    mockUseAuth.mockReturnValue({
+      hasRole: vi.fn().mockImplementation((role: string) => role === 'tenant_admin'),
+      isPlatformAdmin: vi.fn().mockReturnValue(false),
+    });
+
+    render(<AmroHubVerticalPage />);
+
+    const plannerInput = screen.getByPlaceholderText('planner_id');
+    const engineerInput = screen.getByPlaceholderText('engineer_id');
+    fireEvent.change(plannerInput, { target: { value: 'planner-22' } });
+    fireEvent.change(engineerInput, { target: { value: 'engineer-31' } });
+
+    act(() => {
+      fireEvent.click(screen.getByText('Apply Dashboard Scope'));
+    });
+
+    expect(mockLoadDashboard).toHaveBeenCalledTimes(1);
+    expect(mockLoadDashboard.mock.calls[0][0]).toMatchObject({
+      plannerId: 'planner-22',
+      engineerId: 'engineer-31',
+    });
+    expect(typeof mockLoadDashboard.mock.calls[0][0].dateRange).toBe('string');
+    expect(mockLoadDashboard.mock.calls[0][0].dateRange.includes('|')).toBe(true);
+
+    act(() => {
+      fireEvent.click(screen.getByText('Clear Scope'));
+    });
+
+    expect(mockLoadDashboard).toHaveBeenCalledTimes(2);
+    expect(mockLoadDashboard.mock.calls[1][0]).toEqual({
+      dateRange: expect.stringMatching(/\|/),
+    });
+    expect(screen.getByText('Critical Refresh: 30s')).toBeTruthy();
+    expect(screen.getByText('Standard Refresh: 300s')).toBeTruthy();
   });
 });

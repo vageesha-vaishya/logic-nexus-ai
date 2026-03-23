@@ -113,3 +113,113 @@ describe('TenantBrandingService.updateBranding', () => {
     expect(mockFrom).not.toHaveBeenCalled();
   });
 });
+
+describe('TenantBrandingService.getResolvedBranding', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.stubGlobal('fetch', vi.fn());
+    vi.mocked(supabase.auth.getSession).mockResolvedValue({
+      data: {
+        session: {
+          access_token: 'session-token',
+        },
+      },
+    } as any);
+    (supabase.auth as any).getUser = vi.fn().mockResolvedValue({
+      data: { user: { id: 'user-1' } },
+    });
+  });
+
+  it('falls back to direct tenant branding resolution when endpoint returns 404', async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: false,
+      status: 404,
+      json: vi.fn().mockResolvedValue({ error: 'Not Found' }),
+    } as any);
+
+    const profileSelectChain: any = {
+      eq: vi.fn(() => profileSelectChain),
+      limit: vi.fn(() => profileSelectChain),
+      maybeSingle: vi.fn().mockResolvedValue({
+        data: { tenant_id: 'tenant-1' },
+        error: null,
+      }),
+    };
+    const tenantSelectChain: any = {
+      eq: vi.fn(() => tenantSelectChain),
+      limit: vi.fn(() => tenantSelectChain),
+      maybeSingle: vi.fn().mockResolvedValue({
+        data: {
+          id: 'tenant-1',
+          name: 'Acme',
+          slug: 'acme',
+          domain: 'acme.com',
+          logo_url: 'logos/main.png',
+          branding_settings: { primary_color: '#112233' },
+          settings: {},
+        },
+        error: null,
+      }),
+    };
+
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'profiles') {
+        return { select: vi.fn(() => profileSelectChain) };
+      }
+      if (table === 'tenants') {
+        return { select: vi.fn(() => tenantSelectChain) };
+      }
+      throw new Error(`Unexpected table: ${table}`);
+    });
+
+    const result = await TenantBrandingService.getResolvedBranding({ hostname: 'localhost' });
+
+    expect(result.tenantId).toBe('tenant-1');
+    expect(result.tenantName).toBe('Acme');
+    expect(result.primaryColor).toBe('#112233');
+  });
+
+  it('falls back to direct tenant branding resolution when fetch throws', async () => {
+    vi.mocked(fetch).mockRejectedValue(new Error('Network unavailable'));
+
+    const profileSelectChain: any = {
+      eq: vi.fn(() => profileSelectChain),
+      limit: vi.fn(() => profileSelectChain),
+      maybeSingle: vi.fn().mockResolvedValue({
+        data: { tenant_id: 'tenant-1' },
+        error: null,
+      }),
+    };
+    const tenantSelectChain: any = {
+      eq: vi.fn(() => tenantSelectChain),
+      limit: vi.fn(() => tenantSelectChain),
+      maybeSingle: vi.fn().mockResolvedValue({
+        data: {
+          id: 'tenant-1',
+          name: 'Acme',
+          slug: 'acme',
+          domain: 'acme.com',
+          logo_url: 'logos/main.png',
+          branding_settings: {},
+          settings: {},
+        },
+        error: null,
+      }),
+    };
+
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'profiles') {
+        return { select: vi.fn(() => profileSelectChain) };
+      }
+      if (table === 'tenants') {
+        return { select: vi.fn(() => tenantSelectChain) };
+      }
+      throw new Error(`Unexpected table: ${table}`);
+    });
+
+    const result = await TenantBrandingService.getResolvedBranding({ hostname: 'localhost' });
+
+    expect(result.tenantId).toBe('tenant-1');
+    expect(result.companyName).toBe('Acme');
+  });
+});

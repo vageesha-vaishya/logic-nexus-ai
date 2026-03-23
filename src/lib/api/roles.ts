@@ -19,6 +19,12 @@ export interface DbPermission {
   description: string;
 }
 
+type RoleAssignmentScope = {
+  role: string;
+  tenant_id: string | null;
+  franchise_id: string | null;
+};
+
 export class RoleService {
   constructor(private db: ScopedDataAccess) {}
 
@@ -84,18 +90,58 @@ export class RoleService {
   /**
    * Fetches the mapping of roles to permissions
    */
-  async getRolePermissions() {
+  async getRolePermissions(assignments?: RoleAssignmentScope[]) {
     const { data, error } = await (this.db.client as any)
       .from('auth_role_permissions')
-      .select('role_id, permission_id');
+      .select('role_id, permission_id, scope_level, tenant_id, franchise_id, is_denied');
     
     if (error) throw error;
     
-    // Transform to Record<roleId, permissionId[]>
     const map: Record<string, string[]> = {};
+    const deniedMap: Record<string, Set<string>> = {};
+    const roleAssignments = Array.isArray(assignments) ? assignments : [];
+    const hasScopedResolution = roleAssignments.length > 0;
     (data || []).forEach((item: any) => {
-      if (!map[item.role_id]) map[item.role_id] = [];
-      map[item.role_id].push(item.permission_id);
+      const roleId = String(item.role_id || '');
+      const permissionId = String(item.permission_id || '');
+      if (!roleId || !permissionId) return;
+
+      const isDenied = Boolean(item.is_denied);
+      if (hasScopedResolution) {
+        const scopedAssignments = roleAssignments.filter((assignment) => assignment.role === roleId);
+        if (scopedAssignments.length === 0) return;
+        const scopeLevel = String(item.scope_level || 'global') as 'global' | 'tenant' | 'franchisee';
+        const rowTenantId = item.tenant_id ? String(item.tenant_id) : null;
+        const rowFranchiseId = item.franchise_id ? String(item.franchise_id) : null;
+        const matchesAssignment = scopedAssignments.some((assignment) => {
+          if (scopeLevel === 'global') return true;
+          if (scopeLevel === 'tenant') {
+            if (!assignment.tenant_id) return false;
+            return !rowTenantId || rowTenantId === assignment.tenant_id;
+          }
+          if (!assignment.tenant_id) return false;
+          const tenantMatch = !rowTenantId || rowTenantId === assignment.tenant_id;
+          const franchiseMatch = !rowFranchiseId || (assignment.franchise_id && rowFranchiseId === assignment.franchise_id);
+          return tenantMatch && franchiseMatch;
+        });
+        if (!matchesAssignment) return;
+      }
+
+      if (isDenied) {
+        if (!deniedMap[roleId]) deniedMap[roleId] = new Set<string>();
+        deniedMap[roleId].add(permissionId);
+        return;
+      }
+
+      if (!map[roleId]) map[roleId] = [];
+      if (!map[roleId].includes(permissionId)) {
+        map[roleId].push(permissionId);
+      }
+    });
+
+    Object.entries(deniedMap).forEach(([roleId, deniedPermissions]) => {
+      if (!map[roleId]) return;
+      map[roleId] = map[roleId].filter((permissionId) => !deniedPermissions.has(permissionId));
     });
     
     return map;

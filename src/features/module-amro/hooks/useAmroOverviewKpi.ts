@@ -164,6 +164,13 @@ type ApiEnvelope<TOutput> = {
   error?: string;
 };
 
+type AmroRequestScope = {
+  tenantId?: string | null;
+  franchiseId?: string | null;
+  userId?: string | null;
+  domainCode?: string | null;
+};
+
 const DEFAULT_STATION_IDS = ['station-a'];
 const DEFAULT_FLEET_IDS = ['fleet-a'];
 const DEFAULT_WIDGETS = ['kpi_cards', 'risk_heatmap', 'trend_lines', 'anomaly_flags'];
@@ -186,7 +193,7 @@ function buildIsoRange(days: number): string {
   return `${start.toISOString()}|${end.toISOString()}`;
 }
 
-async function requestOverview<TOutput>(url: string, init?: RequestInit): Promise<TOutput> {
+async function requestOverview<TOutput>(url: string, init: RequestInit | undefined, scope: AmroRequestScope): Promise<TOutput> {
   const { data: sessionData } = await supabase.auth.getSession();
   let token = sessionData?.session?.access_token || '';
   if (!token) {
@@ -201,6 +208,18 @@ async function requestOverview<TOutput>(url: string, init?: RequestInit): Promis
   const buildRequestHeaders = () => {
     const headers = new Headers(init?.headers || {});
     headers.set('Authorization', `Bearer ${token}`);
+    if (scope.tenantId) {
+      headers.set('x-tenant-id', scope.tenantId);
+    }
+    if (scope.franchiseId) {
+      headers.set('x-franchise-id', scope.franchiseId);
+    }
+    if (scope.userId) {
+      headers.set('x-user-id', scope.userId);
+    }
+    if (scope.domainCode) {
+      headers.set('x-domain-id', scope.domainCode);
+    }
     return headers;
   };
 
@@ -233,7 +252,7 @@ async function requestOverview<TOutput>(url: string, init?: RequestInit): Promis
   return payload.output;
 }
 
-export function useAmroOverviewKpi() {
+export function useAmroOverviewKpi(scope: AmroRequestScope = {}) {
   const [dashboard, setDashboard] = useState<DashboardOutput | null>(null);
   const [trends, setTrends] = useState<TrendOutput | null>(null);
   const [lastExport, setLastExport] = useState<ExportOutput | null>(null);
@@ -244,6 +263,15 @@ export function useAmroOverviewKpi() {
   const [lastTrendsRefreshAt, setLastTrendsRefreshAt] = useState<string | null>(null);
   const dashboardRequestRef = useRef<DashboardRequest>(DEFAULT_DASHBOARD_REQUEST);
   const trendsRequestRef = useRef<TrendsRequest>(DEFAULT_TRENDS_REQUEST);
+  const normalizedScope = useMemo(
+    () => ({
+      tenantId: scope.tenantId?.trim() || undefined,
+      franchiseId: scope.franchiseId?.trim() || undefined,
+      userId: scope.userId?.trim() || undefined,
+      domainCode: scope.domainCode?.trim() || undefined,
+    }),
+    [scope.domainCode, scope.franchiseId, scope.tenantId, scope.userId],
+  );
 
   const loadDashboard = useCallback(async (request: DashboardRequest) => {
     dashboardRequestRef.current = request;
@@ -260,11 +288,11 @@ export function useAmroOverviewKpi() {
     if (request.engineerId) {
       params.set('engineer_id', request.engineerId);
     }
-    const output = await requestOverview<DashboardOutput>(`${AMRO_OVERVIEW_KPI_PATH}?${params.toString()}`);
+    const output = await requestOverview<DashboardOutput>(`${AMRO_OVERVIEW_KPI_PATH}?${params.toString()}`, undefined, normalizedScope);
     setDashboard(output);
     setLastDashboardRefreshAt(new Date().toISOString());
     return output;
-  }, []);
+  }, [normalizedScope]);
 
   const loadTrends = useCallback(async (request: TrendsRequest) => {
     trendsRequestRef.current = request;
@@ -274,11 +302,11 @@ export function useAmroOverviewKpi() {
       window: request.window,
       compare_window: request.compareWindow,
     });
-    const output = await requestOverview<TrendOutput>(`${AMRO_OVERVIEW_KPI_PATH}?${params.toString()}`);
+    const output = await requestOverview<TrendOutput>(`${AMRO_OVERVIEW_KPI_PATH}?${params.toString()}`, undefined, normalizedScope);
     setTrends(output);
     setLastTrendsRefreshAt(new Date().toISOString());
     return output;
-  }, []);
+  }, [normalizedScope]);
 
   const exportSnapshot = useCallback(async (request?: Partial<ExportRequest>) => {
     setExporting(true);
@@ -292,13 +320,13 @@ export function useAmroOverviewKpi() {
           date_range: request?.dateRange || buildIsoRange(30),
           selected_widgets: request?.selectedWidgets || DEFAULT_WIDGETS,
         }),
-      });
+      }, normalizedScope);
       setLastExport(output);
       return output;
     } finally {
       setExporting(false);
     }
-  }, []);
+  }, [normalizedScope]);
 
   const refreshAll = useCallback(async () => {
     setError(null);

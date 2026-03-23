@@ -30,6 +30,17 @@ const ALLOWED_WINDOWS = new Set<KpiWindow>(['7d', '30d', '90d']);
 const ALLOWED_EXPORT_FORMATS = new Set(['csv', 'pdf']);
 const ALLOWED_WIDGETS = new Set(['kpi_cards', 'risk_heatmap', 'trend_lines', 'anomaly_flags']);
 const KPI_CACHE_STALE_THRESHOLD_SECONDS = Number(process.env.AMRO_KPI_CACHE_STALE_SECONDS || 900);
+const TABLE_FALLBACK_CANDIDATES: Record<string, string[]> = {
+  work_package_master: ['work_packages'],
+  materials_inventory: ['parts_inventory', 'work_package_materials'],
+  compliance_gates: ['compliance_records', 'compliance_obligations'],
+  integration_logs: ['integration_jobs', 'webhook_outbox'],
+  forecast_recommendations: ['forecast_outputs', 'forecast_decisions'],
+  task_execution_status: ['tasks'],
+  scheduling_board_data: ['schedules'],
+  certification_records: ['certification_actions'],
+  audit_trails: ['maintenance_events'],
+};
 
 function getMaxCompareWindowDays(): number {
   return Number(process.env.AMRO_KPI_COMPARE_WINDOW_MAX_DAYS || 90);
@@ -159,7 +170,10 @@ function parseDateMs(value: unknown): number {
 }
 
 function resolveStatus(row: JsonRecord): string {
-  return getStringValue(row, ['status', 'state', 'workflow_state', 'execution_status']).toLowerCase();
+  return getStringValue(
+    row,
+    ['status', 'state', 'workflow_state', 'execution_status', 'compliance_status', 'certification_status', 'result_status'],
+  ).toLowerCase();
 }
 
 function isResolvedStatus(status: string): boolean {
@@ -190,22 +204,43 @@ async function fetchScopedRows(
   limit: number,
   issueCollector: string[],
 ): Promise<JsonRecord[]> {
-  try {
-    const supabase = getSupabaseAdminClient();
-    const { data, error } = await supabase
-      .from(table)
-      .select('*')
-      .eq('tenant_id', tenantId)
-      .limit(limit);
+  const tableCandidates = [table, ...(TABLE_FALLBACK_CANDIDATES[table] || [])];
+  let fallbackErrorMessage = '';
 
-    if (error) {
-      issueCollector.push(`${table}: ${error.message}`);
+  const isMissingTableError = (message: string, code: string) =>
+    code === 'PGRST205'
+    || message.toLowerCase().includes('could not find the table')
+    || (message.toLowerCase().includes('relation') && message.toLowerCase().includes('does not exist'));
+
+  try {
+    for (const [index, tableCandidate] of tableCandidates.entries()) {
+      const supabase = getSupabaseAdminClient();
+      const { data, error } = await supabase
+        .from(tableCandidate)
+        .select('*')
+        .eq('tenant_id', tenantId)
+        .limit(limit);
+
+      if (!error) {
+        return Array.isArray(data) ? (data as JsonRecord[]) : [];
+      }
+
+      const message = String(error.message || 'database connectivity failure');
+      const code = String((error as { code?: string }).code || '');
+      if (!fallbackErrorMessage) {
+        fallbackErrorMessage = `${table}: ${message}`;
+      }
+      const allowFallback = index < tableCandidates.length - 1 && isMissingTableError(message, code);
+      if (allowFallback) {
+        continue;
+      }
+      issueCollector.push(`${table}: ${message}`);
       return [];
     }
-    if (!Array.isArray(data)) {
-      return [];
+    if (fallbackErrorMessage) {
+      issueCollector.push(fallbackErrorMessage);
     }
-    return data as JsonRecord[];
+    return [];
   } catch (error) {
     issueCollector.push(`${table}: ${error instanceof Error ? error.message : 'database connectivity failure'}`);
     return [];
@@ -225,13 +260,13 @@ function mapWorkPackageOverview(
     return plannerPass && engineerPass;
   });
   return filtered.slice(0, 15).map((row) => ({
-    work_package_id: getStringValue(row, ['id', 'work_package_id', 'code'], 'unknown-work-package'),
-    title: getStringValue(row, ['title', 'name', 'description'], 'Untitled work package'),
+    work_package_id: getStringValue(row, ['id', 'work_package_id', 'code', 'work_package_number'], 'unknown-work-package'),
+    title: getStringValue(row, ['title', 'name', 'description', 'work_package_number'], 'Untitled work package'),
     status: resolveStatus(row) || 'unknown',
-    planner_id: getStringValue(row, ['planner_id', 'assigned_planner_id'], 'unassigned'),
-    engineer_id: getStringValue(row, ['engineer_id', 'assigned_engineer_id'], 'unassigned'),
-    due_at: getStringValue(row, ['due_at', 'planned_end_at', 'target_end_at'], ''),
-    progress_pct: Math.round(normalizePercent(getNumericValue(row, ['progress_pct', 'completion_pct'], 0))),
+    planner_id: getStringValue(row, ['planner_id', 'assigned_planner_id', 'assigned_to'], 'unassigned'),
+    engineer_id: getStringValue(row, ['engineer_id', 'assigned_engineer_id', 'lead_engineer_id'], 'unassigned'),
+    due_at: getStringValue(row, ['due_at', 'planned_end_at', 'target_end_at', 'planned_end', 'scheduled_end_at'], ''),
+    progress_pct: Math.round(normalizePercent(getNumericValue(row, ['progress_pct', 'completion_pct', 'completion_percentage'], 0))),
   }));
 }
 
@@ -305,12 +340,12 @@ function mapMaterialsAlerts(rows: JsonRecord[]) {
   return rows
     .map((row) => {
       const available = getNumericValue(row, ['available_qty', 'quantity_available', 'on_hand_qty'], 0);
-      const reserved = getNumericValue(row, ['reserved_qty', 'quantity_reserved'], 0);
+      const reserved = getNumericValue(row, ['reserved_qty', 'quantity_reserved', 'quantity_required', 'allocated_quantity'], 0);
       const reorderPoint = getNumericValue(row, ['reorder_point', 'minimum_qty'], 0);
       const shortage = Math.max(0, Math.max(reserved - available, reorderPoint - available));
       return {
-        part_number: getStringValue(row, ['part_number', 'sku', 'material_code'], 'unknown-part'),
-        location: getStringValue(row, ['station_id', 'warehouse_id', 'location'], 'unknown-location'),
+        part_number: getStringValue(row, ['part_number', 'sku', 'material_code', 'part_id'], 'unknown-part'),
+        location: getStringValue(row, ['station_id', 'warehouse_id', 'location', 'storage_location'], 'unknown-location'),
         available_qty: available,
         reserved_qty: reserved,
         shortage_qty: shortage,

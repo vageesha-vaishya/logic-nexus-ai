@@ -287,6 +287,102 @@ describe('/api/v2/amro/overview-kpi', () => {
     expect((res.jsonBody as any)?.output).toHaveProperty('anomaly_flags');
   });
 
+  it('uses fallback AMRO tables when overview aliases are missing from schema cache', async () => {
+    process.env.AMRO_OVERVIEW_KPI_V2_ENABLED = 'true';
+    const fallbackRows: Record<string, unknown[]> = {
+      work_packages: [
+        {
+          id: 'wp-9',
+          work_package_number: 'WP-009',
+          status: 'in_progress',
+          planned_end: '2026-03-22T05:00:00.000Z',
+          tenant_id: 'tenant-1',
+        },
+      ],
+      parts_inventory: [
+        {
+          id: 'inv-1',
+          part_number: 'PART-ALPHA',
+          station_id: 'station-a',
+          quantity_available: 1,
+          quantity_required: 3,
+          tenant_id: 'tenant-1',
+        },
+      ],
+      compliance_records: [
+        {
+          id: 'cr-1',
+          gate_name: 'ETOPS',
+          compliance_status: 'failed',
+          due_at: '2026-03-25T00:00:00.000Z',
+          owner_id: 'inspector-1',
+          tenant_id: 'tenant-1',
+        },
+      ],
+      integration_jobs: [
+        {
+          id: 'ij-1',
+          integration_id: 'sap-pm',
+          status: 'failed',
+          direction: 'outbound',
+          last_attempt_at: '2026-03-21T09:00:00.000Z',
+          error_message: 'Timeout',
+          tenant_id: 'tenant-1',
+        },
+      ],
+      forecast_outputs: [
+        {
+          id: 'fo-1',
+          recommendation: 'Re-sequence inspections',
+          confidence_pct: 91,
+          risk_score: 75,
+          reason: 'Utilization drift',
+          work_package_id: 'wp-9',
+          tenant_id: 'tenant-1',
+        },
+      ],
+    };
+    vi.mocked(getSupabaseAdminClient).mockReturnValue({
+      from: vi.fn((tableName: string) => ({
+        select: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            limit: vi.fn(async () => {
+              if (['work_package_master', 'materials_inventory', 'compliance_gates', 'integration_logs', 'forecast_recommendations'].includes(tableName)) {
+                return {
+                  data: null,
+                  error: {
+                    code: 'PGRST205',
+                    message: `Could not find the table 'public.${tableName}' in the schema cache`,
+                  },
+                };
+              }
+              return {
+                data: fallbackRows[tableName] || [],
+                error: null,
+              };
+            }),
+          })),
+        })),
+      })),
+    } as any);
+
+    const req: ApiRequest = {
+      method: 'GET',
+      query: {
+        interface: 'load-kpi-dashboard',
+        date_range: '2026-03-01T00:00:00.000Z:2026-03-21T00:00:00.000Z',
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.output?.data_issues).toEqual([]);
+    expect((res.jsonBody as any)?.output?.work_package_overview?.[0]?.work_package_id).toBe('wp-9');
+  });
+
   it('returns freshness warning when dashboard cache exceeds stale threshold', async () => {
     process.env.AMRO_OVERVIEW_KPI_V2_ENABLED = 'true';
     const req: ApiRequest = {
@@ -355,6 +451,106 @@ describe('/api/v2/amro/overview-kpi', () => {
     expect((res.jsonBody as any)?.output).toHaveProperty('certification_decision_queue');
     expect((res.jsonBody as any)?.output).toHaveProperty('audit_timeline');
     expect((res.jsonBody as any)?.output).toHaveProperty('forecast_recommendation_hub');
+  });
+
+  it('uses fallback operational tables when trend aliases are missing from schema cache', async () => {
+    process.env.AMRO_OVERVIEW_KPI_V2_ENABLED = 'true';
+    const fallbackRows: Record<string, unknown[]> = {
+      tasks: [
+        {
+          id: 'task-88',
+          status: 'completed',
+          assignee_id: 'tech-1',
+          completed_at: '2026-03-21T10:00:00.000Z',
+          completed_on_mobile: true,
+          productivity_score: 90,
+          tenant_id: 'tenant-1',
+        },
+      ],
+      schedules: [
+        {
+          id: 'sched-1',
+          station: 'station-a',
+          scheduled_start_at: '2030-03-23T10:00:00.000Z',
+          scheduled_end_at: '2030-03-23T12:00:00.000Z',
+          resource_name: 'Line Team 1',
+          utilization_pct: 82,
+          tenant_id: 'tenant-1',
+        },
+      ],
+      certification_actions: [
+        {
+          id: 'cert-a',
+          work_package_id: 'wp-1',
+          authority: 'FAA',
+          certification_status: 'pending',
+          submitted_at: '2026-03-21T11:00:00.000Z',
+          tenant_id: 'tenant-1',
+        },
+      ],
+      maintenance_events: [
+        {
+          id: 'evt-1',
+          event_type: 'gate-evaluation',
+          performed_by: 'inspector-1',
+          occurred_at: '2026-03-21T12:00:00.000Z',
+          result_status: 'failed',
+          tenant_id: 'tenant-1',
+        },
+      ],
+      forecast_outputs: [
+        {
+          id: 'fo-2',
+          recommendation: 'Advance A-check',
+          confidence_pct: 87,
+          risk_score: 70,
+          reason: 'Lead-time risk',
+          work_package_id: 'wp-1',
+          tenant_id: 'tenant-1',
+        },
+      ],
+    };
+    vi.mocked(getSupabaseAdminClient).mockReturnValue({
+      from: vi.fn((tableName: string) => ({
+        select: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            limit: vi.fn(async () => {
+              if (['task_execution_status', 'scheduling_board_data', 'certification_records', 'audit_trails', 'forecast_recommendations'].includes(tableName)) {
+                return {
+                  data: null,
+                  error: {
+                    code: 'PGRST205',
+                    message: `Could not find the table 'public.${tableName}' in the schema cache`,
+                  },
+                };
+              }
+              return {
+                data: fallbackRows[tableName] || [],
+                error: null,
+              };
+            }),
+          })),
+        })),
+      })),
+    } as any);
+
+    const req: ApiRequest = {
+      method: 'GET',
+      query: {
+        interface: 'load-operational-trends',
+        metric_key: 'schedule_adherence',
+        window: '7d',
+        compare_window: '30d',
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.output?.data_issues).toEqual([]);
+    expect((res.jsonBody as any)?.output?.task_execution_monitor?.completed_tasks).toBeGreaterThan(0);
   });
 
   it('rejects compare window beyond policy maximum', async () => {

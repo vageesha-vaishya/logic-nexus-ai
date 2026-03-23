@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { AmroOwnedWorkspace } from './AmroOwnedWorkspace';
 
 const mockUseAmroWorkspaceState = vi.fn();
@@ -218,5 +218,163 @@ describe('AmroOwnedWorkspace', () => {
     fireEvent.change(screen.getByLabelText('Certification deferral rationale'), { target: { value: 'Awaiting authority package update.' } });
     fireEvent.click(screen.getByRole('button', { name: 'Confirm certification deferral' }));
     expect(submitCertificationDecision).toHaveBeenCalledWith('defer');
+  });
+
+  it('runs work package row actions from the list surface', () => {
+    const setSelectedWorkPackageId = vi.fn();
+    const assignSelectedWorkPackageToNextSlot = vi.fn().mockResolvedValue(true);
+    const advanceWorkPackageLifecycle = vi.fn().mockResolvedValue(true);
+    mockUseAmroWorkspaceState.mockReturnValue(
+      createWorkspaceState({
+        setSelectedWorkPackageId,
+        assignSelectedWorkPackageToNextSlot,
+        advanceWorkPackageLifecycle,
+        workPackages: [
+          {
+            id: 'wp-1',
+            packageNumber: 'WP-1',
+            lifecycleStage: 'in_progress',
+            assetId: 'asset-1',
+            tasks: [
+              {
+                id: 'task-1',
+                workPackageId: 'wp-1',
+                title: 'Inspect',
+                lifecycleStage: 'execute',
+                assignedRole: 'technician',
+                completed: false,
+              },
+            ],
+          },
+        ],
+        selectedWorkPackage: {
+          id: 'wp-1',
+          packageNumber: 'WP-1',
+          lifecycleStage: 'in_progress',
+          assetId: 'asset-1',
+          tasks: [
+            {
+              id: 'task-1',
+              workPackageId: 'wp-1',
+              title: 'Inspect',
+              lifecycleStage: 'execute',
+              assignedRole: 'technician',
+              completed: false,
+            },
+          ],
+        },
+      }),
+    );
+    render(<AmroOwnedWorkspace moduleKey="work-packages" />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open work package WP-1' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Hold work package WP-1' }));
+
+    expect(setSelectedWorkPackageId).toHaveBeenCalledWith('wp-1');
+    expect(advanceWorkPackageLifecycle).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows recovery actions when work package module has no rows', async () => {
+    const refreshWorkPackages = vi.fn().mockResolvedValue(true);
+    const setSelectedSavedViewId = vi.fn();
+    const setWorkPackageStatusFilter = vi.fn();
+    const setWorkPackageSearch = vi.fn();
+    const createWorkPackage = vi.fn().mockResolvedValue(true);
+    mockUseAmroWorkspaceState.mockReturnValue(
+      createWorkspaceState({
+        refreshWorkPackages,
+        setSelectedSavedViewId,
+        setWorkPackageStatusFilter,
+        setWorkPackageSearch,
+        createWorkPackage,
+        workPackageStatusFilter: 'planning',
+        workPackageSearch: 'x',
+        selectedSavedViewId: 'saved-1',
+        savedWorkPackageViews: [
+          { id: 'default-all', name: 'All Work Packages', filters: { status: 'all', search: '' } },
+          { id: 'saved-1', name: 'Planning Only', filters: { status: 'planning', search: 'x' } },
+        ],
+        workPackages: [],
+        selectedWorkPackage: null,
+        selectedWorkPackageId: '',
+      }),
+    );
+    render(<AmroOwnedWorkspace moduleKey="work-packages" />);
+
+    expect(screen.getByText('No AMRO work packages are available yet.')).toBeTruthy();
+    expect(screen.getByText('No work package selected for the detail sheet.')).toBeTruthy();
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Retry Refresh' })[0]);
+    fireEvent.click(screen.getByRole('button', { name: 'Clear Scope' }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Create Starter Package' })[0]);
+
+    await waitFor(() => {
+      expect(refreshWorkPackages).toHaveBeenCalledTimes(1);
+      expect(setSelectedSavedViewId).toHaveBeenCalledWith('default-all');
+      expect(setWorkPackageStatusFilter).toHaveBeenCalledWith('all');
+      expect(setWorkPackageSearch).toHaveBeenCalledWith('');
+      expect(createWorkPackage).toHaveBeenCalledWith('Starter Work Package');
+    });
+  });
+
+  it('runs integration monitor actions from integration module page', () => {
+    const refreshWorkPackages = vi.fn().mockResolvedValue(true);
+    const loadAuditReplayTimeline = vi.fn().mockResolvedValue(true);
+    mockUseAmroWorkspaceState.mockReturnValue(
+      createWorkspaceState({
+        refreshWorkPackages,
+        loadAuditReplayTimeline,
+      }),
+    );
+    render(<AmroOwnedWorkspace moduleKey="integration" />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh Integration Status' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open Replay Console' }));
+
+    expect(refreshWorkPackages).toHaveBeenCalledTimes(1);
+    expect(loadAuditReplayTimeline).toHaveBeenCalledTimes(2);
+  });
+
+  it('wires shell and sticky action buttons to interactive handlers', () => {
+    const setSelectedWorkPackageId = vi.fn();
+    const assignSelectedWorkPackageToNextSlot = vi.fn().mockResolvedValue(true);
+    const advanceWorkPackageLifecycle = vi.fn().mockResolvedValue(true);
+    mockUseAmroWorkspaceState.mockReturnValue(
+      createWorkspaceState({
+        setSelectedWorkPackageId,
+        assignSelectedWorkPackageToNextSlot,
+        advanceWorkPackageLifecycle,
+      }),
+    );
+    render(<AmroOwnedWorkspace />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Import/Export' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Assign work package' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Hold work package' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Bulk Actions' }));
+
+    expect(screen.getByText(/Export prepared for workspace-shell/i)).toBeTruthy();
+    expect(assignSelectedWorkPackageToNextSlot).toHaveBeenCalledTimes(1);
+    expect(setSelectedWorkPackageId).toHaveBeenCalledWith('wp-1');
+    expect(advanceWorkPackageLifecycle).toHaveBeenCalledTimes(2);
+  });
+
+  it('opens compliance gate modal after loading explainability', async () => {
+    const loadComplianceGateExplainability = vi.fn().mockResolvedValue(true);
+    const setComplianceGateModalOpen = vi.fn();
+    mockUseAmroWorkspaceState.mockReturnValue(
+      createWorkspaceState({
+        loadComplianceGateExplainability,
+        setComplianceGateModalOpen,
+      }),
+    );
+    render(<AmroOwnedWorkspace moduleKey="compliance" />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Load Compliance Gate' }));
+
+    await waitFor(() => {
+      expect(loadComplianceGateExplainability).toHaveBeenCalledTimes(1);
+      expect(setComplianceGateModalOpen).toHaveBeenCalledWith(true);
+    });
   });
 });

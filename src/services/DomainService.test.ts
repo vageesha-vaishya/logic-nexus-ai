@@ -91,6 +91,36 @@ describe('DomainService', () => {
       await expect(DomainService.getAuthorizedDomains()).rejects.toThrow('ref: corr-500');
     });
 
+    it('should fallback to client-side resolution when endpoint is unavailable', async () => {
+      const mockFetch = vi.mocked(fetch);
+      const tenantAssignmentsChain = {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockResolvedValue({
+          data: [{ platform_domains: mockDomains[0] }],
+          error: null,
+        }),
+      };
+
+      (supabase.from as any).mockImplementation((table: string) => {
+        if (table === 'tenant_domain_assignments') return tenantAssignmentsChain;
+        throw new Error(`Unexpected table: ${table}`);
+      });
+
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 404,
+        headers: jsonHeaders,
+        json: async () => ({ error: 'Not Found' }),
+      } as unknown as Response);
+
+      const result = await DomainService.getAuthorizedDomains();
+
+      expect(result.domains).toEqual([mockDomains[0]]);
+      expect(result.tenantDomainCount).toBe(1);
+      expect(result.tenantId).toBeNull();
+      expect(result.isPlatformAdmin).toBe(false);
+    });
+
     it('should recover when API returns HTML instead of JSON', async () => {
       const mockFetch = vi.mocked(fetch);
       const tenantAssignmentsChain = {

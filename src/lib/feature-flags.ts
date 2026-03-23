@@ -17,6 +17,7 @@ export const FEATURE_FLAGS = {
   USER_INFO_HEADER_MODULE: 'user_info_header_module',
   USER_INFO_HEADER_DUAL_MODE: 'user_info_header_dual_mode',
   HEADER_DEBUG_BUTTON: 'header_debug_button',
+  AMRO_RBAC_FIX_ENABLED: 'amro_rbac_fix_enabled',
 } as const;
 
 export type FeatureFlagKey = (typeof FEATURE_FLAGS)[keyof typeof FEATURE_FLAGS];

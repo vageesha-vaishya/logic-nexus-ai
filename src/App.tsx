@@ -232,7 +232,7 @@ const App = () => (
             <Route 
               path="/dashboard" 
               element={
-                <ProtectedRoute requiredPermissions={["dashboards.view", "leads.view"]}>
+                <ProtectedRoute>
                   <DashboardRouter />
                 </ProtectedRoute>
               } 
