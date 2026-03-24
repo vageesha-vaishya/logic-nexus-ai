@@ -158,6 +158,8 @@ async function fetchScopedRows(
     code === 'PGRST205'
     || message.toLowerCase().includes('could not find the table')
     || (message.toLowerCase().includes('relation') && message.toLowerCase().includes('does not exist'));
+  const isInvalidTenantUuidError = (message: string) =>
+    message.toLowerCase().includes('invalid input syntax for type uuid');
 
   try {
     for (const [index, tableCandidate] of tableCandidates.entries()) {
@@ -172,6 +174,16 @@ async function fetchScopedRows(
       }
       const message = String(error.message || 'database connectivity failure');
       const code = String((error as { code?: string }).code || '');
+      if (process.env.NODE_ENV !== 'production' && isInvalidTenantUuidError(message)) {
+        const fallbackResult = await supabase
+          .from(tableCandidate)
+          .select('*')
+          .limit(limit);
+        if (!fallbackResult.error) {
+          issueCollector.push(`${table}: tenant scope fallback applied for non-UUID tenant_id in development`);
+          return Array.isArray(fallbackResult.data) ? (fallbackResult.data as JsonRecord[]) : [];
+        }
+      }
       if (!fallbackErrorMessage) {
         fallbackErrorMessage = `${table}: ${message}`;
       }
@@ -225,7 +237,16 @@ app.use(
     origin: corsOrigin,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'x-user-id',
+      'x-tenant-id',
+      'x-franchise-id',
+      'x-domain-id',
+      'x-user-role',
+      'x-user-permissions',
+    ],
   }),
 );
 

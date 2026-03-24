@@ -2250,12 +2250,16 @@ Input Contract:
   - date_range | string(ISO start|end) | required
   - station_ids | string[] | optional
   - fleet_ids | string[] | optional
+  - region_ids | string[] | optional
   - regulator_profile | string | optional
   - planner_id | string | optional
   - engineer_id | string | optional
+  - page | integer >= 1 | optional, default 1
+  - page_size | integer 1..200 | optional, default 15
 Output Contract:
   - executive_summary | object(active_work_packages, overdue_tasks, compliance_status_pct, forecast_accuracy_pct)
   - work_package_overview | object[](work_package_id, title, status, planner_id, engineer_id, due_at, progress_pct)
+  - pagination | object(page, page_size, total_rows, total_pages)
   - materials_reservation_alerts | object[]
   - compliance_gate_status | object[]
   - integration_monitor | object(status, failed_attempts, failure_rate_pct, recent_failures[])
@@ -2283,6 +2287,11 @@ Input Contract:
   - metric_key | enum(open_work_packages,schedule_adherence,aog_count,compliance_risk,parts_fill_rate) | required
   - window | enum(7d,30d,90d) | required
   - compare_window | string(<N>d) within policy max | required
+  - station_ids | string[] | optional
+  - fleet_ids | string[] | optional
+  - region_ids | string[] | optional
+  - page | integer >= 1 | optional, default 1
+  - page_size | integer 1..200 | optional, default 15
 Output Contract:
   - time_series | object[](date,value)
   - task_execution_monitor | object(technician_count, completed_tasks, average_productivity_pct, mobile_completion_rate_pct)
@@ -2290,6 +2299,7 @@ Output Contract:
   - certification_decision_queue | object[]
   - audit_timeline | object[]
   - forecast_recommendation_hub | object[]
+  - pagination | object(page, page_size, audit_timeline_total_rows, certification_queue_total_rows)
 Authorization:
   - authenticated AMRO domain tenant or franchise scope with active AMRO domain assignment
 Data Dependencies:
@@ -2312,7 +2322,7 @@ Component Type: Module API
 Component Name: POST /api/v2/amro/overview-kpi?interface=export-kpi-snapshot
 Purpose: Export selected overview dashboard widgets for CRUD operational reporting.
 Input Contract:
-  - format | enum(csv,pdf) | required
+  - format | enum(csv,pdf,xlsx) | required
   - date_range | string(ISO start|end) | required
   - selected_widgets | enum[](kpi_cards,risk_heatmap,trend_lines,anomaly_flags) | required min:1
 Output Contract:

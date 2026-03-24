@@ -586,6 +586,26 @@ describe('http domain and scope guards', () => {
     ).rejects.toThrow('Unauthorized');
   });
 
+  it('allows localhost fallback auth headers without bearer token in production runtime', async () => {
+    const originalNodeEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+    try {
+      const request = createMockRequest({
+        host: 'localhost:8081',
+        'x-user-id': 'local-dev-user',
+        'x-user-role': 'tenant_admin',
+        'x-user-permissions': 'dashboards.view,dashboards.manage',
+      });
+      await expect(authenticateRequest(request)).resolves.toEqual({
+        userId: 'local-dev-user',
+        role: 'tenant_admin',
+        permissions: ['dashboards.view', 'dashboards.manage'],
+      });
+    } finally {
+      process.env.NODE_ENV = originalNodeEnv;
+    }
+  });
+
   it('rejects expired JWT during authentication', async () => {
     const supabaseMock = {
       auth: {

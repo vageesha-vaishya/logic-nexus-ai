@@ -85,6 +85,8 @@ describe('amroWorkspaceModel', () => {
       totalRecords: 3,
       shortageCount: 1,
       pendingReservations: 1,
+      llpAlertCount: 0,
+      atRiskEtaCount: 0,
     });
 
     expect(

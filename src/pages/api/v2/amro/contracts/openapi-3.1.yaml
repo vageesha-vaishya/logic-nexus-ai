@@ -1385,6 +1385,11 @@ paths:
           schema:
             type: string
         - in: query
+          name: region_ids
+          required: false
+          schema:
+            type: string
+        - in: query
           name: regulator_profile
           required: false
           schema:
@@ -1420,6 +1425,19 @@ paths:
             type: string
             pattern: '^[0-9]+d$'
           description: Cannot exceed AMRO compare-window policy maximum.
+        - in: query
+          name: page
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+        - in: query
+          name: page_size
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
       responses:
         '200':
           description: Overview KPI dashboard or trends response
@@ -1447,7 +1465,7 @@ paths:
               properties:
                 format:
                   type: string
-                  enum: [csv, pdf]
+                  enum: [csv, pdf, xlsx]
                 date_range:
                   type: string
                 selected_widgets:

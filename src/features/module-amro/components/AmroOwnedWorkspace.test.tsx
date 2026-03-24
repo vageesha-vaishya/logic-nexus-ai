@@ -168,14 +168,58 @@ describe('AmroOwnedWorkspace', () => {
     expect(screen.getAllByText('Role: planner').length).toBeGreaterThan(0);
     expect(screen.getByText('Create Allowed')).toBeTruthy();
     expect(screen.getByText('Delete Allowed')).toBeTruthy();
-    expect(screen.getByText('SCR-AMRO-001 Overview Dashboard')).toBeTruthy();
+    expect(screen.getByText('SCR-AMRO-001 AMRO Command Center')).toBeTruthy();
     expect(screen.getByText('SCR-AMRO-002 Work Package List')).toBeTruthy();
     expect(screen.getByText('SCR-AMRO-005 Task Execution Card')).toBeTruthy();
     expect(screen.getByText('SCR-AMRO-011 Integration Monitor Console')).toBeTruthy();
     expect(screen.getByText('SCR-AMRO-012 Forecast Recommendation Hub')).toBeTruthy();
     expect(screen.getByText('SCR-AMRO-010 Audit Replay Timeline')).toBeTruthy();
-    expect(screen.getByLabelText('Locale selector')).toBeTruthy();
-    expect(screen.getByText('✓ Success: task completed')).toBeTruthy();
+    expect(screen.getByText('Overview dashboard UI has been cleared.')).toBeTruthy();
+  });
+
+  it('renders cleared overview dashboard surface in overview module scope', () => {
+    mockUseAmroWorkspaceState.mockReturnValue(createWorkspaceState());
+    render(
+      <AmroOwnedWorkspace
+        moduleKey="overview"
+        overviewTelemetry={{
+          openWorkPackages: 38,
+          aogCount: 3,
+        }}
+      />,
+    );
+
+    expect(screen.getByText('SCR-AMRO-001 AMRO Command Center')).toBeTruthy();
+    expect(screen.getByText('Overview dashboard UI has been cleared.')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Export' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Refresh' })).toBeNull();
+  });
+
+  it('does not render SCR-AMRO-001 controls after UI deletion', () => {
+    mockUseAmroWorkspaceState.mockReturnValue(createWorkspaceState());
+    render(
+      <AmroOwnedWorkspace
+        moduleKey="overview"
+        overviewControls={{
+          dateRange: '30d',
+          regulatorProfile: 'FAA',
+          fleetFilter: 'all',
+          stationFilter: 'all',
+          onCycleDateRange: vi.fn(),
+          onCycleRegulatorProfile: vi.fn(),
+          onFleetFilterChange: vi.fn(),
+          onStationFilterChange: vi.fn(),
+          onRefresh: vi.fn(),
+          onExport: vi.fn(),
+          exporting: false,
+        }}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: 'Date Range: 30d' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Regulator: FAA' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Export' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Refresh' })).toBeNull();
   });
 
   it('tracks unsaved detail changes in detail sheet', () => {

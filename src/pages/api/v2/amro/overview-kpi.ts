@@ -29,9 +29,12 @@ const ALLOWED_METRIC_KEYS = new Set([
   'parts_fill_rate',
 ]);
 const ALLOWED_WINDOWS = new Set<KpiWindow>(['7d', '30d', '90d']);
-const ALLOWED_EXPORT_FORMATS = new Set(['csv', 'pdf']);
+const ALLOWED_EXPORT_FORMATS = new Set(['csv', 'pdf', 'xlsx']);
 const ALLOWED_WIDGETS = new Set(['kpi_cards', 'risk_heatmap', 'trend_lines', 'anomaly_flags']);
 const KPI_CACHE_STALE_THRESHOLD_SECONDS = Number(process.env.AMRO_KPI_CACHE_STALE_SECONDS || 900);
+const DEFAULT_PAGE = 1;
+const DEFAULT_PAGE_SIZE = 15;
+const MAX_PAGE_SIZE = 200;
 const TABLE_FALLBACK_CANDIDATES: Record<string, string[]> = {
   work_package_master: ['work_packages'],
   materials_inventory: ['parts_inventory', 'work_package_materials'],
@@ -139,6 +142,14 @@ function assertWithinPolicyWindow(compareWindow: string) {
   }
 }
 
+function parsePagination(value: unknown, fallback: number, maxValue = MAX_PAGE_SIZE): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  const normalized = Math.trunc(parsed);
+  if (normalized <= 0) return fallback;
+  return Math.min(normalized, maxValue);
+}
+
 function generateTimeSeries(window: KpiWindow): Array<{ date: string; value: number }> {
   const pointsByWindow: Record<KpiWindow, number> = { '7d': 7, '30d': 10, '90d': 12 };
   const points = pointsByWindow[window];
@@ -215,6 +226,111 @@ function toIsoDay(value: string): string {
   return parsed.toISOString().slice(0, 10);
 }
 
+function buildScopedFilterSet(values: string[], tenantId: string): Set<string> {
+  const set = new Set<string>();
+  for (const value of values) {
+    const trimmed = value.trim();
+    if (!trimmed) continue;
+    const normalized = trimmed.toLowerCase();
+    set.add(normalized);
+    if (!normalized.startsWith(`${tenantId.toLowerCase()}:`)) {
+      set.add(`${tenantId.toLowerCase()}:${normalized}`);
+    }
+  }
+  return set;
+}
+
+function matchesScopeFilter(rowValue: string, filters: Set<string>): boolean {
+  if (filters.size === 0) return true;
+  const normalized = rowValue.trim().toLowerCase();
+  if (!normalized) return false;
+  return filters.has(normalized);
+}
+
+function filterRowsByScope(
+  rows: JsonRecord[],
+  filters: {
+    tenantId: string;
+    stationIds: string[];
+    fleetIds: string[];
+    regionIds: string[];
+    dateFromIso?: string;
+    dateToIso?: string;
+  },
+) {
+  const stationFilters = buildScopedFilterSet(filters.stationIds, filters.tenantId);
+  const fleetFilters = buildScopedFilterSet(filters.fleetIds, filters.tenantId);
+  const regionFilters = buildScopedFilterSet(filters.regionIds, filters.tenantId);
+  const fromMs = filters.dateFromIso ? parseDateMs(filters.dateFromIso) : Number.NaN;
+  const toMs = filters.dateToIso ? parseDateMs(filters.dateToIso) : Number.NaN;
+
+  return rows.filter((row) => {
+    const stationValue = getStringValue(row, ['station_id', 'station', 'hangar', 'location', 'warehouse_id', 'storage_location'], '');
+    const fleetValue = getStringValue(row, ['fleet_id', 'fleet', 'fleet_code', 'aircraft_fleet'], '');
+    const regionValue = getStringValue(row, ['region_id', 'region', 'region_code'], '');
+    const timestampValue = getStringValue(
+      row,
+      [
+        'snapshot_at',
+        'due_at',
+        'planned_end_at',
+        'planned_end',
+        'scheduled_end_at',
+        'slot_start_at',
+        'submitted_at',
+        'recorded_at',
+        'detected_at',
+        'created_at',
+        'updated_at',
+      ],
+      '',
+    );
+    const timestampMs = parseDateMs(timestampValue);
+    const dateMatches = (!Number.isFinite(fromMs) || !Number.isFinite(toMs))
+      || !Number.isFinite(timestampMs)
+      || (timestampMs >= fromMs && timestampMs <= toMs);
+
+    return matchesScopeFilter(stationValue, stationFilters)
+      && matchesScopeFilter(fleetValue, fleetFilters)
+      && matchesScopeFilter(regionValue, regionFilters)
+      && dateMatches;
+  });
+}
+
+function filterRowsByDateRange(
+  rows: JsonRecord[],
+  dateFromIso: string,
+  dateToIso: string,
+  timestampKeys: string[],
+) {
+  const fromMs = parseDateMs(dateFromIso);
+  const toMs = parseDateMs(dateToIso);
+  if (!Number.isFinite(fromMs) || !Number.isFinite(toMs)) {
+    return rows;
+  }
+  return rows.filter((row) => {
+    const timestampValue = getStringValue(row, timestampKeys, '');
+    const timestampMs = parseDateMs(timestampValue);
+    return Number.isFinite(timestampMs) && timestampMs >= fromMs && timestampMs <= toMs;
+  });
+}
+
+function paginate<TItem>(items: TItem[], page: number, pageSize: number) {
+  const safePage = Math.max(DEFAULT_PAGE, page);
+  const safePageSize = Math.max(1, pageSize);
+  const offset = (safePage - 1) * safePageSize;
+  const pagedItems = items.slice(offset, offset + safePageSize);
+  return {
+    items: pagedItems,
+    pagination: {
+      page: safePage,
+      page_size: safePageSize,
+      total_rows: items.length,
+      total_pages: Math.max(1, Math.ceil(items.length / safePageSize)),
+    },
+  };
+}
+
 async function fetchScopedRows(
   table: string,
   tenantId: string,
@@ -232,11 +348,15 @@ async function fetchScopedRows(
   try {
     for (const [index, tableCandidate] of tableCandidates.entries()) {
       const supabase = getSupabaseAdminClient();
-      const { data, error } = await supabase
+      let query = supabase
         .from(tableCandidate)
         .select('*')
-        .eq('tenant_id', tenantId)
-        .limit(limit);
+        .eq('tenant_id', tenantId);
+      if (tableCandidate === 'amro_overview_kpi_snapshots' && typeof (query as { order?: unknown }).order === 'function') {
+        query = (query as { order: (column: string, options: { ascending: boolean }) => typeof query })
+          .order('snapshot_at', { ascending: false });
+      }
+      const { data, error } = await query.limit(limit);
 
       if (!error) {
         return Array.isArray(data) ? (data as JsonRecord[]) : [];
@@ -386,6 +506,50 @@ function mapComplianceAttention(rows: JsonRecord[]) {
     .slice(0, 10);
 }
 
+function mapComplianceAttentionFromEvents(rows: JsonRecord[]) {
+  const openStatuses = new Set(['open', 'acknowledged']);
+  const buckets = new Map<string, {
+    gate_id: string;
+    gate_name: string;
+    status: string;
+    due_at: string;
+    owner_id: string;
+    score: number;
+  }>();
+  for (const row of rows) {
+    const eventStatus = getStringValue(row, ['event_status', 'status'], '').toLowerCase();
+    if (!openStatuses.has(eventStatus)) continue;
+    const eventType = getStringValue(row, ['event_type', 'summary'], 'compliance_event');
+    const severity = getStringValue(row, ['severity'], 'medium').toLowerCase();
+    const severityScore = severity === 'critical' ? 4 : severity === 'high' ? 3 : severity === 'medium' ? 2 : 1;
+    const existing = buckets.get(eventType);
+    const status = severity === 'critical' || severity === 'high' ? 'failed' : 'open';
+    if (!existing) {
+      buckets.set(eventType, {
+        gate_id: getStringValue(row, ['event_code', 'id'], `evt-${eventType}`),
+        gate_name: eventType.replace(/_/g, ' '),
+        status,
+        due_at: getStringValue(row, ['detected_at', 'created_at'], ''),
+        owner_id: getStringValue(row, ['updated_by', 'created_by'], 'system'),
+        score: severityScore,
+      });
+      continue;
+    }
+    existing.score += severityScore;
+    if (status === 'failed') {
+      existing.status = 'failed';
+    }
+    const detectedAt = getStringValue(row, ['detected_at', 'created_at'], '');
+    if (parseDateMs(detectedAt) > parseDateMs(existing.due_at)) {
+      existing.due_at = detectedAt;
+    }
+  }
+  return Array.from(buckets.values())
+    .sort((left, right) => right.score - left.score)
+    .slice(0, 10)
+    .map(({ score: _score, ...item }) => item);
+}
+
 function mapCertificationQueue(rows: JsonRecord[]) {
   return rows
     .map((row) => ({
@@ -439,6 +603,40 @@ function mapIntegrationMonitor(rows: JsonRecord[]) {
   };
 }
 
+function mapIntegrationMonitorFromComplianceEvents(rows: JsonRecord[]) {
+  if (rows.length === 0) {
+    return {
+      status: 'healthy',
+      failed_attempts: 0,
+      failure_rate_pct: 0,
+      recent_failures: [],
+    };
+  }
+  const criticalStatuses = new Set(['open', 'acknowledged']);
+  const severeRows = rows
+    .filter((row) => {
+      const status = getStringValue(row, ['event_status', 'status'], '').toLowerCase();
+      const severity = getStringValue(row, ['severity'], '').toLowerCase();
+      return criticalStatuses.has(status) && (severity === 'critical' || severity === 'high');
+    })
+    .sort((left, right) => parseDateMs(getStringValue(right, ['detected_at', 'created_at'])) - parseDateMs(getStringValue(left, ['detected_at', 'created_at'])))
+    .slice(0, 8);
+  const failedAttempts = severeRows.length;
+  const failureRate = (failedAttempts / Math.max(1, rows.length)) * 100;
+  return {
+    status: failureRate > 15 ? 'degraded' : 'healthy',
+    failed_attempts: failedAttempts,
+    failure_rate_pct: Math.round(failureRate * 10) / 10,
+    recent_failures: severeRows.map((row, index) => ({
+      integration_id: getStringValue(row, ['event_code', 'id'], `compliance-${index + 1}`),
+      status: getStringValue(row, ['event_status'], 'open'),
+      direction: 'amro-compliance',
+      last_attempt_at: getStringValue(row, ['detected_at', 'created_at'], ''),
+      error_message: getStringValue(row, ['summary', 'event_type'], 'Compliance signal raised'),
+    })),
+  };
+}
+
 function mapForecastRecommendations(rows: JsonRecord[]) {
   const mapped = rows
     .map((row) => {
@@ -466,6 +664,45 @@ function mapForecastRecommendations(rows: JsonRecord[]) {
   };
 }
 
+function mapForecastRecommendationsFromTelemetry(rows: JsonRecord[]) {
+  const grouped = new Map<string, { count: number; total: number; peak: number }>();
+  for (const row of rows) {
+    const metricKey = getStringValue(row, ['metric_key'], '').toLowerCase();
+    if (!metricKey) continue;
+    const value = getNumericValue(row, ['metric_value', 'value'], Number.NaN);
+    if (!Number.isFinite(value)) continue;
+    const current = grouped.get(metricKey) || { count: 0, total: 0, peak: Number.NEGATIVE_INFINITY };
+    current.count += 1;
+    current.total += value;
+    current.peak = Math.max(current.peak, value);
+    grouped.set(metricKey, current);
+  }
+  const items = Array.from(grouped.entries())
+    .map(([metricKey, summary], index) => {
+      const average = summary.total / Math.max(1, summary.count);
+      const varianceScore = Math.max(0, ((summary.peak - average) / Math.max(1, Math.abs(average))) * 100);
+      const riskScore = Math.min(100, Math.round(varianceScore * 10) / 10);
+      const confidencePct = Math.max(35, Math.min(98, Math.round((100 - (varianceScore * 0.55)) * 10) / 10));
+      return {
+        recommendation_id: `telemetry-${metricKey}-${index + 1}`,
+        work_package_id: 'telemetry-derived',
+        recommendation: `Investigate ${metricKey.replace(/_/g, ' ')} drift`,
+        confidence_pct: confidencePct,
+        risk_score: riskScore,
+        reason: `${summary.count} telemetry samples analyzed`,
+      };
+    })
+    .sort((left, right) => right.risk_score - left.risk_score)
+    .slice(0, 10);
+  const forecastAccuracy = items.length
+    ? items.reduce((sum, item) => sum + item.confidence_pct, 0) / items.length
+    : 0;
+  return {
+    items,
+    forecast_accuracy_pct: Math.round(forecastAccuracy * 10) / 10,
+  };
+}
+
 function buildTrendSeriesFromTasks(rows: JsonRecord[], window: KpiWindow) {
   const pointsByWindow: Record<KpiWindow, number> = { '7d': 7, '30d': 30, '90d': 90 };
   const totalDays = pointsByWindow[window];
@@ -474,6 +711,27 @@ function buildTrendSeriesFromTasks(rows: JsonRecord[], window: KpiWindow) {
   for (const row of rows) {
     const timestamp = getStringValue(row, ['completed_at', 'updated_at', 'created_at']);
     const day = toIsoDay(timestamp);
+    if (!day) continue;
+    histogram.set(day, (histogram.get(day) || 0) + 1);
+  }
+  return Array.from({ length: totalDays }).map((_, index) => {
+    const current = new Date(today);
+    current.setDate(today.getDate() - (totalDays - index - 1));
+    const day = current.toISOString().slice(0, 10);
+    return {
+      date: day,
+      value: histogram.get(day) || 0,
+    };
+  });
+}
+
+function buildTrendSeriesFromTelemetry(rows: JsonRecord[], window: KpiWindow) {
+  const pointsByWindow: Record<KpiWindow, number> = { '7d': 7, '30d': 30, '90d': 90 };
+  const totalDays = pointsByWindow[window];
+  const today = new Date();
+  const histogram = new Map<string, number>();
+  for (const row of rows) {
+    const day = toIsoDay(getStringValue(row, ['recorded_at', 'created_at']));
     if (!day) continue;
     histogram.set(day, (histogram.get(day) || 0) + 1);
   }
@@ -587,6 +845,28 @@ function mapTrendLinesFromSnapshot(
       const trend = entry as JsonRecord;
       const metricName = getStringValue(trend, ['metric_key', 'metric'], '').trim().toLowerCase();
       if (!metricName) return null;
+      const seededPoints = Array.isArray(trend.points)
+        ? trend.points
+          .map((point) => {
+            if (!point || typeof point !== 'object') return null;
+            const pointRecord = point as JsonRecord;
+            const date = getStringValue(pointRecord, ['date', 'day'], '');
+            const parsedDate = toIsoDay(date);
+            const value = getNumericValue(pointRecord, ['value', 'count', 'score'], Number.NaN);
+            if (!parsedDate || !Number.isFinite(value)) return null;
+            return {
+              date: parsedDate,
+              value: Math.round(Math.max(0, value) * 10) / 10,
+            };
+          })
+          .filter((point): point is { date: string; value: number } => Boolean(point))
+        : [];
+      if (seededPoints.length > 0) {
+        return {
+          metric_key: metricName,
+          points: seededPoints,
+        };
+      }
       const slope = getNumericValue(trend, ['slope', 'delta', 'change_per_day'], 0);
       const baseValue = metricName.includes('sla')
         ? baseline.slaBreachCount
@@ -685,8 +965,12 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     enforceAmroSequentialMilestoneForOverviewKpiInterface(interfaceName);
     const stationIds = sanitizeScopeFilters(parseStringArray(req.query.station_ids), 'station_ids');
     const fleetIds = sanitizeScopeFilters(parseStringArray(req.query.fleet_ids), 'fleet_ids');
+    const regionIds = sanitizeScopeFilters(parseStringArray(req.query.region_ids), 'region_ids');
+    const page = parsePagination(req.query.page, DEFAULT_PAGE, Number.MAX_SAFE_INTEGER);
+    const pageSize = parsePagination(req.query.page_size, DEFAULT_PAGE_SIZE);
     const scopeStationIds = stationIds.map((id) => `${tenantId}:${id}`);
     const scopeFleetIds = fleetIds.map((id) => `${tenantId}:${id}`);
+    const scopeRegionIds = regionIds.map((id) => `${tenantId}:${id}`);
     const plannerId = String(req.query.planner_id || '').trim() || null;
     const engineerId = String(req.query.engineer_id || '').trim() || null;
     const persona = resolveOverviewPersona(auth.role, auth.permissions || []);
@@ -700,6 +984,14 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         ? 'Data may be stale; cache age exceeded freshness threshold'
         : null;
       const dataIssues: string[] = [];
+      const sharedFilters = {
+        tenantId,
+        stationIds,
+        fleetIds,
+        regionIds,
+        dateFromIso: dateRange.from,
+        dateToIso: dateRange.to,
+      };
 
       const [
         workPackageRows,
@@ -708,6 +1000,9 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         integrationRows,
         forecastRows,
         overviewSnapshotRows,
+        telemetryRows,
+        complianceEventRows,
+        slaDefinitionRows,
       ] = await Promise.all([
         fetchScopedRows('work_package_master', tenantId, 200, dataIssues),
         fetchScopedRows('materials_inventory', tenantId, 200, dataIssues),
@@ -715,23 +1010,40 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         fetchScopedRows('integration_logs', tenantId, 200, dataIssues),
         fetchScopedRows('forecast_recommendations', tenantId, 200, dataIssues),
         fetchScopedRows('amro_overview_kpi_snapshots', tenantId, 60, dataIssues),
+        fetchScopedRows('amro_operational_telemetry', tenantId, 1200, dataIssues),
+        fetchScopedRows('amro_compliance_events', tenantId, 600, dataIssues),
+        fetchScopedRows('amro_sla_definitions', tenantId, 120, dataIssues),
       ]);
 
       const now = Date.now();
       const snapshot = selectLatestOverviewSnapshot(overviewSnapshotRows, persona, franchiseId, dateRange.from, dateRange.to);
-      const activeWorkPackagesFromRows = workPackageRows.filter((row) => !isResolvedStatus(resolveStatus(row))).length;
-      const overdueTasksApproxFromRows = workPackageRows.filter((row) => {
+      const scopedWorkPackageRows = filterRowsByScope(workPackageRows, sharedFilters);
+      const scopedMaterialsRows = filterRowsByScope(materialsRows, sharedFilters);
+      const scopedComplianceRows = filterRowsByScope(complianceRows, sharedFilters);
+      const scopedIntegrationRows = filterRowsByScope(integrationRows, sharedFilters);
+      const scopedForecastRows = filterRowsByScope(forecastRows, sharedFilters);
+      const scopedTelemetryRows = filterRowsByDateRange(telemetryRows, dateRange.from, dateRange.to, ['recorded_at', 'created_at']);
+      const scopedComplianceEventRows = filterRowsByDateRange(complianceEventRows, dateRange.from, dateRange.to, ['detected_at', 'created_at']);
+      const activeWorkPackagesFromRows = scopedWorkPackageRows.filter((row) => !isResolvedStatus(resolveStatus(row))).length;
+      const overdueTasksApproxFromRows = scopedWorkPackageRows.filter((row) => {
         const dueMs = parseDateMs(getStringValue(row, ['due_at', 'planned_end_at', 'target_end_at']));
         const status = resolveStatus(row);
         return Number.isFinite(dueMs) && dueMs < now && !isResolvedStatus(status);
       }).length;
-      const compliancePassed = complianceRows.filter((row) => ['passed', 'approved', 'resolved'].includes(resolveStatus(row))).length;
-      const compliancePctFromRows = complianceRows.length ? (compliancePassed / complianceRows.length) * 100 : 0;
-      const forecast = mapForecastRecommendations(forecastRows);
-      const workPackageOverview = mapWorkPackageOverview(workPackageRows, effectivePlannerId, engineerId);
-      const materialsAlerts = mapMaterialsAlerts(materialsRows);
-      const complianceAttention = mapComplianceAttention(complianceRows);
-      const integrationMonitor = mapIntegrationMonitor(integrationRows);
+      const compliancePassed = scopedComplianceRows.filter((row) => ['passed', 'approved', 'resolved'].includes(resolveStatus(row))).length;
+      const compliancePctFromRows = scopedComplianceRows.length ? (compliancePassed / scopedComplianceRows.length) * 100 : 0;
+      const forecast = scopedForecastRows.length > 0
+        ? mapForecastRecommendations(scopedForecastRows)
+        : mapForecastRecommendationsFromTelemetry(scopedTelemetryRows);
+      const fullWorkPackageOverview = mapWorkPackageOverview(scopedWorkPackageRows, effectivePlannerId, engineerId);
+      const workPackageOverviewPaging = paginate(fullWorkPackageOverview, page, pageSize);
+      const materialsAlerts = mapMaterialsAlerts(scopedMaterialsRows);
+      const complianceAttention = scopedComplianceRows.length > 0
+        ? mapComplianceAttention(scopedComplianceRows)
+        : mapComplianceAttentionFromEvents(scopedComplianceEventRows);
+      const integrationMonitor = scopedIntegrationRows.length > 0
+        ? mapIntegrationMonitor(scopedIntegrationRows)
+        : mapIntegrationMonitorFromComplianceEvents(scopedComplianceEventRows);
       const scopedIntegrationMonitor = persona === 'management'
         ? integrationMonitor
         : {
@@ -741,17 +1053,30 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           recent_failures: [],
         };
       const defaultRiskHeatmapCells = complianceAttention.slice(0, 8).map((item, index) => ({
-        station: workPackageOverview[index]?.planner_id || scopeStationIds[index] || `${tenantId}:station-${index + 1}`,
+        station: fullWorkPackageOverview[index]?.planner_id || scopeStationIds[index] || `${tenantId}:station-${index + 1}`,
         severity: item.status === 'failed' ? 'high' : item.status === 'blocked' ? 'medium' : 'low',
         score: item.status === 'failed' ? 90 : item.status === 'blocked' ? 65 : 30,
       }));
       const snapshotOpenWorkPackages = snapshot ? Math.max(0, Math.round(getNumericValue(snapshot, ['open_work_packages'], activeWorkPackagesFromRows))) : activeWorkPackagesFromRows;
       const snapshotOverdueTasks = snapshot ? Math.max(0, Math.round(getNumericValue(snapshot, ['sla_breach_count', 'deferred_items'], overdueTasksApproxFromRows))) : overdueTasksApproxFromRows;
-      const snapshotComplianceAlerts = snapshot ? Math.max(0, Math.round(getNumericValue(snapshot, ['compliance_alerts'], 0))) : 0;
+      const snapshotComplianceAlerts = snapshot
+        ? Math.max(0, Math.round(getNumericValue(snapshot, ['compliance_alerts'], 0)))
+        : Math.max(
+          complianceAttention.length,
+          scopedComplianceEventRows.filter((row) => ['critical', 'high'].includes(getStringValue(row, ['severity'], '').toLowerCase())).length,
+        );
+      const snapshotAogCount = snapshot
+        ? Math.max(0, Math.round(getNumericValue(snapshot, ['aog_count'], 0)))
+        : scopedWorkPackageRows.filter((row) => resolveStatus(row).includes('aog')).length;
+      const snapshotDeferredItems = snapshot
+        ? Math.max(0, Math.round(getNumericValue(snapshot, ['deferred_items'], 0)))
+        : scopedWorkPackageRows.filter((row) => ['deferred', 'blocked', 'on_hold'].includes(resolveStatus(row))).length;
       const snapshotComplianceStatusPct = snapshot
         ? Math.max(0, Math.min(100, Math.round(((snapshotOpenWorkPackages / Math.max(1, snapshotOpenWorkPackages + snapshotComplianceAlerts)) * 100) * 10) / 10))
         : Math.round(compliancePctFromRows * 10) / 10;
-      const snapshotInProgressTasks = snapshot ? Math.max(0, Math.round(getNumericValue(snapshot, ['in_progress_tasks'], 0))) : 0;
+      const snapshotInProgressTasks = snapshot
+        ? Math.max(0, Math.round(getNumericValue(snapshot, ['in_progress_tasks'], 0)))
+        : scopedWorkPackageRows.filter((row) => resolveStatus(row) === 'in_progress').length;
       const dashboardTrendLines = mapTrendLinesFromSnapshot(
         snapshot,
         [
@@ -797,9 +1122,12 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           date_range: dateRange,
           station_ids: scopeStationIds,
           fleet_ids: scopeFleetIds,
+          region_ids: scopeRegionIds,
           regulator_profile: regulatorProfile,
           planner_id: plannerId,
           engineer_id: engineerId,
+          page,
+          page_size: pageSize,
         },
         output: {
           executive_summary: {
@@ -810,6 +1138,9 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           },
           kpi_cards: [
             { key: 'open_work_packages', label: 'Open Work Packages', value: snapshotOpenWorkPackages, trend: snapshotOpenWorkPackages > 0 ? '+2%' : '0%' },
+            { key: 'in_progress_tasks', label: 'In Progress Tasks', value: snapshotInProgressTasks, trend: snapshotInProgressTasks > 0 ? '+1.1%' : '0%' },
+            { key: 'deferred_items', label: 'Deferred Items', value: snapshotDeferredItems, trend: snapshotDeferredItems > 0 ? '+0.9%' : '0%' },
+            { key: 'aog_count', label: 'AOG Count', value: snapshotAogCount, trend: snapshotAogCount > 0 ? '+0.4%' : '0%' },
             { key: 'overdue_tasks', label: 'Overdue Tasks', value: snapshotOverdueTasks, trend: snapshotOverdueTasks > 0 ? '+1%' : '0%' },
             { key: 'compliance_status_pct', label: 'Compliance Status %', value: snapshotComplianceStatusPct, trend: snapshotComplianceStatusPct >= 95 ? '+0.5%' : '-0.8%' },
             { key: 'forecast_accuracy_pct', label: 'Forecast Accuracy %', value: forecast.forecast_accuracy_pct, trend: forecast.forecast_accuracy_pct >= 90 ? '+1.2%' : '-0.4%' },
@@ -819,7 +1150,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           },
           trend_lines: dashboardTrendLines,
           anomaly_flags: anomalyFlags,
-          work_package_overview: workPackageOverview,
+          work_package_overview: workPackageOverviewPaging.items,
+          pagination: workPackageOverviewPaging.pagination,
           materials_reservation_alerts: materialsAlerts,
           compliance_gate_status: complianceAttention,
           integration_monitor: scopedIntegrationMonitor,
@@ -832,6 +1164,21 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
             planner_id: effectivePlannerId,
             restricted_sections: persona === 'management' ? [] : ['integration_monitor.recent_failures', 'anomaly_flags'],
           },
+          seeded_sources: {
+            overview_snapshots: overviewSnapshotRows.length,
+            operational_telemetry: scopedTelemetryRows.length,
+            compliance_events: scopedComplianceEventRows.length,
+            sla_definitions: slaDefinitionRows.length,
+          },
+          snapshot_metadata: snapshot
+            ? {
+              snapshot_id: getStringValue(snapshot, ['id']),
+              snapshot_at: getStringValue(snapshot, ['snapshot_at', 'created_at']),
+              persona: getStringValue(snapshot, ['persona']),
+              date_range_start: getStringValue(snapshot, ['date_range_start']),
+              date_range_end: getStringValue(snapshot, ['date_range_end']),
+            }
+            : null,
           data_issues: dataIssues,
           freshness_warning: freshnessWarning,
         },
@@ -851,31 +1198,58 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       }
       assertWithinPolicyWindow(compareWindow);
       const dataIssues: string[] = [];
+      const sharedFilters = {
+        tenantId,
+        stationIds,
+        fleetIds,
+        regionIds,
+        dateFromIso: '',
+        dateToIso: '',
+      };
       const [
         taskRows,
         schedulingRows,
         certificationRows,
         auditRows,
         forecastRows,
+        telemetryRows,
       ] = await Promise.all([
         fetchScopedRows('task_execution_status', tenantId, 400, dataIssues),
         fetchScopedRows('scheduling_board_data', tenantId, 200, dataIssues),
         fetchScopedRows('certification_records', tenantId, 200, dataIssues),
         fetchScopedRows('audit_trails', tenantId, 300, dataIssues),
         fetchScopedRows('forecast_recommendations', tenantId, 200, dataIssues),
+        fetchScopedRows('amro_operational_telemetry', tenantId, 1500, dataIssues),
       ]);
 
-      const timeSeries = buildTrendSeriesFromTasks(taskRows, window);
+      const scopedTaskRows = filterRowsByScope(taskRows, sharedFilters);
+      const scopedSchedulingRows = filterRowsByScope(schedulingRows, sharedFilters);
+      const scopedCertificationRows = filterRowsByScope(certificationRows, sharedFilters);
+      const scopedAuditRows = filterRowsByScope(auditRows, sharedFilters);
+      const scopedForecastRows = filterRowsByScope(forecastRows, sharedFilters);
+      const telemetryWindowRangeStart = new Date();
+      telemetryWindowRangeStart.setDate(telemetryWindowRangeStart.getDate() - (window === '7d' ? 7 : window === '90d' ? 90 : 30));
+      const scopedTelemetryRows = telemetryRows.filter((row) => {
+        const recordedAt = parseDateMs(getStringValue(row, ['recorded_at', 'created_at']));
+        return Number.isFinite(recordedAt) && recordedAt >= telemetryWindowRangeStart.getTime();
+      });
+      const timeSeries = scopedTaskRows.length > 0
+        ? buildTrendSeriesFromTasks(scopedTaskRows, window)
+        : buildTrendSeriesFromTelemetry(scopedTelemetryRows, window);
       const baseline = Math.round(timeSeries.reduce((sum, point) => sum + point.value, 0) / Math.max(1, timeSeries.length));
       const variance = Math.round((timeSeries[timeSeries.length - 1].value - baseline) * 100) / 100;
-      const taskExecution = mapTaskExecutionMonitor(taskRows);
-      const schedulingSnapshot = mapSchedulingSnapshot(schedulingRows);
-      const certificationQueue = mapCertificationQueue(certificationRows);
-      const auditTimeline = mapAuditTimeline(auditRows);
+      const taskExecution = mapTaskExecutionMonitor(scopedTaskRows);
+      const schedulingSnapshot = mapSchedulingSnapshot(scopedSchedulingRows);
+      const certificationQueue = mapCertificationQueue(scopedCertificationRows);
+      const auditTimeline = mapAuditTimeline(scopedAuditRows);
       const scopedAuditTimeline = persona === 'management'
         ? auditTimeline
         : auditTimeline.map((item) => ({ ...item, actor: 'restricted' })).slice(0, 6);
-      const forecast = mapForecastRecommendations(forecastRows);
+      const forecast = scopedForecastRows.length > 0
+        ? mapForecastRecommendations(scopedForecastRows)
+        : mapForecastRecommendationsFromTelemetry(scopedTelemetryRows);
+      const auditPaging = paginate(scopedAuditTimeline, page, pageSize);
+      const certificationPaging = paginate(certificationQueue, page, pageSize);
 
       return res.status(200).json({
         version: 'v2',
@@ -888,6 +1262,11 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           metric_key: metricKey,
           window,
           compare_window: compareWindow,
+          station_ids: scopeStationIds,
+          fleet_ids: scopeFleetIds,
+          region_ids: scopeRegionIds,
+          page,
+          page_size: pageSize,
         },
         output: {
           time_series: timeSeries,
@@ -897,9 +1276,15 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
             : [],
           task_execution_monitor: taskExecution,
           scheduling_board_snapshot: schedulingSnapshot,
-          certification_decision_queue: certificationQueue,
-          audit_timeline: scopedAuditTimeline,
+          certification_decision_queue: certificationPaging.items,
+          audit_timeline: auditPaging.items,
           forecast_recommendation_hub: forecast.items,
+          pagination: {
+            page,
+            page_size: pageSize,
+            audit_timeline_total_rows: scopedAuditTimeline.length,
+            certification_queue_total_rows: certificationQueue.length,
+          },
           role_scope: {
             persona,
             restricted_sections: persona === 'management' ? [] : ['audit_timeline.actor'],
@@ -917,7 +1302,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       const selectedWidgets = parseStringArray(body.selected_widgets).map((widget) => widget.trim().toLowerCase());
 
       if (!ALLOWED_EXPORT_FORMATS.has(format)) {
-        throw new Error('format must be csv or pdf');
+        throw new Error('format must be csv, pdf, or xlsx');
       }
       const unsupportedWidget = selectedWidgets.find((widget) => !ALLOWED_WIDGETS.has(widget));
       if (unsupportedWidget) {

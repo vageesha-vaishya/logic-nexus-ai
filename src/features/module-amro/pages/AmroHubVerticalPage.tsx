@@ -4,9 +4,11 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/hooks/useAuth';
 import { useCRM } from '@/hooks/useCRM';
 import { useDomain } from '@/contexts/DomainContext';
+import { logger } from '@/lib/logger';
 import {
   AMRO_ASYNCAPI_SPEC_PATH,
   AMRO_GRAPHQL_SUBGRAPH_PATH,
@@ -29,6 +31,17 @@ import {
   AMRO_UIUX_BEHAVIOR_RULES,
 } from '@/pages/api/v2/amro/screen-inventory-model';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 import { AmroOwnedWorkspace } from '../components/AmroOwnedWorkspace';
 import { useAmroOverviewKpi } from '../hooks/useAmroOverviewKpi';
 
@@ -66,6 +79,36 @@ type AmroHubVerticalPageProps = {
   moduleKey?: AmroModuleKey;
 };
 
+export type AmroOverviewWorkspaceTelemetry = {
+  openWorkPackages?: number;
+  aogCount?: number;
+  complianceRiskCount?: number;
+  deferredCount?: number;
+  fillRatePct?: number;
+  pipelineSnapshot?: string;
+  riskHeatmapSummary?: string;
+  forecastSummary?: string;
+  confidenceSegmentation?: string;
+  recommendedActions?: string;
+  slaTrendSummary?: string;
+  dataFreshness?: string;
+  syncHealth?: string;
+};
+
+type AmroOverviewWorkspaceControls = {
+  dateRange: '7d' | '30d' | '90d';
+  regulatorProfile: 'FAA' | 'EASA' | 'CAAC';
+  fleetFilter: string;
+  stationFilter: string;
+  onCycleDateRange: () => void;
+  onCycleRegulatorProfile: () => void;
+  onFleetFilterChange: (value: string) => void;
+  onStationFilterChange: (value: string) => void;
+  onRefresh: () => void;
+  onExport: () => void;
+  exporting?: boolean;
+};
+
 const AMRO_MODULE_PAGE_LABEL: Record<AmroModuleKey, string> = {
   overview: 'Overview',
   'primary-users': 'Primary Users',
@@ -91,6 +134,8 @@ const AMRO_DOCUMENTATION_CATEGORY_LABEL: Record<Exclude<AmroDocumentationCategor
   'phase-1': 'Phase 1',
   'phase-plan': 'Phase Plan',
 };
+const OVERVIEW_WORK_PACKAGE_PAGE_SIZE = 10;
+const OVERVIEW_TRENDS_PAGE_SIZE = 5;
 
 type AmroDocumentationReference = {
   id: string;
@@ -130,8 +175,25 @@ function AmroModuleShell({ children }: AmroModuleShellProps) {
   );
 }
 
-function AmroWorkspaceSurface({ moduleKey }: { moduleKey?: AmroWorkspaceModuleKey }) {
-  return <AmroOwnedWorkspace moduleKey={moduleKey} />;
+function AmroWorkspaceSurface({
+  moduleKey,
+  overviewPersona,
+  overviewControls,
+  overviewTelemetry,
+}: {
+  moduleKey?: AmroWorkspaceModuleKey;
+  overviewPersona?: PersonaRole;
+  overviewControls?: AmroOverviewWorkspaceControls;
+  overviewTelemetry?: AmroOverviewWorkspaceTelemetry;
+}) {
+  return (
+    <AmroOwnedWorkspace
+      moduleKey={moduleKey}
+      overviewPersona={overviewPersona}
+      overviewControls={overviewControls}
+      overviewTelemetry={overviewTelemetry}
+    />
+  );
 }
 
 function AmroWorkspaceDocumentationReference({
@@ -538,6 +600,7 @@ function AmroWorkspaceDocumentationReference({
 }
 
 export default function AmroHubVerticalPage({ moduleKey }: AmroHubVerticalPageProps = {}) {
+  const { t } = useTranslation();
   const {
     currentDomain,
     availableDomains = [],
@@ -578,12 +641,65 @@ export default function AmroHubVerticalPage({ moduleKey }: AmroHubVerticalPagePr
     lastDashboardRefreshAt,
     lastTrendsRefreshAt,
     loadDashboard,
+    loadTrends,
   } = useAmroOverviewKpi(overviewScope);
+  const overviewTelemetry = useMemo<AmroOverviewWorkspaceTelemetry>(() => {
+    if (!dashboard) {
+      return {};
+    }
+    const getKpiValue = (key: string) => dashboard.kpi_cards.find((card) => card.key === key)?.value;
+    const openWorkPackages = dashboard.executive_summary.active_work_packages;
+    const aogCount = getKpiValue('aog_count') ?? 0;
+    const complianceRiskCount = getKpiValue('compliance_alerts') ?? dashboard.anomaly_flags.length;
+    const deferredCount = dashboard.executive_summary.overdue_tasks;
+    const fillRatePct = Number.isFinite(dashboard.executive_summary.compliance_status_pct)
+      ? Math.max(0, Math.min(100, Math.round(dashboard.executive_summary.compliance_status_pct)))
+      : undefined;
+    const pipelineStages = ['planning', 'scheduled', 'in_progress'] as const;
+    const pipelineSummary = pipelineStages
+      .map((stage) => `${stage} ${dashboard.work_package_overview.filter((item) => item.status === stage).length}`)
+      .join(' / ');
+    const blockedCount = dashboard.work_package_overview.filter((item) => item.status === 'blocked').length;
+    const criticalHeatmapCount = dashboard.risk_heatmap.cells.filter((cell) => String(cell.severity || '').toLowerCase() === 'high').length;
+    const warningHeatmapCount = dashboard.risk_heatmap.cells.filter((cell) => String(cell.severity || '').toLowerCase() === 'medium').length;
+    const recommendations = trends?.forecast_recommendation_hub || [];
+    const highRiskRecommendations = recommendations.filter((item) => item.risk_score >= 80).length;
+    const confidenceHigh = recommendations.filter((item) => item.confidence_pct >= 80).length;
+    const confidenceMedium = recommendations.filter((item) => item.confidence_pct >= 50 && item.confidence_pct < 80).length;
+    const confidenceLow = recommendations.filter((item) => item.confidence_pct < 50).length;
+    const absoluteVariance = Math.abs(trends?.variance || 0);
+    const slaTrendSummary = absoluteVariance <= 1 ? '7d / 30d stable' : `7d / 30d variance ${Math.round(absoluteVariance * 10) / 10}`;
+    const dataFreshness = dashboard.freshness_warning || 'Within SLA window';
+    const syncHealth = dashboard.integration_monitor.status === 'healthy' ? 'Healthy sync' : dashboard.integration_monitor.status;
+    return {
+      openWorkPackages,
+      aogCount,
+      complianceRiskCount,
+      deferredCount,
+      fillRatePct,
+      pipelineSnapshot: `${pipelineSummary} with blocked ${blockedCount}`,
+      riskHeatmapSummary: `critical ${criticalHeatmapCount}, warning ${warningHeatmapCount}`,
+      forecastSummary: `recommendations ${recommendations.length} / high risk ${highRiskRecommendations}`,
+      confidenceSegmentation: `high ${confidenceHigh} · medium ${confidenceMedium} · low ${confidenceLow}`,
+      recommendedActions: recommendations[0]?.recommendation || 'maintenance interventions prioritized by risk and schedule impact.',
+      slaTrendSummary,
+      dataFreshness,
+      syncHealth,
+    };
+  }, [dashboard, trends]);
   const [phasePlanRows, setPhasePlanRows] = useState<AmroPhasePlanUiRow[]>([...AMRO_PHASE_PLAN_MATRIX]);
   const [phasePlanSource, setPhasePlanSource] = useState<'api' | 'fallback'>('fallback');
   const [plannerFilter, setPlannerFilter] = useState<string>('');
   const [engineerFilter, setEngineerFilter] = useState<string>('');
+  const [overviewDateRange, setOverviewDateRange] = useState<'7d' | '30d' | '90d'>('30d');
+  const [overviewRegionFilter, setOverviewRegionFilter] = useState<'all' | 'amer' | 'emea' | 'apac'>('all');
+  const [overviewRegulatorProfile, setOverviewRegulatorProfile] = useState<'FAA' | 'EASA' | 'CAAC'>('FAA');
+  const [overviewFleetFilter, setOverviewFleetFilter] = useState<string>('all');
+  const [overviewStationFilter, setOverviewStationFilter] = useState<string>('all');
+  const [overviewWorkPackagePage, setOverviewWorkPackagePage] = useState<number>(1);
+  const [overviewTrendsPage, setOverviewTrendsPage] = useState<number>(1);
   const isWorkspaceDocumentationRoute = moduleKey === 'workspace-documentation';
+  const isOverviewDashboardRoute = moduleKey === 'overview';
   const modulePageLabel = moduleKey ? AMRO_MODULE_PAGE_LABEL[moduleKey] : 'Operations Overview';
 
   useEffect(() => {
@@ -603,23 +719,184 @@ export default function AmroHubVerticalPage({ moduleKey }: AmroHubVerticalPagePr
   const canExportKpiSnapshot = activePersona === 'platform_admin' || activePersona === 'tenant_admin';
   const canViewDetailedOps = activePersona !== 'user';
   const canViewCertificationQueue = activePersona === 'platform_admin' || activePersona === 'tenant_admin' || activePersona === 'franchise_admin';
-  const criticalCards = useMemo(
+  const overviewRealtimeState = useMemo(() => {
+    if (error || dashboard?.integration_monitor.status === 'degraded') {
+      return 'degraded';
+    }
+    if (loading || !dashboard) {
+      return 'syncing';
+    }
+    return 'live';
+  }, [dashboard, error, loading]);
+  const overviewCriticalCards = useMemo(
     () => (dashboard?.kpi_cards || []).filter((card) => getMetricTier(card.key) === 'critical'),
-    [dashboard?.kpi_cards, getMetricTier]
+    [dashboard?.kpi_cards, getMetricTier],
   );
-  const standardCards = useMemo(
+  const overviewStandardCards = useMemo(
     () => (dashboard?.kpi_cards || []).filter((card) => getMetricTier(card.key) === 'standard'),
-    [dashboard?.kpi_cards, getMetricTier]
+    [dashboard?.kpi_cards, getMetricTier],
   );
-  const applyScopeFilters = async () => {
+  const buildDateRangeWindow = (window: '7d' | '30d' | '90d'): string => {
+    const days = window === '7d' ? 7 : window === '90d' ? 90 : 30;
     const end = new Date();
     const start = new Date(end);
-    start.setDate(start.getDate() - 30);
-    await loadDashboard({
-      dateRange: `${start.toISOString()}|${end.toISOString()}`,
-      plannerId: plannerFilter.trim() || undefined,
-      engineerId: engineerFilter.trim() || undefined,
+    start.setDate(start.getDate() - days);
+    return `${start.toISOString()}|${end.toISOString()}`;
+  };
+  const formatDisplayDate = (value?: string) => {
+    const normalized = String(value || '').trim();
+    if (!normalized) return 'N/A';
+    const parsed = Date.parse(normalized);
+    if (!Number.isFinite(parsed)) return normalized;
+    return new Date(parsed).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: '2-digit' });
+  };
+  const formatPercent = (value?: number) => {
+    if (!Number.isFinite(value)) return '0%';
+    return `${Math.round(Number(value) * 10) / 10}%`;
+  };
+  const buildOverviewDashboardRequest = (page: number = overviewWorkPackagePage) => ({
+    dateRange: buildDateRangeWindow(overviewDateRange),
+    regionIds: overviewRegionFilter !== 'all' ? [overviewRegionFilter.toUpperCase()] : undefined,
+    stationIds: overviewStationFilter !== 'all' ? [overviewStationFilter] : undefined,
+    fleetIds: overviewFleetFilter !== 'all' ? [overviewFleetFilter] : undefined,
+    regulatorProfile: overviewRegulatorProfile,
+    plannerId: plannerFilter.trim() || undefined,
+    engineerId: engineerFilter.trim() || undefined,
+    page,
+    pageSize: OVERVIEW_WORK_PACKAGE_PAGE_SIZE,
+  });
+  const buildOverviewTrendsRequest = (page: number = overviewTrendsPage) => ({
+    metricKey: 'schedule_adherence',
+    window: overviewDateRange,
+    compareWindow: '30d',
+    page,
+    pageSize: OVERVIEW_TRENDS_PAGE_SIZE,
+  });
+  const applyScopeFilters = async () => {
+    setOverviewWorkPackagePage(1);
+    setOverviewTrendsPage(1);
+    await Promise.all([
+      loadDashboard(buildOverviewDashboardRequest(1)),
+      loadTrends(buildOverviewTrendsRequest(1)),
+    ]);
+  };
+  const handleOverviewWorkspaceRefresh = async () => {
+    await Promise.all([
+      loadDashboard(buildOverviewDashboardRequest()),
+      loadTrends(buildOverviewTrendsRequest()),
+    ]);
+  };
+  const handleOverviewWorkspaceExport = async () => {
+    await exportSnapshot({
+      format: 'pdf',
+      dateRange: buildDateRangeWindow(overviewDateRange),
+      selectedWidgets: ['kpi_cards', 'risk_heatmap', 'trend_lines', 'anomaly_flags'],
     });
+  };
+  const handleOverviewDateRangeCycle = () => {
+    setOverviewDateRange((previous) => (previous === '7d' ? '30d' : previous === '30d' ? '90d' : '7d'));
+  };
+  const handleOverviewRegionCycle = () => {
+    setOverviewRegionFilter((previous) => (previous === 'all' ? 'amer' : previous === 'amer' ? 'emea' : previous === 'emea' ? 'apac' : 'all'));
+  };
+  const handleOverviewRegulatorProfileCycle = () => {
+    setOverviewRegulatorProfile((previous) => (previous === 'FAA' ? 'EASA' : previous === 'EASA' ? 'CAAC' : 'FAA'));
+  };
+  const overviewControls: AmroOverviewWorkspaceControls = {
+    dateRange: overviewDateRange,
+    regulatorProfile: overviewRegulatorProfile,
+    fleetFilter: overviewFleetFilter,
+    stationFilter: overviewStationFilter,
+    onCycleDateRange: handleOverviewDateRangeCycle,
+    onCycleRegulatorProfile: handleOverviewRegulatorProfileCycle,
+    onFleetFilterChange: setOverviewFleetFilter,
+    onStationFilterChange: setOverviewStationFilter,
+    onRefresh: () => {
+      void handleOverviewWorkspaceRefresh();
+    },
+    onExport: () => {
+      void handleOverviewWorkspaceExport();
+    },
+    exporting,
+  };
+  const handleOverviewRouteRefresh = async () => {
+    logger.info('AMRO overview dashboard refresh triggered', {
+      component: 'AmroHubVerticalPage',
+      route: 'overview',
+      persona: activePersona,
+      domain: effectiveDomainCode,
+    });
+    await Promise.all([
+      loadDashboard(buildOverviewDashboardRequest()),
+      loadTrends(buildOverviewTrendsRequest()),
+    ]);
+  };
+  const handleOverviewRouteExport = async () => {
+    logger.info('AMRO overview dashboard export triggered', {
+      component: 'AmroHubVerticalPage',
+      route: 'overview',
+      persona: activePersona,
+      domain: effectiveDomainCode,
+    });
+    await exportSnapshot({
+      format: 'pdf',
+      dateRange: buildDateRangeWindow(overviewDateRange),
+      selectedWidgets: ['kpi_cards', 'risk_heatmap', 'trend_lines', 'anomaly_flags'],
+    });
+  };
+  const handleOverviewRouteExportExcel = async () => {
+    logger.info('AMRO overview dashboard excel export triggered', {
+      component: 'AmroHubVerticalPage',
+      route: 'overview',
+      persona: activePersona,
+      domain: effectiveDomainCode,
+    });
+    await exportSnapshot({
+      format: 'xlsx',
+      dateRange: buildDateRangeWindow(overviewDateRange),
+      selectedWidgets: ['kpi_cards', 'risk_heatmap', 'trend_lines', 'anomaly_flags'],
+    });
+  };
+  const overviewTrendSeries = useMemo(() => {
+    const fromTrendEndpoint = trends?.time_series?.map((point) => ({
+      date: point.date,
+      value: point.value,
+    })) || [];
+    if (fromTrendEndpoint.length > 0) {
+      return fromTrendEndpoint;
+    }
+    const fallbackSeries = dashboard?.trend_lines?.[0]?.points?.map((point) => ({
+      date: point.date,
+      value: point.value,
+    })) || [];
+    return fallbackSeries;
+  }, [dashboard?.trend_lines, trends?.time_series]);
+  const overviewRiskBySeverity = useMemo(() => {
+    const bucket = new Map<string, number>();
+    (dashboard?.risk_heatmap?.cells || []).forEach((cell) => {
+      const severity = cell.severity || 'unknown';
+      bucket.set(severity, (bucket.get(severity) || 0) + cell.score);
+    });
+    return Array.from(bucket.entries()).map(([severity, score]) => ({ severity, score }));
+  }, [dashboard?.risk_heatmap?.cells]);
+  const workPackageCurrentPage = dashboard?.pagination?.page || overviewWorkPackagePage;
+  const workPackageTotalPages = dashboard?.pagination?.total_pages || 1;
+  const trendsCurrentPage = trends?.pagination?.page || overviewTrendsPage;
+  const trendsTotalRows = Math.max(
+    trends?.pagination?.audit_timeline_total_rows || 0,
+    trends?.pagination?.certification_queue_total_rows || 0,
+  );
+  const trendsPageSize = trends?.pagination?.page_size || OVERVIEW_TRENDS_PAGE_SIZE;
+  const trendsTotalPages = Math.max(1, Math.ceil((trendsTotalRows || (trends?.audit_timeline?.length || 0)) / trendsPageSize));
+  const handleWorkPackagePageChange = async (nextPage: number) => {
+    const safePage = Math.max(1, nextPage);
+    setOverviewWorkPackagePage(safePage);
+    await loadDashboard(buildOverviewDashboardRequest(safePage));
+  };
+  const handleTrendsPageChange = async (nextPage: number) => {
+    const safePage = Math.max(1, nextPage);
+    setOverviewTrendsPage(safePage);
+    await loadTrends(buildOverviewTrendsRequest(safePage));
   };
 
   useEffect(() => {
@@ -656,6 +933,183 @@ export default function AmroHubVerticalPage({ moduleKey }: AmroHubVerticalPagePr
     <DashboardLayout>
       <AmroModuleShell>
         <div className="flex-1 space-y-4 p-6" data-amro-uiux="base-preserved">
+          {isOverviewDashboardRoute ? (
+            <Card data-amro-overview-surface="next-gen">
+              <CardHeader className="pb-2">
+                <CardTitle>{t('amro.overview.intelligenceHub', { defaultValue: 'AMRO Operations Intelligence Hub' })}</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4 text-xs">
+                <p className="text-sm text-muted-foreground">
+                  {t('amro.overview.description', {
+                    defaultValue: 'Live operations, predictive recommendations, and compliance command for AMRO tenant workflows.',
+                  })}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant={isAmroDomainActive ? 'secondary' : 'destructive'}>
+                    {isAmroDomainActive
+                      ? t('amro.overview.domainActive', { defaultValue: 'AMRO Domain Context Active' })
+                      : t('amro.overview.domainRequired', { defaultValue: 'AMRO Domain Context Required' })}
+                  </Badge>
+                  <Badge variant="outline">{t('amro.overview.persona', { defaultValue: 'Persona' })}: {activePersona.replace('_', ' ')}</Badge>
+                  <Badge variant="outline">
+                    {t('amro.overview.criticalRefresh', { defaultValue: 'Critical Refresh' })}: {Math.round(refreshCadence.criticalMs / 1000)}s
+                  </Badge>
+                  <Badge variant="outline">
+                    {t('amro.overview.standardRefresh', { defaultValue: 'Standard Refresh' })}: {Math.round(refreshCadence.standardMs / 1000)}s
+                  </Badge>
+                  <Badge variant={overviewRealtimeState === 'degraded' ? 'destructive' : 'outline'}>
+                    {t('amro.overview.realtimeState', { defaultValue: 'Realtime State' })}: {overviewRealtimeState}
+                  </Badge>
+                  {lastDashboardRefreshAt ? (
+                    <Badge variant="outline">
+                      {t('amro.overview.lastDashboardRefresh', { defaultValue: 'Dashboard Refresh' })}: {lastDashboardRefreshAt}
+                    </Badge>
+                  ) : null}
+                  {lastTrendsRefreshAt ? (
+                    <Badge variant="outline">
+                      {t('amro.overview.lastTrendsRefresh', { defaultValue: 'Trend Refresh' })}: {lastTrendsRefreshAt}
+                    </Badge>
+                  ) : null}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" variant="outline" onClick={handleOverviewDateRangeCycle} aria-label="Cycle date range filter">
+                    {t('amro.overview.dateRange', { defaultValue: 'Date Range' })}: {overviewDateRange}
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={handleOverviewRegionCycle} aria-label="Cycle region filter">
+                    {t('amro.overview.region', { defaultValue: 'Region' })}: {overviewRegionFilter.toUpperCase()}
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => void handleOverviewRouteRefresh()}>
+                    {t('amro.overview.refreshAction', { defaultValue: 'Refresh Overview' })}
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => void applyScopeFilters()}>
+                    {t('amro.overview.applyFilters', { defaultValue: 'Apply Filters' })}
+                  </Button>
+                  {canExportKpiSnapshot ? (
+                    <>
+                      <Button size="sm" variant="outline" disabled={exporting} onClick={() => void handleOverviewRouteExport()}>
+                        {exporting
+                          ? t('amro.overview.exporting', { defaultValue: 'Exporting Snapshot...' })
+                          : t('amro.overview.exportPdfAction', { defaultValue: 'Export PDF' })}
+                      </Button>
+                      <Button size="sm" variant="outline" disabled={exporting} onClick={() => void handleOverviewRouteExportExcel()}>
+                        {exporting
+                          ? t('amro.overview.exporting', { defaultValue: 'Exporting Snapshot...' })
+                          : t('amro.overview.exportExcelAction', { defaultValue: 'Export Excel' })}
+                      </Button>
+                    </>
+                  ) : (
+                    <Badge variant="outline">
+                      {t('amro.overview.exportRestricted', { defaultValue: 'Export restricted to tenant/platform admin persona' })}
+                    </Badge>
+                  )}
+                </div>
+                {error ? (
+                  <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3" role="alert" aria-live="polite">
+                    <p className="font-semibold">{t('amro.overview.degradedTitle', { defaultValue: 'Overview Degraded State' })}</p>
+                    <p className="mt-1 text-muted-foreground">{error}</p>
+                  </div>
+                ) : null}
+                <div className="grid grid-cols-1 gap-3 lg:grid-cols-3" role="region" aria-label="AMRO Next Gen Overview KPI Grid">
+                  {overviewCriticalCards.concat(overviewStandardCards).slice(0, 6).map((card) => (
+                    <div key={card.key} className="rounded-md border p-3">
+                      <p className="text-[11px] text-muted-foreground">{card.label}</p>
+                      <p className="mt-1 text-base font-semibold">{card.value}</p>
+                      <Badge className="mt-2" variant={getMetricTier(card.key) === 'critical' ? 'destructive' : 'secondary'}>
+                        {t('amro.overview.trend', { defaultValue: 'Trend' })} {card.trend}
+                      </Badge>
+                    </div>
+                  ))}
+                  {!dashboard?.kpi_cards?.length ? (
+                    <div className="rounded-md border p-3 text-muted-foreground">
+                      {t('amro.overview.noKpis', { defaultValue: 'No KPI cards available for the active scope.' })}
+                    </div>
+                  ) : null}
+                </div>
+                <div className="grid grid-cols-1 gap-3 xl:grid-cols-12">
+                  <div className="rounded-md border p-3 xl:col-span-6" role="region" aria-label="Trend Analysis Chart">
+                    <p className="font-semibold">{t('amro.overview.trendAnalysis', { defaultValue: 'Trend Analysis' })}</p>
+                    <div className="mt-3 h-56 w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={overviewTrendSeries}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="date" hide />
+                          <YAxis />
+                          <Tooltip />
+                          <Line type="monotone" dataKey="value" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                  <div className="rounded-md border p-3 xl:col-span-6" role="region" aria-label="Risk Heatmap Severity Chart">
+                    <p className="font-semibold">{t('amro.overview.riskHeatmap', { defaultValue: 'Risk Heatmap by Severity' })}</p>
+                    <div className="mt-3 h-56 w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={overviewRiskBySeverity}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="severity" />
+                          <YAxis />
+                          <Tooltip />
+                          <Bar dataKey="score" fill="hsl(var(--destructive))" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                  <div className="rounded-md border p-3 xl:col-span-4" role="region" aria-label="Critical Signal Board">
+                    <p className="font-semibold">{t('amro.overview.criticalSignalBoard', { defaultValue: 'Critical Signal Board' })}</p>
+                    <p className="mt-2 text-muted-foreground">
+                      {t('amro.overview.activeWorkPackages', { defaultValue: 'Active Work Packages' })}: {dashboard?.executive_summary.active_work_packages ?? 0}
+                    </p>
+                    <p className="mt-1 text-muted-foreground">
+                      {t('amro.overview.overdueTasks', { defaultValue: 'Overdue Tasks' })}: {dashboard?.executive_summary.overdue_tasks ?? 0}
+                    </p>
+                    <p className="mt-1 text-muted-foreground">
+                      {t('amro.overview.complianceStatus', { defaultValue: 'Compliance Status %' })}: {dashboard?.executive_summary.compliance_status_pct ?? 0}
+                    </p>
+                  </div>
+                  <div className="rounded-md border p-3 xl:col-span-4" role="region" aria-label="Predictive Recommendation Queue">
+                    <p className="font-semibold">{t('amro.overview.predictiveQueue', { defaultValue: 'Predictive Recommendation Queue' })}</p>
+                    <div className="mt-2 space-y-1">
+                      {(trends?.forecast_recommendation_hub || []).slice(0, 5).map((item) => (
+                        <div key={item.recommendation_id} className="rounded-md border p-2">
+                          {item.recommendation} | {t('amro.overview.confidence', { defaultValue: 'Confidence' })}: {item.confidence_pct}% | {t('amro.overview.risk', { defaultValue: 'Risk' })}:{' '}
+                          {item.risk_score}
+                        </div>
+                      ))}
+                      {!trends?.forecast_recommendation_hub?.length ? (
+                        <p className="text-muted-foreground">
+                          {t('amro.overview.noRecommendations', { defaultValue: 'No predictive recommendations returned.' })}
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className="rounded-md border p-3 xl:col-span-4" role="region" aria-label="Compliance and Integration Command">
+                    <p className="font-semibold">{t('amro.overview.complianceIntegrationCommand', { defaultValue: 'Compliance and Integration Command' })}</p>
+                    <p className="mt-2 text-muted-foreground">
+                      {t('amro.overview.integrationHealth', { defaultValue: 'Integration Health' })}: {dashboard?.integration_monitor?.status || 'unknown'}
+                    </p>
+                    <p className="mt-1 text-muted-foreground">
+                      {t('amro.overview.failureRate', { defaultValue: 'Failure Rate' })}: {dashboard?.integration_monitor?.failure_rate_pct || 0}%
+                    </p>
+                    <p className="mt-1 text-muted-foreground">
+                      {t('amro.overview.complianceQueue', { defaultValue: 'Compliance Gates' })}: {dashboard?.compliance_gate_status?.length || 0}
+                    </p>
+                  </div>
+                </div>
+                {(dashboard?.data_issues?.length || trends?.data_issues?.length) ? (
+                  <div className="rounded-md border border-warning/50 bg-warning/10 p-3" aria-live="polite">
+                    <p className="font-semibold">{t('amro.overview.dataIssues', { defaultValue: 'Data Connectivity Issues' })}</p>
+                    {dashboard?.data_issues?.slice(0, 3).map((issue) => (
+                      <p key={`dashboard-overview-${issue}`} className="mt-1 text-muted-foreground">{issue}</p>
+                    ))}
+                    {trends?.data_issues?.slice(0, 3).map((issue) => (
+                      <p key={`trends-overview-${issue}`} className="mt-1 text-muted-foreground">{issue}</p>
+                    ))}
+                  </div>
+                ) : null}
+              </CardContent>
+            </Card>
+          ) : (
+            <>
           <Card data-amro-base-surface="operations-overview">
             <CardHeader className="pb-2">
               <CardTitle>{modulePageLabel}</CardTitle>
@@ -673,9 +1127,24 @@ export default function AmroHubVerticalPage({ moduleKey }: AmroHubVerticalPagePr
                 <Badge variant="outline">Standard Refresh: {Math.round(refreshCadence.standardMs / 1000)}s</Badge>
                 {lastDashboardRefreshAt ? <Badge variant="outline">Dashboard Refresh: {lastDashboardRefreshAt}</Badge> : null}
                 {lastTrendsRefreshAt ? <Badge variant="outline">Trend Refresh: {lastTrendsRefreshAt}</Badge> : null}
+                {dashboard?.snapshot_metadata?.snapshot_at ? (
+                  <Badge variant="outline">Seeded Snapshot: {formatDisplayDate(dashboard.snapshot_metadata.snapshot_at)}</Badge>
+                ) : null}
                 {loading ? <Badge variant="outline">KPI Loading</Badge> : null}
                 {error ? <Badge variant="destructive">KPI Error</Badge> : null}
               </div>
+              {dashboard?.snapshot_metadata ? (
+                <p className="text-muted-foreground">
+                  Snapshot source persona {dashboard.snapshot_metadata.persona || 'management'} | Window {dashboard.snapshot_metadata.date_range_start || 'N/A'} to{' '}
+                  {dashboard.snapshot_metadata.date_range_end || 'N/A'}
+                </p>
+              ) : null}
+              {dashboard?.seeded_sources ? (
+                <p className="text-muted-foreground">
+                  DB source rows | snapshots {dashboard.seeded_sources.overview_snapshots} | telemetry {dashboard.seeded_sources.operational_telemetry} | compliance events{' '}
+                  {dashboard.seeded_sources.compliance_events} | SLA definitions {dashboard.seeded_sources.sla_definitions}
+                </p>
+              ) : null}
               <div className="grid grid-cols-1 gap-3 rounded-md border p-3 text-xs lg:grid-cols-12" role="region" aria-label="AMRO Overview Controls">
                 <div className="lg:col-span-3">
                   <p className="font-semibold">Planner Filter</p>
@@ -695,9 +1164,27 @@ export default function AmroHubVerticalPage({ moduleKey }: AmroHubVerticalPagePr
                     onClick={() => {
                       setPlannerFilter('');
                       setEngineerFilter('');
-                      void loadDashboard({
-                        dateRange: `${new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()}|${new Date().toISOString()}`,
-                      });
+                      setOverviewDateRange('30d');
+                      setOverviewRegulatorProfile('FAA');
+                      setOverviewFleetFilter('all');
+                      setOverviewStationFilter('all');
+                      setOverviewWorkPackagePage(1);
+                      setOverviewTrendsPage(1);
+                      void Promise.all([
+                        loadDashboard({
+                          dateRange: buildDateRangeWindow('30d'),
+                          regulatorProfile: 'FAA',
+                          page: 1,
+                          pageSize: OVERVIEW_WORK_PACKAGE_PAGE_SIZE,
+                        }),
+                        loadTrends({
+                          metricKey: 'schedule_adherence',
+                          window: '30d',
+                          compareWindow: '30d',
+                          page: 1,
+                          pageSize: OVERVIEW_TRENDS_PAGE_SIZE,
+                        }),
+                      ]);
                     }}
                   >
                     Clear Scope
@@ -764,12 +1251,35 @@ export default function AmroHubVerticalPage({ moduleKey }: AmroHubVerticalPagePr
                                   <td className="border-b py-1 pr-2">{item.status}</td>
                                   <td className="border-b py-1 pr-2">{item.planner_id}</td>
                                   <td className="border-b py-1 pr-2">{item.engineer_id}</td>
-                                  <td className="border-b py-1 pr-2">{item.due_at || 'N/A'}</td>
-                                  <td className="border-b py-1 pr-2">{item.progress_pct}</td>
+                                  <td className="border-b py-1 pr-2">{formatDisplayDate(item.due_at)}</td>
+                                  <td className="border-b py-1 pr-2">{formatPercent(item.progress_pct)}</td>
                                 </tr>
                               ))}
                             </tbody>
                           </table>
+                        </div>
+                        <div className="mt-2 flex items-center justify-between gap-2">
+                          <p className="text-muted-foreground">
+                            Page {workPackageCurrentPage} of {workPackageTotalPages}
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={loading || workPackageCurrentPage <= 1}
+                              onClick={() => void handleWorkPackagePageChange(workPackageCurrentPage - 1)}
+                            >
+                              Previous
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={loading || workPackageCurrentPage >= workPackageTotalPages}
+                              onClick={() => void handleWorkPackagePageChange(workPackageCurrentPage + 1)}
+                            >
+                              Next
+                            </Button>
+                          </div>
                         </div>
                       </div>
                       <div className="rounded-md border p-3">
@@ -806,11 +1316,11 @@ export default function AmroHubVerticalPage({ moduleKey }: AmroHubVerticalPagePr
                           </div>
                           <div className="rounded-md border p-2">
                             <p className="text-[11px] text-muted-foreground">Compliance Status %</p>
-                            <p className="mt-1 text-base font-semibold">{dashboard.executive_summary.compliance_status_pct}</p>
+                            <p className="mt-1 text-base font-semibold">{formatPercent(dashboard.executive_summary.compliance_status_pct)}</p>
                           </div>
                           <div className="rounded-md border p-2">
                             <p className="text-[11px] text-muted-foreground">Forecast Accuracy %</p>
-                            <p className="mt-1 text-base font-semibold">{dashboard.executive_summary.forecast_accuracy_pct}</p>
+                            <p className="mt-1 text-base font-semibold">{formatPercent(dashboard.executive_summary.forecast_accuracy_pct)}</p>
                           </div>
                         </div>
                       </div>
@@ -874,12 +1384,35 @@ export default function AmroHubVerticalPage({ moduleKey }: AmroHubVerticalPagePr
                       <p className="font-semibold">Certification Decision Queue</p>
                       {canViewCertificationQueue ? (
                         <div className="mt-2 space-y-1">
-                          {(trends?.certification_decision_queue || []).slice(0, 5).map((item) => (
+                          {(trends?.certification_decision_queue || []).map((item) => (
                             <div key={item.certification_id} className="rounded-md border p-2">
                               {item.certification_id} | {item.authority} | {item.status}
                             </div>
                           ))}
                           {!trends?.certification_decision_queue?.length ? <p className="text-muted-foreground">No certification decisions pending.</p> : null}
+                          <div className="mt-2 flex items-center justify-between gap-2">
+                            <p className="text-muted-foreground">
+                              Page {trendsCurrentPage} of {trendsTotalPages}
+                            </p>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={loading || trendsCurrentPage <= 1}
+                                onClick={() => void handleTrendsPageChange(trendsCurrentPage - 1)}
+                              >
+                                Previous
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={loading || trendsCurrentPage >= trendsTotalPages}
+                                onClick={() => void handleTrendsPageChange(trendsCurrentPage + 1)}
+                              >
+                                Next
+                              </Button>
+                            </div>
+                          </div>
                         </div>
                       ) : (
                         <p className="mt-2 text-muted-foreground">Certification queue is hidden for current persona.</p>
@@ -889,12 +1422,35 @@ export default function AmroHubVerticalPage({ moduleKey }: AmroHubVerticalPagePr
                       <p className="font-semibold">Audit Timeline Widget</p>
                       {canViewDetailedOps ? (
                         <div className="mt-2 space-y-1">
-                          {(trends?.audit_timeline || []).slice(0, 5).map((event) => (
+                          {(trends?.audit_timeline || []).map((event) => (
                             <div key={event.event_id} className="rounded-md border p-2">
                               {event.action} | {event.actor} | {event.outcome}
                             </div>
                           ))}
                           {!trends?.audit_timeline?.length ? <p className="text-muted-foreground">No audit events in the selected window.</p> : null}
+                          <div className="mt-2 flex items-center justify-between gap-2">
+                            <p className="text-muted-foreground">
+                              Page {trendsCurrentPage} of {trendsTotalPages}
+                            </p>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={loading || trendsCurrentPage <= 1}
+                                onClick={() => void handleTrendsPageChange(trendsCurrentPage - 1)}
+                              >
+                                Previous
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={loading || trendsCurrentPage >= trendsTotalPages}
+                                onClick={() => void handleTrendsPageChange(trendsCurrentPage + 1)}
+                              >
+                                Next
+                              </Button>
+                            </div>
+                          </div>
                         </div>
                       ) : (
                         <p className="mt-2 text-muted-foreground">Audit timeline is hidden for current persona.</p>
@@ -979,8 +1535,15 @@ export default function AmroHubVerticalPage({ moduleKey }: AmroHubVerticalPagePr
                 },
               ]}
             >
-              <AmroWorkspaceSurface moduleKey={moduleKey} />
+              <AmroWorkspaceSurface
+                moduleKey={moduleKey}
+                overviewPersona={activePersona}
+                overviewControls={overviewControls}
+                overviewTelemetry={overviewTelemetry}
+              />
             </PlatformWidgetSlot>
+          )}
+            </>
           )}
         </div>
       </AmroModuleShell>

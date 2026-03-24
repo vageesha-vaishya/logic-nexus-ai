@@ -126,16 +126,16 @@ describe('AmroHubVerticalPage', () => {
     vi.unstubAllGlobals();
   });
 
-  it('renders operational overview layout with active domain badge', () => {
+  it('renders operational dashboard UI for non-overview modules', () => {
     mockUseDomain.mockReturnValue({ currentDomain: { code: 'AMRO' } });
     mockUseAuth.mockReturnValue({
       hasRole: vi.fn().mockImplementation((role: string) => role === 'tenant_admin'),
       isPlatformAdmin: vi.fn().mockReturnValue(false),
     });
 
-    render(<AmroHubVerticalPage />);
+    render(<AmroHubVerticalPage moduleKey="work-packages" />);
 
-    expect(screen.getByText('Operations Overview')).toBeTruthy();
+    expect(screen.getByText('Work Packages')).toBeTruthy();
     expect(screen.getByText('AMRO Domain Context Active')).toBeTruthy();
     expect(screen.getByText('KPI Deck')).toBeTruthy();
     expect(screen.getByRole('region', { name: 'AMRO Overview Controls' })).toBeTruthy();
@@ -154,7 +154,7 @@ describe('AmroHubVerticalPage', () => {
       isPlatformAdmin: vi.fn().mockReturnValue(false),
     });
 
-    render(<AmroHubVerticalPage />);
+    render(<AmroHubVerticalPage moduleKey="work-packages" />);
 
     expect(screen.getByText('Role Controls: anomaly intelligence is hidden for user persona.')).toBeTruthy();
     expect(screen.getByText('Export restricted to tenant/platform admin persona')).toBeTruthy();
@@ -167,7 +167,7 @@ describe('AmroHubVerticalPage', () => {
       isPlatformAdmin: vi.fn().mockReturnValue(false),
     });
 
-    render(<AmroHubVerticalPage />);
+    render(<AmroHubVerticalPage moduleKey="work-packages" />);
 
     const plannerInput = screen.getByPlaceholderText('planner_id');
     const engineerInput = screen.getByPlaceholderText('engineer_id');
@@ -191,8 +191,9 @@ describe('AmroHubVerticalPage', () => {
     });
 
     expect(mockLoadDashboard).toHaveBeenCalledTimes(2);
-    expect(mockLoadDashboard.mock.calls[1][0]).toEqual({
+    expect(mockLoadDashboard.mock.calls[1][0]).toMatchObject({
       dateRange: expect.stringMatching(/\|/),
+      regulatorProfile: 'FAA',
     });
     expect(screen.getByText('Critical Refresh: 30s')).toBeTruthy();
     expect(screen.getByText('Standard Refresh: 300s')).toBeTruthy();
@@ -219,7 +220,7 @@ describe('AmroHubVerticalPage', () => {
     expect(setDomain).toHaveBeenCalledWith('AMRO');
   });
 
-  it('renders AMRO overview route through auth/domain guard with KPI cards and no error state', async () => {
+  it('renders next-generation AMRO overview dashboard without legacy overview widgets', async () => {
     mockUseDomain.mockReturnValue({
       currentDomain: { code: 'AMRO' },
       availableDomains: [{ id: 'domain-amro', code: 'AMRO', name: 'AMRO', description: null, is_active: true }],
@@ -260,9 +261,21 @@ describe('AmroHubVerticalPage', () => {
       </MemoryRouter>,
     );
 
-    expect(await screen.findByText('KPI Deck')).toBeTruthy();
+    expect(await screen.findByTestId('dashboard-layout')).toBeTruthy();
+    expect(screen.getByText('amro.overview.intelligenceHub')).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'Critical Signal Board' })).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'Predictive Recommendation Queue' })).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'Compliance and Integration Command' })).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'Trend Analysis Chart' })).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'Risk Heatmap Severity Chart' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Cycle date range filter' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Cycle region filter' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'amro.overview.exportPdfAction' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'amro.overview.exportExcelAction' })).toBeTruthy();
     expect(screen.getByText('Open Work Packages')).toBeTruthy();
     expect(screen.getByText('Compliance Risk')).toBeTruthy();
+    expect(screen.queryByText('KPI Deck')).toBeNull();
+    expect(screen.queryByText('AMRO Workspace')).toBeNull();
     expect(screen.queryByText('Overview Widget Error State')).toBeNull();
     expect(screen.queryByText('Unauthorized Screen')).toBeNull();
   });

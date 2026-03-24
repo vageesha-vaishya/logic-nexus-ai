@@ -34,7 +34,6 @@ const certificationAuthorityProfileOptions = ['FAA', 'EASA', 'CAAC'] as const;
 const workspaceViewModes = ['kanban', 'card', 'grid', 'list'] as const;
 const amroHeaderActionOrder = ['Search', 'Filter', 'View', 'Create', 'Refresh', 'Import/Export', 'Theme'] as const;
 const workspaceThemeOptions = ['Azure Sky', 'Hangar Dark', 'Maintenance Slate'] as const;
-const overviewDateRangeOptions = ['7d', '30d', '90d'] as const;
 const workPackagePageSizes = [10, 25, 50] as const;
 const workspaceLocaleOptions = ['en-US', 'en-GB', 'fr-FR', 'de-DE'] as const;
 const amroWorkspaceViewStorageKey = 'amro.workspace.view';
@@ -62,6 +61,35 @@ type AmroWorkspaceModuleKey =
 
 type AmroOwnedWorkspaceProps = {
   moduleKey?: AmroWorkspaceModuleKey;
+  overviewPersona?: 'platform_admin' | 'tenant_admin' | 'franchise_admin' | 'user';
+  overviewControls?: {
+    dateRange: '7d' | '30d' | '90d';
+    regulatorProfile: 'FAA' | 'EASA' | 'CAAC';
+    fleetFilter: string;
+    stationFilter: string;
+    onCycleDateRange: () => void;
+    onCycleRegulatorProfile: () => void;
+    onFleetFilterChange: (value: string) => void;
+    onStationFilterChange: (value: string) => void;
+    onRefresh: () => void;
+    onExport: () => void;
+    exporting?: boolean;
+  };
+  overviewTelemetry?: {
+    openWorkPackages?: number;
+    aogCount?: number;
+    complianceRiskCount?: number;
+    deferredCount?: number;
+    fillRatePct?: number;
+    pipelineSnapshot?: string;
+    riskHeatmapSummary?: string;
+    forecastSummary?: string;
+    confidenceSegmentation?: string;
+    recommendedActions?: string;
+    slaTrendSummary?: string;
+    dataFreshness?: string;
+    syncHealth?: string;
+  };
 };
 
 type AmroModuleAction = {
@@ -106,7 +134,12 @@ const amroRoleVariants: Record<AmroUxRole, AmroRoleVariant> = {
   },
 };
 
-export function AmroOwnedWorkspace({ moduleKey }: AmroOwnedWorkspaceProps) {
+export function AmroOwnedWorkspace({
+  moduleKey,
+  overviewPersona: _overviewPersona = 'tenant_admin',
+  overviewControls: _overviewControls,
+  overviewTelemetry: _overviewTelemetry,
+}: AmroOwnedWorkspaceProps) {
   const state = useAmroWorkspaceState();
   const [newWorkPackageTitle, setNewWorkPackageTitle] = useState('');
   const [savedViewName, setSavedViewName] = useState('');
@@ -116,7 +149,6 @@ export function AmroOwnedWorkspace({ moduleKey }: AmroOwnedWorkspaceProps) {
   const [workspaceViewMode, setWorkspaceViewMode] = useState<(typeof workspaceViewModes)[number]>('kanban');
   const [workspaceTheme, setWorkspaceTheme] = useState<(typeof workspaceThemeOptions)[number]>('Azure Sky');
   const [workspaceLocale, setWorkspaceLocale] = useState<(typeof workspaceLocaleOptions)[number]>('en-US');
-  const [overviewDateRange, setOverviewDateRange] = useState<(typeof overviewDateRangeOptions)[number]>('30d');
   const [workPackagePageSize, setWorkPackagePageSize] = useState<number>(workPackagePageSizes[0]);
   const [workPackagePage, setWorkPackagePage] = useState(1);
   const [workPackageSortField, setWorkPackageSortField] = useState<'packageNumber' | 'lifecycleStage'>('packageNumber');
@@ -514,13 +546,6 @@ export function AmroOwnedWorkspace({ moduleKey }: AmroOwnedWorkspaceProps) {
     const exportedAtLabel = new Date().toISOString();
     setLastWorkspaceExportAt(exportedAtLabel);
     setLastInteractionMessage(`Export prepared for ${scope} at ${formatDateTime(exportedAtLabel)}.`);
-  };
-
-  const handleOverviewDateRangeCycle = () => {
-    const currentIndex = overviewDateRangeOptions.indexOf(overviewDateRange);
-    const nextRange = overviewDateRangeOptions[(currentIndex + 1) % overviewDateRangeOptions.length];
-    setOverviewDateRange(nextRange);
-    setLastInteractionMessage(`Overview date range switched to ${nextRange}.`);
   };
 
   const handleOpenComplianceGate = async () => {
@@ -1025,113 +1050,11 @@ export function AmroOwnedWorkspace({ moduleKey }: AmroOwnedWorkspaceProps) {
       {showOverviewModule ? (
       <Card data-amro-screen="SCR-AMRO-001" role="region" aria-label="SCR-AMRO-001 Overview Dashboard">
         <CardHeader className="pb-2">
-          <CardTitle>SCR-AMRO-001 Overview Dashboard</CardTitle>
+          <CardTitle>SCR-AMRO-001 AMRO Command Center</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="grid grid-cols-2 gap-2 md:grid-cols-8">
-            <Button variant="outline" size="sm" onClick={handleOverviewDateRangeCycle}>Date Range</Button>
-            <Button variant="outline" size="sm" onClick={() => void state.loadRegulatorProfilePack()}>Regulator</Button>
-            <Select value={selectedFleetFilter} onValueChange={setSelectedFleetFilter}>
-              <SelectTrigger aria-label="Fleet filter">
-                <SelectValue placeholder="Fleet filter" />
-              </SelectTrigger>
-              <SelectContent>
-                {fleetOptions.map((fleet) => (
-                  <SelectItem key={fleet} value={fleet}>{fleet === 'all' ? 'Fleet: All' : fleet}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={selectedStationFilter} onValueChange={setSelectedStationFilter}>
-              <SelectTrigger aria-label="Station filter">
-                <SelectValue placeholder="Station filter" />
-              </SelectTrigger>
-              <SelectContent>
-                {stationOptions.map((station) => (
-                  <SelectItem key={station} value={station}>{station === 'all' ? 'Station: All' : station}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => publishWorkspaceExport('overview-dashboard', {
-                dateRange: overviewDateRange,
-                fleet: selectedFleetFilter,
-                station: selectedStationFilter,
-              })}
-            >
-              Export
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                void state.refreshWorkPackages();
-                setLastInteractionMessage('Overview dashboard refresh requested.');
-              }}
-            >
-              Refresh
-            </Button>
-            <Select value={workspaceTheme} onValueChange={(value) => setWorkspaceTheme(value as (typeof workspaceThemeOptions)[number])}>
-              <SelectTrigger aria-label="Theme selector">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {workspaceThemeOptions.map((theme) => (
-                  <SelectItem key={theme} value={theme}>{theme}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={workspaceLocale} onValueChange={(value) => setWorkspaceLocale(value as (typeof workspaceLocaleOptions)[number])}>
-              <SelectTrigger aria-label="Locale selector">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {workspaceLocaleOptions.map((locale) => (
-                  <SelectItem key={locale} value={locale}>{locale}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Badge variant="secondary" className="justify-center">View: {workspaceViewMode}</Badge>
-          </div>
-          <div className="grid grid-cols-1 gap-2 md:grid-cols-5">
-            <div className="rounded-md border p-2 text-xs">Open WPs: {state.workPackages.length}</div>
-            <div className="rounded-md border p-2 text-xs">AOG: {state.materialsSummary.shortageCount}</div>
-            <div className="rounded-md border p-2 text-xs">Compliance Risk: {state.complianceAnomalyAlerts.length}</div>
-            <div className="rounded-md border p-2 text-xs">Deferred: {state.materialsSummary.pendingReservations}</div>
-            <div className="rounded-md border p-2 text-xs">Fill Rate: {Math.max(0, 100 - state.materialsSummary.shortageCount * 5)}%</div>
-          </div>
-          <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-            <div className="rounded-md border p-2 text-xs">
-              Pipeline Snapshot: planning/scheduled/in_progress with blocked counters from lifecycle + shortage signals.
-            </div>
-            <div className="rounded-md border p-2 text-xs">
-              Risk Heatmap: critical {state.complianceAnomalyAlerts.filter((alert) => alert.severity === 'critical').length}, warning {state.complianceAnomalyAlerts.filter((alert) => alert.severity !== 'critical').length}.
-            </div>
-          </div>
-          <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
-            <div className="rounded-md border p-2 text-xs">
-              Forecast panel: recommendations {state.predictiveSummary.totalRecommendations} / high risk {state.predictiveSummary.highRisk}.
-            </div>
-            <div className="rounded-md border p-2 text-xs">
-              Confidence segmentation: high {predictiveRiskSegments.high} · medium {predictiveRiskSegments.medium} · low {predictiveRiskSegments.low}.
-            </div>
-            <div className="rounded-md border p-2 text-xs">
-              Recommended actions: maintenance interventions prioritized by risk and schedule impact.
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-2 text-xs md:grid-cols-4">
-            <div className="rounded-md border p-2">SLA Trend: 7d / 30d stable</div>
-            <div className="rounded-md border p-2">Data Freshness: {dataFreshnessLabel}</div>
-            <div className="rounded-md border p-2">Sync Health: {syncHealthLabel}</div>
-            <div className="rounded-md border p-2">Theme: {workspaceTheme}</div>
-          </div>
-          <div className="grid grid-cols-1 gap-2 md:grid-cols-5 text-xs">
-            <div className="rounded-md border p-2">✓ Success: task completed</div>
-            <div className="rounded-md border p-2">! Warning: watchlist item</div>
-            <div className="rounded-md border p-2">⛔ Critical: compliance risk</div>
-            <div className="rounded-md border p-2">■ Blocked: gate dependency</div>
-            <div className="rounded-md border p-2">i Informational: advisory signal</div>
+        <CardContent>
+          <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+            Overview dashboard UI has been cleared.
           </div>
         </CardContent>
       </Card>

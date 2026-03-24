@@ -1,0 +1,128 @@
+<testsuites id="" name="" tests="14" failures="0" skipped="14" errors="0" time="10.608488">
+<testsuite name="tests/e2e/amro-overview-dashboard.spec.ts" timestamp="2026-03-23T18:15:25.774Z" hostname="chromium" tests="2" failures="0" skipped="2" time="4.84" errors="0">
+<testcase name="amro overview dashboard › renders overview surfaces with filters, charts, and export controls" classname="tests/e2e/amro-overview-dashboard.spec.ts" time="2.425">
+<properties>
+<property name="skip" value="AMRO overview dashboard surface is not available for this account or environment">
+</property>
+</properties>
+<skipped>
+</skipped>
+</testcase>
+<testcase name="amro overview dashboard › stays responsive and keyboard accessible on mobile" classname="tests/e2e/amro-overview-dashboard.spec.ts" time="2.415">
+<properties>
+<property name="skip" value="AMRO overview dashboard surface is not available for this account or environment">
+</property>
+</properties>
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+<testsuite name="tests/e2e/amro-overview-dashboard.spec.ts" timestamp="2026-03-23T18:15:25.774Z" hostname="chrome-latest" tests="2" failures="0" skipped="2" time="7.281" errors="0">
+<testcase name="amro overview dashboard › renders overview surfaces with filters, charts, and export controls" classname="tests/e2e/amro-overview-dashboard.spec.ts" time="4.86">
+<properties>
+<property name="skip" value="AMRO overview dashboard surface is not available for this account or environment">
+</property>
+</properties>
+<skipped>
+</skipped>
+</testcase>
+<testcase name="amro overview dashboard › stays responsive and keyboard accessible on mobile" classname="tests/e2e/amro-overview-dashboard.spec.ts" time="2.421">
+<properties>
+<property name="skip" value="AMRO overview dashboard surface is not available for this account or environment">
+</property>
+</properties>
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+<testsuite name="tests/e2e/amro-overview-dashboard.spec.ts" timestamp="2026-03-23T18:15:25.774Z" hostname="msedge-latest" tests="2" failures="0" skipped="2" time="4.329" errors="0">
+<testcase name="amro overview dashboard › renders overview surfaces with filters, charts, and export controls" classname="tests/e2e/amro-overview-dashboard.spec.ts" time="2.433">
+<properties>
+<property name="skip" value="AMRO overview dashboard surface is not available for this account or environment">
+</property>
+</properties>
+<skipped>
+</skipped>
+</testcase>
+<testcase name="amro overview dashboard › stays responsive and keyboard accessible on mobile" classname="tests/e2e/amro-overview-dashboard.spec.ts" time="1.896">
+<properties>
+<property name="skip" value="AMRO overview dashboard surface is not available for this account or environment">
+</property>
+</properties>
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+<testsuite name="tests/e2e/amro-overview-dashboard.spec.ts" timestamp="2026-03-23T18:15:25.774Z" hostname="firefox" tests="2" failures="0" skipped="2" time="4.593" errors="0">
+<testcase name="amro overview dashboard › renders overview surfaces with filters, charts, and export controls" classname="tests/e2e/amro-overview-dashboard.spec.ts" time="2.127">
+<properties>
+<property name="skip" value="AMRO overview dashboard surface is not available for this account or environment">
+</property>
+</properties>
+<skipped>
+</skipped>
+</testcase>
+<testcase name="amro overview dashboard › stays responsive and keyboard accessible on mobile" classname="tests/e2e/amro-overview-dashboard.spec.ts" time="2.466">
+<properties>
+<property name="skip" value="AMRO overview dashboard surface is not available for this account or environment">
+</property>
+</properties>
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+<testsuite name="tests/e2e/amro-overview-dashboard.spec.ts" timestamp="2026-03-23T18:15:25.774Z" hostname="webkit" tests="2" failures="0" skipped="2" time="1.842" errors="0">
+<testcase name="amro overview dashboard › renders overview surfaces with filters, charts, and export controls" classname="tests/e2e/amro-overview-dashboard.spec.ts" time="1.175">
+<properties>
+<property name="skip" value="AMRO overview dashboard surface is not available for this account or environment">
+</property>
+</properties>
+<skipped>
+</skipped>
+</testcase>
+<testcase name="amro overview dashboard › stays responsive and keyboard accessible on mobile" classname="tests/e2e/amro-overview-dashboard.spec.ts" time="0.667">
+<properties>
+<property name="skip" value="AMRO overview dashboard surface is not available for this account or environment">
+</property>
+</properties>
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+<testsuite name="tests/e2e/amro-overview-dashboard.spec.ts" timestamp="2026-03-23T18:15:25.774Z" hostname="ios-mobile" tests="2" failures="0" skipped="2" time="2.624" errors="0">
+<testcase name="amro overview dashboard › renders overview surfaces with filters, charts, and export controls" classname="tests/e2e/amro-overview-dashboard.spec.ts" time="1.318">
+<properties>
+<property name="skip" value="AMRO overview dashboard surface is not available for this account or environment">
+</property>
+</properties>
+<skipped>
+</skipped>
+</testcase>
+<testcase name="amro overview dashboard › stays responsive and keyboard accessible on mobile" classname="tests/e2e/amro-overview-dashboard.spec.ts" time="1.306">
+<properties>
+<property name="skip" value="AMRO overview dashboard surface is not available for this account or environment">
+</property>
+</properties>
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+<testsuite name="tests/e2e/amro-overview-dashboard.spec.ts" timestamp="2026-03-23T18:15:25.774Z" hostname="android-mobile" tests="2" failures="0" skipped="2" time="1.463" errors="0">
+<testcase name="amro overview dashboard › renders overview surfaces with filters, charts, and export controls" classname="tests/e2e/amro-overview-dashboard.spec.ts" time="1.005">
+<properties>
+<property name="skip" value="AMRO overview dashboard surface is not available for this account or environment">
+</property>
+</properties>
+<skipped>
+</skipped>
+</testcase>
+<testcase name="amro overview dashboard › stays responsive and keyboard accessible on mobile" classname="tests/e2e/amro-overview-dashboard.spec.ts" time="0.458">
+<properties>
+<property name="skip" value="AMRO overview dashboard surface is not available for this account or environment">
+</property>
+</properties>
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+</testsuites>

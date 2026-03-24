@@ -232,3 +232,54 @@ Approval state transitions:
 
 - Draft → Review → Approved Baseline → Controlled Change
 - Any post-baseline change must include revised node versions and impact report references.
+
+## 11. Overview Dashboard Competitive Benchmark and Requirements Baseline
+
+### 11.1 Benchmark Scope
+
+- Platforms benchmarked: SAP A&D MRO, IBM Maximo Application Suite, Oracle Fusion Cloud Maintenance, Infor Birst-enabled maintenance analytics.
+- Evaluation dimensions: dashboard architecture, KPI composition, navigation hierarchy, role-focused experience, predictive maintenance enablement, integration patterns, and operational reliability controls.
+
+### 11.2 Competitive Findings Matrix
+
+| Platform | Dashboard Strengths | Operational Gaps Observed | AMRO Adoption Decision |
+| --- | --- | --- | --- |
+| SAP A&D MRO | Deep spare-parts and planning visibility, regulated maintenance support, consolidated maintenance planning board patterns | Limited out-of-box predictive explainability and cross-surface KPI storytelling | Adopt planning board style for work package and fleet readiness summaries |
+| IBM Maximo Application Suite | AI-infused monitoring, condition-driven maintenance, risk-centric health insight and anomaly workflows | UX density can impact rapid decision cycles for frontline users | Adopt risk-ranked health cards, anomaly first-class widgets, and health trend drilldowns |
+| Oracle Fusion Cloud Maintenance | Smart Operations with maintenance plus supply chain plus finance context, real-time asset and backlog visibility | Requires careful role simplification to prevent operator cognitive overload | Adopt integrated backlog, cost, and service logistics visibility with role-scoped views |
+| Infor Analytics (Birst) | Role-specific KPI dashboards, embedded analytics widgets, strong workspace-level BI composition | Maintenance-specific user journeys often require domain tailoring | Adopt modular KPI workspace patterns and role-aware analytics composition |
+
+### 11.3 Best-Practice Synthesis for AMRO Overview
+
+- Dashboard architecture must separate critical operational insight from analytical deep-dives while preserving one-click drill-down.
+- KPI framework must support executive, planner, and frontline technician personas with shared metric definitions and persona-specific emphasis.
+- Predictive maintenance insight must combine confidence, risk score, recommendation reason, and affected work-package context in one surface.
+- Navigation must preserve platform shell consistency while allowing AMRO route-level specialization.
+- Refresh model must use dual cadence (critical and standard) with visible freshness, degraded mode messaging, and retry behavior.
+- Integration state must be continuously visible with failed attempt, failure-rate, and recent-failure context.
+
+### 11.4 Next-Generation AMRO Overview Functional Requirements
+
+- FR-AMRO-026@v1: Provide role-aware AMRO overview layout with executive, operations, and reliability sections in one unified route.
+- FR-AMRO-027@v1: Provide live KPI strip with criticality tiering, trend context, and domain-scoped filtering support.
+- FR-AMRO-028@v1: Provide predictive recommendation panel with confidence segmentation and risk-ranked action queue.
+- FR-AMRO-029@v1: Provide integration and compliance command panel with real-time health state and gate queue visibility.
+- FR-AMRO-030@v1: Provide graceful fallback and degraded-state UX when KPI APIs are unavailable, with explicit freshness warnings.
+- FR-AMRO-031@v1: Provide role-based export controls and auditable user actions for refresh and snapshot operations.
+- FR-AMRO-032@v1: Provide i18n-ready text contracts for all end-user labels in overview route surfaces.
+
+### 11.5 Next-Generation AMRO Overview Non-Functional Requirements
+
+- NFR-AMRO-008@v1 Performance: critical overview widgets render first meaningful payload in ≤ 1 second for cached responses.
+- NFR-AMRO-009@v1 Availability: overview route operates in degraded fallback mode during upstream API disruption without blank-screen failure.
+- NFR-AMRO-010@v1 Security: overview data access remains tenant and franchise scoped with no cross-tenant leakage.
+- NFR-AMRO-011@v1 Accessibility: overview route supports keyboard navigation, semantic landmarks, and screen-reader compatible status signaling.
+- NFR-AMRO-012@v1 Observability: overview interactions emit structured audit logs for refresh, export, and degraded-mode transitions.
+
+### 11.6 Deployment and Maintenance Procedures
+
+- DEP-AMRO-001@v1 Release Gate: deploy AMRO overview enhancements behind a feature flag and enable by tenant cohort.
+- DEP-AMRO-002@v1 Verification: run unit, integration, and e2e dashboard suites before production promotion.
+- DEP-AMRO-003@v1 Rollback: disable AMRO overview flag and redeploy previous UI artifact without schema rollback.
+- DEP-AMRO-004@v1 Runtime Ops: monitor API error rates, refresh latency, and export job completion in observability dashboards.
+- DEP-AMRO-005@v1 Maintenance: rotate API credentials per security policy and validate AMRO domain assignment checks quarterly.

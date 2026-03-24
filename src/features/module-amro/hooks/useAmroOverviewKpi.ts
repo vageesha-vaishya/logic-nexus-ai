@@ -32,6 +32,13 @@ type AnomalyFlag = {
   message: string;
 };
 
+type PaginationMeta = {
+  page: number;
+  page_size: number;
+  total_rows: number;
+  total_pages: number;
+};
+
 type DashboardOutput = {
   executive_summary: {
     active_work_packages: number;
@@ -82,6 +89,20 @@ type DashboardOutput = {
     total_modules: number;
     management_and_planner_landing: boolean;
   };
+  seeded_sources?: {
+    overview_snapshots: number;
+    operational_telemetry: number;
+    compliance_events: number;
+    sla_definitions: number;
+  };
+  snapshot_metadata?: {
+    snapshot_id: string;
+    snapshot_at: string;
+    persona: string;
+    date_range_start: string;
+    date_range_end: string;
+  } | null;
+  pagination?: PaginationMeta;
   data_issues?: string[];
   freshness_warning?: string | null;
 };
@@ -129,6 +150,12 @@ type TrendOutput = {
     risk_score: number;
     reason: string;
   }>;
+  pagination?: {
+    page: number;
+    page_size: number;
+    audit_timeline_total_rows: number;
+    certification_queue_total_rows: number;
+  };
   data_issues?: string[];
 };
 
@@ -140,21 +167,26 @@ type ExportOutput = {
 
 type DashboardRequest = {
   dateRange: string;
+  regionIds?: string[];
   stationIds?: string[];
   fleetIds?: string[];
   regulatorProfile?: string;
   plannerId?: string;
   engineerId?: string;
+  page?: number;
+  pageSize?: number;
 };
 
 type TrendsRequest = {
   metricKey: string;
   window: '7d' | '30d' | '90d';
   compareWindow: string;
+  page?: number;
+  pageSize?: number;
 };
 
 type ExportRequest = {
-  format: 'csv' | 'pdf';
+  format: 'csv' | 'pdf' | 'xlsx';
   dateRange: string;
   selectedWidgets: string[];
 };
@@ -171,8 +203,6 @@ type AmroRequestScope = {
   domainCode?: string | null;
 };
 
-const DEFAULT_STATION_IDS = ['station-a'];
-const DEFAULT_FLEET_IDS = ['fleet-a'];
 const DEFAULT_WIDGETS = ['kpi_cards', 'risk_heatmap', 'trend_lines', 'anomaly_flags'];
 const DEFAULT_DASHBOARD_REQUEST: DashboardRequest = {
   dateRange: buildIsoRange(30),
@@ -250,7 +280,7 @@ function buildFallbackDashboard(request: DashboardRequest): DashboardOutput {
     },
     data_issues: [
       KPI_FALLBACK_DATA_ISSUE,
-      `Scope: ${(request.stationIds || DEFAULT_STATION_IDS).join(',')} / ${(request.fleetIds || DEFAULT_FLEET_IDS).join(',')}`,
+      `Scope: ${(request.stationIds || ['all-stations']).join(',')} / ${(request.fleetIds || ['all-fleets']).join(',')}`,
     ],
     freshness_warning: API_UNAVAILABLE_MESSAGE,
   };
@@ -278,6 +308,17 @@ function buildFallbackTrends(): TrendOutput {
   };
 }
 
+function withIssue<T extends { data_issues?: string[] }>(payload: T, issue: string): T {
+  const normalizedIssue = issue.trim();
+  if (!normalizedIssue) return payload;
+  const existing = Array.isArray(payload.data_issues) ? payload.data_issues : [];
+  const deduped = existing.includes(normalizedIssue) ? existing : [...existing, normalizedIssue];
+  return {
+    ...payload,
+    data_issues: deduped,
+  };
+}
+
 async function requestOverview<TOutput>(url: string, init: RequestInit | undefined, scope: AmroRequestScope): Promise<TOutput> {
   const { data: sessionData } = await supabase.auth.getSession();
   let token = sessionData?.session?.access_token || '';
@@ -285,14 +326,17 @@ async function requestOverview<TOutput>(url: string, init: RequestInit | undefin
     const { data: refreshData } = await supabase.auth.refreshSession();
     token = refreshData?.session?.access_token || '';
   }
-
-  if (!token) {
+  const hasToken = Boolean(token);
+  const isLoopbackRuntime = typeof window !== 'undefined' && ['localhost', '127.0.0.1', '::1'].includes(String(window.location.hostname || '').toLowerCase());
+  if (!hasToken && import.meta.env.PROD && !isLoopbackRuntime) {
     throw new Error('Unauthorized: missing active session token');
   }
 
   const buildRequestHeaders = () => {
     const headers = new Headers(init?.headers || {});
-    headers.set('Authorization', `Bearer ${token}`);
+    if (hasToken) {
+      headers.set('Authorization', `Bearer ${token}`);
+    }
     if (scope.tenantId) {
       headers.set('x-tenant-id', scope.tenantId);
     }
@@ -345,7 +389,7 @@ async function requestOverview<TOutput>(url: string, init: RequestInit | undefin
 
   let activeUrl = url;
   let { response, payload } = await callWithToken(activeUrl);
-  const isAuthHeaderRejection = response.status === 401
+  const isAuthHeaderRejection = hasToken && response.status === 401
     && /missing or malformed authorization header/i.test(String(payload.error || ''));
   if (isAuthHeaderRejection) {
     const separator = url.includes('?') ? '&' : '?';
@@ -382,6 +426,7 @@ export function useAmroOverviewKpi(scope: AmroRequestScope = {}) {
   const dashboardRequestRef = useRef<DashboardRequest>(DEFAULT_DASHBOARD_REQUEST);
   const trendsRequestRef = useRef<TrendsRequest>(DEFAULT_TRENDS_REQUEST);
   const apiUnavailableUntilRef = useRef<number>(0);
+  const realtimeRefreshAtRef = useRef<number>(0);
   const isApiTemporarilyUnavailable = useCallback(
     () => Date.now() < Math.max(apiUnavailableUntilRef.current, globalApiUnavailableUntil),
     [],
@@ -412,15 +457,28 @@ export function useAmroOverviewKpi(scope: AmroRequestScope = {}) {
     const params = new URLSearchParams({
       interface: 'load-kpi-dashboard',
       date_range: request.dateRange,
-      station_ids: (request.stationIds || DEFAULT_STATION_IDS).join(','),
-      fleet_ids: (request.fleetIds || DEFAULT_FLEET_IDS).join(','),
       regulator_profile: request.regulatorProfile || 'FAA',
     });
+    if (request.stationIds?.length) {
+      params.set('station_ids', request.stationIds.join(','));
+    }
+    if (request.fleetIds?.length) {
+      params.set('fleet_ids', request.fleetIds.join(','));
+    }
+    if (request.regionIds?.length) {
+      params.set('region_ids', request.regionIds.join(','));
+    }
     if (request.plannerId) {
       params.set('planner_id', request.plannerId);
     }
     if (request.engineerId) {
       params.set('engineer_id', request.engineerId);
+    }
+    if (Number.isFinite(request.page) && (request.page || 0) > 0) {
+      params.set('page', String(request.page));
+    }
+    if (Number.isFinite(request.pageSize) && (request.pageSize || 0) > 0) {
+      params.set('page_size', String(request.pageSize));
     }
     let output: DashboardOutput;
     try {
@@ -433,6 +491,10 @@ export function useAmroOverviewKpi(scope: AmroRequestScope = {}) {
         setLastDashboardRefreshAt(new Date().toISOString());
         return fallback;
       }
+      const issue = `AMRO KPI API error: ${error instanceof Error ? error.message : 'unknown failure'}`;
+      const fallback = withIssue(buildFallbackDashboard(request), issue);
+      setDashboard(fallback);
+      setLastDashboardRefreshAt(new Date().toISOString());
       throw error;
     }
     setDashboard(output);
@@ -454,6 +516,22 @@ export function useAmroOverviewKpi(scope: AmroRequestScope = {}) {
       window: request.window,
       compare_window: request.compareWindow,
     });
+    const dashboardScope = dashboardRequestRef.current;
+    if (dashboardScope.stationIds?.length) {
+      params.set('station_ids', dashboardScope.stationIds.join(','));
+    }
+    if (dashboardScope.fleetIds?.length) {
+      params.set('fleet_ids', dashboardScope.fleetIds.join(','));
+    }
+    if (dashboardScope.regionIds?.length) {
+      params.set('region_ids', dashboardScope.regionIds.join(','));
+    }
+    if (Number.isFinite(request.page) && (request.page || 0) > 0) {
+      params.set('page', String(request.page));
+    }
+    if (Number.isFinite(request.pageSize) && (request.pageSize || 0) > 0) {
+      params.set('page_size', String(request.pageSize));
+    }
     let output: TrendOutput;
     try {
       output = await requestOverview<TrendOutput>(`${AMRO_OVERVIEW_KPI_PATH}?${params.toString()}`, undefined, normalizedScope);
@@ -465,6 +543,10 @@ export function useAmroOverviewKpi(scope: AmroRequestScope = {}) {
         setLastTrendsRefreshAt(new Date().toISOString());
         return fallback;
       }
+      const issue = `AMRO trends API error: ${error instanceof Error ? error.message : 'unknown failure'}`;
+      const fallback = withIssue(buildFallbackTrends(), issue);
+      setTrends(fallback);
+      setLastTrendsRefreshAt(new Date().toISOString());
       throw error;
     }
     setTrends(output);
@@ -568,6 +650,51 @@ export function useAmroOverviewKpi(scope: AmroRequestScope = {}) {
       window.clearInterval(standardRefreshId);
     };
   }, [isApiTemporarilyUnavailable, loadTrends]);
+
+  useEffect(() => {
+    if (!normalizedScope.tenantId) {
+      return;
+    }
+    const realtimeTables = [
+      'amro_overview_kpi_snapshots',
+      'work_packages',
+      'parts_inventory',
+      'compliance_records',
+      'integration_jobs',
+      'forecast_outputs',
+      'tasks',
+      'schedules',
+      'certification_actions',
+      'audit_logs',
+    ];
+    const channelName = `amro-overview-${normalizedScope.tenantId}-${normalizedScope.franchiseId || 'all'}`;
+    const channel = supabase.channel(channelName);
+    const onRealtimeChange = () => {
+      if (isApiTemporarilyUnavailable()) {
+        return;
+      }
+      const now = Date.now();
+      if (now - realtimeRefreshAtRef.current < 5_000) {
+        return;
+      }
+      realtimeRefreshAtRef.current = now;
+      void refreshAll().catch((err) => {
+        setError(err instanceof Error ? err.message : 'Failed to refresh AMRO overview from realtime updates');
+      });
+    };
+    realtimeTables.forEach((table) => {
+      channel.on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table,
+        filter: `tenant_id=eq.${normalizedScope.tenantId}`,
+      }, onRealtimeChange);
+    });
+    channel.subscribe();
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [isApiTemporarilyUnavailable, normalizedScope.franchiseId, normalizedScope.tenantId, refreshAll]);
 
   const state = useMemo(() => ({
     dashboard,

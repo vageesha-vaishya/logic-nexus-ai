@@ -290,6 +290,30 @@ describe('/api/v2/amro/overview-kpi', () => {
     expect((res.jsonBody as any)?.output).toHaveProperty('anomaly_flags');
   });
 
+  it('applies dashboard pagination metadata for work package overview rows', async () => {
+    process.env.AMRO_OVERVIEW_KPI_V2_ENABLED = 'true';
+    const req: ApiRequest = {
+      method: 'GET',
+      query: {
+        interface: 'load-kpi-dashboard',
+        date_range: '2026-03-01T00:00:00.000Z:2026-03-23T00:00:00.000Z',
+        page: '2',
+        page_size: '1',
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.input?.page).toBe(2);
+    expect((res.jsonBody as any)?.input?.page_size).toBe(1);
+    expect((res.jsonBody as any)?.output?.pagination?.page).toBe(2);
+    expect((res.jsonBody as any)?.output?.pagination?.page_size).toBe(1);
+    expect((res.jsonBody as any)?.output?.pagination?.total_rows).toBeGreaterThanOrEqual(1);
+  });
+
   it('uses latest seeded overview snapshot values when operational tables are empty', async () => {
     process.env.AMRO_OVERVIEW_KPI_V2_ENABLED = 'true';
     const snapshotRows: Record<string, unknown[]> = {
@@ -311,8 +335,9 @@ describe('/api/v2/amro/overview-kpi', () => {
             station_blr: { medium: 6, high: 3 },
             station_hyd: { medium: 4, high: 1 },
           },
-          trend_lines: [{ metric: 'task_completion', slope: 0.16 }],
+          trend_lines: [{ metric: 'task_completion', points: [{ date: '2026-03-20', value: 77.4 }] }],
           anomaly_alerts: [{ metric: 'engine_vibration', count: 2 }],
+          aog_count: 3,
         },
       ],
     };
@@ -332,7 +357,7 @@ describe('/api/v2/amro/overview-kpi', () => {
       method: 'GET',
       query: {
         interface: 'load-kpi-dashboard',
-        date_range: '2026-03-01T00:00:00.000Z:2026-03-21T00:00:00.000Z',
+        date_range: '2026-03-01T00:00:00.000Z:2026-03-23T00:00:00.000Z',
       },
       headers: {},
     };
@@ -345,7 +370,10 @@ describe('/api/v2/amro/overview-kpi', () => {
     expect((res.jsonBody as any)?.output?.executive_summary?.overdue_tasks).toBe(7);
     expect((res.jsonBody as any)?.output?.risk_heatmap?.cells?.[0]?.station).toContain('tenant-1:station_blr');
     expect((res.jsonBody as any)?.output?.trend_lines?.[0]?.metric_key).toBe('task_completion');
+    expect((res.jsonBody as any)?.output?.trend_lines?.[0]?.points?.[0]?.value).toBe(77.4);
     expect((res.jsonBody as any)?.output?.anomaly_flags?.[0]?.metric_key).toBe('engine_vibration');
+    expect((res.jsonBody as any)?.output?.kpi_cards?.some((card: any) => card.key === 'aog_count' && card.value === 3)).toBe(true);
+    expect((res.jsonBody as any)?.output?.snapshot_metadata?.snapshot_id).toBe('snap-1');
   });
 
   it('logs overview dashboard data issues when source tables fail', async () => {
@@ -369,7 +397,7 @@ describe('/api/v2/amro/overview-kpi', () => {
       method: 'GET',
       query: {
         interface: 'load-kpi-dashboard',
-        date_range: '2026-03-01T00:00:00.000Z:2026-03-21T00:00:00.000Z',
+        date_range: '2026-03-01T00:00:00.000Z:2026-03-23T00:00:00.000Z',
       },
       headers: {},
     };
@@ -424,6 +452,7 @@ describe('/api/v2/amro/overview-kpi', () => {
           id: 'wp-9',
           work_package_number: 'WP-009',
           status: 'in_progress',
+          due_at: '2026-03-20T05:00:00.000Z',
           planned_end: '2026-03-22T05:00:00.000Z',
           tenant_id: 'tenant-1',
         },
@@ -580,6 +609,31 @@ describe('/api/v2/amro/overview-kpi', () => {
     expect((res.jsonBody as any)?.output).toHaveProperty('certification_decision_queue');
     expect((res.jsonBody as any)?.output).toHaveProperty('audit_timeline');
     expect((res.jsonBody as any)?.output).toHaveProperty('forecast_recommendation_hub');
+  });
+
+  it('returns trend pagination metadata for certification queue and audit timeline', async () => {
+    process.env.AMRO_OVERVIEW_KPI_V2_ENABLED = 'true';
+    const req: ApiRequest = {
+      method: 'GET',
+      query: {
+        interface: 'load-operational-trends',
+        metric_key: 'schedule_adherence',
+        window: '30d',
+        compare_window: '30d',
+        page: '1',
+        page_size: '1',
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.output?.pagination?.page).toBe(1);
+    expect((res.jsonBody as any)?.output?.pagination?.page_size).toBe(1);
+    expect((res.jsonBody as any)?.output?.pagination?.audit_timeline_total_rows).toBeGreaterThanOrEqual(1);
+    expect((res.jsonBody as any)?.output?.pagination?.certification_queue_total_rows).toBeGreaterThanOrEqual(1);
   });
 
   it('redacts trend actor details for planner persona', async () => {
@@ -787,6 +841,29 @@ describe('/api/v2/amro/overview-kpi', () => {
     expect((res.jsonBody as any)?.output?.export_job_id).toContain('tenant-1-kpi-export');
     expect((res.jsonBody as any)?.policy?.row_cap).toBe(2000);
     expect((res.jsonBody as any)?.policy?.row_cap_applied).toBe(true);
+  });
+
+  it('accepts xlsx export format for overview snapshot', async () => {
+    process.env.AMRO_OVERVIEW_KPI_V2_ENABLED = 'true';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: {
+        interface: 'export-kpi-snapshot',
+      },
+      body: {
+        format: 'xlsx',
+        date_range: '2026-03-01T00:00:00.000Z:2026-03-21T00:00:00.000Z',
+        selected_widgets: ['kpi_cards'],
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.interface).toBe('export-kpi-snapshot');
+    expect((res.jsonBody as any)?.output?.download_url).toContain('.xlsx');
   });
 
   it('rejects export when selected_widgets is empty', async () => {

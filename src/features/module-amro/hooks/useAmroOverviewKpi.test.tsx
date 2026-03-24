@@ -1,6 +1,7 @@
 import { renderHook, waitFor, act } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { __resetAmroOverviewKpiCooldownForTests, useAmroOverviewKpi } from './useAmroOverviewKpi';
+import { supabase } from '@/integrations/supabase/client';
 
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: {
@@ -20,6 +21,13 @@ vi.mock('@/integrations/supabase/client', () => ({
         },
       })),
     },
+    channel: vi.fn(() => ({
+      on: vi.fn(function on() {
+        return this;
+      }),
+      subscribe: vi.fn(() => ({ status: 'SUBSCRIBED' })),
+    })),
+    removeChannel: vi.fn(async () => ({ error: null })),
   },
 }));
 
@@ -27,6 +35,20 @@ describe('useAmroOverviewKpi', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     __resetAmroOverviewKpiCooldownForTests();
+    vi.mocked(supabase.auth.getSession).mockResolvedValue({
+      data: {
+        session: {
+          access_token: 'test-session-token',
+        },
+      },
+    } as Awaited<ReturnType<typeof supabase.auth.getSession>>);
+    vi.mocked(supabase.auth.refreshSession).mockResolvedValue({
+      data: {
+        session: {
+          access_token: 'test-session-token',
+        },
+      },
+    } as Awaited<ReturnType<typeof supabase.auth.refreshSession>>);
   });
 
   it('loads dashboard and trends from the overview KPI endpoint', async () => {
@@ -77,7 +99,59 @@ describe('useAmroOverviewKpi', () => {
     expect(result.current.trends?.variance).toBe(2.1);
   });
 
-  it('exports KPI snapshot through POST interface', async () => {
+  it('calls API in local mode without Authorization when Supabase session is absent', async () => {
+    vi.mocked(supabase.auth.getSession).mockResolvedValue({
+      data: {
+        session: null,
+      },
+    } as Awaited<ReturnType<typeof supabase.auth.getSession>>);
+    vi.mocked(supabase.auth.refreshSession).mockResolvedValue({
+      data: {
+        session: null,
+      },
+    } as Awaited<ReturnType<typeof supabase.auth.refreshSession>>);
+
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          output: {
+            kpi_cards: [{ key: 'open_work_packages', label: 'Open Work Packages', value: 14, trend: '+2%' }],
+            risk_heatmap: { cells: [] },
+            trend_lines: [],
+            anomaly_flags: [],
+            freshness_warning: null,
+          },
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          output: {
+            time_series: [],
+            variance: 1.3,
+            threshold_breaches: [],
+          },
+        }),
+      });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { result } = renderHook(() => useAmroOverviewKpi({
+      tenantId: 'tenant-1',
+      franchiseId: 'franchise-1',
+      userId: 'user-1',
+      domainCode: 'AMRO',
+    }));
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    const requestHeaders = new Headers((fetchMock.mock.calls[0][1] as RequestInit).headers);
+    expect(requestHeaders.get('Authorization')).toBeNull();
+    expect(requestHeaders.get('x-user-id')).toBe('user-1');
+    expect(result.current.dashboard?.kpi_cards[0]?.value).toBe(14);
+  });
+
+  it('exports KPI snapshot through POST interface with excel format support', async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce({
         ok: true,
@@ -119,7 +193,7 @@ describe('useAmroOverviewKpi', () => {
 
     await act(async () => {
       await result.current.exportSnapshot({
-        format: 'pdf',
+        format: 'xlsx',
         dateRange: '2026-03-01T00:00:00.000Z|2026-03-21T00:00:00.000Z',
         selectedWidgets: ['kpi_cards'],
       });
@@ -128,9 +202,142 @@ describe('useAmroOverviewKpi', () => {
     expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(String(fetchMock.mock.calls[2][0])).toContain('interface=export-kpi-snapshot');
     expect(fetchMock.mock.calls[2][1]).toMatchObject({ method: 'POST' });
+    expect(String((fetchMock.mock.calls[2][1] as RequestInit).body)).toContain('"format":"xlsx"');
     expect(new Headers((fetchMock.mock.calls[2][1] as RequestInit).headers).get('Content-Type')).toBe('application/json');
     expect(new Headers((fetchMock.mock.calls[2][1] as RequestInit).headers).get('Authorization')).toBe('Bearer test-session-token');
     expect(result.current.lastExport?.export_job_id).toBe('tenant-1-kpi-export-123');
+  });
+
+  it('passes region filter through dashboard query params', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          output: {
+            kpi_cards: [{ key: 'open_work_packages', label: 'Open Work Packages', value: 42, trend: '+6%' }],
+            risk_heatmap: { cells: [] },
+            trend_lines: [],
+            anomaly_flags: [],
+            freshness_warning: null,
+          },
+        }),
+      })
+      .mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          output: {
+            time_series: [],
+            variance: 2.1,
+            threshold_breaches: [],
+          },
+        }),
+      });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { result } = renderHook(() => useAmroOverviewKpi());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => {
+      await result.current.loadDashboard({
+        dateRange: '2026-03-01T00:00:00.000Z|2026-03-21T00:00:00.000Z',
+        regionIds: ['EMEA'],
+      });
+    });
+
+    expect(fetchMock.mock.calls.some((call) => String(call[0]).includes('region_ids=EMEA'))).toBe(true);
+  });
+
+  it('passes pagination params through dashboard and trends query params', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          output: {
+            kpi_cards: [{ key: 'open_work_packages', label: 'Open Work Packages', value: 42, trend: '+6%' }],
+            risk_heatmap: { cells: [] },
+            trend_lines: [],
+            anomaly_flags: [],
+            freshness_warning: null,
+            time_series: [],
+            variance: 1.1,
+            threshold_breaches: [],
+          },
+        }),
+      });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { result } = renderHook(() => useAmroOverviewKpi());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => {
+      await result.current.loadDashboard({
+        dateRange: '2026-03-01T00:00:00.000Z|2026-03-21T00:00:00.000Z',
+        page: 3,
+        pageSize: 10,
+      });
+      await result.current.loadTrends({
+        metricKey: 'schedule_adherence',
+        window: '30d',
+        compareWindow: '30d',
+        page: 2,
+        pageSize: 5,
+      });
+    });
+
+    const dashboardCalls = fetchMock.mock.calls
+      .map((call) => String(call[0]))
+      .filter((url) => url.includes('interface=load-kpi-dashboard'));
+    const trendCalls = fetchMock.mock.calls
+      .map((call) => String(call[0]))
+      .filter((url) => url.includes('interface=load-operational-trends'));
+    expect(dashboardCalls.some((url) => url.includes('page=3'))).toBe(true);
+    expect(dashboardCalls.some((url) => url.includes('page_size=10'))).toBe(true);
+    expect(trendCalls.some((url) => url.includes('page=2'))).toBe(true);
+    expect(trendCalls.some((url) => url.includes('page_size=5'))).toBe(true);
+  });
+
+  it('propagates dashboard scope filters into trends query params', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          output: {
+            kpi_cards: [{ key: 'open_work_packages', label: 'Open Work Packages', value: 42, trend: '+6%' }],
+            risk_heatmap: { cells: [] },
+            trend_lines: [],
+            anomaly_flags: [],
+            freshness_warning: null,
+            time_series: [],
+            variance: 1.1,
+            threshold_breaches: [],
+          },
+        }),
+      });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { result } = renderHook(() => useAmroOverviewKpi());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => {
+      await result.current.loadDashboard({
+        dateRange: '2026-03-01T00:00:00.000Z|2026-03-21T00:00:00.000Z',
+        stationIds: ['station-a'],
+        fleetIds: ['fleet-a'],
+        regionIds: ['EMEA'],
+      });
+      await result.current.loadTrends({
+        metricKey: 'schedule_adherence',
+        window: '30d',
+        compareWindow: '30d',
+      });
+    });
+
+    const trendCalls = fetchMock.mock.calls
+      .map((call) => String(call[0]))
+      .filter((url) => url.includes('interface=load-operational-trends'));
+    expect(trendCalls.some((url) => url.includes('region_ids=EMEA'))).toBe(true);
+    expect(trendCalls.some((url) => url.includes('station_ids=station-a'))).toBe(true);
+    expect(trendCalls.some((url) => url.includes('fleet_ids=fleet-a'))).toBe(true);
   });
 
   it('surfaces API errors as hook error state', async () => {
@@ -157,6 +364,9 @@ describe('useAmroOverviewKpi', () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     expect(result.current.error).toContain('Forbidden');
+    expect(result.current.dashboard?.kpi_cards[0]?.label).toBe('Open Work Packages');
+    expect(result.current.dashboard?.data_issues?.some((issue) => issue.includes('AMRO KPI API error: Forbidden'))).toBe(true);
+    expect(result.current.trends?.variance).toBe(0);
   });
 
   it('uses fallback KPI snapshot after network connectivity failure', async () => {
