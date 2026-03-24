@@ -579,3 +579,145 @@ The workflow mapping document is accepted when:
 | Version | Date | Author | Change summary |
 |---|---|---|---|
 | 1.0.0 | 2026-03-24 | Logic-Nexus-AI Engineering | Initial comprehensive workflow mapping from AMRO operational baseline |
+| 1.1.0 | 2026-03-24 | Logic-Nexus-AI Engineering | Added nine-module mapping analysis with locations, dependencies, cross-references, and hierarchy |
+
+---
+
+## 15. Nine-Module Mapping Analysis and Location Index
+
+### 15.1 Analysis Scope and Pagination Method
+
+This section provides a complete scan-based mapping analysis for the nine specified AMRO modules:
+
+1. Overview
+2. Work Packages
+3. Task Execution
+4. Scheduling
+5. Parts
+6. Compliance
+7. Certification
+8. Integration
+9. Intelligence
+
+**Pagination convention used for exact page references in this Markdown document:**
+
+- Page 1: lines 1-45
+- Page 2: lines 46-90
+- Page 3: lines 91-135
+- Page 4: lines 136-180
+- Page 5: lines 181-225
+- Page 6: lines 226-270
+- Page 7: lines 271-315
+- Page 8: lines 316-360
+- Page 9: lines 361-405
+- Page 10: lines 406-450
+- Page 11: lines 451-495
+- Page 12: lines 496-540
+- Page 13: lines 541-585
+
+### 15.2 Module-by-Module Location Register
+
+| Module | Exact section header(s) | Subsection/title references | Line references | Page reference(s) | Paragraph ID |
+|---|---|---|---|---|---|
+| Overview | 1. Purpose, Scope, and Validation Basis; 2. BPMN 2.0 End-to-End Workflow Diagram | 2.1 BPMN 2.0 Notation Legend; 2.2 BPMN 2.0 XML | 12-19, 22-35, 36-127 | 1-3 | P-OV-001 |
+| Work Packages | 3. Sequential Workflow Procedures with Go/No-Go Logic; 4. Workflow State Transition Specification | Stage 4 Workscope definition; INSPECTION_COMPLETED -> WORKSCOPE_APPROVED | 55, 91, 93, 95, 104, 140, 218 | 2, 4, 5 | P-WP-001 |
+| Task Execution | 2. BPMN 2.0 End-to-End Workflow Diagram; 3. Sequential Workflow Procedures with Go/No-Go Logic; 4. Workflow State Transition Specification | Task_Execution; Stage 7 Execution line/base/component; EXECUTION_IN_PROGRESS | 64-65, 102, 106, 108, 144, 202, 221-225 | 2, 4, 5 | P-TE-001 |
+| Scheduling | 2. BPMN 2.0 End-to-End Workflow Diagram; 3. Sequential Workflow Procedures with Go/No-Go Logic; 4. Workflow State Transition Specification | Split Planning Streams; Stage 5A/5B and Stage 6 Readiness gate; PLANNING_IN_PROGRESS | 56-63, 95-101, 141-143, 219-220, 241, 302 | 2, 4, 5, 6, 7 | P-SCH-001 |
+| Parts | 3. Sequential Workflow Procedures with Go/No-Go Logic; 5. Error Handling, Escalation, and Rollback; 8. Integration Points and Data Flow Mapping | Stage 5B Materials/tooling planning; AMRO-MAT-424-STK; Planning -> Materials | 58, 97, 99, 142, 144, 220, 242, 341 | 2, 4, 5, 6, 8 | P-PRT-001 |
+| Compliance | 2. BPMN 2.0 End-to-End Workflow Diagram; 3. Sequential Workflow Procedures with Go/No-Go Logic; 5. Error Handling; 9. Operational Requirement Checklists; 10. Formal Review | Task_ComplianceHold; Final Inspection & Compliance Closure; Security and Compliance checklist | 49, 74, 87-88, 147, 233-249, 327, 454-460, 499, 509 | 2, 4, 6, 8, 11, 12 | P-CMP-001 |
+| Certification | 2. BPMN 2.0 End-to-End Workflow Diagram; 3. Sequential Workflow Procedures with Go/No-Go Logic; 4. Workflow State Transition Specification; 5. Error Handling | Release-to-Service Authorization; Stage 11 Release-to-service; RTS_APPROVED; AMRO-RTS-403-AUTH | 78, 109, 116, 148, 206, 226-227, 245, 344-345 | 2, 4, 5, 6, 8 | P-CRT-001 |
+| Integration | 8. Integration Points and Data Flow Mapping | 8.1 Module Interaction Matrix; 8.2 API templates; 8.3 auth; 8.4 transformation; 8.5 MQ config | 333-441 | 8-10 | P-INT-001 |
+| Intelligence | 2. BPMN 2.0 End-to-End Workflow Diagram; 7. Performance Metrics, SLAs, and Measurement Model; 11. Comprehensive Testing Scenarios; 12. Traceability Matrix | Reliability & Analytics Feedback Publish; measurement dashboards; observability/UAT links | 80, 121-122, 293-330, 345, 515-562 | 2-3, 7-8, 12-13 | P-ING-001 |
+
+### 15.3 Sequential Module Mapping with Dependencies
+
+```mermaid
+flowchart LR
+  M1[Overview] --> M2[Work Packages]
+  M2 --> M3[Scheduling]
+  M2 --> M4[Parts]
+  M3 --> M5[Task Execution]
+  M4 --> M5
+  M5 --> M6[Compliance]
+  M6 --> M7[Certification]
+  M7 --> M8[Integration]
+  M8 --> M9[Intelligence]
+  M9 --> M2
+```
+
+**Chronological order in workflow runtime:**
+
+1. Overview establishes process boundaries and BPMN orchestration.
+2. Work Packages defines executable scope from intake and inspection outputs.
+3. Scheduling and Parts run as synchronized readiness streams before execution.
+4. Task Execution performs operational maintenance tasks and evidence capture.
+5. Compliance validates holdpoints, non-conformance handling, and closure.
+6. Certification authorizes RTS/CRS under role and evidence controls.
+7. Integration propagates state/events via API and message channels.
+8. Intelligence consumes outcomes, reliability events, and SLA telemetry for optimization.
+
+### 15.4 Cross-Reference and Dependency Matrix
+
+| From module | To module | Cross-reference location | Relationship type | Dependency condition |
+|---|---|---|---|---|
+| Overview | Work Packages | lines 22-127 to line 140 | structural handoff | BPMN stage context must exist before workscope definition |
+| Work Packages | Scheduling | lines 95-99, 141-143 | predecessor-successor | approved workscope required for planning streams |
+| Work Packages | Parts | lines 97, 99, 142 | predecessor-successor | approved scope drives material/tool demand |
+| Scheduling | Task Execution | lines 101-103, 143, 220 | hard dependency | readiness gate must pass |
+| Parts | Task Execution | lines 142-143, 220, 242 | hard dependency | critical parts/tooling availability must pass |
+| Task Execution | Compliance | lines 106, 110-113, 145, 223-225 | quality gate dependency | holdpoint pass required for progression |
+| Compliance | Certification | lines 115-118, 147-148, 226-227, 245 | authorization dependency | zero unsafe open items and valid certifier |
+| Certification | Integration | lines 120-122, 344-345 | event publication dependency | RTS output triggers delivery/reliability flows |
+| Integration | Intelligence | lines 321-329, 345, 515-562 | telemetry dependency | traces/events/metrics feed dashboards and UAT evidence |
+| Intelligence | Work Packages | lines 80, 121-122 with 552-561 | feedback loop | reliability insights tune future scope/planning decisions |
+
+### 15.5 Hyperlink and Interconnection Catalog
+
+**Direct hyperlinks in document body**
+
+- No in-document markdown hyperlinks are used for the nine module references.
+
+**Operational interconnections used instead of hyperlinks**
+
+- BPMN sequence flows (`F1` to `F33`) connect module-relevant tasks.
+- State transitions connect module stages through lifecycle controls.
+- Integration matrix rows connect module-level data exchange patterns.
+- Traceability rows connect module outputs to UAT pass/fail criteria.
+
+### 15.6 Hierarchical Module Structure in the AMRO Workflow Framework
+
+```mermaid
+flowchart TD
+  H0[AMRO Workflow Framework]
+  H0 --> H1[Foundation Layer]
+  H1 --> H1A[Overview]
+  H0 --> H2[Core Execution Layer]
+  H2 --> H2A[Work Packages]
+  H2 --> H2B[Scheduling]
+  H2 --> H2C[Parts]
+  H2 --> H2D[Task Execution]
+  H0 --> H3[Control and Assurance Layer]
+  H3 --> H3A[Compliance]
+  H3 --> H3B[Certification]
+  H0 --> H4[Platform and Data Layer]
+  H4 --> H4A[Integration]
+  H4 --> H4B[Intelligence]
+```
+
+**Hierarchy interpretation**
+
+- **Foundation Layer:** Overview provides process intent, scope, and BPMN control envelope.
+- **Core Execution Layer:** Work Packages, Scheduling, Parts, and Task Execution drive operational throughput.
+- **Control and Assurance Layer:** Compliance and Certification protect airworthiness and release governance.
+- **Platform and Data Layer:** Integration and Intelligence operationalize interoperability, telemetry, and feedback optimization.
+
+### 15.7 Coverage Validation Checklist
+
+| Validation item | Result | Evidence location |
+|---|---|---|
+| All 9 requested modules identified | Pass | Section 15.2 |
+| Exact section/subsection/line/page locations documented | Pass | Section 15.2 |
+| Sequential order and dependencies captured | Pass | Section 15.3 and 15.4 |
+| Cross-references/interconnections cataloged | Pass | Section 15.4 and 15.5 |
+| Hierarchical structure documented | Pass | Section 15.6 |
+| No module omitted | Pass | Section 15.2 module register |
