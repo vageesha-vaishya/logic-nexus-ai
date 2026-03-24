@@ -629,6 +629,115 @@ This section provides a complete scan-based mapping analysis for the nine specif
 | Integration | 8. Integration Points and Data Flow Mapping | 8.1 Module Interaction Matrix; 8.2 API templates; 8.3 auth; 8.4 transformation; 8.5 MQ config | 333-441 | 8-10 | P-INT-001 |
 | Intelligence | 2. BPMN 2.0 End-to-End Workflow Diagram; 7. Performance Metrics, SLAs, and Measurement Model; 11. Comprehensive Testing Scenarios; 12. Traceability Matrix | Reliability & Analytics Feedback Publish; measurement dashboards; observability/UAT links | 80, 121-122, 293-330, 345, 515-562 | 2-3, 7-8, 12-13 | P-ING-001 |
 
+### 15.2A Implementation Status Assessment (Codebase Cross-Reference)
+
+**Assessment timestamp:** 2026-03-24  
+**Authoritative references used:** `AMRO_LOW_LEVEL_DESIGN.md` section 15.2 and `AMRO_OPERATIONAL_DOCUMENT.md` sections 5-10  
+**Codebase scope checked:** `src/pages/api/v2/amro/*`, `src/features/module-amro/*`, routing in `src/App.tsx`
+
+#### 15.2A.1 Category Summary (Fully Implemented / Partially Complete / Unimplemented)
+
+| Category | Modules | Count |
+|---|---|---|
+| Fully implemented | None | 0 |
+| Partially complete | Overview, Work Packages, Task Execution, Scheduling, Parts, Compliance, Certification, Integration, Intelligence | 9 |
+| Unimplemented | None at full-module level | 0 |
+
+#### 15.2A.2 Module Completion Matrix (Percent Rounded to Nearest 5%)
+
+| Module | Completion | Current status category | Missing components (technical) | Critical blockers/dependencies | Complexity |
+|---|---:|---|---|---|---|
+| Overview | 75% | Partially complete | `export-kpi-snapshot` returns generated IDs/URL without persisted export job state; no durable artifact storage lifecycle; KPI freshness warning is advisory and not backed by cache invalidation service | Depends on analytics export worker + object storage + signed download service | Medium |
+| Work Packages | 80% | Partially complete | `create-work-package`/`transition-work-package`/`clone-template` enforce policy but do not persist to AMRO operational tables; template visibility check is string/rule-based, not registry-backed; transition gate outputs are not committed to a workflow transaction log | Depends on AMRO workflow persistence layer and template registry service | High |
+| Task Execution | 80% | Partially complete | `upload-evidence` validates metadata but does not store binary/object evidence in durable storage; `submit-signature` validates payload but does not write immutable signature ledger record; offline queue reconciliation supports memory/redis paths but lacks durable cross-environment replay assurance for all paths | Depends on evidence object store, signature ledger, and resilient queue runtime in production | High |
+| Scheduling | 70% | Partially complete | `assign-maintenance-slot`/`run-replan-simulation`/`confirm-replan` are contract-complete but not persisted as canonical schedule state; simulation recommendations are deterministic/static scoring and not connected to full constraint engine; schedule confirmation is not integrated with downstream work package transaction boundaries | Depends on scheduling state store, optimizer service, and transactional orchestration with work packages | High |
+| Parts | 70% | Partially complete | `reserve-parts`/`process-shortage-response`/`sync-supplier-eta` are implemented in workflow interface layer but not tied to persistent inventory reservation tables in v2 path; supplier/ERP sync events are acknowledged without adapter-level delivery receipts persisted per partner | Depends on inventory service persistence and ERP/supplier adapter runtime telemetry | High |
+| Compliance | 80% | Partially complete | `evaluate-compliance-gate`/`register-exception-request`/`generate-compliance-dossier` return structured outputs, but dossier assembly is metadata-level (manifest list) without full artifact packaging pipeline; exception workflow lacks end-to-end review state machine persistence | Depends on records service, artifact packaging pipeline, and review workflow engine | High |
+| Certification | 75% | Partially complete | Certifying authority validation and decision submission are implemented, but authority source is not integrated with a persistent IAM/qualification registry in v2 runtime path; escalation chain validation is policy-driven but not directory-backed | Depends on qualification registry integration and certifier authority graph source | High |
+| Integration | 70% | Partially complete | `ingest-partner-payload`/`replay-failed-integration-job`/`publish-outbound-callback` are present, but callback/replay status is not persisted in an integration job store with full lifecycle transitions; canonical event lineage is generated but not committed to durable partner-runbook tables | Depends on adapter runtime persistence, delivery tracking, and retry orchestration store | High |
+| Intelligence | 65% | Partially complete | `score-maintenance-risk`/`generate-intervention-recommendations`/`capture-recommendation-outcome` are implemented with deterministic heuristics; no production feature store/model registry integration; feedback capture does not trigger a managed model update pipeline | Depends on ML feature store, model serving pipeline, and governed learning loop | High |
+
+#### 15.2A.3 Section 15.2 Requirement Gap Register (LLD Requirement vs Actual)
+
+| LLD 15.2 requirement | Codebase status | Gap type | Impact |
+|---|---|---|---|
+| Overview export requires governed export privilege and capped rows | Implemented (`overview-kpi.ts`) | Partial | Privilege and cap checks exist, but export lifecycle is not persisted for audit/download governance |
+| Work package create/transition/clone contracts | Implemented (`work-packages.ts`) | Partial | Validation is strong, but durable persistence and template-version source-of-truth are missing |
+| Task step/evidence/signature non-repudiation flow | Implemented (`tasks.ts`) | Partial | Integrity checks exist, but immutable evidence/signature persistence path is incomplete |
+| Scheduling assign/replan/confirm with conflict constraints | Implemented (`schedules/index.ts`, `schedules/replan.ts`, `work-packages.ts`) | Partial | Constraint checks exist, but no canonical scheduling state engine persistence |
+| Parts reserve/shortage/supplier ETA trusted adapter flow | Implemented (`work-packages.ts`) | Partial | API-level trust checks exist, but adapter delivery traceability storage is incomplete |
+| Compliance gate/exception/dossier obligations | Implemented (`compliance-gates.ts`) | Partial | Gate logic exists, but dossier artifact finalization and review workflow persistence are incomplete |
+| Certification validate/decision/escalation authority chain | Implemented (`certification.ts`) | Partial | Decision path exists, but authority chain is not fully backed by externalized registry source |
+| Integration ingest/replay/callback with schema and retry contracts | Implemented (`integration-hub.ts`) | Partial | Runtime contracts exist, but job lifecycle durability and callback evidence persistence are incomplete |
+| Forecast risk/recommendations/outcome feedback | Implemented (`forecast-reliability.ts`) | Partial | Functional interface exists, but ML operationalization and closed-loop model governance are incomplete |
+
+**Result:** No entire 15.2 interface is missing, but all nine modules still have partial implementation gaps against the LLD production-grade operational requirements.
+
+#### 15.2A.4 Testing Status (Unit/Integration/UAT)
+
+| Module | Automated test status | Coverage snapshot (lines %) | Integration test result | UAT status |
+|---|---|---:|---|---|
+| Overview | `overview-kpi.test.ts` passed | 82.85% | Pass (19/19 tests) | Not executed (0% complete) |
+| Work Packages | `work-packages.test.ts` passed | 86.82% | Pass (33/33 tests) | Not executed (0% complete) |
+| Task Execution | `tasks.test.ts` passed | 85.10% | Pass (19/19 tests) | Not executed (0% complete) |
+| Scheduling | `schedules/index.test.ts`, `schedules/replan.test.ts` passed | 92.59% / 93.33% | Pass (13/13 tests) | Not executed (0% complete) |
+| Parts | `inventory/reservations.test.ts`, `inventory/availability.test.ts` passed | 79.54% / 81.57% | Pass (2/2 tests) | Not executed (0% complete) |
+| Compliance | `compliance-gates.test.ts` passed | 89.22% | Pass (23/23 tests) | Not executed (0% complete) |
+| Certification | `certification.test.ts` passed | 87.19% | Pass (11/11 tests) | Not executed (0% complete) |
+| Integration | `integration-hub.test.ts` passed | 90.78% | Pass (18/18 tests) | Not executed (0% complete) |
+| Intelligence | `forecast-reliability.test.ts` passed | 85.21% | Pass (6/6 tests) | Not executed (0% complete) |
+
+**Observed cross-suite note:** `npm run test:amro` currently reports one failing route expectation in `src/tests/integration/amro-domain-separation.test.ts` and should be remediated before UAT entry.
+
+#### 15.2A.5 Implementation Timeline (Milestones, Dates, Deliverables)
+
+| Milestone | Date | Primary deliverables | Exit condition |
+|---|---|---|---|
+| M1 Gap Closure Baseline | 2026-03-29 | Finalized persistence design for all 15.2 interfaces; module-level gap acceptance and ownership | Architecture sign-off recorded |
+| M2 Transactional Persistence | 2026-04-05 | Durable write paths for work packages, tasks, scheduling, parts, compliance, certification, integration, intelligence outcomes | API writes mapped to AMRO operational tables and replay-safe |
+| M3 Artifact and Evidence Hardening | 2026-04-12 | Evidence object storage path, signature ledger persistence, compliance dossier artifact packaging | Non-repudiation and dossier artifact integrity validated |
+| M4 Integration Runtime Hardening | 2026-04-19 | Partner callback lifecycle tracking, replay durability, adapter health and retry telemetry | Integration job lifecycle audit-complete |
+| M5 Intelligence Productionization | 2026-04-26 | Feature-store hookup, model-scoring runtime integration, recommendation feedback governance | Forecast loop traceable with model governance controls |
+| M6 UAT and Readiness Board | 2026-05-03 | Full 15.2 UAT execution, unresolved blockers closure, go/no-go package | UAT critical failures = 0 and final board approval |
+
+#### 15.2A.6 Resource Allocation and Effort Plan
+
+| Team | Assignment | Estimated effort |
+|---|---|---|
+| Backend AMRO Core (2.0 FTE) | Work Packages, Task Execution, Scheduling, Parts persistence and transactional orchestration | 60 engineer-days |
+| Compliance & Certification Engineering (0.75 FTE) | Gate decisions, exception workflow state machine, authority registry integration | 22 engineer-days |
+| Integration Platform (0.75 FTE) | Adapter runtime durability, callback/replay lifecycle persistence, delivery telemetry | 22 engineer-days |
+| Data/ML Engineering (0.5 FTE) | Forecast reliability production scoring path, feedback loop governance, model metadata trail | 15 engineer-days |
+| QA + UAT Coordination (0.5 FTE) | Contract/integration expansion, regression, UAT execution and defect triage | 15 engineer-days |
+
+#### 15.2A.7 Priority Recommendations for Incomplete Modules
+
+| Priority | Module | Estimated completion effort | Key risk | Mitigation strategy |
+|---|---|---:|---|---|
+| P1 | Work Packages | 12 days | Non-transactional lifecycle progression may cause operational divergence | Implement write-through persistence + transition transaction boundaries + rollback-safe state machine |
+| P1 | Task Execution | 10 days | Evidence/signature non-repudiation gap under audit | Integrate immutable evidence storage and signature ledger append in same transaction boundary |
+| P1 | Compliance | 10 days | Dossier and exception lifecycle not fully auditable | Add dossier artifact finalizer and exception review workflow persistence with SLA timers |
+| P1 | Certification | 9 days | Authority validation may drift from real certifier registry | Integrate authoritative qualification registry and enforce runtime authority-chain lookup |
+| P1 | Scheduling | 9 days | Replan outputs not tied to canonical schedule state | Persist schedule decisions and enforce atomic update to affected work packages |
+| P2 | Parts | 8 days | Shortage/ETA decisions may not align with actual inventory/ERP state | Add reservation ledger persistence and adapter acknowledgment reconciliation |
+| P2 | Integration | 8 days | Replay/callback observability gaps under partner incident conditions | Implement job-state tables with retry history, delivery receipts, and dead-letter visibility |
+| P2 | Overview | 6 days | Export traceability and artifact governance gaps | Add export job table, signed artifact storage, and retrieval audit logging |
+| P3 | Intelligence | 11 days | Heuristic-only scoring reduces forecast reliability confidence | Connect feature store + governed model runtime + outcome-to-model feedback policy |
+
+#### 15.2A.8 Immediate Next Steps per Module
+
+| Module | Next step 1 | Next step 2 | Next step 3 |
+|---|---|---|---|
+| Overview | Persist export job metadata | Generate signed artifact URLs from storage service | Add export audit retrieval endpoint |
+| Work Packages | Persist create/transition/clone events | Bind transitions to compliance gate transaction checks | Add template registry-backed version validation |
+| Task Execution | Store evidence references in durable ledger | Append signature records to immutable chain | Harden offline replay with deterministic server checkpoints |
+| Scheduling | Persist assign/replan/confirm decisions | Integrate optimizer constraints from live capacity calendars | Link replan confirmation to affected WP atomic update |
+| Parts | Persist reservation and shortage workflows | Attach supplier ETA sync acknowledgment records | Enforce adapter trust via signed source metadata |
+| Compliance | Persist exception workflow states | Build dossier artifact finalization pipeline | Extend post-release audit replay with retained packages |
+| Certification | Integrate authority graph lookup | Persist escalation events to cert chain log | Enforce mandatory signature matrix from registry policies |
+| Integration | Add durable ingestion/replay/callback tables | Persist partner schema negotiation and delivery attempts | Add dead-letter and replay observability dashboard feed |
+| Intelligence | Replace heuristic scoring with model-serving endpoint | Persist recommendation outcome feedback for retraining | Add confidence monitoring and drift alerting |
+
 ### 15.3 Sequential Module Mapping with Dependencies
 
 ```mermaid
