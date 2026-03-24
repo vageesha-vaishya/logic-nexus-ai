@@ -23,6 +23,10 @@ type EntityConfig = {
   defaultSortColumn: string;
 };
 
+const ENTITY_UNAVAILABLE = new Set<MasterEntity>();
+const ENTITY_COLUMN_OVERRIDES = new Map<MasterEntity, Set<string>>();
+const ENTITY_SEARCH_COLUMN_OVERRIDES = new Map<MasterEntity, Set<string>>();
+
 class HttpError extends Error {
   statusCode: number;
 
@@ -250,6 +254,92 @@ function parseBulkOperation(body: unknown): { isBulkImport: boolean; records: Js
     ? payload.records.filter((record) => record && typeof record === 'object') as JsonRecord[]
     : [];
   return { isBulkImport: operation === 'bulk_import', records };
+}
+
+function splitColumns(raw: string): string[] {
+  return raw
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+}
+
+function getActiveColumns(entity: MasterEntity): string[] {
+  const override = ENTITY_COLUMN_OVERRIDES.get(entity);
+  if (override) {
+    return Array.from(override);
+  }
+  return splitColumns(ENTITY_CONFIG[entity].listColumns);
+}
+
+function getActiveSearchableColumns(entity: MasterEntity): string[] {
+  const override = ENTITY_SEARCH_COLUMN_OVERRIDES.get(entity);
+  if (override) {
+    return Array.from(override);
+  }
+  return [...ENTITY_CONFIG[entity].searchableColumns];
+}
+
+function getSelectClause(entity: MasterEntity): string {
+  const columns = getActiveColumns(entity);
+  if (!columns.length) {
+    return '*';
+  }
+  return columns.join(',');
+}
+
+function markMissingColumn(entity: MasterEntity, rawColumnName: string): boolean {
+  const normalized = rawColumnName.replace(/^public\./, '');
+  const column = normalized.includes('.') ? normalized.split('.').slice(-1)[0] : normalized;
+  if (!column) {
+    return false;
+  }
+  const columns = new Set(getActiveColumns(entity));
+  const hadColumn = columns.delete(column);
+  if (hadColumn) {
+    ENTITY_COLUMN_OVERRIDES.set(entity, columns);
+  }
+  const searchableColumns = new Set(getActiveSearchableColumns(entity));
+  const hadSearchColumn = searchableColumns.delete(column);
+  if (hadSearchColumn) {
+    ENTITY_SEARCH_COLUMN_OVERRIDES.set(entity, searchableColumns);
+  }
+  return hadColumn || hadSearchColumn;
+}
+
+function extractMissingColumn(errorMessage: string): string | null {
+  const direct = errorMessage.match(/column\s+([a-zA-Z0-9_."]+)\s+does not exist/i);
+  if (direct?.[1]) {
+    return direct[1].replace(/"/g, '');
+  }
+  const postgrest = errorMessage.match(/Could not find the ['"]?([a-zA-Z0-9_]+)['"]? column/i);
+  if (postgrest?.[1]) {
+    return postgrest[1];
+  }
+  return null;
+}
+
+function isMissingTableError(errorMessage: string): boolean {
+  return (
+    /Could not find the table/i.test(errorMessage) ||
+    /relation\s+["']?[a-zA-Z0-9_.]+["']?\s+does not exist/i.test(errorMessage)
+  );
+}
+
+function resolveSortColumn(entity: MasterEntity, requestedSortBy: string): string {
+  const columns = getActiveColumns(entity);
+  if (!columns.length) {
+    return requestedSortBy || 'updated_at';
+  }
+  if (requestedSortBy && columns.includes(requestedSortBy)) {
+    return requestedSortBy;
+  }
+  if (columns.includes('updated_at')) {
+    return 'updated_at';
+  }
+  if (columns.includes('created_at')) {
+    return 'created_at';
+  }
+  return columns[0];
 }
 
 function normalizeAircraft(payload: JsonRecord): JsonRecord {
@@ -490,6 +580,20 @@ router.get(
       throw new HttpError('Missing tenant context', 401);
     }
     const entity = resolveEntity(req.params.entity);
+    if (ENTITY_UNAVAILABLE.has(entity)) {
+      res.status(200).json({
+        version: 'v2',
+        correlationId,
+        output: {
+          entity,
+          records: [],
+          page: 1,
+          page_size: 25,
+          total: 0,
+        },
+      });
+      return;
+    }
     const entityConfig = ENTITY_CONFIG[entity];
     const search = parseSearch(req);
     const exportRequested = parseExportRequested(req);
@@ -498,27 +602,55 @@ router.get(
     const franchiseId = extractFranchiseId(req);
     const supabase = getSupabaseAdminClient();
 
-    let query = supabase
-      .from(entityConfig.table)
-      .select(entityConfig.listColumns, { count: 'exact' })
-      .eq('tenant_id', req.tenantId)
-      .order(sortBy, { ascending })
-      .range(start, end);
+    let finalData: unknown[] = [];
+    let finalCount = 0;
+    let currentSortBy = resolveSortColumn(entity, sortBy);
 
-    if (franchiseId) {
-      query = query.or(`franchise_id.is.null,franchise_id.eq.${franchiseId}`);
-    }
-    if (search && !franchiseId) {
-      const clauses = entityConfig.searchableColumns.map((column) => `${column}.ilike.%${search}%`);
-      query = query.or(clauses.join(','));
-    }
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const selectClause = getSelectClause(entity);
+      const searchableColumns = getActiveSearchableColumns(entity);
+      let query = supabase
+        .from(entityConfig.table)
+        .select(selectClause, { count: 'exact' })
+        .eq('tenant_id', req.tenantId)
+        .order(currentSortBy, { ascending })
+        .range(start, end);
 
-    const { data, count, error } = await query;
-    if (error) {
-      throw new HttpError(error.message, 400);
+      if (franchiseId) {
+        query = query.or(`franchise_id.is.null,franchise_id.eq.${franchiseId}`);
+      }
+      if (search && !franchiseId && searchableColumns.length) {
+        const clauses = searchableColumns.map((column) => `${column}.ilike.%${search}%`);
+        query = query.or(clauses.join(','));
+      }
+
+      const { data, count, error } = await query;
+      if (!error) {
+        finalData = Array.isArray(data) ? data : [];
+        finalCount = count || 0;
+        break;
+      }
+
+      const errorMessage = String(error.message || '');
+      if (isMissingTableError(errorMessage)) {
+        ENTITY_UNAVAILABLE.add(entity);
+        finalData = [];
+        finalCount = 0;
+        break;
+      }
+
+      const missingColumn = extractMissingColumn(errorMessage);
+      if (missingColumn && markMissingColumn(entity, missingColumn)) {
+        currentSortBy = resolveSortColumn(entity, currentSortBy);
+        continue;
+      }
+
+      throw new HttpError(errorMessage, 400);
     }
-    const rawRows = Array.isArray(data) ? (data as unknown as JsonRecord[]) : [];
-    const rows = franchiseId && search ? rawRows.filter((row) => matchesSearch(row, entityConfig.searchableColumns, search)) : rawRows;
+    const rawRows = Array.isArray(finalData) ? (finalData as unknown as JsonRecord[]) : [];
+    const activeSearchableColumns = getActiveSearchableColumns(entity);
+    const rows =
+      franchiseId && search ? rawRows.filter((row) => matchesSearch(row, activeSearchableColumns, search)) : rawRows;
 
     if (exportRequested) {
       const csv = buildCsv(rows);
@@ -536,7 +668,7 @@ router.get(
         records: rows,
         page,
         page_size: pageSize,
-        total: count || rows.length,
+        total: finalCount || rows.length,
       },
     });
   }),
