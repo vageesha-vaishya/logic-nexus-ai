@@ -5,7 +5,7 @@ DECLARE
   t RECORD;
   tenant_key text;
   selected_franchise_id uuid;
-  policy_key text;
+  policy_key_value text;
   policy_snapshot_id uuid;
   tenant_query text;
   has_tenant_domain_assignments boolean;
@@ -56,7 +56,7 @@ BEGIN
     ORDER BY f.created_at ASC NULLS LAST, f.id ASC
     LIMIT 1;
 
-    policy_key := format('AMRO-SEED-%s-POLICY-V1', tenant_key);
+    policy_key_value := format('AMRO-SEED-%s-POLICY-V1', tenant_key);
 
     INSERT INTO public.policy_snapshots (
       tenant_id,
@@ -73,7 +73,7 @@ BEGIN
       selected_franchise_id,
       'regulatory_compliance',
       1,
-      policy_key,
+      policy_key_value,
       jsonb_build_object(
         'authority_profiles', jsonb_build_array('FAA', 'EASA', 'CAAC'),
         'release_gate_rules', jsonb_build_array(
@@ -83,14 +83,14 @@ BEGIN
         'shift_capacity_threshold_pct', 85
       ),
       now() - interval '30 days',
-      md5(format('%s:%s:%s', t.id::text, COALESCE(selected_franchise_id::text, ''), policy_key))
+      md5(format('%s:%s:%s', t.id::text, COALESCE(selected_franchise_id::text, ''), policy_key_value))
     WHERE NOT EXISTS (
       SELECT 1
       FROM public.policy_snapshots ps
       WHERE ps.tenant_id = t.id
         AND COALESCE(ps.franchise_id, '00000000-0000-0000-0000-000000000000'::uuid) =
             COALESCE(selected_franchise_id, '00000000-0000-0000-0000-000000000000'::uuid)
-        AND ps.policy_key = policy_key
+        AND ps.policy_key = policy_key_value
     );
 
     SELECT ps.id
@@ -99,7 +99,7 @@ BEGIN
     WHERE ps.tenant_id = t.id
       AND COALESCE(ps.franchise_id, '00000000-0000-0000-0000-000000000000'::uuid) =
           COALESCE(selected_franchise_id, '00000000-0000-0000-0000-000000000000'::uuid)
-      AND ps.policy_key = policy_key
+      AND ps.policy_key = policy_key_value
     ORDER BY ps.version DESC, ps.created_at DESC
     LIMIT 1;
 
