@@ -6,7 +6,8 @@ const lldPath = path.resolve(repoRoot, 'docs/AMRO_LOW_LEVEL_DESIGN.md');
 const migrations = [
   path.resolve(repoRoot, 'supabase/migrations/20260319143000_create_amro_schema.sql'),
   path.resolve(repoRoot, 'supabase/migrations/20260319143100_create_amro_audit_schema.sql'),
-  path.resolve(repoRoot, 'supabase/migrations/20260322150000_amro_expanded_schema_controls.sql')
+  path.resolve(repoRoot, 'supabase/migrations/20260322150000_amro_expanded_schema_controls.sql'),
+  path.resolve(repoRoot, 'supabase/migrations/20260324170000_amro_master_data_entity_structure_repairs.sql')
 ];
 const reportDir = path.resolve(repoRoot, 'artifacts/mro/analysis');
 const reportPath = path.resolve(reportDir, 'amro-db-docs-compliance-report.json');
@@ -38,6 +39,7 @@ const normalizeDefault = (value) =>
 const parseActualTables = (sqlText) => {
   const tables = new Map();
   const tableRegex = /CREATE TABLE IF NOT EXISTS\s+([\w\.]+)\s*\(([\s\S]*?)\);/g;
+  const alterAddColumnRegex = /ALTER TABLE\s+([\w\.]+)\s+ADD COLUMN IF NOT EXISTS\s+(\w+)\s+([^;]+);/g;
   let tableMatch;
 
   while ((tableMatch = tableRegex.exec(sqlText))) {
@@ -72,6 +74,27 @@ const parseActualTables = (sqlText) => {
     }
 
     tables.set(tableName, { columns });
+  }
+
+  let alterMatch;
+  while ((alterMatch = alterAddColumnRegex.exec(sqlText))) {
+    const tableName = alterMatch[1];
+    const columnName = alterMatch[2];
+    const spec = alterMatch[3].trim();
+    const table = tables.get(tableName);
+    if (!table) {
+      continue;
+    }
+    const keywordIndex = spec.search(/\s(?:not null|null|default|references|check|unique|primary key)\b/i);
+    const dataType = keywordIndex === -1 ? spec : spec.slice(0, keywordIndex);
+    const defaultMatch = spec.match(/\bDEFAULT\s+(.+?)(?=\s(?:REFERENCES|CHECK|UNIQUE|PRIMARY KEY)\b|$)/i);
+    const isPrimaryKey = /\bPRIMARY KEY\b/i.test(spec);
+
+    table.columns.set(columnName, {
+      type: normalizeType(dataType.replace(/,\s*$/, '')),
+      nullable: !/\bNOT NULL\b/i.test(spec) && !isPrimaryKey,
+      defaultValue: normalizeDefault(defaultMatch ? defaultMatch[1] : '—')
+    });
   }
 
   return tables;

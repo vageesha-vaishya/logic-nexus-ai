@@ -145,4 +145,37 @@ describe('/api/v2/amro/master-data/[entity]/[id]', () => {
     expect(res.statusCode).toBe(404);
     expect((res.jsonBody as any)?.error).toBe('Record not found');
   });
+
+  it('returns PATCH validation results when validate_only is enabled', async () => {
+    const maybeSingleMock = vi.fn().mockResolvedValue({
+      data: { id: 'inv-1', part_number: 'PN-100', tenant_id: 'tenant-1' },
+      error: null,
+    });
+    const limitMock = vi.fn().mockReturnValue({ maybeSingle: maybeSingleMock });
+    const eqIdMock = vi.fn().mockReturnValue({ limit: limitMock });
+    const eqTenantMock = vi.fn().mockReturnValue({ eq: eqIdMock });
+    const selectMock = vi.fn().mockReturnValue({ eq: eqTenantMock });
+    const fromMock = vi.fn().mockReturnValue({ select: selectMock });
+    vi.mocked(getSupabaseAdminClient).mockReturnValue({
+      from: fromMock,
+    } as any);
+
+    const req: ApiRequest = {
+      method: 'PATCH',
+      query: { entity: 'parts_inventory', id: 'inv-1', validate_only: 'true' },
+      body: {
+        quantity_on_hand: 1,
+        quantity_reserved: 2,
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.output?.validation?.is_valid).toBe(false);
+    expect((res.jsonBody as any)?.output?.validation?.issues?.length).toBeGreaterThan(0);
+    expect(fromMock).toHaveBeenCalledTimes(1);
+  });
 });

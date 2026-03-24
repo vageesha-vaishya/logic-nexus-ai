@@ -1834,8 +1834,9 @@ All database implementation and review activities must treat this section as nor
 | `updated_by` | `uuid` | Yes | — | FK -> `auth.users(id)` ON DELETE SET NULL |
 | `deleted_at` | `timestamptz` | Yes | — | Soft delete marker |
 
-- Unique constraints: `(tenant_id, COALESCE(franchise_id, zero_uuid), template_code, version)`
-- Indexes: `idx_work_package_templates_tenant_active`, `uq_work_package_templates_tenant_franchise_code_version`
+- Unique constraints: `(tenant_id, COALESCE(franchise_id, zero_uuid), template_code, version)` for active rows (`deleted_at IS NULL`)
+- Check constraints: `version > 0`, `jsonb_typeof(scope_json) = 'array'`, `jsonb_typeof(tasks_json) = 'array'`
+- Indexes: `idx_work_package_templates_tenant_active`, `uq_work_package_templates_tenant_franchise_code_version_active`
 
 #### 28.2.11 `public.task_evidence`
 
@@ -2001,6 +2002,64 @@ All database implementation and review activities must treat this section as nor
 - Unique constraints: `(tenant_id, COALESCE(franchise_id, zero_uuid), recommendation_id)`
 - Indexes: `idx_forecast_decisions_tenant_decided_at_desc`, `uq_forecast_decisions_tenant_franchise_recommendation`
 
+#### 28.2.17 `public.shift_calendars`
+
+- Namespace prefix: `public`
+- Purpose: Maintains station-level maintenance shift capacity windows used by scheduling and slot optimization.
+- Estimated row count: 2,000-1,500,000 per active tenant per 12 months.
+- Primary key: `id`
+- Security considerations: Tenant/franchise RLS isolation with soft-delete aware uniqueness to avoid cross-franchise leakage.
+
+| Column | Type | Nullable | Default | Constraints |
+|---|---|---|---|---|
+| `id` | `uuid` | No | `gen_random_uuid()` | Primary key |
+| `tenant_id` | `uuid` | No | — | FK -> `public.tenants(id)` ON DELETE CASCADE |
+| `franchise_id` | `uuid` | Yes | — | FK -> `public.franchises(id)` ON DELETE SET NULL |
+| `station_code` | `text` | No | — | Station identifier |
+| `shift_name` | `text` | No | — | Shift label within station scope |
+| `shift_start_time` | `time` | No | — | Shift opening time |
+| `shift_end_time` | `time` | No | — | Shift closing time |
+| `capacity` | `integer` | No | `1` | Check `capacity > 0` |
+| `effective_from` | `date` | No | `CURRENT_DATE` | Start date |
+| `effective_to` | `date` | Yes | — | Optional end date |
+| `is_active` | `boolean` | No | `true` | Active-state selector |
+| `created_at` | `timestamptz` | No | `now()` | — |
+| `updated_at` | `timestamptz` | No | `now()` | — |
+| `deleted_at` | `timestamptz` | Yes | — | Soft delete marker |
+
+- Unique constraints: `(tenant_id, COALESCE(franchise_id, zero_uuid), station_code, shift_name, effective_from)` for active rows (`deleted_at IS NULL`)
+- Check constraints: `capacity > 0`, `shift_start_time <> shift_end_time`
+- Indexes: `idx_shift_calendars_tenant_station`, `idx_shift_calendars_tenant_active`, `uq_shift_calendars_tenant_franchise_station_shift_effective_active`
+
+#### 28.2.18 `public.regulator_profiles`
+
+- Namespace prefix: `public`
+- Purpose: Stores regulator authority profiles and effective policy versions used by compliance gates and release decisions.
+- Estimated row count: 500-300,000 per active tenant per 12 months.
+- Primary key: `id`
+- Security considerations: Tenant/franchise RLS isolation with active-row uniqueness on `(regulator_code, policy_version)` to maintain policy replay integrity.
+
+| Column | Type | Nullable | Default | Constraints |
+|---|---|---|---|---|
+| `id` | `uuid` | No | `gen_random_uuid()` | Primary key |
+| `tenant_id` | `uuid` | No | — | FK -> `public.tenants(id)` ON DELETE CASCADE |
+| `franchise_id` | `uuid` | Yes | — | FK -> `public.franchises(id)` ON DELETE SET NULL |
+| `regulator_code` | `text` | No | — | Authority business code |
+| `regulator_name` | `text` | No | — | Display name |
+| `jurisdiction` | `text` | No | — | Jurisdiction scope |
+| `policy_version` | `text` | No | — | Effective policy version |
+| `effective_from` | `date` | No | `CURRENT_DATE` | Start date |
+| `effective_to` | `date` | Yes | — | Optional end date |
+| `is_active` | `boolean` | No | `true` | Active-state selector |
+| `metadata` | `jsonb` | No | `'{}'::jsonb` | Structured policy metadata |
+| `created_at` | `timestamptz` | No | `now()` | — |
+| `updated_at` | `timestamptz` | No | `now()` | — |
+| `deleted_at` | `timestamptz` | Yes | — | Soft delete marker |
+
+- Unique constraints: `(tenant_id, COALESCE(franchise_id, zero_uuid), regulator_code, policy_version)` for active rows (`deleted_at IS NULL`)
+- Check constraints: `regulator_code <> ''`, `regulator_name <> ''`, `jurisdiction <> ''`, `policy_version <> ''`
+- Indexes: `idx_regulator_profiles_tenant_code`, `idx_regulator_profiles_tenant_active`, `uq_regulator_profiles_tenant_franchise_code_policy_active`
+
 ### 28.3 Supporting Schema Components
 
 - Domains in `public` schema:
@@ -2018,6 +2077,24 @@ All database implementation and review activities must treat this section as nor
 - Security posture:
   - RLS is enabled across all AMRO operational and audit tables.
   - Access is controlled by platform-admin and tenant-scoped policies using `public.user_roles`.
+
+### 28.4 Seed Data Process (Master Data Entities)
+
+- Seed migrations:
+  - `20260324171000_amro_master_data_entity_seed_pack.sql` seeds `regulator_profiles`, `shift_calendars`, `work_package_templates` and links templates to `policy_snapshots`.
+  - `20260324170000_amro_master_data_entity_structure_repairs.sql` applies supporting integrity constraints and active-row unique indexes for these entities.
+- Tenant scope logic:
+  - Seed execution targets AMRO-assigned tenants in `tenant_domain_assignments` joined to active `platform_domains(code='amro')`.
+  - If domain-assignment tables are unavailable, the script falls back to all tenants to preserve deployment continuity.
+- Franchise scope logic:
+  - One franchise is selected per tenant when available; otherwise tenant-global records are seeded with `franchise_id = NULL`.
+- Scenario coverage:
+  - Regulator profiles include active and inactive versions plus open-ended and bounded effective windows.
+  - Shift calendars include day/swing/night shifts and an overnight shift where `shift_end_time < shift_start_time`.
+  - Work package templates include multiple maintenance types, active/inactive template states, and varied JSON scope/task payloads.
+- Idempotency and safety:
+  - Inserts are guarded with scoped `NOT EXISTS` checks aligned to active-row business keys.
+  - Soft-deleted records are excluded from conflict checks via `deleted_at IS NULL`.
 
 ## 29. Plugins and Modules Documentation Contract
 

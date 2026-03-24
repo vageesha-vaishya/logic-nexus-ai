@@ -132,6 +132,39 @@ describe('/api/v2/amro/master-data/[entity]', () => {
     expect((res.jsonBody as any)?.output?.entity).toBe('aircraft');
   });
 
+  it('returns paginated records for regulator profiles GET', async () => {
+    const rangeMock = vi.fn().mockResolvedValue({
+      data: [{ id: 'reg-1', regulator_code: 'FAA', regulator_name: 'Federal Aviation Administration', jurisdiction: 'US' }],
+      count: 1,
+      error: null,
+    });
+    const orderMock = vi.fn().mockReturnValue({ range: rangeMock });
+    const eqMock = vi.fn().mockReturnValue({ order: orderMock });
+    const selectMock = vi.fn().mockReturnValue({ eq: eqMock });
+    const fromMock = vi.fn().mockReturnValue({ select: selectMock });
+    vi.mocked(getSupabaseAdminClient).mockReturnValue({
+      from: fromMock,
+    } as any);
+
+    const req: ApiRequest = {
+      method: 'GET',
+      query: {
+        entity: 'regulator_profiles',
+        page: '1',
+        page_size: '25',
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(fromMock).toHaveBeenCalledWith('regulator_profiles');
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.output?.entity).toBe('regulator_profiles');
+    expect((res.jsonBody as any)?.output?.records?.[0]?.regulator_code).toBe('FAA');
+  });
+
   it('rejects unsupported methods', async () => {
     const req: ApiRequest = {
       method: 'PUT',
@@ -147,5 +180,35 @@ describe('/api/v2/amro/master-data/[entity]', () => {
     expect(res.statusCode).toBe(405);
     expect((res.jsonBody as any)?.error).toContain('Method PUT Not Allowed');
     expect(res.headers.Allow).toEqual(['GET', 'POST']);
+  });
+
+  it('returns validation results without inserting records for validate_only POST', async () => {
+    const fromMock = vi.fn();
+    vi.mocked(getSupabaseAdminClient).mockReturnValue({
+      from: fromMock,
+    } as any);
+
+    const req: ApiRequest = {
+      method: 'POST',
+      query: {
+        entity: 'parts_inventory',
+        validate_only: 'true',
+      },
+      body: {
+        part_number: 'PN-100',
+        warehouse_location: 'MAIN',
+        quantity_on_hand: 2,
+        quantity_reserved: 3,
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.output?.validation?.is_valid).toBe(false);
+    expect((res.jsonBody as any)?.output?.validation?.issues?.length).toBeGreaterThan(0);
+    expect(fromMock).not.toHaveBeenCalled();
   });
 });

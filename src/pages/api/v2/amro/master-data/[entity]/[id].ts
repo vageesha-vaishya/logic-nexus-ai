@@ -16,6 +16,7 @@ import {
   resolveEntity,
   sanitizeWritePayload,
   sendError,
+  validatePayload,
   writeAuditRecord,
   HttpError,
 } from '../shared';
@@ -29,6 +30,19 @@ function isV2Enabled(): boolean {
 function asBodyObject(body: unknown): Record<string, unknown> {
   if (body && typeof body === 'object') return body as Record<string, unknown>;
   return {};
+}
+
+function isValidationOnly(req: ApiRequest, body: Record<string, unknown>): boolean {
+  const queryFlag = String(req.query.validate_only || req.query.validateOnly || '')
+    .trim()
+    .toLowerCase();
+  if (queryFlag === 'true' || queryFlag === '1' || queryFlag === 'yes' || queryFlag === 'on') {
+    return true;
+  }
+  const bodyFlag = String(body.validate_only || body.validateOnly || '')
+    .trim()
+    .toLowerCase();
+  return bodyFlag === 'true' || bodyFlag === '1' || bodyFlag === 'yes' || bodyFlag === 'on';
 }
 
 export default async function handler(req: ApiRequest, res: ApiResponse): Promise<void> {
@@ -117,7 +131,28 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     }
 
     enforceAnyPermission(auth.permissions || [], ['edit_aircraft_records', 'create_maintenance_request']);
-    const payload = sanitizeWritePayload(entity, asBodyObject(req.body));
+    const body = asBodyObject(req.body);
+    const validationOnly = isValidationOnly(req, body);
+    const payload = sanitizeWritePayload(entity, body, { requireCreateFields: false });
+    const issues = validatePayload(entity, payload);
+    if (validationOnly) {
+      res.status(200).json({
+        version: 'v2',
+        correlationId: ctx.correlationId,
+        output: {
+          entity,
+          validation: {
+            mode: 'single-update',
+            is_valid: issues.length === 0,
+            issues,
+          },
+        },
+      });
+      return;
+    }
+    if (issues.length > 0) {
+      throw new HttpError('Validation failed', 422);
+    }
     const updatePayload = {
       ...payload,
       updated_by: auth.userId,

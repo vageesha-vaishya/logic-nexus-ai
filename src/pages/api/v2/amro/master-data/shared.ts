@@ -8,7 +8,10 @@ export type AmroMasterDataEntity =
   | 'suppliers'
   | 'maintenance_facilities'
   | 'work_centers'
-  | 'skill_codes';
+  | 'skill_codes'
+  | 'regulator_profiles'
+  | 'shift_calendars'
+  | 'work_package_templates';
 
 type EntityConfig = {
   table: string;
@@ -159,6 +162,60 @@ const ENTITY_CONFIG: Record<AmroMasterDataEntity, EntityConfig> = {
     ],
     defaultSortColumn: 'updated_at',
   },
+  regulator_profiles: {
+    table: 'regulator_profiles',
+    searchableColumns: ['regulator_code', 'regulator_name', 'jurisdiction', 'policy_version'],
+    listColumns:
+      'id,tenant_id,franchise_id,regulator_code,regulator_name,jurisdiction,policy_version,effective_from,effective_to,is_active,metadata,created_at,updated_at',
+    requiredCreateFields: ['regulator_code', 'regulator_name', 'jurisdiction', 'policy_version'],
+    writeAllowedFields: [
+      'regulator_code',
+      'regulator_name',
+      'jurisdiction',
+      'policy_version',
+      'effective_from',
+      'effective_to',
+      'is_active',
+      'metadata',
+    ],
+    defaultSortColumn: 'updated_at',
+  },
+  shift_calendars: {
+    table: 'shift_calendars',
+    searchableColumns: ['station_code', 'shift_name'],
+    listColumns:
+      'id,tenant_id,franchise_id,station_code,shift_name,shift_start_time,shift_end_time,capacity,effective_from,effective_to,is_active,created_at,updated_at',
+    requiredCreateFields: ['station_code', 'shift_name', 'shift_start_time', 'shift_end_time'],
+    writeAllowedFields: [
+      'station_code',
+      'shift_name',
+      'shift_start_time',
+      'shift_end_time',
+      'capacity',
+      'effective_from',
+      'effective_to',
+      'is_active',
+    ],
+    defaultSortColumn: 'updated_at',
+  },
+  work_package_templates: {
+    table: 'work_package_templates',
+    searchableColumns: ['template_code', 'template_name', 'maintenance_type'],
+    listColumns:
+      'id,tenant_id,franchise_id,template_code,version,active,template_name,maintenance_type,scope_json,tasks_json,policy_snapshot_id,created_at,updated_at',
+    requiredCreateFields: ['template_code', 'version', 'template_name', 'maintenance_type'],
+    writeAllowedFields: [
+      'template_code',
+      'version',
+      'active',
+      'template_name',
+      'maintenance_type',
+      'scope_json',
+      'tasks_json',
+      'policy_snapshot_id',
+    ],
+    defaultSortColumn: 'updated_at',
+  },
 };
 
 function asString(value: unknown): string {
@@ -188,6 +245,22 @@ function asJsonObject(value: unknown): Record<string, unknown> {
   if (!value) return {};
   if (typeof value === 'object' && !Array.isArray(value)) return value as Record<string, unknown>;
   throw new HttpError('metadata must be an object', 400);
+}
+
+function asJsonArray(value: unknown): unknown[] {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+  throw new HttpError('value must be an array', 400);
+}
+
+function asDateString(value: unknown): string | null {
+  const normalized = asNullableString(value);
+  if (!normalized) return null;
+  const parsed = Date.parse(normalized);
+  if (Number.isNaN(parsed)) {
+    throw new HttpError('Invalid date value', 400);
+  }
+  return normalized;
 }
 
 export function resolveEntity(rawEntity: unknown): AmroMasterDataEntity {
@@ -346,16 +419,141 @@ function normalizeSkillCode(payload: Record<string, unknown>) {
   };
 }
 
+function normalizeRegulatorProfile(payload: Record<string, unknown>) {
+  return {
+    regulator_code: asString(payload.regulator_code),
+    regulator_name: asString(payload.regulator_name),
+    jurisdiction: asString(payload.jurisdiction),
+    policy_version: asString(payload.policy_version),
+    effective_from: asDateString(payload.effective_from) || new Date().toISOString().slice(0, 10),
+    effective_to: asDateString(payload.effective_to),
+    is_active: asBoolean(payload.is_active, true),
+    metadata: asJsonObject(payload.metadata),
+  };
+}
+
+function normalizeShiftCalendar(payload: Record<string, unknown>) {
+  return {
+    station_code: asString(payload.station_code),
+    shift_name: asString(payload.shift_name),
+    shift_start_time: asString(payload.shift_start_time),
+    shift_end_time: asString(payload.shift_end_time),
+    capacity: asNumber(payload.capacity) ?? 1,
+    effective_from: asDateString(payload.effective_from) || new Date().toISOString().slice(0, 10),
+    effective_to: asDateString(payload.effective_to),
+    is_active: asBoolean(payload.is_active, true),
+  };
+}
+
+function normalizeWorkPackageTemplate(payload: Record<string, unknown>) {
+  return {
+    template_code: asString(payload.template_code),
+    version: asNumber(payload.version),
+    active: asBoolean(payload.active, true),
+    template_name: asString(payload.template_name),
+    maintenance_type: asString(payload.maintenance_type),
+    scope_json: asJsonArray(payload.scope_json),
+    tasks_json: asJsonArray(payload.tasks_json),
+    policy_snapshot_id: asNullableString(payload.policy_snapshot_id),
+  };
+}
+
 export function normalizePayload(entity: AmroMasterDataEntity, payload: Record<string, unknown>) {
   if (entity === 'aircraft') return normalizeAircraft(payload);
   if (entity === 'parts_inventory') return normalizePartsInventory(payload);
   if (entity === 'suppliers') return normalizeSupplier(payload);
   if (entity === 'maintenance_facilities') return normalizeMaintenanceFacility(payload);
   if (entity === 'work_centers') return normalizeWorkCenter(payload);
-  return normalizeSkillCode(payload);
+  if (entity === 'skill_codes') return normalizeSkillCode(payload);
+  if (entity === 'regulator_profiles') return normalizeRegulatorProfile(payload);
+  if (entity === 'shift_calendars') return normalizeShiftCalendar(payload);
+  return normalizeWorkPackageTemplate(payload);
 }
 
-export function sanitizeWritePayload(entity: AmroMasterDataEntity, payload: Record<string, unknown>): Record<string, unknown> {
+export type MasterDataValidationIssue = {
+  field: string;
+  message: string;
+};
+
+export function validatePayload(entity: AmroMasterDataEntity, payload: Record<string, unknown>): MasterDataValidationIssue[] {
+  const issues: MasterDataValidationIssue[] = [];
+  if (entity === 'parts_inventory') {
+    const quantityOnHand = Number(payload.quantity_on_hand ?? 0);
+    const quantityReserved = Number(payload.quantity_reserved ?? 0);
+    if (quantityReserved > quantityOnHand) {
+      issues.push({
+        field: 'quantity_reserved',
+        message: 'quantity_reserved cannot exceed quantity_on_hand',
+      });
+    }
+  }
+  if (entity === 'work_centers') {
+    const capacity = Number(payload.capacity_hours_per_day ?? 0);
+    if (!(capacity > 0)) {
+      issues.push({
+        field: 'capacity_hours_per_day',
+        message: 'capacity_hours_per_day must be greater than zero',
+      });
+    }
+  }
+  if (entity === 'skill_codes') {
+    const validityPeriod = payload.validity_period_months;
+    if (validityPeriod !== null && validityPeriod !== undefined && Number(validityPeriod) <= 0) {
+      issues.push({
+        field: 'validity_period_months',
+        message: 'validity_period_months must be greater than zero when provided',
+      });
+    }
+  }
+  if (entity === 'regulator_profiles' || entity === 'shift_calendars') {
+    const effectiveFrom = asNullableString(payload.effective_from);
+    const effectiveTo = asNullableString(payload.effective_to);
+    if (effectiveFrom && effectiveTo && Date.parse(effectiveTo) < Date.parse(effectiveFrom)) {
+      issues.push({
+        field: 'effective_to',
+        message: 'effective_to must be greater than or equal to effective_from',
+      });
+    }
+  }
+  if (entity === 'shift_calendars') {
+    const capacity = Number(payload.capacity ?? 0);
+    if (!(capacity > 0)) {
+      issues.push({
+        field: 'capacity',
+        message: 'capacity must be greater than zero',
+      });
+    }
+  }
+  if (entity === 'work_package_templates') {
+    const version = Number(payload.version ?? 0);
+    if (!(version > 0)) {
+      issues.push({
+        field: 'version',
+        message: 'version must be greater than zero',
+      });
+    }
+    if (!Array.isArray(payload.scope_json)) {
+      issues.push({
+        field: 'scope_json',
+        message: 'scope_json must be an array',
+      });
+    }
+    if (!Array.isArray(payload.tasks_json)) {
+      issues.push({
+        field: 'tasks_json',
+        message: 'tasks_json must be an array',
+      });
+    }
+  }
+  return issues;
+}
+
+export function sanitizeWritePayload(
+  entity: AmroMasterDataEntity,
+  payload: Record<string, unknown>,
+  options: { requireCreateFields?: boolean } = {},
+): Record<string, unknown> {
+  const requireCreateFields = options.requireCreateFields ?? true;
   const config = getEntityConfig(entity);
   const normalized = normalizePayload(entity, payload) as Record<string, unknown>;
   const writePayload: Record<string, unknown> = {};
@@ -364,10 +562,12 @@ export function sanitizeWritePayload(entity: AmroMasterDataEntity, payload: Reco
       writePayload[field] = normalized[field];
     }
   }
-  for (const requiredField of config.requiredCreateFields) {
-    const value = asString(writePayload[requiredField]);
-    if (!value) {
-      throw new HttpError(`${requiredField} is required`, 400);
+  if (requireCreateFields) {
+    for (const requiredField of config.requiredCreateFields) {
+      const value = asString(writePayload[requiredField]);
+      if (!value) {
+        throw new HttpError(`${requiredField} is required`, 400);
+      }
     }
   }
   return writePayload;

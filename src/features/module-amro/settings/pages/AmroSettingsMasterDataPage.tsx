@@ -14,7 +14,16 @@ import { useCRM } from '@/hooks/useCRM';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-type MasterEntity = 'aircraft' | 'parts_inventory' | 'suppliers' | 'maintenance_facilities' | 'work_centers' | 'skill_codes';
+type MasterEntity =
+  | 'aircraft'
+  | 'parts_inventory'
+  | 'suppliers'
+  | 'maintenance_facilities'
+  | 'work_centers'
+  | 'skill_codes'
+  | 'regulator_profiles'
+  | 'shift_calendars'
+  | 'work_package_templates';
 
 const ENTITY_LABEL: Record<MasterEntity, string> = {
   aircraft: 'Aircraft',
@@ -23,6 +32,9 @@ const ENTITY_LABEL: Record<MasterEntity, string> = {
   maintenance_facilities: 'Maintenance Facilities',
   work_centers: 'Work Centers',
   skill_codes: 'Skill Codes',
+  regulator_profiles: 'Regulator Profiles',
+  shift_calendars: 'Shift Calendars',
+  work_package_templates: 'Work Package Templates',
 };
 
 type RecordRow = {
@@ -101,6 +113,50 @@ function createDefaultForm(entity: MasterEntity): string {
       2,
     );
   }
+  if (entity === 'regulator_profiles') {
+    return JSON.stringify(
+      {
+        regulator_code: '',
+        regulator_name: '',
+        jurisdiction: '',
+        policy_version: '',
+        effective_from: new Date().toISOString().slice(0, 10),
+        is_active: true,
+      },
+      null,
+      2,
+    );
+  }
+  if (entity === 'shift_calendars') {
+    return JSON.stringify(
+      {
+        station_code: '',
+        shift_name: '',
+        shift_start_time: '08:00:00',
+        shift_end_time: '16:00:00',
+        capacity: 1,
+        effective_from: new Date().toISOString().slice(0, 10),
+        is_active: true,
+      },
+      null,
+      2,
+    );
+  }
+  if (entity === 'work_package_templates') {
+    return JSON.stringify(
+      {
+        template_code: '',
+        version: 1,
+        active: true,
+        template_name: '',
+        maintenance_type: 'line',
+        scope_json: [],
+        tasks_json: [],
+      },
+      null,
+      2,
+    );
+  }
   return JSON.stringify(
     {
       skill_code: '',
@@ -170,7 +226,10 @@ export function AmroSettingsMasterDataPage() {
       if (!response.ok) throw new Error(String(payload.error || 'Failed to load records'));
       let records = Array.isArray(payload?.output?.records) ? payload.output.records : [];
       if (statusFilter !== 'all') {
-        records = records.filter((record: Record<string, unknown>) => String(record.status || record.is_active).toLowerCase() === statusFilter.toLowerCase());
+        records = records.filter(
+          (record: Record<string, unknown>) =>
+            String(record.status ?? record.is_active ?? record.active).toLowerCase() === statusFilter.toLowerCase(),
+        );
       }
       setRows(records);
     } catch (error) {
@@ -309,7 +368,10 @@ export function AmroSettingsMasterDataPage() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl font-semibold">AMRO Settings · Master Data</h1>
-            <p className="text-sm text-muted-foreground">Tenant-scoped CRUD management for aircraft, inventory, suppliers, facilities, work centers, and skill codes.</p>
+            <p className="text-sm text-muted-foreground">
+              Tenant-scoped CRUD management for fleet, inventory, suppliers, facilities, workforce, compliance profiles, shift
+              capacity, and work package templates.
+            </p>
           </div>
           <div className="flex items-center gap-2">
             <Badge variant="secondary">Tenant: {context.tenantId || 'unscoped'}</Badge>

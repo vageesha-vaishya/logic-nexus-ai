@@ -88,4 +88,20 @@ describe('AmroMasterDataPage', () => {
     });
     expect(global.fetch).toHaveBeenCalled();
   });
+
+  it('renders new AMRO master data entity options', async () => {
+    render(
+      <MemoryRouter>
+        <AmroMasterDataPage />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole('tab', { name: 'Regulator Profiles' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Shift Calendars' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Work Package Templates' })).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(mockToastError).not.toHaveBeenCalled();
+    });
+  });
 });

@@ -22,6 +22,7 @@ import {
   resolveEntity,
   sanitizeWritePayload,
   sendError,
+  validatePayload,
   writeAuditRecord,
   HttpError,
 } from './shared';
@@ -35,6 +36,19 @@ function isV2Enabled(): boolean {
 function asBodyObject(body: unknown): Record<string, unknown> {
   if (body && typeof body === 'object') return body as Record<string, unknown>;
   return {};
+}
+
+function isValidationOnly(req: ApiRequest, body: Record<string, unknown>): boolean {
+  const queryFlag = String(req.query.validate_only || req.query.validateOnly || '')
+    .trim()
+    .toLowerCase();
+  if (queryFlag === 'true' || queryFlag === '1' || queryFlag === 'yes' || queryFlag === 'on') {
+    return true;
+  }
+  const bodyFlag = String(body.validate_only || body.validateOnly || '')
+    .trim()
+    .toLowerCase();
+  return bodyFlag === 'true' || bodyFlag === '1' || bodyFlag === 'yes' || bodyFlag === 'on';
 }
 
 export default async function handler(req: ApiRequest, res: ApiResponse): Promise<void> {
@@ -117,6 +131,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
 
     enforceAnyPermission(auth.permissions || [], ['edit_aircraft_records', 'create_maintenance_request']);
     const body = asBodyObject(req.body);
+    const validationOnly = isValidationOnly(req, body);
     const { isBulkImport, records } = parseBulkOperation(body);
 
     if (isBulkImport) {
@@ -126,15 +141,41 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       if (records.length > 500) {
         throw new HttpError('bulk import supports up to 500 records per request', 400);
       }
-      const prepared = records.map((record) => ({
-        ...sanitizeWritePayload(entity, record),
+      const prepared = records.map((record) => sanitizeWritePayload(entity, record));
+      const validationResults = prepared.map((record, index) => ({
+        index,
+        issues: validatePayload(entity, record),
+      }));
+      const invalidRows = validationResults.filter((result) => result.issues.length > 0);
+      if (validationOnly) {
+        res.status(200).json({
+          version: 'v2',
+          correlationId: ctx.correlationId,
+          output: {
+            entity,
+            validation: {
+              mode: 'bulk_import',
+              is_valid: invalidRows.length === 0,
+              total_records: prepared.length,
+              invalid_records: invalidRows.length,
+              results: validationResults,
+            },
+          },
+        });
+        return;
+      }
+      if (invalidRows.length > 0) {
+        throw new HttpError(`Validation failed for ${invalidRows.length} record(s)`, 422);
+      }
+      const insertRows = prepared.map((record) => ({
+        ...record,
         tenant_id: tenantId,
         franchise_id: franchiseId,
         updated_by: auth.userId,
       }));
       const { data, error } = await supabase
         .from(entityConfig.table)
-        .insert(prepared)
+        .insert(insertRows)
         .select(entityConfig.listColumns);
       if (error) throw new HttpError(error.message, 400);
       await writeAuditRecord({
@@ -144,7 +185,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         entity,
         action: 'bulk_import',
         afterData: {
-          count: prepared.length,
+          count: insertRows.length,
         },
       });
       res.status(200).json({
@@ -152,7 +193,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         correlationId: ctx.correlationId,
         output: {
           entity,
-          imported_count: prepared.length,
+          imported_count: insertRows.length,
           records: data || [],
         },
       });
@@ -160,6 +201,25 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     }
 
     const payload = sanitizeWritePayload(entity, body);
+    const issues = validatePayload(entity, payload);
+    if (validationOnly) {
+      res.status(200).json({
+        version: 'v2',
+        correlationId: ctx.correlationId,
+        output: {
+          entity,
+          validation: {
+            mode: 'single',
+            is_valid: issues.length === 0,
+            issues,
+          },
+        },
+      });
+      return;
+    }
+    if (issues.length > 0) {
+      throw new HttpError('Validation failed', 422);
+    }
     const insertPayload = {
       ...payload,
       tenant_id: tenantId,
