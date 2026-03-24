@@ -104,7 +104,7 @@ export function AppSidebar() {
 
       <Sidebar 
         className={cn(
-          "z-50 shrink-0 border-r transition-[width,left,right] duration-300 ease-[cubic-bezier(0.4,0.0,0.2,1)]"
+          "z-50 shrink-0 border-r transition-[width,left,right] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]"
         )} 
         collapsible="icon"
       >
