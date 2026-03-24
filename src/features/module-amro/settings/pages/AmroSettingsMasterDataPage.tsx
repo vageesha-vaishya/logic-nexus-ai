@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,7 +26,7 @@ import { useCRM } from '@/hooks/useCRM';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-type MasterEntity =
+export type MasterEntity =
   | 'aircraft'
   | 'parts_inventory'
   | 'suppliers'
@@ -36,7 +37,7 @@ type MasterEntity =
   | 'shift_calendars'
   | 'work_package_templates';
 
-const ENTITY_LABEL: Record<MasterEntity, string> = {
+export const ENTITY_LABEL: Record<MasterEntity, string> = {
   aircraft: 'Aircraft',
   parts_inventory: 'Parts Inventory',
   suppliers: 'Suppliers',
@@ -178,6 +179,25 @@ const ENTITY_FORM_FIELDS: Record<MasterEntity, EntityFormField[]> = {
 };
 
 export const AMRO_MASTER_ENTITY_FORM_FIELDS = ENTITY_FORM_FIELDS;
+const MASTER_ENTITY_SEQUENCE = Object.keys(ENTITY_LABEL) as MasterEntity[];
+const ENTITY_ROUTE_SEGMENT: Record<MasterEntity, string> = {
+  aircraft: 'aircraft',
+  parts_inventory: 'parts-inventory',
+  suppliers: 'suppliers',
+  maintenance_facilities: 'maintenance-facilities',
+  work_centers: 'work-centers',
+  skill_codes: 'skill-codes',
+  regulator_profiles: 'regulator-profiles',
+  shift_calendars: 'shift-calendars',
+  work_package_templates: 'work-package-templates',
+};
+const ROUTE_SEGMENT_ENTITY: Record<string, MasterEntity> = Object.entries(ENTITY_ROUTE_SEGMENT).reduce(
+  (accumulator, [entityKey, routeSegment]) => {
+    accumulator[routeSegment] = entityKey as MasterEntity;
+    return accumulator;
+  },
+  {} as Record<string, MasterEntity>,
+);
 
 const ENTITY_DEFAULT_VALUES: Record<MasterEntity, FormValues> = {
   aircraft: {
@@ -585,20 +605,43 @@ export async function verifyReferenceExists(headers: Headers, entity: MasterEnti
   return records.some((record) => fieldKeys.some((fieldKey) => String(record[fieldKey] || '').trim().toLowerCase() === normalized));
 }
 
-export function AmroSettingsMasterDataPage() {
+type AmroSettingsMasterDataPageProps = {
+  entityOverride?: MasterEntity;
+};
+
+export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMasterDataPageProps = {}) {
   const { context } = useCRM();
-  const [entity, setEntity] = useState<MasterEntity>('aircraft');
+  const { entity: entityParam } = useParams<{ entity?: string }>();
+  const navigate = useNavigate();
+  const resolvedRouteEntity = useMemo(() => {
+    if (entityOverride) {
+      return entityOverride;
+    }
+    if (entityParam && ROUTE_SEGMENT_ENTITY[entityParam]) {
+      return ROUTE_SEGMENT_ENTITY[entityParam];
+    }
+    if (entityParam && MASTER_ENTITY_SEQUENCE.includes(entityParam as MasterEntity)) {
+      return entityParam as MasterEntity;
+    }
+    return 'aircraft' as MasterEntity;
+  }, [entityOverride, entityParam]);
+  const [entity, setEntity] = useState<MasterEntity>(resolvedRouteEntity);
   const [rows, setRows] = useState<RecordRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [formValues, setFormValues] = useState<FormValues>(getInitialFormValues('aircraft'));
+  const [formValues, setFormValues] = useState<FormValues>(getInitialFormValues(resolvedRouteEntity));
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [bulkText, setBulkText] = useState(createDefaultBulkText('aircraft'));
+  const [bulkText, setBulkText] = useState(createDefaultBulkText(resolvedRouteEntity));
   const [pageSize, setPageSize] = useState('25');
   const [page, setPage] = useState(1);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState<'create' | 'update'>('create');
+  const [activeFormTab, setActiveFormTab] = useState<'basic' | 'configuration' | 'system'>('basic');
+  const clickDelayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const firstFieldRef = useRef<HTMLInputElement | null>(null);
 
   const scope = useMemo(
     () => ({
@@ -639,6 +682,10 @@ export function AmroSettingsMasterDataPage() {
   }, [entity, page, pageSize, scope, search, statusFilter]);
 
   useEffect(() => {
+    setEntity(resolvedRouteEntity);
+  }, [resolvedRouteEntity]);
+
+  useEffect(() => {
     void loadRecords();
   }, [loadRecords]);
 
@@ -649,13 +696,36 @@ export function AmroSettingsMasterDataPage() {
     setBulkText(createDefaultBulkText(entity));
   }, [entity]);
 
+  useEffect(() => {
+    navigate(`/dashboard/amro/settings/master-data/${ENTITY_ROUTE_SEGMENT[entity]}`, { replace: true });
+  }, [entity, navigate]);
+
+  useEffect(() => {
+    if (!modalOpen) {
+      return;
+    }
+    const timeout = setTimeout(() => {
+      firstFieldRef.current?.focus();
+    }, 0);
+    return () => clearTimeout(timeout);
+  }, [modalOpen]);
+
+  useEffect(
+    () => () => {
+      if (clickDelayTimerRef.current) {
+        clearTimeout(clickDelayTimerRef.current);
+      }
+    },
+    [],
+  );
+
   const handleCreate = useCallback(async () => {
     try {
       const { payload, errors } = buildPayloadFromForm(entity, formValues);
       setFormErrors(errors);
       if (Object.keys(errors).length > 0) {
         toast.error('Please resolve form validation errors');
-        return;
+        return false;
       }
       const headers = await buildApiHeaders(scope);
       if (entity === 'parts_inventory' && payload.supplier_id) {
@@ -663,7 +733,7 @@ export function AmroSettingsMasterDataPage() {
         if (!exists) {
           setFormErrors((previous) => ({ ...previous, supplier_id: 'Supplier ID was not found' }));
           toast.error('Supplier reference is invalid');
-          return;
+          return false;
         }
       }
       if (entity === 'work_centers') {
@@ -674,7 +744,7 @@ export function AmroSettingsMasterDataPage() {
           if (!exists) {
             setFormErrors((previous) => ({ ...previous, facility_id: 'Facility ID was not found' }));
             toast.error('Facility reference is invalid');
-            return;
+            return false;
           }
         }
         if (facilityCode) {
@@ -682,7 +752,7 @@ export function AmroSettingsMasterDataPage() {
           if (!exists) {
             setFormErrors((previous) => ({ ...previous, facility_code: 'Facility Code was not found' }));
             toast.error('Facility reference is invalid');
-            return;
+            return false;
           }
         }
       }
@@ -698,22 +768,24 @@ export function AmroSettingsMasterDataPage() {
       setFormValues(getInitialFormValues(entity));
       setSelectedId(null);
       await loadRecords();
+      return true;
     } catch (error) {
       toast.error(String((error as Error).message || 'Create failed'));
+      return false;
     }
   }, [entity, formValues, loadRecords, scope]);
 
   const handleUpdate = useCallback(async () => {
     if (!selectedId) {
       toast.error('Select a record first');
-      return;
+      return false;
     }
     try {
       const { payload, errors } = buildPayloadFromForm(entity, formValues);
       setFormErrors(errors);
       if (Object.keys(errors).length > 0) {
         toast.error('Please resolve form validation errors');
-        return;
+        return false;
       }
       const headers = await buildApiHeaders(scope);
       if (entity === 'parts_inventory' && payload.supplier_id) {
@@ -721,7 +793,7 @@ export function AmroSettingsMasterDataPage() {
         if (!exists) {
           setFormErrors((previous) => ({ ...previous, supplier_id: 'Supplier ID was not found' }));
           toast.error('Supplier reference is invalid');
-          return;
+          return false;
         }
       }
       if (entity === 'work_centers') {
@@ -732,7 +804,7 @@ export function AmroSettingsMasterDataPage() {
           if (!exists) {
             setFormErrors((previous) => ({ ...previous, facility_id: 'Facility ID was not found' }));
             toast.error('Facility reference is invalid');
-            return;
+            return false;
           }
         }
         if (facilityCode) {
@@ -740,7 +812,7 @@ export function AmroSettingsMasterDataPage() {
           if (!exists) {
             setFormErrors((previous) => ({ ...previous, facility_code: 'Facility Code was not found' }));
             toast.error('Facility reference is invalid');
-            return;
+            return false;
           }
         }
       }
@@ -754,8 +826,10 @@ export function AmroSettingsMasterDataPage() {
       toast.success(`${ENTITY_LABEL[entity]} record updated`);
       setFormErrors({});
       await loadRecords();
+      return true;
     } catch (error) {
       toast.error(String((error as Error).message || 'Update failed'));
+      return false;
     }
   }, [entity, formValues, loadRecords, scope, selectedId]);
 
@@ -845,10 +919,72 @@ export function AmroSettingsMasterDataPage() {
   }, [entity, rows]);
 
   const formFields = ENTITY_FORM_FIELDS[entity];
+  const basicSectionFields = useMemo(() => formFields.slice(0, Math.min(formFields.length, 4)), [formFields]);
+  const configurationSectionFields = useMemo(() => formFields.slice(Math.min(formFields.length, 4)), [formFields]);
+  const systemFields = useMemo(
+    () => tableColumns.filter((column) => ['id', 'created_at', 'updated_at', 'created_by', 'updated_by'].includes(column)),
+    [tableColumns],
+  );
+  const selectedRow = useMemo(() => rows.find((row) => row.id === selectedId) || null, [rows, selectedId]);
+
+  const setFieldValue = useCallback((fieldKey: string, value: unknown) => {
+    setFormValues((previous) => ({ ...previous, [fieldKey]: value }));
+    setFormErrors((previous) => ({ ...previous, [fieldKey]: '' }));
+  }, []);
+
+  const handleRowSingleClick = useCallback(
+    (row: RecordRow) => {
+      if (clickDelayTimerRef.current) {
+        clearTimeout(clickDelayTimerRef.current);
+      }
+      clickDelayTimerRef.current = setTimeout(() => {
+        setSelectedId(row.id);
+        setFormValues(pickFormValuesFromRow(entity, row));
+        setFormErrors({});
+      }, 300);
+    },
+    [entity],
+  );
+
+  const handleRowDoubleClick = useCallback(
+    (row: RecordRow) => {
+      if (clickDelayTimerRef.current) {
+        clearTimeout(clickDelayTimerRef.current);
+      }
+      setSelectedId(row.id);
+      setFormValues(pickFormValuesFromRow(entity, row));
+      setFormErrors({});
+      setModalMode('update');
+      setActiveFormTab('basic');
+      setModalOpen(true);
+    },
+    [entity],
+  );
+
+  const handleOpenCreateModal = useCallback(() => {
+    setModalMode('create');
+    setSelectedId(null);
+    setFormValues(getInitialFormValues(entity));
+    setFormErrors({});
+    setActiveFormTab('basic');
+    setModalOpen(true);
+  }, [entity]);
+
+  const handleSubmitModal = useCallback(async () => {
+    const ok = modalMode === 'create' ? await handleCreate() : await handleUpdate();
+    if (ok) {
+      setModalOpen(false);
+    }
+  }, [handleCreate, handleUpdate, modalMode]);
+
+  const tabLabelClass = (tab: 'basic' | 'configuration' | 'system') =>
+    `border-b-2 px-4 pb-2 pt-1 text-sm font-medium transition-colors duration-200 ${
+      activeFormTab === tab ? 'border-[#1E3A8A] text-[#1E3A8A]' : 'border-[#E5E7EB] text-[#64748B]'
+    }`;
 
   return (
     <DashboardLayout>
-      <div className="space-y-4 p-4 lg:p-6">
+      <div className="space-y-4 p-4 font-[Inter] text-[14px] leading-6 lg:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl font-semibold">AMRO Settings · Master Data</h1>
@@ -864,13 +1000,14 @@ export function AmroSettingsMasterDataPage() {
             </Button>
             <Button variant="outline" onClick={() => void loadRecords()} disabled={loading}>{loading ? 'Refreshing...' : 'Refresh'}</Button>
             <Button variant="outline" onClick={() => void handleExport()}>Export CSV</Button>
+            <Button className="bg-[#1E3A8A] hover:bg-[#1E3A8A]/90" onClick={handleOpenCreateModal}>New {ENTITY_LABEL[entity]}</Button>
           </div>
         </div>
 
         <Tabs value={entity} onValueChange={(next) => setEntity(next as MasterEntity)}>
           <TabsList className="flex h-auto flex-wrap gap-2">
-            {Object.entries(ENTITY_LABEL).map(([key, label]) => (
-              <TabsTrigger key={key} value={key}>{label}</TabsTrigger>
+            {MASTER_ENTITY_SEQUENCE.map((key) => (
+              <TabsTrigger key={key} value={key}>{ENTITY_LABEL[key]}</TabsTrigger>
             ))}
           </TabsList>
         </Tabs>
@@ -921,9 +1058,11 @@ export function AmroSettingsMasterDataPage() {
             <div className="overflow-auto rounded-md border">
               <Table>
                 <TableHeader>
-                  <TableRow>
+                  <TableRow className="bg-[#F8FAFC]">
                     {tableColumns.map((column) => (
-                      <TableHead key={column}>{column}</TableHead>
+                      <TableHead key={column} className="h-auto px-4 py-3 text-left text-[14px] font-semibold text-[#64748B]">
+                        {column}
+                      </TableHead>
                     ))}
                   </TableRow>
                 </TableHeader>
@@ -932,15 +1071,14 @@ export function AmroSettingsMasterDataPage() {
                     <TableRow
                       key={row.id}
                       data-state={row.id === selectedId ? 'selected' : undefined}
-                      className="cursor-pointer"
-                      onClick={() => {
-                        setSelectedId(row.id);
-                        setFormValues(pickFormValuesFromRow(entity, row));
-                        setFormErrors({});
-                      }}
+                      className="cursor-pointer transition-colors duration-200 ease-in-out hover:bg-[#F5F7FA]"
+                      onClick={() => handleRowSingleClick(row)}
+                      onDoubleClick={() => handleRowDoubleClick(row)}
                     >
                       {tableColumns.map((column) => (
-                        <TableCell key={column}>{String(row[column] ?? '')}</TableCell>
+                        <TableCell key={column} className="max-w-[240px] px-4 py-3 text-left align-middle text-[14px] text-[#1F2937]">
+                          <span className="block truncate">{String(row[column] ?? '')}</span>
+                        </TableCell>
                       ))}
                     </TableRow>
                   ))}
@@ -958,95 +1096,7 @@ export function AmroSettingsMasterDataPage() {
           </CardContent>
         </Card>
 
-        <div className="grid gap-4 xl:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>{ENTITY_LABEL[entity]} Create and Update</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="grid gap-3 md:grid-cols-2">
-                {formFields.map((field) => (
-                  <div key={field.key} className={field.type === 'textarea' || field.type === 'json' ? 'space-y-2 md:col-span-2' : 'space-y-2'}>
-                    <Label htmlFor={`master-data-${field.key}`}>{field.label}{field.required ? ' *' : ''}</Label>
-                    {field.type === 'select' && (
-                      <Select
-                        value={String(formValues[field.key] ?? '')}
-                        onValueChange={(value) => {
-                          setFormValues((previous) => ({ ...previous, [field.key]: value }));
-                          setFormErrors((previous) => ({ ...previous, [field.key]: '' }));
-                        }}
-                      >
-                        <SelectTrigger id={`master-data-${field.key}`}>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {(field.options || []).map((option) => (
-                            <SelectItem key={option} value={option}>
-                              {option}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                    {field.type === 'boolean' && (
-                      <div className="flex h-10 items-center rounded-md border px-3">
-                        <Switch
-                          id={`master-data-${field.key}`}
-                          checked={Boolean(formValues[field.key])}
-                          onCheckedChange={(checked) => {
-                            setFormValues((previous) => ({ ...previous, [field.key]: checked }));
-                            setFormErrors((previous) => ({ ...previous, [field.key]: '' }));
-                          }}
-                        />
-                      </div>
-                    )}
-                    {(field.type === 'textarea' || field.type === 'json') && (
-                      <Textarea
-                        id={`master-data-${field.key}`}
-                        rows={field.type === 'json' ? 6 : 4}
-                        value={String(formValues[field.key] ?? '')}
-                        onChange={(event) => {
-                          setFormValues((previous) => ({ ...previous, [field.key]: event.target.value }));
-                          setFormErrors((previous) => ({ ...previous, [field.key]: '' }));
-                        }}
-                        placeholder={field.placeholder}
-                      />
-                    )}
-                    {['text', 'email', 'number', 'date', 'time'].includes(field.type) && (
-                      <Input
-                        id={`master-data-${field.key}`}
-                        type={field.type === 'number' ? 'number' : field.type}
-                        value={String(formValues[field.key] ?? '')}
-                        onChange={(event) => {
-                          setFormValues((previous) => ({ ...previous, [field.key]: event.target.value }));
-                          setFormErrors((previous) => ({ ...previous, [field.key]: '' }));
-                        }}
-                        placeholder={field.placeholder}
-                        min={typeof field.min === 'number' ? field.min : undefined}
-                        step={field.type === 'number' ? 'any' : undefined}
-                      />
-                    )}
-                    {formErrors[field.key] ? <p className="text-xs text-destructive">{formErrors[field.key]}</p> : null}
-                  </div>
-                ))}
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Button onClick={() => void handleCreate()}>Create</Button>
-                <Button variant="outline" onClick={() => void handleUpdate()}>Update Selected</Button>
-                <Button variant="destructive" onClick={() => void handleDelete()}>Delete Selected</Button>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setSelectedId(null);
-                    setFormValues(getInitialFormValues(entity));
-                    setFormErrors({});
-                  }}
-                >
-                  Reset Form
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+        <div className="grid gap-4">
           <Card>
             <CardHeader>
               <CardTitle>{ENTITY_LABEL[entity]} Bulk Import</CardTitle>
@@ -1068,6 +1118,161 @@ export function AmroSettingsMasterDataPage() {
             </CardContent>
           </Card>
         </div>
+        <Dialog open={modalOpen} onOpenChange={setModalOpen}>
+          <DialogContent className="z-[1000] max-h-[90vh] max-w-5xl overflow-y-auto border border-[#E5E7EB] p-0 duration-[250ms] data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95">
+            <DialogHeader className="border-b border-[#E5E7EB] px-6 py-4">
+              <DialogTitle className="text-[16px] font-semibold text-[#1F2937]">
+                {modalMode === 'create' ? `Create ${ENTITY_LABEL[entity]}` : `Update ${ENTITY_LABEL[entity]}`}
+              </DialogTitle>
+              <DialogDescription className="text-[14px] text-[#64748B]">
+                Double-click row behavior and CRUD flow mirrors Leads Management interaction patterns.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-6 px-6 pb-6 pt-4">
+              <div className="flex flex-wrap gap-4 border-b-2 border-[#E5E7EB]">
+                <button type="button" className={tabLabelClass('basic')} onClick={() => setActiveFormTab('basic')}>Basic Information</button>
+                <button type="button" className={tabLabelClass('configuration')} onClick={() => setActiveFormTab('configuration')}>Configuration Settings</button>
+                <button type="button" className={tabLabelClass('system')} onClick={() => setActiveFormTab('system')}>System Information</button>
+              </div>
+              {activeFormTab === 'basic' && (
+                <div className="mt-6 space-y-4">
+                  <h3 className="mb-6 text-[16px] font-semibold">Basic Information</h3>
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    {basicSectionFields.map((field, index) => (
+                      <div key={field.key} className={field.type === 'textarea' || field.type === 'json' ? 'space-y-2 md:col-span-2 xl:col-span-4' : 'space-y-2'}>
+                        <Label htmlFor={`master-data-basic-${field.key}`}>{field.label}{field.required ? ' *' : ''}</Label>
+                        {field.type === 'select' && (
+                          <Select value={String(formValues[field.key] ?? '')} onValueChange={(value) => setFieldValue(field.key, value)}>
+                            <SelectTrigger id={`master-data-basic-${field.key}`} className="h-10">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {(field.options || []).map((option) => (
+                                <SelectItem key={option} value={option}>
+                                  {option}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                        {field.type === 'boolean' && (
+                          <div className="flex h-10 items-center rounded-md border px-3">
+                            <Switch id={`master-data-basic-${field.key}`} checked={Boolean(formValues[field.key])} onCheckedChange={(checked) => setFieldValue(field.key, checked)} />
+                          </div>
+                        )}
+                        {(field.type === 'textarea' || field.type === 'json') && (
+                          <Textarea
+                            id={`master-data-basic-${field.key}`}
+                            rows={field.type === 'json' ? 6 : 4}
+                            value={String(formValues[field.key] ?? '')}
+                            onChange={(event) => setFieldValue(field.key, event.target.value)}
+                            placeholder={field.placeholder}
+                            className="text-[14px]"
+                            aria-invalid={Boolean(formErrors[field.key])}
+                          />
+                        )}
+                        {['text', 'email', 'number', 'date', 'time'].includes(field.type) && (
+                          <Input
+                            id={`master-data-basic-${field.key}`}
+                            ref={index === 0 ? firstFieldRef : undefined}
+                            type={field.type === 'number' ? 'number' : field.type}
+                            value={String(formValues[field.key] ?? '')}
+                            onChange={(event) => setFieldValue(field.key, event.target.value)}
+                            placeholder={field.placeholder}
+                            min={typeof field.min === 'number' ? field.min : undefined}
+                            step={field.type === 'number' ? 'any' : undefined}
+                            className={`h-10 text-[14px] ${formErrors[field.key] ? 'border-[#EF4444]' : ''}`}
+                            aria-invalid={Boolean(formErrors[field.key])}
+                          />
+                        )}
+                        {formErrors[field.key] ? <p className="text-xs text-[#EF4444]">{formErrors[field.key]}</p> : null}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {activeFormTab === 'configuration' && (
+                <div className="mt-6 space-y-4">
+                  <h3 className="mb-6 text-[16px] font-semibold">Configuration Settings</h3>
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    {configurationSectionFields.map((field) => (
+                      <div key={field.key} className={field.type === 'textarea' || field.type === 'json' ? 'space-y-2 md:col-span-2 xl:col-span-4' : 'space-y-2'}>
+                        <Label htmlFor={`master-data-configuration-${field.key}`}>{field.label}{field.required ? ' *' : ''}</Label>
+                        {field.type === 'select' && (
+                          <Select value={String(formValues[field.key] ?? '')} onValueChange={(value) => setFieldValue(field.key, value)}>
+                            <SelectTrigger id={`master-data-configuration-${field.key}`} className="h-10">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {(field.options || []).map((option) => (
+                                <SelectItem key={option} value={option}>
+                                  {option}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                        {field.type === 'boolean' && (
+                          <div className="flex h-10 items-center rounded-md border px-3">
+                            <Switch id={`master-data-configuration-${field.key}`} checked={Boolean(formValues[field.key])} onCheckedChange={(checked) => setFieldValue(field.key, checked)} />
+                          </div>
+                        )}
+                        {(field.type === 'textarea' || field.type === 'json') && (
+                          <Textarea
+                            id={`master-data-configuration-${field.key}`}
+                            rows={field.type === 'json' ? 6 : 4}
+                            value={String(formValues[field.key] ?? '')}
+                            onChange={(event) => setFieldValue(field.key, event.target.value)}
+                            placeholder={field.placeholder}
+                            className="text-[14px]"
+                            aria-invalid={Boolean(formErrors[field.key])}
+                          />
+                        )}
+                        {['text', 'email', 'number', 'date', 'time'].includes(field.type) && (
+                          <Input
+                            id={`master-data-configuration-${field.key}`}
+                            type={field.type === 'number' ? 'number' : field.type}
+                            value={String(formValues[field.key] ?? '')}
+                            onChange={(event) => setFieldValue(field.key, event.target.value)}
+                            placeholder={field.placeholder}
+                            min={typeof field.min === 'number' ? field.min : undefined}
+                            step={field.type === 'number' ? 'any' : undefined}
+                            className={`h-10 text-[14px] ${formErrors[field.key] ? 'border-[#EF4444]' : ''}`}
+                            aria-invalid={Boolean(formErrors[field.key])}
+                          />
+                        )}
+                        {formErrors[field.key] ? <p className="text-xs text-[#EF4444]">{formErrors[field.key]}</p> : null}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {activeFormTab === 'system' && (
+                <div className="mt-6 space-y-4">
+                  <h3 className="mb-6 text-[16px] font-semibold">System Information</h3>
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    {systemFields.map((field) => (
+                      <div key={field} className="space-y-2">
+                        <Label htmlFor={`master-data-system-${field}`}>{field}</Label>
+                        <Input id={`master-data-system-${field}`} value={String(selectedRow?.[field] ?? '')} readOnly className="h-10 bg-muted" />
+                      </div>
+                    ))}
+                    {!systemFields.length && (
+                      <p className="text-sm text-[#64748B]">Select a row to view system metadata.</p>
+                    )}
+                  </div>
+                </div>
+              )}
+              <div className="mt-6 flex flex-wrap items-center justify-end gap-2">
+                <Button variant="outline" className="h-9 px-4" onClick={() => setModalOpen(false)}>Cancel</Button>
+                <Button variant="destructive" className="h-9 px-4" onClick={() => void handleDelete()} disabled={!selectedId}>Delete</Button>
+                <Button className="h-9 bg-[#1E3A8A] px-4 hover:bg-[#1E3A8A]/90" onClick={() => void handleSubmitModal()}>
+                  {modalMode === 'create' ? 'Save' : 'Save Changes'}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
         <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
           <AlertDialogContent>
             <AlertDialogHeader>

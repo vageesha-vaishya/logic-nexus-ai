@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import AmroSettingsMasterDataPage, {
   AMRO_MASTER_ENTITY_FORM_FIELDS,
   buildPayloadFromForm,
@@ -147,7 +147,7 @@ describe('AmroSettingsMasterDataPage', () => {
     );
   });
 
-  it('renders a dedicated create-update form for each master data entity', async () => {
+  it('renders all nine master data modules with shared list layout controls', async () => {
     render(
       <MemoryRouter>
         <AmroSettingsMasterDataPage />
@@ -175,10 +175,12 @@ describe('AmroSettingsMasterDataPage', () => {
       }
     }
 
-    expect(await screen.findByLabelText(/Tail Number/)).toBeInTheDocument();
+    expect(await screen.findByText('N100AA')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /New Aircraft/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Run Bulk Import/ })).toBeInTheDocument();
   });
 
-  it('submits create and update operations through dedicated forms', async () => {
+  it('submits create and update operations through modal CRUD forms', async () => {
     render(
       <MemoryRouter>
         <AmroSettingsMasterDataPage />
@@ -187,26 +189,43 @@ describe('AmroSettingsMasterDataPage', () => {
 
     await screen.findByText('N100AA');
 
+    fireEvent.click(screen.getByRole('button', { name: /New Aircraft/ }));
     fireEvent.change(screen.getByLabelText(/Tail Number/), { target: { value: 'N200AA' } });
     fireEvent.change(screen.getByLabelText(/Serial Number/), { target: { value: 'SN-200' } });
     fireEvent.change(screen.getByLabelText(/Aircraft Type/), { target: { value: 'A321' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Configuration Settings' }));
     fireEvent.change(screen.getByLabelText(/Aircraft Model/), { target: { value: 'A321-200' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     await waitFor(() => {
       expect(mockToastSuccess).toHaveBeenCalledWith('Aircraft record created');
     });
 
-    fireEvent.click(screen.getByText('N100AA'));
+    fireEvent.doubleClick(screen.getByText('N100AA'));
+    expect(await screen.findByText('Update Aircraft')).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText(/Tail Number/), { target: { value: 'N300AA' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Update Selected' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
 
     await waitFor(() => {
       expect(mockToastSuccess).toHaveBeenCalledWith('Aircraft record updated');
     });
   });
 
-  it('confirms destructive operations and supports bulk import', async () => {
+  it('hydrates entity state from kebab-case route segments', async () => {
+    render(
+      <MemoryRouter initialEntries={['/dashboard/amro/settings/master-data/parts-inventory']}>
+        <Routes>
+          <Route path="/dashboard/amro/settings/master-data/:entity" element={<AmroSettingsMasterDataPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /New\s+Parts Inventory/ })).toBeInTheDocument();
+    });
+  });
+
+  it('confirms destructive operations from modal and supports bulk import', async () => {
     render(
       <MemoryRouter>
         <AmroSettingsMasterDataPage />
@@ -214,8 +233,8 @@ describe('AmroSettingsMasterDataPage', () => {
     );
 
     await screen.findByText('N100AA');
-    fireEvent.click(screen.getByText('N100AA'));
-    fireEvent.click(screen.getByRole('button', { name: 'Delete Selected' }));
+    fireEvent.doubleClick(screen.getByText('N100AA'));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
     expect(await screen.findByText(/Delete selected Aircraft record/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Confirm Delete' }));
 
@@ -223,7 +242,7 @@ describe('AmroSettingsMasterDataPage', () => {
       expect(mockToastSuccess).toHaveBeenCalledWith('Aircraft record deleted');
     });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Run Bulk Import' }));
+    fireEvent.click(screen.getByText('Run Bulk Import'));
     await waitFor(() => {
       expect(mockToastSuccess).toHaveBeenCalledWith(expect.stringMatching(/records imported$/));
     });

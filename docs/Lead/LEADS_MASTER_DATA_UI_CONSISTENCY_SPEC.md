@@ -174,3 +174,66 @@ This specification defines the exact visual and interaction contract used to ali
 - Uses matching validation presentation (`text-destructive` messaging beneath fields).
 - Uses matching action grouping pattern (primary + outline secondary controls).
 - Preserves CRM header action sequence and theme/view persistence behavior.
+
+## AMRO Master Data Multi-Page Replication Contract
+
+### Module Coverage
+
+- Aircraft
+- Parts Inventory
+- Suppliers
+- Maintenance Facilities
+- Work Centers
+- Skill Codes
+- Regulator Profiles
+- Shift Calendars
+- Work Package Templates
+
+### List View Architecture Contract
+
+- Shared route shell supports module-specific pages under `/dashboard/amro/settings/master-data/*`.
+- Table header uses `text-[14px] font-semibold text-[#64748B]`.
+- Table row cell spacing uses `px-4 py-3` (16px horizontal, 12px vertical).
+- Row hover state uses `hover:bg-[#F5F7FA]` with `duration-200 ease-in-out`.
+- Typography baseline uses `font-[Inter] text-[14px] leading-6`.
+- Color contract uses:
+  - Primary `#1E3A8A`
+  - Secondary `#64748B`
+  - Success `#10B981`
+  - Error `#EF4444`
+
+### Double-Click Interaction Contract
+
+- Single row click selection is delayed by `300ms` to avoid conflict with double-click.
+- Double-click on a row opens CRUD modal in update mode with selected row prefilled.
+- Modal transition uses `duration-[250ms]` with zoom state classes (`zoom-in-95`/`zoom-out-95`).
+- Dialog remains centered by shared shell transform (`left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%]`).
+- Focus behavior auto-focuses the first editable field when modal opens.
+
+### CRUD Modal and Section Architecture Contract
+
+- Form modal contains three sections with tab navigation:
+  - `Basic Information`
+  - `Configuration Settings`
+  - `System Information`
+- Tab rail uses `border-b-2 border-[#E5E7EB]` and active state `border-[#1E3A8A] text-[#1E3A8A]`.
+- Section header style uses `text-[16px] font-semibold` with 24px spacing rhythm.
+- Field density contract:
+  - Desktop: up to 4 columns (`xl:grid-cols-4`)
+  - Tablet: 2 columns (`md:grid-cols-2`)
+  - Mobile: 1 column (`grid-cols-1`)
+- Control dimensions:
+  - Text inputs/selects/date/time: `h-10` (40px)
+  - Toggle control remains compact inside bordered 40px row container.
+- Validation style:
+  - Field border on invalid: `border-[#EF4444]`
+  - Error text: `text-xs text-[#EF4444]`
+
+### Testing and Validation Contract
+
+- Unit and integration coverage includes:
+  - Nine-module tab registry checks
+  - Modal create/update/delete flows
+  - Kebab-case route hydration for module pages
+  - Payload validation for required/date/time/json constraints
+  - Referential checks for supplier/facility dependencies
