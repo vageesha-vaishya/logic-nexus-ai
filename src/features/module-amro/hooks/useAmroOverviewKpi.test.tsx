@@ -389,6 +389,62 @@ describe('useAmroOverviewKpi', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it('does not activate outage cooldown for auth failures and recovers on manual refresh', async () => {
+    let callCount = 0;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      callCount += 1;
+      if (callCount <= 4) {
+        return {
+          ok: false,
+          status: 401,
+          json: async () => ({ error: 'Unauthorized' }),
+        };
+      }
+      const url = String(input);
+      if (url.includes('interface=load-kpi-dashboard')) {
+        return {
+          ok: true,
+          json: async () => ({
+            output: {
+              kpi_cards: [{ key: 'open_work_packages', label: 'Open Work Packages', value: 33, trend: '+5%' }],
+              risk_heatmap: { cells: [] },
+              trend_lines: [],
+              anomaly_flags: [],
+              freshness_warning: null,
+            },
+          }),
+        };
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          output: {
+            time_series: [],
+            variance: 1.8,
+            threshold_breaches: [],
+          },
+        }),
+      };
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { result } = renderHook(() => useAmroOverviewKpi());
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.dashboard?.data_issues?.some((issue) => issue.includes('Unauthorized'))).toBe(true);
+    const callsAfterInitialLoad = fetchMock.mock.calls.length;
+
+    await act(async () => {
+      await result.current.refreshAll();
+    });
+
+    await waitFor(() => {
+      expect(result.current.dashboard?.kpi_cards[0]?.value).toBe(33);
+      expect(result.current.trends?.variance).toBe(1.8);
+    });
+    expect(fetchMock.mock.calls.length).toBeGreaterThan(callsAfterInitialLoad);
+  });
+
   it('reuses outage cooldown across hook remounts to prevent proxy retry storms', async () => {
     const fetchMock = vi.fn().mockRejectedValue(new Error('ECONNREFUSED'));
     vi.stubGlobal('fetch', fetchMock);

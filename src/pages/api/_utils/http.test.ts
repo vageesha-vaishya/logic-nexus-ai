@@ -606,6 +606,38 @@ describe('http domain and scope guards', () => {
     }
   });
 
+  it('authenticates with query access_token when authorization header is unavailable', async () => {
+    const supabaseMock = {
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: {
+            user: {
+              id: 'query-token-user',
+              email: 'query-token@example.com',
+              app_metadata: { role: 'tenant_admin', permissions: ['dashboards.view'] },
+            },
+          },
+          error: null,
+        }),
+      },
+    } as any;
+    vi.mocked(getSupabaseAdminClient).mockReturnValue(supabaseMock);
+
+    await expect(
+      authenticateRequest({
+        headers: {},
+        method: 'GET',
+        query: {
+          access_token: 'query-token-value',
+        },
+      } as any)
+    ).resolves.toEqual({
+      userId: 'query-token-user',
+      role: 'tenant_admin',
+      permissions: ['dashboards.view'],
+    });
+  });
+
   it('rejects expired JWT during authentication', async () => {
     const supabaseMock = {
       auth: {

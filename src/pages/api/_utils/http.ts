@@ -544,7 +544,14 @@ export function sanitizeQueryId(value: unknown, fieldName: string): string {
 
 export async function authenticateRequest(req: ApiRequest): Promise<{ userId: string; role: string; permissions: string[] }> {
   const authHeader = parseHeaderValue(req.headers.authorization);
-  const token = authHeader.startsWith('Bearer ') ? authHeader.slice('Bearer '.length).trim() : '';
+  const headerToken = authHeader.startsWith('Bearer ') ? authHeader.slice('Bearer '.length).trim() : '';
+  const queryToken = Array.isArray(req.query.access_token)
+    ? String(req.query.access_token[0] || '').trim()
+    : String(req.query.access_token || '').trim();
+  const bodyToken = req.body && typeof req.body === 'object'
+    ? String((req.body as { access_token?: unknown }).access_token || '').trim()
+    : '';
+  const token = headerToken || queryToken || bodyToken;
 
   const fallbackUserId = parseHeaderValue(req.headers['x-user-id']);
   const fallbackPermissions = parsePermissionHeader(parseHeaderValue(req.headers['x-user-permissions']));

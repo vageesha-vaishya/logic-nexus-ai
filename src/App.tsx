@@ -190,6 +190,7 @@ const AmroCertification = lazy(() => import("./features/module-amro").then((modu
 const AmroAudit = lazy(() => import("./features/module-amro").then((module) => ({ default: module.AmroAuditPage })));
 const AmroIntegration = lazy(() => import("./features/module-amro").then((module) => ({ default: module.AmroIntegrationPage })));
 const AmroIntelligence = lazy(() => import("./features/module-amro").then((module) => ({ default: module.AmroIntelligencePage })));
+const AmroMasterData = lazy(() => import("./features/module-amro").then((module) => ({ default: module.AmroMasterDataPage })));
 const AmroWorkspaceDocumentation = lazy(() => import("./features/module-amro").then((module) => ({ default: module.AmroWorkspaceDocumentationPage })));
 const MigrationBaselineDashboard = lazy(() => import("./pages/dashboard/MigrationBaselineDashboard"));
 
@@ -869,6 +870,7 @@ const App = () => (
             <Route path="/dashboard/amro/audit" element={<ProtectedRoute requiredDomainCode="AMRO"><AmroAudit /></ProtectedRoute>} />
             <Route path="/dashboard/amro/integration" element={<ProtectedRoute requiredDomainCode="AMRO"><AmroIntegration /></ProtectedRoute>} />
             <Route path="/dashboard/amro/intelligence" element={<ProtectedRoute requiredDomainCode="AMRO"><AmroIntelligence /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/master-data" element={<ProtectedRoute requiredDomainCode="AMRO"><AmroMasterData /></ProtectedRoute>} />
             <Route path="/dashboard/amro/workspace-documentation" element={<ProtectedRoute requiredDomainCode="AMRO"><AmroWorkspaceDocumentation /></ProtectedRoute>} />
             <Route path="/dashboard/amro/changes" element={<Navigate to="/dashboard/amro/work-packages" replace />} />
             

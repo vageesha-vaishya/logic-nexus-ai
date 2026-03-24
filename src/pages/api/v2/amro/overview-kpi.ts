@@ -344,6 +344,8 @@ async function fetchScopedRows(
     code === 'PGRST205'
     || message.toLowerCase().includes('could not find the table')
     || (message.toLowerCase().includes('relation') && message.toLowerCase().includes('does not exist'));
+  const isInvalidTenantUuidError = (message: string) =>
+    message.toLowerCase().includes('invalid input syntax for type uuid');
 
   try {
     for (const [index, tableCandidate] of tableCandidates.entries()) {
@@ -364,6 +366,20 @@ async function fetchScopedRows(
 
       const message = String(error.message || 'database connectivity failure');
       const code = String((error as { code?: string }).code || '');
+      if (process.env.NODE_ENV !== 'production' && isInvalidTenantUuidError(message)) {
+        let fallbackQuery = supabase
+          .from(tableCandidate)
+          .select('*');
+        if (tableCandidate === 'amro_overview_kpi_snapshots' && typeof (fallbackQuery as { order?: unknown }).order === 'function') {
+          fallbackQuery = (fallbackQuery as { order: (column: string, options: { ascending: boolean }) => typeof fallbackQuery })
+            .order('snapshot_at', { ascending: false });
+        }
+        const fallbackResult = await fallbackQuery.limit(limit);
+        if (!fallbackResult.error) {
+          issueCollector.push(`${table}: tenant scope fallback applied for non-UUID tenant_id in development`);
+          return Array.isArray(fallbackResult.data) ? (fallbackResult.data as JsonRecord[]) : [];
+        }
+      }
       if (!fallbackErrorMessage) {
         fallbackErrorMessage = `${table}: ${message}`;
       }
@@ -390,8 +406,8 @@ function mapWorkPackageOverview(
   engineerFilter: string | null,
 ) {
   const filtered = rows.filter((row) => {
-    const plannerId = getStringValue(row, ['planner_id', 'assigned_planner_id']);
-    const engineerId = getStringValue(row, ['engineer_id', 'assigned_engineer_id']);
+    const plannerId = getStringValue(row, ['planner_id', 'assigned_planner_id', 'assigned_to']);
+    const engineerId = getStringValue(row, ['engineer_id', 'assigned_engineer_id', 'lead_engineer_id']);
     const plannerPass = !plannerFilter || plannerId === plannerFilter;
     const engineerPass = !engineerFilter || engineerId === engineerFilter;
     return plannerPass && engineerPass;

@@ -37,8 +37,8 @@ FROM nginx:stable
 # Copy build artifacts
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Copy custom Nginx config
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Copy custom Nginx template for runtime env substitution
+COPY nginx.conf /etc/nginx/templates/default.conf.template
 
 # Expose port 80
 EXPOSE 80

@@ -42,7 +42,9 @@ function createThenableBuilder(result: QueryResult) {
   const builder = {
     select: jest.fn(),
     eq: jest.fn(),
+    neq: jest.fn(),
     order: jest.fn(),
+    limit: jest.fn(),
     insert: jest.fn(),
     update: jest.fn(),
     delete: jest.fn(),
@@ -55,7 +57,9 @@ function createThenableBuilder(result: QueryResult) {
 
   builder.select.mockReturnValue(builder);
   builder.eq.mockReturnValue(builder);
+  builder.neq.mockReturnValue(builder);
   builder.order.mockReturnValue(builder);
+  builder.limit.mockReturnValue(builder);
   builder.insert.mockReturnValue(builder);
   builder.update.mockReturnValue(builder);
   builder.delete.mockReturnValue(builder);
@@ -95,6 +99,10 @@ describe('WorkOrdersService', () => {
 
   it('creates work package and publishes events', async () => {
     const service = new WorkOrdersService();
+    queuedResults.push({
+      data: [{ id: 'ac-1', status: 'active' }],
+      error: null,
+    });
     queuedResults.push({
       data: {
         id: 'wp-9',

@@ -389,8 +389,12 @@ async function requestOverview<TOutput>(url: string, init: RequestInit | undefin
 
   let activeUrl = url;
   let { response, payload } = await callWithToken(activeUrl);
-  const isAuthHeaderRejection = hasToken && response.status === 401
-    && /missing or malformed authorization header/i.test(String(payload.error || ''));
+  const authFailureMessage = String(payload.error || '').trim();
+  const isAuthHeaderRejection = hasToken && response.status === 401 && (
+    !authFailureMessage
+    || /missing or malformed authorization header/i.test(authFailureMessage)
+    || /unauthorized/i.test(authFailureMessage)
+  );
   if (isAuthHeaderRejection) {
     const separator = url.includes('?') ? '&' : '?';
     const fallbackUrl = `${url}${separator}access_token=${encodeURIComponent(token)}`;
@@ -484,12 +488,19 @@ export function useAmroOverviewKpi(scope: AmroRequestScope = {}) {
     try {
       output = await requestOverview<DashboardOutput>(`${AMRO_OVERVIEW_KPI_PATH}?${params.toString()}`, undefined, normalizedScope);
     } catch (error) {
-      if (isNetworkConnectivityError(error) || isSessionAuthError(error)) {
+      if (isNetworkConnectivityError(error)) {
         markApiTemporarilyUnavailable();
         const fallback = buildFallbackDashboard(request);
         setDashboard(fallback);
         setLastDashboardRefreshAt(new Date().toISOString());
         return fallback;
+      }
+      if (isSessionAuthError(error)) {
+        const issue = `AMRO KPI API error: ${error instanceof Error ? error.message : 'Unauthorized'}`;
+        const fallback = withIssue(buildFallbackDashboard(request), issue);
+        setDashboard(fallback);
+        setLastDashboardRefreshAt(new Date().toISOString());
+        throw error;
       }
       const issue = `AMRO KPI API error: ${error instanceof Error ? error.message : 'unknown failure'}`;
       const fallback = withIssue(buildFallbackDashboard(request), issue);
@@ -536,12 +547,19 @@ export function useAmroOverviewKpi(scope: AmroRequestScope = {}) {
     try {
       output = await requestOverview<TrendOutput>(`${AMRO_OVERVIEW_KPI_PATH}?${params.toString()}`, undefined, normalizedScope);
     } catch (error) {
-      if (isNetworkConnectivityError(error) || isSessionAuthError(error)) {
+      if (isNetworkConnectivityError(error)) {
         markApiTemporarilyUnavailable();
         const fallback = buildFallbackTrends();
         setTrends(fallback);
         setLastTrendsRefreshAt(new Date().toISOString());
         return fallback;
+      }
+      if (isSessionAuthError(error)) {
+        const issue = `AMRO trends API error: ${error instanceof Error ? error.message : 'Unauthorized'}`;
+        const fallback = withIssue(buildFallbackTrends(), issue);
+        setTrends(fallback);
+        setLastTrendsRefreshAt(new Date().toISOString());
+        throw error;
       }
       const issue = `AMRO trends API error: ${error instanceof Error ? error.message : 'unknown failure'}`;
       const fallback = withIssue(buildFallbackTrends(), issue);

@@ -1,4 +1,5 @@
 export { default as AmroHubVerticalPage } from './pages/AmroHubVerticalPage';
+export { default as AmroMasterDataPage } from './pages/AmroMasterDataPage';
 export {
   AmroAuditPage,
   AmroCertificationPage,

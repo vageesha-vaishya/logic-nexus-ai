@@ -9,6 +9,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { authMiddleware, AuthRequest } from './middleware/auth.middleware';
+import masterDataRoutes from './routes/master-data.routes';
 import workOrdersRoutes from './routes/work-orders.routes';
 import { ErrorResponse } from './types/amro.types';
 import { logger } from './utils/logger';
@@ -472,8 +473,8 @@ app.all('/api/v2/amro/overview-kpi', authMiddleware as any, async (req: AuthRequ
       ]);
 
       const filteredWorkPackages = workPackageRows.filter((row) => {
-        const planner = getStringValue(row, ['planner_id', 'assigned_planner_id']);
-        const engineer = getStringValue(row, ['engineer_id', 'assigned_engineer_id']);
+        const planner = getStringValue(row, ['planner_id', 'assigned_planner_id', 'assigned_to']);
+        const engineer = getStringValue(row, ['engineer_id', 'assigned_engineer_id', 'lead_engineer_id']);
         const plannerPass = !plannerId || planner === plannerId;
         const engineerPass = !engineerId || engineer === engineerId;
         return plannerPass && engineerPass;
@@ -786,6 +787,7 @@ app.use('/api/v2/amro', authMiddleware);
 // Mount work orders routes
 app.use('/api/v1', workOrdersRoutes);
 app.use('/api/v2', workOrdersRoutes);
+app.use('/api/v2', masterDataRoutes);
 
 // ============================================================================
 // ERROR HANDLING

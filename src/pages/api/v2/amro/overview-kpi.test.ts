@@ -62,6 +62,41 @@ function createResponse(): ApiResponse & { statusCode?: number; jsonBody?: unkno
   return res;
 }
 
+type QueryInvocationState = {
+  eqCalls: Array<{ column: string; value: unknown }>;
+  neqCalls: Array<{ column: string; value: unknown }>;
+  orderCalls: Array<{ column: string; options?: { ascending: boolean } }>;
+};
+
+function createSupabaseFromMock(
+  resolver: (tableName: string, state: QueryInvocationState) => Promise<{ data: unknown[] | null; error: unknown }> | { data: unknown[] | null; error: unknown }
+) {
+  return vi.fn((tableName: string) => {
+    const state: QueryInvocationState = {
+      eqCalls: [],
+      neqCalls: [],
+      orderCalls: [],
+    };
+    const chain: any = {
+      select: vi.fn(() => chain),
+      eq: vi.fn((column: string, value: unknown) => {
+        state.eqCalls.push({ column, value });
+        return chain;
+      }),
+      neq: vi.fn((column: string, value: unknown) => {
+        state.neqCalls.push({ column, value });
+        return chain;
+      }),
+      order: vi.fn((column: string, options?: { ascending: boolean }) => {
+        state.orderCalls.push({ column, options });
+        return chain;
+      }),
+      limit: vi.fn(async () => resolver(tableName, state)),
+    };
+    return chain;
+  });
+}
+
 describe('/api/v2/amro/overview-kpi', () => {
   const envBackup = { ...process.env };
 
@@ -241,15 +276,9 @@ describe('/api/v2/amro/overview-kpi', () => {
       ],
     };
     vi.mocked(getSupabaseAdminClient).mockReturnValue({
-      from: vi.fn((tableName: string) => ({
-        select: vi.fn(() => ({
-          eq: vi.fn(() => ({
-            limit: vi.fn(async () => ({
-              data: tableRows[tableName] || [],
-              error: null,
-            })),
-          })),
-        })),
+      from: createSupabaseFromMock(async (tableName) => ({
+        data: tableRows[tableName] || [],
+        error: null,
       })),
     } as any);
   });
@@ -342,15 +371,9 @@ describe('/api/v2/amro/overview-kpi', () => {
       ],
     };
     vi.mocked(getSupabaseAdminClient).mockReturnValue({
-      from: vi.fn((tableName: string) => ({
-        select: vi.fn(() => ({
-          eq: vi.fn(() => ({
-            limit: vi.fn(async () => ({
-              data: snapshotRows[tableName] || [],
-              error: null,
-            })),
-          })),
-        })),
+      from: createSupabaseFromMock(async (tableName) => ({
+        data: snapshotRows[tableName] || [],
+        error: null,
       })),
     } as any);
     const req: ApiRequest = {
@@ -379,18 +402,12 @@ describe('/api/v2/amro/overview-kpi', () => {
   it('logs overview dashboard data issues when source tables fail', async () => {
     process.env.AMRO_OVERVIEW_KPI_V2_ENABLED = 'true';
     vi.mocked(getSupabaseAdminClient).mockReturnValue({
-      from: vi.fn(() => ({
-        select: vi.fn(() => ({
-          eq: vi.fn(() => ({
-            limit: vi.fn(async () => ({
-              data: null,
-              error: {
-                code: 'XX000',
-                message: 'database connectivity failure',
-              },
-            })),
-          })),
-        })),
+      from: createSupabaseFromMock(async () => ({
+        data: null,
+        error: {
+          code: 'XX000',
+          message: 'database connectivity failure',
+        },
       })),
     } as any);
     const req: ApiRequest = {
@@ -442,6 +459,71 @@ describe('/api/v2/amro/overview-kpi', () => {
     expect((res.jsonBody as any)?.output?.role_scope?.planner_id).toBe('planner-1');
     expect((res.jsonBody as any)?.output?.integration_monitor?.recent_failures).toEqual([]);
     expect((res.jsonBody as any)?.output?.anomaly_flags).toEqual([]);
+  });
+
+  it('applies non-UUID tenant fallback in development when tenant filter fails', async () => {
+    process.env.AMRO_OVERVIEW_KPI_V2_ENABLED = 'true';
+    process.env.NODE_ENV = 'development';
+    vi.mocked(resolveAndApplyAccessContext).mockResolvedValue({
+      userId: 'user-dev',
+      tenantId: 'tenant-dev-local',
+      franchiseId: 'fr-1',
+      isPlatformAdmin: false,
+      adminOverrideEnabled: false,
+    } as any);
+    vi.mocked(getSupabaseAdminClient).mockReturnValue({
+      from: createSupabaseFromMock(async (tableName, state) => {
+        if (tableName === 'work_package_master' || tableName === 'work_packages') {
+          const hasTenantFilter = state.eqCalls.some((call) => call.column === 'tenant_id');
+          if (hasTenantFilter) {
+            return {
+              data: null,
+              error: {
+                code: '22P02',
+                message: 'invalid input syntax for type uuid: "tenant-dev-local"',
+              },
+            };
+          }
+          return {
+            data: [
+              {
+                id: 'wp-dev-1',
+                title: 'Dev Tenant Work Package',
+                status: 'in_progress',
+                assigned_to: 'user-dev',
+                due_at: '2026-03-23T10:00:00.000Z',
+                tenant_id: 'tenant-dev-local',
+              },
+            ],
+            error: null,
+          };
+        }
+        return {
+          data: [],
+          error: null,
+        };
+      }),
+    } as any);
+
+    const req: ApiRequest = {
+      method: 'GET',
+      query: {
+        interface: 'load-kpi-dashboard',
+        date_range: '2026-03-01T00:00:00.000Z:2026-03-24T00:00:00.000Z',
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    const scopeTenantId = (res.jsonBody as any)?.scope?.tenantId || (res.jsonBody as any)?.scope?.tenant_id;
+    expect(scopeTenantId).toBe('tenant-dev-local');
+    expect((res.jsonBody as any)?.output?.work_package_overview?.[0]?.work_package_id).toBe('wp-dev-1');
+    expect((res.jsonBody as any)?.output?.data_issues).toContain(
+      'work_package_master: tenant scope fallback applied for non-UUID tenant_id in development'
+    );
   });
 
   it('uses fallback AMRO tables when overview aliases are missing from schema cache', async () => {
@@ -501,27 +583,21 @@ describe('/api/v2/amro/overview-kpi', () => {
       ],
     };
     vi.mocked(getSupabaseAdminClient).mockReturnValue({
-      from: vi.fn((tableName: string) => ({
-        select: vi.fn(() => ({
-          eq: vi.fn(() => ({
-            limit: vi.fn(async () => {
-              if (['work_package_master', 'materials_inventory', 'compliance_gates', 'integration_logs', 'forecast_recommendations'].includes(tableName)) {
-                return {
-                  data: null,
-                  error: {
-                    code: 'PGRST205',
-                    message: `Could not find the table 'public.${tableName}' in the schema cache`,
-                  },
-                };
-              }
-              return {
-                data: fallbackRows[tableName] || [],
-                error: null,
-              };
-            }),
-          })),
-        })),
-      })),
+      from: createSupabaseFromMock(async (tableName) => {
+        if (['work_package_master', 'materials_inventory', 'compliance_gates', 'integration_logs', 'forecast_recommendations'].includes(tableName)) {
+          return {
+            data: null,
+            error: {
+              code: 'PGRST205',
+              message: `Could not find the table 'public.${tableName}' in the schema cache`,
+            },
+          };
+        }
+        return {
+          data: fallbackRows[tableName] || [],
+          error: null,
+        };
+      }),
     } as any);
 
     const req: ApiRequest = {
@@ -720,27 +796,21 @@ describe('/api/v2/amro/overview-kpi', () => {
       ],
     };
     vi.mocked(getSupabaseAdminClient).mockReturnValue({
-      from: vi.fn((tableName: string) => ({
-        select: vi.fn(() => ({
-          eq: vi.fn(() => ({
-            limit: vi.fn(async () => {
-              if (['task_execution_status', 'scheduling_board_data', 'certification_records', 'audit_trails', 'forecast_recommendations'].includes(tableName)) {
-                return {
-                  data: null,
-                  error: {
-                    code: 'PGRST205',
-                    message: `Could not find the table 'public.${tableName}' in the schema cache`,
-                  },
-                };
-              }
-              return {
-                data: fallbackRows[tableName] || [],
-                error: null,
-              };
-            }),
-          })),
-        })),
-      })),
+      from: createSupabaseFromMock(async (tableName) => {
+        if (['task_execution_status', 'scheduling_board_data', 'certification_records', 'audit_trails', 'forecast_recommendations'].includes(tableName)) {
+          return {
+            data: null,
+            error: {
+              code: 'PGRST205',
+              message: `Could not find the table 'public.${tableName}' in the schema cache`,
+            },
+          };
+        }
+        return {
+          data: fallbackRows[tableName] || [],
+          error: null,
+        };
+      }),
     } as any);
 
     const req: ApiRequest = {

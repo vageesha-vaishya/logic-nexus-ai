@@ -159,6 +159,8 @@ services:
       - amro-api
     ports:
       - "8083:80"
+    environment:
+      AMRO_API_UPSTREAM: ${AMRO_API_UPSTREAM:-amro-api:3001}
     networks:
       - supabase-network
 
