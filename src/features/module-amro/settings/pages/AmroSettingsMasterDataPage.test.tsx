@@ -78,7 +78,45 @@ describe('AmroSettingsMasterDataPage', () => {
                       serial_number: 'SN-100',
                       aircraft_type: 'A320',
                       aircraft_model: 'A320-200',
+                      manufacturer_id: 'manu-1',
+                      manufacturer: 'Boeing',
                       status: 'active',
+                    },
+                  ],
+                },
+              }),
+          };
+        }
+        if (method === 'GET' && url.includes('/api/v2/amro/master-data/manufacturers')) {
+          return {
+            ok: true,
+            text: async () =>
+              JSON.stringify({
+                output: {
+                  records: [
+                    {
+                      id: 'manu-1',
+                      manufacturer_code: 'BOE',
+                      name: 'Boeing',
+                      is_active: true,
+                    },
+                  ],
+                },
+              }),
+          };
+        }
+        if (method === 'GET' && url.includes('/api/v2/amro/master-data/assembly_types')) {
+          return {
+            ok: true,
+            text: async () =>
+              JSON.stringify({
+                output: {
+                  records: [
+                    {
+                      id: 'atype-1',
+                      assembly_code: 'AIRFRAME',
+                      name: 'Airframe',
+                      is_active: true,
                     },
                   ],
                 },
@@ -147,7 +185,7 @@ describe('AmroSettingsMasterDataPage', () => {
     );
   });
 
-  it('renders all nine master data modules with shared list layout controls', async () => {
+  it('renders all ten master data modules with shared list layout controls', async () => {
     render(
       <MemoryRouter>
         <AmroSettingsMasterDataPage />
@@ -161,6 +199,8 @@ describe('AmroSettingsMasterDataPage', () => {
       { tab: 'Maintenance Facilities', entity: 'maintenance_facilities', labels: ['Facility Code', 'Station Code'] },
       { tab: 'Work Centers', entity: 'work_centers', labels: ['Work Center Code', 'Center Type'] },
       { tab: 'Skill Codes', entity: 'skill_codes', labels: ['Skill Code', 'Skill Family'] },
+      { tab: 'Manufacturers', entity: 'manufacturers', labels: ['Manufacturer Code', 'Name'] },
+      { tab: 'Model', entity: 'assembly_models', labels: ['Model Code', 'Name'] },
       { tab: 'Regulator Profiles', entity: 'regulator_profiles', labels: ['Regulator Code', 'Policy Version'] },
       { tab: 'Shift Calendars', entity: 'shift_calendars', labels: ['Shift Start', 'Shift End'] },
       { tab: 'Work Package Templates', entity: 'work_package_templates', labels: ['Template Code', 'Maintenance Type'] },
@@ -194,6 +234,8 @@ describe('AmroSettingsMasterDataPage', () => {
     fireEvent.change(screen.getByLabelText(/Serial Number/), { target: { value: 'SN-200' } });
     fireEvent.change(screen.getByLabelText(/Aircraft Type/), { target: { value: 'A321' } });
     fireEvent.click(screen.getByRole('button', { name: 'Configuration Settings' }));
+    fireEvent.click(screen.getByLabelText(/Manufacturer/));
+    fireEvent.click(await screen.findByText('Boeing (BOE)'));
     fireEvent.change(screen.getByLabelText(/Aircraft Model/), { target: { value: 'A321-200' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
@@ -209,6 +251,27 @@ describe('AmroSettingsMasterDataPage', () => {
     await waitFor(() => {
       expect(mockToastSuccess).toHaveBeenCalledWith('Aircraft record updated');
     });
+  });
+
+  it('renders manufacturer and assembly type dropdown options for model creation', async () => {
+    render(
+      <MemoryRouter initialEntries={['/dashboard/amro/settings/master-data/model']}>
+        <Routes>
+          <Route path="/dashboard/amro/settings/master-data/:entity" element={<AmroSettingsMasterDataPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /New Model/ })).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole('button', { name: /New Model/ }));
+
+    fireEvent.click(screen.getByLabelText(/Manufacturer/));
+    expect(await screen.findByText('Boeing (BOE)')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText(/Assembly Type Id/));
+    expect(await screen.findByText('Airframe (AIRFRAME)')).toBeInTheDocument();
   });
 
   it('hydrates entity state from kebab-case route segments', async () => {
@@ -256,6 +319,7 @@ describe('AmroSettingsMasterDataPage', () => {
       { entity: 'maintenance_facilities', field: 'facility_code', message: 'Facility Code is required' },
       { entity: 'work_centers', field: 'work_center_code', message: 'Work Center Code is required' },
       { entity: 'skill_codes', field: 'skill_code', message: 'Skill Code is required' },
+      { entity: 'manufacturers', field: 'manufacturer_code', message: 'Manufacturer Code is required' },
       { entity: 'regulator_profiles', field: 'regulator_code', message: 'Regulator Code is required' },
       { entity: 'shift_calendars', field: 'station_code', message: 'Station Code is required' },
       { entity: 'work_package_templates', field: 'template_code', message: 'Template Code is required' },

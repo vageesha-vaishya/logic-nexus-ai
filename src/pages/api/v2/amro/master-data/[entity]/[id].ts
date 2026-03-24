@@ -27,6 +27,84 @@ function isV2Enabled(): boolean {
   return normalized === 'true' || normalized === '1' || normalized === 'on';
 }
 
+function asNullableString(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  const text = String(value).trim();
+  return text ? text : null;
+}
+
+function normalizeManufacturerToken(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+type ManufacturerRecord = {
+  id: string;
+  manufacturer_code: string | null;
+  name: string | null;
+  is_active: boolean | null;
+};
+
+async function loadManufacturers(
+  supabase: ReturnType<typeof getSupabaseAdminClient>,
+): Promise<ManufacturerRecord[]> {
+  const query = supabase
+    .from('manufacturers')
+    .select('id,manufacturer_code,name,is_active');
+  const { data, error } = await query;
+  if (error) {
+    throw new HttpError(error.message, 400);
+  }
+  return Array.isArray(data) ? data : [];
+}
+
+async function resolveAircraftManufacturerUpdate(
+  supabase: ReturnType<typeof getSupabaseAdminClient>,
+  payload: Record<string, unknown>,
+): Promise<{ payload: Record<string, unknown>; issues: { field: string; message: string }[] }> {
+  const manufacturers = await loadManufacturers(supabase);
+  const byId = new Map<string, ManufacturerRecord>();
+  const byToken = new Map<string, ManufacturerRecord>();
+  manufacturers.forEach((record) => {
+    if (record.id) {
+      byId.set(record.id, record);
+    }
+    const code = record.manufacturer_code ? normalizeManufacturerToken(record.manufacturer_code) : null;
+    const name = record.name ? normalizeManufacturerToken(record.name) : null;
+    if (code) {
+      byToken.set(code, record);
+    }
+    if (name) {
+      byToken.set(name, record);
+    }
+  });
+  const manufacturerId = asNullableString(payload.manufacturer_id);
+  const manufacturerToken = asNullableString(payload.manufacturer || payload.manufacturer_code);
+  if (manufacturerId) {
+    const match = byId.get(manufacturerId);
+    if (!match) {
+      return { payload, issues: [{ field: 'manufacturer_id', message: 'manufacturer_id is not valid' }] };
+    }
+    if (match.is_active === false) {
+      return { payload, issues: [{ field: 'manufacturer_id', message: 'manufacturer_id must reference an active manufacturer' }] };
+    }
+    return { payload: { ...payload, manufacturer: match.name || payload.manufacturer }, issues: [] };
+  }
+  if (manufacturerToken) {
+    const match = byToken.get(normalizeManufacturerToken(manufacturerToken));
+    if (!match) {
+      return { payload, issues: [{ field: 'manufacturer_id', message: 'manufacturer_id is required' }] };
+    }
+    if (match.is_active === false) {
+      return { payload, issues: [{ field: 'manufacturer_id', message: 'manufacturer_id must reference an active manufacturer' }] };
+    }
+    return {
+      payload: { ...payload, manufacturer_id: match.id, manufacturer: match.name || payload.manufacturer },
+      issues: [],
+    };
+  }
+  return { payload, issues: [] };
+}
+
 function asBodyObject(body: unknown): Record<string, unknown> {
   if (body && typeof body === 'object') return body as Record<string, unknown>;
   return {};
@@ -77,20 +155,22 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     if (!id) throw new HttpError('id is required', 400);
     const entityConfig = getEntityConfig(entity);
     const supabase = getSupabaseAdminClient();
+    const isGlobalEntity = entity === 'manufacturers' || entity === 'assembly_types' || entity === 'assembly_models';
 
-    const { data: existing, error: existingError } = await supabase
+    const existingQuery = supabase
       .from(entityConfig.table)
       .select(entityConfig.listColumns)
-      .eq('tenant_id', tenantId)
       .eq('id', id)
-      .limit(1)
-      .maybeSingle();
+      .limit(1);
+    const { data: existing, error: existingError } = await (isGlobalEntity ? existingQuery : existingQuery.eq('tenant_id', tenantId)).maybeSingle();
     if (existingError) throw new HttpError(existingError.message, 400);
     if (!existing) throw new HttpError('Record not found', 404);
-    const existingRecord = existing as unknown as Record<string, unknown>;
-    const existingFranchiseId = String(existingRecord.franchise_id || '').trim();
-    if (franchiseId && existingFranchiseId && existingFranchiseId !== franchiseId) {
-      throw new HttpError('Forbidden', 403);
+    if (!isGlobalEntity) {
+      const existingRecord = existing as unknown as Record<string, unknown>;
+      const existingFranchiseId = String(existingRecord.franchise_id || '').trim();
+      if (franchiseId && existingFranchiseId && existingFranchiseId !== franchiseId) {
+        throw new HttpError('Forbidden', 403);
+      }
     }
 
     if (req.method === 'GET') {
@@ -108,7 +188,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
 
     if (req.method === 'DELETE') {
       enforceAnyPermission(auth.permissions || [], ['edit_aircraft_records']);
-      const { error } = await supabase.from(entityConfig.table).delete().eq('tenant_id', tenantId).eq('id', id);
+      const deleteQuery = supabase.from(entityConfig.table).delete().eq('id', id);
+      const { error } = await (isGlobalEntity ? deleteQuery : deleteQuery.eq('tenant_id', tenantId));
       if (error) throw new HttpError(error.message, 400);
       await writeAuditRecord({
         tenantId,
@@ -133,8 +214,14 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     enforceAnyPermission(auth.permissions || [], ['edit_aircraft_records', 'create_maintenance_request']);
     const body = asBodyObject(req.body);
     const validationOnly = isValidationOnly(req, body);
-    const payload = sanitizeWritePayload(entity, body, { requireCreateFields: false });
-    const issues = validatePayload(entity, payload);
+    let payload = sanitizeWritePayload(entity, body, { requireCreateFields: false });
+    let manufacturerIssues: { field: string; message: string }[] = [];
+    if (entity === 'aircraft' && (payload.manufacturer_id || payload.manufacturer || payload.manufacturer_code)) {
+      const resolved = await resolveAircraftManufacturerUpdate(supabase, payload);
+      payload = resolved.payload;
+      manufacturerIssues = resolved.issues;
+    }
+    const issues = [...manufacturerIssues, ...validatePayload(entity, payload)];
     if (validationOnly) {
       res.status(200).json({
         version: 'v2',
@@ -157,14 +244,15 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       ...payload,
       updated_by: auth.userId,
     };
-    const { data, error } = await supabase
+    const updateBaseQuery = supabase
       .from(entityConfig.table)
       .update(updatePayload)
-      .eq('tenant_id', tenantId)
       .eq('id', id)
       .select(entityConfig.listColumns)
-      .limit(1)
-      .maybeSingle();
+      .limit(1);
+    const { data, error } = await (isGlobalEntity
+      ? updateBaseQuery.maybeSingle()
+      : updateBaseQuery.eq('tenant_id', tenantId).maybeSingle());
     if (error) throw new HttpError(error.message, 400);
     await writeAuditRecord({
       tenantId,

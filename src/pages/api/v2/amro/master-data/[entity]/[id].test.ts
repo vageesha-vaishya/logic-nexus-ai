@@ -92,10 +92,10 @@ describe('/api/v2/amro/master-data/[entity]/[id]', () => {
       data: { id: 'ac-1', tail_number: 'N100AA', tenant_id: 'tenant-1' },
       error: null,
     });
-    const limitMock = vi.fn().mockReturnValue({ maybeSingle: maybeSingleMock });
+    const eqTenantMock = vi.fn().mockReturnValue({ maybeSingle: maybeSingleMock });
+    const limitMock = vi.fn().mockReturnValue({ eq: eqTenantMock });
     const eqIdMock = vi.fn().mockReturnValue({ limit: limitMock });
-    const eqTenantMock = vi.fn().mockReturnValue({ eq: eqIdMock });
-    const selectMock = vi.fn().mockReturnValue({ eq: eqTenantMock });
+    const selectMock = vi.fn().mockReturnValue({ eq: eqIdMock });
     const fromMock = vi.fn().mockReturnValue({ select: selectMock });
     vi.mocked(getSupabaseAdminClient).mockReturnValue({
       from: fromMock,
@@ -124,10 +124,10 @@ describe('/api/v2/amro/master-data/[entity]/[id]', () => {
       data: null,
       error: null,
     });
-    const limitMock = vi.fn().mockReturnValue({ maybeSingle: maybeSingleMock });
+    const eqTenantMock = vi.fn().mockReturnValue({ maybeSingle: maybeSingleMock });
+    const limitMock = vi.fn().mockReturnValue({ eq: eqTenantMock });
     const eqIdMock = vi.fn().mockReturnValue({ limit: limitMock });
-    const eqTenantMock = vi.fn().mockReturnValue({ eq: eqIdMock });
-    const selectMock = vi.fn().mockReturnValue({ eq: eqTenantMock });
+    const selectMock = vi.fn().mockReturnValue({ eq: eqIdMock });
     const fromMock = vi.fn().mockReturnValue({ select: selectMock });
     vi.mocked(getSupabaseAdminClient).mockReturnValue({
       from: fromMock,
@@ -151,10 +151,10 @@ describe('/api/v2/amro/master-data/[entity]/[id]', () => {
       data: { id: 'inv-1', part_number: 'PN-100', tenant_id: 'tenant-1' },
       error: null,
     });
-    const limitMock = vi.fn().mockReturnValue({ maybeSingle: maybeSingleMock });
+    const eqTenantMock = vi.fn().mockReturnValue({ maybeSingle: maybeSingleMock });
+    const limitMock = vi.fn().mockReturnValue({ eq: eqTenantMock });
     const eqIdMock = vi.fn().mockReturnValue({ limit: limitMock });
-    const eqTenantMock = vi.fn().mockReturnValue({ eq: eqIdMock });
-    const selectMock = vi.fn().mockReturnValue({ eq: eqTenantMock });
+    const selectMock = vi.fn().mockReturnValue({ eq: eqIdMock });
     const fromMock = vi.fn().mockReturnValue({ select: selectMock });
     vi.mocked(getSupabaseAdminClient).mockReturnValue({
       from: fromMock,

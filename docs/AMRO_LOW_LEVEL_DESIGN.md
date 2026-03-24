@@ -2154,6 +2154,95 @@ Implementation Notes:
   - <migration id, compatibility notes, rollout notes>
 ```
 
+```text
+Component Type: Table
+Component Name: public.assembly_types
+Purpose: Global AMRO reference list for assembly/system classification with standardized descriptions.
+Estimated Row Count: 8-25 (stable reference set)
+Primary Key: id
+Foreign Keys:
+  - created_by -> auth.users(id) ON DELETE SET NULL
+  - updated_by -> auth.users(id) ON DELETE SET NULL
+Unique Constraints:
+  - uq_assembly_types_code (assembly_code)
+  - uq_assembly_types_name (lower(name))
+Check Constraints:
+  - none
+Defaults:
+  - id: gen_random_uuid()
+  - is_active: true
+  - metadata: '{}'::jsonb
+  - created_at: now()
+  - updated_at: now()
+Indexes:
+  - uq_assembly_types_code(assembly_code)
+  - uq_assembly_types_name(lower(name))
+  - idx_assembly_types_active(is_active)
+Columns:
+  - id | uuid | nullable:no | default:gen_random_uuid()
+  - assembly_code | text | nullable:no | default:-
+  - name | text | nullable:no | default:-
+  - description | text | nullable:no | default:-
+  - is_active | boolean | nullable:no | default:true
+  - metadata | jsonb | nullable:no | default:'{}'::jsonb
+  - created_at | timestamptz | nullable:no | default:now()
+  - updated_at | timestamptz | nullable:no | default:now()
+  - created_by | uuid | nullable:yes | default:null
+  - updated_by | uuid | nullable:yes | default:null
+Security Considerations:
+  - RLS enabled; authenticated access policy for AMRO master data; platform admin override enabled.
+Implementation Notes:
+  - Migration: 20260324233000_amro_assembly_types_reference.sql
+```
+
+```text
+Component Type: Table
+Component Name: public.assembly_models
+Purpose: Global AMRO model registry tied to manufacturer and assembly type for standardized model selection.
+Estimated Row Count: 500-5000 (fleet scope dependent)
+Primary Key: id
+Foreign Keys:
+  - manufacturer_id -> public.manufacturers(id) ON DELETE RESTRICT
+  - assembly_type_id -> public.assembly_types(id) ON DELETE RESTRICT
+  - created_by -> auth.users(id) ON DELETE SET NULL
+  - updated_by -> auth.users(id) ON DELETE SET NULL
+Unique Constraints:
+  - uq_assembly_models_code (manufacturer_id, assembly_type_id, model_code)
+  - uq_assembly_models_name (manufacturer_id, assembly_type_id, lower(name))
+Check Constraints:
+  - none
+Defaults:
+  - id: gen_random_uuid()
+  - is_active: true
+  - metadata: '{}'::jsonb
+  - created_at: now()
+  - updated_at: now()
+Indexes:
+  - uq_assembly_models_code(manufacturer_id, assembly_type_id, model_code)
+  - uq_assembly_models_name(manufacturer_id, assembly_type_id, lower(name))
+  - idx_assembly_models_active(is_active)
+  - idx_assembly_models_manufacturer_id(manufacturer_id)
+  - idx_assembly_models_assembly_type_id(assembly_type_id)
+Columns:
+  - id | uuid | nullable:no | default:gen_random_uuid()
+  - manufacturer_id | uuid | nullable:no | default:-
+  - assembly_type_id | uuid | nullable:no | default:-
+  - model_code | text | nullable:no | default:-
+  - name | text | nullable:no | default:-
+  - primary_model | text | nullable:yes | default:null
+  - description | text | nullable:yes | default:null
+  - is_active | boolean | nullable:no | default:true
+  - metadata | jsonb | nullable:no | default:'{}'::jsonb
+  - created_at | timestamptz | nullable:no | default:now()
+  - updated_at | timestamptz | nullable:no | default:now()
+  - created_by | uuid | nullable:yes | default:null
+  - updated_by | uuid | nullable:yes | default:null
+Security Considerations:
+  - RLS enabled; authenticated access policy for AMRO master data; platform admin override enabled.
+Implementation Notes:
+  - Migration: 20260324234500_amro_assembly_models_reference.sql
+```
+
 #### Template: SQL Function / Trigger Function
 
 ```text

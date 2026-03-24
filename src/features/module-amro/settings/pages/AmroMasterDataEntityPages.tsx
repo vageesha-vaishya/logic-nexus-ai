@@ -24,6 +24,14 @@ export function SkillCodesMasterDataPage() {
   return <AmroSettingsMasterDataPage entityOverride="skill_codes" />;
 }
 
+export function ManufacturersMasterDataPage() {
+  return <AmroSettingsMasterDataPage entityOverride="manufacturers" />;
+}
+
+export function ModelMasterDataPage() {
+  return <AmroSettingsMasterDataPage entityOverride="assembly_models" />;
+}
+
 export function RegulatorProfilesMasterDataPage() {
   return <AmroSettingsMasterDataPage entityOverride="regulator_profiles" />;
 }

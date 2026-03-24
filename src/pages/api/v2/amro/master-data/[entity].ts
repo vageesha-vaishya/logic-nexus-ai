@@ -28,9 +28,94 @@ import {
 } from './shared';
 import { applyCompatibilityResponseHeaders, resolveGatewayCompatibility } from '../../../_utils/compatibility-facade';
 
-const ENTITY_UNAVAILABLE = new Set<string>();
+const ENTITY_UNAVAILABLE = new Map<string, number>();
 const ENTITY_COLUMN_OVERRIDES = new Map<string, Set<string>>();
 const ENTITY_SEARCH_COLUMN_OVERRIDES = new Map<string, Set<string>>();
+const ENTITY_UNAVAILABLE_TTL_MS = 30_000;
+
+function asNullableString(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  const text = String(value).trim();
+  return text ? text : null;
+}
+
+function normalizeManufacturerToken(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+type ManufacturerRecord = {
+  id: string;
+  manufacturer_code: string | null;
+  name: string | null;
+  is_active: boolean | null;
+};
+
+async function loadManufacturers(
+  supabase: ReturnType<typeof getSupabaseAdminClient>,
+): Promise<ManufacturerRecord[]> {
+  const query = supabase
+    .from('manufacturers')
+    .select('id,manufacturer_code,name,is_active');
+  const { data, error } = await query;
+  if (error) {
+    throw new HttpError(error.message, 400);
+  }
+  return Array.isArray(data) ? data : [];
+}
+
+async function resolveAircraftManufacturerReferences(
+  supabase: ReturnType<typeof getSupabaseAdminClient>,
+  records: Record<string, unknown>[],
+): Promise<{ resolved: Record<string, unknown>[]; issues: Map<number, { field: string; message: string }[]> }> {
+  const manufacturers = await loadManufacturers(supabase);
+  const byId = new Map<string, ManufacturerRecord>();
+  const byToken = new Map<string, ManufacturerRecord>();
+  manufacturers.forEach((record) => {
+    if (record.id) {
+      byId.set(record.id, record);
+    }
+    const code = record.manufacturer_code ? normalizeManufacturerToken(record.manufacturer_code) : null;
+    const name = record.name ? normalizeManufacturerToken(record.name) : null;
+    if (code) {
+      byToken.set(code, record);
+    }
+    if (name) {
+      byToken.set(name, record);
+    }
+  });
+  const issues = new Map<number, { field: string; message: string }[]>();
+  const resolved = records.map((record, index) => {
+    const manufacturerId = asNullableString(record.manufacturer_id);
+    const manufacturerToken = asNullableString(record.manufacturer || record.manufacturer_code);
+    if (manufacturerId) {
+      const match = byId.get(manufacturerId);
+      if (!match) {
+        issues.set(index, [{ field: 'manufacturer_id', message: 'manufacturer_id is not valid' }]);
+        return record;
+      }
+      if (match.is_active === false) {
+        issues.set(index, [{ field: 'manufacturer_id', message: 'manufacturer_id must reference an active manufacturer' }]);
+        return record;
+      }
+      return { ...record, manufacturer: match.name || record.manufacturer };
+    }
+    if (manufacturerToken) {
+      const match = byToken.get(normalizeManufacturerToken(manufacturerToken));
+      if (!match) {
+        issues.set(index, [{ field: 'manufacturer_id', message: 'manufacturer_id is required' }]);
+        return record;
+      }
+      if (match.is_active === false) {
+        issues.set(index, [{ field: 'manufacturer_id', message: 'manufacturer_id must reference an active manufacturer' }]);
+        return record;
+      }
+      return { ...record, manufacturer_id: match.id, manufacturer: match.name || record.manufacturer };
+    }
+    issues.set(index, [{ field: 'manufacturer_id', message: 'manufacturer_id is required' }]);
+    return record;
+  });
+  return { resolved, issues };
+}
 
 function isV2Enabled(): boolean {
   const normalized = String(process.env.AMRO_MASTER_DATA_V2_ENABLED || 'true').trim().toLowerCase();
@@ -63,6 +148,13 @@ function getActiveSearchableColumns(entity: string, searchableColumns: string[])
     return Array.from(override);
   }
   return [...searchableColumns];
+}
+
+function buildRequiredFieldIssues(entity: string, payload: Record<string, unknown>): { field: string; message: string }[] {
+  const config = getEntityConfig(entity as never);
+  return config.requiredCreateFields
+    .filter((field) => !asNullableString(payload[field]))
+    .map((field) => ({ field, message: `${field} is required` }));
 }
 
 function getSelectClause(entity: string, listColumns: string): string {
@@ -182,6 +274,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     const entity = resolveEntity(req.query.entity);
     const entityConfig = getEntityConfig(entity);
     const supabase = getSupabaseAdminClient();
+    const isGlobalEntity = entity === 'manufacturers' || entity === 'assembly_types' || entity === 'assembly_models';
 
     if (req.method === 'GET') {
       enforceAnyPermission(auth.permissions || [], ['view_amro_dashboard', 'edit_aircraft_records']);
@@ -190,19 +283,25 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       const { page, pageSize, start, end } = parsePagination(req);
       const { sortBy, ascending } = parseSort(req, entity);
 
-      if (ENTITY_UNAVAILABLE.has(entity)) {
-        res.status(200).json({
-          version: 'v2',
-          correlationId: ctx.correlationId,
-          output: {
-            entity,
-            records: [],
-            page,
-            page_size: pageSize,
-            total: 0,
-          },
-        });
-        return;
+      if (!isGlobalEntity) {
+        const unavailableUntil = ENTITY_UNAVAILABLE.get(entity);
+        if (unavailableUntil && unavailableUntil > Date.now()) {
+          res.status(200).json({
+            version: 'v2',
+            correlationId: ctx.correlationId,
+            output: {
+              entity,
+              records: [],
+              page,
+              page_size: pageSize,
+              total: 0,
+            },
+          });
+          return;
+        }
+        if (unavailableUntil) {
+          ENTITY_UNAVAILABLE.delete(entity);
+        }
       }
 
       let finalData: unknown[] = [];
@@ -215,14 +314,17 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         let query = supabase
           .from(entityConfig.table)
           .select(selectClause, { count: 'exact' })
-          .eq('tenant_id', tenantId)
           .order(currentSortBy, { ascending })
           .range(start, end);
 
-        if (franchiseId) {
+        if (!isGlobalEntity) {
+          query = query.eq('tenant_id', tenantId);
+        }
+
+        if (!isGlobalEntity && franchiseId) {
           query = query.or(`franchise_id.is.null,franchise_id.eq.${franchiseId}`);
         }
-        if (search && !franchiseId && searchableColumns.length) {
+        if (search && (isGlobalEntity || !franchiseId) && searchableColumns.length) {
           const clauses = searchableColumns.map((column) => `${column}.ilike.%${search}%`);
           query = query.or(clauses.join(','));
         }
@@ -236,7 +338,9 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
 
         const errorMessage = String(error.message || '');
         if (isMissingTableError(errorMessage)) {
-          ENTITY_UNAVAILABLE.add(entity);
+          if (!isGlobalEntity) {
+            ENTITY_UNAVAILABLE.set(entity, Date.now() + ENTITY_UNAVAILABLE_TTL_MS);
+          }
           finalData = [];
           finalCount = 0;
           break;
@@ -253,7 +357,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
 
       const rawRows = (finalData || []) as Record<string, unknown>[];
       const activeSearchableColumns = getActiveSearchableColumns(entity, entityConfig.searchableColumns);
-      const rows = franchiseId && search ? rawRows.filter((row) => matchesSearch(row, activeSearchableColumns, search)) : rawRows;
+      const rows = !isGlobalEntity && franchiseId && search ? rawRows.filter((row) => matchesSearch(row, activeSearchableColumns, search)) : rawRows;
       if (exportRequested) {
         const csv = buildCsv(rows);
         res.setHeader('Content-Type', 'text/csv; charset=utf-8');
@@ -287,10 +391,23 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       if (records.length > 500) {
         throw new HttpError('bulk import supports up to 500 records per request', 400);
       }
-      const prepared = records.map((record) => sanitizeWritePayload(entity, record));
+      let resolvedRecords = records;
+      let manufacturerIssues = new Map<number, { field: string; message: string }[]>();
+      if (entity === 'aircraft') {
+        const resolved = await resolveAircraftManufacturerReferences(supabase, records);
+        resolvedRecords = resolved.resolved;
+        manufacturerIssues = resolved.issues;
+      }
+      const prepared = resolvedRecords.map((record) =>
+        sanitizeWritePayload(entity, record, { requireCreateFields: entity !== 'aircraft' }),
+      );
       const validationResults = prepared.map((record, index) => ({
         index,
-        issues: validatePayload(entity, record),
+        issues: [
+          ...(manufacturerIssues.get(index) || []),
+          ...buildRequiredFieldIssues(entity, record),
+          ...validatePayload(entity, record),
+        ],
       }));
       const invalidRows = validationResults.filter((result) => result.issues.length > 0);
       if (validationOnly) {
@@ -315,8 +432,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       }
       const insertRows = prepared.map((record) => ({
         ...record,
-        tenant_id: tenantId,
-        franchise_id: franchiseId,
+        ...(isGlobalEntity ? {} : { tenant_id: tenantId, franchise_id: franchiseId }),
         updated_by: auth.userId,
       }));
       const { data, error } = await supabase
@@ -346,8 +462,19 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       return;
     }
 
-    const payload = sanitizeWritePayload(entity, body);
-    const issues = validatePayload(entity, payload);
+    let resolvedBody = body;
+    let manufacturerIssues: { field: string; message: string }[] = [];
+    if (entity === 'aircraft') {
+      const resolved = await resolveAircraftManufacturerReferences(supabase, [body]);
+      resolvedBody = resolved.resolved[0] || body;
+      manufacturerIssues = resolved.issues.get(0) || [];
+    }
+    const payload = sanitizeWritePayload(entity, resolvedBody, { requireCreateFields: entity !== 'aircraft' });
+    const issues = [
+      ...manufacturerIssues,
+      ...buildRequiredFieldIssues(entity, payload),
+      ...validatePayload(entity, payload),
+    ];
     if (validationOnly) {
       res.status(200).json({
         version: 'v2',
@@ -368,8 +495,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     }
     const insertPayload = {
       ...payload,
-      tenant_id: tenantId,
-      franchise_id: franchiseId,
+      ...(isGlobalEntity ? {} : { tenant_id: tenantId, franchise_id: franchiseId }),
       created_by: auth.userId,
       updated_by: auth.userId,
     };

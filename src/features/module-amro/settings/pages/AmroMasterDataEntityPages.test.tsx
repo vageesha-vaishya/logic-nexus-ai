@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import {
   AircraftMasterDataPage,
   MaintenanceFacilitiesMasterDataPage,
+  ManufacturersMasterDataPage,
   PartsInventoryMasterDataPage,
   RegulatorProfilesMasterDataPage,
   ShiftCalendarsMasterDataPage,
@@ -27,6 +28,7 @@ describe('AmroMasterDataEntityPages', () => {
       { component: MaintenanceFacilitiesMasterDataPage, expected: 'maintenance_facilities' },
       { component: WorkCentersMasterDataPage, expected: 'work_centers' },
       { component: SkillCodesMasterDataPage, expected: 'skill_codes' },
+      { component: ManufacturersMasterDataPage, expected: 'manufacturers' },
       { component: RegulatorProfilesMasterDataPage, expected: 'regulator_profiles' },
       { component: ShiftCalendarsMasterDataPage, expected: 'shift_calendars' },
       { component: WorkPackageTemplatesMasterDataPage, expected: 'work_package_templates' },

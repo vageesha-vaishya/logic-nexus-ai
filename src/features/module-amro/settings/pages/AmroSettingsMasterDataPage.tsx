@@ -33,6 +33,8 @@ export type MasterEntity =
   | 'maintenance_facilities'
   | 'work_centers'
   | 'skill_codes'
+  | 'manufacturers'
+  | 'assembly_models'
   | 'regulator_profiles'
   | 'shift_calendars'
   | 'work_package_templates';
@@ -44,6 +46,8 @@ export const ENTITY_LABEL: Record<MasterEntity, string> = {
   maintenance_facilities: 'Maintenance Facilities',
   work_centers: 'Work Centers',
   skill_codes: 'Skill Codes',
+  manufacturers: 'Manufacturers',
+  assembly_models: 'Model',
   regulator_profiles: 'Regulator Profiles',
   shift_calendars: 'Shift Calendars',
   work_package_templates: 'Work Package Templates',
@@ -54,13 +58,33 @@ type RecordRow = {
   [key: string]: unknown;
 };
 
+type ManufacturerOption = {
+  id: string;
+  label: string;
+  active: boolean;
+};
+
+type AssemblyTypeOption = {
+  id: string;
+  label: string;
+  active: boolean;
+};
+
+type SelectOption = {
+  value: string;
+  label: string;
+  disabled?: boolean;
+};
+
 const ENTITY_TABLE_COLUMNS: Record<MasterEntity, string[]> = {
-  aircraft: ['id', 'registration', 'tail_number', 'aircraft_type', 'aircraft_model', 'status', 'updated_at'],
+  aircraft: ['id', 'registration', 'tail_number', 'aircraft_type', 'aircraft_model', 'manufacturer', 'status', 'updated_at'],
   parts_inventory: ['id', 'part_number', 'serial_number', 'description', 'quantity_available', 'warehouse_location', 'status', 'updated_at'],
   suppliers: ['id', 'supplier_code', 'name', 'contact_name', 'email', 'phone', 'is_active', 'updated_at'],
   maintenance_facilities: ['id', 'facility_code', 'name', 'facility_type', 'station_code', 'location_city', 'is_active', 'updated_at'],
   work_centers: ['id', 'work_center_code', 'name', 'center_type', 'station_code', 'capacity_hours_per_day', 'is_active', 'updated_at'],
   skill_codes: ['id', 'skill_code', 'description', 'skill_family', 'license_authority', 'is_certification_required', 'is_active', 'updated_at'],
+  manufacturers: ['id', 'manufacturer_code', 'name', 'country', 'is_active', 'updated_at'],
+  assembly_models: ['id', 'model_code', 'name', 'manufacturer_id', 'assembly_type_id', 'is_active', 'updated_at'],
   regulator_profiles: ['id', 'regulator_code', 'regulator_name', 'jurisdiction', 'policy_version', 'effective_from', 'is_active', 'updated_at'],
   shift_calendars: ['id', 'station_code', 'shift_name', 'shift_start_time', 'shift_end_time', 'capacity', 'is_active', 'updated_at'],
   work_package_templates: ['id', 'template_code', 'template_name', 'maintenance_type', 'version', 'active', 'updated_at'],
@@ -80,6 +104,50 @@ type EntityFormField = {
 
 type FormValues = Record<string, unknown>;
 
+const MANUFACTURER_SEED_NAMES = [
+  'AIRBUS',
+  'ATR',
+  'ATR 72',
+  'Beech Aircraft Corporation, Wichita, Kansas, USA',
+  'BELL HELICOPTER TEXTRON',
+  'Bombardier',
+  'CENTRAL GEARBOX',
+  'CESSNA AIRCRAFT COMPANY',
+  'CESSNA CARAVAN 208B',
+  'CESSNA CITATION',
+  'DASSAULT AVIATION',
+  'De Havilland Aircraft Company of Canada',
+  'EMBRAER',
+  'EUROCOPTER',
+  'FZM',
+  'Hartzell',
+  'HARTZELL PROPELLER INC',
+  'HAWKER BEECHCRAFT',
+  'HINDUSTAN AERONAUTICS LTD',
+  'HONEYWELL',
+  'Keystone Helicopter',
+  'KING AIR',
+  'Learjet Inc. (Bombardier)',
+  'Lycoming Textron',
+  'McCAULEY',
+  'PARTHENAVIA',
+  'PIAGGIO AERO',
+  'Pilatus',
+  'PILATUS PC-12',
+  'Pratt & Whittney',
+  'RAYTHEON AIRCRAFT COMPANY',
+  'ROLLS ROYCE',
+  'Schweizer',
+  'SGST',
+  'SUPER KING AIR',
+  'TAAL',
+  'TURBOMECA',
+  'VULCAN AIR',
+  'Westland Agusta',
+  'WESTLAND AUGUSTA',
+  'WILLIAMS INTERNATIONAL',
+];
+
 const ENTITY_FORM_FIELDS: Record<MasterEntity, EntityFormField[]> = {
   aircraft: [
     { key: 'registration', label: 'Registration', type: 'text' },
@@ -87,6 +155,7 @@ const ENTITY_FORM_FIELDS: Record<MasterEntity, EntityFormField[]> = {
     { key: 'serial_number', label: 'Serial Number', type: 'text', required: true },
     { key: 'aircraft_type', label: 'Aircraft Type', type: 'text', required: true },
     { key: 'aircraft_model', label: 'Aircraft Model', type: 'text', required: true },
+    { key: 'manufacturer_id', label: 'Manufacturer', type: 'select', required: true },
     { key: 'configuration_code', label: 'Configuration Code', type: 'text' },
     { key: 'maintenance_program', label: 'Maintenance Program', type: 'text' },
     { key: 'status', label: 'Status', type: 'select', required: true, options: ['active', 'inactive', 'grounded', 'maintenance'] },
@@ -146,6 +215,23 @@ const ENTITY_FORM_FIELDS: Record<MasterEntity, EntityFormField[]> = {
     { key: 'is_active', label: 'Active', type: 'boolean' },
     { key: 'metadata', label: 'Metadata JSON', type: 'json' },
   ],
+  manufacturers: [
+    { key: 'manufacturer_code', label: 'Manufacturer Code', type: 'text', required: true },
+    { key: 'name', label: 'Name', type: 'text', required: true },
+    { key: 'country', label: 'Country', type: 'text' },
+    { key: 'is_active', label: 'Active', type: 'boolean' },
+    { key: 'metadata', label: 'Metadata JSON', type: 'json' },
+  ],
+  assembly_models: [
+    { key: 'manufacturer_id', label: 'Manufacturer', type: 'select', required: true, placeholder: 'Select manufacturer' },
+    { key: 'assembly_type_id', label: 'Assembly Type Id', type: 'select', required: true, placeholder: 'Select assembly type' },
+    { key: 'model_code', label: 'Model Code', type: 'text', required: true },
+    { key: 'name', label: 'Name', type: 'text', required: true },
+    { key: 'primary_model', label: 'Primary Model', type: 'text' },
+    { key: 'description', label: 'Description', type: 'textarea' },
+    { key: 'is_active', label: 'Active', type: 'boolean' },
+    { key: 'metadata', label: 'Metadata JSON', type: 'json' },
+  ],
   regulator_profiles: [
     { key: 'regulator_code', label: 'Regulator Code', type: 'text', required: true },
     { key: 'regulator_name', label: 'Regulator Name', type: 'text', required: true },
@@ -187,6 +273,8 @@ const ENTITY_ROUTE_SEGMENT: Record<MasterEntity, string> = {
   maintenance_facilities: 'maintenance-facilities',
   work_centers: 'work-centers',
   skill_codes: 'skill-codes',
+  manufacturers: 'manufacturers',
+  assembly_models: 'model',
   regulator_profiles: 'regulator-profiles',
   shift_calendars: 'shift-calendars',
   work_package_templates: 'work-package-templates',
@@ -206,6 +294,7 @@ const ENTITY_DEFAULT_VALUES: Record<MasterEntity, FormValues> = {
     serial_number: '',
     aircraft_type: '',
     aircraft_model: '',
+    manufacturer_id: '',
     configuration_code: '',
     maintenance_program: '',
     status: 'active',
@@ -262,6 +351,23 @@ const ENTITY_DEFAULT_VALUES: Record<MasterEntity, FormValues> = {
     license_authority: '',
     is_certification_required: false,
     validity_period_months: 0,
+    is_active: true,
+    metadata: '{}',
+  },
+  manufacturers: {
+    manufacturer_code: '',
+    name: '',
+    country: '',
+    is_active: true,
+    metadata: '{}',
+  },
+  assembly_models: {
+    manufacturer_id: '',
+    assembly_type_id: '',
+    model_code: '',
+    name: '',
+    primary_model: '',
+    description: '',
     is_active: true,
     metadata: '{}',
   },
@@ -403,6 +509,33 @@ function createSeedRecords(entity: MasterEntity): Record<string, unknown>[] {
         ],
       },
     ];
+  }
+  if (entity === 'manufacturers') {
+    const seen = new Set<string>();
+    const records = MANUFACTURER_SEED_NAMES.map((name) => {
+      const normalized = name.trim().toLowerCase();
+      if (!normalized || seen.has(normalized)) {
+        return null;
+      }
+      seen.add(normalized);
+      const token = normalized.toUpperCase().replace(/[^A-Z0-9]+/g, '_').slice(0, 18);
+      let hash = 0;
+      for (let index = 0; index < normalized.length; index += 1) {
+        hash = (hash << 5) - hash + normalized.charCodeAt(index);
+        hash |= 0;
+      }
+      const suffix = Math.abs(hash).toString(16).slice(0, 4);
+      return {
+        manufacturer_code: `${token}-${suffix}`,
+        name,
+        is_active: true,
+        metadata: { source: 'master_data_seed_ui' },
+      };
+    }).filter(
+      (record): record is { manufacturer_code: string; name: string; is_active: boolean; metadata: { source: string } } =>
+        Boolean(record),
+    );
+    return records as Record<string, unknown>[];
   }
   return [];
 }
@@ -586,7 +719,9 @@ export function buildPayloadFromForm(entity: MasterEntity, values: FormValues): 
   return { payload, errors };
 }
 
-export async function verifyReferenceExists(headers: Headers, entity: MasterEntity, searchTerm: string, fieldKeys: string[]): Promise<boolean> {
+type ReferenceEntity = MasterEntity | 'assembly_types';
+
+export async function verifyReferenceExists(headers: Headers, entity: ReferenceEntity, searchTerm: string, fieldKeys: string[]): Promise<boolean> {
   const query = new URLSearchParams({
     search: searchTerm,
     page: '1',
@@ -598,7 +733,8 @@ export async function verifyReferenceExists(headers: Headers, entity: MasterEnti
   });
   const payload = await parseApiPayload(response);
   if (!response.ok) {
-    throw new Error(String(payload.error || `Failed to validate ${ENTITY_LABEL[entity]} reference`));
+    const label = (ENTITY_LABEL as Record<string, string>)[entity] ?? 'reference';
+    throw new Error(String(payload.error || `Failed to validate ${label} reference`));
   }
   const records = getPayloadRecords(payload);
   const normalized = searchTerm.trim().toLowerCase();
@@ -640,8 +776,15 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'create' | 'update'>('create');
   const [activeFormTab, setActiveFormTab] = useState<'basic' | 'configuration' | 'system'>('basic');
+  const [manufacturerOptions, setManufacturerOptions] = useState<ManufacturerOption[]>([]);
+  const [manufacturerOptionsLoading, setManufacturerOptionsLoading] = useState(false);
+  const [manufacturerOptionsError, setManufacturerOptionsError] = useState('');
+  const [assemblyTypeOptions, setAssemblyTypeOptions] = useState<AssemblyTypeOption[]>([]);
+  const [assemblyTypeOptionsLoading, setAssemblyTypeOptionsLoading] = useState(false);
+  const [assemblyTypeOptionsError, setAssemblyTypeOptionsError] = useState('');
   const clickDelayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const firstFieldRef = useRef<HTMLInputElement | null>(null);
+  const manufacturerSeedAttemptedRef = useRef(false);
 
   const scope = useMemo(
     () => ({
@@ -651,6 +794,114 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
     }),
     [context.franchiseId, context.tenantId, context.userId],
   );
+
+  const fetchManufacturerOptions = useCallback(async (headers: Headers): Promise<ManufacturerOption[]> => {
+    const query = new URLSearchParams({
+      page: '1',
+      page_size: '200',
+      sort_by: 'name',
+      sort_dir: 'asc',
+    });
+    const response = await fetch(`/api/v2/amro/master-data/manufacturers?${query.toString()}`, { method: 'GET', headers });
+    const payload = await parseApiPayload(response);
+    if (!response.ok) throw new Error(String(payload.error || 'Failed to load manufacturers'));
+    const records = getPayloadRecords(payload);
+    return records
+      .map((record) => {
+        const id = String(record.id || '').trim();
+        if (!id) return null;
+        const code = String(record.manufacturer_code || '').trim();
+        const name = String(record.name || '').trim();
+        const label = name && code ? `${name} (${code})` : name || code || id;
+        const active = String(record.is_active ?? 'true').toLowerCase() !== 'false';
+        return { id, label, active };
+      })
+      .filter((option): option is ManufacturerOption => Boolean(option));
+  }, []);
+
+  const fetchAssemblyTypeOptions = useCallback(async (headers: Headers): Promise<AssemblyTypeOption[]> => {
+    const query = new URLSearchParams({
+      page: '1',
+      page_size: '200',
+      sort_by: 'name',
+      sort_dir: 'asc',
+    });
+    const response = await fetch(`/api/v2/amro/master-data/assembly_types?${query.toString()}`, { method: 'GET', headers });
+    const payload = await parseApiPayload(response);
+    if (!response.ok) throw new Error(String(payload.error || 'Failed to load assembly types'));
+    const records = getPayloadRecords(payload);
+    return records
+      .map((record) => {
+        const id = String(record.id || '').trim();
+        if (!id) return null;
+        const code = String(record.assembly_code || '').trim();
+        const name = String(record.name || '').trim();
+        const label = name && code ? `${name} (${code})` : name || code || id;
+        const active = String(record.is_active ?? 'true').toLowerCase() !== 'false';
+        return { id, label, active };
+      })
+      .filter((option): option is AssemblyTypeOption => Boolean(option));
+  }, []);
+
+  const seedManufacturersIfNeeded = useCallback(async (headers: Headers) => {
+    if (manufacturerSeedAttemptedRef.current) {
+      return false;
+    }
+    const seedRecords = createSeedRecords('manufacturers');
+    if (!seedRecords.length) {
+      manufacturerSeedAttemptedRef.current = true;
+      return false;
+    }
+    const response = await fetch('/api/v2/amro/master-data/manufacturers', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ operation: 'bulk_import', records: seedRecords }),
+    });
+    const payload = await parseApiPayload(response);
+    manufacturerSeedAttemptedRef.current = true;
+    if (!response.ok) {
+      throw new Error(String(payload.error || 'Failed to seed manufacturers'));
+    }
+    return true;
+  }, []);
+
+  const loadManufacturerOptions = useCallback(async () => {
+    setManufacturerOptionsLoading(true);
+    setManufacturerOptionsError('');
+    try {
+      const headers = await buildApiHeaders(scope);
+      let options = await fetchManufacturerOptions(headers);
+      if (options.length === 0) {
+        const seeded = await seedManufacturersIfNeeded(headers);
+        if (seeded) {
+          options = await fetchManufacturerOptions(headers);
+        }
+      }
+      setManufacturerOptions(options);
+    } catch (error) {
+      const message = String((error as Error).message || 'Failed to load manufacturers');
+      setManufacturerOptionsError(message);
+      toast.error(message);
+    } finally {
+      setManufacturerOptionsLoading(false);
+    }
+  }, [fetchManufacturerOptions, scope, seedManufacturersIfNeeded]);
+
+  const loadAssemblyTypeOptions = useCallback(async () => {
+    setAssemblyTypeOptionsLoading(true);
+    setAssemblyTypeOptionsError('');
+    try {
+      const headers = await buildApiHeaders(scope);
+      const options = await fetchAssemblyTypeOptions(headers);
+      setAssemblyTypeOptions(options);
+    } catch (error) {
+      const message = String((error as Error).message || 'Failed to load assembly types');
+      setAssemblyTypeOptionsError(message);
+      toast.error(message);
+    } finally {
+      setAssemblyTypeOptionsLoading(false);
+    }
+  }, [fetchAssemblyTypeOptions, scope]);
 
   const loadRecords = useCallback(async () => {
     setLoading(true);
@@ -697,6 +948,30 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
   }, [entity]);
 
   useEffect(() => {
+    if (entity === 'aircraft' || entity === 'assembly_models') {
+      void loadManufacturerOptions();
+    }
+  }, [entity, loadManufacturerOptions]);
+
+  useEffect(() => {
+    if ((entity === 'aircraft' || entity === 'assembly_models') && modalOpen) {
+      void loadManufacturerOptions();
+    }
+  }, [entity, loadManufacturerOptions, modalOpen]);
+
+  useEffect(() => {
+    if (entity === 'assembly_models') {
+      void loadAssemblyTypeOptions();
+    }
+  }, [entity, loadAssemblyTypeOptions]);
+
+  useEffect(() => {
+    if (entity === 'assembly_models' && modalOpen) {
+      void loadAssemblyTypeOptions();
+    }
+  }, [entity, loadAssemblyTypeOptions, modalOpen]);
+
+  useEffect(() => {
     navigate(`/dashboard/amro/settings/master-data/${ENTITY_ROUTE_SEGMENT[entity]}`, { replace: true });
   }, [entity, navigate]);
 
@@ -728,6 +1003,14 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
         return false;
       }
       const headers = await buildApiHeaders(scope);
+      if (entity === 'aircraft' && payload.manufacturer_id) {
+        const exists = await verifyReferenceExists(headers, 'manufacturers', String(payload.manufacturer_id), ['id', 'manufacturer_code', 'name']);
+        if (!exists) {
+          setFormErrors((previous) => ({ ...previous, manufacturer_id: 'Manufacturer was not found' }));
+          toast.error('Manufacturer reference is invalid');
+          return false;
+        }
+      }
       if (entity === 'parts_inventory' && payload.supplier_id) {
         const exists = await verifyReferenceExists(headers, 'suppliers', String(payload.supplier_id), ['id', 'supplier_code']);
         if (!exists) {
@@ -752,6 +1035,26 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
           if (!exists) {
             setFormErrors((previous) => ({ ...previous, facility_code: 'Facility Code was not found' }));
             toast.error('Facility reference is invalid');
+            return false;
+          }
+        }
+      }
+      if (entity === 'assembly_models') {
+        const manufacturerId = String(payload.manufacturer_id || '').trim();
+        if (manufacturerId) {
+          const exists = await verifyReferenceExists(headers, 'manufacturers', manufacturerId, ['id', 'manufacturer_code', 'name']);
+          if (!exists) {
+            setFormErrors((previous) => ({ ...previous, manufacturer_id: 'Manufacturer was not found' }));
+            toast.error('Manufacturer reference is invalid');
+            return false;
+          }
+        }
+        const assemblyTypeId = String(payload.assembly_type_id || '').trim();
+        if (assemblyTypeId) {
+          const exists = await verifyReferenceExists(headers, 'assembly_types', assemblyTypeId, ['id', 'assembly_code', 'name']);
+          if (!exists) {
+            setFormErrors((previous) => ({ ...previous, assembly_type_id: 'Assembly Type was not found' }));
+            toast.error('Assembly Type reference is invalid');
             return false;
           }
         }
@@ -788,6 +1091,14 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
         return false;
       }
       const headers = await buildApiHeaders(scope);
+      if (entity === 'aircraft' && payload.manufacturer_id) {
+        const exists = await verifyReferenceExists(headers, 'manufacturers', String(payload.manufacturer_id), ['id', 'manufacturer_code', 'name']);
+        if (!exists) {
+          setFormErrors((previous) => ({ ...previous, manufacturer_id: 'Manufacturer was not found' }));
+          toast.error('Manufacturer reference is invalid');
+          return false;
+        }
+      }
       if (entity === 'parts_inventory' && payload.supplier_id) {
         const exists = await verifyReferenceExists(headers, 'suppliers', String(payload.supplier_id), ['id', 'supplier_code']);
         if (!exists) {
@@ -812,6 +1123,26 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
           if (!exists) {
             setFormErrors((previous) => ({ ...previous, facility_code: 'Facility Code was not found' }));
             toast.error('Facility reference is invalid');
+            return false;
+          }
+        }
+      }
+      if (entity === 'assembly_models') {
+        const manufacturerId = String(payload.manufacturer_id || '').trim();
+        if (manufacturerId) {
+          const exists = await verifyReferenceExists(headers, 'manufacturers', manufacturerId, ['id', 'manufacturer_code', 'name']);
+          if (!exists) {
+            setFormErrors((previous) => ({ ...previous, manufacturer_id: 'Manufacturer was not found' }));
+            toast.error('Manufacturer reference is invalid');
+            return false;
+          }
+        }
+        const assemblyTypeId = String(payload.assembly_type_id || '').trim();
+        if (assemblyTypeId) {
+          const exists = await verifyReferenceExists(headers, 'assembly_types', assemblyTypeId, ['id', 'assembly_code', 'name']);
+          if (!exists) {
+            setFormErrors((previous) => ({ ...previous, assembly_type_id: 'Assembly Type was not found' }));
+            toast.error('Assembly Type reference is invalid');
             return false;
           }
         }
@@ -926,11 +1257,67 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
     [tableColumns],
   );
   const selectedRow = useMemo(() => rows.find((row) => row.id === selectedId) || null, [rows, selectedId]);
+  const manufacturerSelectOptions = useMemo<SelectOption[]>(
+    () =>
+      manufacturerOptions.map((option) => ({
+        value: option.id,
+        label: option.label,
+        disabled: !option.active,
+      })),
+    [manufacturerOptions],
+  );
+  const assemblyTypeSelectOptions = useMemo<SelectOption[]>(
+    () =>
+      assemblyTypeOptions.map((option) => ({
+        value: option.id,
+        label: option.label,
+        disabled: !option.active,
+      })),
+    [assemblyTypeOptions],
+  );
 
   const setFieldValue = useCallback((fieldKey: string, value: unknown) => {
     setFormValues((previous) => ({ ...previous, [fieldKey]: value }));
     setFormErrors((previous) => ({ ...previous, [fieldKey]: '' }));
   }, []);
+
+  const resolveSelectOptions = useCallback(
+    (field: EntityFormField): SelectOption[] => {
+      if (field.key === 'manufacturer_id') {
+        if (manufacturerOptionsLoading) {
+          return [{ value: '__loading_manufacturers__', label: 'Loading manufacturers...', disabled: true }];
+        }
+        if (manufacturerOptionsError) {
+          return [{ value: '__error_manufacturers__', label: 'Unable to load manufacturers', disabled: true }];
+        }
+        if (manufacturerSelectOptions.length === 0) {
+          return [{ value: '__empty_manufacturers__', label: 'No manufacturers available', disabled: true }];
+        }
+        return manufacturerSelectOptions;
+      }
+      if (field.key === 'assembly_type_id') {
+        if (assemblyTypeOptionsLoading) {
+          return [{ value: '__loading_assembly_types__', label: 'Loading assembly types...', disabled: true }];
+        }
+        if (assemblyTypeOptionsError) {
+          return [{ value: '__error_assembly_types__', label: 'Unable to load assembly types', disabled: true }];
+        }
+        if (assemblyTypeSelectOptions.length === 0) {
+          return [{ value: '__empty_assembly_types__', label: 'No assembly types available', disabled: true }];
+        }
+        return assemblyTypeSelectOptions;
+      }
+      return (field.options || []).map((option) => ({ value: option, label: option }));
+    },
+    [
+      assemblyTypeOptionsError,
+      assemblyTypeOptionsLoading,
+      assemblyTypeSelectOptions,
+      manufacturerOptionsError,
+      manufacturerOptionsLoading,
+      manufacturerSelectOptions,
+    ],
+  );
 
   const handleRowSingleClick = useCallback(
     (row: RecordRow) => {
@@ -989,8 +1376,8 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
           <div>
             <h1 className="text-2xl font-semibold">AMRO Settings · Master Data</h1>
             <p className="text-sm text-muted-foreground">
-              Tenant-scoped CRUD management for fleet, inventory, suppliers, facilities, workforce, compliance profiles, shift
-              capacity, and work package templates.
+              Tenant-scoped CRUD management for fleet, inventory, manufacturers, suppliers, facilities, workforce, compliance profiles,
+              shift capacity, and work package templates.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -1143,13 +1530,16 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
                         <Label htmlFor={`master-data-basic-${field.key}`}>{field.label}{field.required ? ' *' : ''}</Label>
                         {field.type === 'select' && (
                           <Select value={String(formValues[field.key] ?? '')} onValueChange={(value) => setFieldValue(field.key, value)}>
-                            <SelectTrigger id={`master-data-basic-${field.key}`} className="h-10">
-                              <SelectValue />
+                            <SelectTrigger
+                              id={`master-data-basic-${field.key}`}
+                              className={`h-10 ${formErrors[field.key] ? 'border-[#EF4444]' : ''}`}
+                            >
+                              <SelectValue placeholder={field.placeholder ?? `Select ${field.label}`} />
                             </SelectTrigger>
                             <SelectContent>
-                              {(field.options || []).map((option) => (
-                                <SelectItem key={option} value={option}>
-                                  {option}
+                              {resolveSelectOptions(field).map((option) => (
+                                <SelectItem key={option.value} value={option.value} disabled={option.disabled}>
+                                  {option.label}
                                 </SelectItem>
                               ))}
                             </SelectContent>
@@ -1186,6 +1576,12 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
                           />
                         )}
                         {formErrors[field.key] ? <p className="text-xs text-[#EF4444]">{formErrors[field.key]}</p> : null}
+                        {field.type === 'select' && field.key === 'manufacturer_id' && manufacturerOptionsError ? (
+                          <p className="text-xs text-[#EF4444]">{manufacturerOptionsError}</p>
+                        ) : null}
+                        {field.type === 'select' && field.key === 'assembly_type_id' && assemblyTypeOptionsError ? (
+                          <p className="text-xs text-[#EF4444]">{assemblyTypeOptionsError}</p>
+                        ) : null}
                       </div>
                     ))}
                   </div>
@@ -1200,13 +1596,16 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
                         <Label htmlFor={`master-data-configuration-${field.key}`}>{field.label}{field.required ? ' *' : ''}</Label>
                         {field.type === 'select' && (
                           <Select value={String(formValues[field.key] ?? '')} onValueChange={(value) => setFieldValue(field.key, value)}>
-                            <SelectTrigger id={`master-data-configuration-${field.key}`} className="h-10">
-                              <SelectValue />
+                            <SelectTrigger
+                              id={`master-data-configuration-${field.key}`}
+                              className={`h-10 ${formErrors[field.key] ? 'border-[#EF4444]' : ''}`}
+                            >
+                              <SelectValue placeholder={field.placeholder ?? `Select ${field.label}`} />
                             </SelectTrigger>
                             <SelectContent>
-                              {(field.options || []).map((option) => (
-                                <SelectItem key={option} value={option}>
-                                  {option}
+                              {resolveSelectOptions(field).map((option) => (
+                                <SelectItem key={option.value} value={option.value} disabled={option.disabled}>
+                                  {option.label}
                                 </SelectItem>
                               ))}
                             </SelectContent>
@@ -1242,6 +1641,12 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
                           />
                         )}
                         {formErrors[field.key] ? <p className="text-xs text-[#EF4444]">{formErrors[field.key]}</p> : null}
+                        {field.type === 'select' && field.key === 'manufacturer_id' && manufacturerOptionsError ? (
+                          <p className="text-xs text-[#EF4444]">{manufacturerOptionsError}</p>
+                        ) : null}
+                        {field.type === 'select' && field.key === 'assembly_type_id' && assemblyTypeOptionsError ? (
+                          <p className="text-xs text-[#EF4444]">{assemblyTypeOptionsError}</p>
+                        ) : null}
                       </div>
                     ))}
                   </div>
