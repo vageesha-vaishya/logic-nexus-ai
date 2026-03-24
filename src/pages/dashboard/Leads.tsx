@@ -12,6 +12,16 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
@@ -31,6 +41,7 @@ import { EmptyState } from '@/components/system/EmptyState';
 import { TableSkeleton } from '@/components/system/TableSkeleton';
 import { LeadCard } from '@/components/crm/LeadCard';
 import { CRM_HEADER_PRIMARY_CONTROL_SEQUENCE, CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
+import LeadsMasterDataFormModal, { LeadMasterDataFormValues } from '@/components/crm/LeadsMasterDataFormModal';
 import { themeStyleFromPreset } from '@/lib/theme-utils';
 import { Lead } from './leads-data';
 import { usePerformanceMonitor } from '@/hooks/usePerformanceMonitor';
@@ -136,6 +147,10 @@ export default function Leads() {
   const [isDbFallbackActive, setIsDbFallbackActive] = useState(false);
   const [detailsTab, setDetailsTab] = useState('activities');
   const [focusedLeadId, setFocusedLeadId] = useState<string | null>(null);
+  const [leadFormModalOpen, setLeadFormModalOpen] = useState(false);
+  const [leadFormModalMode, setLeadFormModalMode] = useState<'create' | 'update'>('create');
+  const [leadFormModalLead, setLeadFormModalLead] = useState<Lead | null>(null);
+  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
   const [leadActivities, setLeadActivities] = useState<WorkspaceActivity[]>([]);
   const [activitiesLoading, setActivitiesLoading] = useState(false);
   const { supabase, context, scopedDb } = useCRM();
@@ -1574,8 +1589,6 @@ export default function Leads() {
   const { performDeleteWithUndo } = useUndo();
 
   const handleBulkDelete = async () => {
-    if (!window.confirm(t('leads.messages.deleteConfirm', { count: selectedIds.size }))) return;
-    
     try {
       const ids = Array.from(selectedIds);
       const headers = await getCrmApiHeaders();
@@ -1614,9 +1627,93 @@ export default function Leads() {
     });
   };
 
+  const openCreateLeadModal = useCallback(() => {
+    setLeadFormModalMode('create');
+    setLeadFormModalLead(null);
+    setLeadFormModalOpen(true);
+  }, []);
+
+  const openUpdateLeadModal = useCallback((lead: Lead) => {
+    setLeadFormModalMode('update');
+    setLeadFormModalLead(lead);
+    setLeadFormModalOpen(true);
+  }, []);
+
+  const handleLeadModalSubmit = useCallback(async (values: LeadMasterDataFormValues, mode: 'create' | 'update', leadId?: string) => {
+    try {
+      const estimatedValue = values.estimated_value.trim() ? Number(values.estimated_value.trim()) : null;
+      if (values.estimated_value.trim() && !Number.isFinite(estimatedValue)) {
+        toast.error('Estimated Value must be numeric');
+        return;
+      }
+      const payload = {
+        first_name: values.first_name.trim(),
+        last_name: values.last_name.trim(),
+        company: values.company.trim() || null,
+        title: values.title.trim() || null,
+        email: values.email.trim() || null,
+        phone: values.phone.trim() || null,
+        status: values.status.trim(),
+        source: values.source.trim(),
+        estimated_value: estimatedValue,
+        expected_close_date: values.expected_close_date.trim() || null,
+        description: values.description.trim() || null,
+        notes: values.notes.trim() || null,
+      };
+      const headers = await getCrmApiHeaders();
+      if (mode === 'create') {
+        const tenantId = context?.tenantId || '';
+        if (!tenantId) {
+          toast.error('Tenant scope is required');
+          return;
+        }
+        const response = await fetch('/api/crm/v1/leads', {
+          method: 'POST',
+          credentials: 'include',
+          headers,
+          body: JSON.stringify(payload),
+        });
+        if (!response.ok) {
+          const { error } = await scopedDb.from('leads').insert({
+            ...payload,
+            tenant_id: tenantId,
+            franchise_id: context?.franchiseId || null,
+          });
+          if (error) throw error;
+        }
+      } else {
+        if (!leadId) {
+          toast.error('Lead selection is required');
+          return;
+        }
+        const response = await fetch(`/api/crm/v1/leads/${leadId}`, {
+          method: 'PATCH',
+          credentials: 'include',
+          headers,
+          body: JSON.stringify(payload),
+        });
+        if (!response.ok) {
+          const { error } = await scopedDb.from('leads').update(payload).eq('id', leadId);
+          if (error) throw error;
+        }
+      }
+      toast.success(mode === 'create' ? t('leads.messages.createSuccess', 'Lead created successfully') : t('leads.messages.updateSuccess', 'Lead updated successfully'));
+      setLeadFormModalOpen(false);
+      setLeadFormModalLead(null);
+      await fetchLeads();
+    } catch (error) {
+      logger.error('Failed to persist lead from modal', {
+        component: 'Leads',
+        error: error instanceof Error ? error.message : String(error),
+      });
+      Sentry.captureException(error);
+      toast.error(mode === 'create' ? t('leads.messages.createError', 'Failed to create lead') : t('leads.messages.updateError', 'Failed to update lead'));
+    }
+  }, [context?.franchiseId, context?.tenantId, fetchLeads, getCrmApiHeaders, scopedDb, t]);
+
   return (
     <DashboardLayout>
-      <div style={themeStyleFromPreset(currentTheme)} className="min-h-full transition-colors duration-300">
+      <div style={themeStyleFromPreset(currentTheme)} className="min-h-full space-y-4 p-4 lg:p-6 transition-colors duration-300">
         <FirstScreenTemplate
           title={t('leads.title', 'Leads Workspace')}
           actionsRight={
@@ -1639,7 +1736,7 @@ export default function Leads() {
               }}
               controlSequence={CRM_HEADER_PRIMARY_CONTROL_SEQUENCE}
               onThemeChange={handleThemeChange}
-              onCreate={() => navigate('/dashboard/leads/new')}
+              onCreate={openCreateLeadModal}
               createLabel="New Lead"
               iconOnly
               layout="compact"
@@ -1665,8 +1762,45 @@ export default function Leads() {
             {t(dbFallbackBannerCopy.key)}
           </div>
         )}
-        {/* Filters */}
-        <div className="flex flex-col gap-0.5 mb-1.5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold">{t('leads.title', 'Leads Workspace')}</h1>
+            <p className="text-sm text-muted-foreground">
+              {t('leads.subtitle', 'Tenant-scoped lead lifecycle management with list, card, and pipeline workflows.')}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary">Tenant: {context?.tenantId || 'unscoped'}</Badge>
+            <Button variant="outline" onClick={refreshLeads} disabled={loading}>
+              {loading ? t('leads.actions.refreshing', 'Refreshing...') : t('leads.actions.refresh', 'Refresh')}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                const params = buildLeadsImportExportParams({
+                  viewMode,
+                  searchQuery,
+                  statusFilter,
+                  scoreMin,
+                  scoreMax,
+                  createdStart,
+                  createdEnd,
+                  groupBy,
+                });
+                navigate(`/dashboard/leads/import-export?${params.toString()}`);
+              }}
+            >
+              {t('leads.actions.importExport', 'Import/Export')}
+            </Button>
+            <Button onClick={openCreateLeadModal}>{t('leads.actions.addLead', 'New Lead')}</Button>
+          </div>
+        </div>
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle>Lead Search and Filter</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex flex-col gap-0.5 mb-1.5">
           <div className="w-full overflow-x-auto">
             <div className="flex flex-nowrap items-center gap-0.5 min-w-max">
               <div className="relative w-[280px] shrink-0">
@@ -1837,8 +1971,15 @@ export default function Leads() {
               ))}
             </div>
           )}
-        </div>
+            </div>
+          </CardContent>
+        </Card>
 
+        <Card>
+          <CardHeader>
+            <CardTitle>{t('leads.records.title', 'Lead Records')}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
         {loading ? (
           <div className="space-y-4">
              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -1857,7 +1998,7 @@ export default function Leads() {
             title={t('leads.messages.noLeads')}
             description={searchQuery ? t('leads.messages.noLeadsDescSearch') : t('leads.messages.noLeadsDescNew')}
             actionLabel={!searchQuery ? t('leads.actions.addLead') : undefined}
-            onAction={!searchQuery ? () => navigate('/dashboard/leads/new') : undefined}
+            onAction={!searchQuery ? openCreateLeadModal : undefined}
           />
         ) : viewMode === 'list' ? (
           <div ref={splitContainerRef} className="flex h-[calc(100vh-260px)] min-h-[640px] flex-col overflow-hidden rounded-md border bg-background">
@@ -2349,7 +2490,7 @@ export default function Leads() {
                 activeMatch={activeMatchedLeadId === lead.id}
                 onSelect={() => toggleSelection(lead.id)}
                 onDelete={() => handleDelete(lead.id)}
-                onEdit={() => navigateToLeadEdit(lead)}
+                onEdit={() => openUpdateLeadModal(lead)}
               />
             ))}
           </div>
@@ -2373,11 +2514,13 @@ export default function Leads() {
                 activeMatch={activeMatchedLeadId === lead.id}
                 onSelect={() => toggleSelection(lead.id)}
                 onDelete={() => handleDelete(lead.id)}
-                onEdit={() => navigateToLeadEdit(lead)}
+                onEdit={() => openUpdateLeadModal(lead)}
               />
             ))}
           </div>
         )}
+          </CardContent>
+        </Card>
         {/* Bulk Action Bar */}
         {selectedIds.size > 0 && (
           <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-popover text-popover-foreground shadow-lg border rounded-full px-6 py-3 flex items-center gap-4 z-50 animate-in fade-in slide-in-from-bottom-4">
@@ -2386,12 +2529,43 @@ export default function Leads() {
             <Button variant="ghost" size="sm" onClick={() => setSelectedIds([])}>
               {t('leads.actions.cancel')}
             </Button>
-            <Button variant="destructive" size="sm" onClick={handleBulkDelete}>
+            <Button variant="destructive" size="sm" onClick={() => setBulkDeleteDialogOpen(true)}>
               <Trash2 className="mr-2 h-4 w-4" />
               {t('leads.actions.delete')}
             </Button>
           </div>
         )}
+        <LeadsMasterDataFormModal
+          open={leadFormModalOpen}
+          mode={leadFormModalMode}
+          initialLead={leadFormModalLead}
+          onOpenChange={(open) => {
+            setLeadFormModalOpen(open);
+            if (!open) {
+              setLeadFormModalLead(null);
+              setLeadFormModalMode('create');
+            }
+          }}
+          onSubmit={handleLeadModalSubmit}
+        />
+        <AlertDialog open={bulkDeleteDialogOpen} onOpenChange={setBulkDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{t('leads.bulk.deleteTitle', 'Delete selected leads?')}</AlertDialogTitle>
+              <AlertDialogDescription>{t('leads.messages.deleteConfirm', { count: selectedIds.size })}</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>{t('leads.actions.cancel', 'Cancel')}</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  void handleBulkDelete();
+                }}
+              >
+                {t('leads.actions.delete', 'Delete')}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </FirstScreenTemplate>
       </div>
     </DashboardLayout>

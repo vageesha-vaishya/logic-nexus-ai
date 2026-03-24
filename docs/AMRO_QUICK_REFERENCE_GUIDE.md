@@ -242,6 +242,36 @@ GET    /api/amro/v1/metrics/throughput       # Performance metrics
 GET    /api/amro/v1/compliance/scorecard     # Compliance scores
 ```
 
+### Master Data CRUD (Settings)
+```
+GET    /api/v2/amro/master-data/:entity?page=1&page_size=25&search=...
+POST   /api/v2/amro/master-data/:entity
+PATCH  /api/v2/amro/master-data/:entity/:id
+DELETE /api/v2/amro/master-data/:entity/:id
+POST   /api/v2/amro/master-data/:entity               # body.operation=bulk_import
+GET    /api/v2/amro/master-data/:entity/export?format=csv
+```
+
+### Master Data Entities
+- aircraft
+- parts_inventory
+- suppliers
+- maintenance_facilities
+- work_centers
+- skill_codes
+- regulator_profiles
+- shift_calendars
+- work_package_templates
+
+### Master Data Form Usage and Validation
+- Each entity has a dedicated create/update form with required field enforcement before submit.
+- All master data calls require scoped headers (`x-tenant-id`, `x-franchise-id`) and bearer auth.
+- Destructive actions use explicit confirmation before delete execution.
+- Search and filtering are supported through `search` and pagination query parameters.
+- Bulk import uses `operation: "bulk_import"` with `records` array payload.
+- Referential checks are enforced for linked records (for example `parts_inventory.supplier_id`).
+- Every create/update/delete operation writes an audit event for compliance traceability.
+
 ---
 
 ## 8. Event Topics (Kafka)

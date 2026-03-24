@@ -20,6 +20,20 @@ describe('AMRO API Health Check', () => {
     expect(response.body.name).toBe('AMRO API Service');
     expect(response.body.version).toBe('0.1.0');
   });
+
+  it('should return readiness payload on GET /health/ready', async () => {
+    const response = await request(app).get('/health/ready');
+    expect([200, 503]).toContain(response.status);
+    expect(response.body).toHaveProperty('dependencies');
+    expect(response.body).toHaveProperty('resilience');
+  });
+
+  it('should return monitoring metrics on GET /health/metrics', async () => {
+    const response = await request(app).get('/health/metrics');
+    expect(response.status).toBe(200);
+    expect(response.body).toHaveProperty('totals');
+    expect(response.body).toHaveProperty('window');
+  });
 });
 
 describe('AMRO API Contract Artifacts', () => {
@@ -78,6 +92,13 @@ describe('AMRO Public Contract and Readiness APIs', () => {
     expect(response.status).toBe(200);
     expect(response.body.mode).toBe('health');
     expect(response.body.domainAccess?.subscriptionStatus).toBe('public');
+  });
+
+  it('should return v2 monitoring metrics without Authorization header', async () => {
+    const response = await request(app).get('/api/v2/amro/health/metrics');
+    expect(response.status).toBe(200);
+    expect(response.body.mode).toBe('metrics');
+    expect(response.body).toHaveProperty('totals');
   });
 });
 

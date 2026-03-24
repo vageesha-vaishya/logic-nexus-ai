@@ -14,6 +14,7 @@ import workOrdersRoutes from './routes/work-orders.routes';
 import { ErrorResponse } from './types/amro.types';
 import { logger } from './utils/logger';
 import { amroEventsProducer } from './events/amro-events.producer';
+import { executeWithResilience, getResilienceStatus } from './utils/resilience';
 
 const app: Express = express();
 type JsonRecord = Record<string, unknown>;
@@ -41,6 +42,21 @@ const TABLE_FALLBACK_CANDIDATES: Record<string, string[]> = {
   scheduling_board_data: ['schedules'],
   certification_records: ['certification_actions'],
   audit_trails: ['maintenance_events'],
+};
+
+const monitoringOptions = {
+  windowMs: Number(process.env.AMRO_MONITORING_WINDOW_MS || 300000),
+  minSamples: Number(process.env.AMRO_MONITORING_MIN_SAMPLES || 40),
+  alert5xxPercent: Number(process.env.AMRO_MONITORING_ALERT_5XX_PERCENT || 1),
+  minAlertIntervalMs: Number(process.env.AMRO_MONITORING_MIN_ALERT_INTERVAL_MS || 60000),
+};
+
+const monitoringState = {
+  totalRequests: 0,
+  total4xx: 0,
+  total5xx: 0,
+  lastAlertAt: 0,
+  window: [] as Array<{ at: number; statusCode: number }>,
 };
 
 function parseFlag(value: string | undefined, fallback: boolean): boolean {
@@ -75,6 +91,66 @@ function getSupabaseAdminClient(): SupabaseClient {
     throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY environment variables');
   }
   return createClient(url, serviceKey);
+}
+
+function recordMonitoringStatus(statusCode: number, requestId: string, pathName: string): void {
+  const now = Date.now();
+  monitoringState.totalRequests += 1;
+  if (statusCode >= 400 && statusCode < 500) monitoringState.total4xx += 1;
+  if (statusCode >= 500) monitoringState.total5xx += 1;
+  monitoringState.window.push({ at: now, statusCode });
+  monitoringState.window = monitoringState.window.filter((entry) => now - entry.at <= monitoringOptions.windowMs);
+  const sampleCount = monitoringState.window.length;
+  const sample5xx = monitoringState.window.filter((entry) => entry.statusCode >= 500).length;
+  const ratePercent = sampleCount > 0 ? (sample5xx / sampleCount) * 100 : 0;
+  const shouldAlert = sampleCount >= monitoringOptions.minSamples
+    && ratePercent >= monitoringOptions.alert5xxPercent
+    && now - monitoringState.lastAlertAt >= monitoringOptions.minAlertIntervalMs;
+  if (shouldAlert) {
+    monitoringState.lastAlertAt = now;
+    logger.error('[Monitoring Alert] Elevated 5xx rate on AMRO API', {
+      requestId,
+      path: pathName,
+      windowMs: monitoringOptions.windowMs,
+      sampleCount,
+      sample5xx,
+      ratePercent: Number(ratePercent.toFixed(2)),
+      thresholdPercent: monitoringOptions.alert5xxPercent,
+    });
+  }
+}
+
+async function probeSupabaseDependency(requestId: string): Promise<{ ok: boolean; latencyMs: number; message?: string }> {
+  const startedAt = Date.now();
+  try {
+    const supabase = getSupabaseAdminClient();
+    const { error } = await executeWithResilience(
+      {
+        dependency: 'supabase',
+        operation: 'health.probe',
+        requestId,
+      },
+      async () =>
+        await supabase
+          .from('profiles')
+          .select('id')
+          .limit(1),
+    );
+    if (error) {
+      return {
+        ok: false,
+        latencyMs: Date.now() - startedAt,
+        message: String(error.message || 'Supabase probe failed'),
+      };
+    }
+    return { ok: true, latencyMs: Date.now() - startedAt };
+  } catch (error) {
+    return {
+      ok: false,
+      latencyMs: Date.now() - startedAt,
+      message: String((error as { message?: unknown } | null)?.message || 'Supabase probe failed'),
+    };
+  }
 }
 
 function parseDateMs(value: unknown): number {
@@ -265,6 +341,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   });
 
   res.on('finish', () => {
+    recordMonitoringStatus(res.statusCode, requestId, req.path);
     logger.info('Request finished', {
       requestId,
       method: req.method,
@@ -274,6 +351,33 @@ app.use((req: Request, res: Response, next: NextFunction) => {
     });
   });
 
+  next();
+});
+
+const requestTimeoutMs = Number(process.env.AMRO_REQUEST_TIMEOUT_MS || 15000);
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const isStreamingRequest = req.path.includes('/stream') || String(req.headers.accept || '').includes('text/event-stream');
+  if (isStreamingRequest) {
+    next();
+    return;
+  }
+  const requestId = String(res.getHeader('x-request-id') || req.header('x-request-id') || crypto.randomUUID());
+  const timeoutHandle = setTimeout(() => {
+    if (res.headersSent) return;
+    logger.error('Request timeout', {
+      requestId,
+      method: req.method,
+      path: req.path,
+      timeoutMs: requestTimeoutMs,
+    });
+    res.status(408).json({
+      error: 'Request timeout',
+      code: 'REQUEST_TIMEOUT',
+      statusCode: 408,
+      requestId,
+    } as ErrorResponse);
+  }, requestTimeoutMs);
+  res.on('finish', () => clearTimeout(timeoutHandle));
   next();
 });
 
@@ -290,6 +394,51 @@ app.get('/health', (_req: Request, res: Response) => {
     status: 'ok',
     service: 'amro-api',
     timestamp: new Date().toISOString(),
+    uptimeSec: Math.floor(process.uptime()),
+    resilience: getResilienceStatus(),
+  });
+});
+
+app.get('/health/metrics', (_req: Request, res: Response) => {
+  const now = Date.now();
+  const window = monitoringState.window.filter((entry) => now - entry.at <= monitoringOptions.windowMs);
+  const sampleCount = window.length;
+  const sample5xx = window.filter((entry) => entry.statusCode >= 500).length;
+  const sample4xx = window.filter((entry) => entry.statusCode >= 400 && entry.statusCode < 500).length;
+  const rate5xxPercent = sampleCount > 0 ? (sample5xx / sampleCount) * 100 : 0;
+  res.status(200).json({
+    status: 'ok',
+    totals: {
+      requests: monitoringState.totalRequests,
+      errors4xx: monitoringState.total4xx,
+      errors5xx: monitoringState.total5xx,
+    },
+    window: {
+      sampleCount,
+      errors4xx: sample4xx,
+      errors5xx: sample5xx,
+      error5xxRatePercent: Number(rate5xxPercent.toFixed(2)),
+      windowMs: monitoringOptions.windowMs,
+    },
+    threshold: {
+      minSamples: monitoringOptions.minSamples,
+      alert5xxPercent: monitoringOptions.alert5xxPercent,
+    },
+    resilience: getResilienceStatus(),
+  });
+});
+
+app.get('/health/ready', async (req: Request, res: Response) => {
+  const requestId = req.header('x-request-id') || crypto.randomUUID();
+  const supabase = await probeSupabaseDependency(requestId);
+  const readiness = supabase.ok;
+  res.status(readiness ? 200 : 503).json({
+    status: readiness ? 'ready' : 'degraded',
+    requestId,
+    dependencies: {
+      supabase,
+    },
+    resilience: getResilienceStatus(),
   });
 });
 
@@ -407,18 +556,49 @@ app.get('/api/v2/amro/migration-plan', (req: Request, res: Response) => {
   });
 });
 
-app.get('/api/v2/amro/health', (req: Request, res: Response) => {
+app.get('/api/v2/amro/health', async (req: Request, res: Response) => {
   const requestId = req.header('x-request-id') || crypto.randomUUID();
+  const supabase = await probeSupabaseDependency(requestId);
+  const status = supabase.ok ? 'ok' : 'degraded';
   res.status(200).json({
     version: 'v2',
     mode: 'health',
-    status: 'ok',
+    status,
     requestId,
+    dependencies: {
+      supabase,
+    },
+    resilience: getResilienceStatus(),
     domainAccess: {
       subscriptionStatus: 'public',
       source: 'public',
       validatedAt: new Date().toISOString(),
     },
+  });
+});
+
+app.get('/api/v2/amro/health/metrics', (_req: Request, res: Response) => {
+  const now = Date.now();
+  const window = monitoringState.window.filter((entry) => now - entry.at <= monitoringOptions.windowMs);
+  const sampleCount = window.length;
+  const sample5xx = window.filter((entry) => entry.statusCode >= 500).length;
+  const rate5xxPercent = sampleCount > 0 ? (sample5xx / sampleCount) * 100 : 0;
+  res.status(200).json({
+    version: 'v2',
+    mode: 'metrics',
+    status: 'ok',
+    window: {
+      sampleCount,
+      errors5xx: sample5xx,
+      error5xxRatePercent: Number(rate5xxPercent.toFixed(2)),
+      windowMs: monitoringOptions.windowMs,
+    },
+    totals: {
+      requests: monitoringState.totalRequests,
+      errors4xx: monitoringState.total4xx,
+      errors5xx: monitoringState.total5xx,
+    },
+    resilience: getResilienceStatus(),
   });
 });
 

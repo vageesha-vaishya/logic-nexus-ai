@@ -68,9 +68,23 @@ describe('authMiddleware', () => {
     } as unknown as Response;
   }
 
+  function createRequest(
+    headers: Record<string, string> = {},
+    query: Record<string, unknown> = {},
+  ): Request {
+    return {
+      headers,
+      query,
+      header: (name: string) => {
+        const key = name.toLowerCase();
+        return headers[key] || headers[name] || undefined;
+      },
+    } as unknown as Request;
+  }
+
   it('returns 401 for missing token', async () => {
     const { authMiddleware } = await import('../src/middleware/auth.middleware');
-    const req = { headers: {}, query: {} } as unknown as Request;
+    const req = createRequest();
     const res = createResponse();
     const next = jest.fn() as unknown as NextFunction;
 
@@ -84,7 +98,7 @@ describe('authMiddleware', () => {
   it('returns 401 for invalid token', async () => {
     const { authMiddleware } = await import('../src/middleware/auth.middleware');
     mockGetUser.mockResolvedValueOnce({ data: { user: null }, error: { message: 'invalid' } });
-    const req = { headers: { authorization: 'Bearer bad-token' }, query: {} } as unknown as Request;
+    const req = createRequest({ authorization: 'Bearer bad-token' });
     const res = createResponse();
     const next = jest.fn() as unknown as NextFunction;
 
@@ -101,7 +115,7 @@ describe('authMiddleware', () => {
       data: { user: { id: 'user-1', app_metadata: {}, user_metadata: {} } },
       error: null,
     });
-    const req = { headers: { authorization: 'Bearer ok-token' }, query: {} } as unknown as Request;
+    const req = createRequest({ authorization: 'Bearer ok-token' });
     const res = createResponse();
     const next = jest.fn() as unknown as NextFunction;
 
@@ -122,7 +136,7 @@ describe('authMiddleware', () => {
       data: [{ role: 'tenant_admin', tenant_id: 'tenant-1', franchise_id: null }],
       error: null,
     });
-    const req = { headers: { authorization: 'Bearer ok-token' }, query: {} } as unknown as Request;
+    const req = createRequest({ authorization: 'Bearer ok-token' });
     const res = createResponse();
     const next = jest.fn() as unknown as NextFunction;
 
@@ -133,10 +147,37 @@ describe('authMiddleware', () => {
     expect(next).toHaveBeenCalledTimes(1);
   });
 
+  it('continues with metadata tenant when user_roles lookup table is unavailable', async () => {
+    const { authMiddleware } = await import('../src/middleware/auth.middleware');
+    mockGetUser.mockResolvedValueOnce({
+      data: {
+        user: {
+          id: 'user-1',
+          app_metadata: { tenant_id: 'tenant-meta' },
+          user_metadata: {},
+        },
+      },
+      error: null,
+    });
+    mockRoleLookup.mockReturnValueOnce({
+      data: null,
+      error: { code: '42P01', message: 'relation "user_roles" does not exist' },
+    });
+    const req = createRequest({ authorization: 'Bearer ok-token' });
+    const res = createResponse();
+    const next = jest.fn() as unknown as NextFunction;
+
+    await authMiddleware(req as any, res, next);
+
+    expect((req as any).tenantId).toBe('tenant-meta');
+    expect(next).toHaveBeenCalledTimes(1);
+    expect(res.status).not.toHaveBeenCalledWith(500);
+  });
+
   it('returns 500 when middleware throws', async () => {
     const { authMiddleware } = await import('../src/middleware/auth.middleware');
     mockGetUser.mockRejectedValueOnce(new Error('network'));
-    const req = { headers: { authorization: 'Bearer ok-token' }, query: {} } as unknown as Request;
+    const req = createRequest({ authorization: 'Bearer ok-token' });
     const res = createResponse();
     const next = jest.fn() as unknown as NextFunction;
 

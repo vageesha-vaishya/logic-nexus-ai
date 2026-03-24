@@ -3,6 +3,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { asyncHandler } from '../utils/asyncHandler';
 import { logger } from '../utils/logger';
+import { executeWithResilience } from '../utils/resilience';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -12,7 +13,10 @@ type MasterEntity =
   | 'suppliers'
   | 'maintenance_facilities'
   | 'work_centers'
-  | 'skill_codes';
+  | 'skill_codes'
+  | 'regulator_profiles'
+  | 'shift_calendars'
+  | 'work_package_templates';
 
 type EntityConfig = {
   table: string;
@@ -23,7 +27,6 @@ type EntityConfig = {
   defaultSortColumn: string;
 };
 
-const ENTITY_UNAVAILABLE = new Set<MasterEntity>();
 const ENTITY_COLUMN_OVERRIDES = new Map<MasterEntity, Set<string>>();
 const ENTITY_SEARCH_COLUMN_OVERRIDES = new Map<MasterEntity, Set<string>>();
 
@@ -143,6 +146,60 @@ const ENTITY_CONFIG: Record<MasterEntity, EntityConfig> = {
     writeAllowedFields: ['skill_code', 'description', 'skill_family', 'license_authority', 'is_certification_required', 'validity_period_months', 'is_active', 'metadata'],
     defaultSortColumn: 'updated_at',
   },
+  regulator_profiles: {
+    table: 'regulator_profiles',
+    searchableColumns: ['regulator_code', 'regulator_name', 'jurisdiction', 'policy_version'],
+    listColumns:
+      'id,tenant_id,franchise_id,regulator_code,regulator_name,jurisdiction,policy_version,effective_from,effective_to,is_active,metadata,created_at,updated_at',
+    requiredCreateFields: ['regulator_code', 'regulator_name', 'jurisdiction', 'policy_version'],
+    writeAllowedFields: [
+      'regulator_code',
+      'regulator_name',
+      'jurisdiction',
+      'policy_version',
+      'effective_from',
+      'effective_to',
+      'is_active',
+      'metadata',
+    ],
+    defaultSortColumn: 'updated_at',
+  },
+  shift_calendars: {
+    table: 'shift_calendars',
+    searchableColumns: ['station_code', 'shift_name'],
+    listColumns:
+      'id,tenant_id,franchise_id,station_code,shift_name,shift_start_time,shift_end_time,capacity,effective_from,effective_to,is_active,created_at,updated_at',
+    requiredCreateFields: ['station_code', 'shift_name', 'shift_start_time', 'shift_end_time'],
+    writeAllowedFields: [
+      'station_code',
+      'shift_name',
+      'shift_start_time',
+      'shift_end_time',
+      'capacity',
+      'effective_from',
+      'effective_to',
+      'is_active',
+    ],
+    defaultSortColumn: 'updated_at',
+  },
+  work_package_templates: {
+    table: 'work_package_templates',
+    searchableColumns: ['template_code', 'template_name', 'maintenance_type'],
+    listColumns:
+      'id,tenant_id,franchise_id,template_code,version,active,template_name,maintenance_type,scope_json,tasks_json,policy_snapshot_id,created_at,updated_at',
+    requiredCreateFields: ['template_code', 'version', 'template_name', 'maintenance_type'],
+    writeAllowedFields: [
+      'template_code',
+      'version',
+      'active',
+      'template_name',
+      'maintenance_type',
+      'scope_json',
+      'tasks_json',
+      'policy_snapshot_id',
+    ],
+    defaultSortColumn: 'updated_at',
+  },
 };
 
 function isV2Enabled(): boolean {
@@ -207,6 +264,22 @@ function asJsonObject(value: unknown): Record<string, unknown> {
   throw new HttpError('metadata must be an object', 400);
 }
 
+function asJsonArray(value: unknown): unknown[] {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+  throw new HttpError('value must be an array', 400);
+}
+
+function asDateString(value: unknown): string | null {
+  const normalized = asNullableString(value);
+  if (!normalized) return null;
+  const parsed = Date.parse(normalized);
+  if (Number.isNaN(parsed)) {
+    throw new HttpError('Invalid date value', 400);
+  }
+  return normalized;
+}
+
 function firstQueryValue(value: unknown): string {
   if (Array.isArray(value)) {
     return String(value[0] || '').trim();
@@ -223,10 +296,21 @@ function resolveEntity(rawEntity: unknown): MasterEntity {
 }
 
 function parsePagination(req: AuthRequest): { page: number; pageSize: number; start: number; end: number } {
-  const pageRaw = Number(firstQueryValue(req.query.page));
-  const pageSizeRaw = Number(firstQueryValue(req.query.page_size || req.query.pageSize));
-  const page = Number.isFinite(pageRaw) && pageRaw > 0 ? Math.floor(pageRaw) : 1;
-  const pageSize = Math.min(200, Math.max(1, Number.isFinite(pageSizeRaw) ? Math.floor(pageSizeRaw) : 25));
+  const pageQuery = firstQueryValue(req.query.page);
+  const pageSizeQuery = firstQueryValue(req.query.page_size || req.query.pageSize);
+  const pageRaw = pageQuery ? Number(pageQuery) : 1;
+  const pageSizeRaw = pageSizeQuery ? Number(pageSizeQuery) : 25;
+  if (!Number.isFinite(pageRaw) || pageRaw <= 0 || !Number.isInteger(pageRaw)) {
+    throw new HttpError('page must be a positive integer', 400);
+  }
+  if (!Number.isFinite(pageSizeRaw) || pageSizeRaw <= 0 || !Number.isInteger(pageSizeRaw)) {
+    throw new HttpError('page_size must be a positive integer', 400);
+  }
+  if (pageSizeRaw > 200) {
+    throw new HttpError('page_size must be less than or equal to 200', 400);
+  }
+  const page = pageRaw;
+  const pageSize = pageSizeRaw;
   const start = (page - 1) * pageSize;
   const end = start + pageSize - 1;
   return { page, pageSize, start, end };
@@ -235,16 +319,37 @@ function parsePagination(req: AuthRequest): { page: number; pageSize: number; st
 function parseSort(req: AuthRequest, entity: MasterEntity): { sortBy: string; ascending: boolean } {
   const config = ENTITY_CONFIG[entity];
   const sortBy = firstQueryValue(req.query.sort_by || req.query.sortBy) || config.defaultSortColumn;
-  const ascending = firstQueryValue(req.query.sort_dir || req.query.sortDir).toLowerCase() === 'asc';
+  const rawSortDir = firstQueryValue(req.query.sort_dir || req.query.sortDir).toLowerCase();
+  if (rawSortDir && rawSortDir !== 'asc' && rawSortDir !== 'desc') {
+    throw new HttpError('sort_dir must be asc or desc', 400);
+  }
+  const ascending = rawSortDir === 'asc';
   return { sortBy, ascending };
 }
 
 function parseSearch(req: AuthRequest): string {
-  return firstQueryValue(req.query.search || req.query.q);
+  const search = firstQueryValue(req.query.search || req.query.q);
+  if (search.length > 200) {
+    throw new HttpError('search must be 200 characters or fewer', 400);
+  }
+  return search;
 }
 
 function parseExportRequested(req: AuthRequest): boolean {
-  return firstQueryValue(req.query.export).toLowerCase() === 'csv';
+  const exportValue = firstQueryValue(req.query.export).toLowerCase();
+  if (exportValue && exportValue !== 'csv') {
+    throw new HttpError('export must be csv when provided', 400);
+  }
+  return exportValue === 'csv';
+}
+
+function toHttpError(error: unknown): HttpError {
+  if (error instanceof HttpError) {
+    return error;
+  }
+  const statusCode = Number((error as { statusCode?: unknown } | null)?.statusCode || 500);
+  const message = String((error as { message?: unknown } | null)?.message || 'Internal Server Error');
+  return new HttpError(message, statusCode >= 400 && statusCode <= 599 ? statusCode : 500);
 }
 
 function parseBulkOperation(body: unknown): { isBulkImport: boolean; records: JsonRecord[] } {
@@ -452,13 +557,55 @@ function normalizeSkillCode(payload: JsonRecord): JsonRecord {
   };
 }
 
+function normalizeRegulatorProfile(payload: JsonRecord): JsonRecord {
+  return {
+    regulator_code: asString(payload.regulator_code),
+    regulator_name: asString(payload.regulator_name),
+    jurisdiction: asString(payload.jurisdiction),
+    policy_version: asString(payload.policy_version),
+    effective_from: asDateString(payload.effective_from) || new Date().toISOString().slice(0, 10),
+    effective_to: asDateString(payload.effective_to),
+    is_active: asBoolean(payload.is_active, true),
+    metadata: asJsonObject(payload.metadata),
+  };
+}
+
+function normalizeShiftCalendar(payload: JsonRecord): JsonRecord {
+  return {
+    station_code: asString(payload.station_code),
+    shift_name: asString(payload.shift_name),
+    shift_start_time: asString(payload.shift_start_time),
+    shift_end_time: asString(payload.shift_end_time),
+    capacity: asNumber(payload.capacity) ?? 1,
+    effective_from: asDateString(payload.effective_from) || new Date().toISOString().slice(0, 10),
+    effective_to: asDateString(payload.effective_to),
+    is_active: asBoolean(payload.is_active, true),
+  };
+}
+
+function normalizeWorkPackageTemplate(payload: JsonRecord): JsonRecord {
+  return {
+    template_code: asString(payload.template_code),
+    version: asNumber(payload.version),
+    active: asBoolean(payload.active, true),
+    template_name: asString(payload.template_name),
+    maintenance_type: asString(payload.maintenance_type),
+    scope_json: asJsonArray(payload.scope_json),
+    tasks_json: asJsonArray(payload.tasks_json),
+    policy_snapshot_id: asNullableString(payload.policy_snapshot_id),
+  };
+}
+
 function normalizePayload(entity: MasterEntity, payload: JsonRecord): JsonRecord {
   if (entity === 'aircraft') return normalizeAircraft(payload);
   if (entity === 'parts_inventory') return normalizePartsInventory(payload);
   if (entity === 'suppliers') return normalizeSupplier(payload);
   if (entity === 'maintenance_facilities') return normalizeMaintenanceFacility(payload);
   if (entity === 'work_centers') return normalizeWorkCenter(payload);
-  return normalizeSkillCode(payload);
+  if (entity === 'skill_codes') return normalizeSkillCode(payload);
+  if (entity === 'regulator_profiles') return normalizeRegulatorProfile(payload);
+  if (entity === 'shift_calendars') return normalizeShiftCalendar(payload);
+  return normalizeWorkPackageTemplate(payload);
 }
 
 function sanitizeWritePayload(entity: MasterEntity, payload: JsonRecord): JsonRecord {
@@ -541,7 +688,13 @@ async function writeAuditRecord(params: {
         source: 'api.v2.amro.master-data',
       },
     };
-    const { error } = await supabase.from('maintenance_events').insert(payload);
+    const { error } = await executeWithResilience(
+      {
+        dependency: 'supabase',
+        operation: `master-data.${params.entity}.audit.${params.action}`,
+      },
+      async () => await supabase.from('maintenance_events').insert(payload),
+    );
     if (error) {
       logger.warn('[AMRO Master Data] audit insert failed', {
         entity: params.entity,
@@ -580,20 +733,6 @@ router.get(
       throw new HttpError('Missing tenant context', 401);
     }
     const entity = resolveEntity(req.params.entity);
-    if (ENTITY_UNAVAILABLE.has(entity)) {
-      res.status(200).json({
-        version: 'v2',
-        correlationId,
-        output: {
-          entity,
-          records: [],
-          page: 1,
-          page_size: 25,
-          total: 0,
-        },
-      });
-      return;
-    }
     const entityConfig = ENTITY_CONFIG[entity];
     const search = parseSearch(req);
     const exportRequested = parseExportRequested(req);
@@ -624,7 +763,15 @@ router.get(
         query = query.or(clauses.join(','));
       }
 
-      const { data, count, error } = await query;
+      const { data, count, error } = await executeWithResilience(
+        {
+          dependency: 'supabase',
+          operation: `master-data.${entity}.list`,
+          requestId: correlationId,
+          tenantId: req.tenantId,
+        },
+        async () => await query,
+      );
       if (!error) {
         finalData = Array.isArray(data) ? data : [];
         finalCount = count || 0;
@@ -633,7 +780,6 @@ router.get(
 
       const errorMessage = String(error.message || '');
       if (isMissingTableError(errorMessage)) {
-        ENTITY_UNAVAILABLE.add(entity);
         finalData = [];
         finalCount = 0;
         break;
@@ -645,7 +791,7 @@ router.get(
         continue;
       }
 
-      throw new HttpError(errorMessage, 400);
+      throw toHttpError(error);
     }
     const rawRows = Array.isArray(finalData) ? (finalData as unknown as JsonRecord[]) : [];
     const activeSearchableColumns = getActiveSearchableColumns(entity);
@@ -705,7 +851,15 @@ router.post(
         franchise_id: franchiseId,
         updated_by: req.userId,
       }));
-      const { data, error } = await supabase.from(entityConfig.table).insert(prepared).select(entityConfig.listColumns);
+      const { data, error } = await executeWithResilience(
+        {
+          dependency: 'supabase',
+          operation: `master-data.${entity}.bulk_import`,
+          requestId: correlationId,
+          tenantId: req.tenantId,
+        },
+        async () => await supabase.from(entityConfig.table).insert(prepared).select(entityConfig.listColumns),
+      );
       if (error) {
         throw new HttpError(error.message, 400);
       }
@@ -737,11 +891,20 @@ router.post(
       created_by: req.userId,
       updated_by: req.userId,
     };
-    const { data, error } = await supabase
-      .from(entityConfig.table)
-      .insert(insertPayload)
-      .select(entityConfig.listColumns)
-      .maybeSingle();
+    const { data, error } = await executeWithResilience(
+      {
+        dependency: 'supabase',
+        operation: `master-data.${entity}.create`,
+        requestId: correlationId,
+        tenantId: req.tenantId,
+      },
+      async () =>
+        await supabase
+          .from(entityConfig.table)
+          .insert(insertPayload)
+          .select(entityConfig.listColumns)
+          .maybeSingle(),
+    );
     if (error) {
       throw new HttpError(error.message, 400);
     }
@@ -785,13 +948,22 @@ router.get(
     const franchiseId = extractFranchiseId(req);
     const entityConfig = ENTITY_CONFIG[entity];
     const supabase = getSupabaseAdminClient();
-    const { data, error } = await supabase
-      .from(entityConfig.table)
-      .select(entityConfig.listColumns)
-      .eq('tenant_id', req.tenantId)
-      .eq('id', id)
-      .limit(1)
-      .maybeSingle();
+    const { data, error } = await executeWithResilience(
+      {
+        dependency: 'supabase',
+        operation: `master-data.${entity}.get`,
+        requestId: correlationId,
+        tenantId: req.tenantId,
+      },
+      async () =>
+        await supabase
+          .from(entityConfig.table)
+          .select(entityConfig.listColumns)
+          .eq('tenant_id', req.tenantId)
+          .eq('id', id)
+          .limit(1)
+          .maybeSingle(),
+    );
     if (error) {
       throw new HttpError(error.message, 400);
     }
@@ -833,13 +1005,22 @@ router.patch(
     const franchiseId = extractFranchiseId(req);
     const entityConfig = ENTITY_CONFIG[entity];
     const supabase = getSupabaseAdminClient();
-    const { data: existing, error: existingError } = await supabase
-      .from(entityConfig.table)
-      .select(entityConfig.listColumns)
-      .eq('tenant_id', req.tenantId)
-      .eq('id', id)
-      .limit(1)
-      .maybeSingle();
+    const { data: existing, error: existingError } = await executeWithResilience(
+      {
+        dependency: 'supabase',
+        operation: `master-data.${entity}.update.load`,
+        requestId: correlationId,
+        tenantId: req.tenantId,
+      },
+      async () =>
+        await supabase
+          .from(entityConfig.table)
+          .select(entityConfig.listColumns)
+          .eq('tenant_id', req.tenantId)
+          .eq('id', id)
+          .limit(1)
+          .maybeSingle(),
+    );
     if (existingError) {
       throw new HttpError(existingError.message, 400);
     }
@@ -856,14 +1037,23 @@ router.patch(
       ...sanitizeWritePayload(entity, payload),
       updated_by: req.userId,
     };
-    const { data, error } = await supabase
-      .from(entityConfig.table)
-      .update(updatePayload)
-      .eq('tenant_id', req.tenantId)
-      .eq('id', id)
-      .select(entityConfig.listColumns)
-      .limit(1)
-      .maybeSingle();
+    const { data, error } = await executeWithResilience(
+      {
+        dependency: 'supabase',
+        operation: `master-data.${entity}.update`,
+        requestId: correlationId,
+        tenantId: req.tenantId,
+      },
+      async () =>
+        await supabase
+          .from(entityConfig.table)
+          .update(updatePayload)
+          .eq('tenant_id', req.tenantId)
+          .eq('id', id)
+          .select(entityConfig.listColumns)
+          .limit(1)
+          .maybeSingle(),
+    );
     if (error) {
       throw new HttpError(error.message, 400);
     }
@@ -907,13 +1097,22 @@ router.delete(
     const franchiseId = extractFranchiseId(req);
     const entityConfig = ENTITY_CONFIG[entity];
     const supabase = getSupabaseAdminClient();
-    const { data: existing, error: existingError } = await supabase
-      .from(entityConfig.table)
-      .select(entityConfig.listColumns)
-      .eq('tenant_id', req.tenantId)
-      .eq('id', id)
-      .limit(1)
-      .maybeSingle();
+    const { data: existing, error: existingError } = await executeWithResilience(
+      {
+        dependency: 'supabase',
+        operation: `master-data.${entity}.delete.load`,
+        requestId: correlationId,
+        tenantId: req.tenantId,
+      },
+      async () =>
+        await supabase
+          .from(entityConfig.table)
+          .select(entityConfig.listColumns)
+          .eq('tenant_id', req.tenantId)
+          .eq('id', id)
+          .limit(1)
+          .maybeSingle(),
+    );
     if (existingError) {
       throw new HttpError(existingError.message, 400);
     }
@@ -925,11 +1124,20 @@ router.delete(
     if (franchiseId && existingFranchise && existingFranchise !== franchiseId) {
       throw new HttpError('Forbidden', 403);
     }
-    const { error } = await supabase
-      .from(entityConfig.table)
-      .delete()
-      .eq('tenant_id', req.tenantId)
-      .eq('id', id);
+    const { error } = await executeWithResilience(
+      {
+        dependency: 'supabase',
+        operation: `master-data.${entity}.delete`,
+        requestId: correlationId,
+        tenantId: req.tenantId,
+      },
+      async () =>
+        await supabase
+          .from(entityConfig.table)
+          .delete()
+          .eq('tenant_id', req.tenantId)
+          .eq('id', id),
+    );
     if (error) {
       throw new HttpError(error.message, 400);
     }
@@ -953,18 +1161,18 @@ router.delete(
   }),
 );
 
-router.use((error: unknown, req: AuthRequest, res: any, _next: any) => {
+router.use((error: unknown, req: AuthRequest, res: { status: (code: number) => { json: (body: unknown) => void } }, _next: unknown) => {
   const correlationId = req.header('x-request-id') || crypto.randomUUID();
-  if (error instanceof HttpError) {
-    res.status(error.statusCode).json({
-      error: error.message,
-      version: 'v2',
-      correlationId,
-    });
-    return;
-  }
-  res.status(500).json({
-    error: error instanceof Error ? error.message : 'Internal Server Error',
+  const resolved = toHttpError(error);
+  logger.error('[AMRO Master Data] request failed', {
+    correlationId,
+    method: req.method,
+    path: req.path,
+    statusCode: resolved.statusCode,
+    message: resolved.message,
+  });
+  res.status(resolved.statusCode).json({
+    error: resolved.message,
     version: 'v2',
     correlationId,
   });

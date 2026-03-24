@@ -7,10 +7,12 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
+    "typecheck": "tsc --noEmit",
     "start": "node dist/index.js",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
+    "benchmark:master-data": "tsx tests/master-data.benchmark.ts",
     "lint": "ESLINT_USE_FLAT_CONFIG=false eslint src",
     "lint:fix": "ESLINT_USE_FLAT_CONFIG=false eslint src --fix"
   },

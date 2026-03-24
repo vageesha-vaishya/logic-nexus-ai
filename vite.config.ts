@@ -6,11 +6,62 @@ import { componentTagger } from "lovable-tagger";
 
 const require = createRequire(import.meta.url);
 
+type ProxyServiceDefinition = {
+  serviceName: string;
+  startCommand: string;
+  target: string;
+};
+
+function createServiceProxy(definition: ProxyServiceDefinition) {
+  return {
+    target: definition.target,
+    changeOrigin: true,
+    secure: false,
+    configure: (proxy: any) => {
+      proxy.on('error', (error: any, req: any, res: any) => {
+        const statusCode = 503;
+        const payload = {
+          error: 'Upstream service unavailable',
+          code: 'UPSTREAM_UNAVAILABLE',
+          service: definition.serviceName,
+          target: definition.target,
+          requestPath: String(req?.url || ''),
+          requestMethod: String(req?.method || ''),
+          upstreamError: String(error?.code || error?.message || 'proxy_error'),
+          resolution: `Start ${definition.serviceName} using: ${definition.startCommand}`,
+        };
+        if (res && !res.headersSent) {
+          res.writeHead(statusCode, { 'Content-Type': 'application/json' });
+        }
+        if (res && typeof res.end === 'function') {
+          res.end(JSON.stringify(payload));
+        }
+      });
+    },
+  };
+}
+
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   const crmApiProxyTarget = env.VITE_CRM_API_PROXY_TARGET || 'http://localhost:3011';
   const amroApiProxyTarget = env.VITE_AMRO_API_PROXY_TARGET || 'http://localhost:3001';
+  const tenantBrandingProxyTarget = env.VITE_TENANT_BRANDING_PROXY_TARGET || env.VITE_WEB_API_PROXY_TARGET || 'http://localhost:8787';
+  const crmProxy = createServiceProxy({
+    serviceName: 'CRM API',
+    startCommand: 'cd services/crm-api && npm run dev',
+    target: crmApiProxyTarget,
+  });
+  const amroProxy = createServiceProxy({
+    serviceName: 'AMRO API',
+    startCommand: 'cd services/amro-api && npm run dev',
+    target: amroApiProxyTarget,
+  });
+  const tenantBrandingProxy = createServiceProxy({
+    serviceName: 'Tenant Branding API',
+    startCommand: 'set VITE_TENANT_BRANDING_PROXY_TARGET or run tenant-branding host',
+    target: tenantBrandingProxyTarget,
+  });
   const enableDesignSystemFederation = env.VITE_ENABLE_DESIGN_SYSTEM_FEDERATION === 'true';
   const enableDesignSystemRemote = env.VITE_ENABLE_DESIGN_SYSTEM_REMOTE === 'true';
   let federationPlugin: PluginOption = false;
@@ -63,25 +114,13 @@ export default defineConfig(({ mode }) => {
       ].join("; "),
     },
     proxy: {
-      '/api/crm': {
-        target: crmApiProxyTarget,
-        changeOrigin: true,
-        secure: false,
-      },
-      '/api/v1': {
-        target: amroApiProxyTarget,
-        changeOrigin: true,
-        secure: false,
-      },
-      '/api/v2/amro': {
-        target: amroApiProxyTarget,
-        changeOrigin: true,
-        secure: false,
-      },
+      '/api/crm': crmProxy,
+      '/api/v1/tenant-branding.css': tenantBrandingProxy,
+      '/api/v1/tenant-branding': tenantBrandingProxy,
+      '/api/v1': amroProxy,
+      '/api/v2/amro': amroProxy,
       '/api/amro': {
-        target: amroApiProxyTarget,
-        changeOrigin: true,
-        secure: false,
+        ...amroProxy,
         rewrite: (path: string) => path.replace(/^\/api\/amro/, ''),
       },
       '/functions/v1': {
@@ -102,25 +141,13 @@ export default defineConfig(({ mode }) => {
     port: 4173,
     strictPort: true,
     proxy: {
-      '/api/crm': {
-        target: crmApiProxyTarget,
-        changeOrigin: true,
-        secure: false,
-      },
-      '/api/v1': {
-        target: amroApiProxyTarget,
-        changeOrigin: true,
-        secure: false,
-      },
-      '/api/v2/amro': {
-        target: amroApiProxyTarget,
-        changeOrigin: true,
-        secure: false,
-      },
+      '/api/crm': crmProxy,
+      '/api/v1/tenant-branding.css': tenantBrandingProxy,
+      '/api/v1/tenant-branding': tenantBrandingProxy,
+      '/api/v1': amroProxy,
+      '/api/v2/amro': amroProxy,
       '/api/amro': {
-        target: amroApiProxyTarget,
-        changeOrigin: true,
-        secure: false,
+        ...amroProxy,
         rewrite: (path: string) => path.replace(/^\/api\/amro/, ''),
       },
       '/functions/v1': {

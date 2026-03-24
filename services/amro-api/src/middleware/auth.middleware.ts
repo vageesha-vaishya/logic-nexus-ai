@@ -6,6 +6,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { createClient } from '@supabase/supabase-js';
 import { logger } from '../utils/logger';
+import { executeWithResilience } from '../utils/resilience';
 
 interface AuthRequest extends Request {
   tenantId?: string;
@@ -33,6 +34,18 @@ type TenantRoleScope = {
   tenant_id: string | null;
   franchise_id: string | null;
 };
+
+function isRecoverableLookupError(error: unknown): boolean {
+  const code = String((error as { code?: unknown } | null)?.code || '').trim();
+  const message = String((error as { message?: unknown } | null)?.message || '').toLowerCase();
+  if (code === '42P01' || code === '42703') return true;
+  return (
+    message.includes('does not exist') ||
+    message.includes('undefined table') ||
+    message.includes('schema cache') ||
+    message.includes('could not find')
+  );
+}
 
 /**
  * Extract Bearer token from Authorization header
@@ -63,6 +76,7 @@ export async function authMiddleware(
   res: Response,
   next: NextFunction,
 ): Promise<void> {
+  const requestId = String(req.header('x-request-id') || '');
   try {
     const fallbackUserHeader = req.headers['x-user-id'];
     const fallbackUserId = typeof fallbackUserHeader === 'string'
@@ -100,7 +114,14 @@ export async function authMiddleware(
     }
 
     // Verify token with Supabase
-    const { data, error } = await supabase.auth.getUser(token);
+    const { data, error } = await executeWithResilience(
+      {
+        dependency: 'supabase',
+        operation: 'auth.getUser',
+        requestId,
+      },
+      async () => supabase.auth.getUser(token),
+    );
     if (error || !data.user) {
       res.status(401).json({
         error: 'Invalid or expired token',
@@ -123,18 +144,34 @@ export async function authMiddleware(
           : '';
     const requestedTenantId = requestedTenantRaw.trim().length > 0 ? requestedTenantRaw.trim() : null;
 
-    const { data: userRoles, error: roleError } = await supabase
-      .from('user_roles')
-      .select('role, tenant_id, franchise_id')
-      .eq('user_id', userId);
+    const { data: userRoles, error: roleError } = await executeWithResilience(
+      {
+        dependency: 'supabase',
+        operation: 'auth.user_roles.lookup',
+        requestId,
+        tenantId: requestedTenantId || undefined,
+      },
+      async () =>
+        await supabase
+          .from('user_roles')
+          .select('role, tenant_id, franchise_id')
+          .eq('user_id', userId),
+    );
 
     if (roleError) {
-      res.status(500).json({
-        error: 'Failed to resolve tenant assignment',
-        code: 'TENANT_LOOKUP_FAILED',
-        statusCode: 500,
+      if (!isRecoverableLookupError(roleError)) {
+        res.status(500).json({
+          error: 'Failed to resolve tenant assignment',
+          code: 'TENANT_LOOKUP_FAILED',
+          statusCode: 500,
+        });
+        return;
+      }
+      logger.warn('Auth middleware user_roles lookup unavailable; continuing with fallback resolution', {
+        userId,
+        error: String((roleError as any)?.message || ''),
+        code: String((roleError as any)?.code || ''),
       });
-      return;
     }
 
     const scopedRoles = (Array.isArray(userRoles) ? userRoles : []) as TenantRoleScope[];
@@ -151,57 +188,106 @@ export async function authMiddleware(
       .filter((franchiseId) => franchiseId.length > 0);
     let franchiseResolvedTenantId: string | null = null;
     if (roleFranchiseIds.length > 0) {
-      const { data: franchiseRows, error: franchiseError } = await supabase
-        .from('franchises')
-        .select('tenant_id')
-        .in('id', roleFranchiseIds)
-        .not('tenant_id', 'is', null)
-        .limit(1);
+      const { data: franchiseRows, error: franchiseError } = await executeWithResilience(
+        {
+          dependency: 'supabase',
+          operation: 'auth.franchises.lookup',
+          requestId,
+          tenantId: requestedTenantId || undefined,
+        },
+        async () =>
+          await supabase
+            .from('franchises')
+            .select('tenant_id')
+            .in('id', roleFranchiseIds)
+            .not('tenant_id', 'is', null)
+            .limit(1),
+      );
       if (franchiseError) {
+        if (!isRecoverableLookupError(franchiseError)) {
+          res.status(500).json({
+            error: 'Failed to resolve franchise tenant assignment',
+            code: 'FRANCHISE_TENANT_LOOKUP_FAILED',
+            statusCode: 500,
+          });
+          return;
+        }
+        logger.warn('Auth middleware franchises lookup unavailable; skipping franchise tenant fallback', {
+          userId,
+          error: String((franchiseError as any)?.message || ''),
+          code: String((franchiseError as any)?.code || ''),
+        });
+      } else {
+        const firstFranchise = (Array.isArray(franchiseRows) ? franchiseRows[0] : null) as { tenant_id?: string | null } | null;
+        franchiseResolvedTenantId = String(firstFranchise?.tenant_id || '').trim() || null;
+      }
+    }
+
+    const { data: profile, error: profileError } = await executeWithResilience(
+      {
+        dependency: 'supabase',
+        operation: 'auth.profiles.lookup',
+        requestId,
+        tenantId: requestedTenantId || undefined,
+      },
+      async () =>
+        await supabase
+          .from('profiles')
+          .select('tenant_id')
+          .eq('id', userId)
+          .maybeSingle(),
+    );
+
+    if (profileError) {
+      if (!isRecoverableLookupError(profileError)) {
         res.status(500).json({
-          error: 'Failed to resolve franchise tenant assignment',
-          code: 'FRANCHISE_TENANT_LOOKUP_FAILED',
+          error: 'Failed to resolve profile tenant assignment',
+          code: 'PROFILE_TENANT_LOOKUP_FAILED',
           statusCode: 500,
         });
         return;
       }
-      const firstFranchise = (Array.isArray(franchiseRows) ? franchiseRows[0] : null) as { tenant_id?: string | null } | null;
-      franchiseResolvedTenantId = String(firstFranchise?.tenant_id || '').trim() || null;
-    }
-
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('tenant_id')
-      .eq('id', userId)
-      .maybeSingle();
-
-    if (profileError) {
-      res.status(500).json({
-        error: 'Failed to resolve profile tenant assignment',
-        code: 'PROFILE_TENANT_LOOKUP_FAILED',
-        statusCode: 500,
+      logger.warn('Auth middleware profiles lookup unavailable; continuing with fallback resolution', {
+        userId,
+        error: String((profileError as any)?.message || ''),
+        code: String((profileError as any)?.code || ''),
       });
-      return;
     }
 
-    const profileTenantId = String((profile as { tenant_id?: string | null } | null)?.tenant_id || '').trim();
-    const { data: preferences, error: preferenceError } = await supabase
-      .from('user_preferences')
-      .select('tenant_id')
-      .eq('user_id', userId)
-      .limit(1)
-      .maybeSingle();
+    const profileTenantId = profileError ? '' : String((profile as { tenant_id?: string | null } | null)?.tenant_id || '').trim();
+    const { data: preferences, error: preferenceError } = await executeWithResilience(
+      {
+        dependency: 'supabase',
+        operation: 'auth.user_preferences.lookup',
+        requestId,
+        tenantId: requestedTenantId || undefined,
+      },
+      async () =>
+        await supabase
+          .from('user_preferences')
+          .select('tenant_id')
+          .eq('user_id', userId)
+          .limit(1)
+          .maybeSingle(),
+    );
 
     if (preferenceError) {
-      res.status(500).json({
-        error: 'Failed to resolve preference tenant assignment',
-        code: 'PREFERENCE_TENANT_LOOKUP_FAILED',
-        statusCode: 500,
+      if (!isRecoverableLookupError(preferenceError)) {
+        res.status(500).json({
+          error: 'Failed to resolve preference tenant assignment',
+          code: 'PREFERENCE_TENANT_LOOKUP_FAILED',
+          statusCode: 500,
+        });
+        return;
+      }
+      logger.warn('Auth middleware user_preferences lookup unavailable; continuing with fallback resolution', {
+        userId,
+        error: String((preferenceError as any)?.message || ''),
+        code: String((preferenceError as any)?.code || ''),
       });
-      return;
     }
 
-    const preferenceTenantId = String((preferences as { tenant_id?: string | null } | null)?.tenant_id || '').trim();
+    const preferenceTenantId = preferenceError ? '' : String((preferences as { tenant_id?: string | null } | null)?.tenant_id || '').trim();
     const metadataTenantId = String(
       ((data.user.app_metadata as Record<string, unknown> | undefined)?.tenant_id ||
         (data.user.user_metadata as Record<string, unknown> | undefined)?.tenant_id ||
@@ -227,11 +313,22 @@ export async function authMiddleware(
     req.tenantId = resolvedTenantId;
     next();
   } catch (err) {
-    logger.error('Auth middleware error:', err);
-    res.status(500).json({
-      error: 'Internal server error during authentication',
-      code: 'AUTH_ERROR',
-      statusCode: 500,
+    const statusCode = Number((err as { statusCode?: unknown } | null)?.statusCode || 500);
+    const errorCode = String((err as { code?: unknown } | null)?.code || 'AUTH_ERROR');
+    const errorMessage =
+      statusCode >= 500
+        ? 'Internal server error during authentication'
+        : String((err as { message?: unknown } | null)?.message || 'Authentication failed');
+    logger.error('Auth middleware error', {
+      requestId,
+      statusCode,
+      errorCode,
+      message: String((err as { message?: unknown } | null)?.message || ''),
+    });
+    res.status(statusCode).json({
+      error: errorMessage,
+      code: errorCode,
+      statusCode,
     });
   }
 }

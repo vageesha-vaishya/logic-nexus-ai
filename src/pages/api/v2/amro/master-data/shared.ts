@@ -641,8 +641,21 @@ export function sendError(res: ApiResponse, error: unknown, correlationId: strin
     });
     return;
   }
-  res.status(500).json({
-    error: String((error as Error)?.message || 'Internal Server Error'),
+  const message = String((error as Error)?.message || 'Internal Server Error');
+  const normalized = message.toLowerCase();
+  const statusCode = normalized.includes('unauthorized')
+    ? 401
+    : normalized.includes('forbidden')
+      ? 403
+      : normalized.includes('rate limit')
+        ? 429
+        : normalized.includes('https required')
+          ? 400
+          : normalized.includes('csrf')
+            ? 403
+            : 500;
+  res.status(statusCode).json({
+    error: message,
     version: 'v2',
     correlationId,
   });

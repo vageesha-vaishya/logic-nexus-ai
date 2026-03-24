@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import AmroMasterDataPage from './AmroMasterDataPage';
 
@@ -55,19 +55,19 @@ describe('AmroMasterDataPage', () => {
         },
       },
     });
+    const successPayload = {
+      output: {
+        records: [
+          { id: 'ac-1', tail_number: 'N100AA', status: 'active' },
+          { id: 'ac-2', tail_number: 'N200BB', status: 'inactive' },
+        ],
+      },
+    };
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue({
         ok: true,
-        json: async () => ({
-          output: {
-            records: [
-              { id: 'ac-1', tail_number: 'N100AA', status: 'active' },
-              { id: 'ac-2', tail_number: 'N200BB', status: 'inactive' },
-            ],
-          },
-        }),
-        text: async () => '',
+        text: async () => JSON.stringify(successPayload),
       }),
     );
   });
@@ -102,6 +102,44 @@ describe('AmroMasterDataPage', () => {
 
     await waitFor(() => {
       expect(mockToastError).not.toHaveBeenCalled();
+    });
+  });
+
+  it('loads seed payload for work package templates', async () => {
+    render(
+      <MemoryRouter>
+        <AmroMasterDataPage />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Work Package Templates' }));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Load Seed Payload' }));
+
+    await waitFor(() => {
+      expect(mockToastSuccess).toHaveBeenCalled();
+    });
+  });
+
+  it('handles empty successful API responses without JSON parsing errors', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        text: async () => '',
+      }),
+    );
+
+    render(
+      <MemoryRouter>
+        <AmroMasterDataPage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(mockToastError).not.toHaveBeenCalledWith(
+        expect.stringContaining("Failed to execute 'json' on 'Response'"),
+      );
     });
   });
 });
