@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import AmroMasterDataPage from './AmroMasterDataPage';
 
 const mockGetSession = vi.fn();
@@ -72,9 +73,13 @@ describe('AmroMasterDataPage', () => {
   });
 
   it('renders AMRO master data page and loads aircraft records', async () => {
-    render(<AmroMasterDataPage />);
+    render(
+      <MemoryRouter>
+        <AmroMasterDataPage />
+      </MemoryRouter>,
+    );
 
-    expect(screen.getByRole('heading', { name: 'AMRO Master Data' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'AMRO Settings · Master Data' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Aircraft' })).toBeInTheDocument();
     expect(screen.getAllByText(/Bulk Import/i).length).toBeGreaterThan(0);
 

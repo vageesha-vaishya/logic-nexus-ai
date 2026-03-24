@@ -26,6 +26,17 @@ describe('amro domain separation strategy', () => {
     expect(appRoutes).toContain('path="/dashboard/amro/workspace-documentation"');
   });
 
+  it('routes AMRO settings and master data through settings sub-module paths', () => {
+    const navigation = read('src/config/navigation.ts');
+    const appRoutes = read('src/App.tsx');
+    expect(navigation).toContain("name: 'Settings'");
+    expect(navigation).toContain("path: '/dashboard/amro/settings'");
+    expect(appRoutes).toContain('const AmroSettings');
+    expect(appRoutes).toContain('path="/dashboard/amro/settings"');
+    expect(appRoutes).toContain('path="/dashboard/amro/settings/master-data"');
+    expect(appRoutes).toContain('Navigate to="/dashboard/amro/settings/master-data"');
+  });
+
   it('implements all AMRO-owned bounded-context capability surfaces', () => {
     const workspaceSurface = read('src/features/module-amro/components/AmroOwnedWorkspace.tsx');
     expect(workspaceSurface).toContain('data-amro-owned-surface="asset-registry-configuration-state"');

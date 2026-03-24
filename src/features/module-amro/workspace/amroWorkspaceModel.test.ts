@@ -77,9 +77,9 @@ describe('amroWorkspaceModel', () => {
 
     expect(
       buildMaterialsPlanningSummary([
-        { id: 'm1', partNumber: 'PN-1', reservationStatus: 'shortage', repairAction: 'install', supplierEta: '2026-01-01T00:00:00.000Z' },
-        { id: 'm2', partNumber: 'PN-2', reservationStatus: 'pending', repairAction: 'repair', supplierEta: '2026-01-01T00:00:00.000Z' },
-        { id: 'm3', partNumber: 'PN-3', reservationStatus: 'reserved', repairAction: 'remove', supplierEta: '2026-01-01T00:00:00.000Z' },
+        { id: 'm1', partNumber: 'PN-1', reservationStatus: 'shortage', repairAction: 'install', supplierEta: '2026-01-01T00:00:00.000Z', shortageSeverity: 'critical', etaStatus: 'on_time', rotableStatus: 'serviceable', llpRemainingCycles: 1200, traceabilityStatus: 'verified' },
+        { id: 'm2', partNumber: 'PN-2', reservationStatus: 'pending', repairAction: 'repair', supplierEta: '2026-01-01T00:00:00.000Z', shortageSeverity: 'watch', etaStatus: 'on_time', rotableStatus: 'unserviceable', llpRemainingCycles: 700, traceabilityStatus: 'released' },
+        { id: 'm3', partNumber: 'PN-3', reservationStatus: 'reserved', repairAction: 'remove', supplierEta: '2026-01-01T00:00:00.000Z', shortageSeverity: 'none', etaStatus: 'on_time', rotableStatus: 'serviceable', llpRemainingCycles: 5000, traceabilityStatus: 'verified' },
       ])
     ).toEqual({
       totalRecords: 3,

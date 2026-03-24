@@ -103,7 +103,7 @@ export const APP_MENU: MenuModule[] = [
       { name: 'Audit', path: '/dashboard/amro/audit', icon: FileText, description: 'Audit replay timeline and traceability', permissions: ['delete_flight_logs'] },
       { name: 'Integration', path: '/dashboard/amro/integration', icon: GitBranch, description: 'Integration monitor and sync operations', permissions: ['edit_aircraft_records'] },
       { name: 'Intelligence', path: '/dashboard/amro/intelligence', icon: TrendingUp, description: 'Forecast recommendation and risk intelligence', permissions: ['view_amro_dashboard'] },
-      { name: 'Master Data', path: '/dashboard/amro/master-data', icon: Database, description: 'Tenant-scoped AMRO reference data management', permissions: ['edit_aircraft_records'] },
+      { name: 'Settings', path: '/dashboard/amro/settings', icon: Cog, description: 'AMRO configuration and master data controls', permissions: ['edit_aircraft_records'] },
       { name: 'Workspace Documentation', path: '/dashboard/amro/workspace-documentation', icon: BookOpen, description: 'AMRO reference materials and contracts', permissions: ['view_amro_dashboard'] },
     ],
   },

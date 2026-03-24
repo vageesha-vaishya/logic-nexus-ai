@@ -459,7 +459,31 @@ showToast(`Error: ${error.message}`); // Could expose internal details
 
 ---
 
-## 14. Key Contacts & Resources
+## 14. Settings Sub-Module Migration
+
+### Routing and Navigation
+- Primary AMRO settings entry: `/dashboard/amro/settings`
+- Master data location after migration: `/dashboard/amro/settings/master-data`
+- Backward-compatible redirect retained: `/dashboard/amro/master-data` → `/dashboard/amro/settings/master-data`
+- AMRO navigation item now points to **Settings** instead of direct **Master Data**
+
+### Frontend Module Structure
+- Settings dashboard page: `src/features/module-amro/settings/pages/AmroSettingsPage.tsx`
+- Migrated master data page: `src/features/module-amro/settings/pages/AmroSettingsMasterDataPage.tsx`
+- Backward-compatible export bridge: `src/features/module-amro/pages/AmroMasterDataPage.tsx`
+- AMRO module exports updated in: `src/features/module-amro/index.ts`
+- AMRO route wiring updated in: `src/App.tsx`
+- AMRO menu wiring updated in: `src/config/navigation.ts`
+
+### Migration Notes for Maintenance
+- All CRUD operations continue to use `/api/v2/amro/master-data/:entity` endpoints.
+- Tenant/franchise/user scoping headers are unchanged and still required for every request.
+- Data persistence behavior remains unchanged because migration is UI-route and module-structure focused.
+- Access checks now explicitly enforce `edit_aircraft_records` on AMRO settings and master data routes.
+
+---
+
+## 15. Key Contacts & Resources
 
 ### Documentation
 - **Main Spec:** `docs/AMRO_COMPREHENSIVE_DESIGN_SPECIFICATION.md`
@@ -481,5 +505,5 @@ showToast(`Error: ${error.message}`); // Could expose internal details
 
 ---
 
-**Last Updated:** 2026-03-19
+**Last Updated:** 2026-03-24
 **Next Review:** After each phase completion
