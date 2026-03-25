@@ -388,6 +388,45 @@ export default function ThemeManagement() {
 
         <Card>
           <CardHeader>
+            <CardTitle>Main Menu Group Strip Colors</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-sm text-muted-foreground mb-4">
+              Configure individual color strips for CRM, Sales, Financials, Logistics, AMRO, Administration, and Other Modules.
+            </div>
+            <div className="grid gap-4 md:grid-cols-4">
+              <HslPicker label="CRM Strip" value={menuStripCrm} onChange={setMenuStripCrm} />
+              <HslPicker label="Sales Strip" value={menuStripSales} onChange={setMenuStripSales} />
+              <HslPicker label="Financials Strip" value={menuStripFinancials} onChange={setMenuStripFinancials} />
+              <HslPicker label="Logistics Strip" value={menuStripLogistics} onChange={setMenuStripLogistics} />
+              <HslPicker label="AMRO Strip" value={menuStripAmro} onChange={setMenuStripAmro} />
+              <HslPicker label="Administration Strip" value={menuStripAdministration} onChange={setMenuStripAdministration} />
+              <HslPicker label="Other Modules Strip" value={menuStripOther} onChange={setMenuStripOther} />
+            </div>
+            <div className="mt-4 grid gap-2 md:grid-cols-2 lg:grid-cols-4">
+              {MENU_GROUP_THEME_LABELS.map(({ key, label }) => {
+                const color = {
+                  menuStripCrm,
+                  menuStripSales,
+                  menuStripFinancials,
+                  menuStripLogistics,
+                  menuStripAmro,
+                  menuStripAdministration,
+                  menuStripOther,
+                }[key];
+                return (
+                  <div key={key} className="flex items-center gap-3 rounded-md border p-2">
+                    <span className="h-10 w-2 rounded-full" style={{ backgroundColor: `hsl(${color})` }} />
+                    <span className="text-sm font-medium">{label}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
             <CardTitle>Create / Preview</CardTitle>
           </CardHeader>
           <CardContent>
@@ -427,37 +466,6 @@ export default function ThemeManagement() {
                     <label className="text-sm">Banner Height</label>
                     <Input value={headerBannerHeight} onChange={(e) => setHeaderBannerHeight(e.target.value)} placeholder="e.g., 48px" />
                   </div>
-                </div>
-              </div>
-              <div className="col-span-full mt-2 border-t pt-4">
-                <div className="text-sm font-medium mb-3">Navigation Group Color Strips</div>
-                <div className="grid gap-4 md:grid-cols-4">
-                  <HslPicker label="CRM Strip" value={menuStripCrm} onChange={setMenuStripCrm} />
-                  <HslPicker label="Sales Strip" value={menuStripSales} onChange={setMenuStripSales} />
-                  <HslPicker label="Financials Strip" value={menuStripFinancials} onChange={setMenuStripFinancials} />
-                  <HslPicker label="Logistics Strip" value={menuStripLogistics} onChange={setMenuStripLogistics} />
-                  <HslPicker label="AMRO Strip" value={menuStripAmro} onChange={setMenuStripAmro} />
-                  <HslPicker label="Administration Strip" value={menuStripAdministration} onChange={setMenuStripAdministration} />
-                  <HslPicker label="Other Modules Strip" value={menuStripOther} onChange={setMenuStripOther} />
-                </div>
-                <div className="mt-4 grid gap-2 md:grid-cols-2 lg:grid-cols-4">
-                  {MENU_GROUP_THEME_LABELS.map(({ key, label }) => {
-                    const color = {
-                      menuStripCrm,
-                      menuStripSales,
-                      menuStripFinancials,
-                      menuStripLogistics,
-                      menuStripAmro,
-                      menuStripAdministration,
-                      menuStripOther,
-                    }[key];
-                    return (
-                      <div key={key} className="flex items-center gap-3 rounded-md border p-2">
-                        <span className="h-10 w-2 rounded-full" style={{ backgroundColor: `hsl(${color})` }} />
-                        <span className="text-sm font-medium">{label}</span>
-                      </div>
-                    );
-                  })}
                 </div>
               </div>
             </div>
