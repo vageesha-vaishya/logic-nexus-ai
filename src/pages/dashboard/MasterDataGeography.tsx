@@ -118,27 +118,27 @@ export default function MasterDataGeography() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
+      <div className="mdm-template-page" data-testid="master-data-geography-template">
         <div>
-          <h1 className="text-3xl font-bold">Master Data Management</h1>
-          <p className="text-muted-foreground">Manage geographical demographic data</p>
+          <h1 className="mdm-template-header-title">Master Data Management</h1>
+          <p className="mdm-template-header-subtitle">Manage geographical demographic data</p>
         </div>
 
         <Tabs value={tab} onValueChange={setTab}>
-          <TabsList>
-            <TabsTrigger value="continents">Continents</TabsTrigger>
-            <TabsTrigger value="countries">Countries</TabsTrigger>
-            <TabsTrigger value="states">States</TabsTrigger>
-            <TabsTrigger value="cities">Cities</TabsTrigger>
+          <TabsList className="mdm-template-tab-rail h-auto">
+            <TabsTrigger value="continents" className="mdm-template-tab data-[state=active]:bg-[hsl(var(--mdm-template-focus))/0.14] data-[state=active]:text-[hsl(var(--mdm-template-heading))]">Continents</TabsTrigger>
+            <TabsTrigger value="countries" className="mdm-template-tab data-[state=active]:bg-[hsl(var(--mdm-template-focus))/0.14] data-[state=active]:text-[hsl(var(--mdm-template-heading))]">Countries</TabsTrigger>
+            <TabsTrigger value="states" className="mdm-template-tab data-[state=active]:bg-[hsl(var(--mdm-template-focus))/0.14] data-[state=active]:text-[hsl(var(--mdm-template-heading))]">States</TabsTrigger>
+            <TabsTrigger value="cities" className="mdm-template-tab data-[state=active]:bg-[hsl(var(--mdm-template-focus))/0.14] data-[state=active]:text-[hsl(var(--mdm-template-heading))]">Cities</TabsTrigger>
           </TabsList>
 
           <div className="flex items-center gap-2 mt-4">
-            <Input placeholder="Search by name" value={search} onChange={(e) => setSearch(e.target.value)} />
+            <Input className="mdm-template-input" placeholder="Search by name" value={search} onChange={(e) => setSearch(e.target.value)} />
             <Button variant="outline" onClick={loadData} disabled={loading}>Refresh</Button>
           </div>
 
           <TabsContent value="continents" className="mt-4">
-            <Card>
+            <Card className="mdm-template-panel">
               <CardHeader>
                 <CardTitle>Continents</CardTitle>
                 <CardDescription>International and national codes</CardDescription>
@@ -154,14 +154,14 @@ export default function MasterDataGeography() {
                         <TooltipContent>Add a single continent</TooltipContent>
                       </Tooltip>
                     </DialogTrigger>
-                    <DialogContent>
+                    <DialogContent className="mdm-template-dialog">
                       <DialogHeader>
                         <DialogTitle>Add Continent</DialogTitle>
                       </DialogHeader>
-                      <div className="grid grid-cols-3 gap-2">
-                        <Input placeholder="Name" value={continentForm.name} onChange={e => setContinentForm({ ...continentForm, name: e.target.value })} />
-                        <Input placeholder="International Code" value={continentForm.intl} onChange={e => setContinentForm({ ...continentForm, intl: e.target.value })} />
-                        <Input placeholder="National Code" value={continentForm.nat} onChange={e => setContinentForm({ ...continentForm, nat: e.target.value })} />
+                      <div className="mdm-template-form-grid">
+                        <Input className="mdm-template-input" placeholder="Name" value={continentForm.name} onChange={e => setContinentForm({ ...continentForm, name: e.target.value })} />
+                        <Input className="mdm-template-input" placeholder="International Code" value={continentForm.intl} onChange={e => setContinentForm({ ...continentForm, intl: e.target.value })} />
+                        <Input className="mdm-template-input" placeholder="National Code" value={continentForm.nat} onChange={e => setContinentForm({ ...continentForm, nat: e.target.value })} />
                       </div>
                       <div className="flex justify-end gap-2 mt-3">
                         <Button variant="outline" onClick={() => setShowAddContinent(false)}>Cancel</Button>
@@ -287,14 +287,14 @@ export default function MasterDataGeography() {
                 {/* Inline add retained if you prefer quick adds; modal provided above */}
                 {/* Edit Continent Modal */}
                 <Dialog open={showEditContinent} onOpenChange={setShowEditContinent}>
-                  <DialogContent>
+                  <DialogContent className="mdm-template-dialog">
                     <DialogHeader>
                       <DialogTitle>Edit Continent</DialogTitle>
                     </DialogHeader>
-                    <div className="grid grid-cols-3 gap-2">
-                      <Input placeholder="Name" value={editContinentForm.name} onChange={e => setEditContinentForm({ ...editContinentForm, name: e.target.value })} />
-                      <Input placeholder="International Code" value={editContinentForm.intl} onChange={e => setEditContinentForm({ ...editContinentForm, intl: e.target.value })} />
-                      <Input placeholder="National Code" value={editContinentForm.nat} onChange={e => setEditContinentForm({ ...editContinentForm, nat: e.target.value })} />
+                    <div className="mdm-template-form-grid">
+                      <Input className="mdm-template-input" placeholder="Name" value={editContinentForm.name} onChange={e => setEditContinentForm({ ...editContinentForm, name: e.target.value })} />
+                      <Input className="mdm-template-input" placeholder="International Code" value={editContinentForm.intl} onChange={e => setEditContinentForm({ ...editContinentForm, intl: e.target.value })} />
+                      <Input className="mdm-template-input" placeholder="National Code" value={editContinentForm.nat} onChange={e => setEditContinentForm({ ...editContinentForm, nat: e.target.value })} />
                     </div>
                     <div className="flex justify-end gap-2 mt-3">
                       <Button variant="outline" onClick={() => setShowEditContinent(false)}>Cancel</Button>
@@ -316,7 +316,7 @@ export default function MasterDataGeography() {
           </TabsContent>
 
           <TabsContent value="countries" className="mt-4">
-            <Card>
+            <Card className="mdm-template-panel">
               <CardHeader>
                 <CardTitle>Countries</CardTitle>
                 <CardDescription>ISO2, ISO3 and national codes</CardDescription>
@@ -332,22 +332,22 @@ export default function MasterDataGeography() {
                         <TooltipContent>Add a single country</TooltipContent>
                       </Tooltip>
                     </DialogTrigger>
-                    <DialogContent>
+                    <DialogContent className="mdm-template-dialog">
                       <DialogHeader>
                         <DialogTitle>Add Country</DialogTitle>
                       </DialogHeader>
-                      <div className="grid grid-cols-3 gap-2">
-                        <Input placeholder="Name" value={countryForm.name} onChange={e => setCountryForm({ ...countryForm, name: e.target.value })} />
+                      <div className="mdm-template-form-grid">
+                        <Input className="mdm-template-input" placeholder="Name" value={countryForm.name} onChange={e => setCountryForm({ ...countryForm, name: e.target.value })} />
                         <Select onValueChange={(v) => setCountryForm({ ...countryForm, continent_id: v })}>
-                          <SelectTrigger><SelectValue placeholder="Continent" /></SelectTrigger>
+                          <SelectTrigger className="mdm-template-input"><SelectValue placeholder="Continent" /></SelectTrigger>
                           <SelectContent>
                             {continents.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
                           </SelectContent>
                         </Select>
-                        <Input placeholder="ISO2" value={countryForm.iso2} onChange={e => setCountryForm({ ...countryForm, iso2: e.target.value })} />
-                        <Input placeholder="ISO3" value={countryForm.iso3} onChange={e => setCountryForm({ ...countryForm, iso3: e.target.value })} />
-                        <Input placeholder="National Code" value={countryForm.nat} onChange={e => setCountryForm({ ...countryForm, nat: e.target.value })} />
-                        <Input placeholder="Phone Code" value={countryForm.phone} onChange={e => setCountryForm({ ...countryForm, phone: e.target.value })} />
+                        <Input className="mdm-template-input" placeholder="ISO2" value={countryForm.iso2} onChange={e => setCountryForm({ ...countryForm, iso2: e.target.value })} />
+                        <Input className="mdm-template-input" placeholder="ISO3" value={countryForm.iso3} onChange={e => setCountryForm({ ...countryForm, iso3: e.target.value })} />
+                        <Input className="mdm-template-input" placeholder="National Code" value={countryForm.nat} onChange={e => setCountryForm({ ...countryForm, nat: e.target.value })} />
+                        <Input className="mdm-template-input" placeholder="Phone Code" value={countryForm.phone} onChange={e => setCountryForm({ ...countryForm, phone: e.target.value })} />
                       </div>
                       <div className="flex justify-end gap-2 mt-3">
                         <Button variant="outline" onClick={() => setShowAddCountry(false)}>Cancel</Button>
@@ -499,22 +499,22 @@ export default function MasterDataGeography() {
                 {/* Inline add removed in favor of modal above for better UX */}
                 {/* Edit Country Modal */}
                 <Dialog open={showEditCountry} onOpenChange={setShowEditCountry}>
-                  <DialogContent>
+                  <DialogContent className="mdm-template-dialog">
                     <DialogHeader>
                       <DialogTitle>Edit Country</DialogTitle>
                     </DialogHeader>
-                    <div className="grid grid-cols-3 gap-2">
-                      <Input placeholder="Name" value={editCountryForm.name} onChange={e => setEditCountryForm({ ...editCountryForm, name: e.target.value })} />
+                    <div className="mdm-template-form-grid">
+                      <Input className="mdm-template-input" placeholder="Name" value={editCountryForm.name} onChange={e => setEditCountryForm({ ...editCountryForm, name: e.target.value })} />
                       <Select value={String(editCountryForm.continent_id || '')} onValueChange={(v) => setEditCountryForm({ ...editCountryForm, continent_id: v })}>
-                        <SelectTrigger><SelectValue placeholder="Continent" /></SelectTrigger>
+                        <SelectTrigger className="mdm-template-input"><SelectValue placeholder="Continent" /></SelectTrigger>
                         <SelectContent>
                           {continents.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
                         </SelectContent>
                       </Select>
-                      <Input placeholder="ISO2" value={editCountryForm.iso2} onChange={e => setEditCountryForm({ ...editCountryForm, iso2: e.target.value })} />
-                      <Input placeholder="ISO3" value={editCountryForm.iso3} onChange={e => setEditCountryForm({ ...editCountryForm, iso3: e.target.value })} />
-                      <Input placeholder="National Code" value={editCountryForm.nat} onChange={e => setEditCountryForm({ ...editCountryForm, nat: e.target.value })} />
-                      <Input placeholder="Phone Code" value={editCountryForm.phone} onChange={e => setEditCountryForm({ ...editCountryForm, phone: e.target.value })} />
+                      <Input className="mdm-template-input" placeholder="ISO2" value={editCountryForm.iso2} onChange={e => setEditCountryForm({ ...editCountryForm, iso2: e.target.value })} />
+                      <Input className="mdm-template-input" placeholder="ISO3" value={editCountryForm.iso3} onChange={e => setEditCountryForm({ ...editCountryForm, iso3: e.target.value })} />
+                      <Input className="mdm-template-input" placeholder="National Code" value={editCountryForm.nat} onChange={e => setEditCountryForm({ ...editCountryForm, nat: e.target.value })} />
+                      <Input className="mdm-template-input" placeholder="Phone Code" value={editCountryForm.phone} onChange={e => setEditCountryForm({ ...editCountryForm, phone: e.target.value })} />
                     </div>
                     <div className="flex justify-end gap-2 mt-3">
                       <Button variant="outline" onClick={() => setShowEditCountry(false)}>Cancel</Button>
@@ -537,7 +537,7 @@ export default function MasterDataGeography() {
           </TabsContent>
 
           <TabsContent value="states" className="mt-4">
-            <Card>
+            <Card className="mdm-template-panel">
               <CardHeader>
                 <CardTitle>States / Provinces</CardTitle>
                 <CardDescription>ISO-3166-2 / national codes</CardDescription>
@@ -555,19 +555,19 @@ export default function MasterDataGeography() {
                         <TooltipContent>Add a single state</TooltipContent>
                       </Tooltip>
                     </DialogTrigger>
-                    <DialogContent>
+                    <DialogContent className="mdm-template-dialog">
                       <DialogHeader>
                         <DialogTitle>Add State / Province</DialogTitle>
                       </DialogHeader>
-                      <div className="grid grid-cols-3 gap-2">
-                        <Input placeholder="Name" value={stateForm.name} onChange={e => setStateForm({ ...stateForm, name: e.target.value })} />
+                      <div className="mdm-template-form-grid">
+                        <Input className="mdm-template-input" placeholder="Name" value={stateForm.name} onChange={e => setStateForm({ ...stateForm, name: e.target.value })} />
                         <Select onValueChange={(v) => setStateForm({ ...stateForm, country_id: v })}>
-                          <SelectTrigger><SelectValue placeholder="Country" /></SelectTrigger>
+                          <SelectTrigger className="mdm-template-input"><SelectValue placeholder="Country" /></SelectTrigger>
                           <SelectContent>
                             {countries.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
                           </SelectContent>
                         </Select>
-                        <Input placeholder="ISO Code" value={stateForm.iso} onChange={e => setStateForm({ ...stateForm, iso: e.target.value })} />
+                        <Input className="mdm-template-input" placeholder="ISO Code" value={stateForm.iso} onChange={e => setStateForm({ ...stateForm, iso: e.target.value })} />
                       </div>
                       <div className="flex justify-end gap-2 mt-3">
                         <Button variant="outline" onClick={() => setShowAddState(false)}>Cancel</Button>
@@ -715,17 +715,17 @@ export default function MasterDataGeography() {
                     ))}
                   </TableBody>
                 </Table>
-                <div className="mt-4 grid grid-cols-5 gap-2">
-                  <Input id="state_name" placeholder="Name" />
+                <div className="mt-4 mdm-template-form-grid">
+                  <Input className="mdm-template-input" id="state_name" placeholder="Name" />
                   <Select onValueChange={(v) => (document.getElementById('state_country') as HTMLInputElement).value = v}>
-                    <SelectTrigger><SelectValue placeholder="Country" /></SelectTrigger>
+                    <SelectTrigger className="mdm-template-input"><SelectValue placeholder="Country" /></SelectTrigger>
                     <SelectContent>
                       {countries.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
-                  <Input id="state_country" type="hidden" />
-                  <Input id="state_iso" placeholder="ISO Code" />
-                  <Input id="state_nat" placeholder="National Code" />
+                  <Input className="mdm-template-input" id="state_country" type="hidden" />
+                  <Input className="mdm-template-input" id="state_iso" placeholder="ISO Code" />
+                  <Input className="mdm-template-input" id="state_nat" placeholder="National Code" />
                   <Button onClick={() => {
                     const name = (document.getElementById('state_name') as HTMLInputElement).value.trim();
                     const country_id = (document.getElementById('state_country') as HTMLInputElement).value.trim();
@@ -737,19 +737,19 @@ export default function MasterDataGeography() {
                 </div>
                 {/* Edit State Modal */}
                 <Dialog open={showEditState} onOpenChange={setShowEditState}>
-                  <DialogContent>
+                  <DialogContent className="mdm-template-dialog">
                     <DialogHeader>
                       <DialogTitle>Edit State / Province</DialogTitle>
                     </DialogHeader>
-                    <div className="grid grid-cols-3 gap-2">
-                      <Input placeholder="Name" value={editStateForm.name} onChange={e => setEditStateForm({ ...editStateForm, name: e.target.value })} />
+                    <div className="mdm-template-form-grid">
+                      <Input className="mdm-template-input" placeholder="Name" value={editStateForm.name} onChange={e => setEditStateForm({ ...editStateForm, name: e.target.value })} />
                       <Select value={String(editStateForm.country_id || '')} onValueChange={(v) => setEditStateForm({ ...editStateForm, country_id: v })}>
-                        <SelectTrigger><SelectValue placeholder="Country" /></SelectTrigger>
+                        <SelectTrigger className="mdm-template-input"><SelectValue placeholder="Country" /></SelectTrigger>
                         <SelectContent>
                           {countries.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
                         </SelectContent>
                       </Select>
-                      <Input placeholder="ISO Code" value={editStateForm.iso} onChange={e => setEditStateForm({ ...editStateForm, iso: e.target.value })} />
+                      <Input className="mdm-template-input" placeholder="ISO Code" value={editStateForm.iso} onChange={e => setEditStateForm({ ...editStateForm, iso: e.target.value })} />
                     </div>
                     <div className="flex justify-end gap-2 mt-3">
                       <Button variant="outline" onClick={() => setShowEditState(false)}>Cancel</Button>
@@ -770,7 +770,7 @@ export default function MasterDataGeography() {
           </TabsContent>
 
           <TabsContent value="cities" className="mt-4">
-            <Card>
+            <Card className="mdm-template-panel">
               <CardHeader>
                 <CardTitle>Cities</CardTitle>
                 <CardDescription>National codes and coordinates</CardDescription>
@@ -786,27 +786,27 @@ export default function MasterDataGeography() {
                         <TooltipContent>Add a single city</TooltipContent>
                       </Tooltip>
                     </DialogTrigger>
-                    <DialogContent>
+                    <DialogContent className="mdm-template-dialog">
                       <DialogHeader>
                         <DialogTitle>Add City</DialogTitle>
                       </DialogHeader>
-                      <div className="grid grid-cols-3 gap-2">
-                        <Input placeholder="Name" value={cityForm.name} onChange={e => setCityForm({ ...cityForm, name: e.target.value })} />
+                      <div className="mdm-template-form-grid">
+                        <Input className="mdm-template-input" placeholder="Name" value={cityForm.name} onChange={e => setCityForm({ ...cityForm, name: e.target.value })} />
                         <Select onValueChange={(v) => setCityForm({ ...cityForm, country_id: v })}>
-                          <SelectTrigger><SelectValue placeholder="Country" /></SelectTrigger>
+                          <SelectTrigger className="mdm-template-input"><SelectValue placeholder="Country" /></SelectTrigger>
                           <SelectContent>
                             {countries.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
                           </SelectContent>
                         </Select>
                         <Select onValueChange={(v) => setCityForm({ ...cityForm, state_id: v })}>
-                          <SelectTrigger><SelectValue placeholder="State" /></SelectTrigger>
+                          <SelectTrigger className="mdm-template-input"><SelectValue placeholder="State" /></SelectTrigger>
                           <SelectContent>
                             {states.map(s => <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>)}
                           </SelectContent>
                         </Select>
-                        <Input placeholder="National Code" value={cityForm.nat} onChange={e => setCityForm({ ...cityForm, nat: e.target.value })} />
-                        <Input placeholder="Latitude" value={cityForm.lat} onChange={e => setCityForm({ ...cityForm, lat: e.target.value })} />
-                        <Input placeholder="Longitude" value={cityForm.lng} onChange={e => setCityForm({ ...cityForm, lng: e.target.value })} />
+                        <Input className="mdm-template-input" placeholder="National Code" value={cityForm.nat} onChange={e => setCityForm({ ...cityForm, nat: e.target.value })} />
+                        <Input className="mdm-template-input" placeholder="Latitude" value={cityForm.lat} onChange={e => setCityForm({ ...cityForm, lat: e.target.value })} />
+                        <Input className="mdm-template-input" placeholder="Longitude" value={cityForm.lng} onChange={e => setCityForm({ ...cityForm, lng: e.target.value })} />
                       </div>
                       <div className="flex justify-end gap-2 mt-3">
                         <Button variant="outline" onClick={() => setShowAddCity(false)}>Cancel</Button>
@@ -969,27 +969,27 @@ export default function MasterDataGeography() {
                 {/* Toolbar-only pattern: no inline quick-add forms for Cities; use Add modal above */}
                 {/* Edit City Modal */}
                 <Dialog open={showEditCity} onOpenChange={setShowEditCity}>
-                  <DialogContent>
+                  <DialogContent className="mdm-template-dialog">
                     <DialogHeader>
                       <DialogTitle>Edit City</DialogTitle>
                     </DialogHeader>
-                    <div className="grid grid-cols-3 gap-2">
-                      <Input placeholder="Name" value={editCityForm.name} onChange={e => setEditCityForm({ ...editCityForm, name: e.target.value })} />
+                    <div className="mdm-template-form-grid">
+                      <Input className="mdm-template-input" placeholder="Name" value={editCityForm.name} onChange={e => setEditCityForm({ ...editCityForm, name: e.target.value })} />
                       <Select value={String(editCityForm.country_id || '')} onValueChange={(v) => setEditCityForm({ ...editCityForm, country_id: v })}>
-                        <SelectTrigger><SelectValue placeholder="Country" /></SelectTrigger>
+                        <SelectTrigger className="mdm-template-input"><SelectValue placeholder="Country" /></SelectTrigger>
                         <SelectContent>
                           {countries.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
                         </SelectContent>
                       </Select>
                       <Select value={String(editCityForm.state_id || '')} onValueChange={(v) => setEditCityForm({ ...editCityForm, state_id: v })}>
-                        <SelectTrigger><SelectValue placeholder="State" /></SelectTrigger>
+                        <SelectTrigger className="mdm-template-input"><SelectValue placeholder="State" /></SelectTrigger>
                         <SelectContent>
                           {states.map(s => <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>)}
                         </SelectContent>
                       </Select>
-                      <Input placeholder="National Code" value={editCityForm.nat} onChange={e => setEditCityForm({ ...editCityForm, nat: e.target.value })} />
-                      <Input placeholder="Latitude" value={editCityForm.lat} onChange={e => setEditCityForm({ ...editCityForm, lat: e.target.value })} />
-                      <Input placeholder="Longitude" value={editCityForm.lng} onChange={e => setEditCityForm({ ...editCityForm, lng: e.target.value })} />
+                      <Input className="mdm-template-input" placeholder="National Code" value={editCityForm.nat} onChange={e => setEditCityForm({ ...editCityForm, nat: e.target.value })} />
+                      <Input className="mdm-template-input" placeholder="Latitude" value={editCityForm.lat} onChange={e => setEditCityForm({ ...editCityForm, lat: e.target.value })} />
+                      <Input className="mdm-template-input" placeholder="Longitude" value={editCityForm.lng} onChange={e => setEditCityForm({ ...editCityForm, lng: e.target.value })} />
                     </div>
                     <div className="flex justify-end gap-2 mt-3">
                       <Button variant="outline" onClick={() => setShowEditCity(false)}>Cancel</Button>

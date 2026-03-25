@@ -4,7 +4,10 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "node scripts/dev-orchestrator.mjs",
+    "dev:vite": "vite",
+    "services:start": "node scripts/service-orchestrator.mjs --start-only",
+    "services:check": "node scripts/service-orchestrator.mjs --check-only",
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "typecheck": "tsc --noEmit",

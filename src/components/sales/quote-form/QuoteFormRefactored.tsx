@@ -289,7 +289,7 @@ function QuoteFormContent({ quoteId, quoteNumber, versionId, onSuccess, initialD
             <section className="space-y-4">
                 <div className="flex items-center gap-2 text-primary/80 font-medium px-1">
                     <span className="flex h-6 w-6 items-center justify-center rounded-full border border-primary/30 bg-primary/5 text-xs">1</span>
-                    <h3>General Information</h3>
+                    <h2 className="text-lg">General Information</h2>
                 </div>
                 <QuoteHeader />
             </section>
@@ -297,7 +297,7 @@ function QuoteFormContent({ quoteId, quoteNumber, versionId, onSuccess, initialD
             <section className="space-y-4">
                 <div className="flex items-center gap-2 text-primary/80 font-medium px-1">
                     <span className="flex h-6 w-6 items-center justify-center rounded-full border border-primary/30 bg-primary/5 text-xs">2</span>
-                    <h3>Logistics & Routing</h3>
+                    <h2 className="text-lg">Logistics & Routing</h2>
                 </div>
                 <QuoteLogistics />
             </section>
@@ -305,7 +305,7 @@ function QuoteFormContent({ quoteId, quoteNumber, versionId, onSuccess, initialD
             <section className="space-y-4">
                 <div className="flex items-center gap-2 text-primary/80 font-medium px-1">
                     <span className="flex h-6 w-6 items-center justify-center rounded-full border border-primary/30 bg-primary/5 text-xs">3</span>
-                    <h3>Cargo & Commodity Details</h3>
+                    <h2 className="text-lg">Cargo & Commodity Details</h2>
                 </div>
                 <Suspense fallback={<div className="h-40 flex items-center justify-center border rounded-lg bg-muted/10"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>}>
                     <QuoteLineItems />
@@ -315,7 +315,7 @@ function QuoteFormContent({ quoteId, quoteNumber, versionId, onSuccess, initialD
             <section className="space-y-4">
                 <div className="flex items-center gap-2 text-primary/80 font-medium px-1">
                     <span className="flex h-6 w-6 items-center justify-center rounded-full border border-primary/30 bg-primary/5 text-xs">4</span>
-                    <h3>Financials</h3>
+                    <h2 className="text-lg">Financials</h2>
                 </div>
                 <Suspense fallback={<div className="h-40 flex items-center justify-center border rounded-lg bg-muted/10"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>}>
                     <QuoteFinancials />

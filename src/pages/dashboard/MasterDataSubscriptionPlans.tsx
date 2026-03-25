@@ -232,9 +232,9 @@ export default function MasterDataSubscriptionPlans() {
   if (!context.isPlatformAdmin) {
     return (
       <DashboardLayout>
-        <div className="space-y-4">
-          <h1 className="text-3xl font-bold">Subscription Plans</h1>
-          <p className="text-muted-foreground">Only platform admins can manage subscription plans.</p>
+        <div className="mdm-template-page">
+          <h1 className="mdm-template-header-title">Subscription Plans</h1>
+          <p className="mdm-template-header-subtitle">Only platform admins can manage subscription plans.</p>
         </div>
       </DashboardLayout>
     );
@@ -242,23 +242,24 @@ export default function MasterDataSubscriptionPlans() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
+      <div className="mdm-template-page" data-testid="master-data-subscription-plans-template">
         <div>
-          <h1 className="text-3xl font-bold">Master Data: Subscription Plans</h1>
-          <p className="text-muted-foreground">
+          <h1 className="mdm-template-header-title">Master Data: Subscription Plans</h1>
+          <p className="mdm-template-header-subtitle">
             Configure subscription plans, pricing tiers, billing cycles, and deployment options.
           </p>
         </div>
 
         <Tabs defaultValue="plans">
-          <TabsList>
-            <TabsTrigger value="plans">Plans</TabsTrigger>
-            <TabsTrigger value="metadata">Hybrid & Metadata</TabsTrigger>
+          <TabsList className="mdm-template-tab-rail h-auto">
+            <TabsTrigger value="plans" className="mdm-template-tab data-[state=active]:bg-[hsl(var(--mdm-template-focus))/0.14] data-[state=active]:text-[hsl(var(--mdm-template-heading))]">Plans</TabsTrigger>
+            <TabsTrigger value="metadata" className="mdm-template-tab data-[state=active]:bg-[hsl(var(--mdm-template-focus))/0.14] data-[state=active]:text-[hsl(var(--mdm-template-heading))]">Hybrid & Metadata</TabsTrigger>
           </TabsList>
 
           <TabsContent value="plans" className="mt-4 space-y-4">
             <div className="flex items-center gap-2">
               <Input
+                className="mdm-template-input"
                 placeholder="Search by name or slug"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -268,7 +269,7 @@ export default function MasterDataSubscriptionPlans() {
               </Button>
             </div>
 
-            <Card>
+            <Card className="mdm-template-panel">
               <CardHeader>
                 <CardTitle>Subscription Plans</CardTitle>
                 <CardDescription>Core plan catalog for CRM and logistics modules</CardDescription>
@@ -344,7 +345,7 @@ export default function MasterDataSubscriptionPlans() {
           </TabsContent>
 
           <TabsContent value="metadata" className="mt-4">
-            <Card>
+            <Card className="mdm-template-panel">
               <CardHeader>
                 <CardTitle>Hybrid Deployment & Localization</CardTitle>
                 <CardDescription>
@@ -363,7 +364,7 @@ export default function MasterDataSubscriptionPlans() {
       </div>
 
       <Dialog open={showEdit} onOpenChange={setShowEdit}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogContent className="mdm-template-dialog max-h-[90vh] max-w-3xl overflow-hidden">
           <DialogHeader>
             <DialogTitle>{editingPlan ? 'Edit Subscription Plan' : 'New Subscription Plan'}</DialogTitle>
             <DialogDescription>
@@ -371,7 +372,7 @@ export default function MasterDataSubscriptionPlans() {
             </DialogDescription>
           </DialogHeader>
           <div className="flex-1 overflow-y-auto pr-1">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+            <div className="mdm-template-form-grid mt-2">
               <div className="md:col-span-2">
                 <h3 className="text-sm font-semibold">Plan Basics</h3>
               </div>
@@ -380,6 +381,7 @@ export default function MasterDataSubscriptionPlans() {
                   Name
                 </label>
                 <Input
+                  className="mdm-template-input"
                   id="plan-name"
                   aria-required="true"
                   value={planForm.name || ''}
@@ -391,6 +393,7 @@ export default function MasterDataSubscriptionPlans() {
                   Slug
                 </label>
                 <Input
+                  className="mdm-template-input"
                   id="plan-slug"
                   aria-required="true"
                   value={planForm.slug || ''}
@@ -403,6 +406,7 @@ export default function MasterDataSubscriptionPlans() {
                   Description
                 </label>
                 <Textarea
+                  className="mdm-template-input"
                   id="plan-description"
                   value={planForm.description || ''}
                   onChange={(e) => setPlanForm({ ...planForm, description: e.target.value })}
@@ -416,7 +420,7 @@ export default function MasterDataSubscriptionPlans() {
                   value={planForm.tier || 'starter'}
                   onValueChange={(v) => setPlanForm({ ...planForm, tier: v })}
                 >
-                  <SelectTrigger aria-labelledby="plan-tier-label">
+                  <SelectTrigger className="mdm-template-input" aria-labelledby="plan-tier-label">
                     <SelectValue placeholder="Select tier" />
                   </SelectTrigger>
                   <SelectContent>
@@ -435,7 +439,7 @@ export default function MasterDataSubscriptionPlans() {
                   value={planForm.plan_type || 'crm_base'}
                   onValueChange={(v) => setPlanForm({ ...planForm, plan_type: v })}
                 >
-                  <SelectTrigger aria-labelledby="plan-type-label">
+                  <SelectTrigger className="mdm-template-input" aria-labelledby="plan-type-label">
                     <SelectValue placeholder="Select type" />
                   </SelectTrigger>
                   <SelectContent>
@@ -452,7 +456,7 @@ export default function MasterDataSubscriptionPlans() {
                   value={planForm.billing_period || 'monthly'}
                   onValueChange={(v) => setPlanForm({ ...planForm, billing_period: v })}
                 >
-                  <SelectTrigger aria-labelledby="plan-billing-label">
+                  <SelectTrigger className="mdm-template-input" aria-labelledby="plan-billing-label">
                     <SelectValue placeholder="Select billing period" />
                   </SelectTrigger>
                   <SelectContent>
@@ -473,7 +477,7 @@ export default function MasterDataSubscriptionPlans() {
                   value={planForm.currency || 'USD'}
                   onValueChange={(v) => setPlanForm({ ...planForm, currency: v })}
                 >
-                  <SelectTrigger id="plan-currency">
+                  <SelectTrigger className="mdm-template-input" id="plan-currency">
                     <SelectValue placeholder="Select currency" />
                   </SelectTrigger>
                   <SelectContent>
@@ -488,6 +492,7 @@ export default function MasterDataSubscriptionPlans() {
                   Monthly Price
                 </label>
                 <Input
+                  className="mdm-template-input"
                   id="plan-price-monthly"
                   type="number"
                   aria-required="true"
@@ -502,6 +507,7 @@ export default function MasterDataSubscriptionPlans() {
                   Quarterly Price
                 </label>
                 <Input
+                  className="mdm-template-input"
                   id="plan-price-quarterly"
                   type="number"
                   value={planForm.price_quarterly ?? ''}
@@ -518,6 +524,7 @@ export default function MasterDataSubscriptionPlans() {
                   Annual Price
                 </label>
                 <Input
+                  className="mdm-template-input"
                   id="plan-price-annual"
                   type="number"
                   value={planForm.price_annual ?? ''}
@@ -534,6 +541,7 @@ export default function MasterDataSubscriptionPlans() {
                   Trial Period (days)
                 </label>
                 <Input
+                  className="mdm-template-input"
                   id="plan-trial-days"
                   type="number"
                   value={planForm.trial_period_days ?? 0}
@@ -553,7 +561,7 @@ export default function MasterDataSubscriptionPlans() {
                   value={planForm.deployment_model || 'saas'}
                   onValueChange={(v) => setPlanForm({ ...planForm, deployment_model: v })}
                 >
-                  <SelectTrigger aria-labelledby="plan-deployment-label">
+                  <SelectTrigger className="mdm-template-input" aria-labelledby="plan-deployment-label">
                     <SelectValue placeholder="Select deployment model" />
                   </SelectTrigger>
                   <SelectContent>
@@ -568,6 +576,7 @@ export default function MasterDataSubscriptionPlans() {
                   Supported Currencies (comma-separated)
                 </label>
                 <Input
+                  className="mdm-template-input"
                   id="plan-supported-currencies"
                   value={(planForm.supported_currencies || ['USD']).join(',')}
                   onChange={(e) =>
@@ -586,6 +595,7 @@ export default function MasterDataSubscriptionPlans() {
                   Supported Languages (comma-separated)
                 </label>
                 <Input
+                  className="mdm-template-input"
                   id="plan-supported-languages"
                   value={(planForm.supported_languages || ['en']).join(',')}
                   onChange={(e) =>
@@ -613,6 +623,7 @@ export default function MasterDataSubscriptionPlans() {
                   User Scaling Factor (Price per User)
                 </label>
                 <Input
+                  className="mdm-template-input"
                   id="plan-scaling-factor"
                   type="number"
                   value={planForm.user_scaling_factor ?? 0}
@@ -626,6 +637,7 @@ export default function MasterDataSubscriptionPlans() {
                   Minimum Users
                 </label>
                 <Input
+                  className="mdm-template-input"
                   id="plan-min-users"
                   type="number"
                   value={planForm.min_users ?? 0}
@@ -639,6 +651,7 @@ export default function MasterDataSubscriptionPlans() {
                   Maximum Users (Optional)
                 </label>
                 <Input
+                  className="mdm-template-input"
                   id="plan-max-users"
                   type="number"
                   placeholder="Unlimited"
@@ -656,6 +669,7 @@ export default function MasterDataSubscriptionPlans() {
                   Maximum Franchises (Optional)
                 </label>
                 <Input
+                  className="mdm-template-input"
                   id="plan-max-franchise"
                   type="number"
                   placeholder="Unlimited"
@@ -677,6 +691,7 @@ export default function MasterDataSubscriptionPlans() {
                       Simulate Active Users
                     </label>
                     <Input
+                      className="mdm-template-input"
                       id="plan-simulated-users"
                       type="number"
                       value={previewUsers}
@@ -715,6 +730,7 @@ export default function MasterDataSubscriptionPlans() {
                   Feature Entitlements (JSON)
                 </label>
                 <Textarea
+                  className="mdm-template-input"
                   id="plan-features-json"
                   value={JSON.stringify(planForm.features || {}, null, 2)}
                   onChange={(e) => {
@@ -732,6 +748,7 @@ export default function MasterDataSubscriptionPlans() {
                   Limitations (JSON)
                 </label>
                 <Textarea
+                  className="mdm-template-input"
                   id="plan-limits-json"
                   value={JSON.stringify(planForm.limits || {}, null, 2)}
                   onChange={(e) => {
@@ -749,6 +766,7 @@ export default function MasterDataSubscriptionPlans() {
                   Custom Metadata (JSON)
                 </label>
                 <Textarea
+                  className="mdm-template-input"
                   id="plan-metadata-json"
                   value={JSON.stringify(planForm.metadata || {}, null, 2)}
                   onChange={(e) => {

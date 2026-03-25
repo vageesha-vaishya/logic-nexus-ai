@@ -220,6 +220,24 @@ describe('AmroSettingsMasterDataPage', () => {
     expect(screen.getByRole('button', { name: /Run Bulk Import/ })).toBeInTheDocument();
   });
 
+  it('applies the standardized five-column master data design system classes in form dialog layout', async () => {
+    render(
+      <MemoryRouter>
+        <AmroSettingsMasterDataPage />
+      </MemoryRouter>,
+    );
+
+    await screen.findByText('N100AA');
+    expect(screen.getByTestId('amro-master-data-template')).toHaveClass('mdm-template-page');
+
+    fireEvent.click(screen.getByRole('button', { name: /New Aircraft/ }));
+    const dialog = await screen.findByTestId('amro-master-data-form-dialog');
+    expect(dialog).toHaveClass('mdm-template-dialog');
+
+    const basicGrid = screen.getByTestId('amro-master-data-basic-grid');
+    expect(basicGrid).toHaveClass('mdm-template-form-grid');
+  });
+
   it('submits create and update operations through modal CRUD forms', async () => {
     render(
       <MemoryRouter>

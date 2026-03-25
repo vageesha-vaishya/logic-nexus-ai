@@ -115,6 +115,9 @@ async function resolveBrandingDirectly(query: TenantBrandingRequestQuery): Promi
 
 export const TenantBrandingService = {
   async getResolvedBranding(query: TenantBrandingRequestQuery = {}): Promise<ResolvedTenantBranding> {
+    if (!shouldUseTenantBrandingStylesheetEndpoint()) {
+      return await resolveBrandingDirectly(query);
+    }
     if (isBrandingApiTemporarilyUnavailable()) {
       return await resolveBrandingDirectly(query);
     }

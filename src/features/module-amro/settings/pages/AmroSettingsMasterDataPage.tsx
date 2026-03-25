@@ -24,6 +24,7 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { useCRM } from '@/hooks/useCRM';
 import { supabase } from '@/integrations/supabase/client';
+import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
 export type MasterEntity =
@@ -103,6 +104,7 @@ type EntityFormField = {
 };
 
 type FormValues = Record<string, unknown>;
+type FormSectionKey = 'basic' | 'configuration';
 
 const MANUFACTURER_SEED_NAMES = [
   'AIRBUS',
@@ -1364,22 +1366,99 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
     }
   }, [handleCreate, handleUpdate, modalMode]);
 
-  const sectionGridClass = 'grid grid-cols-1 gap-x-4 gap-y-5 md:grid-cols-2 lg:grid-cols-4';
-  const sectionFieldClass = 'space-y-2';
-  const fullWidthSectionFieldClass = 'space-y-2 md:col-span-2 lg:col-span-4';
+  const sectionGridClass = 'mdm-template-form-grid';
+  const sectionFieldClass = 'mdm-template-form-field';
+  const fullWidthSectionFieldClass = 'mdm-template-form-field-full';
 
   const tabLabelClass = (tab: 'basic' | 'configuration' | 'system') =>
-    `rounded-md px-3 py-2 text-sm font-medium transition-colors duration-200 ${
-      activeFormTab === tab ? 'bg-[#1E3A8A]/10 text-[#1E3A8A]' : 'text-muted-foreground hover:bg-muted'
-    }`;
+    cn('mdm-template-tab', activeFormTab === tab ? 'text-[hsl(var(--mdm-template-heading))]' : 'text-[hsl(var(--mdm-template-muted))]');
+
+  const renderEditableField = useCallback(
+    (field: EntityFormField, section: FormSectionKey, index?: number) => {
+      const fieldId = `master-data-${section}-${field.key}`;
+      const fieldClass = field.type === 'textarea' || field.type === 'json' ? fullWidthSectionFieldClass : sectionFieldClass;
+      const hasError = Boolean(formErrors[field.key]);
+
+      return (
+        <div key={field.key} className={fieldClass}>
+          <Label htmlFor={fieldId} className="mdm-template-label">
+            {field.label}
+            {field.required ? ' *' : ''}
+          </Label>
+          {field.type === 'select' && (
+            <Select value={String(formValues[field.key] ?? '')} onValueChange={(value) => setFieldValue(field.key, value)}>
+              <SelectTrigger id={fieldId} className={cn('mdm-template-input', hasError && 'border-destructive')} aria-invalid={hasError}>
+                <SelectValue placeholder={field.placeholder ?? `Select ${field.label}`} />
+              </SelectTrigger>
+              <SelectContent>
+                {resolveSelectOptions(field).map((option) => (
+                  <SelectItem key={option.value} value={option.value} disabled={option.disabled}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          {field.type === 'boolean' && (
+            <div className="mdm-template-input flex items-center rounded-md px-3">
+              <Switch id={fieldId} checked={Boolean(formValues[field.key])} onCheckedChange={(checked) => setFieldValue(field.key, checked)} />
+            </div>
+          )}
+          {(field.type === 'textarea' || field.type === 'json') && (
+            <Textarea
+              id={fieldId}
+              rows={field.type === 'json' ? 6 : 4}
+              value={String(formValues[field.key] ?? '')}
+              onChange={(event) => setFieldValue(field.key, event.target.value)}
+              placeholder={field.placeholder}
+              className={cn('mdm-template-input min-h-[110px]', hasError && 'border-destructive')}
+              aria-invalid={hasError}
+            />
+          )}
+          {['text', 'email', 'number', 'date', 'time'].includes(field.type) && (
+            <Input
+              id={fieldId}
+              ref={index === 0 && section === 'basic' ? firstFieldRef : undefined}
+              type={field.type === 'number' ? 'number' : field.type}
+              value={String(formValues[field.key] ?? '')}
+              onChange={(event) => setFieldValue(field.key, event.target.value)}
+              placeholder={field.placeholder}
+              min={typeof field.min === 'number' ? field.min : undefined}
+              step={field.type === 'number' ? 'any' : undefined}
+              className={cn('mdm-template-input', hasError && 'border-destructive')}
+              aria-invalid={hasError}
+            />
+          )}
+          {formErrors[field.key] ? <p className="mdm-template-danger">{formErrors[field.key]}</p> : null}
+          {field.type === 'select' && field.key === 'manufacturer_id' && manufacturerOptionsError ? (
+            <p className="mdm-template-danger">{manufacturerOptionsError}</p>
+          ) : null}
+          {field.type === 'select' && field.key === 'assembly_type_id' && assemblyTypeOptionsError ? (
+            <p className="mdm-template-danger">{assemblyTypeOptionsError}</p>
+          ) : null}
+        </div>
+      );
+    },
+    [
+      assemblyTypeOptionsError,
+      firstFieldRef,
+      formErrors,
+      formValues,
+      fullWidthSectionFieldClass,
+      manufacturerOptionsError,
+      resolveSelectOptions,
+      sectionFieldClass,
+      setFieldValue,
+    ],
+  );
 
   return (
     <DashboardLayout>
-      <div className="space-y-4 p-4 font-sans text-[14px] leading-6 lg:p-6">
+      <div className="mdm-template-page" data-testid="amro-master-data-template">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-semibold">AMRO Settings · Master Data</h1>
-            <p className="text-sm text-muted-foreground">
+            <h1 className="mdm-template-header-title">AMRO Settings · Master Data</h1>
+            <p className="mdm-template-header-subtitle">
               Tenant-scoped CRUD management for fleet, inventory, manufacturers, suppliers, facilities, workforce, compliance profiles,
               shift capacity, and work package templates.
             </p>
@@ -1391,31 +1470,33 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
             </Button>
             <Button variant="outline" onClick={() => void loadRecords()} disabled={loading}>{loading ? 'Refreshing...' : 'Refresh'}</Button>
             <Button variant="outline" onClick={() => void handleExport()}>Export CSV</Button>
-            <Button className="bg-[#1E3A8A] hover:bg-[#1E3A8A]/90" onClick={handleOpenCreateModal}>New {ENTITY_LABEL[entity]}</Button>
+            <Button className="bg-[hsl(var(--mdm-template-focus))] text-white hover:bg-[hsl(var(--mdm-template-focus))/0.9]" onClick={handleOpenCreateModal}>New {ENTITY_LABEL[entity]}</Button>
           </div>
         </div>
 
         <Tabs value={entity} onValueChange={(next) => setEntity(next as MasterEntity)}>
-          <TabsList className="flex h-auto flex-wrap gap-2">
+          <TabsList className="mdm-template-tab-rail h-auto">
             {MASTER_ENTITY_SEQUENCE.map((key) => (
-              <TabsTrigger key={key} value={key}>{ENTITY_LABEL[key]}</TabsTrigger>
+              <TabsTrigger key={key} value={key} className="mdm-template-tab data-[state=active]:bg-[hsl(var(--mdm-template-focus))/0.14] data-[state=active]:text-[hsl(var(--mdm-template-heading))]">
+                {ENTITY_LABEL[key]}
+              </TabsTrigger>
             ))}
           </TabsList>
         </Tabs>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>{ENTITY_LABEL[entity]} Search and Filter</CardTitle>
+        <Card className="mdm-template-panel">
+          <CardHeader className="mdm-template-panel-head">
+            <CardTitle className="mdm-template-panel-title">{ENTITY_LABEL[entity]} Search and Filter</CardTitle>
           </CardHeader>
-          <CardContent className="grid gap-3 md:grid-cols-4">
+          <CardContent className="mdm-template-panel-body mdm-template-grid-five">
             <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="amro-master-search">Search</Label>
-              <Input id="amro-master-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search..." />
+              <Label htmlFor="amro-master-search" className="mdm-template-label">Search</Label>
+              <Input id="amro-master-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search..." className="mdm-template-input" />
             </div>
             <div className="space-y-2">
-              <Label>Status</Label>
+              <Label className="mdm-template-label">Status</Label>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger>
+                <SelectTrigger className="mdm-template-input">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -1426,9 +1507,9 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Page Size</Label>
+              <Label className="mdm-template-label">Page Size</Label>
               <Select value={pageSize} onValueChange={setPageSize}>
-                <SelectTrigger>
+                <SelectTrigger className="mdm-template-input">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -1441,11 +1522,11 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>{ENTITY_LABEL[entity]} Records</CardTitle>
+        <Card className="mdm-template-panel">
+          <CardHeader className="mdm-template-panel-head">
+            <CardTitle className="mdm-template-panel-title">{ENTITY_LABEL[entity]} Records</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="mdm-template-panel-body space-y-3">
             <div className="overflow-auto rounded-md border">
               <Table>
                 <TableHeader>
@@ -1488,11 +1569,11 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
         </Card>
 
         <div className="grid gap-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>{ENTITY_LABEL[entity]} Bulk Import</CardTitle>
+          <Card className="mdm-template-panel">
+            <CardHeader className="mdm-template-panel-head">
+              <CardTitle className="mdm-template-panel-title">{ENTITY_LABEL[entity]} Bulk Import</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="mdm-template-panel-body space-y-3">
               <div className="flex justify-end">
                 <Button
                   variant="outline"
@@ -1504,175 +1585,60 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
                   Load Seed Payload
                 </Button>
               </div>
-              <Textarea value={bulkText} onChange={(event) => setBulkText(event.target.value)} rows={14} />
+              <Textarea value={bulkText} onChange={(event) => setBulkText(event.target.value)} rows={14} className="mdm-template-input min-h-[200px]" />
               <Button onClick={() => void handleBulkImport()}>Run Bulk Import</Button>
             </CardContent>
           </Card>
         </div>
         <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-          <DialogContent className="z-[1000] max-h-[90vh] max-w-5xl overflow-y-auto border border-[#E5E7EB] p-0 font-sans text-[14px] duration-[250ms] data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95">
-            <DialogHeader className="border-b border-[#E5E7EB] px-6 py-4">
-              <DialogTitle className="text-[16px] font-semibold text-[#1F2937]">
+          <DialogContent className="mdm-template-dialog" data-testid="amro-master-data-form-dialog">
+            <DialogHeader className="border-b border-[hsl(var(--mdm-template-border))] px-6 py-4">
+              <DialogTitle className="text-[15px] font-semibold text-[hsl(var(--mdm-template-heading))]">
                 {modalMode === 'create' ? `Create ${ENTITY_LABEL[entity]}` : `Update ${ENTITY_LABEL[entity]}`}
               </DialogTitle>
-              <DialogDescription className="text-[14px] text-[#64748B]">
+              <DialogDescription className="text-[12px] text-[hsl(var(--mdm-template-muted))]">
                 Double-click row behavior and CRUD flow mirrors Leads Management interaction patterns.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-6 px-6 pb-6 pt-4">
-              <div className="flex flex-wrap gap-2 rounded-md border bg-muted/30 p-2">
-                <button type="button" className={tabLabelClass('basic')} onClick={() => setActiveFormTab('basic')}>Basic Information</button>
-                <button type="button" className={tabLabelClass('configuration')} onClick={() => setActiveFormTab('configuration')}>Configuration Settings</button>
-                <button type="button" className={tabLabelClass('system')} onClick={() => setActiveFormTab('system')}>System Information</button>
+              <div className="mdm-template-tab-rail">
+                <button type="button" className={tabLabelClass('basic')} data-state={activeFormTab === 'basic' ? 'active' : 'inactive'} onClick={() => setActiveFormTab('basic')}>Basic Information</button>
+                <button type="button" className={tabLabelClass('configuration')} data-state={activeFormTab === 'configuration' ? 'active' : 'inactive'} onClick={() => setActiveFormTab('configuration')}>Configuration Settings</button>
+                <button type="button" className={tabLabelClass('system')} data-state={activeFormTab === 'system' ? 'active' : 'inactive'} onClick={() => setActiveFormTab('system')}>System Information</button>
               </div>
               {activeFormTab === 'basic' && (
                 <div className="space-y-6">
                   <div>
-                    <h3 className="text-base font-semibold">Basic Information</h3>
-                    <p className="text-sm text-muted-foreground">Use the same required-field and validation flow as the Leads form.</p>
+                    <h3 className="text-[14px] font-semibold text-[hsl(var(--mdm-template-heading))]">Basic Information</h3>
+                    <p className="text-[12px] text-[hsl(var(--mdm-template-muted))]">Use the same required-field and validation flow as the Leads form.</p>
                   </div>
-                  <div className={sectionGridClass}>
-                    {basicSectionFields.map((field, index) => (
-                      <div key={field.key} className={field.type === 'textarea' || field.type === 'json' ? fullWidthSectionFieldClass : sectionFieldClass}>
-                        <Label htmlFor={`master-data-basic-${field.key}`}>{field.label}{field.required ? ' *' : ''}</Label>
-                        {field.type === 'select' && (
-                          <Select value={String(formValues[field.key] ?? '')} onValueChange={(value) => setFieldValue(field.key, value)}>
-                            <SelectTrigger
-                              id={`master-data-basic-${field.key}`}
-                              className={`h-10 ${formErrors[field.key] ? 'border-destructive' : ''}`}
-                            >
-                              <SelectValue placeholder={field.placeholder ?? `Select ${field.label}`} />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {resolveSelectOptions(field).map((option) => (
-                                <SelectItem key={option.value} value={option.value} disabled={option.disabled}>
-                                  {option.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        )}
-                        {field.type === 'boolean' && (
-                          <div className="flex h-10 items-center rounded-md border px-3">
-                            <Switch id={`master-data-basic-${field.key}`} checked={Boolean(formValues[field.key])} onCheckedChange={(checked) => setFieldValue(field.key, checked)} />
-                          </div>
-                        )}
-                        {(field.type === 'textarea' || field.type === 'json') && (
-                          <Textarea
-                            id={`master-data-basic-${field.key}`}
-                            rows={field.type === 'json' ? 6 : 4}
-                            value={String(formValues[field.key] ?? '')}
-                            onChange={(event) => setFieldValue(field.key, event.target.value)}
-                            placeholder={field.placeholder}
-                            className={`min-h-[120px] ${formErrors[field.key] ? 'border-destructive' : ''}`}
-                            aria-invalid={Boolean(formErrors[field.key])}
-                          />
-                        )}
-                        {['text', 'email', 'number', 'date', 'time'].includes(field.type) && (
-                          <Input
-                            id={`master-data-basic-${field.key}`}
-                            ref={index === 0 ? firstFieldRef : undefined}
-                            type={field.type === 'number' ? 'number' : field.type}
-                            value={String(formValues[field.key] ?? '')}
-                            onChange={(event) => setFieldValue(field.key, event.target.value)}
-                            placeholder={field.placeholder}
-                            min={typeof field.min === 'number' ? field.min : undefined}
-                            step={field.type === 'number' ? 'any' : undefined}
-                            className={`h-10 ${formErrors[field.key] ? 'border-destructive' : ''}`}
-                            aria-invalid={Boolean(formErrors[field.key])}
-                          />
-                        )}
-                        {formErrors[field.key] ? <p className="text-xs text-destructive">{formErrors[field.key]}</p> : null}
-                        {field.type === 'select' && field.key === 'manufacturer_id' && manufacturerOptionsError ? (
-                          <p className="text-xs text-destructive">{manufacturerOptionsError}</p>
-                        ) : null}
-                        {field.type === 'select' && field.key === 'assembly_type_id' && assemblyTypeOptionsError ? (
-                          <p className="text-xs text-destructive">{assemblyTypeOptionsError}</p>
-                        ) : null}
-                      </div>
-                    ))}
+                  <div className={sectionGridClass} data-testid="amro-master-data-basic-grid">
+                    {basicSectionFields.map((field, index) => renderEditableField(field, 'basic', index))}
                   </div>
                 </div>
               )}
               {activeFormTab === 'configuration' && (
                 <div className="space-y-6">
                   <div>
-                    <h3 className="text-base font-semibold">Configuration Settings</h3>
-                    <p className="text-sm text-muted-foreground">Keep layout, spacing, and error presentation consistent with Leads.</p>
+                    <h3 className="text-[14px] font-semibold text-[hsl(var(--mdm-template-heading))]">Configuration Settings</h3>
+                    <p className="text-[12px] text-[hsl(var(--mdm-template-muted))]">Keep layout, spacing, and error presentation consistent with Leads.</p>
                   </div>
-                  <div className={sectionGridClass}>
-                    {configurationSectionFields.map((field) => (
-                      <div key={field.key} className={field.type === 'textarea' || field.type === 'json' ? fullWidthSectionFieldClass : sectionFieldClass}>
-                        <Label htmlFor={`master-data-configuration-${field.key}`}>{field.label}{field.required ? ' *' : ''}</Label>
-                        {field.type === 'select' && (
-                          <Select value={String(formValues[field.key] ?? '')} onValueChange={(value) => setFieldValue(field.key, value)}>
-                            <SelectTrigger
-                              id={`master-data-configuration-${field.key}`}
-                              className={`h-10 ${formErrors[field.key] ? 'border-destructive' : ''}`}
-                            >
-                              <SelectValue placeholder={field.placeholder ?? `Select ${field.label}`} />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {resolveSelectOptions(field).map((option) => (
-                                <SelectItem key={option.value} value={option.value} disabled={option.disabled}>
-                                  {option.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        )}
-                        {field.type === 'boolean' && (
-                          <div className="flex h-10 items-center rounded-md border px-3">
-                            <Switch id={`master-data-configuration-${field.key}`} checked={Boolean(formValues[field.key])} onCheckedChange={(checked) => setFieldValue(field.key, checked)} />
-                          </div>
-                        )}
-                        {(field.type === 'textarea' || field.type === 'json') && (
-                          <Textarea
-                            id={`master-data-configuration-${field.key}`}
-                            rows={field.type === 'json' ? 6 : 4}
-                            value={String(formValues[field.key] ?? '')}
-                            onChange={(event) => setFieldValue(field.key, event.target.value)}
-                            placeholder={field.placeholder}
-                            className={`min-h-[120px] ${formErrors[field.key] ? 'border-destructive' : ''}`}
-                            aria-invalid={Boolean(formErrors[field.key])}
-                          />
-                        )}
-                        {['text', 'email', 'number', 'date', 'time'].includes(field.type) && (
-                          <Input
-                            id={`master-data-configuration-${field.key}`}
-                            type={field.type === 'number' ? 'number' : field.type}
-                            value={String(formValues[field.key] ?? '')}
-                            onChange={(event) => setFieldValue(field.key, event.target.value)}
-                            placeholder={field.placeholder}
-                            min={typeof field.min === 'number' ? field.min : undefined}
-                            step={field.type === 'number' ? 'any' : undefined}
-                            className={`h-10 ${formErrors[field.key] ? 'border-destructive' : ''}`}
-                            aria-invalid={Boolean(formErrors[field.key])}
-                          />
-                        )}
-                        {formErrors[field.key] ? <p className="text-xs text-destructive">{formErrors[field.key]}</p> : null}
-                        {field.type === 'select' && field.key === 'manufacturer_id' && manufacturerOptionsError ? (
-                          <p className="text-xs text-destructive">{manufacturerOptionsError}</p>
-                        ) : null}
-                        {field.type === 'select' && field.key === 'assembly_type_id' && assemblyTypeOptionsError ? (
-                          <p className="text-xs text-destructive">{assemblyTypeOptionsError}</p>
-                        ) : null}
-                      </div>
-                    ))}
+                  <div className={sectionGridClass} data-testid="amro-master-data-configuration-grid">
+                    {configurationSectionFields.map((field) => renderEditableField(field, 'configuration'))}
                   </div>
                 </div>
               )}
               {activeFormTab === 'system' && (
                 <div className="space-y-6">
                   <div>
-                    <h3 className="text-base font-semibold">System Information</h3>
-                    <p className="text-sm text-muted-foreground">Read-only fields follow the same grid and spacing contract.</p>
+                    <h3 className="text-[14px] font-semibold text-[hsl(var(--mdm-template-heading))]">System Information</h3>
+                    <p className="text-[12px] text-[hsl(var(--mdm-template-muted))]">Read-only fields follow the same grid and spacing contract.</p>
                   </div>
                   <div className={sectionGridClass}>
                     {systemFields.map((field) => (
                       <div key={field} className={sectionFieldClass}>
-                        <Label htmlFor={`master-data-system-${field}`}>{field}</Label>
-                        <Input id={`master-data-system-${field}`} value={String(selectedRow?.[field] ?? '')} readOnly className="h-10 bg-muted" />
+                        <Label htmlFor={`master-data-system-${field}`} className="mdm-template-label">{field}</Label>
+                        <Input id={`master-data-system-${field}`} value={String(selectedRow?.[field] ?? '')} readOnly className="mdm-template-readonly" />
                       </div>
                     ))}
                     {!systemFields.length && (
@@ -1681,7 +1647,7 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
                   </div>
                 </div>
               )}
-              <div className="flex flex-wrap items-center justify-end gap-3 border-t border-border pt-4">
+              <div className="flex flex-wrap items-center justify-end gap-3 border-t border-[hsl(var(--mdm-template-border))] pt-4">
                 <Button variant="outline" onClick={() => setModalOpen(false)}>Cancel</Button>
                 <Button variant="destructive" onClick={() => void handleDelete()} disabled={!selectedId}>Delete</Button>
                 <Button onClick={() => void handleSubmitModal()}>

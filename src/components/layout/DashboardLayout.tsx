@@ -49,6 +49,7 @@ import {
 } from '@/components/ui/breadcrumb';
 import { GlobalSearch } from '@/components/ui/global-search';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { ServiceStatusBadge } from '@/components/dev/ServiceStatusBadge';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -705,6 +706,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               </Breadcrumb>
               <div className="flex-1" />
               <GlobalSearch />
+              <ServiceStatusBadge />
               <HelpDialog />
               {canShowDebugButton && (
                 <Tooltip>
@@ -746,7 +748,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               </DropdownMenu>
             </div>
           </header>
-          <main id="main-content" className="flex-1 p-4 bg-muted/30 pb-24 outline-none overflow-x-hidden" style={{ backgroundImage: 'var(--app-background, none)' }} tabIndex={-1}>
+          <main id="main-content" role="main" className="flex-1 p-4 bg-muted/30 pb-24 outline-none overflow-x-hidden" style={{ backgroundImage: 'var(--app-background, none)' }} tabIndex={-1}>
             <FeatureErrorBoundary featureName="Dashboard Content">
               {children}
             </FeatureErrorBoundary>

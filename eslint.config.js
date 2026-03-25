@@ -1,5 +1,5 @@
 // For more info, see https://github.com/storybookjs/eslint-plugin-storybook#configuration-flat-config-format
-import storybook from "eslint-plugin-storybook";
+import { createRequire } from "node:module";
 
 import js from "@eslint/js";
 import globals from "globals";
@@ -7,6 +7,16 @@ import reactHooks from "eslint-plugin-react-hooks";
 import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
 import * as mdx from "eslint-plugin-mdx";
+
+const require = createRequire(import.meta.url);
+let storybook = null;
+try {
+  storybook = require("eslint-plugin-storybook");
+  if (storybook && storybook.default) storybook = storybook.default;
+} catch {
+  storybook = null;
+}
+const storybookFlatRecommended = storybook?.configs?.["flat/recommended"] ?? {};
 
 export default tseslint.config(
   { ignores: ["dist", "storybook-static", "test-results", "docs", ".worktrees", "CHANGELOG.md", "RUN_MIGRATION.md", "dataentry/dataEntryInstructions.md"] },
@@ -274,5 +284,5 @@ export default tseslint.config(
   {
     ...mdx.flatCodeBlocks
   },
-  storybook.configs["flat/recommended"]
+  storybookFlatRecommended
 );

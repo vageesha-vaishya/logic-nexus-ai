@@ -6,22 +6,22 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 export default function MasterDataHTS() {
   return (
     <DashboardLayout>
-      <div className="space-y-6">
+      <div className="mdm-template-page">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">HTS Master Data</h1>
-          <p className="text-muted-foreground">
+          <h1 className="mdm-template-header-title">HTS Master Data</h1>
+          <p className="mdm-template-header-subtitle">
             Manage and browse Harmonized Tariff Schedule codes and classifications.
           </p>
         </div>
 
         <Tabs defaultValue="browser" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="browser">Visual Browser</TabsTrigger>
-            <TabsTrigger value="management">Management & Search</TabsTrigger>
+          <TabsList className="mdm-template-tab-rail h-auto">
+            <TabsTrigger value="browser" className="mdm-template-tab data-[state=active]:bg-[hsl(var(--mdm-template-focus))/0.14] data-[state=active]:text-[hsl(var(--mdm-template-heading))]">Visual Browser</TabsTrigger>
+            <TabsTrigger value="management" className="mdm-template-tab data-[state=active]:bg-[hsl(var(--mdm-template-focus))/0.14] data-[state=active]:text-[hsl(var(--mdm-template-heading))]">Management & Search</TabsTrigger>
           </TabsList>
           
           <TabsContent value="browser" className="space-y-4">
-            <div className="rounded-lg border bg-card p-6 shadow-sm">
+            <div className="mdm-template-panel p-6">
               <VisualHTSBrowser />
             </div>
           </TabsContent>

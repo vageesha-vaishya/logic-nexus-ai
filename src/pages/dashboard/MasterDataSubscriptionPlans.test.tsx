@@ -102,6 +102,50 @@ describe('MasterDataSubscriptionPlans', () => {
 
     expect(await screen.findByText('Pro Plan')).toBeInTheDocument();
     expect(from).toHaveBeenCalledWith('subscription_plans', true);
+    expect(screen.getByTestId('master-data-subscription-plans-template')).toHaveClass('mdm-template-page');
+  });
+
+  it('applies mdm-template contract on plan editor surfaces', async () => {
+    const mockOrder = vi.fn().mockResolvedValue({ data: [], error: null });
+    const mockSelect = vi.fn(() => ({ order: mockOrder }));
+
+    const from = vi.fn((table: string) => {
+      if (table === 'subscription_plans') {
+        return {
+          select: mockSelect,
+          insert: vi.fn(() => ({ select: vi.fn(() => ({ single: vi.fn() })) })),
+          update: vi.fn().mockResolvedValue({ error: null }),
+          delete: vi.fn().mockResolvedValue({ error: null }),
+          eq: vi.fn(),
+        };
+      }
+      return {
+        select: vi.fn(),
+        insert: vi.fn(),
+      };
+    });
+
+    (useCRM as any).mockReturnValue({
+      scopedDb: { from },
+      context: { isPlatformAdmin: true },
+    });
+
+    render(
+      <BrowserRouter>
+        <TooltipProvider>
+          <MasterDataSubscriptionPlans />
+        </TooltipProvider>
+      </BrowserRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /New Plan/i })).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole('button', { name: /New Plan/i }));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveClass('mdm-template-dialog');
+    expect(screen.getByLabelText('Name')).toHaveClass('mdm-template-input');
   });
 
   it('validates required fields and sends payload with audit log on create', async () => {

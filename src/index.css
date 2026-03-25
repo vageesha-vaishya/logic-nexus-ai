@@ -84,6 +84,18 @@ All colors MUST be HSL.
     --shadow-lg: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
     --shadow-primary: 0 10px 30px -10px hsl(217 91% 60% / 0.3);
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --mdm-template-canvas: 186 84% 41%;
+    --mdm-template-surface: 0 0% 100%;
+    --mdm-template-border: 210 16% 90%;
+    --mdm-template-border-strong: 186 84% 41%;
+    --mdm-template-heading: 215 28% 17%;
+    --mdm-template-body: 215 22% 28%;
+    --mdm-template-muted: 215 14% 47%;
+    --mdm-template-field-bg: 210 20% 98%;
+    --mdm-template-field-border: 214 24% 86%;
+    --mdm-template-required: 0 84% 60%;
+    --mdm-template-focus: 188 91% 42%;
+    --mdm-template-line-height: 1.15;
   }
 
   .dark {
@@ -175,6 +187,138 @@ All colors MUST be HSL.
 }
 
 @layer components {
+  .mdm-template-page {
+    @apply space-y-4 p-4 font-sans text-[13px] tracking-[0.01em] lg:p-6;
+    line-height: var(--mdm-template-line-height);
+  }
+
+  .mdm-template-page :is(
+      h1,
+      h2,
+      h3,
+      h4,
+      h5,
+      h6,
+      p,
+      span,
+      label,
+      small,
+      li,
+      td,
+      th,
+      a,
+      button,
+      input,
+      textarea
+    ) {
+    line-height: var(--mdm-template-line-height);
+  }
+
+  .mdm-template-panel {
+    @apply rounded-md border bg-white shadow-sm;
+    border-color: hsl(var(--mdm-template-border-strong));
+    background-color: hsl(var(--mdm-template-surface));
+  }
+
+  .mdm-template-panel-head {
+    @apply px-4 py-3;
+  }
+
+  .mdm-template-panel-title {
+    @apply text-[13px] font-semibold;
+    color: hsl(var(--mdm-template-heading));
+  }
+
+  .mdm-template-panel-body {
+    @apply px-4 pb-4 pt-0;
+  }
+
+  .mdm-template-form-grid {
+    @apply grid grid-cols-1 gap-x-3 gap-y-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5;
+  }
+
+  .mdm-template-form-field {
+    @apply space-y-1;
+  }
+
+  .mdm-template-form-field-full {
+    @apply space-y-1 md:col-span-2 lg:col-span-3 xl:col-span-5;
+  }
+
+  .mdm-template-label {
+    @apply text-[12px] font-medium;
+    color: hsl(var(--mdm-template-body));
+  }
+
+  .mdm-template-input {
+    @apply h-9 border bg-white text-[13px] shadow-none transition-colors duration-150;
+    border-color: hsl(var(--mdm-template-field-border));
+    background-color: hsl(var(--mdm-template-surface));
+  }
+
+  .mdm-template-input[aria-invalid='true'] {
+    border-color: hsl(var(--mdm-template-required));
+  }
+
+  .mdm-template-input:focus-visible {
+    box-shadow: 0 0 0 1px hsl(var(--mdm-template-focus));
+  }
+
+  .mdm-template-readonly {
+    @apply h-9 border text-[13px];
+    border-color: hsl(var(--mdm-template-field-border));
+    background-color: hsl(var(--mdm-template-field-bg));
+  }
+
+  .mdm-template-dialog {
+    @apply z-[1000] max-h-[92vh] max-w-6xl overflow-y-auto border p-0 font-sans text-[13px] transition-transform duration-300 data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95;
+    border-color: hsl(var(--mdm-template-border-strong));
+    line-height: var(--mdm-template-line-height);
+  }
+
+  .mdm-template-tab-rail {
+    @apply flex flex-wrap gap-2 rounded-md border p-2;
+    border-color: hsl(var(--mdm-template-border));
+    background-color: hsl(var(--mdm-template-field-bg));
+  }
+
+  .mdm-template-tab {
+    @apply rounded-md px-3 py-2 text-[12px] font-semibold transition-colors duration-150;
+  }
+
+  .mdm-template-tab[data-state='active'] {
+    background-color: hsl(var(--mdm-template-focus) / 0.14);
+    color: hsl(var(--mdm-template-heading));
+  }
+
+  .mdm-template-tab[data-state='inactive'] {
+    color: hsl(var(--mdm-template-muted));
+  }
+
+  .mdm-template-tab[data-state='inactive']:hover {
+    background-color: hsl(var(--mdm-template-border));
+    color: hsl(var(--mdm-template-heading));
+  }
+
+  .mdm-template-header-title {
+    @apply text-2xl font-semibold;
+    color: hsl(var(--mdm-template-heading));
+  }
+
+  .mdm-template-header-subtitle {
+    @apply text-[13px];
+    color: hsl(var(--mdm-template-muted));
+  }
+
+  .mdm-template-grid-five {
+    @apply grid gap-3 xl:grid-cols-5;
+  }
+
+  .mdm-template-danger {
+    @apply text-xs;
+    color: hsl(var(--mdm-template-required));
+  }
+
   .lead-workspace-tight-lines {
     --lead-workspace-line-height: 1.2;
   }

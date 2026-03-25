@@ -404,20 +404,20 @@ export default function MasterDataSubscriptions() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
+      <div className="mdm-template-page" data-testid="master-data-subscriptions-template">
         <div>
-          <h1 className="text-3xl font-bold">Subscription Master Data</h1>
-          <p className="text-muted-foreground">Manage subscription plans and assignments for tenants</p>
+          <h1 className="mdm-template-header-title">Subscription Master Data</h1>
+          <p className="mdm-template-header-subtitle">Manage subscription plans and assignments for tenants</p>
         </div>
 
         <Tabs value={tab} onValueChange={setTab}>
-          <TabsList>
-            <TabsTrigger value="plans">Plans Catalog</TabsTrigger>
-            <TabsTrigger value="tenant">Tenant Assignments</TabsTrigger>
+          <TabsList className="mdm-template-tab-rail h-auto">
+            <TabsTrigger value="plans" className="mdm-template-tab data-[state=active]:bg-[hsl(var(--mdm-template-focus))/0.14] data-[state=active]:text-[hsl(var(--mdm-template-heading))]">Plans Catalog</TabsTrigger>
+            <TabsTrigger value="tenant" className="mdm-template-tab data-[state=active]:bg-[hsl(var(--mdm-template-focus))/0.14] data-[state=active]:text-[hsl(var(--mdm-template-heading))]">Tenant Assignments</TabsTrigger>
           </TabsList>
 
           <TabsContent value="plans" className="mt-4 space-y-4">
-            <Card>
+            <Card className="mdm-template-panel">
               <CardHeader className="flex flex-row items-center justify-between">
                 <div>
                   <CardTitle>Subscription Plans</CardTitle>
@@ -427,34 +427,39 @@ export default function MasterDataSubscriptions() {
                   <DialogTrigger asChild>
                     <Button onClick={openCreatePlan}>New Plan</Button>
                   </DialogTrigger>
-                  <DialogContent className="max-w-2xl">
+                  <DialogContent className="mdm-template-dialog max-w-2xl" data-testid="master-data-subscriptions-dialog">
                     <DialogHeader>
                       <DialogTitle>{editingPlan ? 'Edit Subscription Plan' : 'New Subscription Plan'}</DialogTitle>
                     </DialogHeader>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="mdm-template-form-grid">
                       <Input
+                        className="mdm-template-input"
                         placeholder="Name"
                         value={planForm.name}
                         onChange={(e) => setPlanForm({ ...planForm, name: e.target.value })}
                       />
                       <Input
+                        className="mdm-template-input"
                         placeholder="Slug"
                         value={planForm.slug}
                         onChange={(e) => setPlanForm({ ...planForm, slug: e.target.value })}
                       />
                       <Input
+                        className="mdm-template-input"
                         placeholder="Monthly price"
                         type="number"
                         value={planForm.price_monthly}
                         onChange={(e) => setPlanForm({ ...planForm, price_monthly: e.target.value })}
                       />
                       <Input
+                        className="mdm-template-input"
                         placeholder="Annual price"
                         type="number"
                         value={planForm.price_annual}
                         onChange={(e) => setPlanForm({ ...planForm, price_annual: e.target.value })}
                       />
                       <Input
+                        className="mdm-template-input"
                         placeholder="Tier (free, basic, professional, enterprise, starter, business)"
                         value={planForm.tier}
                         onChange={(e) => setPlanForm({ ...planForm, tier: e.target.value })}
@@ -463,7 +468,7 @@ export default function MasterDataSubscriptions() {
                         value={planForm.billing_period}
                         onValueChange={(v) => setPlanForm({ ...planForm, billing_period: v })}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="mdm-template-input">
                           <SelectValue placeholder="Billing period" />
                         </SelectTrigger>
                         <SelectContent>
@@ -472,22 +477,25 @@ export default function MasterDataSubscriptions() {
                         </SelectContent>
                       </Select>
                       <Input
+                        className="mdm-template-input"
                         placeholder="Currency"
                         value={planForm.currency}
                         onChange={(e) => setPlanForm({ ...planForm, currency: e.target.value })}
                       />
                       <Input
+                        className="mdm-template-input"
                         placeholder="Plan type"
                         value={planForm.plan_type}
                         onChange={(e) => setPlanForm({ ...planForm, plan_type: e.target.value })}
                       />
                       <Input
+                        className="mdm-template-input"
                         placeholder="Sort order"
                         type="number"
                         value={planForm.sort_order}
                         onChange={(e) => setPlanForm({ ...planForm, sort_order: e.target.value })}
                       />
-                      <div className="flex items-center justify-between border rounded-md px-3 py-2">
+                      <div className="mdm-template-input flex items-center justify-between rounded-md px-3 py-2">
                         <span className="text-sm">Active</span>
                         <Switch
                           checked={planForm.is_active}
@@ -496,6 +504,7 @@ export default function MasterDataSubscriptions() {
                       </div>
                       <div className="md:col-span-2">
                         <Input
+                          className="mdm-template-input"
                           placeholder="Description"
                           value={planForm.description}
                           onChange={(e) => setPlanForm({ ...planForm, description: e.target.value })}
@@ -504,7 +513,7 @@ export default function MasterDataSubscriptions() {
                       <div className="md:col-span-2">
                         <label className="block text-sm mb-1">Features (JSON array)</label>
                         <textarea
-                          className="w-full border rounded-md p-2 text-sm font-mono"
+                          className="mdm-template-input h-auto w-full rounded-md p-2 text-sm font-mono"
                           rows={4}
                           value={planForm.features}
                           onChange={(e) => setPlanForm({ ...planForm, features: e.target.value })}
@@ -513,7 +522,7 @@ export default function MasterDataSubscriptions() {
                       <div className="md:col-span-2">
                         <label className="block text-sm mb-1">Limits (JSON object)</label>
                         <textarea
-                          className="w-full border rounded-md p-2 text-sm font-mono"
+                          className="mdm-template-input h-auto w-full rounded-md p-2 text-sm font-mono"
                           rows={4}
                           value={planForm.limits}
                           onChange={(e) => setPlanForm({ ...planForm, limits: e.target.value })}
@@ -590,7 +599,7 @@ export default function MasterDataSubscriptions() {
           </TabsContent>
 
           <TabsContent value="tenant" className="mt-4 space-y-4">
-            <Card>
+            <Card className="mdm-template-panel">
               <CardHeader>
                 <CardTitle>Tenant Subscription Management</CardTitle>
                 <CardDescription>Assign and manage subscription plans for tenants</CardDescription>
@@ -602,7 +611,7 @@ export default function MasterDataSubscriptions() {
                       value={selectedTenantId || ''}
                       onValueChange={(v) => setSelectedTenantId(v)}
                     >
-                      <SelectTrigger className="w-[280px]">
+                      <SelectTrigger className="mdm-template-input w-[280px]">
                         <SelectValue placeholder="Choose a tenant" />
                       </SelectTrigger>
                       <SelectContent>
@@ -627,7 +636,7 @@ export default function MasterDataSubscriptions() {
 
                 {!loadingTenant && currentSubscription && (
                   <div className="grid gap-4 md:grid-cols-3">
-                    <Card>
+                    <Card className="mdm-template-panel">
                       <CardHeader className="flex flex-row items-center justify-between pb-2">
                         <CardTitle className="text-sm font-medium">Current Plan</CardTitle>
                       </CardHeader>
@@ -638,7 +647,7 @@ export default function MasterDataSubscriptions() {
                         </Badge>
                       </CardContent>
                     </Card>
-                    <Card>
+                    <Card className="mdm-template-panel">
                       <CardHeader className="flex flex-row items-center justify-between pb-2">
                         <CardTitle className="text-sm font-medium">Monthly Cost</CardTitle>
                       </CardHeader>
@@ -651,7 +660,7 @@ export default function MasterDataSubscriptions() {
                         </p>
                       </CardContent>
                     </Card>
-                    <Card>
+                    <Card className="mdm-template-panel">
                       <CardHeader className="flex flex-row items-center justify-between pb-2">
                         <CardTitle className="text-sm font-medium">Renewal Date</CardTitle>
                       </CardHeader>
@@ -687,4 +696,3 @@ export default function MasterDataSubscriptions() {
     </DashboardLayout>
   );
 }
-

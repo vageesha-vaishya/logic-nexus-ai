@@ -1,0 +1,75 @@
+{
+  "services": [
+    {
+      "id": "crm",
+      "name": "CRM API",
+      "command": "cd services/crm-api && npx tsx watch src/index.ts",
+      "urlEnv": "VITE_CRM_API_PROXY_TARGET",
+      "defaultUrl": "http://localhost:3011",
+      "remoteUrlEnv": "VITE_CRM_API_PROXY_TARGET_REMOTE",
+      "remoteDefaultUrl": "",
+      "preferEndpoint": "local",
+      "healthPath": "/health",
+      "okStatus": [200],
+      "required": false,
+      "requiredWhenRemote": true,
+      "retry": { "attempts": 12, "baseDelayMs": 500, "timeoutMs": 30000 },
+      "dependsOn": []
+    },
+    {
+      "id": "amro",
+      "name": "AMRO API",
+      "command": "cd services/amro-api && npx tsx watch src/index.ts",
+      "urlEnv": "VITE_AMRO_API_PROXY_TARGET",
+      "defaultUrl": "http://localhost:3001",
+      "remoteUrlEnv": "VITE_AMRO_API_PROXY_TARGET_REMOTE",
+      "remoteDefaultUrl": "",
+      "preferEndpoint": "local",
+      "healthPath": "/health",
+      "okStatus": [200],
+      "required": false,
+      "requiredWhenRemote": true,
+      "retry": { "attempts": 12, "baseDelayMs": 500, "timeoutMs": 30000 },
+      "dependsOn": []
+    },
+    {
+      "id": "tenantBranding",
+      "name": "Tenant Branding API",
+      "command": null,
+      "urlEnv": "VITE_TENANT_BRANDING_PROXY_TARGET",
+      "defaultUrl": "http://localhost:8787",
+      "remoteUrlEnv": "VITE_TENANT_BRANDING_PROXY_TARGET_REMOTE",
+      "remoteDefaultUrl": "",
+      "preferEndpoint": "local",
+      "healthPath": "/",
+      "okStatus": [200, 404],
+      "required": false,
+      "retry": { "attempts": 8, "baseDelayMs": 500, "timeoutMs": 15000 },
+      "dependsOn": []
+    },
+    {
+      "id": "supabaseAuth",
+      "name": "Supabase Auth",
+      "command": null,
+      "urlEnv": "VITE_SUPABASE_URL",
+      "defaultUrl": "http://localhost:54321",
+      "healthPath": "/auth/v1/authorize",
+      "okStatus": [200, 301, 302, 400, 401, 404],
+      "required": false,
+      "retry": { "attempts": 6, "baseDelayMs": 500, "timeoutMs": 8000 },
+      "dependsOn": []
+    },
+    {
+      "id": "supabaseFunctions",
+      "name": "Supabase Functions Gateway",
+      "command": null,
+      "urlEnv": "VITE_SUPABASE_URL",
+      "defaultUrl": "http://localhost:54321",
+      "healthPath": "/functions/v1/",
+      "okStatus": [200, 401, 404],
+      "required": false,
+      "retry": { "attempts": 6, "baseDelayMs": 500, "timeoutMs": 8000 },
+      "dependsOn": ["supabaseAuth"]
+    }
+  ]
+}

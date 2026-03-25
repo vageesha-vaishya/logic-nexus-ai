@@ -10,6 +10,8 @@ type ProxyServiceDefinition = {
   serviceName: string;
   startCommand: string;
   target: string;
+  targetEnvVar: string;
+  healthPathHint?: string;
 };
 
 function createServiceProxy(definition: ProxyServiceDefinition) {
@@ -25,10 +27,13 @@ function createServiceProxy(definition: ProxyServiceDefinition) {
           code: 'UPSTREAM_UNAVAILABLE',
           service: definition.serviceName,
           target: definition.target,
+          targetEnvVar: definition.targetEnvVar,
+          healthPathHint: definition.healthPathHint,
           requestPath: String(req?.url || ''),
           requestMethod: String(req?.method || ''),
           upstreamError: String(error?.code || error?.message || 'proxy_error'),
-          resolution: `Start ${definition.serviceName} using: ${definition.startCommand}`,
+          resolution: `Dev orchestrator will start services automatically. Use: npm run dev. To start only services: ${definition.startCommand} or npm run services:start`,
+          hint: `Set ${definition.targetEnvVar} in .env to point to a reachable instance`,
         };
         if (res && !res.headersSent) {
           res.writeHead(statusCode, { 'Content-Type': 'application/json' });
@@ -44,23 +49,34 @@ function createServiceProxy(definition: ProxyServiceDefinition) {
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
-  const crmApiProxyTarget = env.VITE_CRM_API_PROXY_TARGET || 'http://localhost:3011';
-  const amroApiProxyTarget = env.VITE_AMRO_API_PROXY_TARGET || 'http://localhost:3001';
-  const tenantBrandingProxyTarget = env.VITE_TENANT_BRANDING_PROXY_TARGET || env.VITE_WEB_API_PROXY_TARGET || 'http://localhost:8787';
+  const crmApiProxyTarget = process.env.VITE_CRM_API_PROXY_TARGET || env.VITE_CRM_API_PROXY_TARGET || 'http://localhost:3011';
+  const amroApiProxyTarget = process.env.VITE_AMRO_API_PROXY_TARGET || env.VITE_AMRO_API_PROXY_TARGET || 'http://localhost:3001';
+  const tenantBrandingProxyTarget =
+    process.env.VITE_TENANT_BRANDING_PROXY_TARGET ||
+    env.VITE_TENANT_BRANDING_PROXY_TARGET ||
+    process.env.VITE_WEB_API_PROXY_TARGET ||
+    env.VITE_WEB_API_PROXY_TARGET ||
+    'http://localhost:8787';
   const crmProxy = createServiceProxy({
     serviceName: 'CRM API',
     startCommand: 'cd services/crm-api && npm run dev',
     target: crmApiProxyTarget,
+    targetEnvVar: 'VITE_CRM_API_PROXY_TARGET',
+    healthPathHint: '/health',
   });
   const amroProxy = createServiceProxy({
     serviceName: 'AMRO API',
     startCommand: 'cd services/amro-api && npm run dev',
     target: amroApiProxyTarget,
+    targetEnvVar: 'VITE_AMRO_API_PROXY_TARGET',
+    healthPathHint: '/health',
   });
   const tenantBrandingProxy = createServiceProxy({
     serviceName: 'Tenant Branding API',
     startCommand: 'set VITE_TENANT_BRANDING_PROXY_TARGET or run tenant-branding host',
     target: tenantBrandingProxyTarget,
+    targetEnvVar: 'VITE_TENANT_BRANDING_PROXY_TARGET',
+    healthPathHint: '/',
   });
   const enableDesignSystemFederation = env.VITE_ENABLE_DESIGN_SYSTEM_FEDERATION === 'true';
   const enableDesignSystemRemote = env.VITE_ENABLE_DESIGN_SYSTEM_REMOTE === 'true';
@@ -124,7 +140,7 @@ export default defineConfig(({ mode }) => {
         rewrite: (path: string) => path.replace(/^\/api\/amro/, ''),
       },
       '/functions/v1': {
-        target: env.VITE_SUPABASE_URL || 'https://gzhxgoigflftharcmdqj.supabase.co',
+        target: process.env.VITE_SUPABASE_URL || env.VITE_SUPABASE_URL || 'https://gzhxgoigflftharcmdqj.supabase.co',
         changeOrigin: true,
         secure: false,
         configure: (proxy: any, _options: any) => {
@@ -151,7 +167,7 @@ export default defineConfig(({ mode }) => {
         rewrite: (path: string) => path.replace(/^\/api\/amro/, ''),
       },
       '/functions/v1': {
-        target: env.VITE_SUPABASE_URL || 'https://gzhxgoigflftharcmdqj.supabase.co',
+        target: process.env.VITE_SUPABASE_URL || env.VITE_SUPABASE_URL || 'https://gzhxgoigflftharcmdqj.supabase.co',
         changeOrigin: true,
         secure: false,
       },
