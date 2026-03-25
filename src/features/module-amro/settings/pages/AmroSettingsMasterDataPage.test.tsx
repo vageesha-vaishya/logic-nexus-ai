@@ -296,7 +296,8 @@ describe('AmroSettingsMasterDataPage', () => {
     const dialog = await screen.findByTestId('amro-master-data-form-dialog');
     fireEvent.change(within(dialog).getByLabelText(/^Tail Number/), { target: { value: 'N200AA' } });
     fireEvent.change(within(dialog).getByLabelText(/^Serial Number/), { target: { value: 'SN-200' } });
-    fireEvent.change(within(dialog).getByLabelText(/^Aircraft Type/), { target: { value: 'A321' } });
+    fireEvent.click(within(dialog).getByLabelText(/^Aircraft Type/));
+    fireEvent.click(await screen.findByText('NarrowBody'));
     fireEvent.click(within(dialog).getByRole('button', { name: 'Configuration Settings' }));
     fireEvent.click(within(dialog).getByLabelText(/Manufacturer/));
     fireEvent.click(await screen.findByText('Boeing (BOE)'));

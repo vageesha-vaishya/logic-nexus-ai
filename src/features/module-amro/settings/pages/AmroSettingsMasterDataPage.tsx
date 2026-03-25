@@ -229,12 +229,14 @@ const MANUFACTURER_SEED_NAMES = [
   'WILLIAMS INTERNATIONAL',
 ];
 
+const AIRCRAFT_TYPE_OPTIONS = ['NarrowBody', 'RegionalJet', 'Turboprop', 'WideBody', 'auto_seeded'];
+
 const ENTITY_FORM_FIELDS: Record<MasterEntity, EntityFormField[]> = {
   aircraft: [
     { key: 'registration', label: 'Registration', type: 'text' },
     { key: 'tail_number', label: 'Tail Number', type: 'text', required: true },
     { key: 'serial_number', label: 'Serial Number', type: 'text', required: true },
-    { key: 'aircraft_type', label: 'Aircraft Type', type: 'text', required: true },
+    { key: 'aircraft_type', label: 'Aircraft Type', type: 'select', required: true, options: AIRCRAFT_TYPE_OPTIONS },
     { key: 'manufacturer_id', label: 'Manufacturer', type: 'select', required: true },
     { key: 'aircraft_model', label: 'Aircraft Model', type: 'text', required: true },
     { key: 'configuration_code', label: 'Configuration Code', type: 'text' },
