@@ -283,3 +283,160 @@ Approval state transitions:
 - DEP-AMRO-003@v1 Rollback: disable AMRO overview flag and redeploy previous UI artifact without schema rollback.
 - DEP-AMRO-004@v1 Runtime Ops: monitor API error rates, refresh latency, and export job completion in observability dashboards.
 - DEP-AMRO-005@v1 Maintenance: rotate API credentials per security policy and validate AMRO domain assignment checks quarterly.
+
+## 12. Aircraft Form Enhancement Requirements Baseline
+
+### 12.1 Objective and Scope
+
+- Establish aircraft-screen-driven work package creation and status orchestration without breaking existing AMRO master data flows.
+- Keep platform shell and AMRO navigation consistent while reducing click-path depth for planners and operations users.
+- Align UX and status governance to SAP MRO, IBM Maximo for Aviation, and Ramco Aviation Suite practices.
+- Preserve tenant and franchise data isolation for every read/write path in aircraft and work package surfaces.
+
+### 12.2 Current-State Inventory and Gaps
+
+Current implementation observations:
+
+- Aircraft route `/dashboard/amro/settings/master-data/aircraft` renders a generic entity CRUD shell.
+- Aircraft form currently captures registration, tail number, serial number, type/model, manufacturer, configuration code, maintenance program, and status.
+- Work package creation currently exists in AMRO workspace hooks and API interfaces, but not as a first-class aircraft-screen action path.
+- Work package list and task board are available in AMRO workspace and preview surfaces, yet aircraft-specific launch context is not unified in one interaction flow.
+
+Key gaps:
+
+- No direct “Create Work Package” CTA in aircraft record experience.
+- No aircraft-context scheduling intelligence panel at point of creation.
+- No integrated predictive risk strip on aircraft form.
+- No aircraft-linked one-click navigation rail to work package pipeline, scheduling board, compliance gates, and task execution.
+- No explicit aircraft-level KPI and live status dashboard on the master-data aircraft surface.
+
+### 12.3 Benchmark Mapping
+
+| Platform | Reference Pattern | Aircraft Form Enhancement Adoption |
+| --- | --- | --- |
+| SAP MRO | Planning-centric maintenance package creation with strong materials/schedule context | Adopt guided package creation with planning defaults and station window suggestions from aircraft context |
+| IBM Maximo for Aviation | Risk-first monitoring and anomaly visibility with AI-assisted prioritization | Adopt aircraft health strip with risk score, confidence, anomaly reasons, and recommended actions |
+| Ramco Aviation Suite | Aviation-native execution and integrated maintenance lifecycle orchestration | Adopt tightly coupled aircraft-to-work-package workflow with minimal navigation hops and lifecycle state visibility |
+
+### 12.4 Target UX Wireframes
+
+#### Wireframe A: Aircraft Detail + Operational Header
+
+```text
++---------------------------------------------------------------------------------------------------+
+| AMRO / Settings / Master Data / Aircraft / [Tail Number]                         [Refresh][New] |
++---------------------------------------------------------------------------------------------------+
+| Aircraft Identity Sheet                                    | Aircraft Status & Risk             |
+| Tail Number | Registration | Type | Model | Manufacturer   | Health: Amber  Risk: 0.72 High     |
+| Program     | Station      | Operator | Config             | Predictive: Hydraulic leak trend    |
+|                                                     [Create Work Package] [View Active Packages] |
++---------------------------------------------------------------------------------------------------+
+| Navigation Rail: [Overview] [Work Packages] [Scheduling] [Compliance] [Task Execution] [Audit]  |
++---------------------------------------------------------------------------------------------------+
+```
+
+#### Wireframe B: Create Work Package From Aircraft
+
+```text
++---------------------------------------------------------------------------------------------------+
+| Create Work Package (Aircraft: N200AA)                                                            |
++---------------------------------------------------------------------------------------------------+
+| Source Trigger: [Schedule Due] [Defect] [Campaign] [Predictive Alert]                            |
+| Maintenance Type: [Line/Base/Hangar/Shop]   Priority: [Low/Medium/High/Critical]                |
+| Planned Window: [Start DateTime] [End DateTime]  Station: [Select]                               |
+| Scope Builder:                                                                                     |
+|  - suggested scope items from maintenance program + due tasks + active anomalies                  |
+|  - editable checklist with labor estimate and required skill tags                                 |
+|                                                                                                    |
+| Compliance Snapshot: AD/SB | MEL/CDL | Certifying Staff Availability                              |
+|                                                                                                    |
+| [Save Draft] [Create & Schedule] [Create & Open Work Package]                                     |
++---------------------------------------------------------------------------------------------------+
+```
+
+#### Wireframe C: Aircraft-Centric Live Status Dashboard
+
+```text
++---------------------------------------------------------------------------------------------------+
+| Aircraft Operations Snapshot                                                                        |
++---------------------------------------------------------------------------------------------------+
+| KPI Cards: Open WP | In Progress | Deferred | Completed | RTS Blockers | SLA Risk                 |
+| Timeline: Last 24h events + next 7-day maintenance windows                                         |
+| Alerts: Predictive recommendations with confidence + rationale + related package links             |
+| Quick Actions: [Replan] [Escalate] [Export] [Open Compliance Queue]                               |
++---------------------------------------------------------------------------------------------------+
+```
+
+### 12.5 User Journey Map
+
+| Persona | Current Journey | Target Journey | Outcome |
+| --- | --- | --- | --- |
+| Planner | Navigate aircraft master data → copy aircraft id → open work package module → create package | Open aircraft record → click Create Work Package → prefilled aircraft context → create/schedule | Reduced context switching and faster package launch |
+| Engineer | Open work package list separately to check aircraft context | Open aircraft page and view active packages + risk + compliance summary inline | Better situational awareness and fewer lookup steps |
+| Inspector | Open compliance pages independently after package creation | Use aircraft-linked compliance gate panel before package submission | Earlier compliance detection and reduced rework |
+| Operations Manager | Aggregate from multiple routes for status | Use aircraft-centric dashboard with KPI and trend cards | Faster decision cadence and better exception handling |
+
+### 12.6 Functional Requirements
+
+- FR-AMRO-033@v1: Provide an aircraft-screen primary action to create work packages with aircraft context pre-bound.
+- FR-AMRO-034@v1: Support work package creation triggers from schedule due, defect, campaign, and predictive recommendations.
+- FR-AMRO-035@v1: Prefill maintenance type, station, planned window, and priority using aircraft and planner defaults, with editable override.
+- FR-AMRO-036@v1: Provide aircraft-level status dashboard with KPI cards, timeline, alert queue, and one-click drill-down actions.
+- FR-AMRO-037@v1: Provide direct route transitions from aircraft screen to work packages, scheduling, compliance, task execution, and audit.
+- FR-AMRO-038@v1: Surface predictive indicators with risk score, confidence score, rationale, and recommended scope items.
+- FR-AMRO-039@v1: Enforce role-based action controls for create/schedule/export/escalate actions with auditable events.
+- FR-AMRO-040@v1: Maintain backward-compatible CRUD behavior for aircraft master data and existing API contracts.
+
+### 12.7 Non-Functional Requirements
+
+- NFR-AMRO-013@v1 Performance: aircraft-screen work package draft creation interaction completes in ≤ 2 user clicks after opening record.
+- NFR-AMRO-014@v1 Performance: aircraft status dashboard first meaningful payload renders in ≤ 1 second for cached responses.
+- NFR-AMRO-015@v1 Security: all aircraft and work package operations remain tenant and franchise scoped with no cross-scope data leakage.
+- NFR-AMRO-016@v1 Reliability: creation workflow supports graceful fallback when upstream predictive feeds are degraded.
+- NFR-AMRO-017@v1 Accessibility: workflow is keyboard-complete and meets WCAG 2.1 AA for forms, status cards, and action controls.
+- NFR-AMRO-018@v1 Observability: emit structured audit events for create, schedule, status transitions, exports, and escalations.
+
+### 12.8 Technical Specification Baseline
+
+Frontend surfaces:
+
+- Extend aircraft route surface in AMRO master data with contextual work package launcher and status strip.
+- Reuse existing AMRO shell and mdm-template classes to preserve platform visual consistency.
+- Add aircraft-context navigation rail to AMRO operational modules with current permission checks.
+
+API and integration contracts:
+
+- Reuse existing `/api/v2/amro/work-packages` create-work-package interface for initial launch path.
+- Preserve existing `/api/v2/amro/master-data/aircraft` contracts; enhancement remains additive.
+- Include creation trigger metadata (`source`, `reference_id`, `triggered_at`) for traceability and analytics.
+
+Data and security controls:
+
+- Continue tenant/franchise scoping through existing AMRO access context and domain access enforcement.
+- Keep auditable event creation for aircraft and work package lifecycle transitions in maintenance events/audit ledgers.
+- Keep feature-flag strategy for staged rollout and fast rollback without schema-breaking migration.
+
+### 12.9 Phased Implementation Plan
+
+| Phase | Scope | Exit Criteria |
+| --- | --- | --- |
+| Phase 1: Discovery and UX Baseline | Implement aircraft screen CTA, wireframe-aligned layout shell, and route-level navigation rail | CTA visible to authorized users, no regression in aircraft CRUD, baseline UX tests pass |
+| Phase 2: Creation Workflow Integration | Connect CTA to work package creation drawer/modal with aircraft prefill and trigger metadata | Create/schedule flow succeeds with tenant-franchise scoping and auditable events |
+| Phase 3: Status Dashboard and Predictive Layer | Add KPI strip, timeline, predictive indicator panel, and quick actions | Dashboard renders with fallback behavior and role-aware controls |
+| Phase 4: Optimization and Rollout | Add measured UX optimization, telemetry, and staged tenant rollout via feature flags | KPI goals met in pilot cohort and compatibility gates pass |
+
+### 12.10 Success Criteria and KPI Framework
+
+| KPI | Baseline | Target |
+| --- | --- | --- |
+| User adoption rate of aircraft-driven work package creation | New flow not available | ≥ 70% of planner-created packages originate from aircraft screen in pilot tenants |
+| Task completion time for package creation | Current multi-screen path baseline | ≥ 35% reduction in median completion time |
+| Workflow error rate (validation/rework at creation stage) | Current baseline from audit logs | ≥ 25% reduction in creation-stage errors |
+| Navigation efficiency | Current click depth baseline | ≤ 3 clicks from aircraft screen to scheduled work package |
+| Operational visibility | Fragmented status lookup | 100% pilot users see aircraft KPI/status dashboard on route load |
+
+### 12.11 Traceability Addendum
+
+- New functional requirements FR-AMRO-033 through FR-AMRO-040 trace to existing lifecycle baseline FR-AMRO-001 through FR-AMRO-006 and overview requirements FR-AMRO-026 through FR-AMRO-032.
+- New non-functional requirements NFR-AMRO-013 through NFR-AMRO-018 extend NFR-AMRO-008 through NFR-AMRO-012 for aircraft-screen operational flow.
+- Delivery remains additive and backward compatible with existing API and data model contracts.
