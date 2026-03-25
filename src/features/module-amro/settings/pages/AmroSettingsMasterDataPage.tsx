@@ -1268,6 +1268,10 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
       })),
     [manufacturerOptions],
   );
+  const manufacturerLabelById = useMemo(
+    () => new Map(manufacturerOptions.map((option) => [option.id, option.label])),
+    [manufacturerOptions],
+  );
   const assemblyTypeSelectOptions = useMemo<SelectOption[]>(
     () =>
       assemblyTypeOptions.map((option) => ({
@@ -1275,6 +1279,10 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
         label: option.label,
         disabled: !option.active,
       })),
+    [assemblyTypeOptions],
+  );
+  const assemblyTypeLabelById = useMemo(
+    () => new Map(assemblyTypeOptions.map((option) => [option.id, option.label])),
     [assemblyTypeOptions],
   );
 
@@ -1319,6 +1327,23 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
       manufacturerOptionsLoading,
       manufacturerSelectOptions,
     ],
+  );
+
+  const resolveTableCellValue = useCallback(
+    (row: RecordRow, column: string) => {
+      if (entity === 'assembly_models') {
+        if (column === 'manufacturer_id') {
+          const raw = String(row[column] ?? '').trim();
+          return manufacturerLabelById.get(raw) ?? raw;
+        }
+        if (column === 'assembly_type_id') {
+          const raw = String(row[column] ?? '').trim();
+          return assemblyTypeLabelById.get(raw) ?? raw;
+        }
+      }
+      return String(row[column] ?? '');
+    },
+    [assemblyTypeLabelById, entity, manufacturerLabelById],
   );
 
   const handleRowSingleClick = useCallback(
@@ -1549,7 +1574,7 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
                     >
                       {tableColumns.map((column) => (
                         <TableCell key={column} className="max-w-[240px] px-4 py-3 text-left align-middle text-[14px] text-[#1F2937]">
-                          <span className="block truncate">{String(row[column] ?? '')}</span>
+                          <span className="block truncate">{resolveTableCellValue(row, column)}</span>
                         </TableCell>
                       ))}
                     </TableRow>
