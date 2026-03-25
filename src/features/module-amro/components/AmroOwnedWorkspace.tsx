@@ -227,29 +227,7 @@ export function AmroOwnedWorkspace({
         },
       ]
     : moduleKey === 'work-packages'
-      ? [
-          {
-            id: 'work-packages-create',
-            label: 'Create Work Package',
-            onClick: () => void handleCreateWorkPackage(),
-            disabled: !newWorkPackageTitle.trim() || !state.canCreateWorkPackage,
-            disabledReason: !state.canCreateWorkPackage ? 'Current role cannot create work packages.' : !newWorkPackageTitle.trim() ? 'Enter a work package title first.' : 'Ready.',
-          },
-          {
-            id: 'work-packages-advance',
-            label: 'Advance Lifecycle',
-            onClick: () => void state.advanceWorkPackageLifecycle(),
-            disabled: !state.selectedWorkPackageId || !state.canAdvanceLifecycle,
-            disabledReason: !state.selectedWorkPackageId ? 'Select a work package first.' : !state.canAdvanceLifecycle ? 'Lifecycle transition is not allowed for current stage.' : 'Ready.',
-          },
-          {
-            id: 'work-packages-delete',
-            label: 'Delete Work Package',
-            onClick: () => void state.deleteSelectedWorkPackage(),
-            disabled: !state.selectedWorkPackageId || !state.canDeleteWorkPackage,
-            disabledReason: !state.selectedWorkPackageId ? 'Select a work package first.' : !state.canDeleteWorkPackage ? 'Current role cannot delete work packages.' : 'Ready.',
-          },
-        ]
+      ? []
       : moduleKey === 'primary-users'
         ? [
             {
@@ -1113,6 +1091,61 @@ export function AmroOwnedWorkspace({
             <p className="mt-1 text-xs text-muted-foreground">
               Columns: WO# | Aircraft | Priority | Type | Station | Due | Status | Owner
             </p>
+            <div className="mt-2 grid grid-cols-1 gap-2 xl:grid-cols-[1fr_auto]">
+              <div className="flex items-center gap-2 text-xs">
+                <Badge variant="outline">AMRO &gt; Work Packages</Badge>
+              </div>
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <Input
+                  value={state.workPackageSearch}
+                  onChange={(event) => handleSearchFilterChange(event.target.value)}
+                  placeholder="Search"
+                  className="w-[180px]"
+                />
+                <Select value={state.workPackageStatusFilter} onValueChange={handleStatusFilterChange}>
+                  <SelectTrigger className="w-[120px]" aria-label="Filters">
+                    <SelectValue placeholder="Filters" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {workPackageStatusFilters.map((status) => (
+                      <SelectItem key={status} value={status}>
+                        {status}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={`${workPackageSortField}:${workPackageSortDirection}`} onValueChange={(value) => {
+                  const [field, direction] = value.split(':') as ['packageNumber' | 'lifecycleStage', 'asc' | 'desc'];
+                  setWorkPackageSortField(field);
+                  setWorkPackageSortDirection(direction);
+                }}>
+                  <SelectTrigger className="w-[140px]" aria-label="Group">
+                    <SelectValue placeholder="Group" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="packageNumber:asc">Group WO# ↑</SelectItem>
+                    <SelectItem value="packageNumber:desc">Group WO# ↓</SelectItem>
+                    <SelectItem value="lifecycleStage:asc">Group Status ↑</SelectItem>
+                    <SelectItem value="lifecycleStage:desc">Group Status ↓</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={state.selectedSavedViewId} onValueChange={handleSavedViewChange}>
+                  <SelectTrigger className="w-[140px]" aria-label="Saved View">
+                    <SelectValue placeholder="Saved View" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {state.savedWorkPackageViews.map((view) => (
+                      <SelectItem key={view.id} value={view.id}>
+                        {view.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button onClick={() => void handleCreateStarterWorkPackage()} disabled={!state.canCreateWorkPackage}>
+                  New WP
+                </Button>
+              </div>
+            </div>
             <div className="mt-2 flex flex-wrap gap-2 text-xs">
               <Badge variant="outline">Frozen identifiers: WO# / Aircraft</Badge>
               <Button variant="outline" size="sm" onClick={() => setWorkPackageSortField('packageNumber')}>Sort WO#</Button>
@@ -1391,6 +1424,21 @@ export function AmroOwnedWorkspace({
             <div className="xl:col-span-2">
               {state.selectedWorkPackage ? (
                 <Tabs value={detailTab} onValueChange={handleDetailTabChange}>
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-md border p-2 text-xs">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold">{state.selectedWorkPackage.packageNumber}</span>
+                <Badge variant="outline">{state.selectedWorkPackage.lifecycleStage}</Badge>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" size="sm" aria-label="Update work package status" onClick={() => void handleStickyHoldAction()}>Status</Button>
+                <Button variant="outline" size="sm" aria-label="Assign work package" onClick={() => void handleStickyAssignAction()}>Assign</Button>
+                <Button variant="outline" size="sm" aria-label="Schedule work package" onClick={() => void handleStickyScheduleAction()}>Schedule</Button>
+                <Button variant="outline" size="sm" aria-label="Run compliance gate check" onClick={() => void handleStickyGateCheckAction()}>Gate Check</Button>
+                <Button size="sm" disabled={!canRunWorkPackageClosure} onClick={() => setClosureConfirmOpen(true)} aria-label="Close work package with confirmation">
+                  Close
+                </Button>
+              </div>
+            </div>
             <TabsList className="grid w-full grid-cols-7">
               <TabsTrigger value="overview">Overview</TabsTrigger>
               <TabsTrigger value="tasks">Tasks</TabsTrigger>
@@ -1404,13 +1452,13 @@ export function AmroOwnedWorkspace({
               <div className="rounded-md border p-2 text-xs">
                 <p className="font-medium">Sticky Top Actions</p>
                 <p className="mt-1 text-muted-foreground">
-                  Sticky actions: Assign | Schedule | Run gate check | Hold | Close
+                  Sticky actions: Status | Assign | Schedule | Gate Check | Close
                 </p>
                 <div className="mt-2 flex flex-wrap gap-2">
+                  <Button variant="outline" size="sm" aria-label="Update work package status" onClick={() => void handleStickyHoldAction()}>Status</Button>
                   <Button variant="outline" size="sm" aria-label="Assign work package" onClick={() => void handleStickyAssignAction()}>Assign</Button>
                   <Button variant="outline" size="sm" aria-label="Schedule work package" onClick={() => void handleStickyScheduleAction()}>Schedule</Button>
                   <Button variant="outline" size="sm" aria-label="Run compliance gate check" onClick={() => void handleStickyGateCheckAction()}>Gate Check</Button>
-                  <Button variant="outline" size="sm" aria-label="Hold work package" onClick={() => void handleStickyHoldAction()}>Hold</Button>
                   <Button size="sm" disabled={!canRunWorkPackageClosure} onClick={() => setClosureConfirmOpen(true)} aria-label="Close work package with confirmation">
                     Close
                   </Button>
@@ -1581,9 +1629,22 @@ export function AmroOwnedWorkspace({
             </div>
             <div className="space-y-2 rounded-md border p-3 text-xs">
               <p className="font-medium">Side Panel</p>
-              <p className="text-muted-foreground">Activity feed: latest updates synchronized with compliance replay and task signatures.</p>
-              <p className="text-muted-foreground">Signature state: {state.canSignOff ? 'Ready for certifying signature' : 'Signature not permitted for current authority'}</p>
-              <p className="text-muted-foreground">Pending blockers: {state.complianceAnomalyAlerts.length}</p>
+              <div className="space-y-1 rounded-md border p-2">
+                <p className="font-medium">Activity Feed</p>
+                <p className="text-muted-foreground">Latest updates synchronized with compliance replay and task signatures.</p>
+              </div>
+              <div className="space-y-1 rounded-md border p-2">
+                <p className="font-medium">Signatures</p>
+                <p className="text-muted-foreground">{state.canSignOff ? 'Ready for certifying signature' : 'Signature not permitted for current authority'}</p>
+              </div>
+              <div className="space-y-1 rounded-md border p-2">
+                <p className="font-medium">Overrides</p>
+                <p className="text-muted-foreground">Pending blockers: {state.complianceAnomalyAlerts.length}</p>
+              </div>
+              <div className="space-y-1 rounded-md border p-2">
+                <p className="font-medium">Gate Outcomes</p>
+                <p className="text-muted-foreground">Compliance gate outcomes are available in replay and anomaly traces.</p>
+              </div>
               <div className="flex flex-wrap gap-2">
                 <Button variant="outline" size="sm" onClick={() => handleEscalateAction('engineering')}>Escalate to Engineering</Button>
                 <Button variant="outline" size="sm" onClick={() => handleEscalateAction('compliance')}>Escalate to Compliance</Button>

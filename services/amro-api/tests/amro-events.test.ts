@@ -6,13 +6,19 @@
 import { AmroEventsProducer } from '../src/events/amro-events.producer';
 import { AmroEventType } from '../src/events/amro-events.types';
 import { Kafka, Producer } from 'kafkajs';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock KafkaJS
-jest.mock('kafkajs');
+vi.mock('kafkajs', () => ({
+  Kafka: vi.fn(),
+  logLevel: {
+    ERROR: 1,
+  },
+}));
 
 describe('AmroEventsProducer', () => {
-  let mockProducer: jest.Mocked<Producer>;
-  let mockKafka: jest.Mocked<Kafka>;
+  let mockProducer: any;
+  let mockKafka: any;
 
   beforeEach(() => {
     // Clear singleton instance
@@ -20,22 +26,24 @@ describe('AmroEventsProducer', () => {
 
     // Setup mock producer
     mockProducer = {
-      connect: jest.fn().mockResolvedValue(undefined),
-      disconnect: jest.fn().mockResolvedValue(undefined),
-      send: jest.fn().mockResolvedValue(undefined),
+      connect: vi.fn().mockResolvedValue(undefined),
+      disconnect: vi.fn().mockResolvedValue(undefined),
+      send: vi.fn().mockResolvedValue(undefined),
     } as any;
 
     // Setup mock Kafka client
     mockKafka = {
-      producer: jest.fn().mockReturnValue(mockProducer),
+      producer: vi.fn().mockReturnValue(mockProducer),
     } as any;
 
     // Mock the Kafka constructor
-    (Kafka as jest.Mock).mockImplementation(() => mockKafka);
+    vi.mocked(Kafka).mockImplementation(function kafkaConstructorMock() {
+      return mockKafka as Kafka;
+    });
   });
 
   afterEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   describe('Initialization', () => {
@@ -74,7 +82,7 @@ describe('AmroEventsProducer', () => {
     beforeEach(async () => {
       const producer = AmroEventsProducer.getInstance();
       await producer.initialize();
-      jest.clearAllMocks();
+      vi.clearAllMocks();
     });
 
     it('should publish work order created event', async () => {
@@ -187,7 +195,7 @@ describe('AmroEventsProducer', () => {
     beforeEach(async () => {
       const producer = AmroEventsProducer.getInstance();
       await producer.initialize();
-      jest.clearAllMocks();
+      vi.clearAllMocks();
     });
 
     it('should publish task created event', async () => {
@@ -372,7 +380,7 @@ describe('AmroEventsProducer', () => {
     beforeEach(async () => {
       const producer = AmroEventsProducer.getInstance();
       await producer.initialize();
-      jest.clearAllMocks();
+      vi.clearAllMocks();
     });
 
     it('should include idempotency key in headers', async () => {
@@ -459,7 +467,7 @@ describe('AmroEventsProducer', () => {
     beforeEach(async () => {
       const producer = AmroEventsProducer.getInstance();
       await producer.initialize();
-      jest.clearAllMocks();
+      vi.clearAllMocks();
     });
 
     it('should publish maintenance event recorded event', async () => {
@@ -540,10 +548,10 @@ describe('AmroEventsProducer', () => {
     beforeEach(async () => {
       const producer = AmroEventsProducer.getInstance();
       await producer.initialize();
-      jest.clearAllMocks();
+      vi.clearAllMocks();
     });
 
-    it('should not throw on publish error (fire-and-forget)', (done) => {
+    it('should not throw on publish error (fire-and-forget)', () => {
       const producer = AmroEventsProducer.getInstance();
       mockProducer.send.mockRejectedValue(new Error('Kafka error'));
 
@@ -562,7 +570,6 @@ describe('AmroEventsProducer', () => {
         );
       }).not.toThrow();
 
-      done();
     });
 
     it('should handle invalid event type gracefully', () => {

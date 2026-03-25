@@ -7,10 +7,20 @@ import { Input } from '@/components/ui/input';
 import { HslPicker } from '@/components/ui/hsl-picker';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { THEME_PRESETS } from '@/theme/themes';
-import { useTheme } from '@/hooks/useTheme';
+import { DEFAULT_MENU_GROUP_STRIP_COLORS, useTheme } from '@/hooks/useTheme';
 import { useCRM } from '@/hooks/useCRM';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+
+const MENU_GROUP_THEME_LABELS = [
+  { key: 'menuStripCrm', label: 'CRM' },
+  { key: 'menuStripSales', label: 'Sales' },
+  { key: 'menuStripFinancials', label: 'Financials' },
+  { key: 'menuStripLogistics', label: 'Logistics' },
+  { key: 'menuStripAmro', label: 'AMRO' },
+  { key: 'menuStripAdministration', label: 'Administration' },
+  { key: 'menuStripOther', label: 'Other Modules' },
+] as const;
 
 export default function ThemeManagement() {
   const { themes, applyTheme, saveTheme, setActive, activeThemeName, toggleDark, scope, setScope } = useTheme();
@@ -46,6 +56,13 @@ export default function ThemeManagement() {
   const [headerBannerColor, setHeaderBannerColor] = useState('217 91% 60%');
   const [headerBannerTextColor, setHeaderBannerTextColor] = useState('0 0% 100%');
   const [headerBannerHeight, setHeaderBannerHeight] = useState('48px');
+  const [menuStripCrm, setMenuStripCrm] = useState(DEFAULT_MENU_GROUP_STRIP_COLORS.crm);
+  const [menuStripSales, setMenuStripSales] = useState(DEFAULT_MENU_GROUP_STRIP_COLORS.sales);
+  const [menuStripFinancials, setMenuStripFinancials] = useState(DEFAULT_MENU_GROUP_STRIP_COLORS.financials);
+  const [menuStripLogistics, setMenuStripLogistics] = useState(DEFAULT_MENU_GROUP_STRIP_COLORS.logistics);
+  const [menuStripAmro, setMenuStripAmro] = useState(DEFAULT_MENU_GROUP_STRIP_COLORS.amro);
+  const [menuStripAdministration, setMenuStripAdministration] = useState(DEFAULT_MENU_GROUP_STRIP_COLORS.administration);
+  const [menuStripOther, setMenuStripOther] = useState(DEFAULT_MENU_GROUP_STRIP_COLORS.other);
   
   const [sidebarBackground, setSidebarBackground] = useState('222 47% 11%');
   const [sidebarAccent, setSidebarAccent] = useState('217 32% 17%');
@@ -119,6 +136,13 @@ export default function ThemeManagement() {
         } else {
           setHeaderBannerHeight('48px');
         }
+        setMenuStripCrm((found as any).menuStripCrm || DEFAULT_MENU_GROUP_STRIP_COLORS.crm);
+        setMenuStripSales((found as any).menuStripSales || DEFAULT_MENU_GROUP_STRIP_COLORS.sales);
+        setMenuStripFinancials((found as any).menuStripFinancials || DEFAULT_MENU_GROUP_STRIP_COLORS.financials);
+        setMenuStripLogistics((found as any).menuStripLogistics || DEFAULT_MENU_GROUP_STRIP_COLORS.logistics);
+        setMenuStripAmro((found as any).menuStripAmro || DEFAULT_MENU_GROUP_STRIP_COLORS.amro);
+        setMenuStripAdministration((found as any).menuStripAdministration || DEFAULT_MENU_GROUP_STRIP_COLORS.administration);
+        setMenuStripOther((found as any).menuStripOther || DEFAULT_MENU_GROUP_STRIP_COLORS.other);
         setSidebarBackground(found.sidebarBackground || sidebarBackground);
         setSidebarAccent(found.sidebarAccent || sidebarAccent);
         setDark(found.dark ?? dark);
@@ -216,6 +240,13 @@ export default function ThemeManagement() {
       headerBannerColor,
       headerBannerTextColor,
       headerBannerHeight,
+      menuStripCrm,
+      menuStripSales,
+      menuStripFinancials,
+      menuStripLogistics,
+      menuStripAmro,
+      menuStripAdministration,
+      menuStripOther,
       dark,
       bgStart: bgStart ?? start,
       bgEnd: bgEnd ?? end,
@@ -235,6 +266,86 @@ export default function ThemeManagement() {
     if (nextSeparator) setTableHeaderSeparator(nextSeparator);
     if (nextTableFg) setTableForeground(nextTableFg);
   };
+
+  const themePayload = useMemo(() => ({
+    start,
+    end,
+    primary,
+    accent,
+    titleStrip,
+    angle,
+    radius,
+    sidebarBackground,
+    sidebarAccent,
+    kanbanCardBg,
+    kanbanCardRadius,
+    stripColor,
+    stripOpacity,
+    stripWidth,
+    stripAngle,
+    headerBannerVisible,
+    headerBannerContent,
+    headerBannerColor,
+    headerBannerTextColor,
+    headerBannerHeight,
+    menuStripCrm,
+    menuStripSales,
+    menuStripFinancials,
+    menuStripLogistics,
+    menuStripAmro,
+    menuStripAdministration,
+    menuStripOther,
+    dark,
+    tableHeaderText,
+    tableHeaderSeparator: tableHeaderSeparator ?? (dark ? '0 0% 100% / 0.75' : '0 0% 0% / 0.2'),
+    tableHeaderBackground: tableHeaderBackground ?? titleStrip,
+    tableBackground: tableBackground ?? (dark ? '222 47% 11%' : '0 0% 100%'),
+    tableForeground: tableForeground ?? (dark ? '210 40% 98%' : '222.2 84% 4.9%'),
+    bgStart: bgStart ?? start,
+    bgEnd: bgEnd ?? end,
+    bgAngle: bgAngle ?? angle,
+  }), [
+    accent,
+    angle,
+    bgAngle,
+    bgEnd,
+    bgStart,
+    dark,
+    end,
+    headerBannerColor,
+    headerBannerContent,
+    headerBannerHeight,
+    headerBannerTextColor,
+    headerBannerVisible,
+    kanbanCardBg,
+    kanbanCardRadius,
+    menuStripAdministration,
+    menuStripAmro,
+    menuStripCrm,
+    menuStripFinancials,
+    menuStripLogistics,
+    menuStripOther,
+    menuStripSales,
+    primary,
+    radius,
+    sidebarAccent,
+    sidebarBackground,
+    start,
+    stripAngle,
+    stripColor,
+    stripOpacity,
+    stripWidth,
+    tableBackground,
+    tableForeground,
+    tableHeaderBackground,
+    tableHeaderSeparator,
+    tableHeaderText,
+    titleStrip,
+  ]);
+
+  useEffect(() => {
+    applyTheme(themePayload);
+  }, [applyTheme, themePayload]);
 
   return (
     <DashboardLayout>
@@ -316,6 +427,37 @@ export default function ThemeManagement() {
                     <label className="text-sm">Banner Height</label>
                     <Input value={headerBannerHeight} onChange={(e) => setHeaderBannerHeight(e.target.value)} placeholder="e.g., 48px" />
                   </div>
+                </div>
+              </div>
+              <div className="col-span-full mt-2 border-t pt-4">
+                <div className="text-sm font-medium mb-3">Navigation Group Color Strips</div>
+                <div className="grid gap-4 md:grid-cols-4">
+                  <HslPicker label="CRM Strip" value={menuStripCrm} onChange={setMenuStripCrm} />
+                  <HslPicker label="Sales Strip" value={menuStripSales} onChange={setMenuStripSales} />
+                  <HslPicker label="Financials Strip" value={menuStripFinancials} onChange={setMenuStripFinancials} />
+                  <HslPicker label="Logistics Strip" value={menuStripLogistics} onChange={setMenuStripLogistics} />
+                  <HslPicker label="AMRO Strip" value={menuStripAmro} onChange={setMenuStripAmro} />
+                  <HslPicker label="Administration Strip" value={menuStripAdministration} onChange={setMenuStripAdministration} />
+                  <HslPicker label="Other Modules Strip" value={menuStripOther} onChange={setMenuStripOther} />
+                </div>
+                <div className="mt-4 grid gap-2 md:grid-cols-2 lg:grid-cols-4">
+                  {MENU_GROUP_THEME_LABELS.map(({ key, label }) => {
+                    const color = {
+                      menuStripCrm,
+                      menuStripSales,
+                      menuStripFinancials,
+                      menuStripLogistics,
+                      menuStripAmro,
+                      menuStripAdministration,
+                      menuStripOther,
+                    }[key];
+                    return (
+                      <div key={key} className="flex items-center gap-3 rounded-md border p-2">
+                        <span className="h-10 w-2 rounded-full" style={{ backgroundColor: `hsl(${color})` }} />
+                        <span className="text-sm font-medium">{label}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -420,7 +562,7 @@ export default function ThemeManagement() {
             </div>
 
             <div className="mt-6 flex items-center gap-3">
-              <Button onClick={() => applyTheme({ start, end, primary, accent, titleStrip, angle, radius, sidebarBackground, sidebarAccent, kanbanCardBg, kanbanCardRadius, stripColor, stripOpacity, stripWidth, stripAngle, headerBannerVisible, headerBannerContent, headerBannerColor, headerBannerTextColor, headerBannerHeight, dark, tableHeaderText, tableHeaderSeparator: tableHeaderSeparator ?? (dark ? '0 0% 100% / 0.75' : '0 0% 0% / 0.2'), tableHeaderBackground: tableHeaderBackground ?? titleStrip, tableBackground: tableBackground ?? (dark ? '222 47% 11%' : '0 0% 100%'), tableForeground: tableForeground ?? (dark ? '210 40% 98%' : '222.2 84% 4.9%'), bgStart: bgStart ?? start, bgEnd: bgEnd ?? end, bgAngle: bgAngle ?? angle })}>Preview</Button>
+              <Button onClick={() => applyTheme(themePayload)}>Preview</Button>
               <Button variant="secondary" onClick={() => setOpen(true)} disabled={!canWrite}>Save As</Button>
               <div className="flex-1 h-16 rounded-lg bg-gradient-primary shadow-primary flex items-center justify-between px-4">
                 <Button className="rounded-lg" variant="default">Primary Button</Button>
@@ -474,6 +616,14 @@ export default function ThemeManagement() {
                           tableHeaderSeparator: (p as any).tableHeaderSeparator ?? (isDarkPreset ? '0 0% 100% / 0.75' : '0 0% 0% / 0.2'),
                           tableHeaderBackground: (p as any).tableHeaderBackground ?? (p as any).titleStrip ?? p.accent ?? p.primary,
                           tableBackground: (p as any).tableBackground ?? (isDarkPreset ? '222 47% 11%' : '0 0% 100%'),
+                          tableForeground: (p as any).tableForeground ?? (isDarkPreset ? '210 40% 98%' : '222.2 84% 4.9%'),
+                          menuStripCrm: (p as any).menuStripCrm ?? DEFAULT_MENU_GROUP_STRIP_COLORS.crm,
+                          menuStripSales: (p as any).menuStripSales ?? DEFAULT_MENU_GROUP_STRIP_COLORS.sales,
+                          menuStripFinancials: (p as any).menuStripFinancials ?? DEFAULT_MENU_GROUP_STRIP_COLORS.financials,
+                          menuStripLogistics: (p as any).menuStripLogistics ?? DEFAULT_MENU_GROUP_STRIP_COLORS.logistics,
+                          menuStripAmro: (p as any).menuStripAmro ?? DEFAULT_MENU_GROUP_STRIP_COLORS.amro,
+                          menuStripAdministration: (p as any).menuStripAdministration ?? DEFAULT_MENU_GROUP_STRIP_COLORS.administration,
+                          menuStripOther: (p as any).menuStripOther ?? DEFAULT_MENU_GROUP_STRIP_COLORS.other,
                         });
                         // Persist preset as a scoped theme if not yet saved, then set as default for scope
                         if (canWrite) {
@@ -513,6 +663,13 @@ export default function ThemeManagement() {
                               tableHeaderBackground: (p as any).tableHeaderBackground ?? (p as any).titleStrip ?? p.accent ?? p.primary,
                               tableBackground: (p as any).tableBackground ?? (isDarkPreset ? '222 47% 11%' : '0 0% 100%'),
                               tableForeground: (p as any).tableForeground ?? (isDarkPreset ? '210 40% 98%' : '222.2 84% 4.9%'),
+                              menuStripCrm: (p as any).menuStripCrm ?? DEFAULT_MENU_GROUP_STRIP_COLORS.crm,
+                              menuStripSales: (p as any).menuStripSales ?? DEFAULT_MENU_GROUP_STRIP_COLORS.sales,
+                              menuStripFinancials: (p as any).menuStripFinancials ?? DEFAULT_MENU_GROUP_STRIP_COLORS.financials,
+                              menuStripLogistics: (p as any).menuStripLogistics ?? DEFAULT_MENU_GROUP_STRIP_COLORS.logistics,
+                              menuStripAmro: (p as any).menuStripAmro ?? DEFAULT_MENU_GROUP_STRIP_COLORS.amro,
+                              menuStripAdministration: (p as any).menuStripAdministration ?? DEFAULT_MENU_GROUP_STRIP_COLORS.administration,
+                              menuStripOther: (p as any).menuStripOther ?? DEFAULT_MENU_GROUP_STRIP_COLORS.other,
                             });
                           }
                           setActive(p.name);
@@ -552,6 +709,14 @@ export default function ThemeManagement() {
                         setTableHeaderSeparator((p as any).tableHeaderSeparator ?? (isDarkPreset ? '0 0% 100% / 0.75' : '0 0% 0% / 0.2'));
                         setTableHeaderBackground((p as any).tableHeaderBackground ?? (p as any).titleStrip ?? p.accent ?? p.primary);
                         setTableBackground((p as any).tableBackground ?? (isDarkPreset ? '222 47% 11%' : '0 0% 100%'));
+                        setTableForeground((p as any).tableForeground ?? (isDarkPreset ? '210 40% 98%' : '222.2 84% 4.9%'));
+                        setMenuStripCrm((p as any).menuStripCrm ?? DEFAULT_MENU_GROUP_STRIP_COLORS.crm);
+                        setMenuStripSales((p as any).menuStripSales ?? DEFAULT_MENU_GROUP_STRIP_COLORS.sales);
+                        setMenuStripFinancials((p as any).menuStripFinancials ?? DEFAULT_MENU_GROUP_STRIP_COLORS.financials);
+                        setMenuStripLogistics((p as any).menuStripLogistics ?? DEFAULT_MENU_GROUP_STRIP_COLORS.logistics);
+                        setMenuStripAmro((p as any).menuStripAmro ?? DEFAULT_MENU_GROUP_STRIP_COLORS.amro);
+                        setMenuStripAdministration((p as any).menuStripAdministration ?? DEFAULT_MENU_GROUP_STRIP_COLORS.administration);
+                        setMenuStripOther((p as any).menuStripOther ?? DEFAULT_MENU_GROUP_STRIP_COLORS.other);
                         if (canWrite) setOpen(true);
                       }}>Customize</Button>
                     </div>
@@ -572,9 +737,9 @@ export default function ThemeManagement() {
             </div>
             <DialogFooter>
               <Button disabled={!canWrite} onClick={async () => {
-                await saveTheme({ name, start, end, primary, accent, titleStrip, angle, radius, sidebarBackground, sidebarAccent, kanbanCardBg, kanbanCardRadius, stripColor, stripOpacity, stripWidth, stripAngle, headerBannerVisible, headerBannerContent, headerBannerColor, headerBannerTextColor, headerBannerHeight, dark, tableHeaderText, tableHeaderSeparator: tableHeaderSeparator ?? (dark ? '0 0% 100% / 0.75' : '0 0% 0% / 0.2'), tableHeaderBackground: tableHeaderBackground ?? titleStrip, tableBackground: tableBackground ?? (dark ? '222 47% 11%' : '0 0% 100%'), tableForeground: tableForeground ?? (dark ? '210 40% 98%' : '222.2 84% 4.9%'), bgStart: bgStart ?? start, bgEnd: bgEnd ?? end, bgAngle: bgAngle ?? angle });
+                await saveTheme({ name, ...themePayload });
                 setActive(name);
-                applyTheme({ start, end, primary, accent, titleStrip, angle, radius, sidebarBackground, sidebarAccent, kanbanCardBg, kanbanCardRadius, stripColor, stripOpacity, stripWidth, stripAngle, headerBannerVisible, headerBannerContent, headerBannerColor, headerBannerTextColor, headerBannerHeight, dark, tableHeaderText, tableHeaderSeparator: tableHeaderSeparator ?? (dark ? '0 0% 100% / 0.75' : '0 0% 0% / 0.2'), tableHeaderBackground: tableHeaderBackground ?? titleStrip, tableBackground: tableBackground ?? (dark ? '222 47% 11%' : '0 0% 100%'), tableForeground: tableForeground ?? (dark ? '210 40% 98%' : '222.2 84% 4.9%'), bgStart: bgStart ?? start, bgEnd: bgEnd ?? end, bgAngle: bgAngle ?? angle });
+                applyTheme(themePayload);
                 setOpen(false);
               }}>Save</Button>
             </DialogFooter>

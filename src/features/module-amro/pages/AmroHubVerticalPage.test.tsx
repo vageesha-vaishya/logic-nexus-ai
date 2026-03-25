@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import AmroHubVerticalPage from './AmroHubVerticalPage';
@@ -126,7 +126,7 @@ describe('AmroHubVerticalPage', () => {
     vi.unstubAllGlobals();
   });
 
-  it('renders operational dashboard UI for non-overview modules', () => {
+  it('renders focused workspace UI for work packages route', () => {
     mockUseDomain.mockReturnValue({ currentDomain: { code: 'AMRO' } });
     mockUseAuth.mockReturnValue({
       hasRole: vi.fn().mockImplementation((role: string) => role === 'tenant_admin'),
@@ -135,19 +135,16 @@ describe('AmroHubVerticalPage', () => {
 
     render(<AmroHubVerticalPage moduleKey="work-packages" />);
 
-    expect(screen.getByText('Work Packages')).toBeTruthy();
-    expect(screen.getByText('AMRO Domain Context Active')).toBeTruthy();
-    expect(screen.getByText('KPI Deck')).toBeTruthy();
-    expect(screen.getByRole('region', { name: 'AMRO Overview Controls' })).toBeTruthy();
-    expect(screen.getByText('Apply Dashboard Scope')).toBeTruthy();
-    expect(screen.getByText('Clear Scope')).toBeTruthy();
-    expect(screen.getByText('Work Package Overview Grid')).toBeTruthy();
-    expect(screen.getByText('Forecast Recommendation Hub')).toBeTruthy();
-    expect(screen.getByText('Anomaly Flags')).toBeTruthy();
-    expect(screen.getByText('Export KPI Snapshot')).toBeTruthy();
+    expect(screen.getByTestId('amro-owned-workspace')).toBeTruthy();
+    expect(screen.queryByText('KPI Deck')).toBeNull();
+    expect(screen.queryByRole('region', { name: 'AMRO Overview Controls' })).toBeNull();
+    expect(screen.queryByText('Work Package Overview Grid')).toBeNull();
+    expect(screen.queryByText('Forecast Recommendation Hub')).toBeNull();
+    expect(screen.queryByText('Anomaly Flags')).toBeNull();
+    expect(screen.queryByText('Export KPI Snapshot')).toBeNull();
   });
 
-  it('applies persona controls for user role and hides restricted actions', () => {
+  it('removes non-work-package operational sections for user persona', () => {
     mockUseDomain.mockReturnValue({ currentDomain: { code: 'AMRO' } });
     mockUseAuth.mockReturnValue({
       hasRole: vi.fn().mockReturnValue(false),
@@ -156,11 +153,12 @@ describe('AmroHubVerticalPage', () => {
 
     render(<AmroHubVerticalPage moduleKey="work-packages" />);
 
-    expect(screen.getByText('Role Controls: anomaly intelligence is hidden for user persona.')).toBeTruthy();
-    expect(screen.getByText('Export restricted to tenant/platform admin persona')).toBeTruthy();
+    expect(screen.getByTestId('amro-owned-workspace')).toBeTruthy();
+    expect(screen.queryByText('Role Controls: anomaly intelligence is hidden for user persona.')).toBeNull();
+    expect(screen.queryByText('Export restricted to tenant/platform admin persona')).toBeNull();
   });
 
-  it('applies and clears dashboard scope filters with planner and engineer values', () => {
+  it('does not show overview filter controls on work packages route', () => {
     mockUseDomain.mockReturnValue({ currentDomain: { code: 'AMRO' } });
     mockUseAuth.mockReturnValue({
       hasRole: vi.fn().mockImplementation((role: string) => role === 'tenant_admin'),
@@ -169,34 +167,11 @@ describe('AmroHubVerticalPage', () => {
 
     render(<AmroHubVerticalPage moduleKey="work-packages" />);
 
-    const plannerInput = screen.getByPlaceholderText('planner_id');
-    const engineerInput = screen.getByPlaceholderText('engineer_id');
-    fireEvent.change(plannerInput, { target: { value: 'planner-22' } });
-    fireEvent.change(engineerInput, { target: { value: 'engineer-31' } });
-
-    act(() => {
-      fireEvent.click(screen.getByText('Apply Dashboard Scope'));
-    });
-
-    expect(mockLoadDashboard).toHaveBeenCalledTimes(1);
-    expect(mockLoadDashboard.mock.calls[0][0]).toMatchObject({
-      plannerId: 'planner-22',
-      engineerId: 'engineer-31',
-    });
-    expect(typeof mockLoadDashboard.mock.calls[0][0].dateRange).toBe('string');
-    expect(mockLoadDashboard.mock.calls[0][0].dateRange.includes('|')).toBe(true);
-
-    act(() => {
-      fireEvent.click(screen.getByText('Clear Scope'));
-    });
-
-    expect(mockLoadDashboard).toHaveBeenCalledTimes(2);
-    expect(mockLoadDashboard.mock.calls[1][0]).toMatchObject({
-      dateRange: expect.stringMatching(/\|/),
-      regulatorProfile: 'FAA',
-    });
-    expect(screen.getByText('Critical Refresh: 30s')).toBeTruthy();
-    expect(screen.getByText('Standard Refresh: 300s')).toBeTruthy();
+    expect(screen.queryByPlaceholderText('planner_id')).toBeNull();
+    expect(screen.queryByPlaceholderText('engineer_id')).toBeNull();
+    expect(screen.queryByText('Apply Dashboard Scope')).toBeNull();
+    expect(screen.queryByText('Clear Scope')).toBeNull();
+    expect(mockLoadDashboard).not.toHaveBeenCalled();
   });
 
   it('auto-switches to AMRO domain when tenant assignments include AMRO', () => {

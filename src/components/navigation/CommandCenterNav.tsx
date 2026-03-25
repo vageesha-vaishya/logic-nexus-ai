@@ -30,6 +30,7 @@ import { cn } from '@/lib/utils';
 import { useDomain } from '@/contexts/DomainContext';
 import { FEATURE_FLAGS, useAppFeatureFlag } from '@/lib/feature-flags';
 import { useAuth } from '@/hooks/useAuth';
+import { DEFAULT_MENU_GROUP_STRIP_COLORS } from '@/hooks/useTheme';
 
 interface MenuItem {
   title: string;
@@ -59,6 +60,16 @@ const SALES_PRIORITY_ITEM_TITLES = ['Quotes', 'Quote Templates'];
 const GROUPS_STORAGE_KEY = 'sidebar:groups';
 const EXPANDED_ITEMS_STORAGE_KEY = 'sidebar:expandedItems';
 const AMRO_COLLAPSED_STORAGE_KEY = 'sidebar:amroCollapsed';
+const GROUP_STRIP_COLOR_TOKEN: Record<string, { cssVar: string; fallback: string }> = {
+  crm: { cssVar: '--menu-strip-crm', fallback: DEFAULT_MENU_GROUP_STRIP_COLORS.crm },
+  sales: { cssVar: '--menu-strip-sales', fallback: DEFAULT_MENU_GROUP_STRIP_COLORS.sales },
+  financials: { cssVar: '--menu-strip-financials', fallback: DEFAULT_MENU_GROUP_STRIP_COLORS.financials },
+  logistics: { cssVar: '--menu-strip-logistics', fallback: DEFAULT_MENU_GROUP_STRIP_COLORS.logistics },
+  amro: { cssVar: '--menu-strip-amro', fallback: DEFAULT_MENU_GROUP_STRIP_COLORS.amro },
+  admin: { cssVar: '--menu-strip-administration', fallback: DEFAULT_MENU_GROUP_STRIP_COLORS.administration },
+  administration: { cssVar: '--menu-strip-administration', fallback: DEFAULT_MENU_GROUP_STRIP_COLORS.administration },
+  other: { cssVar: '--menu-strip-other', fallback: DEFAULT_MENU_GROUP_STRIP_COLORS.other },
+};
 const GROUP_THEME: Record<string, { heading: string; trigger: string; item: string; active: string; icon: string; iconActive: string; panel: string }> = {
   crm: {
     heading: 'text-violet-700 dark:text-violet-300',
@@ -370,12 +381,16 @@ export function CommandCenterNav() {
   }, [menuGroups, searchQuery]);
 
   const getGroupTheme = (groupId: string) => GROUP_THEME[groupId] ?? GROUP_THEME.crm;
+  const getGroupStripColor = (groupId: string) => {
+    const token = GROUP_STRIP_COLOR_TOKEN[groupId] ?? GROUP_STRIP_COLOR_TOKEN.other;
+    return `hsl(var(${token.cssVar}, ${token.fallback}))`;
+  };
 
   const getNavClass = (groupId: string, isActive: boolean) => {
     const theme = getGroupTheme(groupId);
     if (collapsed) {
       return cn(
-        "group/menu-link mx-auto flex h-10 w-10 items-center justify-center rounded-xl border text-sm transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar",
+        "group/menu-link relative mx-auto flex h-10 w-10 items-center justify-center rounded-xl border text-sm transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar",
         isActive
           ? cn("font-semibold shadow-sm ring-1 ring-inset", theme.active)
           : cn("border-transparent text-muted-foreground hover:text-foreground hover:scale-[1.03]", theme.item),
@@ -412,6 +427,16 @@ export function CommandCenterNav() {
             {({ isActive }) => (
               <>
                 <span
+                  aria-hidden="true"
+                  data-menu-strip={groupId}
+                  className={cn(
+                    "absolute bg-current/0 transition-opacity duration-200",
+                    collapsed ? "left-1.5 top-1.5 h-1.5 w-7 rounded-full" : "left-0.5 top-1.5 bottom-1.5 w-1 rounded-full",
+                    isActive ? "opacity-100" : "opacity-75",
+                  )}
+                  style={{ backgroundColor: getGroupStripColor(groupId) }}
+                />
+                <span
                   className={cn(
                     "flex shrink-0 items-center justify-center rounded-md transition-all duration-200",
                     collapsed ? "h-8 w-8" : "h-7 w-7",
@@ -421,7 +446,7 @@ export function CommandCenterNav() {
                   <item.icon className={cn("shrink-0", collapsed ? "h-[18px] w-[18px]" : "h-4 w-4")} />
                 </span>
                 {!collapsed && <span className="truncate font-medium">{item.title}</span>}
-                {!collapsed && isActive && <span className="ml-auto h-2 w-2 rounded-full bg-current/80" />}
+                {!collapsed && isActive && <span className="ml-auto h-2.5 w-2.5 rounded-full" style={{ backgroundColor: getGroupStripColor(groupId) }} />}
               </>
             )}
           </NavLink>
@@ -505,7 +530,10 @@ export function CommandCenterNav() {
                     >
                       {!collapsed && (
                         <>
-                          <span>{group.label}</span>
+                          <span className="flex items-center gap-2">
+                            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: getGroupStripColor(group.id) }} />
+                            <span>{group.label}</span>
+                          </span>
                           <ChevronDown className={cn("h-3.5 w-3.5 transition-transform duration-300 ease-out", !isOpen && "-rotate-90")} />
                         </>
                       )}

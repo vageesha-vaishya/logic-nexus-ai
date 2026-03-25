@@ -700,6 +700,7 @@ export default function AmroHubVerticalPage({ moduleKey }: AmroHubVerticalPagePr
   const [overviewTrendsPage, setOverviewTrendsPage] = useState<number>(1);
   const isWorkspaceDocumentationRoute = moduleKey === 'workspace-documentation';
   const isOverviewDashboardRoute = moduleKey === 'overview';
+  const isWorkPackagesRoute = moduleKey === 'work-packages';
   const modulePageLabel = moduleKey ? AMRO_MODULE_PAGE_LABEL[moduleKey] : 'Operations Overview';
 
   useEffect(() => {
@@ -1110,6 +1111,15 @@ export default function AmroHubVerticalPage({ moduleKey }: AmroHubVerticalPagePr
             </Card>
           ) : (
             <>
+              {isWorkPackagesRoute ? (
+                <AmroWorkspaceSurface
+                  moduleKey={moduleKey}
+                  overviewPersona={activePersona}
+                  overviewControls={overviewControls}
+                  overviewTelemetry={overviewTelemetry}
+                />
+              ) : (
+                <>
           <Card data-amro-base-surface="operations-overview">
             <CardHeader className="pb-2">
               <CardTitle>{modulePageLabel}</CardTitle>
@@ -1543,6 +1553,8 @@ export default function AmroHubVerticalPage({ moduleKey }: AmroHubVerticalPagePr
               />
             </PlatformWidgetSlot>
           )}
+                </>
+              )}
             </>
           )}
         </div>

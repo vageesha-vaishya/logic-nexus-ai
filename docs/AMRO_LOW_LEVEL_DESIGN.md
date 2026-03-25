@@ -2642,6 +2642,271 @@ Implementation Notes:
   - Feeds compliance alert counters and risk severity distribution visualizations.
 ```
 
+```text
+Component Type: Table
+Component Name: amro_audit.amro_workflow_tx_log
+Purpose: Persist immutable workflow transition transaction events using the same transactional boundary as work package state mutations.
+Estimated Row Count: 100,000-20,000,000 rows per tenant per year.
+Primary Key: tx_id
+Foreign Keys:
+  - tenant_id -> public.tenants(id) ON DELETE CASCADE
+  - franchise_id -> public.franchises(id) ON DELETE SET NULL
+Unique Constraints:
+  - uq_amro_workflow_tx_log_transition(tenant_id, transition_id)
+Check Constraints:
+  - tx_status in (STARTED, SUCCESS, FAILED)
+Defaults:
+  - tx_id: gen_random_uuid()
+  - tx_timestamp: now()
+Indexes:
+  - idx_amro_workflow_tx_log_scope_transition(tenant_id, transition_id)
+  - idx_amro_workflow_tx_log_scope_timestamp(tenant_id, tx_timestamp DESC)
+  - idx_amro_workflow_tx_log_status(tenant_id, tx_status, tx_timestamp DESC)
+Columns:
+  - tx_id | uuid | nullable:no | default:gen_random_uuid()
+  - tenant_id | uuid | nullable:no | default:none
+  - franchise_id | uuid | nullable:yes | default:none
+  - transition_id | text | nullable:no | default:none
+  - gate_name | text | nullable:no | default:none
+  - input_payload | jsonb | nullable:no | default:'{}'::jsonb
+  - output_payload | jsonb | nullable:no | default:'{}'::jsonb
+  - tx_timestamp | timestamptz | nullable:no | default:now()
+  - user_ctx | jsonb | nullable:no | default:'{}'::jsonb
+  - tx_status | text | nullable:no | default:none
+Security Considerations:
+  - RLS enabled and scoped by tenant/franchise context.
+  - Sensitive payload keys are masked before persistence.
+  - Immutable-write trigger blocks update and delete operations.
+Implementation Notes:
+  - Migration: 20260324195500_amro_workflow_tx_log_and_version.sql
+  - Trigger function: amro_audit.prevent_amro_workflow_tx_log_mutation()
+```
+
+```text
+Component Type: SQL Function
+Component Name: amro_audit.prevent_amro_workflow_tx_log_mutation()
+Purpose: Enforce immutability of workflow transaction logs by rejecting update and delete attempts.
+Input Parameters:
+  - none
+Output Contract:
+  - trigger (raises exception on UPDATE/DELETE)
+Dependencies:
+  - amro_audit.amro_workflow_tx_log
+Security:
+  - Security Definer
+  - Grants execution to authenticated and service_role
+  - Tenant/franchise access behavior enforced by table RLS prior to trigger execution
+Performance:
+  - Expected p95 <= 1ms per attempted mutation
+Validation:
+  - src/pages/api/v2/amro/work-packages.test.ts
+```
+
+```text
+Component Type: Table
+Component Name: public.work_packages (version extension)
+Purpose: Add optimistic locking version control for concurrent work package transitions.
+Estimated Row Count: Existing `public.work_packages` volume; +1 integer column.
+Primary Key: id
+Foreign Keys:
+  - unchanged from existing table contract
+Unique Constraints:
+  - unchanged from existing table contract
+Check Constraints:
+  - version >= 1
+Defaults:
+  - version: 1
+Indexes:
+  - idx_work_packages_id_version(id, version)
+Columns:
+  - version | integer | nullable:no | default:1
+Security Considerations:
+  - Version checks prevent lost updates across concurrent transitions.
+  - RLS behavior inherits existing tenant/franchise scope controls.
+Implementation Notes:
+  - Migration: 20260324195500_amro_workflow_tx_log_and_version.sql
+  - Enforced in API transition path with expected_version precondition.
+```
+
+```text
+Component Type: SQL Function
+Component Name: amro_ops.amro_ops_create_work_package(...)
+Purpose: Create a tenant/franchise-scoped AMRO work package with persistence-level validation for aircraft state, maintenance type, priority, and non-empty scope.
+Input Parameters:
+  - p_tenant_id | text | required
+  - p_franchise_id | text | required
+  - p_user_id | text | required
+  - p_aircraft_id | text | required
+  - p_maintenance_type | text | required
+  - p_planned_window_from | timestamptz | required
+  - p_planned_window_to | timestamptz | required
+  - p_station | text | required
+  - p_priority | text | required
+  - p_scope_items | text[] | required (min length 1)
+  - p_creation_trigger_source | text | required
+  - p_creation_trigger_reference_id | text | required
+  - p_creation_triggered_at | timestamptz | required
+  - p_engineer_plan | jsonb | optional
+Output Contract:
+  - work_package_id | text
+  - status | text
+  - version | integer
+  - created_at | timestamptz
+  - created_by | text
+  - updated_at | timestamptz
+  - updated_by | text
+Dependencies:
+  - amro_ops.work_package
+Validation Rules:
+  - aircraft_id cannot contain inactive/retired markers
+  - maintenance_type in (line, base, component, a-check, c-check)
+  - priority in (low, medium, high, critical)
+  - p_scope_items length >= 1
+Security:
+  - Requires tenant/franchise identifiers and persists scoped ownership columns
+  - Execution granted to authenticated role in amro_ops schema
+Performance:
+  - Single-row insert path with indexed primary-key lookup return
+Implementation Notes:
+  - Migration: V2024.06.15.002__add_version_column_work_package.sql
+  - Used by: src/pages/api/v2/amro/work-package-persistence.ts
+```
+
+```text
+Component Type: SQL Function
+Component Name: amro_ops.amro_ops_transition_work_package(...)
+Purpose: Transition work package status with optimistic locking, policy-matrix validation, role authorization, and in-transaction workflow audit logging.
+Input Parameters:
+  - p_tenant_id | text | required
+  - p_franchise_id | text | required
+  - p_user_id | text | required
+  - p_work_package_id | text | required
+  - p_current_status | text | required
+  - p_target_status | text | required
+  - p_reason_code | text | required
+  - p_actor_signature | text | required
+  - p_expected_version | integer | required
+  - p_actor_role | text | required
+  - p_transition_id | text | required
+  - p_gate_name | text | required
+  - p_input_payload | jsonb | optional
+  - p_user_ctx | jsonb | optional
+Output Contract:
+  - work_package_id | text
+  - status | text
+  - version | integer
+  - created_at | timestamptz
+  - created_by | text
+  - updated_at | timestamptz
+  - updated_by | text
+Dependencies:
+  - amro_ops.work_package
+  - amro_audit.amro_workflow_tx_log
+Validation Rules:
+  - Current and target statuses must be in the supported lifecycle set
+  - Transition path must satisfy policy matrix constraints
+  - Role-to-status mapping must allow requested target status
+  - Version must match expected_version to avoid lost updates
+Failure Modes:
+  - optimistic lock conflict: version mismatch
+  - current_status is invalid for policy matrix
+  - target_status is invalid for policy matrix
+  - transition is not allowed by policy matrix
+  - transition is not allowed for role
+Security:
+  - Tenant/franchise filters enforced in update predicate
+  - Audit insert records transition/user context for immutable traceability
+Performance:
+  - Single-row update with direct-key predicate and append-only audit write
+Implementation Notes:
+  - Migration: V2024.06.15.002__add_version_column_work_package.sql
+  - Used by: src/pages/api/v2/amro/work-package-persistence.ts
+```
+
+```text
+Component Type: SQL Function
+Component Name: amro_ops.amro_ops_clone_template_work_package(...)
+Purpose: Clone a template into a new tenant/franchise-scoped work package after persistence-level aircraft activity validation.
+Input Parameters:
+  - p_tenant_id | text | required
+  - p_franchise_id | text | required
+  - p_user_id | text | required
+  - p_template_id | text | required
+  - p_template_name | text | required
+  - p_template_version | text | required
+  - p_aircraft_id | text | required
+  - p_override_fields | jsonb | optional
+Output Contract:
+  - work_package_id | text
+  - status | text
+  - version | integer
+  - created_at | timestamptz
+  - created_by | text
+  - updated_at | timestamptz
+  - updated_by | text
+  - inherited_tasks_count | integer
+Dependencies:
+  - amro_ops.work_package
+Validation Rules:
+  - aircraft_id cannot contain inactive/retired markers
+Security:
+  - Requires tenant/franchise identifiers and persists scoped ownership columns
+  - Execution granted to authenticated role in amro_ops schema
+Performance:
+  - Single-row insert path with deterministic inherited task count return
+Implementation Notes:
+  - Migration: V2024.06.15.002__add_version_column_work_package.sql
+  - Used by: src/pages/api/v2/amro/work-package-persistence.ts
+```
+
+```text
+Component Type: Module API
+Component Name: GET /api/v2/amro/ops/health/persistence
+Purpose: Validate synchronous connectivity to amro_ops persistence path and report elapsed latency against a 500ms threshold.
+Input Contract:
+  - none
+Output Contract:
+  - version | string(v2)
+  - status | enum(ok,degraded)
+  - schema | string(amro_ops)
+  - elapsed_ms | number
+  - threshold_ms | number(500)
+Authorization:
+  - authenticated AMRO domain tenant or franchise scope with dashboards.view permission
+Data Dependencies:
+  - public.work_packages
+Failure Modes:
+  - 403 unauthorized AMRO domain access
+  - 405 unsupported method
+  - 500 persistence health probe failure
+Performance Targets:
+  - p95 <= 500ms, synchronous response required
+```
+
+```text
+Component Type: Module API
+Component Name: GET /api/v2/amro/audits/workflow/{transitionId}
+Purpose: Fetch immutable workflow transaction audit record for a specific transition.
+Input Contract:
+  - transitionId | string | required path parameter
+Output Contract:
+  - version | string(v2)
+  - transition_id | string
+  - elapsed_ms | number
+  - p99_target_ms | number(50)
+  - log | object(tx_id, gate_name, input_payload, output_payload, tx_timestamp, user_ctx, tx_status)
+Authorization:
+  - authenticated AMRO domain tenant or franchise scope with dashboards.view permission
+Data Dependencies:
+  - amro_audit.amro_workflow_tx_log
+Failure Modes:
+  - 403 unauthorized AMRO domain access
+  - 404 transition log not found
+  - 405 unsupported method
+Performance Targets:
+  - p99 <= 50ms for indexed transition lookup
+```
+
 ---
 
 **Document End**  

@@ -660,6 +660,30 @@ describe('/api/v2/amro/overview-kpi', () => {
     );
   });
 
+  it('rejects unsupported trend window values', async () => {
+    process.env.AMRO_OVERVIEW_KPI_V2_ENABLED = 'true';
+    const req: ApiRequest = {
+      method: 'GET',
+      query: {
+        interface: 'load-operational-trends',
+        metric_key: 'aog_count',
+        window: '14d',
+        compare_window: '30d',
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(sendErrorResponse).toHaveBeenCalledWith(
+      res,
+      expect.any(Error),
+      'corr-amro-overview-kpi',
+      { apiVersion: 'v2' }
+    );
+  });
+
   it('returns trends payload for allow-listed metric and valid compare window', async () => {
     process.env.AMRO_OVERVIEW_KPI_V2_ENABLED = 'true';
     const req: ApiRequest = {
@@ -685,6 +709,54 @@ describe('/api/v2/amro/overview-kpi', () => {
     expect((res.jsonBody as any)?.output).toHaveProperty('certification_decision_queue');
     expect((res.jsonBody as any)?.output).toHaveProperty('audit_timeline');
     expect((res.jsonBody as any)?.output).toHaveProperty('forecast_recommendation_hub');
+  });
+
+  it('uses telemetry-only trend fallback and filters invalid timestamps', async () => {
+    process.env.AMRO_OVERVIEW_KPI_V2_ENABLED = 'true';
+    const telemetryRows: Record<string, unknown[]> = {
+      task_execution_status: [],
+      scheduling_board_data: [],
+      certification_records: [],
+      audit_trails: [],
+      forecast_recommendations: [],
+      amro_operational_telemetry: [
+        {
+          id: 'tel-1',
+          tenant_id: 'tenant-1',
+          recorded_at: new Date().toISOString(),
+          active_work_packages: 21,
+        },
+        {
+          id: 'tel-2',
+          tenant_id: 'tenant-1',
+          recorded_at: 'not-a-date',
+          active_work_packages: 11,
+        },
+      ],
+    };
+    vi.mocked(getSupabaseAdminClient).mockReturnValue({
+      from: createSupabaseFromMock(async (tableName) => ({
+        data: telemetryRows[tableName] || [],
+        error: null,
+      })),
+    } as any);
+    const req: ApiRequest = {
+      method: 'GET',
+      query: {
+        interface: 'load-operational-trends',
+        metric_key: 'open_work_packages',
+        window: '7d',
+        compare_window: '30d',
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.output?.time_series?.length).toBeGreaterThan(0);
+    expect((res.jsonBody as any)?.output?.task_execution_monitor?.completed_tasks).toBe(0);
   });
 
   it('returns trend pagination metadata for certification queue and audit timeline', async () => {
@@ -962,6 +1034,58 @@ describe('/api/v2/amro/overview-kpi', () => {
     );
   });
 
+  it('rejects export for unsupported format', async () => {
+    process.env.AMRO_OVERVIEW_KPI_V2_ENABLED = 'true';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: {
+        interface: 'export-kpi-snapshot',
+      },
+      body: {
+        format: 'docx',
+        date_range: '2026-03-01T00:00:00.000Z:2026-03-21T00:00:00.000Z',
+        selected_widgets: ['kpi_cards'],
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(sendErrorResponse).toHaveBeenCalledWith(
+      res,
+      expect.any(Error),
+      'corr-amro-overview-kpi',
+      { apiVersion: 'v2' }
+    );
+  });
+
+  it('rejects export for unsupported widget key', async () => {
+    process.env.AMRO_OVERVIEW_KPI_V2_ENABLED = 'true';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: {
+        interface: 'export-kpi-snapshot',
+      },
+      body: {
+        format: 'pdf',
+        date_range: '2026-03-01T00:00:00.000Z:2026-03-21T00:00:00.000Z',
+        selected_widgets: ['kpi_cards', 'unknown_widget'],
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(sendErrorResponse).toHaveBeenCalledWith(
+      res,
+      expect.any(Error),
+      'corr-amro-overview-kpi',
+      { apiVersion: 'v2' }
+    );
+  });
+
   it('blocks M9 export interface when M8 is not completed', async () => {
     process.env.AMRO_OVERVIEW_KPI_V2_ENABLED = 'true';
     process.env.AMRO_SEQ_M8_STATUS = 'in-progress';
@@ -987,5 +1111,189 @@ describe('/api/v2/amro/overview-kpi', () => {
       'corr-amro-overview-kpi',
       { apiVersion: 'v2' }
     );
+  });
+
+  it('returns structured freshness metadata with invalidation details', async () => {
+    process.env.AMRO_OVERVIEW_KPI_V2_ENABLED = 'true';
+    process.env.AMRO_KPI_FRESHNESS_THRESHOLDS = JSON.stringify({ overview_dashboard: 60 });
+    const req: ApiRequest = {
+      method: 'GET',
+      query: {
+        interface: 'load-kpi-dashboard',
+        date_range: '2026-03-01T00:00:00.000Z:2026-03-21T00:00:00.000Z',
+        cache_age_seconds: '1200',
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.output?.freshness_warning).toContain('Data may be stale');
+    expect((res.jsonBody as any)?.output?.freshness?.status).toBe('refreshing');
+    expect((res.jsonBody as any)?.output?.freshness?.invalidated).toBe(true);
+    expect((res.jsonBody as any)?.output?.freshness?.threshold_seconds).toBe(60);
+    expect((res.jsonBody as any)?.output?.freshness?.cache_hit_ratio).toBeGreaterThanOrEqual(0);
+  });
+
+  it('returns comprehensive job metadata for export-kpi-snapshot', async () => {
+    process.env.AMRO_OVERVIEW_KPI_V2_ENABLED = 'true';
+    process.env.AMRO_KPI_EXPORT_RETENTION_DAYS = '60';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: {
+        interface: 'export-kpi-snapshot',
+      },
+      body: {
+        format: 'pdf',
+        date_range: '2026-03-01T00:00:00.000Z:2026-03-21T00:00:00.000Z',
+        selected_widgets: ['kpi_cards', 'trend_lines'],
+        retention_days: 60,
+        storage_tier: 'warm',
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.output?.export_job_id).toContain('tenant-1-kpi-export');
+    expect((res.jsonBody as any)?.output?.job_status).toBe('succeeded');
+    expect((res.jsonBody as any)?.output?.completion_pct).toBe(100);
+    expect((res.jsonBody as any)?.output?.signed_download_url).toContain('/api/v2/amro/overview-kpi/download/');
+    expect((res.jsonBody as any)?.output?.artifact?.retention_days).toBe(60);
+    expect((res.jsonBody as any)?.policy?.retention_days).toBe(60);
+    expect((res.jsonBody as any)?.dependencies?.analytics_worker?.state).toMatch(/healthy|degraded/);
+    expect((res.jsonBody as any)?.lifecycle?.cleanup).toHaveProperty('cleanup_job_id');
+    expect((res.jsonBody as any)?.monitoring?.cache_metrics).toHaveProperty('hit_ratio_pct');
+  });
+
+  it('applies dependency fallback and degraded status when worker/storage/signing fail', async () => {
+    process.env.AMRO_OVERVIEW_KPI_V2_ENABLED = 'true';
+    process.env.AMRO_EXPORT_FORCE_WORKER_FAILURE = 'true';
+    process.env.AMRO_EXPORT_FORCE_STORAGE_FAILURE = 'true';
+    process.env.AMRO_EXPORT_FORCE_SIGNED_URL_FAILURE = 'true';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: {
+        interface: 'export-kpi-snapshot',
+      },
+      body: {
+        format: 'csv',
+        date_range: '2026-03-01T00:00:00.000Z:2026-03-21T00:00:00.000Z',
+        selected_widgets: ['kpi_cards'],
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.dependencies?.analytics_worker?.fallback_used).toBe(true);
+    expect((res.jsonBody as any)?.dependencies?.object_storage?.fallback_used).toBe(true);
+    expect((res.jsonBody as any)?.dependencies?.signed_download?.fallback_used).toBe(true);
+    expect((res.jsonBody as any)?.output?.job_status).toBe('succeeded');
+  });
+
+  it('returns dependency health endpoint payload', async () => {
+    process.env.AMRO_OVERVIEW_KPI_V2_ENABLED = 'true';
+    const req: ApiRequest = {
+      method: 'GET',
+      query: {
+        interface: 'export-dependency-health',
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.interface).toBe('export-dependency-health');
+    expect((res.jsonBody as any)?.output?.dependencies?.length).toBe(3);
+    expect((res.jsonBody as any)?.output?.dependencies?.[0]).toHaveProperty('dependency');
+    expect((res.jsonBody as any)?.output?.availability).toMatch(/available|degraded/);
+  });
+
+  it('returns unsupported interface response for unknown interface', async () => {
+    process.env.AMRO_OVERVIEW_KPI_V2_ENABLED = 'true';
+    const req: ApiRequest = {
+      method: 'GET',
+      query: {
+        interface: 'unknown-interface',
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(400);
+    expect((res.jsonBody as any)?.error).toContain('Unsupported interface');
+  });
+
+  it('returns export monitoring dashboard with storage and cache metrics', async () => {
+    process.env.AMRO_OVERVIEW_KPI_V2_ENABLED = 'true';
+    const exportReq: ApiRequest = {
+      method: 'POST',
+      query: {
+        interface: 'export-kpi-snapshot',
+      },
+      body: {
+        format: 'pdf',
+        date_range: '2026-03-01T00:00:00.000Z:2026-03-21T00:00:00.000Z',
+        selected_widgets: ['kpi_cards'],
+      },
+      headers: {},
+    };
+    const exportRes = createResponse();
+    await handler(exportReq, exportRes);
+
+    const dashboardReq: ApiRequest = {
+      method: 'GET',
+      query: {
+        interface: 'load-export-monitoring-dashboard',
+      },
+      headers: {},
+    };
+    const dashboardRes = createResponse();
+    await handler(dashboardReq, dashboardRes);
+
+    expect(dashboardRes.statusCode).toBe(200);
+    expect((dashboardRes.jsonBody as any)?.interface).toBe('load-export-monitoring-dashboard');
+    expect((dashboardRes.jsonBody as any)?.output?.export_success_rate_pct).toBeGreaterThanOrEqual(0);
+    expect((dashboardRes.jsonBody as any)?.output?.storage_usage).toHaveProperty('total_bytes');
+    expect((dashboardRes.jsonBody as any)?.output?.cache_metrics).toHaveProperty('hit_ratio_pct');
+  });
+
+  it('handles concurrent exports and keeps job identifiers unique', async () => {
+    process.env.AMRO_OVERVIEW_KPI_V2_ENABLED = 'true';
+    const requests = Array.from({ length: 12 }).map((_, index) => {
+      const req: ApiRequest = {
+        method: 'POST',
+        query: {
+          interface: 'export-kpi-snapshot',
+        },
+        body: {
+          format: index % 2 === 0 ? 'csv' : 'xlsx',
+          date_range: '2026-03-01T00:00:00.000Z:2026-03-21T00:00:00.000Z',
+          selected_widgets: ['kpi_cards', 'trend_lines'],
+        },
+        headers: {},
+      };
+      const res = createResponse();
+      return { req, res };
+    });
+
+    await Promise.all(requests.map((entry) => handler(entry.req, entry.res)));
+
+    const jobIds = requests.map((entry) => (entry.res.jsonBody as any)?.output?.export_job_id);
+    const uniqueJobIds = new Set(jobIds);
+    expect(requests.every((entry) => entry.res.statusCode === 200)).toBe(true);
+    expect(uniqueJobIds.size).toBe(jobIds.length);
+    expect(jobIds.every((id) => typeof id === 'string' && id.includes('tenant-1-kpi-export'))).toBe(true);
   });
 });

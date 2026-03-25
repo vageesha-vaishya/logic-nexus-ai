@@ -125,6 +125,14 @@ describe('WorkOrdersService', () => {
     });
 
     expect(created.id).toBe('wp-9');
+    const workPackageInsertBuilder = mockFrom.mock.results[1]?.value;
+    const insertPayload = workPackageInsertBuilder?.insert?.mock.calls?.[0]?.[0];
+    expect(insertPayload).toEqual(
+      expect.objectContaining({
+        work_order_number: expect.stringMatching(/^WP-/),
+        work_package_number: expect.stringMatching(/^WP-/),
+      }),
+    );
     expect(amroEventsProducer.publishWorkOrderEvent).toHaveBeenCalledTimes(1);
     expect(workPackagesStream.publish).toHaveBeenCalledWith(expect.objectContaining({ type: 'created' }));
   });

@@ -91,6 +91,16 @@ describe('CommandCenterNav', () => {
     expect(screen.queryByText('Work Packages')).not.toBeInTheDocument();
   });
 
+  it('renders visible color strips for each menu group item', () => {
+    sessionStorage.setItem('sidebar:groups', JSON.stringify({ amro: true }));
+    renderNav('/dashboard/amro/overview');
+
+    const overviewLink = screen.getByRole('link', { name: 'Overview' });
+    const strip = overviewLink.querySelector('[data-menu-strip="amro"]');
+    expect(strip).not.toBeNull();
+    expect(strip).toHaveAttribute('style', expect.stringContaining('var(--menu-strip-amro,'));
+  });
+
   it('renders distinct CRM and Sales navigation sections', () => {
     localStorage.setItem('sidebar:groups', JSON.stringify({ crm: true, sales: true }));
     renderNav('/dashboard');

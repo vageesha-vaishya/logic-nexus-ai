@@ -34,7 +34,7 @@ describe('amro domain separation strategy', () => {
     expect(appRoutes).toContain('const AmroSettings');
     expect(appRoutes).toContain('path="/dashboard/amro/settings"');
     expect(appRoutes).toContain('path="/dashboard/amro/settings/master-data"');
-    expect(appRoutes).toContain('Navigate to="/dashboard/amro/settings/master-data"');
+    expect(appRoutes).toContain('Navigate to="/dashboard/amro/settings/master-data/aircraft"');
   });
 
   it('implements all AMRO-owned bounded-context capability surfaces', () => {

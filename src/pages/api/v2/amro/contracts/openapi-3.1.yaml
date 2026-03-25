@@ -10,6 +10,12 @@ paths:
     get:
       operationId: listAmroWorkPackages
       tags: [AMRO]
+      parameters:
+        - in: query
+          name: registryVersion
+          required: false
+          schema:
+            type: string
       responses:
         '200':
           description: Work packages response
@@ -69,6 +75,9 @@ paths:
                   properties:
                     work_package_id:
                       type: string
+                    expected_version:
+                      type: integer
+                      minimum: 1
                     target_status:
                       type: string
                     reason_code:
@@ -79,6 +88,8 @@ paths:
                   required: [template_id, aircraft_id, override_fields]
                   properties:
                     template_id:
+                      type: string
+                    registry_version:
                       type: string
                     aircraft_id:
                       type: string
@@ -214,6 +225,38 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/WorkPackageMutationResponse'
+  /api/v2/amro/templates:
+    get:
+      operationId: listAmroTemplates
+      tags: [AMRO]
+      parameters:
+        - in: query
+          name: registryVersion
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Template registry list response
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [version, source, registryVersion, templates]
+                properties:
+                  version:
+                    type: string
+                    const: v2
+                  source:
+                    type: string
+                    const: template-registry
+                  registryVersion:
+                    type: string
+                  templates:
+                    type: array
+                    items:
+                      type: object
+                      additionalProperties: true
   /api/v2/amro/work-packages/{id}:
     get:
       operationId: getAmroWorkPackageDetail
@@ -287,6 +330,63 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/WorkPackageTransitionResponse'
+  /api/v2/amro/ops/health/persistence:
+    get:
+      operationId: amroOpsPersistenceHealth
+      tags: [AMRO]
+      responses:
+        '200':
+          description: Persistence connectivity is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [version, status, schema, elapsed_ms, threshold_ms]
+                properties:
+                  version:
+                    type: string
+                    const: v2
+                  status:
+                    type: string
+                    enum: [ok, degraded]
+                  schema:
+                    type: string
+                    const: amro_ops
+                  elapsed_ms:
+                    type: number
+                  threshold_ms:
+                    type: number
+  /api/v2/amro/audits/workflow/{transitionId}:
+    get:
+      operationId: getAmroWorkflowAudit
+      tags: [AMRO]
+      parameters:
+        - in: path
+          name: transitionId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Workflow transaction log entry
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [version, transition_id, elapsed_ms, p99_target_ms, log]
+                properties:
+                  version:
+                    type: string
+                    const: v2
+                  transition_id:
+                    type: string
+                  elapsed_ms:
+                    type: number
+                  p99_target_ms:
+                    type: number
+                  log:
+                    type: object
+                    additionalProperties: true
   /api/v2/amro/schedules:
     get:
       operationId: listAmroSchedules

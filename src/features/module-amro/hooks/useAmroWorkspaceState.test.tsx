@@ -336,6 +336,60 @@ describe('useAmroWorkspaceState realtime schedule connectivity', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('sanitizes saved views returned by v2 work package fallback', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/api/v1/work-packages') && !url.includes('/tasks') && !url.includes('/materials')) {
+        throw new TypeError('Failed to fetch');
+      }
+      if (url.includes('/api/v2/amro/work-packages')) {
+        return jsonResponse({
+          data: {
+            workPackages: [{ id: 'wp-v2-1', code: 'WP-V2-001', status: 'planning' }],
+          },
+          savedViews: [
+            { id: '', name: 'Broken Empty Id', filters: { status: 'all', search: '' } },
+            { id: 'default-all', name: '', filters: { status: 'all', search: '' } },
+            { id: 'valid-view', name: 'Valid View', filters: { status: 'scheduled', search: 'wp' } },
+          ],
+        });
+      }
+      if (url.includes('/api/v2/amro/schedules')) {
+        return jsonResponse({ output: { schedules: [] } });
+      }
+      if (url.includes('/api/v1/assets')) {
+        return jsonResponse({ data: [] });
+      }
+      if (url.includes('/api/v1/qualifications')) {
+        return jsonResponse({ data: [] });
+      }
+      if (url.includes('/api/v1/compliance/summary')) {
+        return jsonResponse({ data: { authorityCoverage: ['FAA'], activeRulePacks: 1 } });
+      }
+      if (url.includes('/api/v1/evidence')) {
+        return jsonResponse({ data: [] });
+      }
+      if (url.includes('/api/v1/forecast/recommendations')) {
+        return jsonResponse({ data: [] });
+      }
+      if (url.includes('/api/v1/work-packages/') && url.includes('/materials')) {
+        return jsonResponse({ data: [] });
+      }
+      return jsonResponse({ data: [] });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { result } = renderHook(() => useAmroWorkspaceState());
+
+    await waitFor(() => expect(result.current.workPackages.length).toBe(1));
+    expect(result.current.workPackages[0]?.packageNumber).toBe('WP-V2-001');
+    expect(result.current.savedWorkPackageViews.some((view) => view.id === '')).toBe(false);
+    expect(result.current.savedWorkPackageViews.some((view) => view.name === '')).toBe(false);
+    expect(result.current.savedWorkPackageViews.some((view) => view.id === 'default-all')).toBe(true);
+    expect(result.current.savedWorkPackageViews.some((view) => view.id === 'valid-view')).toBe(true);
+    expect(result.current.selectedSavedViewId).toBe('default-all');
+  });
+
   it('loads certification workflow states through certification interfaces', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);

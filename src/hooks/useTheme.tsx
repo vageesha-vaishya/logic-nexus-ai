@@ -35,7 +35,43 @@ export type SavedTheme = {
   headerBannerColor?: string;
   headerBannerTextColor?: string;
   headerBannerHeight?: string;
+  menuStripCrm?: string;
+  menuStripSales?: string;
+  menuStripFinancials?: string;
+  menuStripLogistics?: string;
+  menuStripAmro?: string;
+  menuStripAdministration?: string;
+  menuStripOther?: string;
   createdAt: string;
+};
+
+export type MenuGroupColorKey =
+  | 'crm'
+  | 'sales'
+  | 'financials'
+  | 'logistics'
+  | 'amro'
+  | 'administration'
+  | 'other';
+
+export const MENU_GROUP_COLOR_KEYS: MenuGroupColorKey[] = [
+  'crm',
+  'sales',
+  'financials',
+  'logistics',
+  'amro',
+  'administration',
+  'other',
+];
+
+export const DEFAULT_MENU_GROUP_STRIP_COLORS: Record<MenuGroupColorKey, string> = {
+  crm: '272 85% 55%',
+  sales: '217 91% 60%',
+  financials: '150 83% 40%',
+  logistics: '38 92% 50%',
+  amro: '190 95% 42%',
+  administration: '310 78% 55%',
+  other: '220 15% 60%',
 };
 
 type ThemeContextValue = {
@@ -111,6 +147,13 @@ const normalizeSavedThemeForStartup = (theme: SavedTheme): SavedTheme => {
     headerBannerColor: normalizeHslToken(theme.headerBannerColor || theme.stripColor || theme.accent || theme.primary, '217 91% 60%'),
     headerBannerTextColor: normalizeHslToken(theme.headerBannerTextColor, '0 0% 100%'),
     headerBannerHeight: theme.headerBannerHeight || '48px',
+    menuStripCrm: normalizeHslToken(theme.menuStripCrm, DEFAULT_MENU_GROUP_STRIP_COLORS.crm),
+    menuStripSales: normalizeHslToken(theme.menuStripSales, DEFAULT_MENU_GROUP_STRIP_COLORS.sales),
+    menuStripFinancials: normalizeHslToken(theme.menuStripFinancials, DEFAULT_MENU_GROUP_STRIP_COLORS.financials),
+    menuStripLogistics: normalizeHslToken(theme.menuStripLogistics, DEFAULT_MENU_GROUP_STRIP_COLORS.logistics),
+    menuStripAmro: normalizeHslToken(theme.menuStripAmro, DEFAULT_MENU_GROUP_STRIP_COLORS.amro),
+    menuStripAdministration: normalizeHslToken(theme.menuStripAdministration, DEFAULT_MENU_GROUP_STRIP_COLORS.administration),
+    menuStripOther: normalizeHslToken(theme.menuStripOther, DEFAULT_MENU_GROUP_STRIP_COLORS.other),
   };
 };
 
@@ -226,6 +269,20 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     root.style.setProperty('--strip-width', t.stripWidth || '22px');
     root.style.setProperty('--strip-angle', t.stripAngle || '14deg');
     root.style.setProperty('--strip-strategy', 'css');
+    const menuStripCrm = normalizeHslToken(t.menuStripCrm, DEFAULT_MENU_GROUP_STRIP_COLORS.crm);
+    const menuStripSales = normalizeHslToken(t.menuStripSales, DEFAULT_MENU_GROUP_STRIP_COLORS.sales);
+    const menuStripFinancials = normalizeHslToken(t.menuStripFinancials, DEFAULT_MENU_GROUP_STRIP_COLORS.financials);
+    const menuStripLogistics = normalizeHslToken(t.menuStripLogistics, DEFAULT_MENU_GROUP_STRIP_COLORS.logistics);
+    const menuStripAmro = normalizeHslToken(t.menuStripAmro, DEFAULT_MENU_GROUP_STRIP_COLORS.amro);
+    const menuStripAdministration = normalizeHslToken(t.menuStripAdministration, DEFAULT_MENU_GROUP_STRIP_COLORS.administration);
+    const menuStripOther = normalizeHslToken(t.menuStripOther, DEFAULT_MENU_GROUP_STRIP_COLORS.other);
+    root.style.setProperty('--menu-strip-crm', menuStripCrm);
+    root.style.setProperty('--menu-strip-sales', menuStripSales);
+    root.style.setProperty('--menu-strip-financials', menuStripFinancials);
+    root.style.setProperty('--menu-strip-logistics', menuStripLogistics);
+    root.style.setProperty('--menu-strip-amro', menuStripAmro);
+    root.style.setProperty('--menu-strip-administration', menuStripAdministration);
+    root.style.setProperty('--menu-strip-other', menuStripOther);
     const isDefaultSimpleTheme = t.name === 'Default Simple';
     const existingBannerVisible = root.getAttribute('data-header-banner-visible') === '1'
       || getComputedStyle(root).getPropertyValue('--header-banner-visible').trim() === '1';
@@ -423,6 +480,13 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             headerBannerColor: normalizeHslToken(row.tokens.headerBannerColor, row.tokens.accent || row.tokens.primary || '217 91% 60%'),
             headerBannerTextColor: normalizeHslToken(row.tokens.headerBannerTextColor, '0 0% 100%'),
             headerBannerHeight: row.tokens.headerBannerHeight,
+            menuStripCrm: normalizeHslToken(row.tokens.menuStripCrm, DEFAULT_MENU_GROUP_STRIP_COLORS.crm),
+            menuStripSales: normalizeHslToken(row.tokens.menuStripSales, DEFAULT_MENU_GROUP_STRIP_COLORS.sales),
+            menuStripFinancials: normalizeHslToken(row.tokens.menuStripFinancials, DEFAULT_MENU_GROUP_STRIP_COLORS.financials),
+            menuStripLogistics: normalizeHslToken(row.tokens.menuStripLogistics, DEFAULT_MENU_GROUP_STRIP_COLORS.logistics),
+            menuStripAmro: normalizeHslToken(row.tokens.menuStripAmro, DEFAULT_MENU_GROUP_STRIP_COLORS.amro),
+            menuStripAdministration: normalizeHslToken(row.tokens.menuStripAdministration, DEFAULT_MENU_GROUP_STRIP_COLORS.administration),
+            menuStripOther: normalizeHslToken(row.tokens.menuStripOther, DEFAULT_MENU_GROUP_STRIP_COLORS.other),
             createdAt: new Date().toISOString(),
           }));
           setThemes(mapped);
@@ -449,6 +513,13 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       stripColor: normalizeHslToken(t.stripColor || t.accent || t.primary, '267 78% 44%'),
       headerBannerColor: normalizeHslToken(t.headerBannerColor || t.accent || t.primary, '217 91% 60%'),
       headerBannerTextColor: normalizeHslToken(t.headerBannerTextColor, '0 0% 100%'),
+      menuStripCrm: normalizeHslToken(t.menuStripCrm, DEFAULT_MENU_GROUP_STRIP_COLORS.crm),
+      menuStripSales: normalizeHslToken(t.menuStripSales, DEFAULT_MENU_GROUP_STRIP_COLORS.sales),
+      menuStripFinancials: normalizeHslToken(t.menuStripFinancials, DEFAULT_MENU_GROUP_STRIP_COLORS.financials),
+      menuStripLogistics: normalizeHslToken(t.menuStripLogistics, DEFAULT_MENU_GROUP_STRIP_COLORS.logistics),
+      menuStripAmro: normalizeHslToken(t.menuStripAmro, DEFAULT_MENU_GROUP_STRIP_COLORS.amro),
+      menuStripAdministration: normalizeHslToken(t.menuStripAdministration, DEFAULT_MENU_GROUP_STRIP_COLORS.administration),
+      menuStripOther: normalizeHslToken(t.menuStripOther, DEFAULT_MENU_GROUP_STRIP_COLORS.other),
       createdAt: new Date().toISOString(),
     };
     const next = [saved, ...themes.filter(x => x.name !== t.name)];
@@ -486,6 +557,13 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         headerBannerColor: saved.headerBannerColor,
         headerBannerTextColor: saved.headerBannerTextColor,
         headerBannerHeight: t.headerBannerHeight,
+        menuStripCrm: saved.menuStripCrm,
+        menuStripSales: saved.menuStripSales,
+        menuStripFinancials: saved.menuStripFinancials,
+        menuStripLogistics: saved.menuStripLogistics,
+        menuStripAmro: saved.menuStripAmro,
+        menuStripAdministration: saved.menuStripAdministration,
+        menuStripOther: saved.menuStripOther,
       };
       const payload: any = { name: t.name, tokens, scope, is_active: true };
       if (scope === 'user') payload.user_id = context?.userId;

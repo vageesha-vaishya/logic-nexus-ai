@@ -251,7 +251,7 @@ describe('AmroOwnedWorkspace', () => {
     }));
     render(<AmroOwnedWorkspace />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Close work package with confirmation' }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Close work package with confirmation' })[0]);
     expect(screen.getByText('Confirm Work Package Closure')).toBeTruthy();
     fireEvent.change(screen.getByLabelText('Closure rationale'), { target: { value: 'All checks passed and signed.' } });
     fireEvent.click(screen.getByRole('button', { name: 'Confirm closure with rationale' }));
@@ -264,101 +264,31 @@ describe('AmroOwnedWorkspace', () => {
     expect(submitCertificationDecision).toHaveBeenCalledWith('defer');
   });
 
-  it('runs work package row actions from the list surface', () => {
-    const setSelectedWorkPackageId = vi.fn();
-    const assignSelectedWorkPackageToNextSlot = vi.fn().mockResolvedValue(true);
-    const advanceWorkPackageLifecycle = vi.fn().mockResolvedValue(true);
-    mockUseAmroWorkspaceState.mockReturnValue(
-      createWorkspaceState({
-        setSelectedWorkPackageId,
-        assignSelectedWorkPackageToNextSlot,
-        advanceWorkPackageLifecycle,
-        workPackages: [
-          {
-            id: 'wp-1',
-            packageNumber: 'WP-1',
-            lifecycleStage: 'in_progress',
-            assetId: 'asset-1',
-            tasks: [
-              {
-                id: 'task-1',
-                workPackageId: 'wp-1',
-                title: 'Inspect',
-                lifecycleStage: 'execute',
-                assignedRole: 'technician',
-                completed: false,
-              },
-            ],
-          },
-        ],
-        selectedWorkPackage: {
-          id: 'wp-1',
-          packageNumber: 'WP-1',
-          lifecycleStage: 'in_progress',
-          assetId: 'asset-1',
-          tasks: [
-            {
-              id: 'task-1',
-              workPackageId: 'wp-1',
-              title: 'Inspect',
-              lifecycleStage: 'execute',
-              assignedRole: 'technician',
-              completed: false,
-            },
-          ],
-        },
-      }),
-    );
+  it('renders interactive work package surfaces on work-packages route', () => {
+    mockUseAmroWorkspaceState.mockReturnValue(createWorkspaceState());
     render(<AmroOwnedWorkspace moduleKey="work-packages" />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Open work package WP-1' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Hold work package WP-1' }));
-
-    expect(setSelectedWorkPackageId).toHaveBeenCalledWith('wp-1');
-    expect(advanceWorkPackageLifecycle).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('Work Package and Task Lifecycle Orchestration')).toBeTruthy();
+    expect(screen.getByText('AMRO > Work Packages')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'New WP' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Compliance Precheck' })).toBeTruthy();
+    expect(screen.queryByText('Work Packages Redesign Baseline')).toBeNull();
   });
 
-  it('shows recovery actions when work package module has no rows', async () => {
-    const refreshWorkPackages = vi.fn().mockResolvedValue(true);
-    const setSelectedSavedViewId = vi.fn();
-    const setWorkPackageStatusFilter = vi.fn();
-    const setWorkPackageSearch = vi.fn();
-    const createWorkPackage = vi.fn().mockResolvedValue(true);
-    mockUseAmroWorkspaceState.mockReturnValue(
-      createWorkspaceState({
-        refreshWorkPackages,
-        setSelectedSavedViewId,
-        setWorkPackageStatusFilter,
-        setWorkPackageSearch,
-        createWorkPackage,
-        workPackageStatusFilter: 'planning',
-        workPackageSearch: 'x',
-        selectedSavedViewId: 'saved-1',
-        savedWorkPackageViews: [
-          { id: 'default-all', name: 'All Work Packages', filters: { status: 'all', search: '' } },
-          { id: 'saved-1', name: 'Planning Only', filters: { status: 'planning', search: 'x' } },
-        ],
-        workPackages: [],
-        selectedWorkPackage: null,
-        selectedWorkPackageId: '',
-      }),
-    );
+  it('shows UX-AMRO-005 detail tabs and side panel headings on work-packages route', () => {
+    mockUseAmroWorkspaceState.mockReturnValue(createWorkspaceState());
     render(<AmroOwnedWorkspace moduleKey="work-packages" />);
 
-    expect(screen.getByText('No AMRO work packages are available yet.')).toBeTruthy();
-    expect(screen.getByText('No work package selected for the detail sheet.')).toBeTruthy();
-
-    fireEvent.click(screen.getAllByRole('button', { name: 'Retry Refresh' })[0]);
-    fireEvent.click(screen.getByRole('button', { name: 'Clear Scope' }));
-    fireEvent.click(screen.getAllByRole('button', { name: 'Create Starter Package' })[0]);
-
-    await waitFor(() => {
-      expect(refreshWorkPackages).toHaveBeenCalledTimes(1);
-      expect(setSelectedSavedViewId).toHaveBeenCalledWith('default-all');
-      expect(setWorkPackageStatusFilter).toHaveBeenCalledWith('all');
-      expect(setWorkPackageSearch).toHaveBeenCalledWith('');
-      expect(createWorkPackage).toHaveBeenCalledWith('Starter Work Package');
-    });
+    expect(screen.getByText('Overview')).toBeTruthy();
+    expect(screen.getByText('Tasks')).toBeTruthy();
+    expect(screen.getByText('Materials')).toBeTruthy();
+    expect(screen.getByText('Compliance')).toBeTruthy();
+    expect(screen.getByText('Notes')).toBeTruthy();
+    expect(screen.getByText('Attachments')).toBeTruthy();
+    expect(screen.getByText('Activity Feed')).toBeTruthy();
+    expect(screen.getByText('Signatures')).toBeTruthy();
+    expect(screen.getByText('Overrides')).toBeTruthy();
+    expect(screen.getByText('Gate Outcomes')).toBeTruthy();
   });
 
   it('runs integration monitor actions from integration module page', () => {
@@ -393,8 +323,8 @@ describe('AmroOwnedWorkspace', () => {
     render(<AmroOwnedWorkspace />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Import/Export' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Assign work package' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Hold work package' }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Assign work package' })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Update work package status' })[0]);
     fireEvent.click(screen.getByRole('button', { name: 'Bulk Actions' }));
 
     expect(screen.getByText(/Export prepared for workspace-shell/i)).toBeTruthy();

@@ -11,7 +11,7 @@ const QuoteFinancials = lazy(() => import('./QuoteFinancials').then(module => ({
 
 import { quoteSchema, QuoteFormValues } from './types';
 import { QuoteErrorBoundary } from './QuoteErrorBoundary';
-import { MultiModalQuoteComposer } from '@/components/sales/MultiModalQuoteComposer';
+import { UnifiedQuoteComposer } from '@/components/sales/unified-composer/UnifiedQuoteComposer';
 import { Loader2, Save, X, LayoutDashboard } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQuoteRepositoryForm } from './useQuoteRepository';
@@ -279,10 +279,9 @@ function QuoteFormContent({ quoteId, quoteNumber, versionId, onSuccess, initialD
           </div>
         ) : viewMode === 'composer' && quoteId ? (
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <MultiModalQuoteComposer 
+                <UnifiedQuoteComposer
                     quoteId={quoteId}
                     versionId={versionId}
-                    tenantId={resolvedTenantId || undefined}
                 />
             </div>
         ) : (

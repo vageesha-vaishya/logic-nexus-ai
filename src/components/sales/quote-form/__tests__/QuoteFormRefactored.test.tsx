@@ -97,6 +97,10 @@ vi.mock('@/components/sales/unified-composer/UnifiedQuoteComposer', () => ({
   UnifiedQuoteComposer: () => <div>Mocked Composer</div>
 }));
 
+vi.mock('@/components/sales/QuotePreviewModal', () => ({
+  QuotePreviewModal: () => null,
+}));
+
 // Mock useFormDebug
 vi.mock('@/hooks/useFormDebug', () => ({
   useFormDebug: () => ({
@@ -194,6 +198,7 @@ vi.mock('@/hooks/useCRM', () => {
       or: vi.fn().mockReturnThis(),
       limit: vi.fn().mockReturnThis(),
       single: vi.fn().mockResolvedValue({ data: null, error: null }),
+      maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
       then: (resolve: any) => resolve({ data, error: null }),
     };
     return builder;
@@ -313,7 +318,7 @@ describe('QuoteFormRefactored', () => {
 
   it('shows calculate estimate button in financials', async () => {
     renderComponent();
-    expect(screen.getByText('Calculate Estimate')).toBeInTheDocument();
+    expect(await screen.findByText('Calculate Estimate')).toBeInTheDocument();
   });
 
   it('validates required fields on submit', async () => {

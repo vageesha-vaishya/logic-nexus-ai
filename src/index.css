@@ -62,6 +62,13 @@ All colors MUST be HSL.
     --table-header-text: 0 0% 10%;
     --table-header-separator: 0 0% 0% / 0.15;
     --table-foreground: var(--foreground);
+    --menu-strip-crm: 272 85% 55%;
+    --menu-strip-sales: 217 91% 60%;
+    --menu-strip-financials: 150 83% 40%;
+    --menu-strip-logistics: 38 92% 50%;
+    --menu-strip-amro: 190 95% 42%;
+    --menu-strip-administration: 310 78% 55%;
+    --menu-strip-other: 220 15% 60%;
     --gradient-brand-golden: linear-gradient(
       135deg,
       hsl(45 96% 62%) 0%,
@@ -122,6 +129,13 @@ All colors MUST be HSL.
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217 91% 60%;
+    --menu-strip-crm: 272 85% 68%;
+    --menu-strip-sales: 217 91% 72%;
+    --menu-strip-financials: 150 70% 58%;
+    --menu-strip-logistics: 38 92% 62%;
+    --menu-strip-amro: 190 85% 60%;
+    --menu-strip-administration: 310 78% 70%;
+    --menu-strip-other: 220 15% 72%;
   }
 }
 

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import handler from './[id]';
 import transitionHandler from './[id]/transitions';
 import collectionHandler from '../work-packages';
+import { persistCreateWorkPackage } from '../work-package-persistence';
 import type { ApiRequest, ApiResponse } from '../../../_utils/types';
 import {
   applyCors,
@@ -39,6 +40,12 @@ vi.mock('../../../_utils/errorHandler', () => ({
 vi.mock('../../../_utils/compatibility-facade', () => ({
   applyCompatibilityResponseHeaders: vi.fn(),
   resolveGatewayCompatibility: vi.fn(),
+}));
+
+vi.mock('../work-package-persistence', () => ({
+  persistCreateWorkPackage: vi.fn(),
+  persistTransitionWorkPackage: vi.fn(),
+  persistCloneTemplateWorkPackage: vi.fn(),
 }));
 
 function createResponse(): ApiResponse & { statusCode?: number; jsonBody?: unknown; headers: Record<string, unknown> } {
@@ -119,6 +126,15 @@ describe('/api/v2/amro/work-packages/[id] + transitions', () => {
       source: 'database',
       validatedAt: '2026-03-20T00:00:00.000Z',
     } as any);
+    vi.mocked(persistCreateWorkPackage).mockResolvedValue({
+      work_package_id: 'tenant-1-fr-1-wp-101',
+      status: 'planning',
+      version: 1,
+      created_at: '2026-03-20T00:00:00.000Z',
+      created_by: 'user-1',
+      updated_at: '2026-03-20T00:00:00.000Z',
+      updated_by: 'user-1',
+    });
   });
 
   it('returns work package detail for API-AMRO-002 GET', async () => {

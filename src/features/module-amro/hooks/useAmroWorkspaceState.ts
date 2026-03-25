@@ -174,6 +174,15 @@ type V2SavedWorkPackageView = {
   };
 };
 
+const DEFAULT_WORK_PACKAGE_SAVED_VIEW: V2SavedWorkPackageView = {
+  id: 'default-all',
+  name: 'All Work Packages',
+  filters: {
+    status: 'all',
+    search: '',
+  },
+};
+
 type V2SchedulesResponse = {
   output?: {
     schedules?: ApiScheduleRow[];
@@ -317,6 +326,36 @@ function mapLifecycleToStatus(stage: AmroWorkPackageLifecycleStage): string {
   return 'closed';
 }
 
+function sanitizeSavedWorkPackageViews(views: unknown): V2SavedWorkPackageView[] {
+  if (!Array.isArray(views)) {
+    return [DEFAULT_WORK_PACKAGE_SAVED_VIEW];
+  }
+  const dedupe = new Map<string, V2SavedWorkPackageView>();
+  views.forEach((entry) => {
+    if (!entry || typeof entry !== 'object') {
+      return;
+    }
+    const item = entry as Partial<V2SavedWorkPackageView>;
+    const id = String(item.id || '').trim();
+    const name = String(item.name || '').trim();
+    if (!id || !name) {
+      return;
+    }
+    dedupe.set(id, {
+      id,
+      name,
+      filters: {
+        status: String(item.filters?.status || 'all').trim() || 'all',
+        search: String(item.filters?.search || ''),
+      },
+    });
+  });
+  if (!dedupe.has(DEFAULT_WORK_PACKAGE_SAVED_VIEW.id)) {
+    dedupe.set(DEFAULT_WORK_PACKAGE_SAVED_VIEW.id, DEFAULT_WORK_PACKAGE_SAVED_VIEW);
+  }
+  return Array.from(dedupe.values());
+}
+
 function resolveRoleTransitionTargets(role: string): string[] {
   if (role === 'tenant_admin') return ['planning', 'scheduled', 'in_progress', 'completed', 'blocked', 'cancelled'];
   if (role === 'planner') return ['planning', 'scheduled', 'blocked'];
@@ -452,10 +491,8 @@ export function useAmroWorkspaceState() {
   const [workPackagesError, setWorkPackagesError] = useState<string | null>(null);
   const [workPackageStatusFilter, setWorkPackageStatusFilter] = useState<string>('all');
   const [workPackageSearch, setWorkPackageSearch] = useState<string>('');
-  const [selectedSavedViewId, setSelectedSavedViewId] = useState<string>('default-all');
-  const [savedWorkPackageViews, setSavedWorkPackageViews] = useState<V2SavedWorkPackageView[]>([
-    { id: 'default-all', name: 'All Work Packages', filters: { status: 'all', search: '' } },
-  ]);
+  const [selectedSavedViewId, setSelectedSavedViewId] = useState<string>(DEFAULT_WORK_PACKAGE_SAVED_VIEW.id);
+  const [savedWorkPackageViews, setSavedWorkPackageViews] = useState<V2SavedWorkPackageView[]>([DEFAULT_WORK_PACKAGE_SAVED_VIEW]);
   const [realtimeConnected, setRealtimeConnected] = useState<boolean>(false);
   const [requiredAuthority, setRequiredAuthority] = useState<AmroAuthorityLevel>('supervisor');
   const [selectedQualificationId, setSelectedQualificationId] = useState<string>(initialQualifications[0]?.id ?? '');
@@ -633,7 +670,7 @@ export function useAmroWorkspaceState() {
           throw new Error(v2Payload?.error || `Failed to load work packages (${v2Response.status})`);
         }
         if (Array.isArray(v2Payload?.savedViews) && v2Payload.savedViews.length > 0) {
-          setSavedWorkPackageViews(v2Payload.savedViews);
+          setSavedWorkPackageViews(sanitizeSavedWorkPackageViews(v2Payload.savedViews));
         }
         next = v2Items.map((item) =>
           mapWorkPackageRecord({
@@ -2061,12 +2098,13 @@ export function useAmroWorkspaceState() {
   }, [apiBaseUrl, authHeaders, isApiTemporarilyUnavailable, markApiTemporarilyUnavailable, materials, selectedWorkPackageId]);
 
   const applySavedWorkPackageView = useCallback((viewId: string) => {
-    setSelectedSavedViewId(viewId);
-    const selectedView = savedWorkPackageViews.find((item) => item.id === viewId) || null;
-    if (selectedView) {
-      setWorkPackageStatusFilter(selectedView.filters.status || 'all');
-      setWorkPackageSearch(selectedView.filters.search || '');
-    }
+    const selectedView = savedWorkPackageViews.find((item) => item.id === viewId)
+      || savedWorkPackageViews.find((item) => item.id === DEFAULT_WORK_PACKAGE_SAVED_VIEW.id)
+      || savedWorkPackageViews[0]
+      || DEFAULT_WORK_PACKAGE_SAVED_VIEW;
+    setSelectedSavedViewId(selectedView.id);
+    setWorkPackageStatusFilter(selectedView.filters.status || 'all');
+    setWorkPackageSearch(selectedView.filters.search || '');
   }, [savedWorkPackageViews]);
 
   const saveCurrentWorkPackageView = useCallback(
@@ -2096,17 +2134,18 @@ export function useAmroWorkspaceState() {
         }
         const savedViewId = String(payload?.output?.saved_view_id || '').trim();
         if (savedViewId) {
-          setSavedWorkPackageViews((previous) => [
-            ...previous,
-            {
+          setSavedWorkPackageViews((previous) => {
+            const next = previous.filter((item) => item.id !== savedViewId);
+            next.push({
               id: savedViewId,
               name: String(payload?.output?.view_name || cleanName),
               filters: {
                 status: String(payload?.output?.filters?.status || workPackageStatusFilter),
                 search: String(payload?.output?.filters?.search || workPackageSearch),
               },
-            },
-          ]);
+            });
+            return sanitizeSavedWorkPackageViews(next);
+          });
           setSelectedSavedViewId(savedViewId);
         }
         return true;

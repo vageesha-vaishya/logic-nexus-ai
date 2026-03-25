@@ -29,8 +29,10 @@ export interface LogEntry {
 }
 
 const isProduction = typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.PROD : false;
+const isTestEnvironment = typeof process !== 'undefined' && (process.env.NODE_ENV === 'test' || Boolean(process.env.VITEST));
 const FLUSH_INTERVAL = 5000; // 5 seconds
 const BATCH_SIZE = 10;
+const MAX_BUFFER_WITHOUT_SUPABASE = 200;
 
 class LoggerService {
   private static instance: LoggerService;
@@ -217,37 +219,43 @@ class LoggerService {
     };
 
     // Console output
-    this.isInternalLogging = true;
-    try {
-      const style = this.getStyle(level);
-      const consoleArgs = [
-        `%c[${level}] ${message}`,
-        style,
-        entry.context || ''
-      ];
-      
-      // Use appropriate console method
-      switch (level) {
-        case LogLevel.ERROR:
-        case LogLevel.CRITICAL:
-        case LogLevel.FATAL:
-          console.error(...consoleArgs);
-          break;
-        case LogLevel.WARNING:
-          console.warn(...consoleArgs);
-          break;
-        default:
-          // In production, suppress DEBUG logs in console unless forced
-          if (!isProduction || level !== LogLevel.DEBUG) {
-            console.log(...consoleArgs);
-          }
+    const shouldEmitConsole = !isTestEnvironment || [LogLevel.WARNING, LogLevel.ERROR, LogLevel.CRITICAL, LogLevel.FATAL].includes(level);
+    if (shouldEmitConsole) {
+      this.isInternalLogging = true;
+      try {
+        const style = this.getStyle(level);
+        const consoleArgs = [
+          `%c[${level}] ${message}`,
+          style,
+          entry.context || ''
+        ];
+        
+        // Use appropriate console method
+        switch (level) {
+          case LogLevel.ERROR:
+          case LogLevel.CRITICAL:
+          case LogLevel.FATAL:
+            console.error(...consoleArgs);
+            break;
+          case LogLevel.WARNING:
+            console.warn(...consoleArgs);
+            break;
+          default:
+            // In production, suppress DEBUG logs in console unless forced
+            if (!isProduction || level !== LogLevel.DEBUG) {
+              console.log(...consoleArgs);
+            }
+        }
+      } finally {
+        this.isInternalLogging = false;
       }
-    } finally {
-      this.isInternalLogging = false;
     }
 
     // Queue for persistence
     this.buffer.push(entry);
+    if (!this.supabase && this.buffer.length > MAX_BUFFER_WITHOUT_SUPABASE) {
+      this.buffer.splice(0, this.buffer.length - MAX_BUFFER_WITHOUT_SUPABASE);
+    }
 
     // Sentry Integration for Errors
     if ([LogLevel.ERROR, LogLevel.CRITICAL, LogLevel.FATAL].includes(level)) {

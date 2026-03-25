@@ -32,6 +32,13 @@ import {
 import { appendAmroAuditLedgerRecord } from './audit-ledger';
 import { resolveAmroAuditLedgerCutoverState, resolveAmroV2EndpointRolloutState } from './audit-ledger-cutover';
 import { enforceAmroSequentialMilestoneForWorkPackageInterface } from './phase-plan-model';
+import {
+  persistCloneTemplateWorkPackage,
+  persistCreateWorkPackage,
+  persistTransitionWorkPackage,
+} from './work-package-persistence';
+import { TemplateNotAccessibleException, assertTemplateRegistryAccess } from './template-registry-client';
+import { sanitizeWorkflowPayload } from './workflow-transaction-logger';
 
 function parseBoolean(value: string | undefined, fallback: boolean): boolean {
   const normalized = String(value || '').trim().toLowerCase();
@@ -97,30 +104,29 @@ type ShortageAction = 'backorder' | 'substitute' | 'escalate';
 type TraceabilityAction = 'verify' | 'quarantine' | 'release';
 type WorkPackageCreationTrigger = 'schedule' | 'compliance';
 
-const ALLOWED_MAINTENANCE_TYPES = new Set(['line', 'base', 'component', 'a-check', 'c-check']);
-const ALLOWED_PRIORITIES = new Set(['low', 'medium', 'high', 'critical']);
 const ALLOWED_SHORTAGE_ACTIONS = new Set(['backorder', 'substitute', 'escalate']);
 const ALLOWED_TRACEABILITY_ACTIONS = new Set(['verify', 'quarantine', 'release']);
 const TRUSTED_SUPPLIER_ADAPTERS = new Set(['sap-pm', 'maximo', 'oracle-eam']);
 const TRUSTED_PROCUREMENT_ADAPTERS = new Set(['sap-pm', 'oracle-eam', 'maximo', 'ariba', 'coupa']);
 const REPLAN_APPROVER_ROLES = new Set(['tenant_admin', 'planner']);
 const REPLANNABLE_STATES = new Set<ReplanWorkPackageState>(['planning', 'scheduled', 'blocked']);
-const ROLE_TRANSITION_POLICY: Record<string, ReadonlyArray<WorkPackageStatus>> = {
-  tenant_admin: ['planning', 'scheduled', 'in_progress', 'completed', 'blocked', 'cancelled'],
-  planner: ['planning', 'scheduled', 'blocked'],
-  engineer: ['scheduled', 'in_progress', 'blocked'],
-  technician: ['in_progress'],
-  inspector: ['completed', 'blocked'],
-};
-const ALLOWED_TRANSITIONS: Record<WorkPackageStatus, ReadonlyArray<WorkPackageStatus>> = {
-  planning: ['scheduled', 'blocked', 'cancelled'],
-  scheduled: ['in_progress', 'blocked', 'cancelled'],
-  in_progress: ['completed', 'blocked', 'cancelled'],
-  completed: [],
-  blocked: ['planning', 'scheduled', 'in_progress', 'cancelled'],
-  cancelled: [],
-};
 const ALLOWED_FILTER_STATUSES = new Set(['all', 'planning', 'scheduled', 'in_progress', 'completed', 'blocked', 'cancelled']);
+const ALLOWED_WORK_PACKAGE_STATUSES = new Set<WorkPackageStatus>(['planning', 'scheduled', 'in_progress', 'completed', 'blocked', 'cancelled']);
+const WORK_PACKAGE_TRANSITION_POLICY: Record<WorkPackageStatus, ReadonlySet<WorkPackageStatus>> = {
+  planning: new Set(['planning', 'scheduled', 'blocked', 'cancelled']),
+  scheduled: new Set(['scheduled', 'in_progress', 'blocked', 'cancelled']),
+  in_progress: new Set(['in_progress', 'blocked', 'completed', 'cancelled']),
+  blocked: new Set(['blocked', 'scheduled', 'in_progress', 'cancelled']),
+  completed: new Set(['completed']),
+  cancelled: new Set(['cancelled']),
+};
+const WORK_PACKAGE_ROLE_POLICY: Record<string, ReadonlySet<WorkPackageStatus>> = {
+  tenant_admin: new Set(['planning', 'scheduled', 'in_progress', 'blocked', 'completed', 'cancelled']),
+  planner: new Set(['planning', 'scheduled', 'blocked']),
+  engineer: new Set(['scheduled', 'in_progress', 'blocked']),
+  technician: new Set(['in_progress', 'blocked']),
+  inspector: new Set(['completed', 'blocked']),
+};
 const SAVED_WORK_PACKAGE_VIEWS: ReadonlyArray<{
   id: string;
   name: string;
@@ -531,21 +537,35 @@ function assertOptionalScopeContext(body: Record<string, unknown>, tenantId: str
   }
 }
 
-function assertAircraftActive(aircraftId: string) {
-  const normalized = aircraftId.trim().toLowerCase();
-  if (normalized.includes('inactive') || normalized.includes('retired')) {
-    throw new Error('aircraft must be active');
+function parseExpectedVersion(value: unknown): number {
+  const parsed = Number.parseInt(String(value ?? '1'), 10);
+  if (!Number.isFinite(parsed) || parsed < 1) {
+    throw new Error('expected_version must be a positive integer');
   }
+  return parsed;
 }
 
-function ensureTemplateTenantVisible(templateId: string, tenantId: string) {
-  const normalized = templateId.trim();
-  if (normalized.includes('inactive')) {
-    throw new Error('template version must be active');
+function parseWorkPackageStatus(value: unknown, fieldName: string): WorkPackageStatus {
+  const normalized = assertNonEmpty(value, fieldName).toLowerCase() as WorkPackageStatus;
+  if (!ALLOWED_WORK_PACKAGE_STATUSES.has(normalized)) {
+    throw new Error(`${fieldName} is invalid`);
   }
-  const scopedMatch = normalized.match(/^([^:]+):/);
-  if (scopedMatch && scopedMatch[1] !== tenantId) {
-    throw new Error('template must be tenant-visible');
+  return normalized;
+}
+
+function assertTransitionAllowedByPolicyAndRole(
+  currentStatus: WorkPackageStatus,
+  targetStatus: WorkPackageStatus,
+  actorRole: string,
+) {
+  const allowedTargets = WORK_PACKAGE_TRANSITION_POLICY[currentStatus];
+  if (!allowedTargets.has(targetStatus)) {
+    throw new Error('Transition must be allowed by policy matrix and role');
+  }
+  const normalizedRole = String(actorRole || '').trim().toLowerCase();
+  const roleTargets = WORK_PACKAGE_ROLE_POLICY[normalizedRole] || WORK_PACKAGE_ROLE_POLICY.tenant_admin;
+  if (!roleTargets.has(targetStatus)) {
+    throw new Error('Transition must be allowed by policy matrix and role');
   }
 }
 
@@ -726,29 +746,35 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       assertScopeRequired(tenantId, franchiseId);
       const body = parseBody(req.body);
       const aircraftId = assertNonEmpty(body.aircraft_id, 'aircraft_id');
-      assertAircraftActive(aircraftId);
       const maintenanceType = assertNonEmpty(body.maintenance_type, 'maintenance_type').toLowerCase();
-      if (!ALLOWED_MAINTENANCE_TYPES.has(maintenanceType)) {
-        throw new Error('maintenance_type is not supported');
-      }
       const plannedWindow = parseDateWindow(body.planned_window);
       const station = assertNonEmpty(body.station, 'station');
       const priority = assertNonEmpty(body.priority, 'priority').toLowerCase();
-      if (!ALLOWED_PRIORITIES.has(priority)) {
-        throw new Error('priority is not supported');
-      }
       const scopeItems = parseStringArray(body.scope_items);
-      if (scopeItems.length === 0) {
-        throw new Error('scope_items must include at least one item');
-      }
       const creationTrigger = parseCreationTrigger(body);
       const engineerPlan = parseEngineerPlan(body, scopeItems);
-      const createdAt = new Date().toISOString();
+      const persisted = await persistCreateWorkPackage({
+        tenantId,
+        franchiseId: String(franchiseId),
+        userId: String(ctx.userId || ''),
+        aircraftId,
+        maintenanceType,
+        plannedWindowFrom: plannedWindow.from,
+        plannedWindowTo: plannedWindow.to,
+        station: `${tenantId}:${station}`,
+        priority,
+        scopeItems,
+        creationTriggerSource: creationTrigger.source,
+        creationTriggerReferenceId: creationTrigger.referenceId,
+        creationTriggeredAt: creationTrigger.triggeredAt,
+        engineerPlan,
+      });
       const output = {
-        work_package_id: `${tenantId}-${franchiseId}-wp-${Date.now()}`,
-        status: 'planning',
-        created_at: createdAt,
-        created_by: ctx.userId,
+        work_package_id: persisted.work_package_id,
+        status: persisted.status,
+        version: persisted.version,
+        created_at: persisted.created_at,
+        created_by: persisted.created_by,
         planning_bundle: {
           task_count: engineerPlan.tasks.length,
           labor_hours: engineerPlan.labor_hours,
@@ -869,26 +895,13 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       enforceAnyPermission(auth.permissions || [], ['dashboards.manage', 'reports.manage']);
       const body = parseBody(req.body);
       const workPackageId = assertNonEmpty(body.work_package_id, 'work_package_id');
-      const targetStatus = assertNonEmpty(body.target_status, 'target_status').toLowerCase() as WorkPackageStatus;
+      const targetStatus = parseWorkPackageStatus(body.target_status, 'target_status');
       const reasonCode = assertNonEmpty(body.reason_code, 'reason_code');
       const actorSignature = assertNonEmpty(body.actor_signature, 'actor_signature');
-      const currentStatus = String(body.current_status || 'planning').trim().toLowerCase() as WorkPackageStatus;
-      if (!Object.keys(ALLOWED_TRANSITIONS).includes(currentStatus)) {
-        throw new Error('current_status is invalid for policy matrix');
-      }
-      if (!Object.keys(ALLOWED_TRANSITIONS).includes(targetStatus)) {
-        throw new Error('target_status is invalid for policy matrix');
-      }
-      if (!ALLOWED_TRANSITIONS[currentStatus].includes(targetStatus)) {
-        throw new Error('transition is not allowed by policy matrix');
-      }
-      const roleAllowedStatuses = ROLE_TRANSITION_POLICY[String(ctx.role || '').trim().toLowerCase()] || [];
-      if (!roleAllowedStatuses.includes(targetStatus)) {
-        throw new Error('transition is not allowed for role');
-      }
-      if (targetStatus === 'scheduled') {
-        parseEngineerPlan(body, parseStringArray(body.scope_items));
-      }
+      const currentStatus = parseWorkPackageStatus(body.current_status || 'planning', 'current_status');
+      const expectedVersion = parseExpectedVersion(body.expected_version);
+      assertTransitionAllowedByPolicyAndRole(currentStatus, targetStatus, String(ctx.role || ''));
+      const transitionId = `${tenantId}-${workPackageId}-${Date.now()}`;
       const lifecycleEventType = targetStatus === 'completed'
         ? 'amro.work_package.lifecycle.closed.v1'
         : 'amro.work_package.lifecycle.transitioned.v1';
@@ -899,66 +912,70 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         next_status: targetStatus,
         published_at: new Date().toISOString(),
       };
-      const commitDecision = {
-        audit_chain_write_successful: parseBoolean(String(body.audit_chain_write_successful ?? 'true'), true),
-        event_publish_successful: parseBoolean(String(body.event_publish_successful ?? 'true'), true),
-      };
-      const commitSuccessful = commitDecision.audit_chain_write_successful && commitDecision.event_publish_successful;
-      if (!commitSuccessful) {
-        const retryAttempt = Number.parseInt(String(body.retry_attempt ?? '1'), 10);
-        const normalizedRetryAttempt = Number.isFinite(retryAttempt) && retryAttempt > 0 ? retryAttempt : 1;
-        const retryBackoffSeconds = Math.max(5, Number.parseInt(String(body.retry_backoff_seconds ?? '30'), 10) || 30);
-        return res.status(409).json({
-          version: 'v2',
-          interface: 'transition-work-package',
-          correlationId: ctx.correlationId,
-          compatMode: compatDecision.compatMode,
-          mode: 'module',
-          domainAccess: {
-            subscriptionStatus: amroAccess.subscriptionStatus,
-            source: amroAccess.source,
-            validatedAt: amroAccess.validatedAt,
-          },
-          serviceBoundaries,
-          input: {
+      let persistedTransition;
+      try {
+        persistedTransition = await persistTransitionWorkPackage({
+          tenantId,
+          franchiseId: String(franchiseId),
+          userId: String(ctx.userId || ''),
+          workPackageId,
+          currentStatus,
+          targetStatus,
+          reasonCode,
+          actorSignature,
+          expectedVersion,
+          actorRole: String(ctx.role || ''),
+          transitionId,
+          gateName: 'work-package-transition',
+          workflowInputPayload: sanitizeWorkflowPayload({
             work_package_id: workPackageId,
             current_status: currentStatus,
             target_status: targetStatus,
             reason_code: reasonCode,
             actor_signature: actorSignature,
+            expected_version: expectedVersion,
+          }),
+          workflowUserContext: {
+            tenant_id: tenantId,
+            franchise_id: franchiseId,
+            user_id: ctx.userId,
+            role: ctx.role,
           },
-          output: {
-            updated_status: currentStatus,
-            transition_id: `${tenantId}-${workPackageId}-${Date.now()}`,
-            gate_results: [
-              { gate: 'policy-matrix', status: 'passed' },
-              { gate: 'role-authorization', status: 'passed' },
-              { gate: 'commit-transaction', status: 'failed' },
-            ],
-            published_events: [],
-            commit_decision: {
-              successful: false,
-              rollback_status: 'completed',
-              retry_queue: {
-                status: 'queued',
-                retry_attempt: normalizedRetryAttempt,
-                next_retry_in_seconds: retryBackoffSeconds,
-                backoff_strategy: 'exponential',
-              },
-              alert: {
-                severity: 'critical',
-                code: 'closure-commit-failed',
-                message: 'Closure commit failed and was rolled back. Retry queued and alert raised.',
-              },
-            },
-          },
-          auditLedgerCutover: cutoverState,
-          auditLedger: null,
         });
+      } catch (error) {
+        if (error instanceof Error && error.message === 'optimistic_lock_conflict') {
+          return res.status(409).json({
+            version: 'v2',
+            interface: 'transition-work-package',
+            correlationId: ctx.correlationId,
+            compatMode: compatDecision.compatMode,
+            mode: 'module',
+            domainAccess: {
+              subscriptionStatus: amroAccess.subscriptionStatus,
+              source: amroAccess.source,
+              validatedAt: amroAccess.validatedAt,
+            },
+            serviceBoundaries,
+            input: {
+              work_package_id: workPackageId,
+              current_status: currentStatus,
+              target_status: targetStatus,
+              reason_code: reasonCode,
+              actor_signature: actorSignature,
+              expected_version: expectedVersion,
+            },
+            error: {
+              code: 'OPTIMISTIC_LOCK_CONFLICT',
+              message: 'work package was updated by another transaction',
+            },
+          });
+        }
+        throw error;
       }
       const output = {
-        updated_status: targetStatus,
-        transition_id: `${tenantId}-${workPackageId}-${Date.now()}`,
+        updated_status: persistedTransition.status,
+        version: persistedTransition.version,
+        transition_id: transitionId,
         gate_results: [
           { gate: 'policy-matrix', status: 'passed' },
           { gate: 'role-authorization', status: 'passed' },
@@ -1019,13 +1036,38 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       assertScopeRequired(tenantId, franchiseId);
       const body = parseBody(req.body);
       const templateId = assertNonEmpty(body.template_id, 'template_id');
-      ensureTemplateTenantVisible(templateId, tenantId);
+      const registryVersion = String(body.registry_version || req.query.registryVersion || '').trim() || null;
+      const templateMetadata = await assertTemplateRegistryAccess({
+        tenantId,
+        userId: String(ctx.userId || ''),
+        templateId,
+        requiredPermission: 'INSTANTIATE',
+        registryVersion,
+      });
       const aircraftId = assertNonEmpty(body.aircraft_id, 'aircraft_id');
-      assertAircraftActive(aircraftId);
       const overrideFields = parseBody(body.override_fields);
+      const persisted = await persistCloneTemplateWorkPackage({
+        tenantId,
+        franchiseId: String(franchiseId),
+        userId: String(ctx.userId || ''),
+        templateId: templateMetadata.id,
+        templateVersion: templateMetadata.version,
+        templateName: templateMetadata.name,
+        aircraftId,
+        overrideFields,
+      });
       const output = {
-        new_work_package_id: `${tenantId}-${franchiseId}-wp-clone-${Date.now()}`,
-        inherited_tasks_count: 14,
+        new_work_package_id: persisted.work_package_id,
+        inherited_tasks_count: persisted.inherited_tasks_count || 0,
+        version: persisted.version,
+        template: {
+          id: templateMetadata.id,
+          name: templateMetadata.name,
+          version: templateMetadata.version,
+          lifecycle_state: templateMetadata.lifecycleState,
+          valid_from: templateMetadata.validFrom,
+          valid_to: templateMetadata.validTo,
+        },
       };
       const auditRecord = cutoverState.enabled
         ? appendWorkPackageMutationAuditRecord({
@@ -1852,6 +1894,16 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : '';
+    if (error instanceof TemplateNotAccessibleException) {
+      return res.status(error.statusCode).json({
+        version: 'v2',
+        code: 'TEMPLATE_NOT_ACCESSIBLE',
+        message: error.message,
+        details: ['Template registry denied access for this tenant/user scope.'],
+        trace_id: ctx.correlationId,
+        retryable: false,
+      });
+    }
     if (message === 'AMRO_AUTH_SCOPE_INVALID') {
       return res.status(403).json({
         version: 'v2',

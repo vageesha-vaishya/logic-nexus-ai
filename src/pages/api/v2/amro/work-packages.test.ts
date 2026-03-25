@@ -18,6 +18,12 @@ import {
   resolveGatewayCompatibility,
 } from '../../_utils/compatibility-facade';
 import { resetAmroAuditLedgerStore } from './audit-ledger';
+import {
+  persistCloneTemplateWorkPackage,
+  persistCreateWorkPackage,
+  persistTransitionWorkPackage,
+} from './work-package-persistence';
+import { assertTemplateRegistryAccess } from './template-registry-client';
 
 vi.mock('../../_utils/http', () => ({
   applyCors: vi.fn(),
@@ -40,6 +46,20 @@ vi.mock('../../_utils/compatibility-facade', () => ({
   applyCompatibilityResponseHeaders: vi.fn(),
   resolveGatewayCompatibility: vi.fn(),
 }));
+
+vi.mock('./work-package-persistence', () => ({
+  persistCreateWorkPackage: vi.fn(),
+  persistTransitionWorkPackage: vi.fn(),
+  persistCloneTemplateWorkPackage: vi.fn(),
+}));
+
+vi.mock('./template-registry-client', () => ({
+  TemplateNotAccessibleException: class TemplateNotAccessibleException extends Error {
+    readonly statusCode = 403;
+  },
+  assertTemplateRegistryAccess: vi.fn(),
+}));
+
 
 function createResponse(): ApiResponse & { statusCode?: number; jsonBody?: unknown; headers: Record<string, any> } {
   const res: any = {
@@ -129,6 +149,43 @@ describe('/api/v2/amro/work-packages', () => {
       graceUntil: null,
       source: 'database',
       validatedAt: '2026-03-20T00:00:00.000Z',
+    } as any);
+    vi.mocked(persistCreateWorkPackage).mockResolvedValue({
+      work_package_id: 'tenant-1-fr-1-wp-100',
+      status: 'planning',
+      version: 1,
+      created_at: '2026-03-21T00:00:00.000Z',
+      created_by: 'user-1',
+      updated_at: '2026-03-21T00:00:00.000Z',
+      updated_by: 'user-1',
+    } as any);
+    vi.mocked(persistTransitionWorkPackage).mockResolvedValue({
+      work_package_id: 'wp-001',
+      status: 'completed',
+      version: 2,
+      created_at: '2026-03-21T00:00:00.000Z',
+      created_by: 'user-1',
+      updated_at: '2026-03-21T00:05:00.000Z',
+      updated_by: 'user-1',
+    } as any);
+    vi.mocked(assertTemplateRegistryAccess).mockResolvedValue({
+      id: 'tenant-1:template-001',
+      name: 'Template 001',
+      version: '1.0.0',
+      lifecycleState: 'ACTIVE',
+      validFrom: '2026-01-01T00:00:00.000Z',
+      validTo: null,
+      permissions: ['READ', 'INSTANTIATE'],
+    } as any);
+    vi.mocked(persistCloneTemplateWorkPackage).mockResolvedValue({
+      work_package_id: 'tenant-1-fr-1-wp-clone-100',
+      status: 'planning',
+      version: 1,
+      created_at: '2026-03-21T00:00:00.000Z',
+      created_by: 'user-1',
+      updated_at: '2026-03-21T00:00:00.000Z',
+      updated_by: 'user-1',
+      inherited_tasks_count: 14,
     } as any);
   });
 
@@ -274,6 +331,7 @@ describe('/api/v2/amro/work-packages', () => {
     expect((res.jsonBody as any)?.output?.status).toBe('planning');
     expect((res.jsonBody as any)?.input?.station).toBe('tenant-1:station-a');
     expect((res.jsonBody as any)?.output?.created_by).toBe('user-1');
+    expect((res.jsonBody as any)?.output?.version).toBe(1);
   });
 
   it('saves work package view with filters', async () => {
@@ -364,19 +422,20 @@ describe('/api/v2/amro/work-packages', () => {
     expect((res.jsonBody as any)?.code).toBe('AMRO_FILTER_VALIDATION_FAILED');
   });
 
-  it('blocks transition when policy matrix disallows target status for current role', async () => {
+  it('delegates transition role-policy rejection from persistence layer', async () => {
     process.env.AMRO_WORK_PACKAGES_V2_ENABLED = 'true';
     vi.mocked(authenticateRequest).mockResolvedValue({
       userId: 'user-1',
-      role: 'technician',
+      role: 'inspector',
       permissions: ['dashboards.view', 'reports.manage'],
     } as any);
+    vi.mocked(persistTransitionWorkPackage).mockRejectedValueOnce(new Error('transition is not allowed for role'));
     const req: ApiRequest = {
       method: 'POST',
       query: { interface: 'transition-work-package' },
       body: {
         work_package_id: 'wp-001',
-        current_status: 'planning',
+        current_status: 'in_progress',
         target_status: 'completed',
         reason_code: 'ops-close',
         actor_signature: 'sig-123',
@@ -393,6 +452,65 @@ describe('/api/v2/amro/work-packages', () => {
       'corr-amro-v2',
       { apiVersion: 'v2' }
     );
+  });
+
+  it('rejects transition when target status is invalid', async () => {
+    process.env.AMRO_WORK_PACKAGES_V2_ENABLED = 'true';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'transition-work-package' },
+      body: {
+        work_package_id: 'wp-invalid-status-001',
+        current_status: 'planning',
+        target_status: 'archived',
+        reason_code: 'invalid-status-test',
+        actor_signature: 'sig-invalid-status-001',
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(sendErrorResponse).toHaveBeenCalledWith(
+      res,
+      expect.any(Error),
+      'corr-amro-v2',
+      { apiVersion: 'v2' }
+    );
+    expect(persistTransitionWorkPackage).not.toHaveBeenCalled();
+  });
+
+  it('rejects transition when policy matrix denies current to target status', async () => {
+    process.env.AMRO_WORK_PACKAGES_V2_ENABLED = 'true';
+    vi.mocked(authenticateRequest).mockResolvedValue({
+      userId: 'user-1',
+      role: 'planner',
+      permissions: ['dashboards.view', 'reports.manage'],
+    } as any);
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'transition-work-package' },
+      body: {
+        work_package_id: 'wp-policy-001',
+        current_status: 'planning',
+        target_status: 'completed',
+        reason_code: 'policy-deny-test',
+        actor_signature: 'sig-policy-001',
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(sendErrorResponse).toHaveBeenCalledWith(
+      res,
+      expect.any(Error),
+      'corr-amro-v2',
+      { apiVersion: 'v2' }
+    );
+    expect(persistTransitionWorkPackage).not.toHaveBeenCalled();
   });
 
   it('publishes lifecycle closure event when transition reaches completed', async () => {
@@ -423,15 +541,33 @@ describe('/api/v2/amro/work-packages', () => {
     expect((res.jsonBody as any)?.output?.published_events?.[0]?.event_type).toBe('amro.work_package.lifecycle.closed.v1');
     expect((res.jsonBody as any)?.closure?.lifecycle_event_published).toBe(true);
     expect((res.jsonBody as any)?.output?.commit_decision?.successful).toBe(true);
+    expect(persistTransitionWorkPackage).toHaveBeenCalledWith(expect.objectContaining({
+      actorRole: 'inspector',
+      gateName: 'work-package-transition',
+      transitionId: expect.any(String),
+      workflowInputPayload: expect.objectContaining({
+        work_package_id: 'wp-closure-001',
+        current_status: 'in_progress',
+        target_status: 'completed',
+        actor_signature: '***',
+      }),
+      workflowUserContext: expect.objectContaining({
+        tenant_id: 'tenant-1',
+        franchise_id: 'fr-1',
+        user_id: 'user-1',
+        role: 'inspector',
+      }),
+    }));
   });
 
-  it('rolls back closure commit and queues retry alert when commit fails', async () => {
+  it('returns conflict when optimistic lock check fails on transition', async () => {
     process.env.AMRO_WORK_PACKAGES_V2_ENABLED = 'true';
     vi.mocked(authenticateRequest).mockResolvedValue({
       userId: 'user-1',
       role: 'inspector',
       permissions: ['dashboards.view', 'reports.manage'],
     } as any);
+    vi.mocked(persistTransitionWorkPackage).mockRejectedValueOnce(new Error('optimistic_lock_conflict'));
     const req: ApiRequest = {
       method: 'POST',
       query: { interface: 'transition-work-package' },
@@ -441,7 +577,7 @@ describe('/api/v2/amro/work-packages', () => {
         target_status: 'completed',
         reason_code: 'all-gates-passed',
         actor_signature: 'sig-closure-rollback-001',
-        audit_chain_write_successful: false,
+        expected_version: 3,
       },
       headers: {},
     };
@@ -451,13 +587,10 @@ describe('/api/v2/amro/work-packages', () => {
 
     expect(res.statusCode).toBe(409);
     expect((res.jsonBody as any)?.interface).toBe('transition-work-package');
-    expect((res.jsonBody as any)?.output?.updated_status).toBe('in_progress');
-    expect((res.jsonBody as any)?.output?.commit_decision?.rollback_status).toBe('completed');
-    expect((res.jsonBody as any)?.output?.commit_decision?.retry_queue?.status).toBe('queued');
-    expect((res.jsonBody as any)?.output?.commit_decision?.alert?.code).toBe('closure-commit-failed');
+    expect((res.jsonBody as any)?.error?.code).toBe('OPTIMISTIC_LOCK_CONFLICT');
   });
 
-  it('clones template only when template is active and tenant-visible', async () => {
+  it('clones template using registry-backed template access checks', async () => {
     process.env.AMRO_WORK_PACKAGES_V2_ENABLED = 'true';
     const req: ApiRequest = {
       method: 'POST',
@@ -475,8 +608,35 @@ describe('/api/v2/amro/work-packages', () => {
 
     expect(res.statusCode).toBe(200);
     expect((res.jsonBody as any)?.interface).toBe('clone-template');
-    expect((res.jsonBody as any)?.output?.new_work_package_id).toContain('tenant-1-fr-1-wp-clone-');
+    expect((res.jsonBody as any)?.output?.new_work_package_id).toBe('tenant-1-fr-1-wp-clone-100');
     expect((res.jsonBody as any)?.output?.inherited_tasks_count).toBeGreaterThan(0);
+    expect((res.jsonBody as any)?.output?.template?.version).toBe('1.0.0');
+  });
+
+  it('rejects clone-template when registry denies active template access', async () => {
+    process.env.AMRO_WORK_PACKAGES_V2_ENABLED = 'true';
+    vi.mocked(assertTemplateRegistryAccess).mockRejectedValueOnce(new Error('template lifecycle state is not active'));
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'clone-template' },
+      body: {
+        template_id: 'tenant-1:template-stale',
+        aircraft_id: 'ac-003',
+        override_fields: { priority: 'high' },
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(sendErrorResponse).toHaveBeenCalledWith(
+      res,
+      expect.any(Error),
+      'corr-amro-v2',
+      { apiVersion: 'v2' }
+    );
+    expect(persistCloneTemplateWorkPackage).not.toHaveBeenCalled();
   });
 
   it('assigns maintenance slot when overlap, capacity, and qualification rules pass', async () => {

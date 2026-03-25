@@ -211,6 +211,7 @@ export class WorkOrdersService {
             tenant_id: tenantId,
             aircraft_id: aircraftId,
             work_order_number: workOrderNumber,
+            work_package_number: workOrderNumber,
             title: request.title,
             description: request.description,
             work_type: request.work_type ?? 'general',
