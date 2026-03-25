@@ -50,6 +50,13 @@ type ManufacturerRecord = {
   is_active: boolean | null;
 };
 
+type AssemblyReferenceRecord = {
+  id: string;
+  tenant_id: string | null;
+  franchise_id: string | null;
+  is_active: boolean | null;
+};
+
 async function loadManufacturers(
   supabase: ReturnType<typeof getSupabaseAdminClient>,
 ): Promise<ManufacturerRecord[]> {
@@ -61,6 +68,101 @@ async function loadManufacturers(
     throw new HttpError(error.message, 400);
   }
   return Array.isArray(data) ? data : [];
+}
+
+async function loadAssemblyReferenceRecords(
+  supabase: ReturnType<typeof getSupabaseAdminClient>,
+  table: 'manufacturers' | 'assembly_types',
+  tenantId: string,
+  ids: string[],
+): Promise<AssemblyReferenceRecord[]> {
+  if (ids.length === 0) return [];
+  const { data, error } = await supabase
+    .from(table)
+    .select('id,tenant_id,franchise_id,is_active')
+    .eq('tenant_id', tenantId)
+    .in('id', ids);
+  if (error) {
+    throw new HttpError(error.message, 400);
+  }
+  return Array.isArray(data) ? (data as AssemblyReferenceRecord[]) : [];
+}
+
+function validateReferenceFranchise(record: AssemblyReferenceRecord, franchiseId: string | null): boolean {
+  if (!franchiseId) return true;
+  if (!record.franchise_id) return true;
+  return record.franchise_id === franchiseId;
+}
+
+async function validateAssemblyModelReferences(
+  supabase: ReturnType<typeof getSupabaseAdminClient>,
+  tenantId: string,
+  franchiseId: string | null,
+  records: Record<string, unknown>[],
+): Promise<Map<number, { field: string; message: string }[]>> {
+  const manufacturerIds = Array.from(
+    new Set(
+      records
+        .map((record) => asNullableString(record.manufacturer_id))
+        .filter((value): value is string => Boolean(value)),
+    ),
+  );
+  const assemblyTypeIds = Array.from(
+    new Set(
+      records
+        .map((record) => asNullableString(record.assembly_type_id))
+        .filter((value): value is string => Boolean(value)),
+    ),
+  );
+  const manufacturerRows = await loadAssemblyReferenceRecords(supabase, 'manufacturers', tenantId, manufacturerIds);
+  const assemblyTypeRows = await loadAssemblyReferenceRecords(supabase, 'assembly_types', tenantId, assemblyTypeIds);
+  const manufacturerById = new Map(manufacturerRows.map((row) => [row.id, row]));
+  const assemblyTypeById = new Map(assemblyTypeRows.map((row) => [row.id, row]));
+  const issues = new Map<number, { field: string; message: string }[]>();
+
+  records.forEach((record, index) => {
+    const rowIssues: { field: string; message: string }[] = [];
+    const manufacturerId = asNullableString(record.manufacturer_id);
+    const assemblyTypeId = asNullableString(record.assembly_type_id);
+
+    if (!manufacturerId) {
+      rowIssues.push({ field: 'manufacturer_id', message: 'manufacturer_id is required' });
+    } else {
+      const manufacturer = manufacturerById.get(manufacturerId);
+      if (!manufacturer) {
+        rowIssues.push({ field: 'manufacturer_id', message: 'manufacturer_id must belong to current tenant' });
+      } else {
+        if (manufacturer.is_active === false) {
+          rowIssues.push({ field: 'manufacturer_id', message: 'manufacturer_id must reference an active manufacturer' });
+        }
+        if (!validateReferenceFranchise(manufacturer, franchiseId)) {
+          rowIssues.push({ field: 'manufacturer_id', message: 'manufacturer_id must belong to current franchise scope' });
+        }
+      }
+    }
+
+    if (!assemblyTypeId) {
+      rowIssues.push({ field: 'assembly_type_id', message: 'assembly_type_id is required' });
+    } else {
+      const assemblyType = assemblyTypeById.get(assemblyTypeId);
+      if (!assemblyType) {
+        rowIssues.push({ field: 'assembly_type_id', message: 'assembly_type_id must belong to current tenant' });
+      } else {
+        if (assemblyType.is_active === false) {
+          rowIssues.push({ field: 'assembly_type_id', message: 'assembly_type_id must reference an active assembly type' });
+        }
+        if (!validateReferenceFranchise(assemblyType, franchiseId)) {
+          rowIssues.push({ field: 'assembly_type_id', message: 'assembly_type_id must belong to current franchise scope' });
+        }
+      }
+    }
+
+    if (rowIssues.length > 0) {
+      issues.set(index, rowIssues);
+    }
+  });
+
+  return issues;
 }
 
 async function resolveAircraftManufacturerReferences(
@@ -274,7 +376,6 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     const entity = resolveEntity(req.query.entity);
     const entityConfig = getEntityConfig(entity);
     const supabase = getSupabaseAdminClient();
-    const isGlobalEntity = entity === 'manufacturers' || entity === 'assembly_types' || entity === 'assembly_models';
 
     if (req.method === 'GET') {
       enforceAnyPermission(auth.permissions || [], ['view_amro_dashboard', 'edit_aircraft_records']);
@@ -283,25 +384,23 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       const { page, pageSize, start, end } = parsePagination(req);
       const { sortBy, ascending } = parseSort(req, entity);
 
-      if (!isGlobalEntity) {
-        const unavailableUntil = ENTITY_UNAVAILABLE.get(entity);
-        if (unavailableUntil && unavailableUntil > Date.now()) {
-          res.status(200).json({
-            version: 'v2',
-            correlationId: ctx.correlationId,
-            output: {
-              entity,
-              records: [],
-              page,
-              page_size: pageSize,
-              total: 0,
-            },
-          });
-          return;
-        }
-        if (unavailableUntil) {
-          ENTITY_UNAVAILABLE.delete(entity);
-        }
+      const unavailableUntil = ENTITY_UNAVAILABLE.get(entity);
+      if (unavailableUntil && unavailableUntil > Date.now()) {
+        res.status(200).json({
+          version: 'v2',
+          correlationId: ctx.correlationId,
+          output: {
+            entity,
+            records: [],
+            page,
+            page_size: pageSize,
+            total: 0,
+          },
+        });
+        return;
+      }
+      if (unavailableUntil) {
+        ENTITY_UNAVAILABLE.delete(entity);
       }
 
       let finalData: unknown[] = [];
@@ -317,14 +416,12 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
           .order(currentSortBy, { ascending })
           .range(start, end);
 
-        if (!isGlobalEntity) {
-          query = query.eq('tenant_id', tenantId);
-        }
+        query = query.eq('tenant_id', tenantId);
 
-        if (!isGlobalEntity && franchiseId) {
+        if (franchiseId) {
           query = query.or(`franchise_id.is.null,franchise_id.eq.${franchiseId}`);
         }
-        if (search && (isGlobalEntity || !franchiseId) && searchableColumns.length) {
+        if (search && !franchiseId && searchableColumns.length) {
           const clauses = searchableColumns.map((column) => `${column}.ilike.%${search}%`);
           query = query.or(clauses.join(','));
         }
@@ -338,9 +435,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
 
         const errorMessage = String(error.message || '');
         if (isMissingTableError(errorMessage)) {
-          if (!isGlobalEntity) {
-            ENTITY_UNAVAILABLE.set(entity, Date.now() + ENTITY_UNAVAILABLE_TTL_MS);
-          }
+          ENTITY_UNAVAILABLE.set(entity, Date.now() + ENTITY_UNAVAILABLE_TTL_MS);
           finalData = [];
           finalCount = 0;
           break;
@@ -355,9 +450,68 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         throw new HttpError(errorMessage, 400);
       }
 
+      if (tenantId && finalData.length === 0) {
+        let fallbackData: unknown[] = [];
+        let fallbackCount = 0;
+        let fallbackSortBy = currentSortBy;
+        for (let attempt = 0; attempt < 4; attempt += 1) {
+          const selectClause = getSelectClause(entity, entityConfig.listColumns);
+          const searchableColumns = getActiveSearchableColumns(entity, entityConfig.searchableColumns);
+          let fallbackQuery: any = supabase
+            .from(entityConfig.table)
+            .select(selectClause, { count: 'exact' })
+            .order(fallbackSortBy, { ascending })
+            .range(start, end);
+
+          if (typeof fallbackQuery.is === 'function') {
+            fallbackQuery = fallbackQuery.is('tenant_id', null);
+          } else {
+            fallbackQuery = fallbackQuery.eq('tenant_id', null);
+          }
+          if (franchiseId) {
+            if (typeof fallbackQuery.is === 'function') {
+              fallbackQuery = fallbackQuery.is('franchise_id', null);
+            } else {
+              fallbackQuery = fallbackQuery.eq('franchise_id', null);
+            }
+          }
+          if (search && !franchiseId && searchableColumns.length) {
+            const clauses = searchableColumns.map((column) => `${column}.ilike.%${search}%`);
+            fallbackQuery = fallbackQuery.or(clauses.join(','));
+          }
+
+          const { data, count, error } = await fallbackQuery;
+          if (!error) {
+            fallbackData = Array.isArray(data) ? data : [];
+            fallbackCount = count || 0;
+            break;
+          }
+
+          const errorMessage = String(error.message || '');
+          if (isMissingTableError(errorMessage)) {
+            ENTITY_UNAVAILABLE.set(entity, Date.now() + ENTITY_UNAVAILABLE_TTL_MS);
+            fallbackData = [];
+            fallbackCount = 0;
+            break;
+          }
+          const missingColumn = extractMissingColumn(errorMessage);
+          if (missingColumn && markMissingColumn(entity, missingColumn, entityConfig.listColumns, entityConfig.searchableColumns)) {
+            fallbackSortBy = resolveSortColumn(entity, fallbackSortBy, entityConfig.listColumns);
+            continue;
+          }
+
+          throw new HttpError(errorMessage, 400);
+        }
+
+        if (fallbackData.length > 0) {
+          finalData = fallbackData;
+          finalCount = fallbackCount;
+        }
+      }
+
       const rawRows = (finalData || []) as Record<string, unknown>[];
       const activeSearchableColumns = getActiveSearchableColumns(entity, entityConfig.searchableColumns);
-      const rows = !isGlobalEntity && franchiseId && search ? rawRows.filter((row) => matchesSearch(row, activeSearchableColumns, search)) : rawRows;
+      const rows = franchiseId && search ? rawRows.filter((row) => matchesSearch(row, activeSearchableColumns, search)) : rawRows;
       if (exportRequested) {
         const csv = buildCsv(rows);
         res.setHeader('Content-Type', 'text/csv; charset=utf-8');
@@ -393,10 +547,14 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       }
       let resolvedRecords = records;
       let manufacturerIssues = new Map<number, { field: string; message: string }[]>();
+      let assemblyModelIssues = new Map<number, { field: string; message: string }[]>();
       if (entity === 'aircraft') {
         const resolved = await resolveAircraftManufacturerReferences(supabase, records);
         resolvedRecords = resolved.resolved;
         manufacturerIssues = resolved.issues;
+      }
+      if (entity === 'assembly_models') {
+        assemblyModelIssues = await validateAssemblyModelReferences(supabase, tenantId, franchiseId, records);
       }
       const prepared = resolvedRecords.map((record) =>
         sanitizeWritePayload(entity, record, { requireCreateFields: entity !== 'aircraft' }),
@@ -405,6 +563,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         index,
         issues: [
           ...(manufacturerIssues.get(index) || []),
+          ...(assemblyModelIssues.get(index) || []),
           ...buildRequiredFieldIssues(entity, record),
           ...validatePayload(entity, record),
         ],
@@ -432,7 +591,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       }
       const insertRows = prepared.map((record) => ({
         ...record,
-        ...(isGlobalEntity ? {} : { tenant_id: tenantId, franchise_id: franchiseId }),
+        tenant_id: tenantId,
+        franchise_id: franchiseId,
         updated_by: auth.userId,
       }));
       const { data, error } = await supabase
@@ -470,8 +630,14 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       manufacturerIssues = resolved.issues.get(0) || [];
     }
     const payload = sanitizeWritePayload(entity, resolvedBody, { requireCreateFields: entity !== 'aircraft' });
+    let assemblyModelIssues: { field: string; message: string }[] = [];
+    if (entity === 'assembly_models') {
+      const validation = await validateAssemblyModelReferences(supabase, tenantId, franchiseId, [payload]);
+      assemblyModelIssues = validation.get(0) || [];
+    }
     const issues = [
       ...manufacturerIssues,
+      ...assemblyModelIssues,
       ...buildRequiredFieldIssues(entity, payload),
       ...validatePayload(entity, payload),
     ];
@@ -495,7 +661,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     }
     const insertPayload = {
       ...payload,
-      ...(isGlobalEntity ? {} : { tenant_id: tenantId, franchise_id: franchiseId }),
+      tenant_id: tenantId,
+      franchise_id: franchiseId,
       created_by: auth.userId,
       updated_by: auth.userId,
     };

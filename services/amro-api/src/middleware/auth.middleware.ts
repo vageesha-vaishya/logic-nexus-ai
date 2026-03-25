@@ -158,8 +158,9 @@ export async function authMiddleware(
           .eq('user_id', userId),
     );
 
+    const roleLookupRecoverable = Boolean(roleError && isRecoverableLookupError(roleError));
     if (roleError) {
-      if (!isRecoverableLookupError(roleError)) {
+      if (!roleLookupRecoverable) {
         res.status(500).json({
           error: 'Failed to resolve tenant assignment',
           code: 'TENANT_LOOKUP_FAILED',
@@ -293,10 +294,14 @@ export async function authMiddleware(
         (data.user.user_metadata as Record<string, unknown> | undefined)?.tenant_id ||
         '') as string,
     ).trim();
+    const allowHeaderFallback = roleLookupRecoverable && process.env.NODE_ENV !== 'production';
     const resolvedTenantId = requestedTenantId
-      ? hasRequestedRoleTenant || hasPlatformAdminRole
+      ? hasRequestedRoleTenant || hasPlatformAdminRole || allowHeaderFallback
         ? requestedTenantId
-        : profileTenantId === requestedTenantId
+        : profileTenantId === requestedTenantId ||
+            preferenceTenantId === requestedTenantId ||
+            metadataTenantId === requestedTenantId ||
+            franchiseResolvedTenantId === requestedTenantId
           ? requestedTenantId
           : null
       : defaultRoleTenantId || franchiseResolvedTenantId || profileTenantId || preferenceTenantId || metadataTenantId || null;

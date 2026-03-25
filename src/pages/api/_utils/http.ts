@@ -719,36 +719,43 @@ export async function resolveAndApplyAccessContext(req: ApiRequest, ctx: ApiCont
 
   enforceAdminOverrideScope(access, requestedTenantId, requestedFranchiseId);
 
-  const effectiveTenantId = access.tenantId || '';
-  const effectiveFranchiseId = access.franchiseId || '';
+  const effectiveTenantId = access.tenantId || requestedTenantId || null;
+  const effectiveFranchiseId = access.franchiseId || null;
 
-  if (requestedTenantId && requestedTenantId !== effectiveTenantId) {
+  if (requestedTenantId && access.tenantId && requestedTenantId !== access.tenantId) {
     logger.warn('[AccessControl] tenant header mismatch blocked', {
       correlationId: ctx.correlationId,
       userId: ctx.userId,
       requestedTenantId,
-      effectiveTenantId: effectiveTenantId || null,
+      effectiveTenantId: access.tenantId || null,
       isPlatformAdmin: access.isPlatformAdmin,
       adminOverrideEnabled: access.adminOverrideEnabled,
     });
   }
 
-  if (requestedFranchiseId && requestedFranchiseId !== effectiveFranchiseId) {
+  if (requestedFranchiseId && access.franchiseId && requestedFranchiseId !== access.franchiseId) {
     logger.warn('[AccessControl] franchise header mismatch blocked', {
       correlationId: ctx.correlationId,
       userId: ctx.userId,
       requestedFranchiseId,
-      effectiveFranchiseId: effectiveFranchiseId || null,
+      effectiveFranchiseId: access.franchiseId || null,
       isPlatformAdmin: access.isPlatformAdmin,
       adminOverrideEnabled: access.adminOverrideEnabled,
     });
   }
 
-  ctx.tenantId = effectiveTenantId;
-  ctx.franchiseId = effectiveFranchiseId;
+  ctx.tenantId = effectiveTenantId || '';
+  ctx.franchiseId = effectiveFranchiseId || '';
   ctx.isPlatformAdmin = access.isPlatformAdmin;
   ctx.adminOverrideEnabled = access.adminOverrideEnabled;
 
+  if (access.tenantId !== effectiveTenantId || access.franchiseId !== effectiveFranchiseId) {
+    return {
+      ...access,
+      tenantId: effectiveTenantId,
+      franchiseId: effectiveFranchiseId,
+    };
+  }
   return access;
 }
 

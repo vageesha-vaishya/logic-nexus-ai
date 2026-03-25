@@ -44,6 +44,13 @@ type ManufacturerRecord = {
   is_active: boolean | null;
 };
 
+type AssemblyReferenceRecord = {
+  id: string;
+  tenant_id: string | null;
+  franchise_id: string | null;
+  is_active: boolean | null;
+};
+
 async function loadManufacturers(
   supabase: ReturnType<typeof getSupabaseAdminClient>,
 ): Promise<ManufacturerRecord[]> {
@@ -55,6 +62,76 @@ async function loadManufacturers(
     throw new HttpError(error.message, 400);
   }
   return Array.isArray(data) ? data : [];
+}
+
+async function loadAssemblyReferenceRecords(
+  supabase: ReturnType<typeof getSupabaseAdminClient>,
+  table: 'manufacturers' | 'assembly_types',
+  tenantId: string,
+  ids: string[],
+): Promise<AssemblyReferenceRecord[]> {
+  if (ids.length === 0) return [];
+  const { data, error } = await supabase
+    .from(table)
+    .select('id,tenant_id,franchise_id,is_active')
+    .eq('tenant_id', tenantId)
+    .in('id', ids);
+  if (error) {
+    throw new HttpError(error.message, 400);
+  }
+  return Array.isArray(data) ? (data as AssemblyReferenceRecord[]) : [];
+}
+
+function validateReferenceFranchise(record: AssemblyReferenceRecord, franchiseId: string | null): boolean {
+  if (!franchiseId) return true;
+  if (!record.franchise_id) return true;
+  return record.franchise_id === franchiseId;
+}
+
+async function validateAssemblyModelReferences(
+  supabase: ReturnType<typeof getSupabaseAdminClient>,
+  tenantId: string,
+  franchiseId: string | null,
+  manufacturerId: string | null,
+  assemblyTypeId: string | null,
+): Promise<{ field: string; message: string }[]> {
+  const issues: { field: string; message: string }[] = [];
+  const manufacturerIds = manufacturerId ? [manufacturerId] : [];
+  const assemblyTypeIds = assemblyTypeId ? [assemblyTypeId] : [];
+  const [manufacturers, assemblyTypes] = await Promise.all([
+    loadAssemblyReferenceRecords(supabase, 'manufacturers', tenantId, manufacturerIds),
+    loadAssemblyReferenceRecords(supabase, 'assembly_types', tenantId, assemblyTypeIds),
+  ]);
+  const manufacturer = manufacturerId ? manufacturers.find((row) => row.id === manufacturerId) : null;
+  const assemblyType = assemblyTypeId ? assemblyTypes.find((row) => row.id === assemblyTypeId) : null;
+
+  if (manufacturerId) {
+    if (!manufacturer) {
+      issues.push({ field: 'manufacturer_id', message: 'manufacturer_id must belong to current tenant' });
+    } else {
+      if (manufacturer.is_active === false) {
+        issues.push({ field: 'manufacturer_id', message: 'manufacturer_id must reference an active manufacturer' });
+      }
+      if (!validateReferenceFranchise(manufacturer, franchiseId)) {
+        issues.push({ field: 'manufacturer_id', message: 'manufacturer_id must belong to current franchise scope' });
+      }
+    }
+  }
+
+  if (assemblyTypeId) {
+    if (!assemblyType) {
+      issues.push({ field: 'assembly_type_id', message: 'assembly_type_id must belong to current tenant' });
+    } else {
+      if (assemblyType.is_active === false) {
+        issues.push({ field: 'assembly_type_id', message: 'assembly_type_id must reference an active assembly type' });
+      }
+      if (!validateReferenceFranchise(assemblyType, franchiseId)) {
+        issues.push({ field: 'assembly_type_id', message: 'assembly_type_id must belong to current franchise scope' });
+      }
+    }
+  }
+
+  return issues;
 }
 
 async function resolveAircraftManufacturerUpdate(
@@ -155,22 +232,20 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     if (!id) throw new HttpError('id is required', 400);
     const entityConfig = getEntityConfig(entity);
     const supabase = getSupabaseAdminClient();
-    const isGlobalEntity = entity === 'manufacturers' || entity === 'assembly_types' || entity === 'assembly_models';
 
     const existingQuery = supabase
       .from(entityConfig.table)
       .select(entityConfig.listColumns)
       .eq('id', id)
+      .eq('tenant_id', tenantId)
       .limit(1);
-    const { data: existing, error: existingError } = await (isGlobalEntity ? existingQuery : existingQuery.eq('tenant_id', tenantId)).maybeSingle();
+    const { data: existing, error: existingError } = await existingQuery.maybeSingle();
     if (existingError) throw new HttpError(existingError.message, 400);
     if (!existing) throw new HttpError('Record not found', 404);
-    if (!isGlobalEntity) {
-      const existingRecord = existing as unknown as Record<string, unknown>;
-      const existingFranchiseId = String(existingRecord.franchise_id || '').trim();
-      if (franchiseId && existingFranchiseId && existingFranchiseId !== franchiseId) {
-        throw new HttpError('Forbidden', 403);
-      }
+    const existingRecord = existing as unknown as Record<string, unknown>;
+    const existingFranchiseId = String(existingRecord.franchise_id || '').trim();
+    if (franchiseId && existingFranchiseId && existingFranchiseId !== franchiseId) {
+      throw new HttpError('Forbidden', 403);
     }
 
     if (req.method === 'GET') {
@@ -189,7 +264,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     if (req.method === 'DELETE') {
       enforceAnyPermission(auth.permissions || [], ['edit_aircraft_records']);
       const deleteQuery = supabase.from(entityConfig.table).delete().eq('id', id);
-      const { error } = await (isGlobalEntity ? deleteQuery : deleteQuery.eq('tenant_id', tenantId));
+      const { error } = await deleteQuery.eq('tenant_id', tenantId);
       if (error) throw new HttpError(error.message, 400);
       await writeAuditRecord({
         tenantId,
@@ -221,7 +296,21 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       payload = resolved.payload;
       manufacturerIssues = resolved.issues;
     }
-    const issues = [...manufacturerIssues, ...validatePayload(entity, payload)];
+    let assemblyModelIssues: { field: string; message: string }[] = [];
+    if (entity === 'assembly_models') {
+      const existingManufacturerId = asNullableString((existingRecord as Record<string, unknown>).manufacturer_id);
+      const existingAssemblyTypeId = asNullableString((existingRecord as Record<string, unknown>).assembly_type_id);
+      const effectiveManufacturerId = asNullableString(payload.manufacturer_id) || existingManufacturerId;
+      const effectiveAssemblyTypeId = asNullableString(payload.assembly_type_id) || existingAssemblyTypeId;
+      assemblyModelIssues = await validateAssemblyModelReferences(
+        supabase,
+        tenantId,
+        franchiseId,
+        effectiveManufacturerId,
+        effectiveAssemblyTypeId,
+      );
+    }
+    const issues = [...manufacturerIssues, ...assemblyModelIssues, ...validatePayload(entity, payload)];
     if (validationOnly) {
       res.status(200).json({
         version: 'v2',
@@ -250,9 +339,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       .eq('id', id)
       .select(entityConfig.listColumns)
       .limit(1);
-    const { data, error } = await (isGlobalEntity
-      ? updateBaseQuery.maybeSingle()
-      : updateBaseQuery.eq('tenant_id', tenantId).maybeSingle());
+    const { data, error } = await updateBaseQuery.eq('tenant_id', tenantId).maybeSingle();
     if (error) throw new HttpError(error.message, 400);
     await writeAuditRecord({
       tenantId,

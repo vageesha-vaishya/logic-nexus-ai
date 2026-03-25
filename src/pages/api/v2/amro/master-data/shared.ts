@@ -169,7 +169,7 @@ const ENTITY_CONFIG: Record<AmroMasterDataEntity, EntityConfig> = {
   manufacturers: {
     table: 'manufacturers',
     searchableColumns: ['manufacturer_code', 'name', 'country', 'id'],
-    listColumns: 'id,manufacturer_code,name,country,is_active,metadata,created_at,updated_at',
+    listColumns: 'id,tenant_id,franchise_id,manufacturer_code,name,country,is_active,metadata,created_at,updated_at',
     requiredCreateFields: ['manufacturer_code', 'name'],
     writeAllowedFields: ['manufacturer_code', 'name', 'country', 'is_active', 'metadata'],
     defaultSortColumn: 'updated_at',
@@ -177,7 +177,7 @@ const ENTITY_CONFIG: Record<AmroMasterDataEntity, EntityConfig> = {
   assembly_types: {
     table: 'assembly_types',
     searchableColumns: ['assembly_code', 'name', 'description', 'id'],
-    listColumns: 'id,assembly_code,name,description,is_active,metadata,created_at,updated_at',
+    listColumns: 'id,tenant_id,franchise_id,assembly_code,name,description,is_active,metadata,created_at,updated_at',
     requiredCreateFields: ['assembly_code', 'name', 'description'],
     writeAllowedFields: ['assembly_code', 'name', 'description', 'is_active', 'metadata'],
     defaultSortColumn: 'updated_at',
@@ -186,7 +186,7 @@ const ENTITY_CONFIG: Record<AmroMasterDataEntity, EntityConfig> = {
     table: 'assembly_models',
     searchableColumns: ['model_code', 'name', 'primary_model', 'id'],
     listColumns:
-      'id,manufacturer_id,assembly_type_id,model_code,name,primary_model,description,is_active,metadata,created_at,updated_at',
+      'id,tenant_id,franchise_id,manufacturer_id,assembly_type_id,model_code,name,primary_model,description,is_active,metadata,created_at,updated_at',
     requiredCreateFields: ['manufacturer_id', 'assembly_type_id', 'model_code', 'name'],
     writeAllowedFields: [
       'manufacturer_id',

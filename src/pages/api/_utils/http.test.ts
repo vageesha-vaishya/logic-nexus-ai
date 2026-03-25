@@ -216,6 +216,43 @@ describe('http domain and scope guards', () => {
     expect(ctx.tenantId).toBe('');
   });
 
+  it('applies requested tenant scope when platform admin has override tenant preference', async () => {
+    const rolesQuery = createSelectEqChain(
+      {
+        data: [{ role: 'platform_admin', tenant_id: null, franchise_id: null }],
+        error: null,
+      },
+      1
+    );
+    const preferenceQuery = createMaybeSingleChain({
+      data: { tenant_id: 'tenant-1', franchise_id: null, admin_override_enabled: false },
+      error: null,
+    });
+    const supabaseMock = {
+      from: vi.fn((table: string) => {
+        if (table === 'user_roles') return rolesQuery;
+        if (table === 'user_preferences') return preferenceQuery;
+        throw new Error(`Unexpected table: ${table}`);
+      }),
+    } as any;
+    vi.mocked(getSupabaseAdminClient).mockReturnValue(supabaseMock);
+
+    const req = createMockRequest({ 'x-tenant-id': 'tenant-1' });
+    const ctx = {
+      correlationId: 'corr-platform-override',
+      tenantId: '',
+      franchiseId: '',
+      userId: 'user-1',
+      role: 'platform_admin',
+      isPlatformAdmin: true,
+      adminOverrideEnabled: false,
+    };
+
+    const result = await resolveAndApplyAccessContext(req, ctx);
+    expect(result.tenantId).toBe('tenant-1');
+    expect(ctx.tenantId).toBe('tenant-1');
+  });
+
   it('blocks platform admin franchise spoof when override is enabled', () => {
     const access = buildAccess({
       isPlatformAdmin: true,

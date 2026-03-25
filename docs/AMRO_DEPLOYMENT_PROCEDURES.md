@@ -59,6 +59,8 @@
 
 **[ ] DevOps**
 - Verify database migrations tested on staging
+- Run AMRO DB documentation compliance checks (`npm run amro:db-docs:validate` and `npm run amro:db-docs:report`)
+- Validate AMRO multi-tenant master data migration 20260325000000 on staging with tenant/franchise fixtures
 - Confirm backup snapshot scheduled
 - Verify monitoring alerts configured
 - Test feature flag toggle on staging
@@ -157,6 +159,8 @@ kubectl wait --for=condition=Ready pods -l app=amro,env=green --timeout=10m
 # 6. Run smoke tests on GREEN (against read-only replica)
 npm run test:smoke --env=green
 ```
+
+Ensure AMRO multi-tenant master data migration `20260325000000_amro_multi_tenant_isolation.sql` is included in the migration run.
 
 **Exit Criteria:**
 - [ ] All GREEN pods healthy
@@ -365,6 +369,28 @@ SELECT COUNT(*) FROM tasks WHERE work_package_id NOT IN (SELECT id FROM work_pac
 -- Verify RLS is enforced
 SELECT COUNT(DISTINCT tenant_id) FROM work_packages;
 -- Expected: match number of tenants
+```
+
+### 3.5 AMRO Master Data Tenant Isolation Validation (10 min)
+
+```sql
+-- Ensure tenant scope is populated
+SELECT COUNT(*) FROM manufacturers WHERE tenant_id IS NULL;
+-- Expected: 0
+
+SELECT COUNT(*) FROM assembly_types WHERE tenant_id IS NULL;
+-- Expected: 0
+
+SELECT COUNT(*) FROM assembly_models WHERE tenant_id IS NULL;
+-- Expected: 0
+
+-- Validate assembly models reference same-tenant manufacturers and assembly types
+SELECT COUNT(*)
+FROM assembly_models m
+LEFT JOIN manufacturers mf ON mf.id = m.manufacturer_id AND mf.tenant_id = m.tenant_id
+LEFT JOIN assembly_types at ON at.id = m.assembly_type_id AND at.tenant_id = m.tenant_id
+WHERE mf.id IS NULL OR at.id IS NULL;
+-- Expected: 0
 ```
 
 ---

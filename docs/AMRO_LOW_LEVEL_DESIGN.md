@@ -2156,16 +2156,17 @@ Implementation Notes:
 
 ```text
 Component Type: Table
-Component Name: public.assembly_types
-Purpose: Global AMRO reference list for assembly/system classification with standardized descriptions.
-Estimated Row Count: 8-25 (stable reference set)
+Component Name: public.manufacturers
+Purpose: Tenant-scoped AMRO manufacturer registry for normalized aircraft/assembly references.
+Estimated Row Count: 200-2000 per tenant
 Primary Key: id
 Foreign Keys:
   - created_by -> auth.users(id) ON DELETE SET NULL
   - updated_by -> auth.users(id) ON DELETE SET NULL
 Unique Constraints:
-  - uq_assembly_types_code (assembly_code)
-  - uq_assembly_types_name (lower(name))
+  - uq_manufacturers_code_active (tenant_id, manufacturer_code) WHERE deleted_at IS NULL
+  - uq_manufacturers_name_active (tenant_id, lower(name)) WHERE deleted_at IS NULL
+  - uq_manufacturers_id_tenant (id, tenant_id)
 Check Constraints:
   - none
 Defaults:
@@ -2174,10 +2175,62 @@ Defaults:
   - metadata: '{}'::jsonb
   - created_at: now()
   - updated_at: now()
+  - tenant_id: 'e42ec6fd-6b88-4721-befe-4443d9743120'::uuid
 Indexes:
-  - uq_assembly_types_code(assembly_code)
-  - uq_assembly_types_name(lower(name))
+  - uq_manufacturers_code_active(tenant_id, manufacturer_code)
+  - uq_manufacturers_name_active(tenant_id, lower(name))
+  - uq_manufacturers_id_tenant(id, tenant_id)
+  - idx_manufacturers_is_active(is_active)
+  - idx_manufacturers_name(lower(name))
+  - idx_manufacturers_tenant_id(tenant_id)
+  - idx_manufacturers_franchise_id(franchise_id)
+Columns:
+  - id | uuid | nullable:no | default:gen_random_uuid()
+  - manufacturer_code | text | nullable:no | default:-
+  - name | text | nullable:no | default:-
+  - country | text | nullable:yes | default:null
+  - is_active | boolean | nullable:no | default:true
+  - metadata | jsonb | nullable:no | default:'{}'::jsonb
+  - created_at | timestamptz | nullable:no | default:now()
+  - updated_at | timestamptz | nullable:no | default:now()
+  - created_by | uuid | nullable:yes | default:null
+  - updated_by | uuid | nullable:yes | default:null
+  - deleted_at | timestamptz | nullable:yes | default:null
+  - tenant_id | uuid | nullable:no | default:'e42ec6fd-6b88-4721-befe-4443d9743120'::uuid
+  - franchise_id | uuid | nullable:yes | default:null
+Security Considerations:
+  - RLS enabled; tenant isolation via user_roles; platform admin override policy.
+Implementation Notes:
+  - Migration: 20260325000000_amro_multi_tenant_isolation.sql
+```
+
+```text
+Component Type: Table
+Component Name: public.assembly_types
+Purpose: Tenant-scoped AMRO reference list for assembly/system classification with standardized descriptions.
+Estimated Row Count: 8-25 per tenant (stable reference set)
+Primary Key: id
+Foreign Keys:
+  - created_by -> auth.users(id) ON DELETE SET NULL
+  - updated_by -> auth.users(id) ON DELETE SET NULL
+Unique Constraints:
+  - uq_assembly_types_code (tenant_id, assembly_code)
+  - uq_assembly_types_name (tenant_id, lower(name))
+Check Constraints:
+  - none
+Defaults:
+  - id: gen_random_uuid()
+  - is_active: true
+  - metadata: '{}'::jsonb
+  - created_at: now()
+  - updated_at: now()
+  - tenant_id: 'e42ec6fd-6b88-4721-befe-4443d9743120'::uuid
+Indexes:
+  - uq_assembly_types_code(tenant_id, assembly_code)
+  - uq_assembly_types_name(tenant_id, lower(name))
   - idx_assembly_types_active(is_active)
+  - idx_assembly_types_tenant_id(tenant_id)
+  - idx_assembly_types_franchise_id(franchise_id)
 Columns:
   - id | uuid | nullable:no | default:gen_random_uuid()
   - assembly_code | text | nullable:no | default:-
@@ -2189,26 +2242,28 @@ Columns:
   - updated_at | timestamptz | nullable:no | default:now()
   - created_by | uuid | nullable:yes | default:null
   - updated_by | uuid | nullable:yes | default:null
+  - tenant_id | uuid | nullable:no | default:'e42ec6fd-6b88-4721-befe-4443d9743120'::uuid
+  - franchise_id | uuid | nullable:yes | default:null
 Security Considerations:
-  - RLS enabled; authenticated access policy for AMRO master data; platform admin override enabled.
+  - RLS enabled; tenant isolation via user_roles; platform admin override policy.
 Implementation Notes:
-  - Migration: 20260324233000_amro_assembly_types_reference.sql
+  - Migration: 20260325000000_amro_multi_tenant_isolation.sql
 ```
 
 ```text
 Component Type: Table
 Component Name: public.assembly_models
-Purpose: Global AMRO model registry tied to manufacturer and assembly type for standardized model selection.
-Estimated Row Count: 500-5000 (fleet scope dependent)
+Purpose: Tenant-scoped AMRO model registry tied to manufacturer and assembly type for standardized model selection.
+Estimated Row Count: 500-5000 per tenant (fleet scope dependent)
 Primary Key: id
 Foreign Keys:
-  - manufacturer_id -> public.manufacturers(id) ON DELETE RESTRICT
-  - assembly_type_id -> public.assembly_types(id) ON DELETE RESTRICT
+  - (manufacturer_id, tenant_id) -> public.manufacturers(id, tenant_id) ON DELETE RESTRICT
+  - (assembly_type_id, tenant_id) -> public.assembly_types(id, tenant_id) ON DELETE RESTRICT
   - created_by -> auth.users(id) ON DELETE SET NULL
   - updated_by -> auth.users(id) ON DELETE SET NULL
 Unique Constraints:
-  - uq_assembly_models_code (manufacturer_id, assembly_type_id, model_code)
-  - uq_assembly_models_name (manufacturer_id, assembly_type_id, lower(name))
+  - uq_assembly_models_code (tenant_id, manufacturer_id, assembly_type_id, model_code)
+  - uq_assembly_models_name (tenant_id, manufacturer_id, assembly_type_id, lower(name))
 Check Constraints:
   - none
 Defaults:
@@ -2217,12 +2272,15 @@ Defaults:
   - metadata: '{}'::jsonb
   - created_at: now()
   - updated_at: now()
+  - tenant_id: 'e42ec6fd-6b88-4721-befe-4443d9743120'::uuid
 Indexes:
-  - uq_assembly_models_code(manufacturer_id, assembly_type_id, model_code)
-  - uq_assembly_models_name(manufacturer_id, assembly_type_id, lower(name))
+  - uq_assembly_models_code(tenant_id, manufacturer_id, assembly_type_id, model_code)
+  - uq_assembly_models_name(tenant_id, manufacturer_id, assembly_type_id, lower(name))
   - idx_assembly_models_active(is_active)
   - idx_assembly_models_manufacturer_id(manufacturer_id)
   - idx_assembly_models_assembly_type_id(assembly_type_id)
+  - idx_assembly_models_tenant_id(tenant_id)
+  - idx_assembly_models_franchise_id(franchise_id)
 Columns:
   - id | uuid | nullable:no | default:gen_random_uuid()
   - manufacturer_id | uuid | nullable:no | default:-
@@ -2237,10 +2295,12 @@ Columns:
   - updated_at | timestamptz | nullable:no | default:now()
   - created_by | uuid | nullable:yes | default:null
   - updated_by | uuid | nullable:yes | default:null
+  - tenant_id | uuid | nullable:no | default:'e42ec6fd-6b88-4721-befe-4443d9743120'::uuid
+  - franchise_id | uuid | nullable:yes | default:null
 Security Considerations:
-  - RLS enabled; authenticated access policy for AMRO master data; platform admin override enabled.
+  - RLS enabled; tenant isolation via user_roles; platform admin override policy.
 Implementation Notes:
-  - Migration: 20260324234500_amro_assembly_models_reference.sql
+  - Migration: 20260325000000_amro_multi_tenant_isolation.sql
 ```
 
 #### Template: SQL Function / Trigger Function

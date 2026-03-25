@@ -7,6 +7,13 @@ import { executeWithResilience } from '../utils/resilience';
 
 type JsonRecord = Record<string, unknown>;
 
+type AssemblyReferenceRecord = {
+  id: string;
+  tenant_id: string | null;
+  franchise_id: string | null;
+  is_active: boolean | null;
+};
+
 type MasterEntity =
   | 'aircraft'
   | 'parts_inventory'
@@ -152,7 +159,7 @@ const ENTITY_CONFIG: Record<MasterEntity, EntityConfig> = {
   manufacturers: {
     table: 'manufacturers',
     searchableColumns: ['manufacturer_code', 'name', 'country', 'id'],
-    listColumns: 'id,manufacturer_code,name,country,is_active,metadata,created_at,updated_at',
+    listColumns: 'id,tenant_id,franchise_id,manufacturer_code,name,country,is_active,metadata,created_at,updated_at',
     requiredCreateFields: ['manufacturer_code', 'name'],
     writeAllowedFields: ['manufacturer_code', 'name', 'country', 'is_active', 'metadata'],
     defaultSortColumn: 'updated_at',
@@ -160,7 +167,7 @@ const ENTITY_CONFIG: Record<MasterEntity, EntityConfig> = {
   assembly_types: {
     table: 'assembly_types',
     searchableColumns: ['assembly_code', 'name', 'description', 'id'],
-    listColumns: 'id,assembly_code,name,description,is_active,metadata,created_at,updated_at',
+    listColumns: 'id,tenant_id,franchise_id,assembly_code,name,description,is_active,metadata,created_at,updated_at',
     requiredCreateFields: ['assembly_code', 'name', 'description'],
     writeAllowedFields: ['assembly_code', 'name', 'description', 'is_active', 'metadata'],
     defaultSortColumn: 'updated_at',
@@ -169,7 +176,7 @@ const ENTITY_CONFIG: Record<MasterEntity, EntityConfig> = {
     table: 'assembly_models',
     searchableColumns: ['model_code', 'name', 'primary_model', 'id'],
     listColumns:
-      'id,manufacturer_id,assembly_type_id,model_code,name,primary_model,description,is_active,metadata,created_at,updated_at',
+      'id,tenant_id,franchise_id,manufacturer_id,assembly_type_id,model_code,name,primary_model,description,is_active,metadata,created_at,updated_at',
     requiredCreateFields: ['manufacturer_id', 'assembly_type_id', 'model_code', 'name'],
     writeAllowedFields: [
       'manufacturer_id',
@@ -238,12 +245,6 @@ const ENTITY_CONFIG: Record<MasterEntity, EntityConfig> = {
     defaultSortColumn: 'updated_at',
   },
 };
-
-const GLOBAL_ENTITIES = new Set<MasterEntity>(['manufacturers', 'assembly_types', 'assembly_models']);
-
-function isGlobalEntity(entity: MasterEntity): boolean {
-  return GLOBAL_ENTITIES.has(entity);
-}
 
 function isV2Enabled(): boolean {
   const normalized = String(process.env.AMRO_MASTER_DATA_V2_ENABLED || 'true').trim().toLowerCase();
@@ -693,6 +694,101 @@ function sanitizeWritePayload(entity: MasterEntity, payload: JsonRecord): JsonRe
   return writePayload;
 }
 
+async function loadAssemblyReferenceRecords(
+  supabase: SupabaseClient,
+  table: 'manufacturers' | 'assembly_types',
+  tenantId: string,
+  ids: string[],
+): Promise<AssemblyReferenceRecord[]> {
+  if (ids.length === 0) return [];
+  const { data, error } = await supabase
+    .from(table)
+    .select('id,tenant_id,franchise_id,is_active')
+    .eq('tenant_id', tenantId)
+    .in('id', ids);
+  if (error) {
+    throw new HttpError(error.message, 400);
+  }
+  return Array.isArray(data) ? (data as AssemblyReferenceRecord[]) : [];
+}
+
+function validateReferenceFranchise(record: AssemblyReferenceRecord, franchiseId: string | null): boolean {
+  if (!franchiseId) return true;
+  if (!record.franchise_id) return true;
+  return record.franchise_id === franchiseId;
+}
+
+async function validateAssemblyModelReferences(
+  supabase: SupabaseClient,
+  tenantId: string,
+  franchiseId: string | null,
+  records: JsonRecord[],
+): Promise<Map<number, { field: string; message: string }[]>> {
+  const manufacturerIds = Array.from(
+    new Set(
+      records
+        .map((record) => asNullableString(record.manufacturer_id))
+        .filter((value): value is string => Boolean(value)),
+    ),
+  );
+  const assemblyTypeIds = Array.from(
+    new Set(
+      records
+        .map((record) => asNullableString(record.assembly_type_id))
+        .filter((value): value is string => Boolean(value)),
+    ),
+  );
+  const manufacturerRows = await loadAssemblyReferenceRecords(supabase, 'manufacturers', tenantId, manufacturerIds);
+  const assemblyTypeRows = await loadAssemblyReferenceRecords(supabase, 'assembly_types', tenantId, assemblyTypeIds);
+  const manufacturerById = new Map(manufacturerRows.map((row) => [row.id, row]));
+  const assemblyTypeById = new Map(assemblyTypeRows.map((row) => [row.id, row]));
+  const issues = new Map<number, { field: string; message: string }[]>();
+
+  records.forEach((record, index) => {
+    const rowIssues: { field: string; message: string }[] = [];
+    const manufacturerId = asNullableString(record.manufacturer_id);
+    const assemblyTypeId = asNullableString(record.assembly_type_id);
+
+    if (!manufacturerId) {
+      rowIssues.push({ field: 'manufacturer_id', message: 'manufacturer_id is required' });
+    } else {
+      const manufacturer = manufacturerById.get(manufacturerId);
+      if (!manufacturer) {
+        rowIssues.push({ field: 'manufacturer_id', message: 'manufacturer_id must belong to current tenant' });
+      } else {
+        if (manufacturer.is_active === false) {
+          rowIssues.push({ field: 'manufacturer_id', message: 'manufacturer_id must reference an active manufacturer' });
+        }
+        if (!validateReferenceFranchise(manufacturer, franchiseId)) {
+          rowIssues.push({ field: 'manufacturer_id', message: 'manufacturer_id must belong to current franchise scope' });
+        }
+      }
+    }
+
+    if (!assemblyTypeId) {
+      rowIssues.push({ field: 'assembly_type_id', message: 'assembly_type_id is required' });
+    } else {
+      const assemblyType = assemblyTypeById.get(assemblyTypeId);
+      if (!assemblyType) {
+        rowIssues.push({ field: 'assembly_type_id', message: 'assembly_type_id must belong to current tenant' });
+      } else {
+        if (assemblyType.is_active === false) {
+          rowIssues.push({ field: 'assembly_type_id', message: 'assembly_type_id must reference an active assembly type' });
+        }
+        if (!validateReferenceFranchise(assemblyType, franchiseId)) {
+          rowIssues.push({ field: 'assembly_type_id', message: 'assembly_type_id must belong to current franchise scope' });
+        }
+      }
+    }
+
+    if (rowIssues.length > 0) {
+      issues.set(index, rowIssues);
+    }
+  });
+
+  return issues;
+}
+
 function buildCsv(rows: JsonRecord[]): string {
   if (!rows.length) return '';
   const headers = Array.from(
@@ -801,7 +897,6 @@ router.get(
       throw new HttpError('Missing tenant context', 401);
     }
     const entity = resolveEntity(req.params.entity);
-    const isGlobal = isGlobalEntity(entity);
     const entityConfig = ENTITY_CONFIG[entity];
     const search = parseSearch(req);
     const exportRequested = parseExportRequested(req);
@@ -823,14 +918,12 @@ router.get(
         .order(currentSortBy, { ascending })
         .range(start, end);
 
-      if (!isGlobal) {
-        query = query.eq('tenant_id', req.tenantId);
-      }
+      query = query.eq('tenant_id', req.tenantId);
 
-      if (!isGlobal && franchiseId) {
+      if (franchiseId) {
         query = query.or(`franchise_id.is.null,franchise_id.eq.${franchiseId}`);
       }
-      if (search && (isGlobal || !franchiseId) && searchableColumns.length) {
+      if (search && !franchiseId && searchableColumns.length) {
         const clauses = searchableColumns.map((column) => `${column}.ilike.%${search}%`);
         query = query.or(clauses.join(','));
       }
@@ -867,8 +960,7 @@ router.get(
     }
     const rawRows = Array.isArray(finalData) ? (finalData as unknown as JsonRecord[]) : [];
     const activeSearchableColumns = getActiveSearchableColumns(entity);
-    const rows =
-      !isGlobal && franchiseId && search ? rawRows.filter((row) => matchesSearch(row, activeSearchableColumns, search)) : rawRows;
+    const rows = franchiseId && search ? rawRows.filter((row) => matchesSearch(row, activeSearchableColumns, search)) : rawRows;
 
     if (exportRequested) {
       const csv = buildCsv(rows);
@@ -904,13 +996,12 @@ router.post(
       throw new HttpError('Missing tenant or user context', 401);
     }
     const entity = resolveEntity(req.params.entity);
-    const isGlobal = isGlobalEntity(entity);
     const entityConfig = ENTITY_CONFIG[entity];
     const body = req.body && typeof req.body === 'object' ? (req.body as JsonRecord) : {};
     const { isBulkImport, records } = parseBulkOperation(body);
     const franchiseId = extractFranchiseId(req);
     const supabase = getSupabaseAdminClient();
-    const scopePayload = isGlobal ? {} : { tenant_id: req.tenantId, franchise_id: franchiseId };
+    const scopePayload = { tenant_id: req.tenantId, franchise_id: franchiseId };
 
     if (isBulkImport) {
       if (!records.length) {
@@ -924,6 +1015,12 @@ router.post(
         ...scopePayload,
         updated_by: req.userId,
       }));
+      if (entity === 'assembly_models') {
+        const issues = await validateAssemblyModelReferences(supabase, req.tenantId, franchiseId, prepared);
+        if (issues.size > 0) {
+          throw new HttpError('Invalid assembly model references', 422);
+        }
+      }
       const { data, error } = await executeWithResilience(
         {
           dependency: 'supabase',
@@ -957,6 +1054,12 @@ router.post(
     }
 
     const payload = sanitizeWritePayload(entity, body);
+    if (entity === 'assembly_models') {
+      const issues = await validateAssemblyModelReferences(supabase, req.tenantId, franchiseId, [payload]);
+      if (issues.size > 0) {
+        throw new HttpError('Invalid assembly model references', 422);
+      }
+    }
     const insertPayload = {
       ...payload,
       ...scopePayload,
@@ -1013,7 +1116,6 @@ router.get(
       throw new HttpError('Missing tenant context', 401);
     }
     const entity = resolveEntity(req.params.entity);
-    const isGlobal = isGlobalEntity(entity);
     const id = asString(req.params.id);
     if (!id) {
       throw new HttpError('id is required', 400);
@@ -1029,14 +1131,13 @@ router.get(
         tenantId: req.tenantId,
       },
       async () => {
-        let query = supabase
+        return await supabase
           .from(entityConfig.table)
           .select(entityConfig.listColumns)
-          .eq('id', id);
-        if (!isGlobal) {
-          query = query.eq('tenant_id', req.tenantId);
-        }
-        return await query.limit(1).maybeSingle();
+          .eq('id', id)
+          .eq('tenant_id', req.tenantId)
+          .limit(1)
+          .maybeSingle();
       },
     );
     if (error) {
@@ -1046,8 +1147,8 @@ router.get(
       throw new HttpError('Record not found', 404);
     }
     const record = data as unknown as JsonRecord;
-    const recordFranchise = isGlobal ? null : asString(record.franchise_id);
-    if (!isGlobal && franchiseId && recordFranchise && recordFranchise !== franchiseId) {
+    const recordFranchise = asString(record.franchise_id);
+    if (franchiseId && recordFranchise && recordFranchise !== franchiseId) {
       throw new HttpError('Forbidden', 403);
     }
     res.status(200).json({
@@ -1073,7 +1174,6 @@ router.patch(
       throw new HttpError('Missing tenant or user context', 401);
     }
     const entity = resolveEntity(req.params.entity);
-    const isGlobal = isGlobalEntity(entity);
     const id = asString(req.params.id);
     if (!id) {
       throw new HttpError('id is required', 400);
@@ -1089,14 +1189,13 @@ router.patch(
         tenantId: req.tenantId,
       },
       async () => {
-        let query = supabase
+        return await supabase
           .from(entityConfig.table)
           .select(entityConfig.listColumns)
-          .eq('id', id);
-        if (!isGlobal) {
-          query = query.eq('tenant_id', req.tenantId);
-        }
-        return await query.limit(1).maybeSingle();
+          .eq('id', id)
+          .eq('tenant_id', req.tenantId)
+          .limit(1)
+          .maybeSingle();
       },
     );
     if (existingError) {
@@ -1106,15 +1205,27 @@ router.patch(
       throw new HttpError('Record not found', 404);
     }
     const existingRecord = existing as unknown as JsonRecord;
-    const existingFranchise = isGlobal ? null : asString(existingRecord.franchise_id);
-    if (!isGlobal && franchiseId && existingFranchise && existingFranchise !== franchiseId) {
+    const existingFranchise = asString(existingRecord.franchise_id);
+    if (franchiseId && existingFranchise && existingFranchise !== franchiseId) {
       throw new HttpError('Forbidden', 403);
     }
     const payload = req.body && typeof req.body === 'object' ? (req.body as JsonRecord) : {};
-    const updatePayload = {
+    const updatePayload: JsonRecord = {
       ...sanitizeWritePayload(entity, payload),
       updated_by: req.userId,
     };
+    if (entity === 'assembly_models') {
+      const existingManufacturerId = asNullableString(existingRecord.manufacturer_id);
+      const existingAssemblyTypeId = asNullableString(existingRecord.assembly_type_id);
+      const effectiveManufacturerId = asNullableString(updatePayload.manufacturer_id) || existingManufacturerId;
+      const effectiveAssemblyTypeId = asNullableString(updatePayload.assembly_type_id) || existingAssemblyTypeId;
+      const issues = await validateAssemblyModelReferences(supabase, req.tenantId, franchiseId, [
+        { manufacturer_id: effectiveManufacturerId, assembly_type_id: effectiveAssemblyTypeId },
+      ]);
+      if (issues.size > 0) {
+        throw new HttpError('Invalid assembly model references', 422);
+      }
+    }
     const { data, error } = await executeWithResilience(
       {
         dependency: 'supabase',
@@ -1123,14 +1234,14 @@ router.patch(
         tenantId: req.tenantId,
       },
       async () => {
-        let query = supabase
+        return await supabase
           .from(entityConfig.table)
           .update(updatePayload)
-          .eq('id', id);
-        if (!isGlobal) {
-          query = query.eq('tenant_id', req.tenantId);
-        }
-        return await query.select(entityConfig.listColumns).limit(1).maybeSingle();
+          .eq('id', id)
+          .eq('tenant_id', req.tenantId)
+          .select(entityConfig.listColumns)
+          .limit(1)
+          .maybeSingle();
       },
     );
     if (error) {
@@ -1169,7 +1280,6 @@ router.delete(
       throw new HttpError('Missing tenant or user context', 401);
     }
     const entity = resolveEntity(req.params.entity);
-    const isGlobal = isGlobalEntity(entity);
     const id = asString(req.params.id);
     if (!id) {
       throw new HttpError('id is required', 400);
@@ -1184,16 +1294,14 @@ router.delete(
         requestId: correlationId,
         tenantId: req.tenantId,
       },
-      async () => {
-        let query = supabase
+      async () =>
+        await supabase
           .from(entityConfig.table)
           .select(entityConfig.listColumns)
-          .eq('id', id);
-        if (!isGlobal) {
-          query = query.eq('tenant_id', req.tenantId);
-        }
-        return await query.limit(1).maybeSingle();
-      },
+          .eq('id', id)
+          .eq('tenant_id', req.tenantId)
+          .limit(1)
+          .maybeSingle(),
     );
     if (existingError) {
       throw new HttpError(existingError.message, 400);
@@ -1202,8 +1310,8 @@ router.delete(
       throw new HttpError('Record not found', 404);
     }
     const existingRecord = existing as unknown as JsonRecord;
-    const existingFranchise = isGlobal ? null : asString(existingRecord.franchise_id);
-    if (!isGlobal && franchiseId && existingFranchise && existingFranchise !== franchiseId) {
+    const existingFranchise = asString(existingRecord.franchise_id);
+    if (franchiseId && existingFranchise && existingFranchise !== franchiseId) {
       throw new HttpError('Forbidden', 403);
     }
     const { error } = await executeWithResilience(
@@ -1213,16 +1321,12 @@ router.delete(
         requestId: correlationId,
         tenantId: req.tenantId,
       },
-      async () => {
-        let query = supabase
+      async () =>
+        await supabase
           .from(entityConfig.table)
           .delete()
-          .eq('id', id);
-        if (!isGlobal) {
-          query = query.eq('tenant_id', req.tenantId);
-        }
-        return await query;
-      },
+          .eq('id', id)
+          .eq('tenant_id', req.tenantId),
     );
     if (error) {
       throw new HttpError(error.message, 400);

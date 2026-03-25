@@ -132,6 +132,38 @@ describe('/api/v2/amro/master-data/[entity]', () => {
     expect((res.jsonBody as any)?.output?.entity).toBe('aircraft');
   });
 
+  it('applies tenant scoping to master data queries', async () => {
+    const eqMock = vi.fn().mockResolvedValue({
+      data: [{ id: 'man-1', manufacturer_code: 'BOE', name: 'Boeing', is_active: true }],
+      count: 1,
+      error: null,
+    });
+    const rangeMock = vi.fn().mockReturnValue({ eq: eqMock });
+    const orderMock = vi.fn().mockReturnValue({ range: rangeMock });
+    const selectMock = vi.fn().mockReturnValue({ order: orderMock });
+    const fromMock = vi.fn().mockReturnValue({ select: selectMock });
+    vi.mocked(getSupabaseAdminClient).mockReturnValue({
+      from: fromMock,
+    } as any);
+
+    const req: ApiRequest = {
+      method: 'GET',
+      query: {
+        entity: 'manufacturers',
+        page: '1',
+        page_size: '25',
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(eqMock).toHaveBeenCalledWith('tenant_id', 'tenant-1');
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.output?.entity).toBe('manufacturers');
+  });
+
   it('returns paginated records for regulator profiles GET', async () => {
     const eqMock = vi.fn().mockResolvedValue({
       data: [{ id: 'reg-1', regulator_code: 'FAA', regulator_name: 'Federal Aviation Administration', jurisdiction: 'US' }],
@@ -301,5 +333,50 @@ describe('/api/v2/amro/master-data/[entity]', () => {
     expect((res.jsonBody as any)?.output?.validation?.is_valid).toBe(false);
     expect((res.jsonBody as any)?.output?.validation?.issues?.length).toBeGreaterThan(0);
     expect(fromMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects assembly models with cross-tenant references', async () => {
+    const manufacturersInMock = vi.fn().mockResolvedValue({ data: [], error: null });
+    const manufacturersEqMock = vi.fn().mockReturnValue({ in: manufacturersInMock });
+    const manufacturersSelectMock = vi.fn().mockReturnValue({ eq: manufacturersEqMock });
+    const assemblyTypesInMock = vi.fn().mockResolvedValue({
+      data: [{ id: 'type-1', tenant_id: 'tenant-1', franchise_id: null, is_active: true }],
+      error: null,
+    });
+    const assemblyTypesEqMock = vi.fn().mockReturnValue({ in: assemblyTypesInMock });
+    const assemblyTypesSelectMock = vi.fn().mockReturnValue({ eq: assemblyTypesEqMock });
+
+    const fromMock = vi.fn((table: string) => {
+      if (table === 'manufacturers') {
+        return { select: manufacturersSelectMock };
+      }
+      if (table === 'assembly_types') {
+        return { select: assemblyTypesSelectMock };
+      }
+      return {};
+    });
+    vi.mocked(getSupabaseAdminClient).mockReturnValue({
+      from: fromMock,
+    } as any);
+
+    const req: ApiRequest = {
+      method: 'POST',
+      query: {
+        entity: 'assembly_models',
+      },
+      body: {
+        manufacturer_id: 'man-1',
+        assembly_type_id: 'type-1',
+        model_code: 'MDL-100',
+        name: 'Model 100',
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(422);
+    expect((res.jsonBody as any)?.error).toContain('Validation failed');
   });
 });
