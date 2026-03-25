@@ -271,13 +271,13 @@ All colors MUST be HSL.
   }
 
   .mdm-template-dialog {
-    @apply z-[1000] max-h-[92vh] max-w-6xl overflow-y-auto border p-0 font-sans text-[13px] transition-transform duration-300 data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95;
+    @apply z-[1000] w-[80vw] max-w-[1400px] max-h-[92vh] overflow-y-auto border p-0 font-sans text-[13px] transition-transform duration-300 data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95 !important;
     border-color: hsl(var(--mdm-template-border-strong));
     line-height: var(--mdm-template-line-height);
   }
 
   .mdm-template-dialog-large {
-    @apply w-[92vw] max-w-[1200px];
+    @apply w-[98vw] max-w-[1800px] max-h-[95vh] !important;
   }
 
   .mdm-template-tab-rail {

@@ -2313,7 +2313,7 @@ export function AmroOwnedWorkspace({
       ) : null}
       {showComplianceModule ? (
       <Dialog open={state.complianceGateModalOpen} onOpenChange={state.setComplianceGateModalOpen}>
-        <DialogContent>
+        <DialogContent className="mdm-template-dialog">
           <DialogHeader>
             <DialogTitle>SCR-AMRO-008 Compliance Gate Modal</DialogTitle>
           </DialogHeader>
@@ -2343,7 +2343,7 @@ export function AmroOwnedWorkspace({
       </Dialog>
       ) : null}
       <Dialog open={closureConfirmOpen} onOpenChange={setClosureConfirmOpen}>
-        <DialogContent>
+        <DialogContent className="mdm-template-dialog">
           <DialogHeader>
             <DialogTitle>Confirm Work Package Closure</DialogTitle>
           </DialogHeader>
@@ -2363,7 +2363,7 @@ export function AmroOwnedWorkspace({
         </DialogContent>
       </Dialog>
       <Dialog open={overrideConfirmOpen} onOpenChange={setOverrideConfirmOpen}>
-        <DialogContent>
+        <DialogContent className="mdm-template-dialog">
           <DialogHeader>
             <DialogTitle>Confirm Compliance Override</DialogTitle>
           </DialogHeader>
@@ -2383,7 +2383,7 @@ export function AmroOwnedWorkspace({
         </DialogContent>
       </Dialog>
       <Dialog open={deferralConfirmOpen} onOpenChange={setDeferralConfirmOpen}>
-        <DialogContent>
+        <DialogContent className="mdm-template-dialog">
           <DialogHeader>
             <DialogTitle>Confirm Certification Deferral</DialogTitle>
           </DialogHeader>
