@@ -873,9 +873,21 @@ async function writeAuditRecord(params: {
   }
 }
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isUuidValue(value: string): boolean {
+  return UUID_REGEX.test(value);
+}
+
 function matchesSearch(row: JsonRecord, searchableColumns: string[], search: string): boolean {
   if (!search) return true;
   const searchLower = search.toLowerCase();
+  if (isUuidValue(searchLower)) {
+    const rowId = String(row.id || '').toLowerCase();
+    if (rowId === searchLower) {
+      return true;
+    }
+  }
   return searchableColumns.some((column) => {
     const value = row[column];
     if (value === null || value === undefined) return false;
@@ -924,8 +936,17 @@ router.get(
         query = query.or(`franchise_id.is.null,franchise_id.eq.${franchiseId}`);
       }
       if (search && !franchiseId && searchableColumns.length) {
-        const clauses = searchableColumns.map((column) => `${column}.ilike.%${search}%`);
-        query = query.or(clauses.join(','));
+        const trimmedSearch = search.trim();
+        const isUuidSearch = isUuidValue(trimmedSearch);
+        if (isUuidSearch && searchableColumns.includes('id')) {
+          query = query.eq('id', trimmedSearch);
+        } else {
+          const ilikeColumns = searchableColumns.filter((column) => column !== 'id');
+          if (ilikeColumns.length) {
+            const clauses = ilikeColumns.map((column) => `${column}.ilike.%${trimmedSearch}%`);
+            query = query.or(clauses.join(','));
+          }
+        }
       }
 
       const { data, count, error } = await executeWithResilience(

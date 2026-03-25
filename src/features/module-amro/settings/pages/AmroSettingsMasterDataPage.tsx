@@ -1482,6 +1482,10 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
       })),
     [manufacturerOptions],
   );
+  const manufacturerLabelById = useMemo(
+    () => new Map(manufacturerOptions.map((option) => [option.id, option.label])),
+    [manufacturerOptions],
+  );
   const assemblyTypeSelectOptions = useMemo<SelectOption[]>(
     () =>
       assemblyTypeOptions.map((option) => ({
@@ -1489,6 +1493,10 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
         label: option.label,
         disabled: !option.active,
       })),
+    [assemblyTypeOptions],
+  );
+  const assemblyTypeLabelById = useMemo(
+    () => new Map(assemblyTypeOptions.map((option) => [option.id, option.label])),
     [assemblyTypeOptions],
   );
 
@@ -1618,7 +1626,22 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
     setInlineEditingCell(null);
     setInlineEditValue('');
   }, []);
-
+  const resolveTableCellValue = useCallback(
+    (row: RecordRow, column: string) => {
+      if (entity === 'assembly_models') {
+        if (column === 'manufacturer_id') {
+          const raw = String(row[column] ?? '').trim();
+          return manufacturerLabelById.get(raw) ?? raw;
+        }
+        if (column === 'assembly_type_id') {
+          const raw = String(row[column] ?? '').trim();
+          return assemblyTypeLabelById.get(raw) ?? raw;
+        }
+      }
+      return String(row[column] ?? '');
+    },
+    [assemblyTypeLabelById, entity, manufacturerLabelById],
+  );
   const handleRowSingleClick = useCallback(
     (row: RecordRow) => {
       if (clickDelayTimerRef.current) {
@@ -2349,11 +2372,11 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
                                       className="inline-flex max-w-full items-center gap-1 truncate text-[hsl(var(--mdm-template-focus))] underline-offset-4 transition-colors hover:underline"
                                       onClick={(event) => event.stopPropagation()}
                                     >
-                                      <span className="truncate">{String(row[column] ?? '')}</span>
+                                      <span className="truncate">{resolveTableCellValue(row, column)}</span>
                                       <ExternalLink className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                     </Link>
                                   ) : (
-                                    <span className="block truncate">{String(row[column] ?? '')}</span>
+                                    <span className="block truncate">{resolveTableCellValue(row, column)}</span>
                                   )}
                                 </div>
                               </ContextMenuTrigger>
