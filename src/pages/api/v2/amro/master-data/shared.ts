@@ -9,6 +9,9 @@ export type AmroMasterDataEntity =
   | 'maintenance_facilities'
   | 'work_centers'
   | 'skill_codes'
+  | 'manufacturers'
+  | 'assembly_types'
+  | 'assembly_models'
   | 'regulator_profiles'
   | 'shift_calendars'
   | 'work_package_templates';
@@ -34,9 +37,9 @@ export class HttpError extends Error {
 const ENTITY_CONFIG: Record<AmroMasterDataEntity, EntityConfig> = {
   aircraft: {
     table: 'aircraft',
-    searchableColumns: ['tail_number', 'registration', 'serial_number', 'aircraft_type', 'aircraft_model', 'msn'],
-    listColumns: 'id,tenant_id,franchise_id,registration,tail_number,serial_number,aircraft_type,aircraft_model,configuration_code,maintenance_program,status,created_at,updated_at',
-    requiredCreateFields: ['tail_number', 'serial_number', 'aircraft_type', 'aircraft_model'],
+    searchableColumns: ['tail_number', 'registration', 'serial_number', 'aircraft_type', 'aircraft_model', 'msn', 'manufacturer', 'model'],
+    listColumns: 'id,tenant_id,franchise_id,registration,tail_number,serial_number,aircraft_type,aircraft_model,manufacturer,manufacturer_id,model,msn,line_number,configuration_code,maintenance_program,status,operator_code,station_code,engine_type,base_location,current_flight_hours,current_cycles,current_flight_hours_since_new,current_cycles_since_new,created_at,updated_at',
+    requiredCreateFields: ['tail_number', 'serial_number', 'aircraft_type', 'aircraft_model', 'manufacturer_id'],
     writeAllowedFields: [
       'registration',
       'tail_number',
@@ -46,6 +49,7 @@ const ENTITY_CONFIG: Record<AmroMasterDataEntity, EntityConfig> = {
       'configuration_code',
       'maintenance_program',
       'manufacturer',
+      'manufacturer_id',
       'model',
       'msn',
       'line_number',
@@ -162,6 +166,40 @@ const ENTITY_CONFIG: Record<AmroMasterDataEntity, EntityConfig> = {
     ],
     defaultSortColumn: 'updated_at',
   },
+  manufacturers: {
+    table: 'manufacturers',
+    searchableColumns: ['manufacturer_code', 'name', 'country', 'id'],
+    listColumns: 'id,manufacturer_code,name,country,is_active,metadata,created_at,updated_at',
+    requiredCreateFields: ['manufacturer_code', 'name'],
+    writeAllowedFields: ['manufacturer_code', 'name', 'country', 'is_active', 'metadata'],
+    defaultSortColumn: 'updated_at',
+  },
+  assembly_types: {
+    table: 'assembly_types',
+    searchableColumns: ['assembly_code', 'name', 'description', 'id'],
+    listColumns: 'id,assembly_code,name,description,is_active,metadata,created_at,updated_at',
+    requiredCreateFields: ['assembly_code', 'name', 'description'],
+    writeAllowedFields: ['assembly_code', 'name', 'description', 'is_active', 'metadata'],
+    defaultSortColumn: 'updated_at',
+  },
+  assembly_models: {
+    table: 'assembly_models',
+    searchableColumns: ['model_code', 'name', 'primary_model', 'id'],
+    listColumns:
+      'id,manufacturer_id,assembly_type_id,model_code,name,primary_model,description,is_active,metadata,created_at,updated_at',
+    requiredCreateFields: ['manufacturer_id', 'assembly_type_id', 'model_code', 'name'],
+    writeAllowedFields: [
+      'manufacturer_id',
+      'assembly_type_id',
+      'model_code',
+      'name',
+      'primary_model',
+      'description',
+      'is_active',
+      'metadata',
+    ],
+    defaultSortColumn: 'updated_at',
+  },
   regulator_profiles: {
     table: 'regulator_profiles',
     searchableColumns: ['regulator_code', 'regulator_name', 'jurisdiction', 'policy_version'],
@@ -263,6 +301,19 @@ function asDateString(value: unknown): string | null {
   return normalized;
 }
 
+function parseTimeToSeconds(value: string | null): number | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  const match = /^(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(trimmed);
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  const seconds = Number(match[3] ?? '0');
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes) || !Number.isFinite(seconds)) return null;
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59 || seconds < 0 || seconds > 59) return null;
+  return hours * 3600 + minutes * 60 + seconds;
+}
+
 export function resolveEntity(rawEntity: unknown): AmroMasterDataEntity {
   const entity = asString(rawEntity).toLowerCase() as AmroMasterDataEntity;
   if (!ENTITY_CONFIG[entity]) {
@@ -323,6 +374,7 @@ function normalizeAircraft(payload: Record<string, unknown>) {
     configuration_code: asNullableString(payload.configuration_code),
     maintenance_program: asNullableString(payload.maintenance_program),
     manufacturer: asNullableString(payload.manufacturer),
+    manufacturer_id: asNullableString(payload.manufacturer_id),
     model: asNullableString(payload.model),
     msn: asNullableString(payload.msn),
     line_number: asNullableString(payload.line_number),
@@ -419,6 +471,39 @@ function normalizeSkillCode(payload: Record<string, unknown>) {
   };
 }
 
+function normalizeManufacturer(payload: Record<string, unknown>) {
+  return {
+    manufacturer_code: asString(payload.manufacturer_code),
+    name: asString(payload.name),
+    country: asNullableString(payload.country),
+    is_active: asBoolean(payload.is_active, true),
+    metadata: asJsonObject(payload.metadata),
+  };
+}
+
+function normalizeAssemblyType(payload: Record<string, unknown>) {
+  return {
+    assembly_code: asString(payload.assembly_code),
+    name: asString(payload.name),
+    description: asString(payload.description),
+    is_active: asBoolean(payload.is_active, true),
+    metadata: asJsonObject(payload.metadata),
+  };
+}
+
+function normalizeAssemblyModel(payload: Record<string, unknown>) {
+  return {
+    manufacturer_id: asString(payload.manufacturer_id),
+    assembly_type_id: asString(payload.assembly_type_id),
+    model_code: asString(payload.model_code),
+    name: asString(payload.name),
+    primary_model: asNullableString(payload.primary_model),
+    description: asNullableString(payload.description),
+    is_active: asBoolean(payload.is_active, true),
+    metadata: asJsonObject(payload.metadata),
+  };
+}
+
 function normalizeRegulatorProfile(payload: Record<string, unknown>) {
   return {
     regulator_code: asString(payload.regulator_code),
@@ -465,6 +550,9 @@ export function normalizePayload(entity: AmroMasterDataEntity, payload: Record<s
   if (entity === 'maintenance_facilities') return normalizeMaintenanceFacility(payload);
   if (entity === 'work_centers') return normalizeWorkCenter(payload);
   if (entity === 'skill_codes') return normalizeSkillCode(payload);
+  if (entity === 'manufacturers') return normalizeManufacturer(payload);
+  if (entity === 'assembly_types') return normalizeAssemblyType(payload);
+  if (entity === 'assembly_models') return normalizeAssemblyModel(payload);
   if (entity === 'regulator_profiles') return normalizeRegulatorProfile(payload);
   if (entity === 'shift_calendars') return normalizeShiftCalendar(payload);
   return normalizeWorkPackageTemplate(payload);
@@ -521,6 +609,26 @@ export function validatePayload(entity: AmroMasterDataEntity, payload: Record<st
       issues.push({
         field: 'capacity',
         message: 'capacity must be greater than zero',
+      });
+    }
+    const shiftStart = parseTimeToSeconds(asNullableString(payload.shift_start_time));
+    const shiftEnd = parseTimeToSeconds(asNullableString(payload.shift_end_time));
+    if (payload.shift_start_time && shiftStart === null) {
+      issues.push({
+        field: 'shift_start_time',
+        message: 'Shift Start must be in HH:mm or HH:mm:ss format',
+      });
+    }
+    if (payload.shift_end_time && shiftEnd === null) {
+      issues.push({
+        field: 'shift_end_time',
+        message: 'Shift End must be in HH:mm or HH:mm:ss format',
+      });
+    }
+    if (shiftStart !== null && shiftEnd !== null && shiftEnd <= shiftStart) {
+      issues.push({
+        field: 'shift_end_time',
+        message: 'Shift End must be after Shift Start',
       });
     }
   }

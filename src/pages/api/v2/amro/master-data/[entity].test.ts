@@ -93,14 +93,14 @@ describe('/api/v2/amro/master-data/[entity]', () => {
   });
 
   it('returns paginated records for supported entity GET', async () => {
-    const rangeMock = vi.fn().mockResolvedValue({
+    const eqMock = vi.fn().mockResolvedValue({
       data: [{ id: 'ac-1', tail_number: 'N100AA', status: 'active' }],
       count: 1,
       error: null,
     });
+    const rangeMock = vi.fn().mockReturnValue({ eq: eqMock });
     const orderMock = vi.fn().mockReturnValue({ range: rangeMock });
-    const eqMock = vi.fn().mockReturnValue({ order: orderMock });
-    const selectMock = vi.fn().mockReturnValue({ eq: eqMock });
+    const selectMock = vi.fn().mockReturnValue({ order: orderMock });
     const fromMock = vi.fn().mockReturnValue({ select: selectMock });
     vi.mocked(getSupabaseAdminClient).mockReturnValue({
       from: fromMock,
@@ -133,14 +133,14 @@ describe('/api/v2/amro/master-data/[entity]', () => {
   });
 
   it('returns paginated records for regulator profiles GET', async () => {
-    const rangeMock = vi.fn().mockResolvedValue({
+    const eqMock = vi.fn().mockResolvedValue({
       data: [{ id: 'reg-1', regulator_code: 'FAA', regulator_name: 'Federal Aviation Administration', jurisdiction: 'US' }],
       count: 1,
       error: null,
     });
+    const rangeMock = vi.fn().mockReturnValue({ eq: eqMock });
     const orderMock = vi.fn().mockReturnValue({ range: rangeMock });
-    const eqMock = vi.fn().mockReturnValue({ order: orderMock });
-    const selectMock = vi.fn().mockReturnValue({ eq: eqMock });
+    const selectMock = vi.fn().mockReturnValue({ order: orderMock });
     const fromMock = vi.fn().mockReturnValue({ select: selectMock });
     vi.mocked(getSupabaseAdminClient).mockReturnValue({
       from: fromMock,
@@ -166,14 +166,14 @@ describe('/api/v2/amro/master-data/[entity]', () => {
   });
 
   it('returns empty records when entity table is unavailable', async () => {
-    const rangeMock = vi.fn().mockResolvedValue({
+    const eqMock = vi.fn().mockResolvedValue({
       data: null,
       count: null,
       error: { message: 'relation "public.regulator_profiles" does not exist' },
     });
+    const rangeMock = vi.fn().mockReturnValue({ eq: eqMock });
     const orderMock = vi.fn().mockReturnValue({ range: rangeMock });
-    const eqMock = vi.fn().mockReturnValue({ order: orderMock });
-    const selectMock = vi.fn().mockReturnValue({ eq: eqMock });
+    const selectMock = vi.fn().mockReturnValue({ order: orderMock });
     const fromMock = vi.fn().mockReturnValue({ select: selectMock });
     vi.mocked(getSupabaseAdminClient).mockReturnValue({
       from: fromMock,
@@ -199,7 +199,7 @@ describe('/api/v2/amro/master-data/[entity]', () => {
   });
 
   it('retries without unavailable columns when select clause has missing column', async () => {
-    const rangeMock = vi
+    const eqMock = vi
       .fn()
       .mockResolvedValueOnce({
         data: null,
@@ -211,9 +211,9 @@ describe('/api/v2/amro/master-data/[entity]', () => {
         count: 1,
         error: null,
       });
+    const rangeMock = vi.fn().mockReturnValue({ eq: eqMock });
     const orderMock = vi.fn().mockReturnValue({ range: rangeMock });
-    const eqMock = vi.fn().mockReturnValue({ order: orderMock });
-    const selectMock = vi.fn().mockReturnValue({ eq: eqMock });
+    const selectMock = vi.fn().mockReturnValue({ order: orderMock });
     const fromMock = vi.fn().mockReturnValue({ select: selectMock });
     vi.mocked(getSupabaseAdminClient).mockReturnValue({
       from: fromMock,
