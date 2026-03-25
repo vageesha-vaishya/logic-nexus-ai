@@ -350,8 +350,8 @@ function parsePagination(req: AuthRequest): { page: number; pageSize: number; st
   if (!Number.isFinite(pageSizeRaw) || pageSizeRaw <= 0 || !Number.isInteger(pageSizeRaw)) {
     throw new HttpError('page_size must be a positive integer', 400);
   }
-  if (pageSizeRaw > 200) {
-    throw new HttpError('page_size must be less than or equal to 200', 400);
+  if (pageSizeRaw > 5000) {
+    throw new HttpError('page_size must be less than or equal to 5000', 400);
   }
   const page = pageRaw;
   const pageSize = pageSizeRaw;

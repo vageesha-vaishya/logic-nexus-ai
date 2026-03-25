@@ -4,18 +4,22 @@ import request from 'supertest';
 const mockExecuteWithResilience = jest.fn();
 
 function createQueryBuilder() {
-  return {
+  const builder: any = {
     select: jest.fn().mockReturnThis(),
     eq: jest.fn().mockReturnThis(),
     limit: jest.fn().mockReturnThis(),
     order: jest.fn().mockReturnThis(),
-    range: jest.fn().mockResolvedValue({ data: [], count: 0, error: null }),
+    range: jest.fn().mockReturnThis(),
     or: jest.fn().mockReturnThis(),
     maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
     insert: jest.fn().mockReturnThis(),
     update: jest.fn().mockReturnThis(),
     delete: jest.fn().mockReturnThis(),
+    then: function(resolve: any, reject: any) {
+      return Promise.resolve({ data: [], count: 0, error: null }).then(resolve, reject);
+    }
   };
+  return builder;
 }
 
 jest.mock('../src/utils/resilience', () => ({

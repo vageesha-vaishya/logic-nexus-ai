@@ -442,7 +442,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         }
 
         const missingColumn = extractMissingColumn(errorMessage);
-        if (missingColumn && markMissingColumn(entity, missingColumn, entityConfig.listColumns, entityConfig.searchableColumns)) {
+        if (missingColumn) {
+          markMissingColumn(entity, missingColumn, entityConfig.listColumns, entityConfig.searchableColumns);
           currentSortBy = resolveSortColumn(entity, currentSortBy, entityConfig.listColumns);
           continue;
         }
@@ -495,7 +496,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
             break;
           }
           const missingColumn = extractMissingColumn(errorMessage);
-          if (missingColumn && markMissingColumn(entity, missingColumn, entityConfig.listColumns, entityConfig.searchableColumns)) {
+          if (missingColumn) {
+            markMissingColumn(entity, missingColumn, entityConfig.listColumns, entityConfig.searchableColumns);
             fallbackSortBy = resolveSortColumn(entity, fallbackSortBy, entityConfig.listColumns);
             continue;
           }

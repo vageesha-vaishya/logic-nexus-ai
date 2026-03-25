@@ -153,6 +153,25 @@ describe('AmroSettingsMasterDataPage', () => {
               }),
           };
         }
+        if (method === 'GET' && url.includes('/api/v2/amro/master-data/assembly_models')) {
+          return {
+            ok: true,
+            text: async () =>
+              JSON.stringify({
+                output: {
+                  records: [
+                    {
+                      id: 'amodel-1',
+                      model_code: 'B737-800',
+                      name: 'B737-800',
+                      manufacturer_id: 'manu-1',
+                      is_active: true,
+                    },
+                  ],
+                },
+              }),
+          };
+        }
         if (method === 'GET') {
           if (url.includes('/api/v2/amro/work-packages')) {
             return {
@@ -301,7 +320,8 @@ describe('AmroSettingsMasterDataPage', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Configuration Settings' }));
     fireEvent.click(within(dialog).getByLabelText(/Manufacturer/));
     fireEvent.click(await screen.findByText('Boeing (BOE)'));
-    fireEvent.change(within(dialog).getByLabelText(/^Aircraft Model/), { target: { value: 'A321-200' } });
+    fireEvent.click(within(dialog).getByLabelText(/^Aircraft Model/));
+    fireEvent.click(await screen.findByText('B737-800'));
     fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
 
     await waitFor(() => {
