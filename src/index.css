@@ -276,14 +276,26 @@ All colors MUST be HSL.
     line-height: var(--mdm-template-line-height);
   }
 
+  .mdm-template-dialog-large {
+    @apply w-[92vw] max-w-[1200px];
+  }
+
   .mdm-template-tab-rail {
     @apply flex flex-wrap gap-2 rounded-md border p-2;
     border-color: hsl(var(--mdm-template-border));
     background-color: hsl(var(--mdm-template-field-bg));
   }
 
+  .mdm-template-tab-rail-inline {
+    @apply flex-nowrap overflow-x-auto;
+  }
+
   .mdm-template-tab {
     @apply rounded-md px-3 py-2 text-[12px] font-semibold transition-colors duration-150;
+  }
+
+  .mdm-template-tab-inline {
+    @apply whitespace-nowrap;
   }
 
   .mdm-template-tab[data-state='active'] {

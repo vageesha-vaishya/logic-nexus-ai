@@ -220,8 +220,8 @@ const ENTITY_FORM_FIELDS: Record<MasterEntity, EntityFormField[]> = {
     { key: 'tail_number', label: 'Tail Number', type: 'text', required: true },
     { key: 'serial_number', label: 'Serial Number', type: 'text', required: true },
     { key: 'aircraft_type', label: 'Aircraft Type', type: 'text', required: true },
-    { key: 'aircraft_model', label: 'Aircraft Model', type: 'text', required: true },
     { key: 'manufacturer_id', label: 'Manufacturer', type: 'select', required: true },
+    { key: 'aircraft_model', label: 'Aircraft Model', type: 'text', required: true },
     { key: 'configuration_code', label: 'Configuration Code', type: 'text' },
     { key: 'maintenance_program', label: 'Maintenance Program', type: 'text' },
     { key: 'status', label: 'Status', type: 'select', required: true, options: ['active', 'inactive', 'grounded', 'maintenance'] },
@@ -1949,7 +1949,10 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
   const fullWidthSectionFieldClass = 'mdm-template-form-field-full';
 
   const tabLabelClass = (tab: 'basic' | 'configuration' | 'system') =>
-    cn('mdm-template-tab', activeFormTab === tab ? 'text-[hsl(var(--mdm-template-heading))]' : 'text-[hsl(var(--mdm-template-muted))]');
+    cn(
+      'mdm-template-tab mdm-template-tab-inline',
+      activeFormTab === tab ? 'text-[hsl(var(--mdm-template-heading))]' : 'text-[hsl(var(--mdm-template-muted))]',
+    );
 
   const renderEditableField = useCallback(
     (field: EntityFormField, section: FormSectionKey, index?: number) => {
@@ -2447,7 +2450,7 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
           </Card>
         </div>
         <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-          <DialogContent className="mdm-template-dialog" data-testid="amro-master-data-form-dialog">
+          <DialogContent className="mdm-template-dialog mdm-template-dialog-large" data-testid="amro-master-data-form-dialog">
             <DialogHeader className="border-b border-[hsl(var(--mdm-template-border))] px-6 py-4">
               <DialogTitle className="text-[15px] font-semibold text-[hsl(var(--mdm-template-heading))]">
                 {modalMode === 'create' ? `Create ${ENTITY_LABEL[entity]}` : `Update ${ENTITY_LABEL[entity]}`}
@@ -2457,7 +2460,7 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-6 px-6 pb-6 pt-4">
-              <div className="mdm-template-tab-rail">
+              <div className="mdm-template-tab-rail mdm-template-tab-rail-inline">
                 <button type="button" className={tabLabelClass('basic')} data-state={activeFormTab === 'basic' ? 'active' : 'inactive'} onClick={() => setActiveFormTab('basic')}>Basic Information</button>
                 <button type="button" className={tabLabelClass('configuration')} data-state={activeFormTab === 'configuration' ? 'active' : 'inactive'} onClick={() => setActiveFormTab('configuration')}>Configuration Settings</button>
                 <button type="button" className={tabLabelClass('system')} data-state={activeFormTab === 'system' ? 'active' : 'inactive'} onClick={() => setActiveFormTab('system')}>System Information</button>
