@@ -1123,4 +1123,156 @@ describe('/api/v2/amro/work-packages', () => {
     expect((res.jsonBody as any)?.output?.sync_status).toBe('applied');
     expect((res.jsonBody as any)?.output?.impacted_work_packages).toEqual(['wp-001']);
   });
+
+  it('creates intelligent plan with idempotency key, scope context, and decision trace', async () => {
+    process.env.AMRO_WORK_PACKAGES_V2_ENABLED = 'true';
+    process.env.AMRO_SEQ_M6_STATUS = 'completed';
+    process.env.AMRO_SEQ_M7_STATUS = 'completed';
+    process.env.AMRO_SEQ_M8_STATUS = 'completed';
+    process.env.AMRO_SEQ_M6_GATE_EVALUATION_BLOCKER_TESTS_PASS = 'true';
+    process.env.AMRO_SEQ_M6_CERT_AUTHORITY_VALIDITY_TESTS_PASS = 'true';
+    process.env.AMRO_SEQ_M6_ZERO_UNRESOLVED_BLOCKER_RULE_PASS = 'true';
+    process.env.AMRO_SEQ_M6_DOSSIER_GENERATION_TESTS_PASS = 'true';
+    process.env.AMRO_SEQ_M7_ADAPTER_CONTRACT_TESTS_PASS = 'true';
+    process.env.AMRO_SEQ_M7_IDEMPOTENCY_REPLAY_TESTS_PASS = 'true';
+    process.env.AMRO_SEQ_M7_DLQ_REPLAY_CLOSURE_100 = 'true';
+    process.env.AMRO_SEQ_M8_KPI_CORRECTNESS_BASELINE_PASS = 'true';
+    process.env.AMRO_SEQ_M8_RECOMMENDATION_CONTRACT_EXPLAINABILITY_PASS = 'true';
+    process.env.AMRO_SEQ_M8_LOW_CONFIDENCE_POLICY_TESTS_PASS = 'true';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'intelligent-plan' },
+      body: {
+        aircraft_id: 'ac-007',
+        source_profile: 'hybrid',
+        planned_window: '2026-03-28T00:00:00.000Z|2026-03-29T00:00:00.000Z',
+        candidate_scope_items: ['ad-check', 'defect-123'],
+        optimization_objectives: ['minimize_ground_time', 'protect_flight_commitments'],
+        scope_context: {
+          tenant_id: 'tenant-1',
+          franchise_id: 'fr-1',
+          domain_id: 'amro',
+          role: 'planner',
+        },
+      },
+      headers: { 'idempotency-key': 'idem-intelligent-plan-1' },
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.interface).toBe('intelligent-plan');
+    expect((res.jsonBody as any)?.input?.idempotency_key).toBe('idem-intelligent-plan-1');
+    expect((res.jsonBody as any)?.output?.decision_trace_id).toContain('decision-corr-amro-v2');
+  });
+
+  it('runs resource optimization with required scope context and idempotency key', async () => {
+    process.env.AMRO_WORK_PACKAGES_V2_ENABLED = 'true';
+    process.env.AMRO_SEQ_M6_STATUS = 'completed';
+    process.env.AMRO_SEQ_M7_STATUS = 'completed';
+    process.env.AMRO_SEQ_M8_STATUS = 'completed';
+    process.env.AMRO_SEQ_M6_GATE_EVALUATION_BLOCKER_TESTS_PASS = 'true';
+    process.env.AMRO_SEQ_M6_CERT_AUTHORITY_VALIDITY_TESTS_PASS = 'true';
+    process.env.AMRO_SEQ_M6_ZERO_UNRESOLVED_BLOCKER_RULE_PASS = 'true';
+    process.env.AMRO_SEQ_M6_DOSSIER_GENERATION_TESTS_PASS = 'true';
+    process.env.AMRO_SEQ_M7_ADAPTER_CONTRACT_TESTS_PASS = 'true';
+    process.env.AMRO_SEQ_M7_IDEMPOTENCY_REPLAY_TESTS_PASS = 'true';
+    process.env.AMRO_SEQ_M7_DLQ_REPLAY_CLOSURE_100 = 'true';
+    process.env.AMRO_SEQ_M8_KPI_CORRECTNESS_BASELINE_PASS = 'true';
+    process.env.AMRO_SEQ_M8_RECOMMENDATION_CONTRACT_EXPLAINABILITY_PASS = 'true';
+    process.env.AMRO_SEQ_M8_LOW_CONFIDENCE_POLICY_TESTS_PASS = 'true';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'optimize-resources' },
+      body: {
+        work_package_id: 'wp-001',
+        resources_snapshot: [{ resource_id: 'team-a', available: true }],
+        optimization_objectives: ['maximize_staff_utilization'],
+        scope_context: {
+          tenant_id: 'tenant-1',
+          franchise_id: 'fr-1',
+          domain_id: 'amro',
+          role: 'planner',
+        },
+      },
+      headers: { 'idempotency-key': 'idem-resource-opt-1' },
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.interface).toBe('optimize-resources');
+    expect((res.jsonBody as any)?.output?.optimization_run_id).toContain('tenant-1-wp-001-resource-opt-');
+    expect((res.jsonBody as any)?.output?.recommendations?.length).toBeGreaterThan(0);
+  });
+
+  it('blocks intelligent planning interfaces until M7 is completed', async () => {
+    process.env.AMRO_WORK_PACKAGES_V2_ENABLED = 'true';
+    process.env.AMRO_SEQ_M6_STATUS = 'completed';
+    process.env.AMRO_SEQ_M7_STATUS = 'in-progress';
+    process.env.AMRO_SEQ_M8_STATUS = 'completed';
+    process.env.AMRO_SEQ_M6_GATE_EVALUATION_BLOCKER_TESTS_PASS = 'true';
+    process.env.AMRO_SEQ_M6_CERT_AUTHORITY_VALIDITY_TESTS_PASS = 'true';
+    process.env.AMRO_SEQ_M6_ZERO_UNRESOLVED_BLOCKER_RULE_PASS = 'true';
+    process.env.AMRO_SEQ_M6_DOSSIER_GENERATION_TESTS_PASS = 'true';
+    process.env.AMRO_SEQ_M8_KPI_CORRECTNESS_BASELINE_PASS = 'true';
+    process.env.AMRO_SEQ_M8_RECOMMENDATION_CONTRACT_EXPLAINABILITY_PASS = 'true';
+    process.env.AMRO_SEQ_M8_LOW_CONFIDENCE_POLICY_TESTS_PASS = 'true';
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'intelligent-plan' },
+      body: {
+        aircraft_id: 'ac-007',
+        planned_window: '2026-03-28T00:00:00.000Z|2026-03-29T00:00:00.000Z',
+        candidate_scope_items: ['defect-123'],
+      },
+      headers: { 'idempotency-key': 'idem-intelligent-plan-blocked' },
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(sendErrorResponse).toHaveBeenCalledWith(
+      res,
+      expect.any(Error),
+      'corr-amro-v2',
+      { apiVersion: 'v2' }
+    );
+  });
+
+  it('returns readiness, compliance gates, and optimization board query contracts', async () => {
+    process.env.AMRO_WORK_PACKAGES_V2_ENABLED = 'true';
+    const readinessReq: ApiRequest = {
+      method: 'GET',
+      query: { interface: 'readiness', work_package_id: 'wp-001' },
+      headers: { 'x-api-version': 'v2' },
+    };
+    const readinessRes = createResponse();
+    await handler(readinessReq, readinessRes);
+    expect(readinessRes.statusCode).toBe(200);
+    expect((readinessRes.jsonBody as any)?.interface).toBe('readiness');
+
+    const gatesReq: ApiRequest = {
+      method: 'GET',
+      query: { interface: 'compliance-gates', work_package_id: 'wp-001' },
+      headers: { 'x-api-version': 'v2' },
+    };
+    const gatesRes = createResponse();
+    await handler(gatesReq, gatesRes);
+    expect(gatesRes.statusCode).toBe(200);
+    expect((gatesRes.jsonBody as any)?.output?.blocking_gate_count).toBe(0);
+
+    const boardReq: ApiRequest = {
+      method: 'GET',
+      query: { interface: 'optimization-board' },
+      headers: { 'x-api-version': 'v2' },
+    };
+    const boardRes = createResponse();
+    await handler(boardReq, boardRes);
+    expect(boardRes.statusCode).toBe(200);
+    expect((boardRes.jsonBody as any)?.interface).toBe('optimization-board');
+    expect(Array.isArray((boardRes.jsonBody as any)?.output?.queue)).toBe(true);
+  });
 });

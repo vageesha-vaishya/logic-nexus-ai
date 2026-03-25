@@ -6,9 +6,9 @@
 | --- | --- |
 | Document ID | RSD-AMRO-001 |
 | Title | AMRO (Asset Maintenance, Repair, and Overhaul) Plugin Module Requirements Specification |
-| Version | 1.0.0 |
+| Version | 1.1.0 |
 | Status | Draft for Stakeholder Review |
-| Baseline Date | 2026-03-19 |
+| Baseline Date | 2026-03-25 |
 | Parent Architecture Reference | `artifacts/mro/analysis/mro-project-analysis.md` |
 | Backward Compatibility Policy | Zero-disruption deployment, additive interfaces, two-version API compatibility minimum |
 | Configuration Governance | Feature-flagged rollout with blue-green switching and rollback window ≤ 5 minutes |
@@ -237,7 +237,7 @@ Approval state transitions:
 
 ### 11.1 Benchmark Scope
 
-- Platforms benchmarked: SAP A&D MRO, IBM Maximo Application Suite, Oracle Fusion Cloud Maintenance, Infor Birst-enabled maintenance analytics.
+- Platforms benchmarked: SAP A&D MRO, IBM Maximo Application Suite, Oracle Fusion Cloud Maintenance, Ramco Aviation 6.0, Swiss-AS AMOS.
 - Evaluation dimensions: dashboard architecture, KPI composition, navigation hierarchy, role-focused experience, predictive maintenance enablement, integration patterns, and operational reliability controls.
 
 ### 11.2 Competitive Findings Matrix
@@ -247,7 +247,8 @@ Approval state transitions:
 | SAP A&D MRO | Deep spare-parts and planning visibility, regulated maintenance support, consolidated maintenance planning board patterns | Limited out-of-box predictive explainability and cross-surface KPI storytelling | Adopt planning board style for work package and fleet readiness summaries |
 | IBM Maximo Application Suite | AI-infused monitoring, condition-driven maintenance, risk-centric health insight and anomaly workflows | UX density can impact rapid decision cycles for frontline users | Adopt risk-ranked health cards, anomaly first-class widgets, and health trend drilldowns |
 | Oracle Fusion Cloud Maintenance | Smart Operations with maintenance plus supply chain plus finance context, real-time asset and backlog visibility | Requires careful role simplification to prevent operator cognitive overload | Adopt integrated backlog, cost, and service logistics visibility with role-scoped views |
-| Infor Analytics (Birst) | Role-specific KPI dashboards, embedded analytics widgets, strong workspace-level BI composition | Maintenance-specific user journeys often require domain tailoring | Adopt modular KPI workspace patterns and role-aware analytics composition |
+| Ramco Aviation 6.0 | Aviation-native control tower patterns, engine MRO readiness visibility, integrated planning-materials view, and AI-assisted execution insights | Advanced capabilities require disciplined governance to avoid over-automation in regulated flows | Adopt real-time readiness cockpit and planning-to-material coupling with controlled AI recommendation guards |
+| Swiss-AS AMOS | Integrated line maintenance visibility, work-package and ground-time orchestration, paperless/mobile-first execution continuity | Advanced predictive analytics often requires adjacent ecosystem services | Adopt one-stop planner experience with mobile-execution continuity and integrated turnaround prioritization |
 
 ### 11.3 Best-Practice Synthesis for AMRO Overview
 
@@ -440,3 +441,287 @@ Data and security controls:
 - New functional requirements FR-AMRO-033 through FR-AMRO-040 trace to existing lifecycle baseline FR-AMRO-001 through FR-AMRO-006 and overview requirements FR-AMRO-026 through FR-AMRO-032.
 - New non-functional requirements NFR-AMRO-013 through NFR-AMRO-018 extend NFR-AMRO-008 through NFR-AMRO-012 for aircraft-screen operational flow.
 - Delivery remains additive and backward compatible with existing API and data model contracts.
+
+## 13. Work Package Management Competitive Intelligence and Industry-Leading Implementation Blueprint
+
+### 13.1 Benchmark Scope and Evaluation Method
+
+- Platforms benchmarked for this section: SAP MRO (A&D maintenance stack and planning patterns), IBM Maximo (Aviation + Maximo Application Suite), Oracle Aviation Maintenance patterns (Oracle Cloud Maintenance and aviation MRO deployment patterns), Ramco Aviation 6.0, and Swiss-AS AMOS.
+- Evaluation dimensions: intelligent work packaging, predictive and condition-based maintenance depth, real-time resource optimization, digital twin and mobile continuity, AI-driven scheduling, UX effectiveness, ecosystem integration, regulatory compliance support, and enterprise scalability.
+- Evidence sources: official vendor product pages, product documentation, release announcements, and regulator publications referenced in Section 13.16.
+- Output intent: define superior AMRO capabilities that are additive, backward compatible, and deployable under platform hierarchy and tenant-franchise isolation constraints.
+
+### 13.2 Competitive Findings Matrix (Work Package Focus)
+
+| Platform | Best-in-Class Strengths | Observed Gaps vs Next-Gen Target | AMRO Adoption Decision |
+| --- | --- | --- | --- |
+| SAP MRO (A&D + SAP asset stack) | Strong service parts planning, maintenance-supply chain coupling, and maintenance strategy alignment with digital twin and ML-enabled asset management | Work package orchestration patterns are powerful but typically depend on broader SAP stack composition | Adopt parts-demand-to-work-package coupling, risk-based maintenance strategy templates, and planning board semantics |
+| IBM Maximo (Aviation + MAS) | Mature work management, AI-driven predictive/risk prioritization, condition-based maintenance actions, rich CMMS/EAM workflow controls | Dense enterprise UX can slow frontline decisions if not role-curated | Adopt risk-first work package prioritization, health/risk scorecards, and predictive-to-work-order automation |
+| Oracle Aviation Maintenance pattern (Oracle Cloud Maintenance + OCI aviation MRO deployments) | Integrated maintenance, inventory, service logistics, and ERP finance context; strong cloud operations and integration posture | Requires careful domain tailoring for aviation-specific package and release workflows | Adopt maintenance + service logistics + cost context in package planning with cloud-native reliability controls |
+| Ramco Aviation 6.0 | Aviation-native end-to-end M&E/MRO depth, real-time scheduling visibility, integrated MRP and supply chain, AI-enhanced workflow automation, engine MRO specialization | Advanced capabilities vary by module maturity and tenant rollout profile | Adopt real-time planning control tower, dynamic material readiness checks, and AI-assisted execution recommendations |
+| Swiss-AS AMOS | Highly integrated maintenance-engineering-logistics model, planning and line maintenance orchestration, paperless mobile execution, one-system operational continuity | Some advanced analytics and AI layers can require ecosystem add-ons | Adopt integrated one-stop planning/execution patterns, turnaround-ground-time package generation, and mobile-first execution loops |
+
+### 13.3 Best-in-Class Capability Synthesis
+
+#### 13.3.1 Intelligent Work Packaging Algorithms
+
+- Build a constraint-based packaging engine that composes work packages from due checks, defects, AD/SB directives, MEL/CDL deferrals, campaign tasks, and predictive recommendations.
+- Use a hybrid optimization model:
+  - Rule layer: hard constraints (regulatory due limits, certifying staff constraints, station capability, parts criticality).
+  - Optimization layer: objective function minimizing AOG risk, package cycle time, and material waiting time.
+  - Heuristic layer: rapid re-packaging under disruption (flight delay, manpower drop, no-go component).
+- Provide scenario simulation with what-if options (hangar slot shift, staff augmentation, parts substitution) and rank options by operational impact and compliance risk.
+- Emit deterministic package rationale to audit logs for explainability and regulatory replay.
+
+#### 13.3.2 Predictive Maintenance Integration
+
+- Integrate telemetry, reliability history, and maintenance execution outcomes to produce risk-ranked candidate tasks before planning lock.
+- Require model outputs to include failure mode, confidence, horizon window, and intervention recommendation class (inspect, replace, defer-with-conditions, escalate).
+- Couple predictive outputs to package scoring:
+  - Increase package priority if confidence and criticality exceed threshold.
+  - Add material pre-positioning suggestions when lead-time risk is high.
+- Preserve human override with mandatory reason capture and post-outcome feedback loop for model retraining.
+
+#### 13.3.3 Real-Time Resource Optimization
+
+- Maintain a live resource graph for certifying staff, technician skills, tools, bays, line stations, and material availability.
+- Recalculate schedule fit on each major event (new defect, flight schedule change, parts delay, AOG trigger).
+- Support optimization objectives by tenant policy:
+  - minimize ground time;
+  - maximize certifying staff utilization;
+  - minimize overtime and contract labor exposure;
+  - protect high-priority flight commitments.
+- Present planner recommendations as ranked actions with expected time/cost/compliance impact.
+
+#### 13.3.4 Digital Twin and Operational Continuity
+
+- Maintain per-aircraft and per-major-component digital twin states synchronized with maintenance events, defects, and package status.
+- Provide bi-directional sync:
+  - twin to planning: condition updates and anomaly trajectories feed package recommendations;
+  - execution to twin: task completion and findings update health state and forecast.
+- Include digital thread continuity across cockpit/line/base operations through mobile paperless workflows and offline-safe synchronization.
+
+#### 13.3.5 AI-Driven Scheduling System
+
+- Implement a multi-horizon scheduler:
+  - tactical horizon (0-72h): disruption recovery and dispatch protection;
+  - operational horizon (3-28 days): slot and resource balancing;
+  - strategic horizon (1-12 months): heavy check and campaign clustering.
+- Use reinforcement + constrained optimization policy for schedule proposals, with policy guards to prevent non-compliant actions.
+- Require explainable recommendations (top constraints, trade-offs, confidence) for every auto-generated schedule.
+
+### 13.4 UX Design Patterns for Superior Work Package Management
+
+- Adopt dual-pane planner workspace:
+  - left pane: package queue, risk tier, readiness state;
+  - right pane: timeline board with drag-assisted reallocation under rule constraints.
+- Maintain three persistent context strips:
+  - compliance strip (EASA/FAA/CAAC gates and blocker status);
+  - resources strip (staff/tools/material readiness);
+  - predictive strip (risk trend, confidence, recommended interventions).
+- Use progressive disclosure:
+  - frontline users see guided action cards and immediate blockers;
+  - planners see optimization controls and scenario simulations;
+  - managers see KPI and throughput analytics.
+- Keep command latency low with optimistic UI and explicit fallback mode indicators during integration lag.
+- Preserve uniform base platform shell and navigation behaviors while layering AMRO-specialized interactions.
+
+### 13.5 Integration Patterns for Logic Nexus-AI AMRO Ecosystem
+
+#### 13.5.1 Integration Principles
+
+- All read/write callbacks for Work Package controls must execute through `ScopedDataAccess`.
+- All data retrieval and mutation paths must enforce `tenant_id` and `franchise_id` scope.
+- All new interfaces are additive and versioned (`/api/v2` extension strategy) to preserve backward compatibility.
+
+#### 13.5.2 API Integration Pattern
+
+- Command APIs (transactional):
+  - `POST /api/v2/amro/work-packages/intelligent-plan`
+  - `POST /api/v2/amro/work-packages/{id}/optimize-resources`
+  - `POST /api/v2/amro/work-packages/{id}/simulate`
+  - `POST /api/v2/amro/work-packages/{id}/publish`
+- Query APIs (analytics and state):
+  - `GET /api/v2/amro/work-packages/{id}/readiness`
+  - `GET /api/v2/amro/work-packages/{id}/compliance-gates`
+  - `GET /api/v2/amro/work-packages/optimization-board`
+- Contract rules:
+  - include idempotency key for all mutation endpoints;
+  - include `scope_context` payload (tenant, franchise, domain, role claims);
+  - include deterministic `decision_trace_id` for all AI-assisted responses.
+
+#### 13.5.3 Event and Streaming Pattern
+
+- Publish domain events:
+  - `amro.workpackage.created.v2`
+  - `amro.workpackage.optimized.v2`
+  - `amro.workpackage.compliance.blocked.v2`
+  - `amro.workpackage.state.changed.v2`
+  - `amro.resource.conflict.detected.v2`
+- Use exactly-once semantic at consumer boundary via idempotency token + dedupe window.
+- Stream telemetry and twin signals through MQTT topics:
+  - `amro/twin/{tenant}/{aircraft}/health`
+  - `amro/twin/{tenant}/{aircraft}/anomaly`
+
+#### 13.5.4 External Ecosystem Connectors
+
+- ERP/EAM connector pack: SAP, IBM, Oracle, and AMOS/Ramco interoperability adapters with canonical AMRO event contracts.
+- Flight-ops connector: ingest schedule disruptions and turnaround windows for package replanning.
+- Reliability connector: ingest model outputs from predictive engines and write back closed-loop outcomes.
+
+### 13.6 Regulatory Compliance Framework (EASA, FAA, CAAC)
+
+- EASA alignment baseline: enforce Continuing Airworthiness and Part-145 traceability, release control, and audit evidence completeness.
+- FAA alignment baseline: enforce 14 CFR Part 145 process controls, repair station authorization checks, return-to-service gate validation, and manual/procedure traceability.
+- CAAC alignment baseline: enforce CCAR-145 organizational control expectations, certifying staff and language/documentation considerations, and approved maintenance scope validation.
+- Compliance engine requirements:
+  - rule-pack registry by authority profile;
+  - pre-publish compliance gate for every work package;
+  - mandatory e-signature chain for high-criticality tasks;
+  - immutable evidence ledger with tamper-evident hash chain.
+- Cross-authority operation:
+  - support mixed-fleet operators with authority-specific gate evaluation per aircraft registration and operation context.
+
+### 13.7 Target Data Model Specification (Work Package Intelligence)
+
+| Entity | Purpose | Key Fields | Security/Isolation |
+| --- | --- | --- | --- |
+| `amro_work_package` | Master work package record | `id`, `tenant_id`, `franchise_id`, `aircraft_id`, `status`, `priority`, `planning_window_start`, `planning_window_end`, `source_profile`, `decision_trace_id` | RLS on tenant/franchise, write policy by role and domain |
+| `amro_work_package_task` | Task-level scope inside package | `id`, `work_package_id`, `task_card_ref`, `trigger_type`, `compliance_ref`, `estimated_hours`, `skill_profile`, `criticality` | Inherits package scope and immutable task lineage |
+| `amro_work_package_constraint` | Optimization constraints and penalties | `id`, `work_package_id`, `constraint_type`, `hard_soft_flag`, `weight`, `source`, `validity_window` | Protected updates, audited change control |
+| `amro_resource_snapshot` | Time-bound resource availability graph | `id`, `station_id`, `resource_type`, `resource_ref`, `available_from`, `available_to`, `capability_tags` | Scope + station policy checks |
+| `amro_package_simulation_run` | What-if simulation archive | `id`, `work_package_id`, `scenario_name`, `input_hash`, `outcome_score`, `aog_risk_delta`, `cost_delta` | Signed result hash and replay metadata |
+| `amro_predictive_signal` | Normalized predictive recommendation input | `id`, `aircraft_id`, `failure_mode`, `risk_score`, `confidence_score`, `horizon_hours`, `recommended_action` | Source trust tier and integrity signature |
+| `amro_compliance_gate_result` | Authority gate outcomes per package | `id`, `work_package_id`, `authority_code`, `gate_code`, `result`, `block_reason`, `evaluated_at` | Immutable evidence retention |
+| `amro_decision_explanation` | Explainability payload for AI/scheduler decisions | `id`, `decision_trace_id`, `model_version`, `top_factors`, `counterfactuals`, `human_override_reason` | Restricted read for regulated roles |
+
+### 13.8 Security and Governance Requirements
+
+- Continue JWT signing key policy and reject legacy JWT secret usage.
+- Enforce step-up authentication for publish, defer, and RTS-impacting decisions.
+- Require ABAC + RBAC hybrid authorization:
+  - role;
+  - tenant/franchise scope;
+  - authority approval capability;
+  - station capability and certification status.
+- Encrypt data at rest and in transit with tenant-segmented key hierarchy.
+- Require tamper-evident, append-only audit streams for:
+  - optimization runs;
+  - manual overrides;
+  - compliance gate decisions;
+  - signature events.
+- Add anomaly detection for suspicious override patterns and cross-scope access attempts.
+
+### 13.9 Performance, Scalability, and Reliability Benchmarks
+
+| Metric | Baseline Target | Industry-Leading Target for AMRO Work Package Intelligence |
+| --- | --- | --- |
+| Intelligent package generation latency (p95) | ≤ 5 s | ≤ 2 s |
+| Resource re-optimization latency after disruption (p95) | ≤ 10 s | ≤ 3 s |
+| Work package board load time (cached p95) | ≤ 1 s | ≤ 600 ms |
+| Work package board load time (cold p95) | ≤ 3 s | ≤ 1.5 s |
+| Scheduler recommendation acceptance rate | ≥ 55% | ≥ 75% |
+| AOG prevention precision (predictive-triggered interventions) | ≥ 70% | ≥ 85% |
+| Compliance gate false-negative rate | ≤ 1.0% | ≤ 0.1% |
+| Multi-tenant scale | 10,000 concurrent users | 25,000 concurrent users with isolation guarantees |
+| Availability | 99.95% | 99.99% |
+| RPO / RTO | 5 min / 15 min | 1 min / 5 min |
+
+### 13.10 Implementation Architecture Recommendations
+
+#### 13.10.1 Logical Architecture
+
+- Planning Intelligence Service:
+  - constraint solver;
+  - scenario simulator;
+  - scheduling policy engine;
+  - explanation generator.
+- Maintenance Execution Service:
+  - package lifecycle state machine;
+  - task card orchestration;
+  - mobile execution sync.
+- Compliance Gate Service:
+  - authority rule-pack evaluation;
+  - e-signature validation;
+  - evidence ledger writes.
+- Resource Graph Service:
+  - near-real-time staff/tool/material availability model;
+  - conflict detection and resolution advisor.
+- Twin and Predictive Integration Service:
+  - telemetry normalization;
+  - digital twin synchronization;
+  - prediction ingestion and feedback closure.
+
+#### 13.10.2 Deployment Pattern
+
+- Deploy services with feature flags by tenant cohort and authority profile.
+- Use blue-green promotion per service boundary with reversible traffic switches.
+- Isolate high-throughput optimization workloads into separate autoscaling worker pools.
+- Support regional data residency through tenant-to-region placement policies.
+
+### 13.11 Actionable Functional Requirements Addendum
+
+- FR-AMRO-041@v1: Generate intelligent work packages using constraint and risk-aware optimization with deterministic rationale output.
+- FR-AMRO-042@v1: Provide multi-scenario what-if simulation with ranked outcomes for schedule, cost, and compliance risk.
+- FR-AMRO-043@v1: Re-optimize active packages in near real time on operational disruption events.
+- FR-AMRO-044@v1: Integrate predictive recommendations into package composition with confidence and horizon metadata.
+- FR-AMRO-045@v1: Synchronize package lifecycle with aircraft/component digital twin state transitions.
+- FR-AMRO-046@v1: Provide AI-assisted scheduling recommendations across tactical, operational, and strategic horizons.
+- FR-AMRO-047@v1: Enforce authority-specific compliance gate evaluation before package publish and release milestones.
+- FR-AMRO-048@v1: Emit explainability artifacts and human-override rationale for all AI-assisted planning decisions.
+- FR-AMRO-049@v1: Provide role-adaptive planner workspace with unified risk, compliance, and resource context strips.
+- FR-AMRO-050@v1: Support cross-system adapter orchestration for SAP, IBM, Oracle, Ramco, and AMOS-aligned contracts.
+
+### 13.12 Actionable Non-Functional Requirements Addendum
+
+- NFR-AMRO-019@v1 Performance: intelligent package generation response p95 ≤ 2 seconds for standard scope packages.
+- NFR-AMRO-020@v1 Performance: disruption-triggered re-optimization response p95 ≤ 3 seconds.
+- NFR-AMRO-021@v1 Reliability: optimization and scheduling services must degrade gracefully with cached fallback recommendations.
+- NFR-AMRO-022@v1 Security: all AI decision payloads must be signed, auditable, and scoped to tenant/franchise context.
+- NFR-AMRO-023@v1 Compliance: package publish action must be blocked when any mandatory EASA/FAA/CAAC gate fails.
+- NFR-AMRO-024@v1 Scalability: support 25,000 concurrent users and 1 million work package tasks/day throughput.
+- NFR-AMRO-025@v1 Observability: maintain trace-level visibility for each decision trace ID across API, event, and UI layers.
+
+### 13.13 Implementation Guidelines by Phase
+
+| Phase | Scope | Technical Exit Criteria |
+| --- | --- | --- |
+| Phase A: Canonical Model and Contracts | Introduce canonical work package intelligence schema, v2 APIs, event catalog, decision trace propagation | Contract tests pass for additive compatibility with existing v2 AMRO endpoints |
+| Phase B: Optimization and Simulation Core | Deliver constraint engine, scenario simulator, and resource graph services | p95 package generation ≤ 2 seconds in staging benchmark datasets |
+| Phase C: Predictive + Twin Integration | Connect telemetry and predictive streams, sync twin state with work package events | Closed-loop signal ingestion and twin update SLA achieved with deterministic replay |
+| Phase D: Compliance and Security Hardening | Activate authority gate packs, immutable evidence chain, step-up auth for critical actions | Zero critical security findings and full gate-block behavior validated |
+| Phase E: UX and Rollout | Deliver role-adaptive planner board and staged tenant rollout with feature flags | Pilot KPI thresholds met and rollback drills validated within target window |
+
+### 13.14 Success Metrics and Competitive Positioning Scorecard
+
+| Strategic Objective | Metric | Target at 6 Months | Target at 12 Months |
+| --- | --- | --- | --- |
+| Faster package planning | Median time from trigger to published package | ≤ 20 minutes | ≤ 10 minutes |
+| Better schedule quality | Post-publish replan rate | ≤ 18% | ≤ 10% |
+| Operational resilience | AOG events attributable to planning/material misses | -25% from baseline | -45% from baseline |
+| Compliance leadership | Audit finding rate tied to work package traceability | ≤ 0.5% | ≤ 0.1% |
+| AI effectiveness | Planner acceptance of AI recommendations | ≥ 65% | ≥ 80% |
+| Resource efficiency | Certifying staff idle time during peak windows | -15% | -30% |
+| User productivity | Planner actions per package creation cycle | -30% clicks | -45% clicks |
+
+### 13.15 Traceability Addendum
+
+- FR-AMRO-041 through FR-AMRO-050 extend lifecycle capabilities defined in FR-AMRO-001 through FR-AMRO-020 and overview/aircraft extensions FR-AMRO-026 through FR-AMRO-040.
+- NFR-AMRO-019 through NFR-AMRO-025 extend baseline operational requirements NFR-AMRO-001 through NFR-AMRO-018 for intelligent work package capabilities.
+- Delivery remains additive with two-version API compatibility and rollback-safe rollout controls.
+
+### 13.16 Competitive and Regulatory Evidence References
+
+- SAP aerospace and defense industry maintenance and planning references, including service parts planning and integrated manufacturing-planning stack.
+- SAP intelligent MRO and supply-chain planning patterns integrating maintenance and spare-parts optimization.
+- IBM Maximo for Aviation product guide references (operator maintenance programs, master task cards, and aviation work management context).
+- IBM Maximo Application Suite and APM references for AI-infused monitoring, predictive maintenance, and risk-centric asset strategy.
+- Oracle Cloud Maintenance references for AI-powered smart operations, maintenance planning/execution, and enterprise integration across SCM/CX/ERP.
+- Oracle aviation MRO cloud deployment reference pattern (AMOS deployment on OCI) demonstrating high-availability, integration-rich operations at airline scale.
+- Ramco Aviation 6.0 release and solution references for AI-enhanced MRO, MCC Hub, aviation MRP, and integrated planning-maintenance-supply chain operations.
+- Swiss-AS AMOS product and module references for end-to-end integrated MRO, open ecosystem connectivity, and paperless mobile execution.
+- Swiss-AS AMOS LMM implementation references for real-time turnaround/work package visualization, assignment orchestration, and single-system operational continuity.
+- Regulatory references:
+  - EASA Continuing Airworthiness framework and Part-145 ecosystem;
+  - FAA 14 CFR Part 145 repair station requirements;
+  - CAAC CCAR-145 Certification Rules on Civil Aircraft Maintenance Organization.

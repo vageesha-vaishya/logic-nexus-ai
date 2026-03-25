@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -22,9 +22,21 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Switch } from '@/components/ui/switch';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuLabel,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from '@/components/ui/context-menu';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useCRM } from '@/hooks/useCRM';
+import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
+import { AlertTriangle, ArrowDown, ArrowUp, ArrowUpDown, CalendarDays, CheckSquare, ExternalLink, FileCheck, FileText, TimerReset } from 'lucide-react';
 import { toast } from 'sonner';
 
 export type MasterEntity =
@@ -59,6 +71,13 @@ type RecordRow = {
   [key: string]: unknown;
 };
 
+type SortDirection = 'asc' | 'desc';
+
+type InlineEditingCell = {
+  rowId: string;
+  column: string;
+} | null;
+
 type ManufacturerOption = {
   id: string;
   label: string;
@@ -91,6 +110,21 @@ const ENTITY_TABLE_COLUMNS: Record<MasterEntity, string[]> = {
   work_package_templates: ['id', 'template_code', 'template_name', 'maintenance_type', 'version', 'active', 'updated_at'],
 };
 
+const ENTITY_HIDDEN_COLUMNS: Partial<Record<MasterEntity, string[]>> = {
+  aircraft: ['id', 'updated_at', 'tenant_id'],
+};
+
+const AIRCRAFT_EDITABLE_COLUMNS = new Set(['registration', 'tail_number', 'serial_number', 'aircraft_type', 'aircraft_model', 'maintenance_program', 'status']);
+
+const COLUMN_LABEL_OVERRIDES: Record<string, string> = {
+  id: 'ID',
+  tail_number: 'Tail Number',
+  serial_number: 'Serial Number',
+  aircraft_type: 'Aircraft Type',
+  aircraft_model: 'Aircraft Model',
+  updated_at: 'Updated At',
+};
+
 type FormFieldType = 'text' | 'email' | 'number' | 'date' | 'time' | 'textarea' | 'select' | 'boolean' | 'json';
 
 type EntityFormField = {
@@ -105,6 +139,36 @@ type EntityFormField = {
 
 type FormValues = Record<string, unknown>;
 type FormSectionKey = 'basic' | 'configuration';
+type WorkPackageTrigger = 'schedule_due' | 'defect' | 'campaign' | 'predictive_alert';
+type WorkPackageCreateAction = 'save_draft' | 'create_schedule' | 'create_open';
+
+type AircraftWorkPackageFormValues = {
+  source: WorkPackageTrigger;
+  maintenanceType: 'line' | 'base' | 'hangar' | 'shop';
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  plannedStart: string;
+  plannedEnd: string;
+  station: string;
+  scopeItemsText: string;
+};
+
+type AircraftWorkPackageSnapshot = {
+  open: number;
+  inProgress: number;
+  deferred: number;
+  completed: number;
+  rtsBlockers: number;
+  slaRisk: number;
+};
+
+const AIRCRAFT_NAV_RAIL = [
+  { label: 'Overview', path: '/dashboard/amro/overview' },
+  { label: 'Work Packages', path: '/dashboard/amro/work-packages' },
+  { label: 'Scheduling', path: '/dashboard/amro/scheduling' },
+  { label: 'Compliance', path: '/dashboard/amro/compliance' },
+  { label: 'Task Execution', path: '/dashboard/amro/task-execution' },
+  { label: 'Audit', path: '/dashboard/amro/audit' },
+] as const;
 
 const MANUFACTURER_SEED_NAMES = [
   'AIRBUS',
@@ -550,6 +614,78 @@ function createDefaultBulkText(entity: MasterEntity): string {
   return '[\n  {}\n]';
 }
 
+function normalizeFeatureFlag(value: string | undefined, fallback: boolean): boolean {
+  if (typeof value !== 'string') return fallback;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'true' || normalized === '1' || normalized === 'on') return true;
+  if (normalized === 'false' || normalized === '0' || normalized === 'off') return false;
+  return fallback;
+}
+
+function toDateTimeInputValue(value: Date): string {
+  const local = new Date(value.getTime() - value.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+}
+
+function getDefaultAircraftWorkPackageValues(stationHint?: string): AircraftWorkPackageFormValues {
+  const now = new Date();
+  const end = new Date(now.getTime() + 4 * 60 * 60 * 1000);
+  return {
+    source: 'schedule_due',
+    maintenanceType: 'line',
+    priority: 'medium',
+    plannedStart: toDateTimeInputValue(now),
+    plannedEnd: toDateTimeInputValue(end),
+    station: stationHint || '',
+    scopeItemsText: 'General inspection',
+  };
+}
+
+function parseWorkPackageItems(payload: Record<string, unknown>): Record<string, unknown>[] {
+  const data = payload.data;
+  if (data && typeof data === 'object') {
+    const workPackages = (data as Record<string, unknown>).workPackages;
+    if (Array.isArray(workPackages)) {
+      return workPackages.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object');
+    }
+  }
+  const items = payload.items;
+  if (Array.isArray(items)) {
+    return items.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object');
+  }
+  return getPayloadRecords(payload);
+}
+
+function buildAircraftWorkPackageSnapshot(items: Record<string, unknown>[]): AircraftWorkPackageSnapshot {
+  let open = 0;
+  let inProgress = 0;
+  let deferred = 0;
+  let completed = 0;
+  let rtsBlockers = 0;
+  let slaRisk = 0;
+
+  items.forEach((item) => {
+    const status = String(item.status || item.lifecycle_stage || '').trim().toLowerCase();
+    if (status.includes('defer')) {
+      deferred += 1;
+      return;
+    }
+    if (status.includes('progress') || status.includes('wip') || status.includes('execution')) {
+      inProgress += 1;
+      return;
+    }
+    if (status.includes('complete') || status.includes('closed') || status.includes('rts')) {
+      completed += 1;
+      return;
+    }
+    open += 1;
+  });
+
+  rtsBlockers = deferred;
+  slaRisk = items.filter((item) => String(item.priority || '').toLowerCase() === 'critical').length;
+  return { open, inProgress, deferred, completed, rtsBlockers, slaRisk };
+}
+
 function getInitialFormValues(entity: MasterEntity): FormValues {
   return { ...ENTITY_DEFAULT_VALUES[entity] };
 }
@@ -749,8 +885,11 @@ type AmroSettingsMasterDataPageProps = {
 
 export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMasterDataPageProps = {}) {
   const { context } = useCRM();
+  const { hasPermission } = useAuth();
   const { entity: entityParam } = useParams<{ entity?: string }>();
+  const location = useLocation();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const resolvedRouteEntity = useMemo(() => {
     if (entityOverride) {
       return entityOverride;
@@ -766,15 +905,25 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
   const [entity, setEntity] = useState<MasterEntity>(resolvedRouteEntity);
   const [rows, setRows] = useState<RecordRow[]>([]);
   const [loading, setLoading] = useState(false);
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [search, setSearch] = useState(searchParams.get('search') || '');
+  const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || 'all');
+  const [columnFilters, setColumnFilters] = useState<Record<string, string>>(() => {
+    const filters: Record<string, string> = {};
+    searchParams.forEach((value, key) => {
+      if (key.startsWith('cf_')) {
+        filters[key.replace('cf_', '')] = value;
+      }
+    });
+    return filters;
+  });
+  const [selectedId, setSelectedId] = useState<string | null>(searchParams.get('selected'));
+  const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
   const [formValues, setFormValues] = useState<FormValues>(getInitialFormValues(resolvedRouteEntity));
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [bulkText, setBulkText] = useState(createDefaultBulkText(resolvedRouteEntity));
-  const [pageSize, setPageSize] = useState('25');
-  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(searchParams.get('page_size') || '25');
+  const [page, setPage] = useState(Number(searchParams.get('page') || '1'));
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'create' | 'update'>('create');
   const [activeFormTab, setActiveFormTab] = useState<'basic' | 'configuration' | 'system'>('basic');
@@ -784,9 +933,31 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
   const [assemblyTypeOptions, setAssemblyTypeOptions] = useState<AssemblyTypeOption[]>([]);
   const [assemblyTypeOptionsLoading, setAssemblyTypeOptionsLoading] = useState(false);
   const [assemblyTypeOptionsError, setAssemblyTypeOptionsError] = useState('');
+  const [aircraftWorkPackageDialogOpen, setAircraftWorkPackageDialogOpen] = useState(false);
+  const [aircraftWorkPackageValues, setAircraftWorkPackageValues] = useState<AircraftWorkPackageFormValues>(getDefaultAircraftWorkPackageValues());
+  const [aircraftWorkPackageErrors, setAircraftWorkPackageErrors] = useState<Record<string, string>>({});
+  const [aircraftWorkPackageSubmitting, setAircraftWorkPackageSubmitting] = useState(false);
+  const [busyAction, setBusyAction] = useState<'refresh' | 'export' | 'create' | null>(null);
+  const [sortColumn, setSortColumn] = useState(searchParams.get('sort_by') || 'updated_at');
+  const [sortDirection, setSortDirection] = useState<SortDirection>((searchParams.get('sort_dir') as SortDirection) || 'desc');
+  const [inlineEditingCell, setInlineEditingCell] = useState<InlineEditingCell>(null);
+  const [inlineEditValue, setInlineEditValue] = useState('');
+  const [aircraftWorkPackageSnapshot, setAircraftWorkPackageSnapshot] = useState<AircraftWorkPackageSnapshot>({
+    open: 0,
+    inProgress: 0,
+    deferred: 0,
+    completed: 0,
+    rtsBlockers: 0,
+    slaRisk: 0,
+  });
   const clickDelayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const firstFieldRef = useRef<HTMLInputElement | null>(null);
   const manufacturerSeedAttemptedRef = useRef(false);
+  const aircraftEnhancementEnabled = normalizeFeatureFlag(import.meta.env.VITE_AMRO_AIRCRAFT_FORM_ENHANCEMENTS, true);
+  const canCreateWorkPackage = hasPermission('create_maintenance_request');
+  const canScheduleWorkPackage = hasPermission('edit_aircraft_records');
+  const canExportAircraftOps = hasPermission('delete_flight_logs');
+  const canEscalateAircraftOps = hasPermission('approve_work_orders');
 
   const scope = useMemo(
     () => ({
@@ -913,8 +1084,8 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
         search,
         page: String(page),
         page_size: pageSize,
-        sort_by: 'updated_at',
-        sort_dir: 'desc',
+        sort_by: sortColumn,
+        sort_dir: sortDirection,
       });
       const response = await fetch(`/api/v2/amro/master-data/${entity}?${query.toString()}`, { method: 'GET', headers });
       const payload = await parseApiPayload(response);
@@ -932,7 +1103,7 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
     } finally {
       setLoading(false);
     }
-  }, [entity, page, pageSize, scope, search, statusFilter]);
+  }, [entity, page, pageSize, scope, search, sortColumn, sortDirection, statusFilter]);
 
   useEffect(() => {
     setEntity(resolvedRouteEntity);
@@ -943,11 +1114,11 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
   }, [loadRecords]);
 
   useEffect(() => {
-    setSelectedId(null);
+    setSelectedId(searchParams.get('selected'));
     setFormValues(getInitialFormValues(entity));
     setFormErrors({});
     setBulkText(createDefaultBulkText(entity));
-  }, [entity]);
+  }, [entity, searchParams]);
 
   useEffect(() => {
     if (entity === 'aircraft' || entity === 'assembly_models') {
@@ -974,8 +1145,37 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
   }, [entity, loadAssemblyTypeOptions, modalOpen]);
 
   useEffect(() => {
-    navigate(`/dashboard/amro/settings/master-data/${ENTITY_ROUTE_SEGMENT[entity]}`, { replace: true });
-  }, [entity, navigate]);
+    navigate(`/dashboard/amro/settings/master-data/${ENTITY_ROUTE_SEGMENT[entity]}${location.search}`, { replace: true });
+  }, [entity, location.search, navigate]);
+
+  useEffect(() => {
+    const next = new URLSearchParams();
+    if (search.trim()) next.set('search', search.trim());
+    if (statusFilter !== 'all') next.set('status', statusFilter);
+    if (page > 1) next.set('page', String(page));
+    if (pageSize !== '25') next.set('page_size', pageSize);
+    if (sortColumn !== 'updated_at') next.set('sort_by', sortColumn);
+    if (sortDirection !== 'desc') next.set('sort_dir', sortDirection);
+    if (selectedId) next.set('selected', selectedId);
+    Object.entries(columnFilters).forEach(([column, value]) => {
+      if (value.trim()) {
+        next.set(`cf_${column}`, value.trim());
+      }
+    });
+    setSearchParams(next, { replace: true });
+  }, [columnFilters, page, pageSize, search, selectedId, setSearchParams, sortColumn, sortDirection, statusFilter]);
+
+  useEffect(() => {
+    const selectedFromUrl = searchParams.get('selected');
+    if (!selectedFromUrl || !rows.length) {
+      return;
+    }
+    const matched = rows.find((row) => row.id === selectedFromUrl);
+    if (matched) {
+      setSelectedId(matched.id);
+      setFormValues(pickFormValuesFromRow(entity, matched));
+    }
+  }, [entity, rows, searchParams]);
 
   useEffect(() => {
     if (!modalOpen) {
@@ -1218,6 +1418,7 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
   }, [bulkText, entity, loadRecords, scope]);
 
   const handleExport = useCallback(async () => {
+    setBusyAction('export');
     try {
       const headers = await buildApiHeaders(scope);
       const query = new URLSearchParams({
@@ -1239,15 +1440,19 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
       toast.success(`Exported ${ENTITY_LABEL[entity]} CSV`);
     } catch (error) {
       toast.error(String((error as Error).message || 'Export failed'));
+    } finally {
+      setBusyAction(null);
     }
   }, [entity, scope, search]);
 
   const tableColumns = useMemo(() => {
     const preferredColumns = ENTITY_TABLE_COLUMNS[entity];
-    if (!rows.length) return preferredColumns;
+    const hiddenColumns = new Set(ENTITY_HIDDEN_COLUMNS[entity] || []);
+    const visiblePreferredColumns = preferredColumns.filter((column) => !hiddenColumns.has(column));
+    if (!rows.length) return visiblePreferredColumns;
     const firstRowColumns = Object.keys(rows[0]);
-    const selected = preferredColumns.filter((column) => firstRowColumns.includes(column));
-    const extras = firstRowColumns.filter((column) => !selected.includes(column));
+    const selected = visiblePreferredColumns.filter((column) => firstRowColumns.includes(column));
+    const extras = firstRowColumns.filter((column) => !selected.includes(column) && !hiddenColumns.has(column));
     return [...selected, ...extras].slice(0, 10);
   }, [entity, rows]);
 
@@ -1255,10 +1460,19 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
   const basicSectionFields = useMemo(() => formFields.slice(0, Math.min(formFields.length, 4)), [formFields]);
   const configurationSectionFields = useMemo(() => formFields.slice(Math.min(formFields.length, 4)), [formFields]);
   const systemFields = useMemo(
-    () => tableColumns.filter((column) => ['id', 'created_at', 'updated_at', 'created_by', 'updated_by'].includes(column)),
-    [tableColumns],
+    () =>
+      tableColumns.filter(
+        (column) =>
+          ['id', 'created_at', 'updated_at', 'created_by', 'updated_by'].includes(column) &&
+          !(ENTITY_HIDDEN_COLUMNS[entity] || []).includes(column),
+      ),
+    [entity, tableColumns],
   );
   const selectedRow = useMemo(() => rows.find((row) => row.id === selectedId) || null, [rows, selectedId]);
+  const selectedAircraft = useMemo(
+    () => (entity === 'aircraft' ? (selectedRow || rows[0] || null) : null),
+    [entity, rows, selectedRow],
+  );
   const manufacturerSelectOptions = useMemo<SelectOption[]>(
     () =>
       manufacturerOptions.map((option) => ({
@@ -1321,6 +1535,90 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
     ],
   );
 
+  const filteredRows = useMemo(() => {
+    if (entity !== 'aircraft') {
+      return rows;
+    }
+    return rows.filter((row) =>
+      Object.entries(columnFilters).every(([column, rawValue]) => {
+        const value = rawValue.trim().toLowerCase();
+        if (!value) return true;
+        return String(row[column] ?? '').toLowerCase().includes(value);
+      }),
+    );
+  }, [columnFilters, entity, rows]);
+
+  const aircraftHeaderColumns = useMemo(() => tableColumns.slice(0, 8), [tableColumns]);
+
+  const toggleSort = useCallback(
+    (column: string) => {
+      if (sortColumn === column) {
+        setSortDirection((previous) => (previous === 'asc' ? 'desc' : 'asc'));
+        return;
+      }
+      setSortColumn(column);
+      setSortDirection('asc');
+    },
+    [sortColumn],
+  );
+
+  const setColumnFilterValue = useCallback((column: string, value: string) => {
+    setColumnFilters((previous) => ({ ...previous, [column]: value }));
+    setPage(1);
+  }, []);
+
+  const toggleRowSelection = useCallback((rowId: string, checked: boolean) => {
+    setSelectedRowIds((previous) => {
+      if (checked) {
+        return previous.includes(rowId) ? previous : [...previous, rowId];
+      }
+      return previous.filter((id) => id !== rowId);
+    });
+  }, []);
+
+  const toggleSelectAllRows = useCallback(
+    (checked: boolean) => {
+      if (checked) {
+        setSelectedRowIds(filteredRows.map((row) => row.id));
+        return;
+      }
+      setSelectedRowIds([]);
+    },
+    [filteredRows],
+  );
+
+  const handleInlineEditStart = useCallback((rowId: string, column: string, currentValue: unknown) => {
+    setInlineEditingCell({ rowId, column });
+    setInlineEditValue(String(currentValue ?? ''));
+  }, []);
+
+  const handleInlineEditCommit = useCallback(async () => {
+    if (!inlineEditingCell) return;
+    try {
+      const headers = await buildApiHeaders(scope);
+      const response = await fetch(`/api/v2/amro/master-data/${entity}/${inlineEditingCell.rowId}`, {
+        method: 'PATCH',
+        headers: {
+          ...headers,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ [inlineEditingCell.column]: inlineEditValue }),
+      });
+      const payload = await parseApiPayload(response);
+      if (!response.ok) throw new Error(String(payload.error || 'Inline update failed'));
+      toast.success('Cell updated');
+      setInlineEditingCell(null);
+      await loadRecords();
+    } catch (error) {
+      toast.error(String((error as Error).message || 'Inline update failed'));
+    }
+  }, [entity, inlineEditValue, inlineEditingCell, loadRecords, scope]);
+
+  const cancelInlineEdit = useCallback(() => {
+    setInlineEditingCell(null);
+    setInlineEditValue('');
+  }, []);
+
   const handleRowSingleClick = useCallback(
     (row: RecordRow) => {
       if (clickDelayTimerRef.current) {
@@ -1351,13 +1649,36 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
   );
 
   const handleOpenCreateModal = useCallback(() => {
+    setBusyAction('create');
     setModalMode('create');
     setSelectedId(null);
     setFormValues(getInitialFormValues(entity));
     setFormErrors({});
     setActiveFormTab('basic');
     setModalOpen(true);
+    setBusyAction(null);
   }, [entity]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey)) return;
+      if (event.shiftKey && event.key.toLowerCase() === 'n') {
+        event.preventDefault();
+        handleOpenCreateModal();
+      }
+      if (event.shiftKey && event.key.toLowerCase() === 'e') {
+        event.preventDefault();
+        void handleExport();
+      }
+      if (event.shiftKey && event.key.toLowerCase() === 'r') {
+        event.preventDefault();
+        setBusyAction('refresh');
+        void loadRecords().finally(() => setBusyAction(null));
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [handleExport, handleOpenCreateModal, loadRecords]);
 
   const handleSubmitModal = useCallback(async () => {
     const ok = modalMode === 'create' ? await handleCreate() : await handleUpdate();
@@ -1365,6 +1686,240 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
       setModalOpen(false);
     }
   }, [handleCreate, handleUpdate, modalMode]);
+
+  const loadAircraftWorkPackageSnapshot = useCallback(async () => {
+    if (!aircraftEnhancementEnabled || entity !== 'aircraft') {
+      return;
+    }
+    const aircraftId = String(selectedAircraft?.id || '').trim();
+    if (!aircraftId) {
+      setAircraftWorkPackageSnapshot({
+        open: 0,
+        inProgress: 0,
+        deferred: 0,
+        completed: 0,
+        rtsBlockers: 0,
+        slaRisk: 0,
+      });
+      return;
+    }
+    try {
+      const headers = await buildApiHeaders(scope);
+      const query = new URLSearchParams({
+        aircraft_id: aircraftId,
+        page: '1',
+        page_size: '50',
+      });
+      const response = await fetch(`/api/v2/amro/work-packages?${query.toString()}`, {
+        method: 'GET',
+        headers,
+      });
+      const payload = await parseApiPayload(response);
+      if (!response.ok) {
+        setAircraftWorkPackageSnapshot({
+          open: 0,
+          inProgress: 0,
+          deferred: 0,
+          completed: 0,
+          rtsBlockers: 0,
+          slaRisk: 0,
+        });
+        return;
+      }
+      setAircraftWorkPackageSnapshot(buildAircraftWorkPackageSnapshot(parseWorkPackageItems(payload)));
+    } catch {
+      setAircraftWorkPackageSnapshot({
+        open: 0,
+        inProgress: 0,
+        deferred: 0,
+        completed: 0,
+        rtsBlockers: 0,
+        slaRisk: 0,
+      });
+    }
+  }, [aircraftEnhancementEnabled, entity, scope, selectedAircraft]);
+
+  useEffect(() => {
+    void loadAircraftWorkPackageSnapshot();
+  }, [loadAircraftWorkPackageSnapshot]);
+
+  useEffect(() => {
+    if (entity !== 'aircraft') {
+      return;
+    }
+    const stationHint = String(selectedAircraft?.station_code || '').trim();
+    setAircraftWorkPackageValues(getDefaultAircraftWorkPackageValues(stationHint));
+    setAircraftWorkPackageErrors({});
+  }, [entity, selectedAircraft]);
+
+  const handleAircraftContextNavigation = useCallback(
+    (path: string) => {
+      const query = new URLSearchParams();
+      if (selectedAircraft?.id) {
+        query.set('aircraft_id', String(selectedAircraft.id));
+      }
+      const target = query.toString() ? `${path}?${query.toString()}` : path;
+      navigate(target);
+    },
+    [navigate, selectedAircraft],
+  );
+
+  const openAircraftWorkPackageDialog = useCallback(() => {
+    const stationHint = String(selectedAircraft?.station_code || '').trim();
+    setAircraftWorkPackageValues(getDefaultAircraftWorkPackageValues(stationHint));
+    setAircraftWorkPackageErrors({});
+    setAircraftWorkPackageDialogOpen(true);
+  }, [selectedAircraft]);
+
+  const setAircraftWorkPackageField = useCallback((key: keyof AircraftWorkPackageFormValues, value: string) => {
+    setAircraftWorkPackageValues((previous) => ({ ...previous, [key]: value }));
+    setAircraftWorkPackageErrors((previous) => ({ ...previous, [key]: '' }));
+  }, []);
+
+  const handleAircraftWorkPackageSubmit = useCallback(
+    async (action: WorkPackageCreateAction) => {
+      if (!selectedAircraft?.id) {
+        toast.error('Select an aircraft record first');
+        return;
+      }
+      const errors: Record<string, string> = {};
+      if (!aircraftWorkPackageValues.station.trim()) {
+        errors.station = 'Station is required';
+      }
+      if (!aircraftWorkPackageValues.plannedStart.trim()) {
+        errors.plannedStart = 'Planned start is required';
+      }
+      if (!aircraftWorkPackageValues.plannedEnd.trim()) {
+        errors.plannedEnd = 'Planned end is required';
+      }
+      const startTime = Date.parse(aircraftWorkPackageValues.plannedStart);
+      const endTime = Date.parse(aircraftWorkPackageValues.plannedEnd);
+      if (Number.isNaN(startTime) || Number.isNaN(endTime)) {
+        errors.plannedEnd = 'Planned window must be valid date-time values';
+      } else if (startTime >= endTime) {
+        errors.plannedEnd = 'Planned end must be after planned start';
+      }
+      const scopeItems = aircraftWorkPackageValues.scopeItemsText
+        .split('\n')
+        .map((item) => item.trim())
+        .filter(Boolean);
+      if (scopeItems.length === 0) {
+        errors.scopeItemsText = 'Add at least one scope item';
+      }
+      setAircraftWorkPackageErrors(errors);
+      if (Object.keys(errors).length > 0) {
+        toast.error('Please resolve aircraft work package validation errors');
+        return;
+      }
+
+      if (action === 'save_draft') {
+        const draft = {
+          aircraft_id: String(selectedAircraft.id),
+          source: aircraftWorkPackageValues.source,
+          maintenance_type: aircraftWorkPackageValues.maintenanceType,
+          station: aircraftWorkPackageValues.station.trim(),
+          priority: aircraftWorkPackageValues.priority,
+          planned_window: `${new Date(aircraftWorkPackageValues.plannedStart).toISOString()}|${new Date(aircraftWorkPackageValues.plannedEnd).toISOString()}`,
+          scope_items: scopeItems,
+          reference_id: String(selectedAircraft.id),
+          triggered_at: new Date().toISOString(),
+        };
+        localStorage.setItem(`amro:aircraft-wp-draft:${selectedAircraft.id}`, JSON.stringify(draft));
+        toast.success('Aircraft work package draft saved');
+        setAircraftWorkPackageDialogOpen(false);
+        return;
+      }
+
+      setAircraftWorkPackageSubmitting(true);
+      try {
+        const headers = await buildApiHeaders(scope);
+        const now = Date.now();
+        const response = await fetch('/api/v2/amro/work-packages?interface=create-work-package', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            aircraft_id: String(selectedAircraft.id),
+            maintenance_type: aircraftWorkPackageValues.maintenanceType,
+            planned_window: `${new Date(aircraftWorkPackageValues.plannedStart).toISOString()}|${new Date(aircraftWorkPackageValues.plannedEnd).toISOString()}`,
+            station: aircraftWorkPackageValues.station.trim(),
+            priority: aircraftWorkPackageValues.priority,
+            scope_items: scopeItems,
+            source: aircraftWorkPackageValues.source,
+            reference_id: String(selectedAircraft.id),
+            triggered_at: new Date().toISOString(),
+            idempotency_key: `aircraft-wp-create-${now}`,
+            decision_trace_id: `aircraft-wp-${selectedAircraft.id}-${now}`,
+            scope_context: {
+              domain_id: 'amro',
+            },
+          }),
+        });
+        const payload = await parseApiPayload(response);
+        if (!response.ok) {
+          throw new Error(String(payload.error || 'Failed to create work package from aircraft'));
+        }
+        const output = payload.output && typeof payload.output === 'object' ? (payload.output as Record<string, unknown>) : {};
+        const workPackageId = String(output.work_package_id || output.id || '');
+        toast.success('Aircraft work package created');
+        setAircraftWorkPackageDialogOpen(false);
+        await loadAircraftWorkPackageSnapshot();
+        if (action === 'create_schedule') {
+          const query = new URLSearchParams();
+          query.set('aircraft_id', String(selectedAircraft.id));
+          if (workPackageId) query.set('work_package_id', workPackageId);
+          navigate(`/dashboard/amro/scheduling?${query.toString()}`);
+          return;
+        }
+        if (action === 'create_open') {
+          const query = new URLSearchParams();
+          query.set('aircraft_id', String(selectedAircraft.id));
+          if (workPackageId) query.set('focus', workPackageId);
+          navigate(`/dashboard/amro/work-packages?${query.toString()}`);
+        }
+      } catch (error) {
+        localStorage.setItem(
+          `amro:aircraft-wp-draft:${selectedAircraft.id}`,
+          JSON.stringify({
+            aircraft_id: String(selectedAircraft.id),
+            source: aircraftWorkPackageValues.source,
+            maintenance_type: aircraftWorkPackageValues.maintenanceType,
+            station: aircraftWorkPackageValues.station.trim(),
+            priority: aircraftWorkPackageValues.priority,
+            planned_window: `${new Date(aircraftWorkPackageValues.plannedStart).toISOString()}|${new Date(aircraftWorkPackageValues.plannedEnd).toISOString()}`,
+            scope_items: scopeItems,
+            reference_id: String(selectedAircraft.id),
+            triggered_at: new Date().toISOString(),
+          }),
+        );
+        toast.error(String((error as Error).message || 'Work package service degraded. Draft captured locally.'));
+      } finally {
+        setAircraftWorkPackageSubmitting(false);
+      }
+    },
+    [aircraftWorkPackageValues, loadAircraftWorkPackageSnapshot, navigate, scope, selectedAircraft],
+  );
+
+  const aircraftRiskScore = useMemo(() => {
+    const status = String(selectedAircraft?.status || '').toLowerCase();
+    if (status === 'grounded') return 0.86;
+    if (status === 'maintenance') return 0.72;
+    if (status === 'inactive') return 0.55;
+    return 0.32;
+  }, [selectedAircraft]);
+  const aircraftRiskConfidence = useMemo(() => {
+    const status = String(selectedAircraft?.status || '').toLowerCase();
+    if (status === 'grounded') return 0.9;
+    if (status === 'maintenance') return 0.84;
+    if (status === 'inactive') return 0.79;
+    return 0.68;
+  }, [selectedAircraft]);
+  const aircraftRiskMessage = useMemo(() => {
+    const status = String(selectedAircraft?.status || '').toLowerCase();
+    if (status === 'grounded') return 'Immediate attention required before release-to-service';
+    if (status === 'maintenance') return 'Hydraulic trend monitoring recommends prioritized scope checks';
+    if (status === 'inactive') return 'Dormant fleet profile indicates schedule-due campaign review';
+    return 'Operationally stable with low anomaly confidence';
+  }, [selectedAircraft]);
 
   const sectionGridClass = 'mdm-template-form-grid';
   const sectionFieldClass = 'mdm-template-form-field';
@@ -1452,11 +2007,44 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
     ],
   );
 
+  const getColumnLabel = useCallback((column: string) => {
+    if (COLUMN_LABEL_OVERRIDES[column]) {
+      return COLUMN_LABEL_OVERRIDES[column];
+    }
+    return column
+      .split('_')
+      .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+      .join(' ');
+  }, []);
+
+  const allRowsSelected = filteredRows.length > 0 && filteredRows.every((row) => selectedRowIds.includes(row.id));
+  const someRowsSelected = !allRowsSelected && selectedRowIds.length > 0;
+
+  const renderSortIcon = useCallback(
+    (column: string) => {
+      if (sortColumn !== column) {
+        return <ArrowUpDown className="h-3.5 w-3.5 text-[hsl(var(--mdm-template-muted))]" aria-hidden="true" />;
+      }
+      if (sortDirection === 'asc') {
+        return <ArrowUp className="h-3.5 w-3.5 text-[hsl(var(--mdm-template-focus))]" aria-hidden="true" />;
+      }
+      return <ArrowDown className="h-3.5 w-3.5 text-[hsl(var(--mdm-template-focus))]" aria-hidden="true" />;
+    },
+    [sortColumn, sortDirection],
+  );
+
   return (
     <DashboardLayout>
       <div className="mdm-template-page" data-testid="amro-master-data-template">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
+            <nav className="mb-1 flex items-center gap-1 text-xs text-[hsl(var(--mdm-template-muted))]" aria-label="Breadcrumb">
+              <Link className="transition-colors hover:text-[hsl(var(--mdm-template-focus))]" to="/dashboard">Dashboard</Link>
+              <span>/</span>
+              <Link className="transition-colors hover:text-[hsl(var(--mdm-template-focus))]" to="/dashboard/amro/settings">AMRO Settings</Link>
+              <span>/</span>
+              <span className="font-medium text-[hsl(var(--mdm-template-heading))]">Master Data</span>
+            </nav>
             <h1 className="mdm-template-header-title">AMRO Settings · Master Data</h1>
             <p className="mdm-template-header-subtitle">
               Tenant-scoped CRUD management for fleet, inventory, manufacturers, suppliers, facilities, workforce, compliance profiles,
@@ -1465,12 +2053,33 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
           </div>
           <div className="flex items-center gap-2">
             <Badge variant="secondary">Tenant: {context.tenantId || 'unscoped'}</Badge>
-            <Button variant="outline" asChild>
-              <Link to="/dashboard/amro/settings">Settings Dashboard</Link>
+            <Button variant="ghost" asChild>
+              <Link to="/dashboard/amro/settings" className="underline-offset-4 hover:underline">
+                Settings Dashboard
+              </Link>
             </Button>
-            <Button variant="outline" onClick={() => void loadRecords()} disabled={loading}>{loading ? 'Refreshing...' : 'Refresh'}</Button>
-            <Button variant="outline" onClick={() => void handleExport()}>Export CSV</Button>
-            <Button className="bg-[hsl(var(--mdm-template-focus))] text-white hover:bg-[hsl(var(--mdm-template-focus))/0.9]" onClick={handleOpenCreateModal}>New {ENTITY_LABEL[entity]}</Button>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setBusyAction('refresh');
+                void loadRecords().finally(() => setBusyAction(null));
+              }}
+              disabled={loading || busyAction === 'refresh'}
+              aria-label="Refresh records"
+            >
+              {busyAction === 'refresh' ? 'Refreshing...' : 'Refresh'}
+            </Button>
+            <Button variant="outline" onClick={() => void handleExport()} disabled={busyAction === 'export'} aria-label="Export records CSV">
+              {busyAction === 'export' ? 'Exporting...' : 'Export CSV'}
+            </Button>
+            <Button
+              className="bg-[hsl(var(--mdm-template-focus))] text-white hover:bg-[hsl(var(--mdm-template-focus))/0.9]"
+              onClick={handleOpenCreateModal}
+              disabled={busyAction === 'create'}
+              aria-label={`New ${ENTITY_LABEL[entity]}`}
+            >
+              {busyAction === 'create' ? 'Opening...' : `New ${ENTITY_LABEL[entity]}`}
+            </Button>
           </div>
         </div>
 
@@ -1483,6 +2092,119 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
             ))}
           </TabsList>
         </Tabs>
+
+        {entity === 'aircraft' && aircraftEnhancementEnabled ? (
+          <Card className="mdm-template-panel">
+            <CardHeader className="mdm-template-panel-head">
+              <CardTitle className="mdm-template-panel-title">Aircraft Operations Snapshot</CardTitle>
+            </CardHeader>
+            <CardContent className="mdm-template-panel-body space-y-4">
+              <div className="grid gap-4 lg:grid-cols-3">
+                <div className="space-y-3 rounded-md border border-[hsl(var(--mdm-template-border))] p-4">
+                  <h3 className="text-[14px] font-semibold text-[hsl(var(--mdm-template-heading))]">Aircraft Identity Sheet</h3>
+                  <div className="grid grid-cols-2 gap-3 text-[12px]">
+                    <div>
+                      <p className="text-[hsl(var(--mdm-template-muted))]">Tail Number</p>
+                      <p className="font-medium text-[hsl(var(--mdm-template-heading))]">{String(selectedAircraft?.tail_number || '-')}</p>
+                    </div>
+                    <div>
+                      <p className="text-[hsl(var(--mdm-template-muted))]">Registration</p>
+                      <p className="font-medium text-[hsl(var(--mdm-template-heading))]">{String(selectedAircraft?.registration || '-')}</p>
+                    </div>
+                    <div>
+                      <p className="text-[hsl(var(--mdm-template-muted))]">Type</p>
+                      <p className="font-medium text-[hsl(var(--mdm-template-heading))]">{String(selectedAircraft?.aircraft_type || '-')}</p>
+                    </div>
+                    <div>
+                      <p className="text-[hsl(var(--mdm-template-muted))]">Model</p>
+                      <p className="font-medium text-[hsl(var(--mdm-template-heading))]">{String(selectedAircraft?.aircraft_model || '-')}</p>
+                    </div>
+                    <div>
+                      <p className="text-[hsl(var(--mdm-template-muted))]">Manufacturer</p>
+                      <p className="font-medium text-[hsl(var(--mdm-template-heading))]">{String(selectedAircraft?.manufacturer || '-')}</p>
+                    </div>
+                    <div>
+                      <p className="text-[hsl(var(--mdm-template-muted))]">Program</p>
+                      <p className="font-medium text-[hsl(var(--mdm-template-heading))]">{String(selectedAircraft?.maintenance_program || '-')}</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-3 rounded-md border border-[hsl(var(--mdm-template-border))] p-4">
+                  <h3 className="text-[14px] font-semibold text-[hsl(var(--mdm-template-heading))]">Aircraft Status & Risk</h3>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary">Health: {String(selectedAircraft?.status || 'unknown')}</Badge>
+                    <Badge variant={aircraftRiskScore >= 0.7 ? 'destructive' : 'secondary'}>Risk: {aircraftRiskScore.toFixed(2)}</Badge>
+                  </div>
+                  <p className="text-[12px] text-[hsl(var(--mdm-template-muted))]">
+                    Confidence {Math.round(aircraftRiskConfidence * 100)}% · {aircraftRiskMessage}
+                  </p>
+                  <div className="flex flex-wrap gap-2 pt-2">
+                    <Button size="sm" onClick={openAircraftWorkPackageDialog} disabled={!canCreateWorkPackage}>
+                      Create Work Package
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => handleAircraftContextNavigation('/dashboard/amro/work-packages')}>
+                      View Active Packages
+                    </Button>
+                  </div>
+                </div>
+                <div className="space-y-3 rounded-md border border-[hsl(var(--mdm-template-border))] p-4">
+                  <h3 className="text-[14px] font-semibold text-[hsl(var(--mdm-template-heading))]">KPI Cards</h3>
+                  <div className="grid grid-cols-2 gap-2 text-[12px]">
+                    <div className="rounded-md bg-muted/40 p-2">Open WP: <span className="font-semibold">{aircraftWorkPackageSnapshot.open}</span></div>
+                    <div className="rounded-md bg-muted/40 p-2">In Progress: <span className="font-semibold">{aircraftWorkPackageSnapshot.inProgress}</span></div>
+                    <div className="rounded-md bg-muted/40 p-2">Deferred: <span className="font-semibold">{aircraftWorkPackageSnapshot.deferred}</span></div>
+                    <div className="rounded-md bg-muted/40 p-2">Completed: <span className="font-semibold">{aircraftWorkPackageSnapshot.completed}</span></div>
+                    <div className="rounded-md bg-muted/40 p-2">RTS Blockers: <span className="font-semibold">{aircraftWorkPackageSnapshot.rtsBlockers}</span></div>
+                    <div className="rounded-md bg-muted/40 p-2">SLA Risk: <span className="font-semibold">{aircraftWorkPackageSnapshot.slaRisk}</span></div>
+                  </div>
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    <Button size="sm" variant="outline" onClick={() => handleAircraftContextNavigation('/dashboard/amro/scheduling')} disabled={!canScheduleWorkPackage}>
+                      <TimerReset className="mr-1 h-3.5 w-3.5" />
+                      Replan
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => handleAircraftContextNavigation('/dashboard/amro/compliance')} disabled={!canEscalateAircraftOps}>
+                      <AlertTriangle className="mr-1 h-3.5 w-3.5" />
+                      Escalate
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => void handleExport()} disabled={!canExportAircraftOps}>
+                      <FileText className="mr-1 h-3.5 w-3.5" />
+                      Export
+                    </Button>
+                  </div>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2 rounded-md border border-[hsl(var(--mdm-template-border))] bg-muted/20 p-2">
+                {AIRCRAFT_NAV_RAIL.map((item) => {
+                  const Icon =
+                    item.label === 'Work Packages'
+                      ? CheckSquare
+                      : item.label === 'Scheduling'
+                        ? CalendarDays
+                        : item.label === 'Compliance'
+                          ? FileCheck
+                          : item.label === 'Task Execution'
+                            ? CheckSquare
+                            : item.label === 'Audit'
+                              ? FileText
+                              : TimerReset;
+                  return (
+                    <Button
+                      key={item.path}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8"
+                      onClick={() => handleAircraftContextNavigation(item.path)}
+                    >
+                      <Icon className="mr-1 h-3.5 w-3.5" />
+                      {item.label}
+                    </Button>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        ) : null}
 
         <Card className="mdm-template-panel">
           <CardHeader className="mdm-template-panel-head">
@@ -1527,38 +2249,149 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
             <CardTitle className="mdm-template-panel-title">{ENTITY_LABEL[entity]} Records</CardTitle>
           </CardHeader>
           <CardContent className="mdm-template-panel-body space-y-3">
-            <div className="overflow-auto rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-[#F8FAFC]">
-                    {tableColumns.map((column) => (
-                      <TableHead key={column} className="h-auto px-4 py-3 text-left text-[14px] font-semibold text-[#64748B]">
-                        {column}
+            <div className="overflow-auto rounded-md border max-h-[560px]">
+              <TooltipProvider delayDuration={300}>
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-[#F8FAFC]">
+                      <TableHead className="sticky top-0 z-20 w-[52px] bg-[#F8FAFC] px-3 py-2">
+                        <Checkbox
+                          checked={allRowsSelected ? true : someRowsSelected ? 'indeterminate' : false}
+                          onCheckedChange={(value) => toggleSelectAllRows(Boolean(value))}
+                          aria-label="Select all rows"
+                        />
                       </TableHead>
-                    ))}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {rows.map((row) => (
-                    <TableRow
-                      key={row.id}
-                      data-state={row.id === selectedId ? 'selected' : undefined}
-                      className="cursor-pointer transition-colors duration-200 ease-in-out hover:bg-[#F5F7FA]"
-                      onClick={() => handleRowSingleClick(row)}
-                      onDoubleClick={() => handleRowDoubleClick(row)}
-                    >
-                      {tableColumns.map((column) => (
-                        <TableCell key={column} className="max-w-[240px] px-4 py-3 text-left align-middle text-[14px] text-[#1F2937]">
-                          <span className="block truncate">{String(row[column] ?? '')}</span>
-                        </TableCell>
+                      {(entity === 'aircraft' ? aircraftHeaderColumns : tableColumns).map((column) => (
+                        <TableHead key={column} className="sticky top-0 z-20 h-auto min-w-[180px] bg-[#F8FAFC] px-3 py-2 text-left text-[13px] font-semibold text-[#64748B]">
+                          <button type="button" className="flex w-full items-center justify-between gap-2 text-left transition-colors hover:text-[hsl(var(--mdm-template-focus))]" onClick={() => toggleSort(column)}>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="truncate">{getColumnLabel(column)}</span>
+                              </TooltipTrigger>
+                              <TooltipContent>{getColumnLabel(column)}</TooltipContent>
+                            </Tooltip>
+                            {renderSortIcon(column)}
+                          </button>
+                        </TableHead>
                       ))}
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                    {entity === 'aircraft' ? (
+                      <TableRow className="bg-white">
+                        <TableHead className="sticky top-[41px] z-10 bg-white px-3 py-2 text-[12px] font-medium text-[#94A3B8]">Filter</TableHead>
+                        {aircraftHeaderColumns.map((column) => (
+                          <TableHead key={`filter-${column}`} className="sticky top-[41px] z-10 bg-white px-3 py-2">
+                            <Input
+                              value={columnFilters[column] || ''}
+                              onChange={(event) => setColumnFilterValue(column, event.target.value)}
+                              placeholder={`Filter ${getColumnLabel(column)}`}
+                              className="h-8 mdm-template-input"
+                              aria-label={`Filter ${getColumnLabel(column)}`}
+                            />
+                          </TableHead>
+                        ))}
+                      </TableRow>
+                    ) : null}
+                  </TableHeader>
+                  <TableBody>
+                    {(entity === 'aircraft' ? filteredRows : rows).map((row, rowIndex) => (
+                      <TableRow
+                        key={row.id}
+                        data-state={row.id === selectedId ? 'selected' : undefined}
+                        className={cn(
+                          'cursor-pointer transition-colors duration-200 ease-in-out hover:bg-[#F1F7FF]',
+                          rowIndex % 2 === 0 ? 'bg-white' : 'bg-[#F8FAFC]',
+                          row.id === selectedId && 'bg-[hsl(var(--mdm-template-focus))/0.12]',
+                        )}
+                        onClick={() => handleRowSingleClick(row)}
+                        onDoubleClick={() => handleRowDoubleClick(row)}
+                      >
+                        <TableCell className="px-3 py-2 align-middle">
+                          <Checkbox
+                            checked={selectedRowIds.includes(row.id)}
+                            onCheckedChange={(value) => toggleRowSelection(row.id, Boolean(value))}
+                            onClick={(event) => event.stopPropagation()}
+                            aria-label={`Select row ${row.id}`}
+                          />
+                        </TableCell>
+                        {(entity === 'aircraft' ? aircraftHeaderColumns : tableColumns).map((column) => (
+                          <TableCell key={column} className="max-w-[260px] px-3 py-2 text-left align-middle text-[13px] text-[#1F2937]">
+                            <ContextMenu>
+                              <ContextMenuTrigger asChild>
+                                <div className="group w-full" onDoubleClick={(event) => {
+                                  if (entity === 'aircraft' && AIRCRAFT_EDITABLE_COLUMNS.has(column)) {
+                                    event.stopPropagation();
+                                    handleInlineEditStart(row.id, column, row[column]);
+                                  }
+                                }}>
+                                  {inlineEditingCell?.rowId === row.id && inlineEditingCell.column === column ? (
+                                    <Input
+                                      value={inlineEditValue}
+                                      onChange={(event) => setInlineEditValue(event.target.value)}
+                                      onBlur={() => void handleInlineEditCommit()}
+                                      onKeyDown={(event) => {
+                                        if (event.key === 'Enter') {
+                                          event.preventDefault();
+                                          void handleInlineEditCommit();
+                                        }
+                                        if (event.key === 'Escape') {
+                                          event.preventDefault();
+                                          cancelInlineEdit();
+                                        }
+                                      }}
+                                      autoFocus
+                                      className="h-8 mdm-template-input"
+                                    />
+                                  ) : column === 'id' || column === 'tail_number' ? (
+                                    <Link
+                                      to={`/dashboard/amro/settings/master-data/${ENTITY_ROUTE_SEGMENT[entity]}?selected=${row.id}`}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="inline-flex max-w-full items-center gap-1 truncate text-[hsl(var(--mdm-template-focus))] underline-offset-4 transition-colors hover:underline"
+                                      onClick={(event) => event.stopPropagation()}
+                                    >
+                                      <span className="truncate">{String(row[column] ?? '')}</span>
+                                      <ExternalLink className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                    </Link>
+                                  ) : (
+                                    <span className="block truncate">{String(row[column] ?? '')}</span>
+                                  )}
+                                </div>
+                              </ContextMenuTrigger>
+                              <ContextMenuContent>
+                                <ContextMenuLabel>{getColumnLabel(column)}</ContextMenuLabel>
+                                <ContextMenuItem onSelect={() => handleRowDoubleClick(row)}>Open Form</ContextMenuItem>
+                                <ContextMenuItem
+                                  onSelect={() => {
+                                    void navigator.clipboard?.writeText(String(row[column] ?? ''));
+                                    toast.success('Cell value copied');
+                                  }}
+                                >
+                                  Copy Value
+                                </ContextMenuItem>
+                                <ContextMenuSeparator />
+                                <ContextMenuItem
+                                  onSelect={() => {
+                                    if (entity === 'aircraft' && AIRCRAFT_EDITABLE_COLUMNS.has(column)) {
+                                      handleInlineEditStart(row.id, column, row[column]);
+                                    }
+                                  }}
+                                >
+                                  Inline Edit
+                                </ContextMenuItem>
+                              </ContextMenuContent>
+                            </ContextMenu>
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TooltipProvider>
             </div>
             <div className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">Selected: {selectedId || 'none'} | Records: {rows.length}</p>
+              <p className="text-sm text-muted-foreground">
+                Selected: {selectedId || 'none'} | Checked: {selectedRowIds.length} | Records: {(entity === 'aircraft' ? filteredRows : rows).length}
+              </p>
               <div className="flex items-center gap-2">
                 <Button variant="outline" onClick={() => setPage((previous) => Math.max(1, previous - 1))}>Previous</Button>
                 <Badge variant="secondary">Page {page}</Badge>
@@ -1652,6 +2485,121 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
                 <Button variant="destructive" onClick={() => void handleDelete()} disabled={!selectedId}>Delete</Button>
                 <Button onClick={() => void handleSubmitModal()}>
                   {modalMode === 'create' ? 'Save' : 'Save Changes'}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+        <Dialog open={aircraftWorkPackageDialogOpen} onOpenChange={setAircraftWorkPackageDialogOpen}>
+          <DialogContent className="mdm-template-dialog">
+            <DialogHeader className="border-b border-[hsl(var(--mdm-template-border))] px-6 py-4">
+              <DialogTitle className="text-[15px] font-semibold text-[hsl(var(--mdm-template-heading))]">
+                Create Work Package (Aircraft: {String(selectedAircraft?.tail_number || 'N/A')})
+              </DialogTitle>
+              <DialogDescription className="text-[12px] text-[hsl(var(--mdm-template-muted))]">
+                Aircraft context is pre-bound with trigger metadata for auditable package creation.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-5 px-6 pb-6 pt-4">
+              <div className="mdm-template-form-grid">
+                <div className={sectionFieldClass}>
+                  <Label className="mdm-template-label">Source Trigger</Label>
+                  <Select value={aircraftWorkPackageValues.source} onValueChange={(value) => setAircraftWorkPackageField('source', value)}>
+                    <SelectTrigger className="mdm-template-input">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="schedule_due">Schedule Due</SelectItem>
+                      <SelectItem value="defect">Defect</SelectItem>
+                      <SelectItem value="campaign">Campaign</SelectItem>
+                      <SelectItem value="predictive_alert">Predictive Alert</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className={sectionFieldClass}>
+                  <Label className="mdm-template-label">Maintenance Type</Label>
+                  <Select value={aircraftWorkPackageValues.maintenanceType} onValueChange={(value) => setAircraftWorkPackageField('maintenanceType', value)}>
+                    <SelectTrigger className="mdm-template-input">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="line">Line</SelectItem>
+                      <SelectItem value="base">Base</SelectItem>
+                      <SelectItem value="hangar">Hangar</SelectItem>
+                      <SelectItem value="shop">Shop</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className={sectionFieldClass}>
+                  <Label className="mdm-template-label">Priority</Label>
+                  <Select value={aircraftWorkPackageValues.priority} onValueChange={(value) => setAircraftWorkPackageField('priority', value)}>
+                    <SelectTrigger className="mdm-template-input">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Low</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                      <SelectItem value="critical">Critical</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className={sectionFieldClass}>
+                  <Label className="mdm-template-label">Station</Label>
+                  <Input
+                    value={aircraftWorkPackageValues.station}
+                    onChange={(event) => setAircraftWorkPackageField('station', event.target.value)}
+                    className={cn('mdm-template-input', aircraftWorkPackageErrors.station && 'border-destructive')}
+                    aria-invalid={Boolean(aircraftWorkPackageErrors.station)}
+                  />
+                  {aircraftWorkPackageErrors.station ? <p className="mdm-template-danger">{aircraftWorkPackageErrors.station}</p> : null}
+                </div>
+                <div className={sectionFieldClass}>
+                  <Label className="mdm-template-label">Planned Start</Label>
+                  <Input
+                    type="datetime-local"
+                    value={aircraftWorkPackageValues.plannedStart}
+                    onChange={(event) => setAircraftWorkPackageField('plannedStart', event.target.value)}
+                    className={cn('mdm-template-input', aircraftWorkPackageErrors.plannedStart && 'border-destructive')}
+                    aria-invalid={Boolean(aircraftWorkPackageErrors.plannedStart)}
+                  />
+                  {aircraftWorkPackageErrors.plannedStart ? <p className="mdm-template-danger">{aircraftWorkPackageErrors.plannedStart}</p> : null}
+                </div>
+                <div className={sectionFieldClass}>
+                  <Label className="mdm-template-label">Planned End</Label>
+                  <Input
+                    type="datetime-local"
+                    value={aircraftWorkPackageValues.plannedEnd}
+                    onChange={(event) => setAircraftWorkPackageField('plannedEnd', event.target.value)}
+                    className={cn('mdm-template-input', aircraftWorkPackageErrors.plannedEnd && 'border-destructive')}
+                    aria-invalid={Boolean(aircraftWorkPackageErrors.plannedEnd)}
+                  />
+                  {aircraftWorkPackageErrors.plannedEnd ? <p className="mdm-template-danger">{aircraftWorkPackageErrors.plannedEnd}</p> : null}
+                </div>
+                <div className={fullWidthSectionFieldClass}>
+                  <Label className="mdm-template-label">Scope Builder</Label>
+                  <Textarea
+                    value={aircraftWorkPackageValues.scopeItemsText}
+                    onChange={(event) => setAircraftWorkPackageField('scopeItemsText', event.target.value)}
+                    className={cn('mdm-template-input min-h-[130px]', aircraftWorkPackageErrors.scopeItemsText && 'border-destructive')}
+                    placeholder="One scope item per line"
+                    aria-invalid={Boolean(aircraftWorkPackageErrors.scopeItemsText)}
+                  />
+                  {aircraftWorkPackageErrors.scopeItemsText ? <p className="mdm-template-danger">{aircraftWorkPackageErrors.scopeItemsText}</p> : null}
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center justify-end gap-3 border-t border-[hsl(var(--mdm-template-border))] pt-4">
+                <Button variant="outline" onClick={() => setAircraftWorkPackageDialogOpen(false)} disabled={aircraftWorkPackageSubmitting}>
+                  Cancel
+                </Button>
+                <Button variant="outline" onClick={() => void handleAircraftWorkPackageSubmit('save_draft')} disabled={aircraftWorkPackageSubmitting || !canCreateWorkPackage}>
+                  Save Draft
+                </Button>
+                <Button variant="outline" onClick={() => void handleAircraftWorkPackageSubmit('create_schedule')} disabled={aircraftWorkPackageSubmitting || !canScheduleWorkPackage}>
+                  Create & Schedule
+                </Button>
+                <Button onClick={() => void handleAircraftWorkPackageSubmit('create_open')} disabled={aircraftWorkPackageSubmitting || !canCreateWorkPackage}>
+                  Create & Open Work Package
                 </Button>
               </div>
             </div>

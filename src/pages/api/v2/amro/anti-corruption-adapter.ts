@@ -1,6 +1,6 @@
 import { AMRO_COEXISTENCE_SAFEGUARDS, AMRO_INTEGRATION_CONTRACTS } from './integration-contracts';
 
-export type WorkPackageStatus = 'planned' | 'in_progress' | 'completed';
+export type WorkPackageStatus = 'planned' | 'planning' | 'scheduled' | 'in_progress' | 'completed' | 'blocked' | 'cancelled';
 export type TaskStatus = 'planned' | 'in_progress' | 'completed';
 export type ComplianceDecision = 'approved' | 'rejected' | 'pending';
 export type AmroServiceName =
@@ -258,7 +258,7 @@ export function adaptLegacyWorkPackages(rows: LegacyWorkPackageRow[]): WorkPacka
 
 export function adaptModuleWorkPackagesFromLegacy(rows: LegacyWorkPackageRow[]): WorkPackageItem[] {
   return rows.map((row) => ({
-    id: toModuleId(row.legacy_id),
+    id: row.legacy_id,
     code: row.legacy_code,
     title: toModuleTitle(row.legacy_title),
     status: row.legacy_status,

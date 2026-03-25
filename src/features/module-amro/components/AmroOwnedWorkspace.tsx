@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import { useAmroWorkspaceState } from '../hooks/useAmroWorkspaceState';
 import type { AmroAuthorityLevel, AmroAssetType } from '../workspace/amroWorkspaceModel';
 
@@ -151,7 +152,7 @@ export function AmroOwnedWorkspace({
   const [workspaceLocale, setWorkspaceLocale] = useState<(typeof workspaceLocaleOptions)[number]>('en-US');
   const [workPackagePageSize, setWorkPackagePageSize] = useState<number>(workPackagePageSizes[0]);
   const [workPackagePage, setWorkPackagePage] = useState(1);
-  const [workPackageSortField, setWorkPackageSortField] = useState<'packageNumber' | 'lifecycleStage'>('packageNumber');
+  const [workPackageSortField, setWorkPackageSortField] = useState<'manual' | 'packageNumber' | 'lifecycleStage'>('manual');
   const [workPackageSortDirection, setWorkPackageSortDirection] = useState<'asc' | 'desc'>('asc');
   const [selectedFleetFilter, setSelectedFleetFilter] = useState('all');
   const [selectedStationFilter, setSelectedStationFilter] = useState('all');
@@ -163,6 +164,8 @@ export function AmroOwnedWorkspace({
   const [deferralRationale, setDeferralRationale] = useState('');
   const [lastInteractionMessage, setLastInteractionMessage] = useState('Ready for module actions.');
   const [busyWorkPackageActionId, setBusyWorkPackageActionId] = useState<string | null>(null);
+  const [manualWorkPackageOrder, setManualWorkPackageOrder] = useState<string[]>([]);
+  const [draggingWorkPackageId, setDraggingWorkPackageId] = useState<string | null>(null);
   const [lastWorkspaceExportAt, setLastWorkspaceExportAt] = useState<string | null>(null);
   const workspaceLoadStartedAtRef = useRef(typeof performance !== 'undefined' ? performance.now() : Date.now());
   const workspaceLoadMetricPublishedRef = useRef(false);
@@ -418,6 +421,14 @@ export function AmroOwnedWorkspace({
   const nowEpoch = Date.now();
   const fleetOptions = ['all', ...Array.from(new Set(state.assets.map((asset) => asset.assetTag)))];
   const stationOptions = ['all', ...Array.from(new Set(state.scheduleBoardRows.map((row) => row.station_code)))];
+  useEffect(() => {
+    setManualWorkPackageOrder((current) => {
+      const liveIds = state.workPackages.map((workPackage) => workPackage.id);
+      const retained = current.filter((id) => liveIds.includes(id));
+      const appended = liveIds.filter((id) => !retained.includes(id));
+      return [...retained, ...appended];
+    });
+  }, [state.workPackages]);
   const filteredWorkPackages = state.workPackages.filter((workPackage) => {
     const assetTag = state.assets.find((asset) => asset.id === workPackage.assetId)?.assetTag || '';
     const stationCode = state.scheduleBoardRows.find((row) => row.work_package_id === workPackage.id)?.station_code || '';
@@ -425,12 +436,22 @@ export function AmroOwnedWorkspace({
     const stationMatch = selectedStationFilter === 'all' || stationCode === selectedStationFilter;
     return fleetMatch && stationMatch;
   });
-  const sortedWorkPackages = [...filteredWorkPackages].sort((left, right) => {
-    const leftValue = workPackageSortField === 'packageNumber' ? left.packageNumber : left.lifecycleStage;
-    const rightValue = workPackageSortField === 'packageNumber' ? right.packageNumber : right.lifecycleStage;
-    const compare = leftValue.localeCompare(rightValue);
-    return workPackageSortDirection === 'asc' ? compare : compare * -1;
+  const manuallyOrderedWorkPackages = [...filteredWorkPackages].sort((left, right) => {
+    const leftIndex = manualWorkPackageOrder.indexOf(left.id);
+    const rightIndex = manualWorkPackageOrder.indexOf(right.id);
+    if (leftIndex === -1 && rightIndex === -1) return 0;
+    if (leftIndex === -1) return 1;
+    if (rightIndex === -1) return -1;
+    return leftIndex - rightIndex;
   });
+  const sortedWorkPackages = workPackageSortField === 'manual'
+    ? manuallyOrderedWorkPackages
+    : [...filteredWorkPackages].sort((left, right) => {
+      const leftValue = workPackageSortField === 'packageNumber' ? left.packageNumber : left.lifecycleStage;
+      const rightValue = workPackageSortField === 'packageNumber' ? right.packageNumber : right.lifecycleStage;
+      const compare = leftValue.localeCompare(rightValue);
+      return workPackageSortDirection === 'asc' ? compare : compare * -1;
+    });
   const workPackageTotalPages = Math.max(1, Math.ceil(sortedWorkPackages.length / workPackagePageSize));
   const pagedWorkPackages = sortedWorkPackages.slice((workPackagePage - 1) * workPackagePageSize, workPackagePage * workPackagePageSize);
   const hasAnyWorkPackages = state.workPackages.length > 0;
@@ -451,8 +472,7 @@ export function AmroOwnedWorkspace({
     },
     { high: 0, medium: 0, low: 0 },
   );
-  const dataFreshnessLabel = state.loadingWorkPackages ? 'Refreshing now' : 'Within SLA window';
-  const syncHealthLabel = state.realtimeConnected ? 'Healthy sync' : 'Degraded sync';
+  const visibleWorkspaceError = state.workPackagesError?.trim().toLowerCase() === 'not found' ? null : state.workPackagesError;
   const taskActionDisabledReason = canDirectTaskExecution ? '' : 'Disabled by policy: management role cannot submit technician execution actions.';
   const selectedWorkPackageAssignee = state.selectedWorkPackage?.tasks?.[0]?.assignedRole || 'Unassigned';
   const formatDateTime = (value: string | number) => new Intl.DateTimeFormat(workspaceLocale, {
@@ -524,6 +544,7 @@ export function AmroOwnedWorkspace({
     const exportedAtLabel = new Date().toISOString();
     setLastWorkspaceExportAt(exportedAtLabel);
     setLastInteractionMessage(`Export prepared for ${scope} at ${formatDateTime(exportedAtLabel)}.`);
+    toast.success(`Export prepared for ${scope}.`);
   };
 
   const handleOpenComplianceGate = async () => {
@@ -531,47 +552,90 @@ export function AmroOwnedWorkspace({
     if (ok) {
       state.setComplianceGateModalOpen(true);
       setLastInteractionMessage('Compliance gate explainability loaded.');
+      toast.success('Compliance gate loaded.');
       return;
     }
     setLastInteractionMessage('Unable to load compliance gate explainability.');
+    toast.error('Unable to load compliance gate.');
   };
 
   const handleOpenWorkPackage = (workPackageId: string, packageNumber: string) => {
     state.setSelectedWorkPackageId(workPackageId);
     setLastInteractionMessage(`Opened work package ${packageNumber}.`);
+    toast.success(`Opened ${packageNumber}.`);
   };
 
   const handleScheduleWorkPackage = async (workPackageId: string, packageNumber: string) => {
     state.setSelectedWorkPackageId(workPackageId);
     setBusyWorkPackageActionId(`schedule-${workPackageId}`);
-    const ok = await state.assignSelectedWorkPackageToNextSlot();
-    setBusyWorkPackageActionId(null);
-    setLastInteractionMessage(ok ? `Scheduled work package ${packageNumber}.` : `Unable to schedule work package ${packageNumber}.`);
+    try {
+      const ok = await state.assignSelectedWorkPackageToNextSlot(workPackageId);
+      setLastInteractionMessage(ok ? `Scheduled work package ${packageNumber}.` : `Unable to schedule work package ${packageNumber}.`);
+      if (ok) {
+        toast.success(`Scheduled ${packageNumber}.`);
+      } else {
+        toast.error(`Unable to schedule ${packageNumber}.`);
+      }
+    } finally {
+      setBusyWorkPackageActionId(null);
+    }
   };
 
   const handleHoldWorkPackage = async (workPackageId: string, packageNumber: string) => {
     state.setSelectedWorkPackageId(workPackageId);
     setBusyWorkPackageActionId(`hold-${workPackageId}`);
-    const ok = await state.advanceWorkPackageLifecycle();
-    setBusyWorkPackageActionId(null);
-    setLastInteractionMessage(ok ? `Lifecycle transition submitted for ${packageNumber}.` : `Lifecycle transition failed for ${packageNumber}.`);
+    try {
+      const ok = await state.advanceWorkPackageLifecycle(workPackageId);
+      setLastInteractionMessage(ok ? `Lifecycle transition submitted for ${packageNumber}.` : `Lifecycle transition failed for ${packageNumber}.`);
+      if (ok) {
+        toast.success(`Lifecycle advanced for ${packageNumber}.`);
+      } else {
+        toast.error(`Lifecycle transition failed for ${packageNumber}.`);
+      }
+    } finally {
+      setBusyWorkPackageActionId(null);
+    }
   };
 
   const handleCloneWorkPackage = async (packageNumber: string) => {
     setBusyWorkPackageActionId(`clone-${packageNumber}`);
-    const ok = await state.createWorkPackage(`${packageNumber} Clone`);
-    setBusyWorkPackageActionId(null);
-    setLastInteractionMessage(ok ? `Cloned from ${packageNumber}.` : `Clone failed for ${packageNumber}.`);
+    try {
+      const ok = await state.createWorkPackage(`${packageNumber} Clone`);
+      setLastInteractionMessage(ok ? `Cloned from ${packageNumber}.` : `Clone failed for ${packageNumber}.`);
+      if (ok) {
+        toast.success(`Cloned ${packageNumber}.`);
+      } else {
+        toast.error(`Clone failed for ${packageNumber}.`);
+      }
+    } finally {
+      setBusyWorkPackageActionId(null);
+    }
   };
 
   const handleWorkPackageExport = (workPackageId: string, packageNumber: string) => {
-    publishWorkspaceExport('work-package', {
+    const exportPayload = {
       workPackageId,
       packageNumber,
       moduleKey: moduleKey || 'amro',
       view: workspaceViewMode,
       theme: workspaceTheme,
+      exportedAt: new Date().toISOString(),
+    };
+    publishWorkspaceExport('work-package', {
+      ...exportPayload,
     });
+    if (typeof window !== 'undefined') {
+      const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: 'application/json' });
+      const objectUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = objectUrl;
+      anchor.download = `${packageNumber}-export.json`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      URL.revokeObjectURL(objectUrl);
+    }
+    toast.success(`Export prepared for ${packageNumber}.`);
   };
 
   const handleWorkspaceImportExport = () => {
@@ -645,8 +709,38 @@ export function AmroOwnedWorkspace({
     setLastInteractionMessage(`Escalation request submitted to ${target}.`);
   };
 
-  const handleDragHandleInteraction = (packageNumber: string) => {
+  const handleDragHandleInteraction = (workPackageId: string, packageNumber: string) => {
+    state.setSelectedWorkPackageId(workPackageId);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('amro:work-package-drag-handle', {
+        detail: {
+          packageNumber,
+          selectedWorkPackageId: workPackageId,
+          triggeredAt: new Date().toISOString(),
+        },
+      }));
+    }
     setLastInteractionMessage(`Drag interaction registered for ${packageNumber}.`);
+    toast.success(`Drag handle active for ${packageNumber}.`);
+  };
+
+  const handleWorkPackageReorder = (sourceWorkPackageId: string, targetWorkPackageId: string) => {
+    if (sourceWorkPackageId === targetWorkPackageId) return;
+    const sourceWorkPackage = state.workPackages.find((workPackage) => workPackage.id === sourceWorkPackageId);
+    const targetWorkPackage = state.workPackages.find((workPackage) => workPackage.id === targetWorkPackageId);
+    setManualWorkPackageOrder((current) => {
+      const order = current.length > 0 ? current : state.workPackages.map((workPackage) => workPackage.id);
+      const sourceIndex = order.indexOf(sourceWorkPackageId);
+      const targetIndex = order.indexOf(targetWorkPackageId);
+      if (sourceIndex === -1 || targetIndex === -1) return current;
+      const reordered = [...order];
+      const [movedItem] = reordered.splice(sourceIndex, 1);
+      reordered.splice(targetIndex, 0, movedItem);
+      return reordered;
+    });
+    setWorkPackageSortField('manual');
+    setLastInteractionMessage(`Reordered ${sourceWorkPackage?.packageNumber || sourceWorkPackageId} before ${targetWorkPackage?.packageNumber || targetWorkPackageId}.`);
+    toast.success(`Reordered ${sourceWorkPackage?.packageNumber || 'work package'}.`);
   };
 
   const handleIntegrationRefresh = () => {
@@ -837,23 +931,17 @@ export function AmroOwnedWorkspace({
 
   return (
     <section className="space-y-4" aria-label="AMRO workspace">
-      <div className="rounded-md border bg-muted/20 px-3 py-2 text-xs" role="status" aria-live="polite">
-        Workspace status: {dataFreshnessLabel}. Sync health: {syncHealthLabel}.
-      </div>
-      <div className="rounded-md border px-3 py-2 text-xs" role="status" aria-live="polite">
-        Interaction status: {lastInteractionMessage}
-      </div>
       {state.loadingWorkPackages ? (
         <div className="rounded-md border px-3 py-2 text-xs text-muted-foreground" role="status" aria-live="polite">
           Loading latest AMRO workspace data...
         </div>
       ) : null}
-      {state.workPackagesError ? (
+      {visibleWorkspaceError ? (
         <div className="rounded-md border border-destructive/50 px-3 py-2 text-xs text-destructive" role="alert">
-          {state.workPackagesError}
+          {visibleWorkspaceError}
         </div>
       ) : null}
-      {moduleKey ? (
+      {moduleKey && moduleKey !== 'work-packages' ? (
         <Card data-amro-owned-surface="module-action-bar">
           <CardHeader className="pb-2">
             <CardTitle>{moduleActionBarTitle} Module Actions</CardTitle>
@@ -873,9 +961,7 @@ export function AmroOwnedWorkspace({
                     {action.label} ({action.stateLabel}): {action.stateReason}
                   </p>
                 ))
-              ) : (
-                <p className="text-muted-foreground">All module actions are ready.</p>
-              )}
+              ) : null}
             </div>
           </CardContent>
         </Card>
@@ -1083,18 +1169,11 @@ export function AmroOwnedWorkspace({
       {showWorkPackagesModule ? (
       <Card data-amro-owned-surface="work-package-task-lifecycle-orchestration">
         <CardHeader className="pb-2">
-          <CardTitle>Work Package and Task Lifecycle Orchestration</CardTitle>
+          <CardTitle>Work Packages</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="rounded-md border p-3" data-amro-screen="SCR-AMRO-002" role="region" aria-label="SCR-AMRO-002 Work Package List">
-            <p className="text-sm font-semibold">SCR-AMRO-002 Work Package List</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Columns: WO# | Aircraft | Priority | Type | Station | Due | Status | Owner
-            </p>
+          <div className="rounded-md border p-3" data-amro-screen="SCR-AMRO-002" role="region" aria-label="Work Package List">
             <div className="mt-2 grid grid-cols-1 gap-2 xl:grid-cols-[1fr_auto]">
-              <div className="flex items-center gap-2 text-xs">
-                <Badge variant="outline">AMRO &gt; Work Packages</Badge>
-              </div>
               <div className="flex flex-wrap items-center justify-end gap-2">
                 <Input
                   value={state.workPackageSearch}
@@ -1148,16 +1227,30 @@ export function AmroOwnedWorkspace({
             </div>
             <div className="mt-2 flex flex-wrap gap-2 text-xs">
               <Badge variant="outline">Frozen identifiers: WO# / Aircraft</Badge>
+              <Badge variant="outline">Sort: {workPackageSortField === 'manual' ? 'Manual' : workPackageSortField}</Badge>
+              <Button variant="outline" size="sm" onClick={() => setWorkPackageSortField('manual')}>Manual Order</Button>
               <Button variant="outline" size="sm" onClick={() => setWorkPackageSortField('packageNumber')}>Sort WO#</Button>
+              <Button variant="outline" size="sm" onClick={() => setWorkPackageSortField('lifecycleStage')}>Sort Status</Button>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setWorkPackageSortDirection((previous) => (previous === 'asc' ? 'desc' : 'asc'))}
+                disabled={workPackageSortField === 'manual'}
               >
                 Sort Direction: {workPackageSortDirection.toUpperCase()}
               </Button>
             </div>
+            <div className="mt-2 flex flex-wrap gap-2 text-xs">
+              <Badge variant="outline">Risk High: {predictiveRiskSegments.high}</Badge>
+              <Badge variant="outline">Risk Medium: {predictiveRiskSegments.medium}</Badge>
+              <Badge variant="outline">Risk Low: {predictiveRiskSegments.low}</Badge>
+              <Badge variant="outline">Compliance Alerts: {state.complianceAnomalyAlerts.length}</Badge>
+              <Badge variant="outline">Shortages: {state.materialsSummary.shortageCount}</Badge>
+            </div>
             <div className="mt-2 space-y-2">
+              <div className="rounded-md border bg-muted/20 p-2 text-xs">
+                {lastInteractionMessage}
+              </div>
               {isWorkspaceEmpty ? (
                 <div className="rounded-md border border-dashed p-3 text-xs">
                   <p className="font-medium">
@@ -1190,12 +1283,26 @@ export function AmroOwnedWorkspace({
                 pagedWorkPackages.map((workPackage) => (
                   <div
                     key={`list-${workPackage.id}`}
+                    draggable
+                    onDragStart={() => {
+                      setDraggingWorkPackageId(workPackage.id);
+                      handleDragHandleInteraction(workPackage.id, workPackage.packageNumber);
+                    }}
+                    onDragEnd={() => setDraggingWorkPackageId(null)}
+                    onDragOver={(event) => event.preventDefault()}
+                    onDrop={() => {
+                      if (!draggingWorkPackageId) return;
+                      handleWorkPackageReorder(draggingWorkPackageId, workPackage.id);
+                      setDraggingWorkPackageId(null);
+                    }}
                     className={`rounded-md border p-2 text-xs ${
                       (state.scheduleBoardRows.find((row) => row.work_package_id === workPackage.id)?.slot_end
                       && new Date(state.scheduleBoardRows.find((row) => row.work_package_id === workPackage.id)?.slot_end || nowEpoch).getTime() < nowEpoch)
                         ? 'border-destructive/40 bg-destructive/5'
-                        : ''
-                    }`}
+                        : state.selectedWorkPackageId === workPackage.id
+                          ? 'border-primary bg-primary/5'
+                          : ''
+                    } ${draggingWorkPackageId === workPackage.id ? 'opacity-60 ring-2 ring-primary' : ''}`}
                   >
                     <div className="grid grid-cols-2 gap-2 md:grid-cols-8">
                       <span>{workPackage.packageNumber}</span>
@@ -1257,9 +1364,9 @@ export function AmroOwnedWorkspace({
                         variant="outline"
                         size="sm"
                         aria-label={`Drag handle for ${workPackage.packageNumber}`}
-                        onClick={() => handleDragHandleInteraction(workPackage.packageNumber)}
+                        onClick={() => handleDragHandleInteraction(workPackage.id, workPackage.packageNumber)}
                       >
-                        Drag Handle
+                        Drag
                       </Button>
                     </div>
                   </div>
@@ -1397,7 +1504,7 @@ export function AmroOwnedWorkspace({
               <p className="text-sm font-medium">{state.selectedWorkPackage?.lifecycleStage ?? 'N/A'}</p>
             </div>
             <div className="flex items-center">
-              <Button onClick={state.advanceWorkPackageLifecycle} disabled={!state.canAdvanceLifecycle}>
+              <Button onClick={() => void state.advanceWorkPackageLifecycle()} disabled={!state.canAdvanceLifecycle}>
                 Advance Stage
               </Button>
             </div>
@@ -1798,7 +1905,7 @@ export function AmroOwnedWorkspace({
         <CardContent className="space-y-3">
           <div className="flex flex-wrap gap-2">
             <Button
-              onClick={state.assignSelectedWorkPackageToNextSlot}
+              onClick={() => void state.assignSelectedWorkPackageToNextSlot()}
               disabled={!state.selectedWorkPackageId}
             >
               Assign Next Slot

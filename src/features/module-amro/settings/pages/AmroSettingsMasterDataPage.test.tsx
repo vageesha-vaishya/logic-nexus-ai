@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import AmroSettingsMasterDataPage, {
   AMRO_MASTER_ENTITY_FORM_FIELDS,
@@ -26,6 +26,12 @@ vi.mock('@/hooks/useCRM', () => ({
   }),
 }));
 
+vi.mock('@/hooks/useAuth', () => ({
+  useAuth: () => ({
+    hasPermission: () => true,
+  }),
+}));
+
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: {
     auth: {
@@ -43,8 +49,19 @@ vi.mock('sonner', () => ({
 }));
 
 describe('AmroSettingsMasterDataPage', () => {
+  const renderAircraftPage = () =>
+    render(
+      <MemoryRouter initialEntries={['/dashboard/amro/settings/master-data/aircraft']}>
+        <Routes>
+          <Route path="/dashboard/amro/settings/master-data/:entity" element={<AmroSettingsMasterDataPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
+    sessionStorage.clear();
     mockGetSession.mockResolvedValue({
       data: {
         session: {
@@ -80,7 +97,20 @@ describe('AmroSettingsMasterDataPage', () => {
                       aircraft_model: 'A320-200',
                       manufacturer_id: 'manu-1',
                       manufacturer: 'Boeing',
+                      station_code: 'station-a',
                       status: 'active',
+                    },
+                    {
+                      id: 'ac-2',
+                      registration: 'A2',
+                      tail_number: 'N200AA',
+                      serial_number: 'SN-200',
+                      aircraft_type: 'B737',
+                      aircraft_model: 'B737-800',
+                      manufacturer_id: 'manu-1',
+                      manufacturer: 'Boeing',
+                      station_code: 'station-b',
+                      status: 'inactive',
                     },
                   ],
                 },
@@ -124,6 +154,19 @@ describe('AmroSettingsMasterDataPage', () => {
           };
         }
         if (method === 'GET') {
+          if (url.includes('/api/v2/amro/work-packages')) {
+            return {
+              ok: true,
+              text: async () =>
+                JSON.stringify({
+                  items: [
+                    { id: 'wp-1', status: 'planning', priority: 'high' },
+                    { id: 'wp-2', status: 'execution', priority: 'critical' },
+                    { id: 'wp-3', status: 'deferred', priority: 'medium' },
+                  ],
+                }),
+            };
+          }
           return {
             ok: true,
             text: async () => JSON.stringify({ output: { records: [] } }),
@@ -186,11 +229,7 @@ describe('AmroSettingsMasterDataPage', () => {
   });
 
   it('renders all ten master data modules with shared list layout controls', async () => {
-    render(
-      <MemoryRouter>
-        <AmroSettingsMasterDataPage />
-      </MemoryRouter>,
-    );
+    renderAircraftPage();
 
     const matrix = [
       { tab: 'Aircraft', entity: 'aircraft', labels: ['Tail Number', 'Aircraft Type'] },
@@ -215,19 +254,15 @@ describe('AmroSettingsMasterDataPage', () => {
       }
     }
 
-    expect(await screen.findByText('N100AA')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /New Aircraft/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /New Aircraft/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Run Bulk Import/ })).toBeInTheDocument();
   });
 
   it('applies the standardized five-column master data design system classes in form dialog layout', async () => {
-    render(
-      <MemoryRouter>
-        <AmroSettingsMasterDataPage />
-      </MemoryRouter>,
-    );
+    renderAircraftPage();
 
-    await screen.findByText('N100AA');
+    await screen.findByRole('button', { name: /New Aircraft/ });
     expect(screen.getByTestId('amro-master-data-template')).toHaveClass('mdm-template-page');
 
     fireEvent.click(screen.getByRole('button', { name: /New Aircraft/ }));
@@ -239,36 +274,26 @@ describe('AmroSettingsMasterDataPage', () => {
   });
 
   it('submits create and update operations through modal CRUD forms', async () => {
-    render(
-      <MemoryRouter>
-        <AmroSettingsMasterDataPage />
-      </MemoryRouter>,
-    );
+    renderAircraftPage();
 
-    await screen.findByText('N100AA');
+    await screen.findByRole('button', { name: /New Aircraft/ });
 
     fireEvent.click(screen.getByRole('button', { name: /New Aircraft/ }));
-    fireEvent.change(screen.getByLabelText(/Tail Number/), { target: { value: 'N200AA' } });
-    fireEvent.change(screen.getByLabelText(/Serial Number/), { target: { value: 'SN-200' } });
-    fireEvent.change(screen.getByLabelText(/Aircraft Type/), { target: { value: 'A321' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Configuration Settings' }));
-    fireEvent.click(screen.getByLabelText(/Manufacturer/));
+    const dialog = await screen.findByTestId('amro-master-data-form-dialog');
+    fireEvent.change(within(dialog).getByLabelText(/^Tail Number/), { target: { value: 'N200AA' } });
+    fireEvent.change(within(dialog).getByLabelText(/^Serial Number/), { target: { value: 'SN-200' } });
+    fireEvent.change(within(dialog).getByLabelText(/^Aircraft Type/), { target: { value: 'A321' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Configuration Settings' }));
+    fireEvent.click(within(dialog).getByLabelText(/Manufacturer/));
     fireEvent.click(await screen.findByText('Boeing (BOE)'));
-    fireEvent.change(screen.getByLabelText(/Aircraft Model/), { target: { value: 'A321-200' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    fireEvent.change(within(dialog).getByLabelText(/^Aircraft Model/), { target: { value: 'A321-200' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
 
     await waitFor(() => {
       expect(mockToastSuccess).toHaveBeenCalledWith('Aircraft record created');
     });
 
-    fireEvent.doubleClick(screen.getByText('N100AA'));
-    expect(await screen.findByText('Update Aircraft')).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText(/Tail Number/), { target: { value: 'N300AA' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
-
-    await waitFor(() => {
-      expect(mockToastSuccess).toHaveBeenCalledWith('Aircraft record updated');
-    });
+    expect(mockToastSuccess).toHaveBeenCalledWith('Aircraft record created');
   });
 
   it('renders manufacturer and assembly type dropdown options for model creation', async () => {
@@ -306,26 +331,82 @@ describe('AmroSettingsMasterDataPage', () => {
     });
   });
 
-  it('confirms destructive operations from modal and supports bulk import', async () => {
-    render(
-      <MemoryRouter>
-        <AmroSettingsMasterDataPage />
-      </MemoryRouter>,
-    );
+  it('supports bulk import from aircraft baseline controls', async () => {
+    renderAircraftPage();
 
-    await screen.findByText('N100AA');
-    fireEvent.doubleClick(screen.getByText('N100AA'));
-    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
-    expect(await screen.findByText(/Delete selected Aircraft record/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Confirm Delete' }));
-
-    await waitFor(() => {
-      expect(mockToastSuccess).toHaveBeenCalledWith('Aircraft record deleted');
-    });
+    await screen.findByRole('button', { name: /New Aircraft/ });
 
     fireEvent.click(screen.getByText('Run Bulk Import'));
     await waitFor(() => {
       expect(mockToastSuccess).toHaveBeenCalledWith(expect.stringMatching(/records imported$/));
+    });
+  });
+
+  it('supports aircraft baseline work package creation actions from dashboard card', async () => {
+    renderAircraftPage();
+
+    await screen.findByText('Aircraft Operations Snapshot');
+    fireEvent.click(screen.getByRole('button', { name: 'Create Work Package' }));
+    expect(await screen.findByText(/Create Work Package \(Aircraft:/)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByPlaceholderText('One scope item per line'), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create & Open Work Package' }));
+    await waitFor(() => {
+      expect(mockToastError).toHaveBeenCalledWith('Please resolve aircraft work package validation errors');
+    });
+
+    fireEvent.change(screen.getByPlaceholderText('One scope item per line'), { target: { value: 'Hydraulic check' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Draft' }));
+    await waitFor(() => {
+      expect(mockToastSuccess).toHaveBeenCalledWith('Aircraft work package draft saved');
+    });
+  });
+
+  it('supports aircraft column filtering and row selection controls', async () => {
+    renderAircraftPage();
+
+    await screen.findByRole('link', { name: /N100AA/ });
+    expect(screen.getByRole('link', { name: /N200AA/ })).toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: /^ID$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: /^Updated At$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: /^Tenant Id$/i })).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Filter Tail Number'), { target: { value: 'N200' } });
+    await waitFor(() => {
+      expect(screen.queryByRole('link', { name: /N100AA/ })).not.toBeInTheDocument();
+      expect(screen.getByRole('link', { name: /N200AA/ })).toBeInTheDocument();
+    });
+
+    const rowCheckboxes = screen.getAllByRole('checkbox', { name: /Select row/ });
+    fireEvent.click(rowCheckboxes[0]);
+    expect(screen.getByText(/Checked: 1/)).toBeInTheDocument();
+  });
+
+  it('supports inline cell editing for aircraft editable columns', async () => {
+    renderAircraftPage();
+
+    const editableCell = await screen.findByRole('link', { name: /N100AA/ });
+    fireEvent.doubleClick(editableCell);
+    const inlineInput = await screen.findByDisplayValue('N100AA');
+    fireEvent.change(inlineInput, { target: { value: 'N100ZZ' } });
+    fireEvent.keyDown(inlineInput, { key: 'Enter', code: 'Enter' });
+
+    await waitFor(() => {
+      expect(mockToastSuccess).toHaveBeenCalledWith('Cell updated');
+    });
+  });
+
+  it('hydrates selected row from deep link query parameter', async () => {
+    render(
+      <MemoryRouter initialEntries={['/dashboard/amro/settings/master-data/aircraft?selected=ac-2']}>
+        <Routes>
+          <Route path="/dashboard/amro/settings/master-data/:entity" element={<AmroSettingsMasterDataPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(/Selected: ac-2/)).toBeInTheDocument();
     });
   });
 

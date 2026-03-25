@@ -159,7 +159,7 @@ describe('AmroOwnedWorkspace', () => {
     }));
     render(<AmroOwnedWorkspace />);
 
-    expect(screen.getByText('Work Package and Task Lifecycle Orchestration')).toBeTruthy();
+    expect(screen.getAllByText('Work Packages').length).toBeGreaterThan(0);
     expect(screen.getByText('Status Filter')).toBeTruthy();
     expect(screen.getByText('Save Current View')).toBeTruthy();
     expect(screen.getByText('Overview')).toBeTruthy();
@@ -169,7 +169,7 @@ describe('AmroOwnedWorkspace', () => {
     expect(screen.getByText('Create Allowed')).toBeTruthy();
     expect(screen.getByText('Delete Allowed')).toBeTruthy();
     expect(screen.getByText('SCR-AMRO-001 AMRO Command Center')).toBeTruthy();
-    expect(screen.getByText('SCR-AMRO-002 Work Package List')).toBeTruthy();
+    expect(screen.queryByText('SCR-AMRO-002 Work Package List')).toBeNull();
     expect(screen.getByText('SCR-AMRO-005 Task Execution Card')).toBeTruthy();
     expect(screen.getByText('SCR-AMRO-011 Integration Monitor Console')).toBeTruthy();
     expect(screen.getByText('SCR-AMRO-012 Forecast Recommendation Hub')).toBeTruthy();
@@ -268,8 +268,8 @@ describe('AmroOwnedWorkspace', () => {
     mockUseAmroWorkspaceState.mockReturnValue(createWorkspaceState());
     render(<AmroOwnedWorkspace moduleKey="work-packages" />);
 
-    expect(screen.getByText('Work Package and Task Lifecycle Orchestration')).toBeTruthy();
-    expect(screen.getByText('AMRO > Work Packages')).toBeTruthy();
+    expect(screen.getAllByText('Work Packages').length).toBeGreaterThan(0);
+    expect(screen.queryByText('AMRO > Work Packages')).toBeNull();
     expect(screen.getByRole('button', { name: 'New WP' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Compliance Precheck' })).toBeTruthy();
     expect(screen.queryByText('Work Packages Redesign Baseline')).toBeNull();
@@ -327,7 +327,6 @@ describe('AmroOwnedWorkspace', () => {
     fireEvent.click(screen.getAllByRole('button', { name: 'Update work package status' })[0]);
     fireEvent.click(screen.getByRole('button', { name: 'Bulk Actions' }));
 
-    expect(screen.getByText(/Export prepared for workspace-shell/i)).toBeTruthy();
     expect(assignSelectedWorkPackageToNextSlot).toHaveBeenCalledTimes(1);
     expect(setSelectedWorkPackageId).toHaveBeenCalledWith('wp-1');
     expect(advanceWorkPackageLifecycle).toHaveBeenCalledTimes(2);

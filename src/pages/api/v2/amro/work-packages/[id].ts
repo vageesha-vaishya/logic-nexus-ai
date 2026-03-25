@@ -12,6 +12,13 @@ import {
 } from '../../../_utils/http';
 import { sendErrorResponse } from '../../../_utils/errorHandler';
 import { applyCompatibilityResponseHeaders, resolveGatewayCompatibility } from '../../../_utils/compatibility-facade';
+import {
+  getRuntimeWorkPackage,
+  isRuntimeWorkPackageDeleted,
+  markRuntimeWorkPackageDeleted,
+  patchRuntimeWorkPackage,
+  upsertRuntimeWorkPackage,
+} from '../work-package-runtime-store';
 
 type WorkPackageStatus = 'planning' | 'scheduled' | 'in_progress' | 'completed' | 'blocked' | 'cancelled';
 
@@ -32,7 +39,7 @@ function parseBoolean(value: string | undefined, fallback: boolean): boolean {
 }
 
 function isV2Enabled(): boolean {
-  return parseBoolean(process.env.AMRO_WORK_PACKAGES_V2_ENABLED, false);
+  return parseBoolean(process.env.AMRO_WORK_PACKAGES_V2_ENABLED, true);
 }
 
 function parsePathId(req: ApiRequest): string {
@@ -49,9 +56,71 @@ function parseBody(body: unknown): Record<string, unknown> {
   return {};
 }
 
+function resolveHeaderValue(req: ApiRequest, headerName: string): string {
+  const value = req.headers?.[headerName];
+  if (Array.isArray(value)) {
+    return String(value[0] || '').trim();
+  }
+  return String(value || '').trim();
+}
+
+function parseIdempotencyKey(req: ApiRequest, payload: Record<string, unknown>, fallbackKey: string): string {
+  const headerKey = resolveHeaderValue(req, 'idempotency-key');
+  const bodyKey = String(payload.idempotency_key || '').trim();
+  const key = headerKey || bodyKey || fallbackKey;
+  if (key.length > 128) {
+    throw new Error('idempotency key length exceeds max limit');
+  }
+  return key;
+}
+
+function parseScopeContext(
+  payload: Record<string, unknown>,
+  tenantId: string,
+  franchiseId: string | null,
+  role: string,
+) {
+  const raw = payload.scope_context;
+  const scopeContext = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {};
+  const payloadTenantId = String(scopeContext.tenant_id || tenantId).trim();
+  const payloadFranchiseId = String(scopeContext.franchise_id || franchiseId || '').trim();
+  const payloadDomainId = String(scopeContext.domain_id || 'amro').trim().toLowerCase();
+  const payloadRole = String(scopeContext.role || role).trim().toLowerCase();
+  if (payloadTenantId !== tenantId) {
+    throw new Error('scope_context tenant_id violates tenant scope');
+  }
+  if (payloadFranchiseId !== String(franchiseId || '')) {
+    throw new Error('scope_context franchise_id violates franchise scope');
+  }
+  if (payloadDomainId !== 'amro') {
+    throw new Error('scope_context domain_id must be amro');
+  }
+  return {
+    tenant_id: tenantId,
+    franchise_id: franchiseId,
+    domain_id: 'amro',
+    role: payloadRole,
+  };
+}
+
+function enforceWorkPackageMutationAccess(permissions: string[], role: string): void {
+  try {
+    enforceAnyPermission(permissions || [], ['dashboards.manage', 'reports.manage']);
+    return;
+  } catch (_error) {
+    const normalizedRole = String(role || '').trim().toLowerCase();
+    const allowedRoles = new Set(['tenant_admin', 'franchise_admin', 'planner', 'engineer', 'inspector', 'developer']);
+    if (allowedRoles.has(normalizedRole)) {
+      return;
+    }
+    throw new Error('Forbidden: missing work package mutation permission');
+  }
+}
+
 function assertAllowedPatchFields(payload: Record<string, unknown>) {
+  const metadataFields = new Set(['current_status', 'idempotency_key', 'decision_trace_id', 'scope_context']);
   const invalid = Object.keys(payload)
-    .filter((key) => key !== 'current_status')
+    .filter((key) => !metadataFields.has(key))
     .find((key) => !ALLOWED_PATCH_FIELDS.has(key));
   if (invalid) {
     throw new Error(`Bad Request: unsupported patch field ${invalid}`);
@@ -74,6 +143,7 @@ function parseStatus(value: unknown, fieldName: string): WorkPackageStatus {
 }
 
 function buildWorkPackageDetail(id: string, tenantId: string, franchiseId: string | null, userId: string) {
+  const nowIso = new Date().toISOString();
   return {
     id,
     code: `WP-${id.slice(-6).toUpperCase()}`,
@@ -88,6 +158,10 @@ function buildWorkPackageDetail(id: string, tenantId: string, franchiseId: strin
     scope_items: ['inspection', 'lubrication'],
     tenant_id: tenantId,
     franchise_id: franchiseId,
+    version: 1,
+    created_at: nowIso,
+    created_by: userId,
+    updated_at: nowIso,
     updated_by: userId,
   };
 }
@@ -122,9 +196,20 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     const scopedAccess = await resolveAndApplyAccessContext(req, ctx);
     const domainAccess = await enforceAmroDomainAccess(scopedAccess, { correlationId: ctx.correlationId });
     const id = parsePathId(req);
+    const scope = { tenantId: scopedAccess.tenantId, franchiseId: scopedAccess.franchiseId };
+    if (isRuntimeWorkPackageDeleted(scope, id) && req.method === 'GET') {
+      res.status(404).json({
+        version: 'v2',
+        interface: 'detail-work-package',
+        correlationId: ctx.correlationId,
+        error: 'work package not found',
+      });
+      return;
+    }
+    const runtimeRecord = getRuntimeWorkPackage(scope, id);
 
     if (req.method === 'GET') {
-      const detail = buildWorkPackageDetail(id, scopedAccess.tenantId, scopedAccess.franchiseId, scopedAccess.userId);
+      const detail = runtimeRecord || buildWorkPackageDetail(id, scopedAccess.tenantId, scopedAccess.franchiseId, scopedAccess.userId);
       res.status(200).json({
         version: 'v2',
         interface: 'detail-work-package',
@@ -138,7 +223,11 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     }
 
     if (req.method === 'DELETE') {
-      enforceAnyPermission(authUser.permissions, ['dashboards.manage', 'reports.manage']);
+      enforceWorkPackageMutationAccess(authUser.permissions, authUser.role);
+      const payload = parseBody(req.body);
+      const idempotencyKey = parseIdempotencyKey(req, payload, `delete-work-package:${ctx.correlationId}`);
+      const scopeContext = parseScopeContext(payload, scopedAccess.tenantId, scopedAccess.franchiseId, authUser.role);
+      markRuntimeWorkPackageDeleted(scope, id);
       res.status(200).json({
         version: 'v2',
         interface: 'delete-work-package',
@@ -146,6 +235,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         data: {
           work_package_id: id,
           deleted: true,
+          idempotency_key: idempotencyKey,
+          scope_context: scopeContext,
           deleted_by: scopedAccess.userId,
           domainAccess,
         },
@@ -154,6 +245,9 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     }
 
     const payload = parseBody(req.body);
+    const idempotencyKey = parseIdempotencyKey(req, payload, `update-work-package:${ctx.correlationId}`);
+    const decisionTraceId = String(payload.decision_trace_id || `decision-${ctx.correlationId}`).trim();
+    const scopeContext = parseScopeContext(payload, scopedAccess.tenantId, scopedAccess.franchiseId, authUser.role);
     assertAllowedPatchFields(payload);
     const fromStatus = parseStatus(payload.current_status || 'planning', 'current_status');
     const toStatus = payload.status ? parseStatus(payload.status, 'status') : fromStatus;
@@ -162,12 +256,19 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     }
 
     const { current_status: _currentStatus, ...patchFields } = payload;
-    const patched = {
+    const ensured = runtimeRecord || upsertRuntimeWorkPackage({
       ...buildWorkPackageDetail(id, scopedAccess.tenantId, scopedAccess.franchiseId, scopedAccess.userId),
-      ...patchFields,
-      status: toStatus,
-      updated_by: scopedAccess.userId,
-    };
+      status: fromStatus,
+    });
+    const patched = patchRuntimeWorkPackage(
+      scope,
+      id,
+      {
+        ...patchFields,
+        status: toStatus,
+      },
+      scopedAccess.userId,
+    ) || ensured;
 
     res.status(200).json({
       version: 'v2',
@@ -177,6 +278,9 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         work_package: patched,
         from_status: fromStatus,
         to_status: toStatus,
+        idempotency_key: idempotencyKey,
+        decision_trace_id: decisionTraceId,
+        scope_context: scopeContext,
         domainAccess,
       },
     });

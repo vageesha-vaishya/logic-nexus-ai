@@ -456,6 +456,10 @@ const AMRO_WORK_PACKAGE_INTERFACE_MILESTONES: Readonly<Record<string, AmroSequen
   'trace-rotable-llp': 'M5',
   'run-inventory-optimization': 'M8',
   'sync-supplier-asn-erp': 'M7',
+  'intelligent-plan': 'M8',
+  'optimize-resources': 'M8',
+  'simulate': 'M8',
+  'publish': 'M8',
 } as const;
 
 const AMRO_TASK_INTERFACE_MILESTONES: Readonly<Record<string, AmroSequentialMilestoneId>> = {
