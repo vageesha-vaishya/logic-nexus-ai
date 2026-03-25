@@ -184,6 +184,20 @@ describe('AmroSettingsMasterDataPage', () => {
               }),
           };
         }
+        if (method === 'POST' && url.includes('/api/v2/amro/flight-logs')) {
+          return {
+            ok: true,
+            text: async () =>
+              JSON.stringify({
+                output: {
+                  flight_log: {
+                    flight_log_id: 'fl-1',
+                    maintenance_flags: [],
+                  },
+                },
+              }),
+          };
+        }
         if (method === 'PATCH') {
           return {
             ok: true,
@@ -394,6 +408,29 @@ describe('AmroSettingsMasterDataPage', () => {
     await waitFor(() => {
       expect(mockToastSuccess).toHaveBeenCalledWith('Cell updated');
     });
+  });
+
+  it('records flight logs from the aircraft row action', async () => {
+    renderAircraftPage();
+
+    await screen.findByRole('link', { name: /N100AA/ });
+    const addButtons = screen.getAllByRole('button', { name: 'Add Flight Logs' });
+    fireEvent.click(addButtons[0]);
+
+    expect(await screen.findByRole('heading', { name: /Add Flight Logs \(Aircraft:/ })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Departure Airport'), { target: { value: 'DEL' } });
+    fireEvent.change(screen.getByLabelText('Arrival Airport'), { target: { value: 'CCU' } });
+    fireEvent.change(screen.getByLabelText('Flight Hours'), { target: { value: '2.4' } });
+    fireEvent.change(screen.getByLabelText('Block Hours'), { target: { value: '2.9' } });
+    fireEvent.change(screen.getByLabelText('Flight Cycles'), { target: { value: '1' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Flight Log' }));
+
+    await waitFor(() => {
+      expect(mockToastSuccess).toHaveBeenCalledWith('Flight log recorded');
+    });
+
+    const requests = vi.mocked(fetch).mock.calls.map(([input]) => String(input));
+    expect(requests.some((requestUrl) => requestUrl.includes('/api/v2/amro/flight-logs'))).toBe(true);
   });
 
   it('hydrates selected row from deep link query parameter', async () => {
