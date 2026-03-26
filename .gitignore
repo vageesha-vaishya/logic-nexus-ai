@@ -39,3 +39,7 @@ migration.env
 
 # Git worktrees (isolated development workspaces)
 .worktrees
+
+# Project rules workflow runtime state
+.trae/rules/.consultation-state.json
+.trae/rules/generated/
