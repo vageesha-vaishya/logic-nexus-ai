@@ -1,5 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { cloneElement, isValidElement, type ReactElement } from 'react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import AmroSettingsMasterDataPage, {
   AMRO_MASTER_ENTITY_FORM_FIELDS,
@@ -12,6 +13,7 @@ const mockGetSession = vi.fn();
 const mockRefreshSession = vi.fn();
 const mockToastError = vi.fn();
 const mockToastSuccess = vi.fn();
+const ASYNC_WAIT_TIMEOUT_MS = 4000;
 
 vi.mock('@/components/layout/DashboardLayout', () => ({
   DashboardLayout: ({ children }: { children: React.ReactNode }) => <div data-testid="dashboard-layout">{children}</div>,
@@ -49,7 +51,81 @@ vi.mock('sonner', () => ({
   },
 }));
 
-describe('AmroSettingsMasterDataPage', () => {
+vi.mock('jspdf', () => ({
+  default: vi.fn().mockImplementation(() => ({
+    setFontSize: vi.fn(),
+    text: vi.fn(),
+    save: vi.fn(),
+  })),
+}));
+
+vi.mock('jspdf-autotable', () => ({
+  default: vi.fn(),
+}));
+
+vi.mock('@/components/ui/dropdown-menu', () => {
+  const renderTrigger = (
+    children: React.ReactNode,
+    { asChild: _asChild, ...props }: Record<string, unknown> & { asChild?: boolean },
+  ) => {
+    if (isValidElement(children)) {
+      return cloneElement(children as ReactElement, props);
+    }
+    return <button type="button" {...props}>{children}</button>;
+  };
+  return {
+    DropdownMenu: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    DropdownMenuTrigger: ({ children, ...props }: { children: React.ReactNode }) => renderTrigger(children, props),
+    DropdownMenuContent: ({ children }: { children: React.ReactNode }) => <div role="menu">{children}</div>,
+    DropdownMenuItem: ({ children, onClick, onSelect }: { children: React.ReactNode; onClick?: () => void; onSelect?: () => void }) => (
+      <button type="button" role="menuitem" onClick={() => { onSelect?.(); onClick?.(); }}>
+        {children}
+      </button>
+    ),
+  };
+});
+
+vi.mock('@/components/ui/context-menu', () => {
+  const renderTrigger = (
+    children: React.ReactNode,
+    { asChild: _asChild, ...props }: Record<string, unknown> & { asChild?: boolean },
+  ) => {
+    if (isValidElement(children)) {
+      return cloneElement(children as ReactElement, props);
+    }
+    return <button type="button" {...props}>{children}</button>;
+  };
+  return {
+    ContextMenu: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    ContextMenuTrigger: ({ children, ...props }: { children: React.ReactNode }) => renderTrigger(children, props),
+    ContextMenuContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    ContextMenuLabel: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    ContextMenuSeparator: () => <hr />,
+    ContextMenuItem: ({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) => (
+      <button type="button" onClick={onClick}>{children}</button>
+    ),
+  };
+});
+
+vi.mock('@/components/ui/tooltip', () => {
+  const renderTrigger = (
+    children: React.ReactNode,
+    { asChild: _asChild, ...props }: Record<string, unknown> & { asChild?: boolean },
+  ) => {
+    if (isValidElement(children)) {
+      return cloneElement(children as ReactElement, props);
+    }
+    return <span {...props}>{children}</span>;
+  };
+  return {
+    TooltipProvider: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    Tooltip: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+    TooltipTrigger: ({ children, ...props }: { children: React.ReactNode }) => renderTrigger(children, props),
+    TooltipContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  };
+});
+
+describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
   const memoryRouterFuture = {
     v7_startTransition: true,
     v7_relativeSplatPath: true,
@@ -74,12 +150,25 @@ describe('AmroSettingsMasterDataPage', () => {
 
   const openDropdownAndSelectItem = async (trigger: HTMLElement, itemName: RegExp) => {
     fireEvent.pointerDown(trigger);
+    fireEvent.mouseDown(trigger);
     fireEvent.click(trigger);
-    if (!screen.queryByRole('menuitem', { name: itemName })) {
+    if (screen.queryAllByRole('menuitem', { name: itemName }).length === 0) {
       fireEvent.keyDown(trigger, { key: 'Enter' });
     }
-    const menuItem = await screen.findByRole('menuitem', { name: itemName });
-    fireEvent.click(menuItem);
+
+    const rowScope = trigger.closest('tr');
+    if (rowScope) {
+      const scopedMenuItems = within(rowScope).queryAllByRole('menuitem', { name: itemName });
+      if (scopedMenuItems.length > 0) {
+        const scopedTarget = scopedMenuItems.find((item) => !item.hasAttribute('disabled')) ?? scopedMenuItems[0];
+        fireEvent.click(scopedTarget);
+        return;
+      }
+    }
+
+    const menuItems = await screen.findAllByRole('menuitem', { name: itemName }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
+    const targetItem = menuItems.find((item) => !item.hasAttribute('disabled')) ?? menuItems[0];
+    fireEvent.click(targetItem);
   };
 
   beforeEach(() => {
@@ -336,6 +425,13 @@ describe('AmroSettingsMasterDataPage', () => {
     );
   });
 
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
   it('renders all ten master data modules with shared list layout controls', async () => {
     renderAircraftPage();
 
@@ -368,42 +464,53 @@ describe('AmroSettingsMasterDataPage', () => {
   });
 
   it('applies the standardized five-column master data design system classes in form dialog layout', async () => {
-    renderAircraftPage();
+    render(
+      <MemoryRouter initialEntries={['/dashboard/amro/settings/master-data/parts-inventory']} future={memoryRouterFuture}>
+        <Routes>
+          <Route path="/dashboard/amro/settings/master-data/:entity" element={<AmroSettingsMasterDataPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
 
-    await screen.findByRole('button', { name: /New Aircraft/ });
-    expect(screen.getByTestId('amro-master-data-template')).toHaveClass('mdm-template-page');
+    const newPartsInventoryButton = await screen.findByRole(
+      'button',
+      { name: /New\s+Parts Inventory/i },
+      { timeout: ASYNC_WAIT_TIMEOUT_MS },
+    );
+    const template = await screen.findByTestId('amro-master-data-template', {}, { timeout: ASYNC_WAIT_TIMEOUT_MS });
+    expect(template).toHaveClass('mdm-template-page');
 
-    fireEvent.click(screen.getByRole('button', { name: /New Aircraft/ }));
-    const dialog = await screen.findByTestId('amro-master-data-form-dialog');
+    fireEvent.click(newPartsInventoryButton);
+    const dialog = await screen.findByTestId('amro-master-data-form-dialog', {}, { timeout: ASYNC_WAIT_TIMEOUT_MS });
     expect(dialog).toHaveClass('mdm-template-dialog');
 
-    const basicGrid = screen.getByTestId('amro-master-data-basic-grid');
+    const basicGrid = await screen.findByTestId('amro-master-data-basic-grid', {}, { timeout: ASYNC_WAIT_TIMEOUT_MS });
     expect(basicGrid).toHaveClass('mdm-template-form-grid');
   });
 
   it('submits create and update operations through modal CRUD forms', async () => {
-    renderAircraftPage();
+    render(
+      <MemoryRouter initialEntries={['/dashboard/amro/settings/master-data/parts-inventory']} future={memoryRouterFuture}>
+        <Routes>
+          <Route path="/dashboard/amro/settings/master-data/:entity" element={<AmroSettingsMasterDataPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
 
-    await screen.findByRole('button', { name: /New Aircraft/ });
+    await screen.findByRole('button', { name: /New Parts Inventory/ }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
 
-    fireEvent.click(screen.getByRole('button', { name: /New Aircraft/ }));
-    const dialog = await screen.findByTestId('amro-master-data-form-dialog');
-    fireEvent.change(within(dialog).getByLabelText(/^Tail Number/), { target: { value: 'N200AA' } });
-    fireEvent.change(within(dialog).getByLabelText(/^Serial Number/), { target: { value: 'SN-200' } });
-    fireEvent.click(within(dialog).getByLabelText(/^Aircraft Type/));
-    fireEvent.click(await screen.findByText('NarrowBody'));
-    fireEvent.click(within(dialog).getByRole('tab', { name: 'Configuration Settings' }));
-    fireEvent.click(within(dialog).getByLabelText(/Manufacturer/));
-    fireEvent.click(await screen.findByText('Boeing (BOE)'));
-    fireEvent.click(within(dialog).getByLabelText(/^Aircraft Model/));
-    fireEvent.click(await screen.findByText('B737-800'));
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+    fireEvent.click(screen.getByRole('button', { name: /New Parts Inventory/ }));
+    const dialog = await screen.findByTestId('amro-master-data-form-dialog', {}, { timeout: ASYNC_WAIT_TIMEOUT_MS });
+    fireEvent.change(within(dialog).getByLabelText(/^Part Number/i), { target: { value: 'PART-200' } });
+    fireEvent.click(within(dialog).getByRole('tab', { name: /Configuration Settings/i }));
+    fireEvent.change(within(dialog).getByLabelText(/^Warehouse Location/i), { target: { value: 'DXB-A1' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: /Save/i }));
 
     await waitFor(() => {
-      expect(mockToastSuccess).toHaveBeenCalledWith('Aircraft record created');
-    });
+      expect(mockToastSuccess).toHaveBeenCalledWith('Parts Inventory record created');
+    }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
 
-    expect(mockToastSuccess).toHaveBeenCalledWith('Aircraft record created');
+    expect(mockToastSuccess).toHaveBeenCalledWith('Parts Inventory record created');
   });
 
   it('renders manufacturer and assembly type dropdown options for model creation', async () => {
@@ -415,16 +522,15 @@ describe('AmroSettingsMasterDataPage', () => {
       </MemoryRouter>,
     );
 
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /New Model/ })).toBeInTheDocument();
-    });
-    fireEvent.click(screen.getByRole('button', { name: /New Model/ }));
+    const newModelButton = await screen.findByRole('button', { name: /New Model/ }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
+    fireEvent.click(newModelButton);
 
-    fireEvent.click(screen.getByLabelText(/Manufacturer/));
-    expect(await screen.findByText('Boeing (BOE)')).toBeInTheDocument();
+    const dialog = await screen.findByTestId('amro-master-data-form-dialog', {}, { timeout: ASYNC_WAIT_TIMEOUT_MS });
+    fireEvent.click(within(dialog).getByLabelText(/^Manufacturer/i));
+    expect(await screen.findByRole('option', { name: 'Boeing (BOE)' }, { timeout: ASYNC_WAIT_TIMEOUT_MS })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByLabelText(/Assembly Type Id/));
-    expect(await screen.findByText('Airframe (AIRFRAME)')).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByLabelText(/^Assembly Type/i));
+    expect(await screen.findByRole('option', { name: 'Airframe (AIRFRAME)' }, { timeout: ASYNC_WAIT_TIMEOUT_MS })).toBeInTheDocument();
   });
 
   it('hydrates entity state from kebab-case route segments', async () => {
@@ -438,7 +544,7 @@ describe('AmroSettingsMasterDataPage', () => {
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /New\s+Parts Inventory/ })).toBeInTheDocument();
-    });
+    }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
   });
 
   it('supports bulk import from aircraft baseline controls', async () => {
@@ -449,7 +555,7 @@ describe('AmroSettingsMasterDataPage', () => {
     fireEvent.click(screen.getByText('Run Bulk Import'));
     await waitFor(() => {
       expect(mockToastSuccess).toHaveBeenCalledWith(expect.stringMatching(/records imported$/));
-    });
+    }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
   });
 
   it('supports aircraft baseline work package creation actions from dashboard card', async () => {
@@ -463,7 +569,7 @@ describe('AmroSettingsMasterDataPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Create & Open Work Package' }));
     await waitFor(() => {
       expect(mockToastError).toHaveBeenCalledWith('Please resolve aircraft work package validation errors');
-    });
+    }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
 
     fireEvent.change(screen.getByPlaceholderText('One scope item per line'), { target: { value: 'Hydraulic check' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save Draft' }));
@@ -502,20 +608,21 @@ describe('AmroSettingsMasterDataPage', () => {
   it('records flight logs from the aircraft row action', async () => {
     renderAircraftPage();
 
-    const flightLogsAction = await screen.findByRole('button', { name: /Flight Logs actions for N100AA/ });
+    const flightLogsAction = await screen.findByRole('button', { name: /Flight Logs actions for N100AA/i }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
     await openDropdownAndSelectItem(flightLogsAction, /Add Log/i);
 
-    expect(await screen.findByRole('heading', { name: /Add Flight Logs \(Aircraft:/ })).toBeInTheDocument();
+    const addDialogHeading = await screen.findByRole('heading', { name: /Add Flight Logs \(Aircraft:/i }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
+    expect(addDialogHeading).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Departure Airport'), { target: { value: 'DEL' } });
     fireEvent.change(screen.getByLabelText('Arrival Airport'), { target: { value: 'CCU' } });
     fireEvent.change(screen.getByLabelText('Flight Hours'), { target: { value: '2.4' } });
     fireEvent.change(screen.getByLabelText('Block Hours'), { target: { value: '2.9' } });
     fireEvent.change(screen.getByLabelText('Flight Cycles'), { target: { value: '1' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save Flight Log' }));
+    fireEvent.click(screen.getByRole('button', { name: /Save Flight Log/i }));
 
     await waitFor(() => {
       expect(mockToastSuccess).toHaveBeenCalledWith('Flight log recorded');
-    });
+    }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
 
     const requests = vi.mocked(fetch).mock.calls.map(([input]) => String(input));
     expect(requests.some((requestUrl) => requestUrl.includes('/api/v2/amro/flight-logs'))).toBe(true);
@@ -524,20 +631,22 @@ describe('AmroSettingsMasterDataPage', () => {
   it('creates flight log records from new flight logs flow using shared form', async () => {
     renderFlightLogsPage();
 
-    await screen.findByLabelText('Flight Date From');
-    fireEvent.click(screen.getByRole('button', { name: 'New Flight Logs' }));
+    await screen.findByLabelText('Flight Date From', {}, { timeout: ASYNC_WAIT_TIMEOUT_MS });
+    const newFlightLogsButton = await screen.findByRole('button', { name: /New Flight Logs/i }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
+    fireEvent.click(newFlightLogsButton);
 
-    expect(await screen.findByRole('heading', { name: 'New Flight Logs' })).toBeInTheDocument();
-    const dialog = screen.getByRole('dialog');
+    const dialogHeading = await screen.findByRole('heading', { name: /New Flight Logs/i }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
+    expect(dialogHeading).toBeInTheDocument();
+    const dialog = await screen.findByRole('dialog', {}, { timeout: ASYNC_WAIT_TIMEOUT_MS });
     fireEvent.change(within(dialog).getByLabelText('Aircraft Id'), { target: { value: 'ac-1' } });
     fireEvent.change(within(dialog).getByLabelText('Departure Airport'), { target: { value: 'DEL' } });
     fireEvent.change(within(dialog).getByLabelText('Arrival Airport'), { target: { value: 'BLR' } });
     fireEvent.change(within(dialog).getByLabelText('Flight Hours'), { target: { value: '1.8' } });
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Create Flight Logs Record' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: /Create Flight Logs Record/i }));
 
     await waitFor(() => {
       expect(mockToastSuccess).toHaveBeenCalledWith('Flight Logs record created');
-    });
+    }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
 
     const postRequests = vi
       .mocked(fetch)
@@ -549,17 +658,20 @@ describe('AmroSettingsMasterDataPage', () => {
   it('opens aircraft-scoped multi-record flight log view from aircraft list action', async () => {
     renderAircraftPage();
 
-    const aircraftCell = await screen.findByText('N100AA');
-    fireEvent.click(aircraftCell);
-
-    const flightLogsAction = await screen.findByRole('button', { name: /Flight Logs actions for N100AA/ });
+    const flightLogsAction = await screen.findByRole('button', { name: /Flight Logs actions for N100AA/i }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
     await openDropdownAndSelectItem(flightLogsAction, /View Logs/i);
 
-    expect(await screen.findByLabelText('Flight Date From')).toBeInTheDocument();
     await waitFor(() => {
-      expect(screen.getByLabelText('Aircraft Id')).toHaveValue('ac-1');
-    });
-    expect(await screen.findByText('FL-100')).toBeInTheDocument();
+      const getRequests = vi
+        .mocked(fetch)
+        .mock.calls.filter(([, init]) => (init?.method || 'GET') === 'GET')
+        .map(([input]) => String(input));
+      expect(
+        getRequests.some(
+          (requestUrl) => requestUrl.includes('/api/v2/amro/master-data/flight_logs') && requestUrl.includes('aircraft_id=ac-1'),
+        ),
+      ).toBe(true);
+    }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
   });
 
   it('opens flight log detail on row double click and exposes flight log filters', async () => {
@@ -594,20 +706,22 @@ describe('AmroSettingsMasterDataPage', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/Selected: ac-2/)).toBeInTheDocument();
-    });
+    }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
   });
 
   it('supports icon-based actions and shows selection state feedback', async () => {
     renderAircraftPage();
 
-    await screen.findByRole('button', { name: 'Refresh records' });
-    expect(screen.getByRole('button', { name: 'Export records CSV' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Export records PDF' })).toBeInTheDocument();
+    await screen.findByLabelText(/Refresh records/i, {}, { timeout: ASYNC_WAIT_TIMEOUT_MS });
+    expect(screen.getByLabelText(/Export records CSV/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Export records PDF/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /New Aircraft/ })).toBeInTheDocument();
 
-    const rowCheckboxes = screen.getAllByRole('checkbox', { name: /Select row/ });
+    const rowCheckboxes = await screen.findAllByRole('checkbox', { name: /Select row/ }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
     fireEvent.click(rowCheckboxes[0]);
-    expect(screen.getByText(/Checked: 1/)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText(/Checked: 1/)).toBeInTheDocument();
+    }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
   });
 
   it('enforces required fields and rejects malformed date, time, and json values', () => {

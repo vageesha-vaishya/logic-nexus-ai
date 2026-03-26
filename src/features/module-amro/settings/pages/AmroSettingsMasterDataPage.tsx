@@ -2231,12 +2231,14 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
         toast.error('Select an aircraft record first');
         return;
       }
-      setEntity('flight_logs');
-      setFlightAircraftFilter(normalizedAircraftId);
-      setSelectedId(null);
-      setPage(1);
+      const query = new URLSearchParams(location.search);
+      query.set('aircraft_id', normalizedAircraftId);
+      query.set('flight_aircraft', normalizedAircraftId);
+      query.delete('selected');
+      query.set('page', '1');
+      navigate(`/dashboard/amro/settings/master-data/${ENTITY_ROUTE_SEGMENT.flight_logs}?${query.toString()}`);
     },
-    [],
+    [location.search, navigate],
   );
 
   const openAircraftWorkPackageDialog = useCallback(() => {
