@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -47,10 +48,8 @@ import {
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
-  BookOpenCheck,
   CalendarDays,
   CheckSquare,
-  ClipboardList,
   Eye,
   FileCheck,
   FileDown,
@@ -59,7 +58,6 @@ import {
   ListChecks,
   Plus,
   RefreshCw,
-  ShieldCheck,
   TimerReset,
   Trash2,
   Users,
@@ -254,13 +252,12 @@ type AircraftWorkPackageSnapshot = {
   slaRisk: number;
 };
 
-type AircraftResearchPattern = {
-  platform: string;
-  layout: string;
-  validation: string;
-  workflow: string;
-  accessibility: string;
-  adoption: string;
+type AircraftPresenceCollaborator = {
+  id: string;
+  name: string;
+  role: string;
+  initials: string;
+  badgeClass: string;
 };
 
 const AIRCRAFT_NAV_RAIL = [
@@ -270,6 +267,21 @@ const AIRCRAFT_NAV_RAIL = [
   { label: 'Compliance', path: '/dashboard/amro/compliance' },
   { label: 'Task Execution', path: '/dashboard/amro/task-execution' },
   { label: 'Audit', path: '/dashboard/amro/audit' },
+] as const;
+
+const AIRCRAFT_PRESENCE_COLLABORATOR_POOL = [
+  { id: 'planner', name: 'Priya Nair', role: 'Maintenance Planner' },
+  { id: 'records', name: 'Liam Carter', role: 'Technical Records' },
+  { id: 'qa', name: 'Ana Flores', role: 'QA Inspector' },
+  { id: 'line', name: 'Marcus Allen', role: 'Line Maintenance' },
+  { id: 'ops', name: 'Noah Kim', role: 'Operations Control' },
+] as const;
+const AIRCRAFT_PRESENCE_BADGE_CLASSES = [
+  'bg-emerald-600',
+  'bg-sky-600',
+  'bg-violet-600',
+  'bg-amber-600',
+  'bg-rose-600',
 ] as const;
 
 const MANUFACTURER_SEED_NAMES = [
@@ -322,55 +334,6 @@ const AIRCRAFT_FORM_SECTION_FIELD_KEYS: Record<FormSectionKey, string[]> = {
   basic: ['tail_number', 'registration', 'serial_number', 'aircraft_type', 'manufacturer_id'],
   configuration: ['aircraft_model', 'configuration_code', 'maintenance_program', 'status'],
 };
-const AIRCRAFT_MASTER_RESEARCH_PATTERNS: AircraftResearchPattern[] = [
-  {
-    platform: 'SAP iMRO/4',
-    layout: 'Workbench-led layout with induction, planning, and execution in one operational context',
-    validation: 'Compliance, material readiness, and progress checkpoints are embedded before release flow',
-    workflow: 'Event-induction and progress controls reduce turnaround delays and improve planning rhythm',
-    accessibility: 'High-density cockpit style requires explicit keyboard focus and clear status emphasis',
-    adoption: 'AMRO uses progress-centric panels and quick actions tied to aircraft context',
-  },
-  {
-    platform: 'IBM Maximo Aviation',
-    layout: 'Task-card and work-package structure with technical records aligned to planning applications',
-    validation: 'Task-card consistency and maintenance-library checks support recurring compliance workflows',
-    workflow: 'Library-driven maintenance planning keeps operator programs and fleet records synchronized',
-    accessibility: 'Action-first screens benefit from predictable tab order and concise error prompts',
-    adoption: 'AMRO emphasizes guided create flow with inline validation and readiness indicators',
-  },
-  {
-    platform: 'Oracle Aviation MRO',
-    layout: 'Role-guided workbenches with deep planning, forecasting, and compliance visibility',
-    validation: 'Regulatory and configuration checks are enforced with audit-oriented data traceability',
-    workflow: 'Forecasting plus package planning links technical records, materials, and schedule windows',
-    accessibility: 'Complex journeys need contextual guidance and progressive disclosure to reduce overload',
-    adoption: 'AMRO maps fields by role sensitivity and keeps focused tab sections by task intent',
-  },
-  {
-    platform: 'Ramco Aviation',
-    layout: 'Persona-aware, mobile-friendly workspace with planning and execution shortcuts',
-    validation: 'Catalog and relationship mapping support reliable downstream reporting and fewer mismatches',
-    workflow: 'Digital and mobile workflows accelerate updates from line maintenance to planning teams',
-    accessibility: 'Usability-forward approach favors clear controls, fast actions, and low-friction navigation',
-    adoption: 'AMRO adds smart defaults, autosave, and rapid quick-action surfaces for operators',
-  },
-  {
-    platform: 'OASES MRO',
-    layout: 'Compact connected modules with unified records and grid-plus-form operational updates',
-    validation: 'Detailed auditable records and traceability-first data model strengthen compliance evidence',
-    workflow: 'Single connected data flow supports planning, execution, inventory, and reporting continuity',
-    accessibility: 'Simple consistent interaction patterns improve learnability across mixed user profiles',
-    adoption: 'AMRO keeps a compact benchmark card, audit visibility, and integrated training checklist',
-  },
-];
-const AIRCRAFT_RESEARCH_BEST_PRACTICES = [
-  'Use role-guided multi-step forms with visible completion progress.',
-  'Keep validation inline and pair every error with corrective guidance.',
-  'Prefer compact dashboard cards for aircraft identity, risk, and readiness.',
-  'Combine grid speed with form depth using tabbed and collapsible sections.',
-  'Expose audit evidence, training guidance, and test checklist near the workflow.',
-] as const;
 const AIRCRAFT_FIELD_HELP: Partial<Record<string, string>> = {
   tail_number: 'Use 3-12 uppercase letters, numbers, or hyphen.',
   registration: 'Registration should align with authority records and paint scheme.',
@@ -892,6 +855,42 @@ function getInitialFormValues(entity: MasterEntity): FormValues {
   return { ...ENTITY_DEFAULT_VALUES[entity] };
 }
 
+function computePresenceHash(value: string): number {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash << 5) - hash + value.charCodeAt(index);
+    hash |= 0;
+  }
+  return Math.abs(hash);
+}
+
+function getInitials(value: string): string {
+  const tokens = value
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (!tokens.length) return 'NA';
+  if (tokens.length === 1) return tokens[0].slice(0, 2).toUpperCase();
+  return `${tokens[0][0] || ''}${tokens[1][0] || ''}`.toUpperCase();
+}
+
+function buildAircraftPresenceCollaborators(row: RecordRow): AircraftPresenceCollaborator[] {
+  const seed = `${String(row.id || '')}|${String(row.tail_number || '')}|${String(row.registration || '')}`;
+  const hash = computePresenceHash(seed);
+  const collaboratorCount = (hash % 3) + 1;
+  return Array.from({ length: collaboratorCount }, (_, index) => {
+    const collaborator = AIRCRAFT_PRESENCE_COLLABORATOR_POOL[(hash + index * 7) % AIRCRAFT_PRESENCE_COLLABORATOR_POOL.length];
+    const badgeClass = AIRCRAFT_PRESENCE_BADGE_CLASSES[(hash + index * 11) % AIRCRAFT_PRESENCE_BADGE_CLASSES.length];
+    return {
+      id: `${collaborator.id}-${index}`,
+      name: collaborator.name,
+      role: collaborator.role,
+      initials: getInitials(collaborator.name),
+      badgeClass,
+    };
+  });
+}
+
 function asInputString(value: unknown): string {
   if (value === null || value === undefined) return '';
   return typeof value === 'string' ? value : String(value);
@@ -1220,6 +1219,7 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
   );
   const [aircraftFormDraftStatus, setAircraftFormDraftStatus] = useState<'idle' | 'restored' | 'saved'>('idle');
   const [aircraftFormLastSavedAt, setAircraftFormLastSavedAt] = useState('');
+  const [lastCollaborationPingAt, setLastCollaborationPingAt] = useState(new Date().toISOString());
   const canCreateWorkPackage = hasPermission('create_maintenance_request');
   const canScheduleWorkPackage = hasPermission('edit_aircraft_records');
   const canExportAircraftOps = hasPermission('delete_flight_logs');
@@ -1494,8 +1494,12 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
   }, [entity, loadAssemblyModelOptions, modalOpen]);
 
   useEffect(() => {
-    navigate(`/dashboard/amro/settings/master-data/${ENTITY_ROUTE_SEGMENT[entity]}${location.search}`, { replace: true });
-  }, [entity, location.search, navigate]);
+    const targetPathname = `/dashboard/amro/settings/master-data/${ENTITY_ROUTE_SEGMENT[entity]}`;
+    if (location.pathname === targetPathname) {
+      return;
+    }
+    navigate(`${targetPathname}${location.search}`, { replace: true });
+  }, [entity, location.pathname, location.search, navigate]);
 
   useEffect(() => {
     const next = new URLSearchParams();
@@ -1517,8 +1521,23 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
         next.set(`cf_${column}`, value.trim());
       }
     });
+    const toSortedQueryString = (params: URLSearchParams) =>
+      Array.from(params.entries())
+        .sort(([leftKey, leftValue], [rightKey, rightValue]) => {
+          if (leftKey === rightKey) {
+            return leftValue.localeCompare(rightValue);
+          }
+          return leftKey.localeCompare(rightKey);
+        })
+        .map(([key, value]) => `${key}=${value}`)
+        .join('&');
+    const nextQuery = toSortedQueryString(next);
+    const currentQuery = toSortedQueryString(searchParams);
+    if (nextQuery === currentQuery) {
+      return;
+    }
     setSearchParams(next, { replace: true });
-  }, [columnFilters, entity, flightAircraftFilter, flightDateFrom, flightDateTo, flightPilotFilter, flightRegistrationFilter, flightNumberFilter, page, pageSize, search, selectedId, setSearchParams, sortColumn, sortDirection, statusFilter]);
+  }, [columnFilters, entity, flightAircraftFilter, flightDateFrom, flightDateTo, flightPilotFilter, flightRegistrationFilter, flightNumberFilter, page, pageSize, search, searchParams, selectedId, setSearchParams, sortColumn, sortDirection, statusFilter]);
 
   useEffect(() => {
     const selectedFromUrl = searchParams.get('selected');
@@ -1923,6 +1942,47 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
     const preview = buildPayloadFromForm('aircraft', formValues);
     return { errorCount: Object.keys(preview.errors).length };
   }, [entity, formValues]);
+  const aircraftSectionProgress = useMemo(() => {
+    if (entity !== 'aircraft') {
+      return {
+        basic: { completed: 0, total: 0 },
+        configuration: { completed: 0, total: 0 },
+      };
+    }
+    const buildProgress = (fields: EntityFormField[]) => {
+      const required = fields.filter((field) => field.required);
+      const completed = required.filter((field) => !isBlank(formValues[field.key])).length;
+      return { completed, total: required.length };
+    };
+    return {
+      basic: buildProgress(basicSectionFields),
+      configuration: buildProgress(configurationSectionFields),
+    };
+  }, [basicSectionFields, configurationSectionFields, entity, formValues]);
+  const aircraftAuditTimeline = useMemo(() => {
+    if (entity !== 'aircraft') {
+      return [] as Array<{ label: string; value: string }>;
+    }
+    return [
+      { label: 'Created', value: String(selectedRow?.created_at || 'Not available') },
+      { label: 'Updated', value: String(selectedRow?.updated_at || 'Not available') },
+      {
+        label: 'Draft Status',
+        value:
+          aircraftFormDraftStatus === 'idle'
+            ? 'No draft in session'
+            : `${aircraftFormDraftStatus === 'restored' ? 'Restored' : 'Saved'} ${aircraftFormLastSavedAt ? new Date(aircraftFormLastSavedAt).toLocaleString() : ''}`,
+      },
+    ];
+  }, [aircraftFormDraftStatus, aircraftFormLastSavedAt, entity, selectedRow?.created_at, selectedRow?.updated_at]);
+  const collaborationIndicator = useMemo(() => {
+    const activeEditors = Math.max(1, selectedRowIds.length || 1);
+    return {
+      activeEditors,
+      status: loading ? 'Syncing' : 'Live',
+      lastSeen: new Date(lastCollaborationPingAt).toLocaleTimeString(),
+    };
+  }, [lastCollaborationPingAt, loading, selectedRowIds.length]);
   const tabSequence: Array<'basic' | 'configuration' | 'system'> = ['basic', 'configuration', 'system'];
   const cycleFormTab = useCallback(
     (direction: 'next' | 'prev') => {
@@ -2130,6 +2190,12 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
 
   const renderedRows = supportsColumnFilters ? filteredRows : rows;
   const renderedRowIds = useMemo(() => renderedRows.map((row) => row.id), [renderedRows]);
+  const aircraftPresenceByRowId = useMemo(() => {
+    if (entity !== 'aircraft') {
+      return {} as Record<string, AircraftPresenceCollaborator[]>;
+    }
+    return Object.fromEntries(renderedRows.map((row) => [row.id, buildAircraftPresenceCollaborators(row)]));
+  }, [entity, renderedRows]);
   const renderedRowIdSet = useMemo(() => new Set(renderedRowIds), [renderedRowIds]);
 
   const aircraftHeaderColumns = useMemo(() => tableColumns, [tableColumns]);
@@ -2344,6 +2410,16 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [handleExport, handleOpenCreateModal, loadRecords]);
+
+  useEffect(() => {
+    if (!modalOpen || entity !== 'aircraft') {
+      return;
+    }
+    const timer = window.setInterval(() => {
+      setLastCollaborationPingAt(new Date().toISOString());
+    }, 30000);
+    return () => window.clearInterval(timer);
+  }, [entity, modalOpen]);
 
   const handleSubmitModal = useCallback(async () => {
     const ok = modalMode === 'create' ? await handleCreate() : await handleUpdate();
@@ -3126,65 +3202,6 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
             </CardContent>
           </Card>
         ) : null}
-        {entity === 'aircraft' && aircraftEnhancementEnabled ? (
-          <Card className="mdm-template-panel">
-            <CardHeader className="mdm-template-panel-head">
-              <CardTitle className="mdm-template-panel-title">Aircraft Master Data Benchmark and Delivery Guides</CardTitle>
-            </CardHeader>
-            <CardContent className="mdm-template-panel-body space-y-4">
-              <div className="grid gap-4 lg:grid-cols-2">
-                <div className="space-y-2 rounded-md border border-[hsl(var(--mdm-template-border))] p-4">
-                  <p className="inline-flex items-center gap-2 text-[13px] font-semibold text-[hsl(var(--mdm-template-heading))]">
-                    <BookOpenCheck className="h-4 w-4" />
-                    World-Class MRO Patterns
-                  </p>
-                  {AIRCRAFT_MASTER_RESEARCH_PATTERNS.map((entry) => (
-                    <div key={entry.platform} className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-muted/20 p-2 text-[12px]">
-                      <p className="font-semibold text-[hsl(var(--mdm-template-heading))]">{entry.platform}</p>
-                      <p className="text-[hsl(var(--mdm-template-muted))]"><span className="font-medium text-[hsl(var(--mdm-template-heading))]">Layout:</span> {entry.layout}</p>
-                      <p className="text-[hsl(var(--mdm-template-muted))]"><span className="font-medium text-[hsl(var(--mdm-template-heading))]">Validation:</span> {entry.validation}</p>
-                      <p className="text-[hsl(var(--mdm-template-muted))]"><span className="font-medium text-[hsl(var(--mdm-template-heading))]">Workflow:</span> {entry.workflow}</p>
-                      <p className="text-[hsl(var(--mdm-template-muted))]"><span className="font-medium text-[hsl(var(--mdm-template-heading))]">Accessibility:</span> {entry.accessibility}</p>
-                      <p className="text-[hsl(var(--mdm-template-muted))]"><span className="font-medium text-[hsl(var(--mdm-template-heading))]">AMRO Adoption:</span> {entry.adoption}</p>
-                    </div>
-                  ))}
-                </div>
-                <div className="space-y-3 rounded-md border border-[hsl(var(--mdm-template-border))] p-4">
-                  <div className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-muted/20 p-3">
-                    <p className="inline-flex items-center gap-2 text-[13px] font-semibold text-[hsl(var(--mdm-template-heading))]">
-                      <FileCheck className="h-4 w-4" />
-                      Comparative Best Practices
-                    </p>
-                    <div className="space-y-1 pt-1">
-                      {AIRCRAFT_RESEARCH_BEST_PRACTICES.map((item) => (
-                        <p key={item} className="text-[12px] text-[hsl(var(--mdm-template-muted))]">• {item}</p>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-muted/20 p-3">
-                    <p className="inline-flex items-center gap-2 text-[13px] font-semibold text-[hsl(var(--mdm-template-heading))]">
-                      <ClipboardList className="h-4 w-4" />
-                      User Training Guide
-                    </p>
-                    <p className="text-[12px] text-[hsl(var(--mdm-template-muted))]">
-                      Step flow: create aircraft profile → validate required fields → verify model/manufacturer linkage → save and review snapshot.
-                    </p>
-                  </div>
-                  <div className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-muted/20 p-3">
-                    <p className="inline-flex items-center gap-2 text-[13px] font-semibold text-[hsl(var(--mdm-template-heading))]">
-                      <ShieldCheck className="h-4 w-4" />
-                      Testing Checklist
-                    </p>
-                    <p className="text-[12px] text-[hsl(var(--mdm-template-muted))]">
-                      Validate required completion, tail/serial format, manufacturer-model consistency, autosave recovery, and role-based work package actions.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ) : null}
-
         <Card className="mdm-template-panel">
           <CardHeader className="mdm-template-panel-head">
             <CardTitle className="mdm-template-panel-title">{ENTITY_LABEL[entity]} Search and Filter</CardTitle>
@@ -3408,6 +3425,24 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
                                   </DropdownMenuItem>
                                 </DropdownMenuContent>
                               </DropdownMenu>
+                              <div
+                                className="flex items-center -space-x-2"
+                                role="group"
+                                aria-label={`Collaborators for aircraft ${String(row.tail_number || row.registration || row.id)}`}
+                              >
+                                {(aircraftPresenceByRowId[row.id] || []).map((collaborator) => (
+                                  <Tooltip key={`${row.id}-${collaborator.id}`}>
+                                    <TooltipTrigger asChild>
+                                      <Avatar className={cn('h-7 w-7 border-2 border-white', collaborator.badgeClass)}>
+                                        <AvatarFallback className={cn('text-[10px] font-semibold text-white', collaborator.badgeClass)}>
+                                          {collaborator.initials}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                    </TooltipTrigger>
+                                    <TooltipContent>{collaborator.name} · {collaborator.role}</TooltipContent>
+                                  </Tooltip>
+                                ))}
+                              </div>
                             </div>
                           </TableCell>
                         ) : null}
@@ -3566,7 +3601,10 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
                     </p>
                     <div className="flex items-center gap-2 text-[11px] text-[hsl(var(--mdm-template-muted))]">
                       <Users className="h-3.5 w-3.5" />
-                      <span>Collaboration: {selectedRowIds.length > 1 ? 'Batch Review' : 'Single Record'}</span>
+                      <span>
+                        Collaboration: {collaborationIndicator.status} · {collaborationIndicator.activeEditors} active
+                      </span>
+                      <span>Last sync {collaborationIndicator.lastSeen}</span>
                       {aircraftFormDraftStatus !== 'idle' ? (
                         <span>
                           Draft {aircraftFormDraftStatus === 'restored' ? 'restored' : 'saved'} {aircraftFormLastSavedAt ? new Date(aircraftFormLastSavedAt).toLocaleTimeString() : ''}
@@ -3607,7 +3645,7 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
                   data-state={activeFormTab === 'basic' ? 'active' : 'inactive'}
                   onClick={() => setActiveFormTab('basic')}
                 >
-                  Basic Information
+                  Basic Information ({aircraftSectionProgress.basic.completed}/{aircraftSectionProgress.basic.total})
                 </button>
                 <button
                   type="button"
@@ -3619,7 +3657,7 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
                   data-state={activeFormTab === 'configuration' ? 'active' : 'inactive'}
                   onClick={() => setActiveFormTab('configuration')}
                 >
-                  Configuration Settings
+                  Configuration Settings ({aircraftSectionProgress.configuration.completed}/{aircraftSectionProgress.configuration.total})
                 </button>
                 <button
                   type="button"
@@ -3699,6 +3737,19 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
                   ) : null}
                 </div>
               )}
+              {entity === 'aircraft' ? (
+                <div className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-muted/20 p-3">
+                  <p className="text-[12px] font-semibold text-[hsl(var(--mdm-template-heading))]">Audit Trail Summary</p>
+                  <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                    {aircraftAuditTimeline.map((item) => (
+                      <div key={item.label} className="rounded border border-[hsl(var(--mdm-template-border))] bg-background px-2 py-1">
+                        <p className="text-[10px] text-[hsl(var(--mdm-template-muted))]">{item.label}</p>
+                        <p className="text-[11px] text-[hsl(var(--mdm-template-heading))]">{item.value}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
               <div className="flex flex-wrap items-center justify-end gap-3 border-t border-[hsl(var(--mdm-template-border))] pt-4">
                 <Button variant="outline" onClick={() => setModalOpen(false)}>Cancel</Button>
                 {entity === 'aircraft' ? (

@@ -50,9 +50,14 @@ vi.mock('sonner', () => ({
 }));
 
 describe('AmroSettingsMasterDataPage', () => {
+  const memoryRouterFuture = {
+    v7_startTransition: true,
+    v7_relativeSplatPath: true,
+  } as const;
+
   const renderAircraftPage = () =>
     render(
-      <MemoryRouter initialEntries={['/dashboard/amro/settings/master-data/aircraft']}>
+      <MemoryRouter initialEntries={['/dashboard/amro/settings/master-data/aircraft']} future={memoryRouterFuture}>
         <Routes>
           <Route path="/dashboard/amro/settings/master-data/:entity" element={<AmroSettingsMasterDataPage />} />
         </Routes>
@@ -60,12 +65,22 @@ describe('AmroSettingsMasterDataPage', () => {
     );
   const renderFlightLogsPage = () =>
     render(
-      <MemoryRouter initialEntries={['/dashboard/amro/settings/master-data/flight-logs']}>
+      <MemoryRouter initialEntries={['/dashboard/amro/settings/master-data/flight-logs']} future={memoryRouterFuture}>
         <Routes>
           <Route path="/dashboard/amro/settings/master-data/:entity" element={<AmroSettingsMasterDataPage />} />
         </Routes>
       </MemoryRouter>,
     );
+
+  const openDropdownAndSelectItem = async (trigger: HTMLElement, itemName: RegExp) => {
+    fireEvent.pointerDown(trigger);
+    fireEvent.click(trigger);
+    if (!screen.queryByRole('menuitem', { name: itemName })) {
+      fireEvent.keyDown(trigger, { key: 'Enter' });
+    }
+    const menuItem = await screen.findByRole('menuitem', { name: itemName });
+    fireEvent.click(menuItem);
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -393,7 +408,7 @@ describe('AmroSettingsMasterDataPage', () => {
 
   it('renders manufacturer and assembly type dropdown options for model creation', async () => {
     render(
-      <MemoryRouter initialEntries={['/dashboard/amro/settings/master-data/model']}>
+      <MemoryRouter initialEntries={['/dashboard/amro/settings/master-data/model']} future={memoryRouterFuture}>
         <Routes>
           <Route path="/dashboard/amro/settings/master-data/:entity" element={<AmroSettingsMasterDataPage />} />
         </Routes>
@@ -414,7 +429,7 @@ describe('AmroSettingsMasterDataPage', () => {
 
   it('hydrates entity state from kebab-case route segments', async () => {
     render(
-      <MemoryRouter initialEntries={['/dashboard/amro/settings/master-data/parts-inventory']}>
+      <MemoryRouter initialEntries={['/dashboard/amro/settings/master-data/parts-inventory']} future={memoryRouterFuture}>
         <Routes>
           <Route path="/dashboard/amro/settings/master-data/:entity" element={<AmroSettingsMasterDataPage />} />
         </Routes>
@@ -488,8 +503,7 @@ describe('AmroSettingsMasterDataPage', () => {
     renderAircraftPage();
 
     const flightLogsAction = await screen.findByRole('button', { name: /Flight Logs actions for N100AA/ });
-    fireEvent.pointerDown(flightLogsAction);
-    fireEvent.click(await screen.findByRole('menuitem', { name: /Add Log/i }));
+    await openDropdownAndSelectItem(flightLogsAction, /Add Log/i);
 
     expect(await screen.findByRole('heading', { name: /Add Flight Logs \(Aircraft:/ })).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Departure Airport'), { target: { value: 'DEL' } });
@@ -535,9 +549,11 @@ describe('AmroSettingsMasterDataPage', () => {
   it('opens aircraft-scoped multi-record flight log view from aircraft list action', async () => {
     renderAircraftPage();
 
+    const aircraftCell = await screen.findByText('N100AA');
+    fireEvent.click(aircraftCell);
+
     const flightLogsAction = await screen.findByRole('button', { name: /Flight Logs actions for N100AA/ });
-    fireEvent.pointerDown(flightLogsAction);
-    fireEvent.click(await screen.findByRole('menuitem', { name: /View Logs/i }));
+    await openDropdownAndSelectItem(flightLogsAction, /View Logs/i);
 
     expect(await screen.findByLabelText('Flight Date From')).toBeInTheDocument();
     await waitFor(() => {
@@ -548,7 +564,7 @@ describe('AmroSettingsMasterDataPage', () => {
 
   it('opens flight log detail on row double click and exposes flight log filters', async () => {
     render(
-      <MemoryRouter initialEntries={['/dashboard/amro/settings/master-data/flight-logs']}>
+      <MemoryRouter initialEntries={['/dashboard/amro/settings/master-data/flight-logs']} future={memoryRouterFuture}>
         <Routes>
           <Route path="/dashboard/amro/settings/master-data/:entity" element={<AmroSettingsMasterDataPage />} />
         </Routes>
@@ -569,7 +585,7 @@ describe('AmroSettingsMasterDataPage', () => {
 
   it('hydrates selected row from deep link query parameter', async () => {
     render(
-      <MemoryRouter initialEntries={['/dashboard/amro/settings/master-data/aircraft?selected=ac-2']}>
+      <MemoryRouter initialEntries={['/dashboard/amro/settings/master-data/aircraft?selected=ac-2']} future={memoryRouterFuture}>
         <Routes>
           <Route path="/dashboard/amro/settings/master-data/:entity" element={<AmroSettingsMasterDataPage />} />
         </Routes>
