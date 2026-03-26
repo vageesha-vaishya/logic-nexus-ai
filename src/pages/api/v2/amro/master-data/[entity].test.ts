@@ -132,6 +132,137 @@ describe('/api/v2/amro/master-data/[entity]', () => {
     expect((res.jsonBody as any)?.output?.entity).toBe('aircraft');
   });
 
+  it('accepts hyphenated flight logs entity route segment', async () => {
+    const eqTenantMock = vi.fn();
+    const eqDeletedMock = vi.fn().mockResolvedValue({
+      data: [{ id: 'fl-1', aircraft_id: 'ac-1', is_deleted: false }],
+      count: 1,
+      error: null,
+    });
+    eqTenantMock.mockReturnValue({ eq: eqDeletedMock });
+    const rangeMock = vi.fn().mockReturnValue({ eq: eqTenantMock });
+    const orderMock = vi.fn().mockReturnValue({ range: rangeMock });
+    const selectMock = vi.fn().mockReturnValue({ order: orderMock });
+    const aircraftEnrichIn = vi.fn().mockResolvedValue({
+      data: [{ id: 'ac-1', tail_number: 'N100AA', status: 'active' }],
+      error: null,
+    });
+    const aircraftEnrichEqTenant = vi.fn().mockReturnValue({ in: aircraftEnrichIn });
+    const aircraftEnrichSelect = vi.fn().mockReturnValue({ eq: aircraftEnrichEqTenant });
+    const fromMock = vi
+      .fn()
+      .mockReturnValueOnce({ select: selectMock })
+      .mockReturnValueOnce({ select: aircraftEnrichSelect });
+    vi.mocked(getSupabaseAdminClient).mockReturnValue({
+      from: fromMock,
+    } as any);
+
+    const req: ApiRequest = {
+      method: 'GET',
+      query: {
+        entity: 'flight-logs',
+        page: '1',
+        page_size: '25',
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(fromMock).toHaveBeenCalledWith('flight_logs');
+    expect(eqTenantMock).toHaveBeenCalledWith('tenant_id', 'tenant-1');
+    expect(eqDeletedMock).toHaveBeenCalledWith('is_deleted', false);
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.output?.entity).toBe('flight_logs');
+  });
+
+  it('filters flight logs by date range, pilot, flight number, and aircraft registration', async () => {
+    const flightLogsResolve = vi.fn().mockResolvedValue({
+      data: [
+        {
+          id: 'fl-1',
+          tenant_id: 'tenant-1',
+          aircraft_id: 'ac-1',
+          flight_date: '2026-03-01',
+          flight_number: 'LN100',
+          pilot_name: 'Jane Doe',
+          is_deleted: false,
+        },
+      ],
+      count: 1,
+      error: null,
+    });
+    const flightLogsIn = vi.fn().mockReturnValue({ or: flightLogsResolve });
+    const flightLogsIlikeFlight = vi.fn().mockReturnValue({ in: flightLogsIn });
+    const flightLogsIlikePilot = vi.fn().mockReturnValue({ ilike: flightLogsIlikeFlight });
+    const flightLogsLte = vi.fn().mockReturnValue({ ilike: flightLogsIlikePilot });
+    const flightLogsGte = vi.fn().mockReturnValue({ lte: flightLogsLte });
+    const flightLogsEqDeleted = vi.fn().mockReturnValue({ gte: flightLogsGte });
+    const flightLogsEqTenant = vi.fn().mockReturnValue({ eq: flightLogsEqDeleted });
+    const flightLogsRange = vi.fn().mockReturnValue({ eq: flightLogsEqTenant });
+    const flightLogsOrder = vi.fn().mockReturnValue({ range: flightLogsRange });
+    const flightLogsSelect = vi.fn().mockReturnValue({ order: flightLogsOrder });
+
+    const aircraftRegistrationResolve = vi.fn().mockResolvedValue({
+      data: [{ id: 'ac-1' }],
+      error: null,
+    });
+    const aircraftRegistrationIlike = vi.fn().mockReturnValue({ or: aircraftRegistrationResolve });
+    const aircraftRegistrationEqTenant = vi.fn().mockReturnValue({ ilike: aircraftRegistrationIlike });
+    const aircraftRegistrationSelect = vi.fn().mockReturnValue({ eq: aircraftRegistrationEqTenant });
+
+    const aircraftEnrichIn = vi.fn().mockResolvedValue({
+      data: [{ id: 'ac-1', tail_number: 'N900LN', status: 'active' }],
+      error: null,
+    });
+    const aircraftEnrichEqTenant = vi.fn().mockReturnValue({ in: aircraftEnrichIn });
+    const aircraftEnrichSelect = vi.fn().mockReturnValue({ eq: aircraftEnrichEqTenant });
+
+    const fromMock = vi
+      .fn()
+      .mockReturnValueOnce({ select: aircraftRegistrationSelect })
+      .mockReturnValueOnce({ select: flightLogsSelect })
+      .mockReturnValueOnce({ select: aircraftEnrichSelect });
+    vi.mocked(getSupabaseAdminClient).mockReturnValue({
+      from: fromMock,
+    } as any);
+    vi.mocked(resolveAndApplyAccessContext).mockResolvedValue({
+      userId: 'user-1',
+      tenantId: 'tenant-1',
+      franchiseId: 'franchise-1',
+      isPlatformAdmin: false,
+      adminOverrideEnabled: false,
+    } as any);
+
+    const req: ApiRequest = {
+      method: 'GET',
+      query: {
+        entity: 'flight_logs',
+        page: '1',
+        page_size: '25',
+        flight_from: '2026-03-01',
+        flight_to: '2026-03-31',
+        pilot_name: 'Jane',
+        flight_number: 'LN',
+        aircraft_registration: 'N900',
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(flightLogsGte).toHaveBeenCalledWith('flight_date', '2026-03-01');
+    expect(flightLogsLte).toHaveBeenCalledWith('flight_date', '2026-03-31');
+    expect(flightLogsIlikePilot).toHaveBeenCalledWith('pilot_name', '%Jane%');
+    expect(flightLogsIlikeFlight).toHaveBeenCalledWith('flight_number', '%LN%');
+    expect(flightLogsIn).toHaveBeenCalledWith('aircraft_id', ['ac-1']);
+    expect((res.jsonBody as any)?.output?.records?.[0]?.aircraft_registration).toBe('N900LN');
+    expect((res.jsonBody as any)?.output?.records?.[0]?.aircraft_status).toBe('active');
+    expect(res.statusCode).toBe(200);
+  });
+
   it('applies tenant scoping to master data queries', async () => {
     const eqMock = vi.fn().mockResolvedValue({
       data: [{ id: 'man-1', manufacturer_code: 'BOE', name: 'Boeing', is_active: true }],

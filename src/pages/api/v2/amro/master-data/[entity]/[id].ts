@@ -263,7 +263,18 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
 
     if (req.method === 'DELETE') {
       enforceAnyPermission(auth.permissions || [], ['edit_aircraft_records']);
-      const deleteQuery = supabase.from(entityConfig.table).delete().eq('id', id);
+      const deleteQuery =
+        entity === 'flight_logs'
+          ? supabase
+              .from(entityConfig.table)
+              .update({
+                is_deleted: true,
+                deleted_at: new Date().toISOString(),
+                deleted_by: auth.userId,
+                updated_by: auth.userId,
+              })
+              .eq('id', id)
+          : supabase.from(entityConfig.table).delete().eq('id', id);
       const { error } = await deleteQuery.eq('tenant_id', tenantId);
       if (error) throw new HttpError(error.message, 400);
       await writeAuditRecord({

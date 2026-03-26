@@ -121,9 +121,13 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     const crewDetails = parseOptionalString(body.crew_details);
     const fuelBurnKg = parseNumericValue(body.fuel_burn_kg, 'fuel_burn_kg', 0);
     const oilUpliftLiters = parseNumericValue(body.oil_uplift_liters, 'oil_uplift_liters', 0);
+    const pilotName = parseOptionalString(body.pilot_name);
     const pirepDiscrepancy = parseOptionalString(body.pirep_discrepancy);
     const regulatoryAuthority = parseOptionalString(body.regulatory_authority);
-    const metadata = parseMetadata(body.metadata);
+    const metadata = {
+      ...parseMetadata(body.metadata),
+      ...(pilotName ? { pilot_name: pilotName } : {}),
+    };
 
     if (departureAirport === arrivalAirport) {
       throw new Error('departure_airport and arrival_airport must be different');
@@ -157,6 +161,18 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       throw new Error(error.message || 'Failed to record flight log');
     }
 
+    const flightLogId = data && typeof data === 'object' ? String((data as Record<string, unknown>).flight_log_id || '').trim() : '';
+    if (pilotName && flightLogId) {
+      const { error: pilotUpdateError } = await supabase
+        .from('flight_logs')
+        .update({ pilot_name: pilotName, updated_by: userId })
+        .eq('id', flightLogId)
+        .eq('tenant_id', tenantId);
+      if (pilotUpdateError) {
+        throw new Error(pilotUpdateError.message || 'Failed to save pilot name');
+      }
+    }
+
     await supabase.from('maintenance_events').insert({
       tenant_id: tenantId,
       franchise_id: franchiseId,
@@ -171,6 +187,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         flight_number: flightNumber,
         departure_airport: departureAirport,
         arrival_airport: arrivalAirport,
+        pilot_name: pilotName,
         flight_hours: flightHours,
         block_hours: blockHours,
         flight_cycles: flightCycles,

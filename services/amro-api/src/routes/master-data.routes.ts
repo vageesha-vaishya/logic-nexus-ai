@@ -16,6 +16,7 @@ type AssemblyReferenceRecord = {
 
 type MasterEntity =
   | 'aircraft'
+  | 'flight_logs'
   | 'parts_inventory'
   | 'suppliers'
   | 'maintenance_facilities'
@@ -79,6 +80,31 @@ const ENTITY_CONFIG: Record<MasterEntity, EntityConfig> = {
       'current_cycles_since_new',
     ],
     defaultSortColumn: 'updated_at',
+  },
+  flight_logs: {
+    table: 'flight_logs',
+    searchableColumns: ['flight_number', 'departure_airport', 'arrival_airport', 'pilot_name', 'regulatory_authority'],
+    listColumns:
+      'id,tenant_id,franchise_id,aircraft_id,flight_date,flight_number,departure_airport,arrival_airport,pilot_name,flight_hours,block_hours,flight_cycles,crew_details,fuel_burn_kg,oil_uplift_liters,pirep_discrepancy,regulatory_authority,is_deleted,deleted_at,deleted_by,metadata,created_at,updated_at,created_by,updated_by',
+    requiredCreateFields: ['aircraft_id', 'flight_date', 'departure_airport', 'arrival_airport'],
+    writeAllowedFields: [
+      'aircraft_id',
+      'flight_date',
+      'flight_number',
+      'departure_airport',
+      'arrival_airport',
+      'pilot_name',
+      'flight_hours',
+      'block_hours',
+      'flight_cycles',
+      'crew_details',
+      'fuel_burn_kg',
+      'oil_uplift_liters',
+      'pirep_discrepancy',
+      'regulatory_authority',
+      'metadata',
+    ],
+    defaultSortColumn: 'flight_date',
   },
   parts_inventory: {
     table: 'parts_inventory',
@@ -332,7 +358,9 @@ function firstQueryValue(value: unknown): string {
 }
 
 function resolveEntity(rawEntity: unknown): MasterEntity {
-  const entity = asString(rawEntity).toLowerCase() as MasterEntity;
+  const entity = asString(rawEntity)
+    .toLowerCase()
+    .replace(/[-\s]+/g, '_') as MasterEntity;
   if (!ENTITY_CONFIG[entity]) {
     throw new HttpError('Unsupported master data entity', 404);
   }
@@ -543,6 +571,26 @@ function normalizePartsInventory(payload: JsonRecord): JsonRecord {
   };
 }
 
+function normalizeFlightLog(payload: JsonRecord): JsonRecord {
+  return {
+    aircraft_id: asString(payload.aircraft_id),
+    flight_date: asDateString(payload.flight_date) || '',
+    flight_number: asNullableString(payload.flight_number),
+    departure_airport: asString(payload.departure_airport),
+    arrival_airport: asString(payload.arrival_airport),
+    pilot_name: asNullableString(payload.pilot_name),
+    flight_hours: asNumber(payload.flight_hours) ?? 0,
+    block_hours: asNumber(payload.block_hours) ?? 0,
+    flight_cycles: asNumber(payload.flight_cycles) ?? 0,
+    crew_details: asNullableString(payload.crew_details),
+    fuel_burn_kg: asNumber(payload.fuel_burn_kg) ?? 0,
+    oil_uplift_liters: asNumber(payload.oil_uplift_liters) ?? 0,
+    pirep_discrepancy: asNullableString(payload.pirep_discrepancy),
+    regulatory_authority: asNullableString(payload.regulatory_authority),
+    metadata: asJsonObject(payload.metadata),
+  };
+}
+
 function normalizeSupplier(payload: JsonRecord): JsonRecord {
   return {
     supplier_code: asString(payload.supplier_code),
@@ -665,6 +713,7 @@ function normalizeWorkPackageTemplate(payload: JsonRecord): JsonRecord {
 
 function normalizePayload(entity: MasterEntity, payload: JsonRecord): JsonRecord {
   if (entity === 'aircraft') return normalizeAircraft(payload);
+  if (entity === 'flight_logs') return normalizeFlightLog(payload);
   if (entity === 'parts_inventory') return normalizePartsInventory(payload);
   if (entity === 'suppliers') return normalizeSupplier(payload);
   if (entity === 'maintenance_facilities') return normalizeMaintenanceFacility(payload);

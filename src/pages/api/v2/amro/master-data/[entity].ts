@@ -345,6 +345,95 @@ function isValidationOnly(req: ApiRequest, body: Record<string, unknown>): boole
   return bodyFlag === 'true' || bodyFlag === '1' || bodyFlag === 'yes' || bodyFlag === 'on';
 }
 
+type FlightLogQueryFilters = {
+  flightFrom: string | null;
+  flightTo: string | null;
+  aircraftId: string | null;
+  pilotName: string | null;
+  flightNumber: string | null;
+  aircraftRegistration: string | null;
+};
+
+function parseFlightLogQueryFilters(req: ApiRequest): FlightLogQueryFilters {
+  return {
+    flightFrom: asNullableString(req.query.flight_from),
+    flightTo: asNullableString(req.query.flight_to),
+    aircraftId: asNullableString(req.query.aircraft_id),
+    pilotName: asNullableString(req.query.pilot_name),
+    flightNumber: asNullableString(req.query.flight_number),
+    aircraftRegistration: asNullableString(req.query.aircraft_registration),
+  };
+}
+
+async function resolveAircraftIdsByRegistration(
+  supabase: ReturnType<typeof getSupabaseAdminClient>,
+  tenantId: string,
+  franchiseId: string | null,
+  aircraftRegistration: string,
+): Promise<string[]> {
+  let query = supabase
+    .from('aircraft')
+    .select('id')
+    .eq('tenant_id', tenantId)
+    .ilike('tail_number', `%${aircraftRegistration}%`);
+  if (franchiseId) {
+    query = query.or(`franchise_id.is.null,franchise_id.eq.${franchiseId}`);
+  }
+  const { data, error } = await query;
+  if (error) {
+    throw new HttpError(error.message, 400);
+  }
+  if (!Array.isArray(data)) {
+    return [];
+  }
+  return data
+    .map((row) => asNullableString((row as Record<string, unknown>).id))
+    .filter((value): value is string => Boolean(value));
+}
+
+async function enrichFlightLogRowsWithAircraftData(
+  supabase: ReturnType<typeof getSupabaseAdminClient>,
+  tenantId: string,
+  rows: Record<string, unknown>[],
+): Promise<Record<string, unknown>[]> {
+  const aircraftIds = Array.from(
+    new Set(
+      rows
+        .map((row) => asNullableString(row.aircraft_id))
+        .filter((value): value is string => Boolean(value)),
+    ),
+  );
+  if (aircraftIds.length === 0) {
+    return rows;
+  }
+  const { data, error } = await supabase
+    .from('aircraft')
+    .select('id,tail_number,status')
+    .eq('tenant_id', tenantId)
+    .in('id', aircraftIds);
+  if (error || !Array.isArray(data)) {
+    return rows;
+  }
+  const aircraftById = new Map<string, Record<string, unknown>>();
+  data.forEach((row) => {
+    const id = asNullableString((row as Record<string, unknown>).id);
+    if (id) {
+      aircraftById.set(id, row as Record<string, unknown>);
+    }
+  });
+  return rows.map((row) => {
+    const aircraftId = asNullableString(row.aircraft_id);
+    if (!aircraftId) return row;
+    const aircraft = aircraftById.get(aircraftId);
+    if (!aircraft) return row;
+    return {
+      ...row,
+      aircraft_registration: asNullableString(aircraft.tail_number),
+      aircraft_status: asNullableString(aircraft.status),
+    };
+  });
+}
+
 export default async function handler(req: ApiRequest, res: ApiResponse): Promise<void> {
   applyCors(req, res, { methods: ['GET', 'POST', 'OPTIONS'] });
   if (handlePreflight(req, res)) return;
@@ -383,6 +472,31 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       const exportRequested = parseExportRequested(req);
       const { page, pageSize, start, end } = parsePagination(req);
       const { sortBy, ascending } = parseSort(req, entity);
+      const flightLogFilters = entity === 'flight_logs' ? parseFlightLogQueryFilters(req) : null;
+      const registrationAircraftIds =
+        flightLogFilters?.aircraftRegistration
+          ? await resolveAircraftIdsByRegistration(
+              supabase,
+              tenantId,
+              franchiseId,
+              flightLogFilters.aircraftRegistration,
+            )
+          : [];
+
+      if (entity === 'flight_logs' && flightLogFilters?.aircraftRegistration && registrationAircraftIds.length === 0) {
+        res.status(200).json({
+          version: 'v2',
+          correlationId: ctx.correlationId,
+          output: {
+            entity,
+            records: [],
+            page,
+            page_size: pageSize,
+            total: 0,
+          },
+        });
+        return;
+      }
 
       const unavailableUntil = ENTITY_UNAVAILABLE.get(entity);
       if (unavailableUntil && unavailableUntil > Date.now()) {
@@ -417,6 +531,15 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
           .range(start, end);
 
         query = query.eq('tenant_id', tenantId);
+        if (entity === 'flight_logs') {
+          query = query.eq('is_deleted', false);
+          if (flightLogFilters?.flightFrom) query = query.gte('flight_date', flightLogFilters.flightFrom);
+          if (flightLogFilters?.flightTo) query = query.lte('flight_date', flightLogFilters.flightTo);
+          if (flightLogFilters?.aircraftId) query = query.eq('aircraft_id', flightLogFilters.aircraftId);
+          if (flightLogFilters?.pilotName) query = query.ilike('pilot_name', `%${flightLogFilters.pilotName}%`);
+          if (flightLogFilters?.flightNumber) query = query.ilike('flight_number', `%${flightLogFilters.flightNumber}%`);
+          if (registrationAircraftIds.length > 0) query = query.in('aircraft_id', registrationAircraftIds);
+        }
 
         if (franchiseId) {
           query = query.or(`franchise_id.is.null,franchise_id.eq.${franchiseId}`);
@@ -468,6 +591,15 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
           } else {
             fallbackQuery = fallbackQuery.eq('tenant_id', null);
           }
+          if (entity === 'flight_logs') {
+            fallbackQuery = fallbackQuery.eq('is_deleted', false);
+            if (flightLogFilters?.flightFrom) fallbackQuery = fallbackQuery.gte('flight_date', flightLogFilters.flightFrom);
+            if (flightLogFilters?.flightTo) fallbackQuery = fallbackQuery.lte('flight_date', flightLogFilters.flightTo);
+            if (flightLogFilters?.aircraftId) fallbackQuery = fallbackQuery.eq('aircraft_id', flightLogFilters.aircraftId);
+            if (flightLogFilters?.pilotName) fallbackQuery = fallbackQuery.ilike('pilot_name', `%${flightLogFilters.pilotName}%`);
+            if (flightLogFilters?.flightNumber) fallbackQuery = fallbackQuery.ilike('flight_number', `%${flightLogFilters.flightNumber}%`);
+            if (registrationAircraftIds.length > 0) fallbackQuery = fallbackQuery.in('aircraft_id', registrationAircraftIds);
+          }
           if (franchiseId) {
             if (typeof fallbackQuery.is === 'function') {
               fallbackQuery = fallbackQuery.is('franchise_id', null);
@@ -509,7 +641,9 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         }
       }
 
-      const rawRows = (finalData || []) as Record<string, unknown>[];
+      const rawRows = entity === 'flight_logs'
+        ? await enrichFlightLogRowsWithAircraftData(supabase, tenantId, (finalData || []) as Record<string, unknown>[])
+        : ((finalData || []) as Record<string, unknown>[]);
       const activeSearchableColumns = getActiveSearchableColumns(entity, entityConfig.searchableColumns);
       const rows = franchiseId && search ? rawRows.filter((row) => matchesSearch(row, activeSearchableColumns, search)) : rawRows;
       if (exportRequested) {

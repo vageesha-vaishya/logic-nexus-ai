@@ -128,3 +128,65 @@
 
 ## Immediate Error Resolution Rule
 - If any error occurs during testing, coding, or implementation of new requirements, it must be fixed immediately before starting any new requirement.
+
+## CRUD Operations Standardization Rule
+
+**Purpose:** Establish a unified, reusable architecture for all Create, Read, Update, and Delete operations across the entire platform to ensure consistency, reduce code duplication, and maintain high code quality standards.
+
+**Implementation Requirements:**
+
+1. **Generic Component Architecture**
+   - Design and implement modular, framework-agnostic CRUD components that encapsulate all common functionality including state management, input validation, error handling, loading states, and user feedback mechanisms.
+   - Ensure components are configurable through props/configuration objects to accommodate module-specific business logic without modifying core component code.
+   - Implement proper separation of concerns with clear boundaries between presentation, business logic, and data access layers.
+
+2. **Centralized Component Library**
+   - Create a dedicated repository/directory structure for all reusable CRUD components including but not limited to: dynamic forms, data tables/lists, action buttons, confirmation dialogs, search/filter interfaces, and data export functionality.
+   - Establish mandatory reference patterns - all modules must import and use components from this centralized library rather than creating local versions.
+   - Implement semantic versioning for the component library with backward compatibility guarantees.
+
+3. **Shared Service Layer**
+   - Develop a comprehensive service abstraction layer that standardizes all API interactions including request/response formatting, authentication handling, retry logic, caching strategies, and error propagation.
+   - Implement consistent data transformation pipelines for mapping between API responses and application data models.
+   - Create standardized error handling with user-friendly error messages, logging, and monitoring integration.
+
+4. **Standardized Interfaces and Models**
+   - Define TypeScript interfaces or equivalent type definitions for all CRUD operations including request/response payloads, component props, and state structures.
+   - Establish naming conventions, data format standards, and validation schemas that must be followed across all modules.
+   - Create base classes or higher-order components that enforce these interface implementations.
+
+5. **Theming and Styling System**
+   - Implement a comprehensive theming solution using CSS variables, theme providers, or equivalent technology that ensures visual consistency while allowing per-module customization.
+   - Define standard UI patterns for CRUD operations including form layouts, button placements, color schemes for different operation types, and responsive behavior.
+   - Create a theme customization API that modules can use to override specific styling aspects without breaking overall consistency.
+
+6. **Testing Requirements**
+   - Write comprehensive unit tests for every shared component achieving minimum 90% code coverage as measured by industry-standard tools.
+   - Implement integration tests for complete CRUD workflows including edge cases, error scenarios, and performance benchmarks.
+   - Establish automated testing pipelines that run on every commit to prevent regressions.
+
+7. **Documentation Standards**
+   - Create detailed documentation for each reusable component including interactive examples, complete prop definitions with types and default values, integration code samples, and best practices.
+   - Maintain a living style guide that showcases all available components with their variations and use cases.
+   - Provide migration guides for upgrading between versions of the component library.
+
+**Strict Reuse Policy Enforcement:**
+
+Implement a zero-tolerance policy for code duplication in CRUD functionality. Before creating any new component, form, list, or management interface:
+
+1. Conduct a thorough audit of existing Business Objects, Data Objects, Form Objects, and UI components across the entire platform.
+2. Demonstrate that no existing functionality can be extended or configured to meet the new requirements.
+3. Document the decision-making process including what was evaluated and why reuse was not possible.
+4. If similar functionality exists in multiple places, refactor to use a single shared implementation.
+
+**Quality Gates:**
+- All new CRUD implementations must pass architectural review ensuring compliance with reuse policy.
+- Code reviews must include verification that existing components were evaluated before approving new implementations.
+- Regular audits will be conducted to identify and consolidate duplicate CRUD functionality.
+- Violations of the reuse policy will require immediate refactoring to use shared components.
+
+**Success Metrics:**
+- Reduce CRUD-related code duplication by 80% within 6 months.
+- Achieve 100% consistency in user experience across all CRUD interfaces.
+- Decrease development time for new CRUD features by 60%.
+- Maintain zero breaking changes in shared components across minor version updates.

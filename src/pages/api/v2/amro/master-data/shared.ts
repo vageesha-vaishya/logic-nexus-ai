@@ -4,6 +4,7 @@ import { getSupabaseAdminClient } from '../../../_utils/supabaseAdmin';
 
 export type AmroMasterDataEntity =
   | 'aircraft'
+  | 'flight_logs'
   | 'parts_inventory'
   | 'suppliers'
   | 'maintenance_facilities'
@@ -37,8 +38,21 @@ export class HttpError extends Error {
 const ENTITY_CONFIG: Record<AmroMasterDataEntity, EntityConfig> = {
   aircraft: {
     table: 'aircraft',
-    searchableColumns: ['tail_number', 'registration', 'serial_number', 'aircraft_type', 'aircraft_model', 'msn', 'manufacturer', 'model'],
-    listColumns: 'id,tenant_id,franchise_id,registration,tail_number,serial_number,aircraft_type,aircraft_model,manufacturer,manufacturer_id,model,msn,line_number,configuration_code,maintenance_program,status,operator_code,station_code,engine_type,base_location,current_flight_hours,current_cycles,current_flight_hours_since_new,current_cycles_since_new,created_at,updated_at',
+    searchableColumns: [
+      'tail_number',
+      'registration',
+      'serial_number',
+      'aircraft_type',
+      'aircraft_model',
+      'msn',
+      'manufacturer',
+      'model',
+      'owner_name',
+      'base_location',
+      'restrictions',
+    ],
+    listColumns:
+      'id,tenant_id,franchise_id,registration,tail_number,serial_number,aircraft_type,aircraft_model,manufacturer,manufacturer_id,model,msn,line_number,configuration_code,maintenance_program,status,operator_code,station_code,engine_type,base_location,owner_name,defect_count,first_limit_remaining,restrictions,current_flight_hours,current_cycles,current_flight_hours_since_new,current_cycles_since_new,created_at,updated_at',
     requiredCreateFields: ['tail_number', 'serial_number', 'aircraft_type', 'aircraft_model', 'manufacturer_id'],
     writeAllowedFields: [
       'registration',
@@ -57,6 +71,10 @@ const ENTITY_CONFIG: Record<AmroMasterDataEntity, EntityConfig> = {
       'operator_code',
       'station_code',
       'base_location',
+      'owner_name',
+      'defect_count',
+      'first_limit_remaining',
+      'restrictions',
       'engine_type',
       'current_flight_hours',
       'current_cycles',
@@ -64,6 +82,31 @@ const ENTITY_CONFIG: Record<AmroMasterDataEntity, EntityConfig> = {
       'current_cycles_since_new',
     ],
     defaultSortColumn: 'updated_at',
+  },
+  flight_logs: {
+    table: 'flight_logs',
+    searchableColumns: ['flight_number', 'departure_airport', 'arrival_airport', 'pilot_name', 'regulatory_authority'],
+    listColumns:
+      'id,tenant_id,franchise_id,aircraft_id,flight_date,flight_number,departure_airport,arrival_airport,pilot_name,flight_hours,block_hours,flight_cycles,crew_details,fuel_burn_kg,oil_uplift_liters,pirep_discrepancy,regulatory_authority,is_deleted,deleted_at,deleted_by,metadata,created_at,updated_at,created_by,updated_by',
+    requiredCreateFields: ['aircraft_id', 'flight_date', 'departure_airport', 'arrival_airport'],
+    writeAllowedFields: [
+      'aircraft_id',
+      'flight_date',
+      'flight_number',
+      'departure_airport',
+      'arrival_airport',
+      'pilot_name',
+      'flight_hours',
+      'block_hours',
+      'flight_cycles',
+      'crew_details',
+      'fuel_burn_kg',
+      'oil_uplift_liters',
+      'pirep_discrepancy',
+      'regulatory_authority',
+      'metadata',
+    ],
+    defaultSortColumn: 'flight_date',
   },
   parts_inventory: {
     table: 'parts_inventory',
@@ -315,7 +358,7 @@ function parseTimeToSeconds(value: string | null): number | null {
 }
 
 export function resolveEntity(rawEntity: unknown): AmroMasterDataEntity {
-  const entity = asString(rawEntity).toLowerCase() as AmroMasterDataEntity;
+  const entity = asString(rawEntity).toLowerCase().replace(/-/g, '_') as AmroMasterDataEntity;
   if (!ENTITY_CONFIG[entity]) {
     throw new HttpError('Unsupported master data entity', 404);
   }
@@ -382,6 +425,10 @@ function normalizeAircraft(payload: Record<string, unknown>) {
     operator_code: asNullableString(payload.operator_code),
     station_code: asNullableString(payload.station_code),
     base_location: asNullableString(payload.base_location),
+    owner_name: asNullableString(payload.owner_name),
+    defect_count: asNumber(payload.defect_count) ?? 0,
+    first_limit_remaining: asNumber(payload.first_limit_remaining),
+    restrictions: asNullableString(payload.restrictions),
     engine_type: asNullableString(payload.engine_type),
     current_flight_hours: asNumber(payload.current_flight_hours) ?? 0,
     current_cycles: asNumber(payload.current_cycles) ?? 0,
@@ -410,6 +457,26 @@ function normalizePartsInventory(payload: Record<string, unknown>) {
     unit_cost: asNumber(payload.unit_cost),
     currency: asString(payload.currency) || 'USD',
     last_movement_at: asNullableString(payload.last_movement_at),
+  };
+}
+
+function normalizeFlightLog(payload: Record<string, unknown>) {
+  return {
+    aircraft_id: asString(payload.aircraft_id),
+    flight_date: asDateString(payload.flight_date) || '',
+    flight_number: asNullableString(payload.flight_number),
+    departure_airport: asString(payload.departure_airport),
+    arrival_airport: asString(payload.arrival_airport),
+    pilot_name: asNullableString(payload.pilot_name),
+    flight_hours: asNumber(payload.flight_hours) ?? 0,
+    block_hours: asNumber(payload.block_hours) ?? 0,
+    flight_cycles: asNumber(payload.flight_cycles) ?? 0,
+    crew_details: asNullableString(payload.crew_details),
+    fuel_burn_kg: asNumber(payload.fuel_burn_kg) ?? 0,
+    oil_uplift_liters: asNumber(payload.oil_uplift_liters) ?? 0,
+    pirep_discrepancy: asNullableString(payload.pirep_discrepancy),
+    regulatory_authority: asNullableString(payload.regulatory_authority),
+    metadata: asJsonObject(payload.metadata),
   };
 }
 
@@ -545,6 +612,7 @@ function normalizeWorkPackageTemplate(payload: Record<string, unknown>) {
 
 export function normalizePayload(entity: AmroMasterDataEntity, payload: Record<string, unknown>) {
   if (entity === 'aircraft') return normalizeAircraft(payload);
+  if (entity === 'flight_logs') return normalizeFlightLog(payload);
   if (entity === 'parts_inventory') return normalizePartsInventory(payload);
   if (entity === 'suppliers') return normalizeSupplier(payload);
   if (entity === 'maintenance_facilities') return normalizeMaintenanceFacility(payload);
@@ -565,6 +633,43 @@ export type MasterDataValidationIssue = {
 
 export function validatePayload(entity: AmroMasterDataEntity, payload: Record<string, unknown>): MasterDataValidationIssue[] {
   const issues: MasterDataValidationIssue[] = [];
+  if (entity === 'flight_logs') {
+    const departureAirport = asString(payload.departure_airport);
+    const arrivalAirport = asString(payload.arrival_airport);
+    const flightHours = Number(payload.flight_hours ?? 0);
+    const blockHours = Number(payload.block_hours ?? 0);
+    const flightCycles = Number(payload.flight_cycles ?? 0);
+    if (departureAirport && arrivalAirport && departureAirport === arrivalAirport) {
+      issues.push({
+        field: 'arrival_airport',
+        message: 'arrival_airport must be different from departure_airport',
+      });
+    }
+    if (flightHours < 0 || !Number.isFinite(flightHours)) {
+      issues.push({
+        field: 'flight_hours',
+        message: 'flight_hours must be a non-negative number',
+      });
+    }
+    if (blockHours < 0 || !Number.isFinite(blockHours)) {
+      issues.push({
+        field: 'block_hours',
+        message: 'block_hours must be a non-negative number',
+      });
+    }
+    if (!Number.isInteger(flightCycles) || flightCycles < 0) {
+      issues.push({
+        field: 'flight_cycles',
+        message: 'flight_cycles must be a non-negative integer',
+      });
+    }
+    if (flightHours <= 0 && blockHours <= 0 && flightCycles <= 0) {
+      issues.push({
+        field: 'flight_hours',
+        message: 'at least one of flight_hours, block_hours, or flight_cycles must be greater than zero',
+      });
+    }
+  }
   if (entity === 'parts_inventory') {
     const quantityOnHand = Number(payload.quantity_on_hand ?? 0);
     const quantityReserved = Number(payload.quantity_reserved ?? 0);

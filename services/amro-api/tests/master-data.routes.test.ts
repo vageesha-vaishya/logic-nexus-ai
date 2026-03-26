@@ -9,7 +9,7 @@ function createQueryBuilder() {
     eq: jest.fn().mockReturnThis(),
     limit: jest.fn().mockReturnThis(),
     order: jest.fn().mockReturnThis(),
-    range: jest.fn().mockResolvedValue({ data: [], count: 0, error: null }),
+    range: jest.fn().mockReturnThis(),
     or: jest.fn().mockReturnThis(),
     maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
     insert: jest.fn().mockReturnThis(),
@@ -112,6 +112,19 @@ describe('master-data.routes', () => {
     expect(response.body.output.entity).toBe('aircraft');
     expect(Array.isArray(response.body.output.records)).toBe(true);
     expect(mockExecuteWithResilience).toHaveBeenCalled();
+  });
+
+  it('accepts hyphenated flight logs entity route', async () => {
+    const app = await createTestApp();
+    const response = await request(app)
+      .get('/api/v2/amro/master-data/flight-logs?page=1&page_size=25')
+      .expect(200);
+    expect(response.body.output.entity).toBe('flight_logs');
+    expect(Array.isArray(response.body.output.records)).toBe(true);
+    expect(mockExecuteWithResilience).toHaveBeenCalledWith(
+      expect.objectContaining({ operation: 'master-data.flight_logs.list' }),
+      expect.any(Function),
+    );
   });
 
   it('validates query parameters before database calls', async () => {

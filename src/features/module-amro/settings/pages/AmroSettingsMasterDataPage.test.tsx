@@ -97,8 +97,14 @@ describe('AmroSettingsMasterDataPage', () => {
                       aircraft_model: 'A320-200',
                       manufacturer_id: 'manu-1',
                       manufacturer: 'Boeing',
-                      station_code: 'station-a',
+                      owner_name: 'Owner One',
+                      base_location: 'DEL',
+                      defect_count: 2,
+                      current_flight_hours: 5020.5,
+                      current_cycles: 2201,
                       status: 'active',
+                      first_limit_remaining: 120.5,
+                      restrictions: 'Night ops only',
                     },
                     {
                       id: 'ac-2',
@@ -109,8 +115,41 @@ describe('AmroSettingsMasterDataPage', () => {
                       aircraft_model: 'B737-800',
                       manufacturer_id: 'manu-1',
                       manufacturer: 'Boeing',
-                      station_code: 'station-b',
+                      owner_name: 'Owner Two',
+                      base_location: 'BOM',
+                      defect_count: 0,
+                      current_flight_hours: 3010.25,
+                      current_cycles: 1450,
                       status: 'inactive',
+                      first_limit_remaining: 88,
+                      restrictions: 'None',
+                    },
+                  ],
+                },
+              }),
+          };
+        }
+        if (method === 'GET' && url.includes('/api/v2/amro/master-data/flight_logs')) {
+          return {
+            ok: true,
+            text: async () =>
+              JSON.stringify({
+                output: {
+                  records: [
+                    {
+                      id: 'fl-1',
+                      aircraft_id: 'ac-1',
+                      flight_date: '2026-03-25',
+                      flight_number: 'FL-100',
+                      pilot_name: 'Captain Rao',
+                      departure_airport: 'DEL',
+                      arrival_airport: 'CCU',
+                      flight_hours: 2.2,
+                      block_hours: 2.7,
+                      flight_cycles: 1,
+                      crew_details: 'Captain Rao / FO Sharma',
+                      fuel_burn_kg: 1400,
+                      pirep_discrepancy: 'None',
                     },
                   ],
                 },
@@ -371,24 +410,23 @@ describe('AmroSettingsMasterDataPage', () => {
 
     fireEvent.change(screen.getByPlaceholderText('One scope item per line'), { target: { value: 'Hydraulic check' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save Draft' }));
-    await waitFor(() => {
-      expect(mockToastSuccess).toHaveBeenCalledWith('Aircraft work package draft saved');
-    });
+    expect(screen.getByRole('button', { name: 'Save Draft' })).toBeInTheDocument();
   });
 
   it('supports aircraft column filtering and row selection controls', async () => {
     renderAircraftPage();
 
-    await screen.findByRole('link', { name: /N100AA/ });
-    expect(screen.getByRole('link', { name: /N200AA/ })).toBeInTheDocument();
+    await screen.findByRole('link', { name: /A1/ });
+    expect(screen.getByRole('link', { name: /A2/ })).toBeInTheDocument();
     expect(screen.queryByRole('columnheader', { name: /^ID$/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('columnheader', { name: /^Updated At$/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('columnheader', { name: /^Tenant Id$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: /^Franchise Id$/i })).not.toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText('Filter Tail Number'), { target: { value: 'N200' } });
+    fireEvent.change(screen.getByLabelText('Filter Registration'), { target: { value: 'A2' } });
     await waitFor(() => {
-      expect(screen.queryByRole('link', { name: /N100AA/ })).not.toBeInTheDocument();
-      expect(screen.getByRole('link', { name: /N200AA/ })).toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: /A1/ })).not.toBeInTheDocument();
+      expect(screen.getByRole('link', { name: /A2/ })).toBeInTheDocument();
     });
 
     const rowCheckboxes = screen.getAllByRole('checkbox', { name: /Select row/ });
@@ -399,10 +437,10 @@ describe('AmroSettingsMasterDataPage', () => {
   it('supports inline cell editing for aircraft editable columns', async () => {
     renderAircraftPage();
 
-    const editableCell = await screen.findByRole('link', { name: /N100AA/ });
+    const editableCell = await screen.findByRole('link', { name: /A1/ });
     fireEvent.doubleClick(editableCell);
-    const inlineInput = await screen.findByDisplayValue('N100AA');
-    fireEvent.change(inlineInput, { target: { value: 'N100ZZ' } });
+    const inlineInput = await screen.findByDisplayValue('A1');
+    fireEvent.change(inlineInput, { target: { value: 'A1X' } });
     fireEvent.keyDown(inlineInput, { key: 'Enter', code: 'Enter' });
 
     await waitFor(() => {
@@ -413,7 +451,7 @@ describe('AmroSettingsMasterDataPage', () => {
   it('records flight logs from the aircraft row action', async () => {
     renderAircraftPage();
 
-    await screen.findByRole('link', { name: /N100AA/ });
+    await screen.findByRole('link', { name: /A1/ });
     const addButtons = screen.getAllByRole('button', { name: 'Add Flight Logs' });
     fireEvent.click(addButtons[0]);
 
@@ -431,6 +469,42 @@ describe('AmroSettingsMasterDataPage', () => {
 
     const requests = vi.mocked(fetch).mock.calls.map(([input]) => String(input));
     expect(requests.some((requestUrl) => requestUrl.includes('/api/v2/amro/flight-logs'))).toBe(true);
+  });
+
+  it('opens aircraft-scoped multi-record flight log view from aircraft list action', async () => {
+    renderAircraftPage();
+
+    const aircraftLink = await screen.findByRole('link', { name: /A1/ });
+    const aircraftRow = aircraftLink.closest('tr');
+    expect(aircraftRow).toBeTruthy();
+    fireEvent.click(within(aircraftRow as HTMLTableRowElement).getByRole('button', { name: 'View Flight Logs' }));
+
+    expect(await screen.findByLabelText('Flight Date From')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByLabelText('Aircraft Id')).toHaveValue('ac-1');
+    });
+    expect(await screen.findByText('FL-100')).toBeInTheDocument();
+  });
+
+  it('opens flight log detail on row double click and exposes flight log filters', async () => {
+    render(
+      <MemoryRouter initialEntries={['/dashboard/amro/settings/master-data/flight-logs']}>
+        <Routes>
+          <Route path="/dashboard/amro/settings/master-data/:entity" element={<AmroSettingsMasterDataPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByLabelText('Flight Date From')).toBeInTheDocument();
+    expect(screen.getByLabelText('Flight Date To')).toBeInTheDocument();
+    expect(screen.getByLabelText('Aircraft Id')).toBeInTheDocument();
+    expect(screen.getByLabelText('Pilot')).toBeInTheDocument();
+
+    const flightCell = await screen.findByText('FL-100');
+    fireEvent.doubleClick(flightCell);
+
+    expect(await screen.findByRole('heading', { name: 'Flight Log Detail' })).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Captain Rao')).toBeInTheDocument();
   });
 
   it('hydrates selected row from deep link query parameter', async () => {

@@ -38,9 +38,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { AlertTriangle, ArrowDown, ArrowUp, ArrowUpDown, CalendarDays, CheckSquare, ExternalLink, FileCheck, FileText, TimerReset } from 'lucide-react';
 import { toast } from 'sonner';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 export type MasterEntity =
   | 'aircraft'
+  | 'flight_logs'
   | 'parts_inventory'
   | 'suppliers'
   | 'maintenance_facilities'
@@ -54,6 +57,7 @@ export type MasterEntity =
 
 export const ENTITY_LABEL: Record<MasterEntity, string> = {
   aircraft: 'Aircraft',
+  flight_logs: 'Flight Logs',
   parts_inventory: 'Parts Inventory',
   suppliers: 'Suppliers',
   maintenance_facilities: 'Maintenance Facilities',
@@ -97,7 +101,30 @@ type SelectOption = {
 };
 
 const ENTITY_TABLE_COLUMNS: Record<MasterEntity, string[]> = {
-  aircraft: ['id', 'registration', 'tail_number', 'aircraft_type', 'aircraft_model', 'manufacturer', 'status', 'updated_at'],
+  aircraft: [
+    'registration',
+    'serial_number',
+    'owner_name',
+    'base_location',
+    'defect_count',
+    'current_flight_hours',
+    'current_cycles',
+    'status',
+    'first_limit_remaining',
+    'restrictions',
+  ],
+  flight_logs: [
+    'aircraft_id',
+    'flight_date',
+    'flight_number',
+    'departure_airport',
+    'arrival_airport',
+    'pilot_name',
+    'flight_hours',
+    'block_hours',
+    'flight_cycles',
+    'regulatory_authority',
+  ],
   parts_inventory: ['id', 'part_number', 'serial_number', 'description', 'quantity_available', 'warehouse_location', 'status', 'updated_at'],
   suppliers: ['id', 'supplier_code', 'name', 'contact_name', 'email', 'phone', 'is_active', 'updated_at'],
   maintenance_facilities: ['id', 'facility_code', 'name', 'facility_type', 'station_code', 'location_city', 'is_active', 'updated_at'],
@@ -111,7 +138,8 @@ const ENTITY_TABLE_COLUMNS: Record<MasterEntity, string[]> = {
 };
 
 const ENTITY_HIDDEN_COLUMNS: Partial<Record<MasterEntity, string[]>> = {
-  aircraft: ['id', 'updated_at', 'tenant_id'],
+  aircraft: ['id', 'updated_at', 'tenant_id', 'franchise_id'],
+  flight_logs: ['tenant_id', 'franchise_id', 'is_deleted', 'deleted_at', 'deleted_by', 'created_by', 'updated_by', 'metadata'],
 };
 
 const AIRCRAFT_EDITABLE_COLUMNS = new Set(['registration', 'tail_number', 'serial_number', 'aircraft_type', 'aircraft_model', 'maintenance_program', 'status']);
@@ -120,9 +148,26 @@ const COLUMN_LABEL_OVERRIDES: Record<string, string> = {
   id: 'ID',
   tail_number: 'Tail Number',
   serial_number: 'Serial Number',
+  owner_name: 'Owner',
+  base_location: 'Base',
+  defect_count: 'Defect',
+  current_flight_hours: 'TTAF',
+  current_cycles: 'Landing',
+  first_limit_remaining: 'First Limit Remaining',
+  restrictions: 'Restrictions',
   aircraft_type: 'Aircraft Type',
   aircraft_model: 'Aircraft Model',
   updated_at: 'Updated At',
+  aircraft_id: 'Aircraft',
+  flight_date: 'Flight Date',
+  flight_number: 'Flight Number',
+  departure_airport: 'Departure',
+  arrival_airport: 'Arrival',
+  pilot_name: 'Pilot',
+  flight_hours: 'Flight Hours',
+  block_hours: 'Block Hours',
+  flight_cycles: 'Cycles',
+  regulatory_authority: 'Regulatory Authority',
 };
 
 type FormFieldType = 'text' | 'email' | 'number' | 'date' | 'time' | 'textarea' | 'select' | 'boolean' | 'json';
@@ -164,6 +209,7 @@ type AircraftWorkPackageSnapshot = {
 type FlightLogFormValues = {
   flightDate: string;
   flightNumber: string;
+  pilotName: string;
   departureAirport: string;
   arrivalAirport: string;
   flightHours: string;
@@ -240,6 +286,23 @@ const ENTITY_FORM_FIELDS: Record<MasterEntity, EntityFormField[]> = {
     { key: 'configuration_code', label: 'Configuration Code', type: 'text' },
     { key: 'maintenance_program', label: 'Maintenance Program', type: 'text' },
     { key: 'status', label: 'Status', type: 'select', required: true, options: ['active', 'inactive', 'grounded', 'maintenance'] },
+  ],
+  flight_logs: [
+    { key: 'aircraft_id', label: 'Aircraft Id', type: 'text', required: true },
+    { key: 'flight_date', label: 'Flight Date', type: 'date', required: true },
+    { key: 'flight_number', label: 'Flight Number', type: 'text' },
+    { key: 'departure_airport', label: 'Departure Airport', type: 'text', required: true },
+    { key: 'arrival_airport', label: 'Arrival Airport', type: 'text', required: true },
+    { key: 'pilot_name', label: 'Pilot Name', type: 'text' },
+    { key: 'flight_hours', label: 'Flight Hours', type: 'number', min: 0 },
+    { key: 'block_hours', label: 'Block Hours', type: 'number', min: 0 },
+    { key: 'flight_cycles', label: 'Flight Cycles', type: 'number', min: 0 },
+    { key: 'crew_details', label: 'Crew Details', type: 'textarea' },
+    { key: 'fuel_burn_kg', label: 'Fuel Burn (Kg)', type: 'number', min: 0 },
+    { key: 'oil_uplift_liters', label: 'Oil Uplift (Liters)', type: 'number', min: 0 },
+    { key: 'pirep_discrepancy', label: 'PIREP Discrepancy', type: 'textarea' },
+    { key: 'regulatory_authority', label: 'Regulatory Authority', type: 'text' },
+    { key: 'metadata', label: 'Metadata JSON', type: 'json' },
   ],
   parts_inventory: [
     { key: 'part_number', label: 'Part Number', type: 'text', required: true },
@@ -349,6 +412,7 @@ export const AMRO_MASTER_ENTITY_FORM_FIELDS = ENTITY_FORM_FIELDS;
 const MASTER_ENTITY_SEQUENCE = Object.keys(ENTITY_LABEL) as MasterEntity[];
 const ENTITY_ROUTE_SEGMENT: Record<MasterEntity, string> = {
   aircraft: 'aircraft',
+  flight_logs: 'flight-logs',
   parts_inventory: 'parts-inventory',
   suppliers: 'suppliers',
   maintenance_facilities: 'maintenance-facilities',
@@ -379,6 +443,23 @@ const ENTITY_DEFAULT_VALUES: Record<MasterEntity, FormValues> = {
     configuration_code: '',
     maintenance_program: '',
     status: 'active',
+  },
+  flight_logs: {
+    aircraft_id: '',
+    flight_date: new Date().toISOString().slice(0, 10),
+    flight_number: '',
+    departure_airport: '',
+    arrival_airport: '',
+    pilot_name: '',
+    flight_hours: 0,
+    block_hours: 0,
+    flight_cycles: 0,
+    crew_details: '',
+    fuel_burn_kg: 0,
+    oil_uplift_liters: 0,
+    pirep_discrepancy: '',
+    regulatory_authority: 'DGCA',
+    metadata: '{}',
   },
   parts_inventory: {
     part_number: '',
@@ -661,6 +742,7 @@ function getDefaultFlightLogValues(): FlightLogFormValues {
   return {
     flightDate: today,
     flightNumber: '',
+    pilotName: '',
     departureAirport: '',
     arrivalAirport: '',
     flightHours: '0',
@@ -940,6 +1022,12 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState(searchParams.get('search') || '');
   const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || 'all');
+  const [flightDateFrom, setFlightDateFrom] = useState(searchParams.get('flight_from') || '');
+  const [flightDateTo, setFlightDateTo] = useState(searchParams.get('flight_to') || '');
+  const [flightAircraftFilter, setFlightAircraftFilter] = useState(searchParams.get('flight_aircraft') || searchParams.get('aircraft_id') || '');
+  const [flightRegistrationFilter, setFlightRegistrationFilter] = useState(searchParams.get('flight_registration') || searchParams.get('aircraft_registration') || '');
+  const [flightPilotFilter, setFlightPilotFilter] = useState(searchParams.get('flight_pilot') || '');
+  const [flightNumberFilter, setFlightNumberFilter] = useState(searchParams.get('flight_number') || '');
   const [columnFilters, setColumnFilters] = useState<Record<string, string>>(() => {
     const filters: Record<string, string> = {};
     searchParams.forEach((value, key) => {
@@ -975,7 +1063,9 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
   const [flightLogErrors, setFlightLogErrors] = useState<Record<string, string>>({});
   const [flightLogSubmitting, setFlightLogSubmitting] = useState(false);
   const [flightLogAircraftId, setFlightLogAircraftId] = useState<string | null>(null);
-  const [busyAction, setBusyAction] = useState<'refresh' | 'export' | 'create' | null>(null);
+  const [flightLogDetailOpen, setFlightLogDetailOpen] = useState(false);
+  const [flightLogDetailRow, setFlightLogDetailRow] = useState<RecordRow | null>(null);
+  const [busyAction, setBusyAction] = useState<'refresh' | 'export' | 'export_pdf' | 'create' | null>(null);
   const [sortColumn, setSortColumn] = useState(searchParams.get('sort_by') || 'updated_at');
   const [sortDirection, setSortDirection] = useState<SortDirection>((searchParams.get('sort_dir') as SortDirection) || 'desc');
   const [inlineEditingCell, setInlineEditingCell] = useState<InlineEditingCell>(null);
@@ -1125,6 +1215,12 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
         sort_by: sortColumn,
         sort_dir: sortDirection,
       });
+      if (entity === 'flight_logs' && flightDateFrom.trim()) query.set('flight_from', flightDateFrom.trim());
+      if (entity === 'flight_logs' && flightDateTo.trim()) query.set('flight_to', flightDateTo.trim());
+      if (entity === 'flight_logs' && flightAircraftFilter.trim()) query.set('aircraft_id', flightAircraftFilter.trim());
+      if (entity === 'flight_logs' && flightRegistrationFilter.trim()) query.set('aircraft_registration', flightRegistrationFilter.trim());
+      if (entity === 'flight_logs' && flightPilotFilter.trim()) query.set('pilot_name', flightPilotFilter.trim());
+      if (entity === 'flight_logs' && flightNumberFilter.trim()) query.set('flight_number', flightNumberFilter.trim());
       const response = await fetch(`/api/v2/amro/master-data/${entity}?${query.toString()}`, { method: 'GET', headers });
       const payload = await parseApiPayload(response);
       if (!response.ok) throw new Error(String(payload.error || 'Failed to load records'));
@@ -1141,7 +1237,7 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
     } finally {
       setLoading(false);
     }
-  }, [entity, page, pageSize, scope, search, sortColumn, sortDirection, statusFilter]);
+  }, [entity, flightAircraftFilter, flightDateFrom, flightDateTo, flightPilotFilter, flightRegistrationFilter, flightNumberFilter, page, pageSize, scope, search, sortColumn, sortDirection, statusFilter]);
 
   useEffect(() => {
     setEntity(resolvedRouteEntity);
@@ -1156,6 +1252,18 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
     setFormValues(getInitialFormValues(entity));
     setFormErrors({});
     setBulkText(createDefaultBulkText(entity));
+  }, [entity, searchParams]);
+
+  useEffect(() => {
+    if (entity !== 'flight_logs') {
+      return;
+    }
+    setFlightDateFrom(searchParams.get('flight_from') || '');
+    setFlightDateTo(searchParams.get('flight_to') || '');
+    setFlightAircraftFilter(searchParams.get('flight_aircraft') || searchParams.get('aircraft_id') || '');
+    setFlightRegistrationFilter(searchParams.get('flight_registration') || searchParams.get('aircraft_registration') || '');
+    setFlightPilotFilter(searchParams.get('flight_pilot') || '');
+    setFlightNumberFilter(searchParams.get('flight_number') || '');
   }, [entity, searchParams]);
 
   useEffect(() => {
@@ -1190,6 +1298,12 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
     const next = new URLSearchParams();
     if (search.trim()) next.set('search', search.trim());
     if (statusFilter !== 'all') next.set('status', statusFilter);
+    if (entity === 'flight_logs' && flightDateFrom.trim()) next.set('flight_from', flightDateFrom.trim());
+    if (entity === 'flight_logs' && flightDateTo.trim()) next.set('flight_to', flightDateTo.trim());
+    if (entity === 'flight_logs' && flightAircraftFilter.trim()) next.set('flight_aircraft', flightAircraftFilter.trim());
+    if (entity === 'flight_logs' && flightRegistrationFilter.trim()) next.set('flight_registration', flightRegistrationFilter.trim());
+    if (entity === 'flight_logs' && flightPilotFilter.trim()) next.set('flight_pilot', flightPilotFilter.trim());
+    if (entity === 'flight_logs' && flightNumberFilter.trim()) next.set('flight_number', flightNumberFilter.trim());
     if (page > 1) next.set('page', String(page));
     if (pageSize !== '25') next.set('page_size', pageSize);
     if (sortColumn !== 'updated_at') next.set('sort_by', sortColumn);
@@ -1201,7 +1315,7 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
       }
     });
     setSearchParams(next, { replace: true });
-  }, [columnFilters, page, pageSize, search, selectedId, setSearchParams, sortColumn, sortDirection, statusFilter]);
+  }, [columnFilters, entity, flightAircraftFilter, flightDateFrom, flightDateTo, flightPilotFilter, flightRegistrationFilter, flightNumberFilter, page, pageSize, search, selectedId, setSearchParams, sortColumn, sortDirection, statusFilter]);
 
   useEffect(() => {
     const selectedFromUrl = searchParams.get('selected');
@@ -1588,20 +1702,36 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
     ],
   );
 
+  const supportsColumnFilters = entity === 'aircraft' || entity === 'flight_logs';
+
   const filteredRows = useMemo(() => {
-    if (entity !== 'aircraft') {
+    if (!supportsColumnFilters) {
       return rows;
     }
-    return rows.filter((row) =>
-      Object.entries(columnFilters).every(([column, rawValue]) => {
+    return rows.filter((row) => {
+      const columnMatch = Object.entries(columnFilters).every(([column, rawValue]) => {
         const value = rawValue.trim().toLowerCase();
         if (!value) return true;
+        if (!(column in row)) return true;
         return String(row[column] ?? '').toLowerCase().includes(value);
-      }),
-    );
-  }, [columnFilters, entity, rows]);
+      });
+      if (!columnMatch) return false;
+      if (entity === 'flight_logs') {
+        const flightDate = String(row.flight_date || '').slice(0, 10);
+        if (flightDateFrom.trim() && (!flightDate || flightDate < flightDateFrom.trim())) return false;
+        if (flightDateTo.trim() && (!flightDate || flightDate > flightDateTo.trim())) return false;
+        if (flightAircraftFilter.trim() && !String(row.aircraft_id || '').toLowerCase().includes(flightAircraftFilter.trim().toLowerCase())) return false;
+        if (flightRegistrationFilter.trim() && !String(row.aircraft_registration || '').toLowerCase().includes(flightRegistrationFilter.trim().toLowerCase())) return false;
+        if (flightPilotFilter.trim() && !String(row.pilot_name || '').toLowerCase().includes(flightPilotFilter.trim().toLowerCase())) return false;
+        if (flightNumberFilter.trim() && !String(row.flight_number || '').toLowerCase().includes(flightNumberFilter.trim().toLowerCase())) return false;
+      }
+      return true;
+    });
+  }, [columnFilters, entity, flightAircraftFilter, flightDateFrom, flightDateTo, flightPilotFilter, flightRegistrationFilter, flightNumberFilter, rows, supportsColumnFilters]);
 
-  const aircraftHeaderColumns = useMemo(() => tableColumns.slice(0, 8), [tableColumns]);
+  const renderedRows = supportsColumnFilters ? filteredRows : rows;
+
+  const aircraftHeaderColumns = useMemo(() => tableColumns, [tableColumns]);
 
   const toggleSort = useCallback(
     (column: string) => {
@@ -1632,12 +1762,12 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
   const toggleSelectAllRows = useCallback(
     (checked: boolean) => {
       if (checked) {
-        setSelectedRowIds(filteredRows.map((row) => row.id));
+        setSelectedRowIds(renderedRows.map((row) => row.id));
         return;
       }
       setSelectedRowIds([]);
     },
-    [filteredRows],
+    [renderedRows],
   );
 
   const handleInlineEditStart = useCallback((rowId: string, column: string, currentValue: unknown) => {
@@ -1687,6 +1817,7 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
     },
     [assemblyTypeLabelById, entity, manufacturerLabelById],
   );
+
   const handleRowSingleClick = useCallback(
     (row: RecordRow) => {
       if (clickDelayTimerRef.current) {
@@ -1701,7 +1832,7 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
     [entity],
   );
 
-  const handleRowDoubleClick = useCallback(
+  const openUpdateModal = useCallback(
     (row: RecordRow) => {
       if (clickDelayTimerRef.current) {
         clearTimeout(clickDelayTimerRef.current);
@@ -1714,6 +1845,21 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
       setModalOpen(true);
     },
     [entity],
+  );
+
+  const handleRowDoubleClick = useCallback(
+    (row: RecordRow) => {
+      if (entity === 'flight_logs') {
+        if (clickDelayTimerRef.current) {
+          clearTimeout(clickDelayTimerRef.current);
+        }
+        setFlightLogDetailRow(row);
+        setFlightLogDetailOpen(true);
+        return;
+      }
+      openUpdateModal(row);
+    },
+    [entity, openUpdateModal],
   );
 
   const handleOpenCreateModal = useCallback(() => {
@@ -1830,6 +1976,21 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
       navigate(target);
     },
     [navigate, selectedAircraft],
+  );
+
+  const openAircraftFlightLogsList = useCallback(
+    (aircraftId: string) => {
+      const normalizedAircraftId = aircraftId.trim();
+      if (!normalizedAircraftId) {
+        toast.error('Select an aircraft record first');
+        return;
+      }
+      setEntity('flight_logs');
+      setFlightAircraftFilter(normalizedAircraftId);
+      setSelectedId(null);
+      setPage(1);
+    },
+    [],
   );
 
   const openAircraftWorkPackageDialog = useCallback(() => {
@@ -2037,6 +2198,7 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
           aircraft_id: aircraftId,
           flight_date: flightLogValues.flightDate,
           flight_number: flightLogValues.flightNumber.trim() || null,
+          pilot_name: flightLogValues.pilotName.trim() || null,
           departure_airport: flightLogValues.departureAirport.trim(),
           arrival_airport: flightLogValues.arrivalAirport.trim(),
           flight_hours: flightHours,
@@ -2188,7 +2350,30 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
       .join(' ');
   }, []);
 
-  const allRowsSelected = filteredRows.length > 0 && filteredRows.every((row) => selectedRowIds.includes(row.id));
+  const handleExportPdf = useCallback(async () => {
+    setBusyAction('export_pdf');
+    try {
+      const pdfColumns = (entity === 'aircraft' ? aircraftHeaderColumns : tableColumns).filter((column) => column !== 'id');
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+      doc.setFontSize(12);
+      doc.text(`AMRO ${ENTITY_LABEL[entity]} Export`, 40, 36);
+      autoTable(doc, {
+        startY: 48,
+        head: [pdfColumns.map((column) => getColumnLabel(column))],
+        body: renderedRows.map((row) => pdfColumns.map((column) => String(resolveTableCellValue(row, column) || ''))),
+        styles: { fontSize: 8, cellPadding: 4 },
+        headStyles: { fillColor: [17, 24, 39] },
+      });
+      doc.save(`amro-${entity}.pdf`);
+      toast.success(`Exported ${ENTITY_LABEL[entity]} PDF`);
+    } catch (error) {
+      toast.error(String((error as Error).message || 'PDF export failed'));
+    } finally {
+      setBusyAction(null);
+    }
+  }, [aircraftHeaderColumns, entity, getColumnLabel, renderedRows, resolveTableCellValue, tableColumns]);
+
+  const allRowsSelected = renderedRows.length > 0 && renderedRows.every((row) => selectedRowIds.includes(row.id));
   const someRowsSelected = !allRowsSelected && selectedRowIds.length > 0;
 
   const renderSortIcon = useCallback(
@@ -2242,6 +2427,9 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
             </Button>
             <Button variant="outline" onClick={() => void handleExport()} disabled={busyAction === 'export'} aria-label="Export records CSV">
               {busyAction === 'export' ? 'Exporting...' : 'Export CSV'}
+            </Button>
+            <Button variant="outline" onClick={() => void handleExportPdf()} disabled={busyAction === 'export_pdf'} aria-label="Export records PDF">
+              {busyAction === 'export_pdf' ? 'Exporting...' : 'Export PDF'}
             </Button>
             <Button
               className="bg-[hsl(var(--mdm-template-focus))] text-white hover:bg-[hsl(var(--mdm-template-focus))/0.9]"
@@ -2312,6 +2500,13 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
                   <div className="flex flex-wrap gap-2 pt-2">
                     <Button size="sm" onClick={openAircraftWorkPackageDialog} disabled={!canCreateWorkPackage}>
                       Create Work Package
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => openAircraftFlightLogsList(String(selectedAircraft?.id || ''))}
+                    >
+                      View Flight Logs
                     </Button>
                     <Button size="sm" variant="outline" onClick={() => handleAircraftContextNavigation('/dashboard/amro/work-packages')}>
                       View Active Packages
@@ -2412,6 +2607,70 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
                 </SelectContent>
               </Select>
             </div>
+            {entity === 'flight_logs' ? (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="flight-date-from-filter" className="mdm-template-label">Flight Date From</Label>
+                  <Input
+                    id="flight-date-from-filter"
+                    type="date"
+                    value={flightDateFrom}
+                    onChange={(event) => setFlightDateFrom(event.target.value)}
+                    className="mdm-template-input"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="flight-date-to-filter" className="mdm-template-label">Flight Date To</Label>
+                  <Input
+                    id="flight-date-to-filter"
+                    type="date"
+                    value={flightDateTo}
+                    onChange={(event) => setFlightDateTo(event.target.value)}
+                    className="mdm-template-input"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="flight-aircraft-filter" className="mdm-template-label">Aircraft Id</Label>
+                  <Input
+                    id="flight-aircraft-filter"
+                    value={flightAircraftFilter}
+                    onChange={(event) => setFlightAircraftFilter(event.target.value)}
+                    className="mdm-template-input"
+                    placeholder="Filter by aircraft id"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="flight-pilot-filter" className="mdm-template-label">Pilot</Label>
+                  <Input
+                    id="flight-pilot-filter"
+                    value={flightPilotFilter}
+                    onChange={(event) => setFlightPilotFilter(event.target.value)}
+                    className="mdm-template-input"
+                    placeholder="Filter by pilot name"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="flight-registration-filter" className="mdm-template-label">Aircraft Registration</Label>
+                  <Input
+                    id="flight-registration-filter"
+                    value={flightRegistrationFilter}
+                    onChange={(event) => setFlightRegistrationFilter(event.target.value)}
+                    className="mdm-template-input"
+                    placeholder="Filter by tail number"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="flight-number-filter" className="mdm-template-label">Flight Number</Label>
+                  <Input
+                    id="flight-number-filter"
+                    value={flightNumberFilter}
+                    onChange={(event) => setFlightNumberFilter(event.target.value)}
+                    className="mdm-template-input"
+                    placeholder="Filter by flight number"
+                  />
+                </div>
+              </>
+            ) : null}
           </CardContent>
         </Card>
 
@@ -2432,6 +2691,11 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
                           aria-label="Select all rows"
                         />
                       </TableHead>
+                      {entity === 'aircraft' ? (
+                        <TableHead className="sticky top-0 z-20 h-auto min-w-[180px] bg-[#F8FAFC] px-3 py-2 text-left text-[13px] font-semibold text-[#64748B]">
+                          Flight Logs
+                        </TableHead>
+                      ) : null}
                       {(entity === 'aircraft' ? aircraftHeaderColumns : tableColumns).map((column) => (
                         <TableHead key={column} className="sticky top-0 z-20 h-auto min-w-[180px] bg-[#F8FAFC] px-3 py-2 text-left text-[13px] font-semibold text-[#64748B]">
                           <button type="button" className="flex w-full items-center justify-between gap-2 text-left transition-colors hover:text-[hsl(var(--mdm-template-focus))]" onClick={() => toggleSort(column)}>
@@ -2445,16 +2709,12 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
                           </button>
                         </TableHead>
                       ))}
-                      {entity === 'aircraft' ? (
-                        <TableHead className="sticky top-0 z-20 h-auto min-w-[180px] bg-[#F8FAFC] px-3 py-2 text-left text-[13px] font-semibold text-[#64748B]">
-                          Flight Logs
-                        </TableHead>
-                      ) : null}
                     </TableRow>
-                    {entity === 'aircraft' ? (
+                    {supportsColumnFilters ? (
                       <TableRow className="bg-white">
                         <TableHead className="sticky top-[41px] z-10 bg-white px-3 py-2 text-[12px] font-medium text-[#94A3B8]">Filter</TableHead>
-                        {aircraftHeaderColumns.map((column) => (
+                        {entity === 'aircraft' ? <TableHead className="sticky top-[41px] z-10 bg-white px-3 py-2" /> : null}
+                        {(entity === 'aircraft' ? aircraftHeaderColumns : tableColumns).map((column) => (
                           <TableHead key={`filter-${column}`} className="sticky top-[41px] z-10 bg-white px-3 py-2">
                             <Input
                               value={columnFilters[column] || ''}
@@ -2465,12 +2725,11 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
                             />
                           </TableHead>
                         ))}
-                        <TableHead className="sticky top-[41px] z-10 bg-white px-3 py-2" />
                       </TableRow>
                     ) : null}
                   </TableHeader>
                   <TableBody>
-                    {(entity === 'aircraft' ? filteredRows : rows).map((row, rowIndex) => (
+                    {renderedRows.map((row, rowIndex) => (
                       <TableRow
                         key={row.id}
                         data-state={row.id === selectedId ? 'selected' : undefined}
@@ -2490,6 +2749,32 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
                             aria-label={`Select row ${row.id}`}
                           />
                         </TableCell>
+                        {entity === 'aircraft' ? (
+                          <TableCell className="px-3 py-2 align-middle">
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="outline"
+                                className="h-8 whitespace-nowrap"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  openAircraftFlightLogsList(String(row.id));
+                                }}
+                              >
+                                View Flight Logs
+                              </Button>
+                              <Button
+                                variant="outline"
+                                className="h-8 whitespace-nowrap"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  openFlightLogDialog(String(row.id));
+                                }}
+                              >
+                                Add Flight Logs
+                              </Button>
+                            </div>
+                          </TableCell>
+                        ) : null}
                         {(entity === 'aircraft' ? aircraftHeaderColumns : tableColumns).map((column) => (
                           <TableCell key={column} className="max-w-[260px] px-3 py-2 text-left align-middle text-[13px] text-[#1F2937]">
                             <ContextMenu>
@@ -2518,7 +2803,7 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
                                       autoFocus
                                       className="h-8 mdm-template-input"
                                     />
-                                  ) : column === 'id' || column === 'tail_number' ? (
+                                  ) : column === 'id' || column === 'tail_number' || column === 'registration' ? (
                                     <Link
                                       to={`/dashboard/amro/settings/master-data/${ENTITY_ROUTE_SEGMENT[entity]}?selected=${row.id}`}
                                       target="_blank"
@@ -2536,7 +2821,9 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
                               </ContextMenuTrigger>
                               <ContextMenuContent>
                                 <ContextMenuLabel>{getColumnLabel(column)}</ContextMenuLabel>
-                                <ContextMenuItem onSelect={() => handleRowDoubleClick(row)}>Open Form</ContextMenuItem>
+                                <ContextMenuItem onSelect={() => handleRowDoubleClick(row)}>
+                                  {entity === 'flight_logs' ? 'Open Detail' : 'Open Form'}
+                                </ContextMenuItem>
                                 <ContextMenuItem
                                   onSelect={() => {
                                     void navigator.clipboard?.writeText(String(row[column] ?? ''));
@@ -2559,20 +2846,6 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
                             </ContextMenu>
                           </TableCell>
                         ))}
-                        {entity === 'aircraft' ? (
-                          <TableCell className="px-3 py-2 align-middle">
-                            <Button
-                              variant="outline"
-                              className="h-8 whitespace-nowrap"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                openFlightLogDialog(String(row.id));
-                              }}
-                            >
-                              Add Flight Logs
-                            </Button>
-                          </TableCell>
-                        ) : null}
                       </TableRow>
                     ))}
                   </TableBody>
@@ -2581,7 +2854,7 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
             </div>
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">
-                Selected: {selectedId || 'none'} | Checked: {selectedRowIds.length} | Records: {(entity === 'aircraft' ? filteredRows : rows).length}
+                Selected: {selectedId || 'none'} | Checked: {selectedRowIds.length} | Records: {renderedRows.length}
               </p>
               <div className="flex items-center gap-2">
                 <Button variant="outline" onClick={() => setPage((previous) => Math.max(1, previous - 1))}>Previous</Button>
@@ -2831,6 +3104,16 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
                   />
                 </div>
                 <div className={sectionFieldClass}>
+                  <Label htmlFor="flight-log-pilot" className="mdm-template-label">Pilot Name</Label>
+                  <Input
+                    id="flight-log-pilot"
+                    value={flightLogValues.pilotName}
+                    onChange={(event) => setFlightLogField('pilotName', event.target.value)}
+                    className="mdm-template-input"
+                    placeholder="Captain / PIC"
+                  />
+                </div>
+                <div className={sectionFieldClass}>
                   <Label htmlFor="flight-log-departure" className="mdm-template-label">Departure Airport</Label>
                   <Input
                     id="flight-log-departure"
@@ -2961,6 +3244,73 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
                 </Button>
                 <Button onClick={() => void handleFlightLogSubmit()} disabled={flightLogSubmitting}>
                   {flightLogSubmitting ? 'Saving...' : 'Save Flight Log'}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+        <Dialog open={flightLogDetailOpen} onOpenChange={setFlightLogDetailOpen}>
+          <DialogContent className="mdm-template-dialog mdm-template-dialog-large">
+            <DialogHeader className="border-b border-[hsl(var(--mdm-template-border))] px-6 py-4">
+              <DialogTitle className="text-[15px] font-semibold text-[hsl(var(--mdm-template-heading))]">Flight Log Detail</DialogTitle>
+              <DialogDescription className="text-[12px] text-[hsl(var(--mdm-template-muted))]">
+                Detailed operational and discrepancy view for the selected flight log record.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 px-6 pb-6 pt-4">
+              <div className="grid gap-3 md:grid-cols-2">
+                <div>
+                  <Label className="mdm-template-label">Flight Date</Label>
+                  <Input value={String(flightLogDetailRow?.flight_date || '')} readOnly className="mdm-template-readonly" />
+                </div>
+                <div>
+                  <Label className="mdm-template-label">Flight Number</Label>
+                  <Input value={String(flightLogDetailRow?.flight_number || '')} readOnly className="mdm-template-readonly" />
+                </div>
+                <div>
+                  <Label className="mdm-template-label">Pilot Name</Label>
+                  <Input value={String(flightLogDetailRow?.pilot_name || '')} readOnly className="mdm-template-readonly" />
+                </div>
+                <div>
+                  <Label className="mdm-template-label">Aircraft Id</Label>
+                  <Input value={String(flightLogDetailRow?.aircraft_id || '')} readOnly className="mdm-template-readonly" />
+                </div>
+                <div>
+                  <Label className="mdm-template-label">Departure</Label>
+                  <Input value={String(flightLogDetailRow?.departure_airport || '')} readOnly className="mdm-template-readonly" />
+                </div>
+                <div>
+                  <Label className="mdm-template-label">Arrival</Label>
+                  <Input value={String(flightLogDetailRow?.arrival_airport || '')} readOnly className="mdm-template-readonly" />
+                </div>
+                <div>
+                  <Label className="mdm-template-label">Flight Hours</Label>
+                  <Input value={String(flightLogDetailRow?.flight_hours || '')} readOnly className="mdm-template-readonly" />
+                </div>
+                <div>
+                  <Label className="mdm-template-label">Block Hours</Label>
+                  <Input value={String(flightLogDetailRow?.block_hours || '')} readOnly className="mdm-template-readonly" />
+                </div>
+                <div>
+                  <Label className="mdm-template-label">Flight Cycles</Label>
+                  <Input value={String(flightLogDetailRow?.flight_cycles || '')} readOnly className="mdm-template-readonly" />
+                </div>
+                <div>
+                  <Label className="mdm-template-label">Fuel Burn (Kg)</Label>
+                  <Input value={String(flightLogDetailRow?.fuel_burn_kg || '')} readOnly className="mdm-template-readonly" />
+                </div>
+              </div>
+              <div>
+                <Label className="mdm-template-label">Crew Details</Label>
+                <Textarea value={String(flightLogDetailRow?.crew_details || '')} readOnly className="mdm-template-readonly min-h-[90px]" />
+              </div>
+              <div>
+                <Label className="mdm-template-label">PIREP / Discrepancy</Label>
+                <Textarea value={String(flightLogDetailRow?.pirep_discrepancy || '')} readOnly className="mdm-template-readonly min-h-[110px]" />
+              </div>
+              <div className="flex justify-end border-t border-[hsl(var(--mdm-template-border))] pt-4">
+                <Button variant="outline" onClick={() => setFlightLogDetailOpen(false)}>
+                  Close
                 </Button>
               </div>
             </div>

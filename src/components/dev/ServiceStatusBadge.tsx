@@ -50,6 +50,7 @@ function useServiceStatuses(services: Service[], intervalMs = 30000) {
 
 export function ServiceStatusBadge() {
   const isDev = import.meta.env.DEV;
+  const enableSupabaseFunctionProbe = import.meta.env.VITE_ENABLE_SUPABASE_FUNCTION_PROBE === "true";
   const isLocalBrowser =
     typeof window !== "undefined" &&
     ["localhost", "127.0.0.1"].includes(window.location.hostname.toLowerCase());
@@ -59,9 +60,9 @@ export function ServiceStatusBadge() {
         { id: "crm", label: "CRM", probePath: "/api/crm/__health__" },
         { id: "amro", label: "AMRO", probePath: "/api/v2/amro/__health__" },
         ...(isLocalBrowser ? [] : [{ id: "branding", label: "Branding", probePath: "/api/v1/tenant-branding" }]),
-        { id: "sb-fn", label: "Supabase Fn", probePath: "/functions/v1/list-edge-functions" },
+        ...(enableSupabaseFunctionProbe ? [{ id: "sb-fn", label: "Supabase Fn", probePath: "/functions/v1/list-edge-functions" }] : []),
       ] as Service[],
-    [isLocalBrowser]
+    [enableSupabaseFunctionProbe, isLocalBrowser]
   );
   const statuses = useServiceStatuses(services);
   if (!isDev) return null;
