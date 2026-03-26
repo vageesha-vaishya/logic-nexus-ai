@@ -37,6 +37,8 @@ type TenantRoleScope = {
 
 type ParsedAuthorizationHeader = {
   present: boolean;
+  rawHeader: string;
+  rawPreview: string;
   rawLength: number;
   scheme: string | null;
   token: string | null;
@@ -61,6 +63,13 @@ const authHeaderMonitoringState = {
   lastAlertAt: 0,
   window: [] as Array<{ at: number; success: boolean; reason: string }>,
 };
+
+function buildHeaderPreview(value: string): string {
+  const normalized = String(value || '').trim();
+  if (!normalized) return '';
+  if (normalized.length <= 24) return normalized;
+  return `${normalized.slice(0, 16)}...${normalized.slice(-8)}`;
+}
 
 function isRecoverableLookupError(error: unknown): boolean {
   const code = String((error as { code?: unknown } | null)?.code || '').trim();
@@ -87,6 +96,8 @@ function parseAuthorizationHeader(authHeader: string | string[] | undefined): Pa
   if (!normalized) {
     return {
       present: false,
+      rawHeader: '',
+      rawPreview: '',
       rawLength: 0,
       scheme: null,
       token: null,
@@ -98,6 +109,8 @@ function parseAuthorizationHeader(authHeader: string | string[] | undefined): Pa
   if (parts.length !== 2) {
     return {
       present: true,
+      rawHeader: normalized,
+      rawPreview: buildHeaderPreview(normalized),
       rawLength: normalized.length,
       scheme: null,
       token: null,
@@ -111,6 +124,8 @@ function parseAuthorizationHeader(authHeader: string | string[] | undefined): Pa
   if (!token) {
     return {
       present: true,
+      rawHeader: normalized,
+      rawPreview: buildHeaderPreview(normalized),
       rawLength: normalized.length,
       scheme,
       token: null,
@@ -121,6 +136,8 @@ function parseAuthorizationHeader(authHeader: string | string[] | undefined): Pa
   if (scheme !== 'bearer') {
     return {
       present: true,
+      rawHeader: normalized,
+      rawPreview: buildHeaderPreview(normalized),
       rawLength: normalized.length,
       scheme,
       token: null,
@@ -130,6 +147,8 @@ function parseAuthorizationHeader(authHeader: string | string[] | undefined): Pa
   }
   return {
     present: true,
+    rawHeader: normalized,
+    rawPreview: buildHeaderPreview(normalized),
     rawLength: normalized.length,
     scheme,
     token,
@@ -146,6 +165,10 @@ function parseFlag(value: string | undefined, fallback: boolean): boolean {
 
 function isAuthFlowLoggingEnabled(): boolean {
   return parseFlag(process.env.AMRO_AUTH_HEADER_FLOW_LOG, true);
+}
+
+function shouldLogRawAuthorizationHeader(): boolean {
+  return process.env.NODE_ENV !== 'production' || parseFlag(process.env.AMRO_AUTH_HEADER_LOG_RAW, false);
 }
 
 function recordAuthHeaderResult(success: boolean, reason: string, requestId: string, pathName: string): void {
@@ -284,6 +307,7 @@ export async function authMiddleware(
         tokenSource: source,
         parseError: parsedHeader.parseError,
         tokenLength: parsedHeader.tokenLength,
+        authorizationHeader: shouldLogRawAuthorizationHeader() ? parsedHeader.rawHeader : parsedHeader.rawPreview,
       });
     }
     if (!token) {
@@ -308,6 +332,7 @@ export async function authMiddleware(
         scheme: parsedHeader.scheme,
         parseError: parsedHeader.parseError,
         tokenSource: source,
+        authorizationHeader: shouldLogRawAuthorizationHeader() ? parsedHeader.rawHeader : parsedHeader.rawPreview,
       });
       res.status(401).json({
         error: 'Missing or malformed Authorization header',

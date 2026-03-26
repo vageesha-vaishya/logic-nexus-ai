@@ -3,7 +3,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Database, Settings2 } from 'lucide-react';
+import { Database, Plane, Settings2 } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 
 export function AmroSettingsPage() {
@@ -22,7 +22,7 @@ export function AmroSettingsPage() {
           <Badge variant="secondary">Tenant: {context.tenantId || 'unscoped'}</Badge>
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid gap-4 lg:grid-cols-3">
           <Card className="border-primary/30">
             <CardHeader className="space-y-2">
               <div className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-primary/10 text-primary">
@@ -36,6 +36,23 @@ export function AmroSettingsPage() {
             <CardContent>
               <Button asChild>
                 <Link to="/dashboard/amro/settings/master-data">Open Master Data</Link>
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="border-primary/30">
+            <CardHeader className="space-y-2">
+              <div className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-primary/10 text-primary">
+                <Plane className="h-5 w-5" />
+              </div>
+              <CardTitle>Aircraft Module</CardTitle>
+              <CardDescription>
+                Open the dedicated AMRO Aircraft sub-module with full CRUD, validation, filters, sorting, and exports.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button asChild>
+                <Link to="/dashboard/amro/aircraft">Open Aircraft Module</Link>
               </Button>
             </CardContent>
           </Card>

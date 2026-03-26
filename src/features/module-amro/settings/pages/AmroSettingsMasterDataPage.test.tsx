@@ -13,6 +13,7 @@ const mockGetSession = vi.fn();
 const mockRefreshSession = vi.fn();
 const mockToastError = vi.fn();
 const mockToastSuccess = vi.fn();
+let mockAuthAccessToken = 'token-1';
 const ASYNC_WAIT_TIMEOUT_MS = 4000;
 
 vi.mock('@/components/layout/DashboardLayout', () => ({
@@ -32,6 +33,7 @@ vi.mock('@/hooks/useCRM', () => ({
 vi.mock('@/hooks/useAuth', () => ({
   useAuth: () => ({
     hasPermission: () => true,
+    session: mockAuthAccessToken ? { access_token: mockAuthAccessToken } : null,
   }),
 }));
 
@@ -147,6 +149,17 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
         </Routes>
       </MemoryRouter>,
     );
+  const renderAircraftSubModulePage = () =>
+    render(
+      <MemoryRouter initialEntries={['/dashboard/amro/aircraft']} future={memoryRouterFuture}>
+        <Routes>
+          <Route
+            path="/dashboard/amro/aircraft"
+            element={<AmroSettingsMasterDataPage entityOverride="aircraft" variant="aircraft-sub-module" />}
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
 
   const openDropdownAndSelectItem = async (trigger: HTMLElement, itemName: RegExp) => {
     fireEvent.pointerDown(trigger);
@@ -171,10 +184,23 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     fireEvent.click(targetItem);
   };
 
+  const resolveAuthorizationHeader = (headers: RequestInit['headers'] | undefined): string => {
+    if (!headers) return '';
+    if (headers instanceof Headers) {
+      return String(headers.get('Authorization') || '');
+    }
+    if (Array.isArray(headers)) {
+      const entry = headers.find(([key]) => String(key).toLowerCase() === 'authorization');
+      return String(entry?.[1] || '');
+    }
+    return String((headers as Record<string, string>)['Authorization'] || (headers as Record<string, string>)['authorization'] || '');
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
     sessionStorage.clear();
+    mockAuthAccessToken = 'token-1';
     mockGetSession.mockResolvedValue({
       data: {
         session: {
@@ -463,6 +489,16 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     expect(screen.getByRole('button', { name: /Run Bulk Import/ })).toBeInTheDocument();
   });
 
+  it('renders aircraft sub-module as standalone AMRO surface without entity tabs', async () => {
+    renderAircraftSubModulePage();
+
+    expect(await screen.findByRole('heading', { name: 'AMRO · Aircraft' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'AMRO Overview' })).toHaveAttribute('href', '/dashboard/amro/overview');
+    expect(screen.getByRole('button', { name: /New Aircraft/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Run Bulk Import/ })).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'Parts Inventory' })).not.toBeInTheDocument();
+  });
+
   it('applies the standardized five-column master data design system classes in form dialog layout', async () => {
     render(
       <MemoryRouter initialEntries={['/dashboard/amro/settings/master-data/parts-inventory']} future={memoryRouterFuture}>
@@ -603,6 +639,37 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     fireEvent.doubleClick(dataRows[0]);
     expect(await screen.findByRole('heading', { name: 'Update Aircraft' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Save Changes' })).toBeInTheDocument();
+  });
+
+  it('includes Bearer Authorization header on aircraft row-triggered work package snapshot requests', async () => {
+    renderAircraftPage();
+
+    await screen.findByText('N100AA');
+    await waitFor(() => {
+      const snapshotCalls = vi
+        .mocked(fetch)
+        .mock.calls.filter(([input]) => String(input).includes('/api/v2/amro/work-packages'));
+      expect(snapshotCalls.length).toBeGreaterThan(0);
+      const hasBearerHeader = snapshotCalls.some(([, init]) => resolveAuthorizationHeader(init?.headers).startsWith('Bearer token-1'));
+      expect(hasBearerHeader).toBe(true);
+    }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
+  });
+
+  it('shows session-expired message and skips snapshot request when no auth token exists', async () => {
+    mockAuthAccessToken = '';
+    mockGetSession.mockResolvedValue({ data: { session: null } });
+    mockRefreshSession.mockResolvedValue({ data: { session: null } });
+
+    renderAircraftPage();
+
+    await screen.findByText('N100AA');
+    await waitFor(() => {
+      expect(mockToastError).toHaveBeenCalledWith('Your session has expired. Sign in again to load aircraft details.');
+    }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
+    const snapshotCalls = vi
+      .mocked(fetch)
+      .mock.calls.filter(([input]) => String(input).includes('/api/v2/amro/work-packages'));
+    expect(snapshotCalls.length).toBe(0);
   });
 
   it('records flight logs from the aircraft row action', async () => {

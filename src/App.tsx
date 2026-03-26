@@ -193,6 +193,7 @@ const AmroIntelligence = lazy(() => import("./features/module-amro").then((modul
 const AmroSettings = lazy(() => import("./features/module-amro").then((module) => ({ default: module.AmroSettingsPage })));
 const AmroMasterData = lazy(() => import("./features/module-amro").then((module) => ({ default: module.AmroMasterDataPage })));
 const AmroAircraftMasterData = lazy(() => import("./features/module-amro/settings/pages/AmroMasterDataEntityPages").then((module) => ({ default: module.AircraftMasterDataPage })));
+const AmroAircraftSubModule = lazy(() => import("./features/module-amro/settings/pages/AmroMasterDataEntityPages").then((module) => ({ default: module.AircraftSubModulePage })));
 const AmroPartsInventoryMasterData = lazy(() => import("./features/module-amro/settings/pages/AmroMasterDataEntityPages").then((module) => ({ default: module.PartsInventoryMasterDataPage })));
 const AmroSuppliersMasterData = lazy(() => import("./features/module-amro/settings/pages/AmroMasterDataEntityPages").then((module) => ({ default: module.SuppliersMasterDataPage })));
 const AmroMaintenanceFacilitiesMasterData = lazy(() => import("./features/module-amro/settings/pages/AmroMasterDataEntityPages").then((module) => ({ default: module.MaintenanceFacilitiesMasterDataPage })));
@@ -873,6 +874,7 @@ const App = () => (
             <Route path="/dashboard/debug-console" element={<ProtectedRoute><DebugConsole /></ProtectedRoute>} />
             <Route path="/dashboard/amro" element={<Navigate to="/dashboard/amro/overview" replace />} />
             <Route path="/dashboard/amro/overview" element={<ProtectedRoute requiredDomainCode="AMRO"><AmroOverview /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/aircraft" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroAircraftSubModule /></ProtectedRoute>} />
             <Route path="/dashboard/amro/work-packages" element={<ProtectedRoute requiredDomainCode="AMRO"><AmroWorkPackages /></ProtectedRoute>} />
             <Route path="/dashboard/amro/task-execution" element={<ProtectedRoute requiredDomainCode="AMRO"><AmroTaskExecution /></ProtectedRoute>} />
             <Route path="/dashboard/amro/scheduling" element={<ProtectedRoute requiredDomainCode="AMRO"><AmroScheduling /></ProtectedRoute>} />

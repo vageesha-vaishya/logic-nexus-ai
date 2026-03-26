@@ -669,15 +669,26 @@ const ENTITY_DEFAULT_VALUES: Record<MasterEntity, FormValues> = {
 
 type AmroSettingsMasterDataPageProps = {
   entityOverride?: MasterEntity;
+  variant?: 'master-data' | 'aircraft-sub-module';
 };
 
-export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMasterDataPageProps = {}) {
+export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-data' }: AmroSettingsMasterDataPageProps = {}) {
   const { context } = useCRM();
-  const { hasPermission } = useAuth();
+  const { hasPermission, session } = useAuth();
   const { entity: entityParam } = useParams<{ entity?: string }>();
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const isAircraftSubModule = variant === 'aircraft-sub-module';
+  const routeBasePath = isAircraftSubModule ? '/dashboard/amro' : '/dashboard/amro/settings/master-data';
+  const breadcrumbParentLabel = isAircraftSubModule ? 'AMRO' : 'AMRO Settings';
+  const breadcrumbParentPath = isAircraftSubModule ? '/dashboard/amro/overview' : '/dashboard/amro/settings';
+  const breadcrumbCurrentLabel = isAircraftSubModule ? 'Aircraft' : 'Master Data';
+  const pageTitle = isAircraftSubModule ? 'AMRO · Aircraft' : 'AMRO Settings · Master Data';
+  const pageSubtitle = isAircraftSubModule
+    ? 'Tenant-scoped aircraft operations management with governed CRUD controls, validation, filtering, and exports.'
+    : 'Tenant-scoped CRUD management for fleet, inventory, manufacturers, suppliers, facilities, workforce, compliance profiles, shift capacity, and work package templates.';
+  const homeActionLabel = isAircraftSubModule ? 'AMRO Overview' : 'Settings Dashboard';
   const resolvedRouteEntity = useMemo(() => {
     if (entityOverride) {
       return entityOverride;
@@ -779,6 +790,7 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
   const rowsRenderSignatureRef = useRef('');
   const manufacturerSeedAttemptedRef = useRef(false);
   const selectionAnchorRef = useRef<string | null>(null);
+  const aircraftSnapshotAuthToastShownRef = useRef(false);
   const aircraftEnhancementEnabled = normalizeFeatureFlag(import.meta.env.VITE_AMRO_AIRCRAFT_FORM_ENHANCEMENTS, true);
   const aircraftFormDraftKey = useMemo(
     () => `amro:aircraft-form-draft:${modalMode}:${selectedId || 'new'}`,
@@ -812,6 +824,7 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
     }),
     [context.franchiseId, context.tenantId, context.userId],
   );
+  const sessionAccessToken = useMemo(() => String(session?.access_token || '').trim(), [session?.access_token]);
 
   const fetchManufacturerOptions = useCallback(async (headers: Headers): Promise<ManufacturerOption[]> => {
     const query = new URLSearchParams({
@@ -1136,12 +1149,15 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
   }, [entity, loadAssemblyModelOptions, modalOpen]);
 
   useEffect(() => {
-    const targetPathname = `/dashboard/amro/settings/master-data/${ENTITY_ROUTE_SEGMENT[entity]}`;
+    if (isAircraftSubModule) {
+      return;
+    }
+    const targetPathname = `${routeBasePath}/${ENTITY_ROUTE_SEGMENT[entity]}`;
     if (location.pathname === targetPathname) {
       return;
     }
     navigate(`${targetPathname}${location.search}`, { replace: true });
-  }, [entity, location.pathname, location.search, navigate]);
+  }, [entity, isAircraftSubModule, location.pathname, location.search, navigate, routeBasePath]);
 
   useEffect(() => {
     const next = new URLSearchParams();
@@ -1907,7 +1923,16 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
       setAircraftPresenceError('');
       const startedAt = performance.now();
       try {
-        const headers = await buildApiHeaders(scope);
+        const headers = await buildApiHeaders(scope, {
+          fallbackAccessToken: sessionAccessToken,
+          requestTag: 'aircraft-collaborator-presence',
+          requestUrl: '/api/v2/amro/master-data/flight_logs',
+          requestMethod: 'GET',
+        });
+        const authorizationHeader = String(headers.get('Authorization') || '');
+        if (!authorizationHeader) {
+          throw new Error('Authentication required to load aircraft collaborator presence');
+        }
         const query = new URLSearchParams({ page: '1', page_size: '1000', sort_by: 'flight_date', sort_dir: 'desc' });
         const response = await fetch(`/api/v2/amro/master-data/flight_logs?${query.toString()}`, { method: 'GET', headers });
         const payload = await parseApiPayload(response);
@@ -1952,7 +1977,7 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
     return () => {
       cancelled = true;
     };
-  }, [entity, renderedRows, scope]);
+  }, [entity, renderedRows, scope, sessionAccessToken]);
 
   const toggleSort = useCallback(
     (column: string) => {
@@ -2236,8 +2261,26 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
       return;
     }
     try {
-      const headers = await buildApiHeaders(scope);
-      if (!headers.get('Authorization')) {
+      const headers = await buildApiHeaders(scope, {
+        fallbackAccessToken: sessionAccessToken,
+        requestTag: 'aircraft-work-package-snapshot',
+        requestUrl: '/api/v2/amro/work-packages',
+        requestMethod: 'GET',
+      });
+      const authorizationHeader = String(headers.get('Authorization') || '');
+      if (!authorizationHeader) {
+        logger.warn('Aircraft row click snapshot skipped: Authorization header missing', {
+          component: 'AmroSettingsMasterDataPage',
+          requestPath: '/api/v2/amro/work-packages',
+          requestMethod: 'GET',
+          aircraftId,
+          selectedId: String(selectedId || ''),
+          authorizationHeader,
+        });
+        if (!aircraftSnapshotAuthToastShownRef.current) {
+          aircraftSnapshotAuthToastShownRef.current = true;
+          toast.error('Your session has expired. Sign in again to load aircraft details.');
+        }
         setAircraftWorkPackageSnapshot({
           open: 0,
           inProgress: 0,
@@ -2259,6 +2302,23 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
       });
       const payload = await parseApiPayload(response);
       if (!response.ok) {
+        const responseError = String(payload.error || '');
+        logger.warn('Aircraft row click snapshot request failed', {
+          component: 'AmroSettingsMasterDataPage',
+          requestPath: '/api/v2/amro/work-packages',
+          requestMethod: 'GET',
+          statusCode: response.status,
+          aircraftId,
+          selectedId: String(selectedId || ''),
+          authorizationHeader,
+          responseError,
+        });
+        if (response.status === 401 && (responseError.includes('Authorization header') || responseError.includes('Invalid or expired token'))) {
+          if (!aircraftSnapshotAuthToastShownRef.current) {
+            aircraftSnapshotAuthToastShownRef.current = true;
+            toast.error('Authentication failed while loading aircraft details. Please sign in again.');
+          }
+        }
         setAircraftWorkPackageSnapshot({
           open: 0,
           inProgress: 0,
@@ -2269,8 +2329,17 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
         });
         return;
       }
+      aircraftSnapshotAuthToastShownRef.current = false;
       setAircraftWorkPackageSnapshot(buildAircraftWorkPackageSnapshot(parseWorkPackageItems(payload)));
-    } catch {
+    } catch (error) {
+      logger.warn('Aircraft row click snapshot request error', {
+        component: 'AmroSettingsMasterDataPage',
+        requestPath: '/api/v2/amro/work-packages',
+        requestMethod: 'GET',
+        aircraftId,
+        selectedId: String(selectedId || ''),
+        message: String((error as Error).message || error),
+      });
       setAircraftWorkPackageSnapshot({
         open: 0,
         inProgress: 0,
@@ -2280,7 +2349,7 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
         slaRisk: 0,
       });
     }
-  }, [aircraftEnhancementEnabled, entity, scope, selectedAircraft]);
+  }, [aircraftEnhancementEnabled, entity, scope, selectedAircraft, selectedId, sessionAccessToken]);
 
   useEffect(() => {
     void loadAircraftWorkPackageSnapshot();
@@ -2822,21 +2891,18 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
             <nav className="mb-1 flex items-center gap-1 text-xs text-[hsl(var(--mdm-template-muted))]" aria-label="Breadcrumb">
               <Link className="transition-colors hover:text-[hsl(var(--mdm-template-focus))]" to="/dashboard">Dashboard</Link>
               <span>/</span>
-              <Link className="transition-colors hover:text-[hsl(var(--mdm-template-focus))]" to="/dashboard/amro/settings">AMRO Settings</Link>
+              <Link className="transition-colors hover:text-[hsl(var(--mdm-template-focus))]" to={breadcrumbParentPath}>{breadcrumbParentLabel}</Link>
               <span>/</span>
-              <span className="font-medium text-[hsl(var(--mdm-template-heading))]">Master Data</span>
+              <span className="font-medium text-[hsl(var(--mdm-template-heading))]">{breadcrumbCurrentLabel}</span>
             </nav>
-            <h1 className="mdm-template-header-title">AMRO Settings · Master Data</h1>
-            <p className="mdm-template-header-subtitle">
-              Tenant-scoped CRUD management for fleet, inventory, manufacturers, suppliers, facilities, workforce, compliance profiles,
-              shift capacity, and work package templates.
-            </p>
+            <h1 className="mdm-template-header-title">{pageTitle}</h1>
+            <p className="mdm-template-header-subtitle">{pageSubtitle}</p>
           </div>
           <div className="flex items-center gap-2">
             <Badge variant="secondary">Tenant: {context.tenantId || 'unscoped'}</Badge>
             <Button variant="ghost" asChild>
-              <Link to="/dashboard/amro/settings" className="underline-offset-4 hover:underline">
-                Settings Dashboard
+              <Link to={breadcrumbParentPath} className="underline-offset-4 hover:underline">
+                {homeActionLabel}
               </Link>
             </Button>
             <Tooltip>
@@ -2889,15 +2955,17 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
           </div>
         </div>
 
-        <Tabs value={entity} onValueChange={(next) => setEntity(next as MasterEntity)}>
-          <TabsList className="mdm-template-tab-rail h-auto">
-            {MASTER_ENTITY_SEQUENCE.map((key) => (
-              <TabsTrigger key={key} value={key} className="mdm-template-tab data-[state=active]:bg-[hsl(var(--mdm-template-focus))/0.14] data-[state=active]:text-[hsl(var(--mdm-template-heading))]">
-                {ENTITY_LABEL[key]}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
+        {!isAircraftSubModule ? (
+          <Tabs value={entity} onValueChange={(next) => setEntity(next as MasterEntity)}>
+            <TabsList className="mdm-template-tab-rail h-auto">
+              {MASTER_ENTITY_SEQUENCE.map((key) => (
+                <TabsTrigger key={key} value={key} className="mdm-template-tab data-[state=active]:bg-[hsl(var(--mdm-template-focus))/0.14] data-[state=active]:text-[hsl(var(--mdm-template-heading))]">
+                  {ENTITY_LABEL[key]}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+        ) : null}
 
         {entity === 'aircraft' && aircraftEnhancementEnabled ? (
           <Card className="mdm-template-panel">

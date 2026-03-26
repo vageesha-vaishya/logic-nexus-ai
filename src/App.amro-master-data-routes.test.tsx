@@ -93,6 +93,7 @@ vi.mock('./pages/SelfServiceOnboarding', () => ({
 
 vi.mock('./features/module-amro/settings/pages/AmroMasterDataEntityPages', () => ({
   AircraftMasterDataPage: () => <div data-testid="route-aircraft">aircraft</div>,
+  AircraftSubModulePage: () => <div data-testid="route-aircraft-sub-module">aircraft-sub-module</div>,
   PartsInventoryMasterDataPage: () => <div data-testid="route-parts-inventory">parts-inventory</div>,
   SuppliersMasterDataPage: () => <div data-testid="route-suppliers">suppliers</div>,
   MaintenanceFacilitiesMasterDataPage: () => <div data-testid="route-maintenance-facilities">maintenance-facilities</div>,
@@ -132,5 +133,11 @@ describe('App AMRO master data route mapping', () => {
     window.history.pushState({}, 'Redirect Test', '/dashboard/amro/settings/master-data');
     render(<App />);
     expect(await screen.findByTestId('route-aircraft')).toBeInTheDocument();
+  });
+
+  it('resolves AMRO aircraft sub-module route', async () => {
+    window.history.pushState({}, 'Aircraft Sub-module Route Test', '/dashboard/amro/aircraft');
+    render(<App />);
+    expect(await screen.findByTestId('route-aircraft-sub-module')).toBeInTheDocument();
   });
 });
