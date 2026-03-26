@@ -85,12 +85,23 @@ type InlineEditingCell = {
 type ManufacturerOption = {
   id: string;
   label: string;
+  code: string;
+  name: string;
   active: boolean;
 };
 
 type AssemblyTypeOption = {
   id: string;
   label: string;
+  active: boolean;
+};
+
+type AssemblyModelOption = {
+  id: string;
+  label: string;
+  modelValue: string;
+  manufacturerId: string;
+  manufacturerTokens: string[];
   active: boolean;
 };
 
@@ -275,14 +286,16 @@ const MANUFACTURER_SEED_NAMES = [
   'WILLIAMS INTERNATIONAL',
 ];
 
+const AIRCRAFT_TYPE_OPTIONS = ['NarrowBody', 'RegionalJet', 'Turboprop', 'WideBody', 'auto_seeded'];
+
 const ENTITY_FORM_FIELDS: Record<MasterEntity, EntityFormField[]> = {
   aircraft: [
     { key: 'registration', label: 'Registration', type: 'text' },
     { key: 'tail_number', label: 'Tail Number', type: 'text', required: true },
     { key: 'serial_number', label: 'Serial Number', type: 'text', required: true },
-    { key: 'aircraft_type', label: 'Aircraft Type', type: 'text', required: true },
+    { key: 'aircraft_type', label: 'Aircraft Type', type: 'select', required: true, options: AIRCRAFT_TYPE_OPTIONS },
     { key: 'manufacturer_id', label: 'Manufacturer', type: 'select', required: true },
-    { key: 'aircraft_model', label: 'Aircraft Model', type: 'text', required: true },
+    { key: 'aircraft_model', label: 'Aircraft Model', type: 'select', required: true },
     { key: 'configuration_code', label: 'Configuration Code', type: 'text' },
     { key: 'maintenance_program', label: 'Maintenance Program', type: 'text' },
     { key: 'status', label: 'Status', type: 'select', required: true, options: ['active', 'inactive', 'grounded', 'maintenance'] },
@@ -1054,6 +1067,9 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
   const [assemblyTypeOptions, setAssemblyTypeOptions] = useState<AssemblyTypeOption[]>([]);
   const [assemblyTypeOptionsLoading, setAssemblyTypeOptionsLoading] = useState(false);
   const [assemblyTypeOptionsError, setAssemblyTypeOptionsError] = useState('');
+  const [assemblyModelOptions, setAssemblyModelOptions] = useState<AssemblyModelOption[]>([]);
+  const [assemblyModelOptionsLoading, setAssemblyModelOptionsLoading] = useState(false);
+  const [assemblyModelOptionsError, setAssemblyModelOptionsError] = useState('');
   const [aircraftWorkPackageDialogOpen, setAircraftWorkPackageDialogOpen] = useState(false);
   const [aircraftWorkPackageValues, setAircraftWorkPackageValues] = useState<AircraftWorkPackageFormValues>(getDefaultAircraftWorkPackageValues());
   const [aircraftWorkPackageErrors, setAircraftWorkPackageErrors] = useState<Record<string, string>>({});
@@ -1115,7 +1131,7 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
         const name = String(record.name || '').trim();
         const label = name && code ? `${name} (${code})` : name || code || id;
         const active = String(record.is_active ?? 'true').toLowerCase() !== 'false';
-        return { id, label, active };
+        return { id, label, code, name, active };
       })
       .filter((option): option is ManufacturerOption => Boolean(option));
   }, []);
@@ -1142,6 +1158,41 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
         return { id, label, active };
       })
       .filter((option): option is AssemblyTypeOption => Boolean(option));
+  }, []);
+
+  const fetchAssemblyModelOptions = useCallback(async (headers: Headers): Promise<AssemblyModelOption[]> => {
+    const query = new URLSearchParams({
+      page: '1',
+      page_size: '500',
+      sort_by: 'name',
+      sort_dir: 'asc',
+    });
+    const response = await fetch(`/api/v2/amro/master-data/assembly_models?${query.toString()}`, { method: 'GET', headers });
+    const payload = await parseApiPayload(response);
+    if (!response.ok) throw new Error(String(payload.error || 'Failed to load aircraft models'));
+    const records = getPayloadRecords(payload);
+    return records
+      .map((record) => {
+        const id = String(record.id || '').trim();
+        if (!id) return null;
+        const manufacturerId = String(record.manufacturer_id || '').trim();
+        const code = String(record.model_code || '').trim();
+        const name = String(record.name || '').trim();
+        const modelValue = name || code || id;
+        const label = name && code && name !== code ? `${name} (${code})` : name || code || id;
+        const active = String(record.is_active ?? 'true').toLowerCase() !== 'false';
+        const manufacturerTokens = [
+          manufacturerId,
+          String(record.manufacturer || '').trim(),
+          String(record.manufacturer_code || '').trim(),
+          String(record.manufacturer_name || '').trim(),
+          String(record.manufacturer_label || '').trim(),
+        ]
+          .filter(Boolean)
+          .map((token) => token.toLowerCase());
+        return { id, manufacturerId, label, modelValue, manufacturerTokens, active };
+      })
+      .filter((option): option is AssemblyModelOption => Boolean(option));
   }, []);
 
   const seedManufacturersIfNeeded = useCallback(async (headers: Headers) => {
@@ -1203,6 +1254,22 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
       setAssemblyTypeOptionsLoading(false);
     }
   }, [fetchAssemblyTypeOptions, scope]);
+
+  const loadAssemblyModelOptions = useCallback(async () => {
+    setAssemblyModelOptionsLoading(true);
+    setAssemblyModelOptionsError('');
+    try {
+      const headers = await buildApiHeaders(scope);
+      const options = await fetchAssemblyModelOptions(headers);
+      setAssemblyModelOptions(options);
+    } catch (error) {
+      const message = String((error as Error).message || 'Failed to load aircraft models');
+      setAssemblyModelOptionsError(message);
+      toast.error(message);
+    } finally {
+      setAssemblyModelOptionsLoading(false);
+    }
+  }, [fetchAssemblyModelOptions, scope]);
 
   const loadRecords = useCallback(async () => {
     setLoading(true);
@@ -1289,6 +1356,18 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
       void loadAssemblyTypeOptions();
     }
   }, [entity, loadAssemblyTypeOptions, modalOpen]);
+
+  useEffect(() => {
+    if (entity === 'aircraft') {
+      void loadAssemblyModelOptions();
+    }
+  }, [entity, loadAssemblyModelOptions]);
+
+  useEffect(() => {
+    if (entity === 'aircraft' && modalOpen) {
+      void loadAssemblyModelOptions();
+    }
+  }, [entity, loadAssemblyModelOptions, modalOpen]);
 
   useEffect(() => {
     navigate(`/dashboard/amro/settings/master-data/${ENTITY_ROUTE_SEGMENT[entity]}${location.search}`, { replace: true });
@@ -1641,6 +1720,7 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
       })),
     [manufacturerOptions],
   );
+  const manufacturerMetaById = useMemo(() => new Map(manufacturerOptions.map((option) => [option.id, option])), [manufacturerOptions]);
   const manufacturerLabelById = useMemo(
     () => new Map(manufacturerOptions.map((option) => [option.id, option.label])),
     [manufacturerOptions],
@@ -1658,6 +1738,34 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
     () => new Map(assemblyTypeOptions.map((option) => [option.id, option.label])),
     [assemblyTypeOptions],
   );
+  const aircraftModelSelectOptions = useMemo<SelectOption[]>(() => {
+    const normalize = (value: string) => value.trim().toLowerCase();
+    const manufacturerId = String(formValues.manufacturer_id ?? '').trim();
+    const manufacturer = manufacturerMetaById.get(manufacturerId);
+    const manufacturerTokens = manufacturer
+      ? [manufacturer.id, manufacturer.code, manufacturer.name, manufacturer.label].filter(Boolean).map(normalize)
+      : [];
+    const manufacturerTokenSet = new Set(manufacturerTokens);
+    const filtered = manufacturerId
+      ? assemblyModelOptions.filter((option) => {
+          if (!option.manufacturerTokens.length) {
+            const fallback = normalize(option.manufacturerId || '');
+            return fallback ? manufacturerTokenSet.has(fallback) : false;
+          }
+          return option.manufacturerTokens.some((token) => manufacturerTokenSet.has(token));
+        })
+      : [];
+    let options = filtered.map((option) => ({
+      value: option.modelValue,
+      label: option.label,
+      disabled: !option.active,
+    }));
+    const currentModel = String(formValues.aircraft_model ?? '').trim();
+    if (currentModel && !options.some((option) => option.value === currentModel)) {
+      options = [{ value: currentModel, label: currentModel, disabled: false }, ...options];
+    }
+    return options;
+  }, [assemblyModelOptions, formValues.aircraft_model, formValues.manufacturer_id, manufacturerMetaById]);
 
   const setFieldValue = useCallback((fieldKey: string, value: unknown) => {
     setFormValues((previous) => ({ ...previous, [fieldKey]: value }));
@@ -1690,17 +1798,82 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
         }
         return assemblyTypeSelectOptions;
       }
+      if (field.key === 'aircraft_model') {
+        const manufacturerId = String(formValues.manufacturer_id ?? '').trim();
+        if (!manufacturerId) {
+          return [{ value: '__select_manufacturer__', label: 'Select manufacturer first', disabled: true }];
+        }
+        if (assemblyModelOptionsLoading) {
+          return [{ value: '__loading_assembly_models__', label: 'Loading aircraft models...', disabled: true }];
+        }
+        if (assemblyModelOptionsError) {
+          return [{ value: '__error_assembly_models__', label: 'Unable to load aircraft models', disabled: true }];
+        }
+        if (aircraftModelSelectOptions.length === 0) {
+          return [{ value: '__empty_assembly_models__', label: 'No aircraft models available', disabled: true }];
+        }
+        return aircraftModelSelectOptions;
+      }
       return (field.options || []).map((option) => ({ value: option, label: option }));
     },
     [
+      aircraftModelSelectOptions,
       assemblyTypeOptionsError,
       assemblyTypeOptionsLoading,
       assemblyTypeSelectOptions,
+      assemblyModelOptionsError,
+      assemblyModelOptionsLoading,
+      formValues.manufacturer_id,
       manufacturerOptionsError,
       manufacturerOptionsLoading,
       manufacturerSelectOptions,
     ],
   );
+
+  useEffect(() => {
+    if (entity !== 'aircraft') {
+      return;
+    }
+    if (assemblyModelOptionsLoading || assemblyModelOptionsError) {
+      return;
+    }
+    const manufacturerId = String(formValues.manufacturer_id ?? '').trim();
+    const currentModel = String(formValues.aircraft_model ?? '').trim();
+    if (!manufacturerId) {
+      if (currentModel) {
+        setFieldValue('aircraft_model', '');
+      }
+      return;
+    }
+    if (!currentModel) {
+      return;
+    }
+    const manufacturer = manufacturerMetaById.get(manufacturerId);
+    const normalize = (value: string) => value.trim().toLowerCase();
+    const manufacturerTokens = manufacturer
+      ? [manufacturer.id, manufacturer.code, manufacturer.name, manufacturer.label].filter(Boolean).map(normalize)
+      : [];
+    const manufacturerTokenSet = new Set(manufacturerTokens);
+    const match = assemblyModelOptions.some((option) => {
+      const manufacturerMatch =
+        option.manufacturerTokens.length > 0
+          ? option.manufacturerTokens.some((token) => manufacturerTokenSet.has(token))
+          : manufacturerTokenSet.has(normalize(option.manufacturerId || ''));
+      return manufacturerMatch && option.modelValue === currentModel;
+    });
+    if (!match) {
+      setFieldValue('aircraft_model', '');
+    }
+  }, [
+    assemblyModelOptions,
+    assemblyModelOptionsError,
+    assemblyModelOptionsLoading,
+    entity,
+    formValues.aircraft_model,
+    formValues.manufacturer_id,
+    manufacturerMetaById,
+    setFieldValue,
+  ]);
 
   const supportsColumnFilters = entity === 'aircraft' || entity === 'flight_logs';
 

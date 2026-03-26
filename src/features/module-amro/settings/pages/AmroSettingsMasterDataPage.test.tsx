@@ -192,6 +192,25 @@ describe('AmroSettingsMasterDataPage', () => {
               }),
           };
         }
+        if (method === 'GET' && url.includes('/api/v2/amro/master-data/assembly_models')) {
+          return {
+            ok: true,
+            text: async () =>
+              JSON.stringify({
+                output: {
+                  records: [
+                    {
+                      id: 'amodel-1',
+                      model_code: 'B737-800',
+                      name: 'B737-800',
+                      manufacturer_id: 'manu-1',
+                      is_active: true,
+                    },
+                  ],
+                },
+              }),
+          };
+        }
         if (method === 'GET') {
           if (url.includes('/api/v2/amro/work-packages')) {
             return {
@@ -335,11 +354,13 @@ describe('AmroSettingsMasterDataPage', () => {
     const dialog = await screen.findByTestId('amro-master-data-form-dialog');
     fireEvent.change(within(dialog).getByLabelText(/^Tail Number/), { target: { value: 'N200AA' } });
     fireEvent.change(within(dialog).getByLabelText(/^Serial Number/), { target: { value: 'SN-200' } });
-    fireEvent.change(within(dialog).getByLabelText(/^Aircraft Type/), { target: { value: 'A321' } });
+    fireEvent.click(within(dialog).getByLabelText(/^Aircraft Type/));
+    fireEvent.click(await screen.findByText('NarrowBody'));
     fireEvent.click(within(dialog).getByRole('button', { name: 'Configuration Settings' }));
     fireEvent.click(within(dialog).getByLabelText(/Manufacturer/));
     fireEvent.click(await screen.findByText('Boeing (BOE)'));
-    fireEvent.change(within(dialog).getByLabelText(/^Aircraft Model/), { target: { value: 'A321-200' } });
+    fireEvent.click(within(dialog).getByLabelText(/^Aircraft Model/));
+    fireEvent.click(await screen.findByText('B737-800'));
     fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
 
     await waitFor(() => {

@@ -378,8 +378,8 @@ function parsePagination(req: AuthRequest): { page: number; pageSize: number; st
   if (!Number.isFinite(pageSizeRaw) || pageSizeRaw <= 0 || !Number.isInteger(pageSizeRaw)) {
     throw new HttpError('page_size must be a positive integer', 400);
   }
-  if (pageSizeRaw > 200) {
-    throw new HttpError('page_size must be less than or equal to 200', 400);
+  if (pageSizeRaw > 5000) {
+    throw new HttpError('page_size must be less than or equal to 5000', 400);
   }
   const page = pageRaw;
   const pageSize = pageSizeRaw;
@@ -838,6 +838,46 @@ async function validateAssemblyModelReferences(
   return issues;
 }
 
+function formatManufacturerLabel(name: string | null, code: string | null, fallback: string): string {
+  if (name && code) return `${name} (${code})`;
+  return name || code || fallback;
+}
+
+async function hydrateAircraftPayload(
+  supabase: SupabaseClient,
+  tenantId: string,
+  franchiseId: string | null,
+  payload: JsonRecord,
+): Promise<JsonRecord> {
+  const manufacturerId = asNullableString(payload.manufacturer_id);
+  const manufacturer = asNullableString(payload.manufacturer);
+  const aircraftModel = asNullableString(payload.aircraft_model);
+  const model = asNullableString(payload.model);
+  const enriched: JsonRecord = { ...payload };
+
+  if (!model && aircraftModel) {
+    enriched.model = aircraftModel;
+  }
+
+  if (!manufacturer && manufacturerId) {
+    let query = supabase
+      .from('manufacturers')
+      .select('name,manufacturer_code,franchise_id')
+      .eq('tenant_id', tenantId)
+      .eq('id', manufacturerId);
+    if (franchiseId) {
+      query = query.or(`franchise_id.is.null,franchise_id.eq.${franchiseId}`);
+    }
+    const { data } = await query.maybeSingle();
+    const record = (data || null) as JsonRecord | null;
+    const name = asNullableString(record?.name);
+    const code = asNullableString(record?.manufacturer_code);
+    enriched.manufacturer = formatManufacturerLabel(name, code, manufacturerId);
+  }
+
+  return enriched;
+}
+
 function buildCsv(rows: JsonRecord[]): string {
   if (!rows.length) return '';
   const headers = Array.from(
@@ -1123,7 +1163,8 @@ router.post(
       return;
     }
 
-    const payload = sanitizeWritePayload(entity, body);
+    const hydratedBody = entity === 'aircraft' ? await hydrateAircraftPayload(supabase, req.tenantId, franchiseId, body) : body;
+    const payload = sanitizeWritePayload(entity, hydratedBody);
     if (entity === 'assembly_models') {
       const issues = await validateAssemblyModelReferences(supabase, req.tenantId, franchiseId, [payload]);
       if (issues.size > 0) {

@@ -1,0 +1,914 @@
+PASS tests/work-orders.service.test.ts
+PASS tests/amro-tracing.test.ts
+PASS tests/work-packages-stream.test.ts
+PASS tests/resilience.test.ts
+  ● Console
+
+    console.error
+      [ERROR] [Resilience] dependency alert {
+        dependency: 'supabase',
+        operation: 'test.open-circuit',
+        statusCode: 500,
+        message: 'network failure',
+        requestId: 'req-2',
+        tenantId: undefined,
+        occurredAt: '2026-03-25T17:50:14.138Z'
+      }
+
+      12 |   },
+      13 |   error: (msg: string, meta?: any): void => {
+    > 14 |     console.error(`[ERROR] ${msg}`, meta || '');
+         |             ^
+      15 |   },
+      16 |   debug: (msg: string, meta?: any): void => {
+      17 |     if (process.env.DEBUG) {
+
+      at Object.error (src/utils/logger.ts:14:13)
+      at emitAlert (src/utils/resilience.ts:100:10)
+      at executeWithResilience (src/utils/resilience.ts:172:9)
+      at Object.<anonymous> (tests/resilience.test.ts:39:5)
+
+FAIL tests/amro-events.test.ts
+  ● Test suite failed to run
+
+    Vitest cannot be imported in a CommonJS module using require(). Please use "import" instead.
+
+    If you are using "import" in your source code, then it's possible it was bundled into require() automatically by your bundler. In that case, do not bundle CommonJS output since it will never work with Vitest, or use dynamic import() which is available in all CommonJS modules.
+
+       7 | import { AmroEventType } from '../src/events/amro-events.types';
+       8 | import { Kafka, Producer } from 'kafkajs';
+    >  9 | import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+         | ^
+      10 |
+      11 | // Mock KafkaJS
+      12 | vi.mock('kafkajs', () => ({
+
+      at Object.<anonymous> (../../node_modules/vitest/index.cjs:1:109)
+      at Object.<anonymous> (tests/amro-events.test.ts:9:1)
+
+PASS tests/auth.middleware.test.ts
+  ● Console
+
+    console.warn
+      [WARN] Auth middleware user_roles lookup unavailable; continuing with fallback resolution {
+        userId: 'user-1',
+        error: 'relation "user_roles" does not exist',
+        code: '42P01'
+      }
+
+       9 |   },
+      10 |   warn: (msg: string, meta?: any): void => {
+    > 11 |     console.warn(`[WARN] ${msg}`, meta || '');
+         |             ^
+      12 |   },
+      13 |   error: (msg: string, meta?: any): void => {
+      14 |     console.error(`[ERROR] ${msg}`, meta || '');
+
+      at Object.warn (src/utils/logger.ts:11:13)
+      at authMiddleware (src/middleware/auth.middleware.ts:171:14)
+      at Object.<anonymous> (tests/auth.middleware.test.ts:170:5)
+
+    console.error
+      [ERROR] Auth middleware error {
+        requestId: '',
+        statusCode: 500,
+        errorCode: 'AUTH_ERROR',
+        message: "Cannot destructure property 'data' of '(intermediate value)' as it is undefined."
+      }
+
+      12 |   },
+      13 |   error: (msg: string, meta?: any): void => {
+    > 14 |     console.error(`[ERROR] ${msg}`, meta || '');
+         |             ^
+      15 |   },
+      16 |   debug: (msg: string, meta?: any): void => {
+      17 |     if (process.env.DEBUG) {
+
+      at Object.error (src/utils/logger.ts:14:13)
+      at authMiddleware (src/middleware/auth.middleware.ts:327:12)
+      at Object.<anonymous> (tests/auth.middleware.test.ts:184:5)
+
+PASS tests/work-orders.routes.test.ts
+PASS tests/master-data.routes.test.ts
+  ● Console
+
+    console.error
+      [ERROR] [AMRO Master Data] request failed {
+        correlationId: 'd4bc71d1-de60-4633-941c-3c4e1892e9c4',
+        method: 'GET',
+        path: '/amro/master-data/aircraft',
+        statusCode: 400,
+        message: 'page must be a positive integer'
+      }
+
+      12 |   },
+      13 |   error: (msg: string, meta?: any): void => {
+    > 14 |     console.error(`[ERROR] ${msg}`, meta || '');
+         |             ^
+      15 |   },
+      16 |   debug: (msg: string, meta?: any): void => {
+      17 |     if (process.env.DEBUG) {
+
+      at Object.error (src/utils/logger.ts:14:13)
+      at src/routes/master-data.routes.ts:1378:10
+      at Layer.handle_error (node_modules/express/lib/router/layer.js:71:5)
+      at trim_prefix (node_modules/express/lib/router/index.js:326:13)
+      at node_modules/express/lib/router/index.js:286:9
+      at router.process_params (node_modules/express/lib/router/index.js:346:12)
+      at next (node_modules/express/lib/router/index.js:280:10)
+      at next (node_modules/express/lib/router/route.js:141:14)
+
+    console.error
+      [ERROR] [AMRO Master Data] request failed {
+        correlationId: '95e3aad9-d1c4-407a-8996-3fd8e6fdd6b4',
+        method: 'GET',
+        path: '/amro/master-data/aircraft',
+        statusCode: 503,
+        message: 'supabase circuit breaker is open'
+      }
+
+      12 |   },
+      13 |   error: (msg: string, meta?: any): void => {
+    > 14 |     console.error(`[ERROR] ${msg}`, meta || '');
+         |             ^
+      15 |   },
+      16 |   debug: (msg: string, meta?: any): void => {
+      17 |     if (process.env.DEBUG) {
+
+      at Object.error (src/utils/logger.ts:14:13)
+      at src/routes/master-data.routes.ts:1378:10
+      at Layer.handle_error (node_modules/express/lib/router/layer.js:71:5)
+      at trim_prefix (node_modules/express/lib/router/index.js:326:13)
+      at node_modules/express/lib/router/index.js:286:9
+      at router.process_params (node_modules/express/lib/router/index.js:346:12)
+      at next (node_modules/express/lib/router/index.js:280:10)
+      at next (node_modules/express/lib/router/route.js:141:14)
+
+PASS tests/work-orders-contract.test.ts
+  ● Console
+
+    console.log
+      [INFO] Request started {
+        requestId: '49204d5d-40b4-4bd3-b38a-7432ab156338',
+        method: 'POST',
+        path: '/api/v1/work-packages/wp-1/tasks',
+        ip: '::ffff:127.0.0.1'
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request finished {
+        requestId: '49204d5d-40b4-4bd3-b38a-7432ab156338',
+        method: 'POST',
+        path: '/work-packages/wp-1/tasks',
+        statusCode: 201,
+        durationMs: 11
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request started {
+        requestId: '44b7b09c-45e2-41ef-96f1-e67c1feb7d46',
+        method: 'POST',
+        path: '/api/v1/work-packages/wp-1/tasks',
+        ip: '::ffff:127.0.0.1'
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request finished {
+        requestId: '44b7b09c-45e2-41ef-96f1-e67c1feb7d46',
+        method: 'POST',
+        path: '/work-packages/wp-1/tasks',
+        statusCode: 201,
+        durationMs: 1
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request started {
+        requestId: 'be88a4e4-7f0a-4089-8dec-57d525dd5700',
+        method: 'GET',
+        path: '/api/v1/work-packages/wp-42/materials',
+        ip: '::ffff:127.0.0.1'
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request finished {
+        requestId: 'be88a4e4-7f0a-4089-8dec-57d525dd5700',
+        method: 'GET',
+        path: '/work-packages/wp-42/materials',
+        statusCode: 200,
+        durationMs: 2
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request started {
+        requestId: 'c621d1a4-c581-4123-8936-dd6f6cc8715b',
+        method: 'POST',
+        path: '/api/v1/tasks/task-99/maintenance-events',
+        ip: '::ffff:127.0.0.1'
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request finished {
+        requestId: 'c621d1a4-c581-4123-8936-dd6f6cc8715b',
+        method: 'POST',
+        path: '/tasks/task-99/maintenance-events',
+        statusCode: 201,
+        durationMs: 1
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+PASS tests/work-orders.test.ts
+  ● Console
+
+    console.log
+      [INFO] Request started {
+        requestId: '48a80766-868f-45e2-80a6-d1adff9d2542',
+        method: 'GET',
+        path: '/health',
+        ip: '::ffff:127.0.0.1'
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request finished {
+        requestId: '48a80766-868f-45e2-80a6-d1adff9d2542',
+        method: 'GET',
+        path: '/health',
+        statusCode: 200,
+        durationMs: 11
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request started {
+        requestId: '7816a4eb-49ad-46bd-b684-3286d66d1ff4',
+        method: 'GET',
+        path: '/',
+        ip: '::ffff:127.0.0.1'
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request finished {
+        requestId: '7816a4eb-49ad-46bd-b684-3286d66d1ff4',
+        method: 'GET',
+        path: '/',
+        statusCode: 200,
+        durationMs: 1
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request started {
+        requestId: '2a3ffd0b-f3aa-4af0-91b0-e596715c5b86',
+        method: 'GET',
+        path: '/health/ready',
+        ip: '::ffff:127.0.0.1'
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request finished {
+        requestId: '2a3ffd0b-f3aa-4af0-91b0-e596715c5b86',
+        method: 'GET',
+        path: '/health/ready',
+        statusCode: 503,
+        durationMs: 13
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request started {
+        requestId: 'd3c53ead-5332-4824-a854-d30833ac94c8',
+        method: 'GET',
+        path: '/health/metrics',
+        ip: '::ffff:127.0.0.1'
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request finished {
+        requestId: 'd3c53ead-5332-4824-a854-d30833ac94c8',
+        method: 'GET',
+        path: '/health/metrics',
+        statusCode: 200,
+        durationMs: 0
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request started {
+        requestId: '50b1d038-36af-4809-b333-1cf8051fbf3d',
+        method: 'GET',
+        path: '/api/v2/amro/contracts/openapi-3.1.yaml',
+        ip: '::ffff:127.0.0.1'
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request finished {
+        requestId: '50b1d038-36af-4809-b333-1cf8051fbf3d',
+        method: 'GET',
+        path: '/api/v2/amro/contracts/openapi-3.1.yaml',
+        statusCode: 200,
+        durationMs: 2
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request started {
+        requestId: 'af25feb0-6d96-494b-88d3-0912ae8ab134',
+        method: 'GET',
+        path: '/api/v2/amro/contracts/unknown-artifact.yaml',
+        ip: '::ffff:127.0.0.1'
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request finished {
+        requestId: 'af25feb0-6d96-494b-88d3-0912ae8ab134',
+        method: 'GET',
+        path: '/api/v2/amro/contracts/unknown-artifact.yaml',
+        statusCode: 404,
+        durationMs: 1
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request started {
+        requestId: '788eadc1-d259-4fc7-858a-61fe83b3c06b',
+        method: 'GET',
+        path: '/api/v2/amro/phase-plan',
+        ip: '::ffff:127.0.0.1'
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request finished {
+        requestId: '788eadc1-d259-4fc7-858a-61fe83b3c06b',
+        method: 'GET',
+        path: '/api/v2/amro/phase-plan',
+        statusCode: 200,
+        durationMs: 1
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request started {
+        requestId: '63187a9d-dca2-4e24-89d7-7c346d18d1ed',
+        method: 'GET',
+        path: '/api/v2/amro/phase-1-readiness',
+        ip: '::ffff:127.0.0.1'
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request finished {
+        requestId: '63187a9d-dca2-4e24-89d7-7c346d18d1ed',
+        method: 'GET',
+        path: '/api/v2/amro/phase-1-readiness',
+        statusCode: 200,
+        durationMs: 0
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request started {
+        requestId: '71e831b4-e1a7-4be7-8e5c-b1564cebf63d',
+        method: 'GET',
+        path: '/api/v2/amro/module-catalog',
+        ip: '::ffff:127.0.0.1'
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request finished {
+        requestId: '71e831b4-e1a7-4be7-8e5c-b1564cebf63d',
+        method: 'GET',
+        path: '/api/v2/amro/module-catalog',
+        statusCode: 200,
+        durationMs: 1
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request started {
+        requestId: 'ab4c92b8-069c-45ce-b2f3-4a0d51e63714',
+        method: 'GET',
+        path: '/api/v2/amro/screen-inventory',
+        ip: '::ffff:127.0.0.1'
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request finished {
+        requestId: 'ab4c92b8-069c-45ce-b2f3-4a0d51e63714',
+        method: 'GET',
+        path: '/api/v2/amro/screen-inventory',
+        statusCode: 200,
+        durationMs: 1
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request started {
+        requestId: '1c28ff6c-e3ce-4aaf-a550-6f224978c667',
+        method: 'GET',
+        path: '/api/v2/amro/migration-plan',
+        ip: '::ffff:127.0.0.1'
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request finished {
+        requestId: '1c28ff6c-e3ce-4aaf-a550-6f224978c667',
+        method: 'GET',
+        path: '/api/v2/amro/migration-plan',
+        statusCode: 200,
+        durationMs: 0
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request started {
+        requestId: '1390f1b5-5490-4508-9eb5-214d81e13c4b',
+        method: 'GET',
+        path: '/api/v2/amro/health',
+        ip: '::ffff:127.0.0.1'
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request finished {
+        requestId: '1390f1b5-5490-4508-9eb5-214d81e13c4b',
+        method: 'GET',
+        path: '/api/v2/amro/health',
+        statusCode: 200,
+        durationMs: 2
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request started {
+        requestId: '091e99ae-f22a-4dcf-9c68-b970161c6cc6',
+        method: 'GET',
+        path: '/api/v2/amro/health/metrics',
+        ip: '::ffff:127.0.0.1'
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request finished {
+        requestId: '091e99ae-f22a-4dcf-9c68-b970161c6cc6',
+        method: 'GET',
+        path: '/api/v2/amro/health/metrics',
+        statusCode: 200,
+        durationMs: 0
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request started {
+        requestId: 'a6122bd5-5085-41ce-9ae5-433534b8bf4a',
+        method: 'GET',
+        path: '/api/v1/work-packages',
+        ip: '::ffff:127.0.0.1'
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request finished {
+        requestId: 'a6122bd5-5085-41ce-9ae5-433534b8bf4a',
+        method: 'GET',
+        path: '/work-packages',
+        statusCode: 401,
+        durationMs: 1
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request started {
+        requestId: '8f8eb593-b06a-4499-8e59-a86012545cb9',
+        method: 'GET',
+        path: '/api/v1/work-packages',
+        ip: '::ffff:127.0.0.1'
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request finished {
+        requestId: '8f8eb593-b06a-4499-8e59-a86012545cb9',
+        method: 'GET',
+        path: '/work-packages',
+        statusCode: 401,
+        durationMs: 0
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request started {
+        requestId: 'e2d018ad-9f8d-4925-a269-66a88298fed5',
+        method: 'GET',
+        path: '/api/v1/work-packages',
+        ip: '::ffff:127.0.0.1'
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request finished {
+        requestId: 'e2d018ad-9f8d-4925-a269-66a88298fed5',
+        method: 'GET',
+        path: '/work-packages',
+        statusCode: 401,
+        durationMs: 1
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request started {
+        requestId: '08fdd575-636e-498b-b9a8-1a6ce6491ba6',
+        method: 'GET',
+        path: '/unknown-endpoint',
+        ip: '::ffff:127.0.0.1'
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request finished {
+        requestId: '08fdd575-636e-498b-b9a8-1a6ce6491ba6',
+        method: 'GET',
+        path: '/unknown-endpoint',
+        statusCode: 404,
+        durationMs: 0
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request started {
+        requestId: '9b5bffbf-5bce-4bf9-b186-f552be8bd32d',
+        method: 'GET',
+        path: '/unknown-endpoint',
+        ip: '::ffff:127.0.0.1'
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request finished {
+        requestId: '9b5bffbf-5bce-4bf9-b186-f552be8bd32d',
+        method: 'GET',
+        path: '/unknown-endpoint',
+        statusCode: 404,
+        durationMs: 0
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request started {
+        requestId: 'cb19e645-5dcb-43ec-927d-8325d21c02f4',
+        method: 'GET',
+        path: '/api/v1/unknown-endpoint',
+        ip: '::ffff:127.0.0.1'
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request finished {
+        requestId: 'cb19e645-5dcb-43ec-927d-8325d21c02f4',
+        method: 'GET',
+        path: '/unknown-endpoint',
+        statusCode: 401,
+        durationMs: 1
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request started {
+        requestId: 'e9108662-5e96-4bfc-a87b-b0893da48efb',
+        method: 'GET',
+        path: '/api/v1/work-packages',
+        ip: '::ffff:127.0.0.1'
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request finished {
+        requestId: 'e9108662-5e96-4bfc-a87b-b0893da48efb',
+        method: 'GET',
+        path: '/work-packages',
+        statusCode: 401,
+        durationMs: 0
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request started {
+        requestId: '0ee8a475-2fa2-48ab-9689-2916e63d2833',
+        method: 'POST',
+        path: '/api/v1/work-packages',
+        ip: '::ffff:127.0.0.1'
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request finished {
+        requestId: '0ee8a475-2fa2-48ab-9689-2916e63d2833',
+        method: 'POST',
+        path: '/work-packages',
+        statusCode: 401,
+        durationMs: 0
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request started {
+        requestId: '72d5a772-5285-4b52-a292-72f67d5dda45',
+        method: 'GET',
+        path: '/api/v1/work-packages/wp-123',
+        ip: '::ffff:127.0.0.1'
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request finished {
+        requestId: '72d5a772-5285-4b52-a292-72f67d5dda45',
+        method: 'GET',
+        path: '/work-packages/wp-123',
+        statusCode: 401,
+        durationMs: 1
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request started {
+        requestId: '23fa274e-20ac-4294-b5be-e4ea75881236',
+        method: 'PATCH',
+        path: '/api/v1/work-packages/wp-123',
+        ip: '::ffff:127.0.0.1'
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request finished {
+        requestId: '23fa274e-20ac-4294-b5be-e4ea75881236',
+        method: 'PATCH',
+        path: '/work-packages/wp-123',
+        statusCode: 401,
+        durationMs: 0
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request started {
+        requestId: '8d0ca756-0b44-47c9-8c82-d2dcf413be46',
+        method: 'DELETE',
+        path: '/api/v1/work-packages/wp-123',
+        ip: '::ffff:127.0.0.1'
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request finished {
+        requestId: '8d0ca756-0b44-47c9-8c82-d2dcf413be46',
+        method: 'DELETE',
+        path: '/work-packages/wp-123',
+        statusCode: 401,
+        durationMs: 0
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request started {
+        requestId: '72bcd0ba-8adf-473b-94df-5fffd6b94edb',
+        method: 'GET',
+        path: '/api/v1/work-packages/wp-123/tasks',
+        ip: '::ffff:127.0.0.1'
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request finished {
+        requestId: '72bcd0ba-8adf-473b-94df-5fffd6b94edb',
+        method: 'GET',
+        path: '/work-packages/wp-123/tasks',
+        statusCode: 401,
+        durationMs: 0
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request started {
+        requestId: 'f3430052-3c39-467c-98bb-f28c5d98beb5',
+        method: 'POST',
+        path: '/api/v1/work-packages/wp-123/tasks',
+        ip: '::ffff:127.0.0.1'
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request finished {
+        requestId: 'f3430052-3c39-467c-98bb-f28c5d98beb5',
+        method: 'POST',
+        path: '/work-packages/wp-123/tasks',
+        statusCode: 401,
+        durationMs: 0
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request started {
+        requestId: 'be5fe100-d485-4f48-b90b-9ad9d74e0a56',
+        method: 'GET',
+        path: '/api/v1/tasks/task-123',
+        ip: '::ffff:127.0.0.1'
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request finished {
+        requestId: 'be5fe100-d485-4f48-b90b-9ad9d74e0a56',
+        method: 'GET',
+        path: '/tasks/task-123',
+        statusCode: 401,
+        durationMs: 1
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request started {
+        requestId: '575ad888-64cd-4325-91aa-bc7fb70b6de5',
+        method: 'PATCH',
+        path: '/api/v1/tasks/task-123',
+        ip: '::ffff:127.0.0.1'
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request finished {
+        requestId: '575ad888-64cd-4325-91aa-bc7fb70b6de5',
+        method: 'PATCH',
+        path: '/tasks/task-123',
+        statusCode: 401,
+        durationMs: 1
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request started {
+        requestId: 'e8169755-f442-4014-a8f4-41b690f11b42',
+        method: 'DELETE',
+        path: '/api/v1/tasks/task-123',
+        ip: '::ffff:127.0.0.1'
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request finished {
+        requestId: 'e8169755-f442-4014-a8f4-41b690f11b42',
+        method: 'DELETE',
+        path: '/tasks/task-123',
+        statusCode: 401,
+        durationMs: 1
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request started {
+        requestId: '2efaadfc-6ee3-425d-aaad-6505b0310102',
+        method: 'GET',
+        path: '/api/v1/work-packages/wp-123/materials',
+        ip: '::ffff:127.0.0.1'
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request finished {
+        requestId: '2efaadfc-6ee3-425d-aaad-6505b0310102',
+        method: 'GET',
+        path: '/work-packages/wp-123/materials',
+        statusCode: 401,
+        durationMs: 1
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request started {
+        requestId: '5cbfbd6b-b21f-4b78-b86b-686feae5ca7d',
+        method: 'GET',
+        path: '/api/v1/materials/material-123',
+        ip: '::ffff:127.0.0.1'
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request finished {
+        requestId: '5cbfbd6b-b21f-4b78-b86b-686feae5ca7d',
+        method: 'GET',
+        path: '/materials/material-123',
+        statusCode: 401,
+        durationMs: 0
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request started {
+        requestId: 'e141b2f9-d7ee-4b12-bca2-1f4e0d218038',
+        method: 'POST',
+        path: '/api/v1/tasks/task-123/maintenance-events',
+        ip: '::ffff:127.0.0.1'
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+    console.log
+      [INFO] Request finished {
+        requestId: 'e141b2f9-d7ee-4b12-bca2-1f4e0d218038',
+        method: 'POST',
+        path: '/tasks/task-123/maintenance-events',
+        statusCode: 401,
+        durationMs: 0
+      }
+
+      at Object.info (src/utils/logger.ts:8:13)
+
+
+Test Suites: 1 failed, 9 passed, 10 total
+Tests:       95 passed, 95 total
+Snapshots:   0 total
+Time:        3.4 s
+Ran all test suites.
