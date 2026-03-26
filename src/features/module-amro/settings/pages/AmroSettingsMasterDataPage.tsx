@@ -343,6 +343,27 @@ const AIRCRAFT_FIELD_HELP: Partial<Record<string, string>> = {
   maintenance_program: 'Attach approved program code used by planning and compliance teams.',
   status: 'Status drives risk scoring and available operational quick actions.',
 };
+const SYSTEM_TEMPLATE_MODEL_OPTIONS = ['B737-800 template', 'A320neo template', 'ATR72 template', 'B787-9 template'];
+const AIRCRAFT_BASE_OPTIONS = ['Nothing selected', 'DXB', 'LHR', 'JFK', 'SIN'];
+const AIRCRAFT_OWNER_OPTIONS = ['Nothing selected', 'Owned', 'Leased', 'Wet Lease'];
+
+type AircraftCounterRow = {
+  key: string;
+  name: string;
+  serialNumber: string;
+  model: string;
+  initialValue: string;
+  initialDate: string;
+  unit: string;
+};
+
+const getDefaultAircraftCounterRows = (): AircraftCounterRow[] => [
+  { key: 'calendar', name: 'Calendar', serialNumber: '-', model: 'Nose Gear Assy', initialValue: 'since', initialDate: '', unit: 'Manufacturing date' },
+  { key: 'flight_hours', name: 'Flight hours', serialNumber: '-', model: '-', initialValue: '0.0', initialDate: '', unit: 'hours' },
+  { key: 'landing', name: 'Landing', serialNumber: '-', model: '-', initialValue: '0.0', initialDate: '', unit: 'cycles' },
+  { key: 'n1', name: 'N1', serialNumber: '-', model: '-', initialValue: '0.0', initialDate: '', unit: 'value' },
+  { key: 'n2', name: 'N2', serialNumber: '-', model: '-', initialValue: '0.0', initialDate: '', unit: 'value' },
+];
 
 const ENTITY_FORM_FIELDS: Record<MasterEntity, EntityFormField[]> = {
   aircraft: [
@@ -1220,6 +1241,18 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
   const [aircraftFormDraftStatus, setAircraftFormDraftStatus] = useState<'idle' | 'restored' | 'saved'>('idle');
   const [aircraftFormLastSavedAt, setAircraftFormLastSavedAt] = useState('');
   const [lastCollaborationPingAt, setLastCollaborationPingAt] = useState(new Date().toISOString());
+  const [aircraftNoSerialNumber, setAircraftNoSerialNumber] = useState(false);
+  const [aircraftTemplateModel, setAircraftTemplateModel] = useState(SYSTEM_TEMPLATE_MODEL_OPTIONS[0]);
+  const [aircraftManufacturingDate, setAircraftManufacturingDate] = useState('');
+  const [aircraftBase, setAircraftBase] = useState(AIRCRAFT_BASE_OPTIONS[0]);
+  const [aircraftOwner, setAircraftOwner] = useState(AIRCRAFT_OWNER_OPTIONS[0]);
+  const [aircraftLineNumber, setAircraftLineNumber] = useState('');
+  const [aircraftVariableNumber, setAircraftVariableNumber] = useState('');
+  const [aircraftMaintenanceRevisionNumber, setAircraftMaintenanceRevisionNumber] = useState('');
+  const [aircraftMaintenanceRevisionDate, setAircraftMaintenanceRevisionDate] = useState('');
+  const [aircraftAmendmentNumber, setAircraftAmendmentNumber] = useState('');
+  const [aircraftAmendmentDate, setAircraftAmendmentDate] = useState('');
+  const [aircraftCounterRows, setAircraftCounterRows] = useState<AircraftCounterRow[]>(getDefaultAircraftCounterRows);
   const canCreateWorkPackage = hasPermission('create_maintenance_request');
   const canScheduleWorkPackage = hasPermission('edit_aircraft_records');
   const canExportAircraftOps = hasPermission('delete_flight_logs');
@@ -2057,6 +2090,30 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
     setFormValues((previous) => ({ ...previous, [fieldKey]: value }));
     setFormErrors((previous) => ({ ...previous, [fieldKey]: '' }));
   }, []);
+  const setAircraftCounterValue = useCallback((key: string, field: 'initialValue' | 'initialDate', value: string) => {
+    setAircraftCounterRows((previous) =>
+      previous.map((row) => (row.key === key ? { ...row, [field]: value } : row)),
+    );
+  }, []);
+  const handleAircraftNoSerialChange = useCallback(
+    (checked: boolean) => {
+      setAircraftNoSerialNumber(checked);
+      if (checked) {
+        setFieldValue('serial_number', 'N/A');
+        return;
+      }
+      if (String(formValues.serial_number ?? '').trim().toUpperCase() === 'N/A') {
+        setFieldValue('serial_number', '');
+      }
+    },
+    [formValues.serial_number, setFieldValue],
+  );
+  const setAircraftAuxField = useCallback(
+    (key: string, value: string) => {
+      setFieldValue(key, value);
+    },
+    [setFieldValue],
+  );
 
   const resolveSelectOptions = useCallback(
     (field: EntityFormField): SelectOption[] => {
@@ -2421,6 +2478,38 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
     return () => window.clearInterval(timer);
   }, [entity, modalOpen]);
 
+  useEffect(() => {
+    if (!modalOpen || entity !== 'aircraft') {
+      return;
+    }
+    const registration = String(formValues.registration ?? '').trim().toUpperCase();
+    const serialNumber = String(formValues.serial_number ?? '').trim().toUpperCase();
+    setAircraftNoSerialNumber(serialNumber === 'N/A');
+    const templateModelSource = formValues.system_template_model ?? SYSTEM_TEMPLATE_MODEL_OPTIONS[0] ?? '';
+    setAircraftTemplateModel(String(templateModelSource).trim() || SYSTEM_TEMPLATE_MODEL_OPTIONS[0]);
+    setAircraftManufacturingDate(String(formValues.manufacturing_date ?? '').trim());
+    const baseSource = formValues.base_location ?? AIRCRAFT_BASE_OPTIONS[0] ?? '';
+    setAircraftBase(String(baseSource).trim() || AIRCRAFT_BASE_OPTIONS[0]);
+    const ownerSource = formValues.owner_name ?? AIRCRAFT_OWNER_OPTIONS[0] ?? '';
+    setAircraftOwner(String(ownerSource).trim() || AIRCRAFT_OWNER_OPTIONS[0]);
+    setAircraftLineNumber(String(formValues.line_number ?? '').trim());
+    setAircraftVariableNumber(String(formValues.variable_number ?? registration).trim());
+    setAircraftMaintenanceRevisionNumber(String(formValues.maintenance_revision_number ?? '').trim());
+    setAircraftMaintenanceRevisionDate(String(formValues.maintenance_revision_date ?? '').trim());
+    setAircraftAmendmentNumber(String(formValues.amendment_number ?? '').trim());
+    setAircraftAmendmentDate(String(formValues.amendment_date ?? '').trim());
+    setAircraftCounterRows(getDefaultAircraftCounterRows());
+    setFormValues((previous) => {
+      const fallbackTailNumber = String(previous.tail_number ?? '').trim() || String(previous.registration ?? '').trim() || String(previous.variable_number ?? '').trim();
+      return {
+        ...previous,
+        tail_number: fallbackTailNumber ? fallbackTailNumber.toUpperCase() : previous.tail_number,
+        aircraft_type: String(previous.aircraft_type ?? '').trim() || AIRCRAFT_TYPE_OPTIONS[0],
+        status: String(previous.status ?? '').trim() || 'active',
+      };
+    });
+  }, [entity, modalMode, modalOpen, selectedId]);
+
   const handleSubmitModal = useCallback(async () => {
     const ok = modalMode === 'create' ? await handleCreate() : await handleUpdate();
     if (ok) {
@@ -2451,6 +2540,17 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
     }
     try {
       const headers = await buildApiHeaders(scope);
+      if (!headers.get('Authorization')) {
+        setAircraftWorkPackageSnapshot({
+          open: 0,
+          inProgress: 0,
+          deferred: 0,
+          completed: 0,
+          rtsBlockers: 0,
+          slaRisk: 0,
+        });
+        return;
+      }
       const query = new URLSearchParams({
         aircraft_id: aircraftId,
         page: '1',
@@ -3594,162 +3694,428 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
             </DialogHeader>
             <div className="space-y-6 px-6 pb-6 pt-4">
               {entity === 'aircraft' ? (
-                <div className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-muted/20 p-3" data-testid="amro-aircraft-form-progress">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-[12px] font-semibold text-[hsl(var(--mdm-template-heading))]">
+                <div className="space-y-3 rounded-md bg-[#08a8bd] p-3 text-[12px]">
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-white">
+                    <p className="font-semibold">
                       Required Completion {aircraftRequiredProgress.completed}/{aircraftRequiredProgress.total} ({aircraftRequiredProgress.percent}%)
                     </p>
-                    <div className="flex items-center gap-2 text-[11px] text-[hsl(var(--mdm-template-muted))]">
+                    <div className="flex items-center gap-2 text-[11px]">
                       <Users className="h-3.5 w-3.5" />
-                      <span>
-                        Collaboration: {collaborationIndicator.status} · {collaborationIndicator.activeEditors} active
-                      </span>
+                      <span>{collaborationIndicator.status} · {collaborationIndicator.activeEditors} active</span>
                       <span>Last sync {collaborationIndicator.lastSeen}</span>
-                      {aircraftFormDraftStatus !== 'idle' ? (
-                        <span>
-                          Draft {aircraftFormDraftStatus === 'restored' ? 'restored' : 'saved'} {aircraftFormLastSavedAt ? new Date(aircraftFormLastSavedAt).toLocaleTimeString() : ''}
-                        </span>
-                      ) : null}
+                      <span>Errors {aircraftValidationSummary.errorCount}</span>
                     </div>
                   </div>
-                  <div className="mt-2 h-2 overflow-hidden rounded bg-[hsl(var(--mdm-template-border))]">
-                    <div className="h-full bg-[hsl(var(--mdm-template-focus))] transition-all" style={{ width: `${aircraftRequiredProgress.percent}%` }} />
-                  </div>
-                  <p className="mt-2 text-[11px] text-[hsl(var(--mdm-template-muted))]" aria-live="polite">
-                    Current validation blockers: {aircraftValidationSummary.errorCount}
-                  </p>
-                </div>
-              ) : null}
-              <div
-                className="mdm-template-tab-rail mdm-template-tab-rail-inline"
-                role="tablist"
-                aria-label="Master data form sections"
-                onKeyDown={(event) => {
-                  if (event.key === 'ArrowRight') {
-                    event.preventDefault();
-                    cycleFormTab('next');
-                  }
-                  if (event.key === 'ArrowLeft') {
-                    event.preventDefault();
-                    cycleFormTab('prev');
-                  }
-                }}
-              >
-                <button
-                  type="button"
-                  role="tab"
-                  id="master-data-tab-basic"
-                  aria-selected={activeFormTab === 'basic'}
-                  aria-controls="master-data-panel-basic"
-                  className={tabLabelClass('basic')}
-                  data-state={activeFormTab === 'basic' ? 'active' : 'inactive'}
-                  onClick={() => setActiveFormTab('basic')}
-                >
-                  Basic Information ({aircraftSectionProgress.basic.completed}/{aircraftSectionProgress.basic.total})
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  id="master-data-tab-configuration"
-                  aria-selected={activeFormTab === 'configuration'}
-                  aria-controls="master-data-panel-configuration"
-                  className={tabLabelClass('configuration')}
-                  data-state={activeFormTab === 'configuration' ? 'active' : 'inactive'}
-                  onClick={() => setActiveFormTab('configuration')}
-                >
-                  Configuration Settings ({aircraftSectionProgress.configuration.completed}/{aircraftSectionProgress.configuration.total})
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  id="master-data-tab-system"
-                  aria-selected={activeFormTab === 'system'}
-                  aria-controls="master-data-panel-system"
-                  className={tabLabelClass('system')}
-                  data-state={activeFormTab === 'system' ? 'active' : 'inactive'}
-                  onClick={() => setActiveFormTab('system')}
-                >
-                  System Information
-                </button>
-              </div>
-              {activeFormTab === 'basic' && (
-                <div className="space-y-6" role="tabpanel" id="master-data-panel-basic" aria-labelledby="master-data-tab-basic">
-                  <div className="flex items-start justify-between gap-3">
-                    <h3 className="text-[14px] font-semibold text-[hsl(var(--mdm-template-heading))]">Basic Information</h3>
-                    <Button type="button" variant="ghost" size="sm" onClick={() => toggleFormPanel('basic')} aria-expanded={!collapsedFormPanels.basic}>
-                      {collapsedFormPanels.basic ? 'Expand Panel' : 'Collapse Panel'}
-                    </Button>
-                  </div>
-                  <p className="text-[12px] text-[hsl(var(--mdm-template-muted))]">
-                    Capture aircraft identity and manufacturer attributes with mandatory validation.
-                  </p>
-                  {!collapsedFormPanels.basic ? (
-                    <div className={sectionGridClass} data-testid="amro-master-data-basic-grid">
-                      {basicSectionFields.map((field, index) => renderEditableField(field, 'basic', index))}
-                    </div>
-                  ) : null}
-                </div>
-              )}
-              {activeFormTab === 'configuration' && (
-                <div className="space-y-6" role="tabpanel" id="master-data-panel-configuration" aria-labelledby="master-data-tab-configuration">
-                  <div className="flex items-start justify-between gap-3">
-                    <h3 className="text-[14px] font-semibold text-[hsl(var(--mdm-template-heading))]">Configuration Settings</h3>
-                    <Button type="button" variant="ghost" size="sm" onClick={() => toggleFormPanel('configuration')} aria-expanded={!collapsedFormPanels.configuration}>
-                      {collapsedFormPanels.configuration ? 'Expand Panel' : 'Collapse Panel'}
-                    </Button>
-                  </div>
-                  <p className="text-[12px] text-[hsl(var(--mdm-template-muted))]">
-                    Configure maintenance profile, model selection, and operational status for planning and execution flows.
-                  </p>
-                  {hasRestrictedAircraftFields ? (
-                    <p className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-muted/20 px-3 py-2 text-[11px] text-[hsl(var(--mdm-template-muted))]">
-                      Some configuration fields are hidden for your current role.
-                    </p>
-                  ) : null}
-                  {!collapsedFormPanels.configuration ? (
-                    <div className={sectionGridClass} data-testid="amro-master-data-configuration-grid">
-                      {configurationSectionFields.map((field) => renderEditableField(field, 'configuration'))}
-                    </div>
-                  ) : null}
-                </div>
-              )}
-              {activeFormTab === 'system' && (
-                <div className="space-y-6" role="tabpanel" id="master-data-panel-system" aria-labelledby="master-data-tab-system">
-                  <div className="flex items-start justify-between gap-3">
-                    <h3 className="text-[14px] font-semibold text-[hsl(var(--mdm-template-heading))]">System Information</h3>
-                    <Button type="button" variant="ghost" size="sm" onClick={() => toggleFormPanel('system')} aria-expanded={!collapsedFormPanels.system}>
-                      {collapsedFormPanels.system ? 'Expand Panel' : 'Collapse Panel'}
-                    </Button>
-                  </div>
-                  <p className="text-[12px] text-[hsl(var(--mdm-template-muted))]">Read-only fields follow the same grid and spacing contract.</p>
-                  {!collapsedFormPanels.system ? (
-                    <div className={sectionGridClass}>
-                      {systemFields.map((field) => (
-                        <div key={field} className={sectionFieldClass}>
-                          <Label htmlFor={`master-data-system-${field}`} className="mdm-template-label">{field}</Label>
-                          <Input id={`master-data-system-${field}`} value={String(selectedRow?.[field] ?? '')} readOnly className="mdm-template-readonly" />
+                  <div className="grid gap-3 lg:grid-cols-[320px_minmax(0,1fr)]">
+                    <section className="space-y-2 rounded bg-white p-3">
+                      <p className="text-[11px] text-slate-600">System Template Model</p>
+                      <Label className="text-[12px] font-medium text-slate-800">System template model</Label>
+                      <Select
+                        value={aircraftTemplateModel}
+                        onValueChange={(value) => {
+                          setAircraftTemplateModel(value);
+                          setAircraftAuxField('system_template_model', value);
+                        }}
+                      >
+                        <SelectTrigger className="h-8 border-slate-300 text-[12px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {SYSTEM_TEMPLATE_MODEL_OPTIONS.map((option) => (
+                            <SelectItem key={option} value={option}>
+                              {option}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </section>
+                    <section className="rounded bg-white p-3">
+                      <p className="mb-2 text-[11px] text-slate-600">System Template Details</p>
+                      <div className="grid grid-cols-[1fr_1fr_1.5fr] border border-slate-200 text-[12px]">
+                        <div className="border-r border-slate-200 px-3 py-2 font-semibold text-slate-800">Name</div>
+                        <div className="border-r border-slate-200 px-3 py-2 font-semibold text-slate-800">Serial number</div>
+                        <div className="px-3 py-2 font-semibold text-slate-800">System Details</div>
+                        <div className="border-r border-t border-slate-200 px-3 py-2 text-slate-700">{String(formValues.registration || '') || 'p'}</div>
+                        <div className="border-r border-t border-slate-200 px-3 py-2 text-slate-700">{String(formValues.serial_number || '') || '-'}</div>
+                        <div className="border-t border-slate-200 px-3 py-2">
+                          <div className="grid gap-2 sm:grid-cols-2">
+                            <Select value={String(formValues.aircraft_type ?? '')} onValueChange={(value) => setFieldValue('aircraft_type', value)}>
+                              <SelectTrigger className={cn('h-8 text-[12px]', formErrors.aircraft_type && 'border-destructive')}>
+                                <SelectValue placeholder="Aircraft type" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {AIRCRAFT_TYPE_OPTIONS.map((option) => (
+                                  <SelectItem key={option} value={option}>
+                                    {option}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Select value={String(formValues.status ?? '')} onValueChange={(value) => setFieldValue('status', value)}>
+                              <SelectTrigger className={cn('h-8 text-[12px]', formErrors.status && 'border-destructive')}>
+                                <SelectValue placeholder="Status" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {AIRCRAFT_STATUS_OPTIONS.map((option) => (
+                                  <SelectItem key={option} value={option}>
+                                    {option}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Select value={String(formValues.manufacturer_id ?? '')} onValueChange={(value) => setFieldValue('manufacturer_id', value)}>
+                              <SelectTrigger className={cn('h-8 text-[12px]', formErrors.manufacturer_id && 'border-destructive')}>
+                                <SelectValue placeholder="Manufacturer" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {resolveSelectOptions({ key: 'manufacturer_id', label: 'Manufacturer', type: 'select' }).map((option) => (
+                                  <SelectItem key={option.value} value={option.value} disabled={option.disabled}>
+                                    {option.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Select value={String(formValues.aircraft_model ?? '')} onValueChange={(value) => setFieldValue('aircraft_model', value)}>
+                              <SelectTrigger className={cn('h-8 text-[12px]', formErrors.aircraft_model && 'border-destructive')}>
+                                <SelectValue placeholder="Aircraft model" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {resolveSelectOptions({ key: 'aircraft_model', label: 'Aircraft Model', type: 'select' }).map((option) => (
+                                  <SelectItem key={option.value} value={option.value} disabled={option.disabled}>
+                                    {option.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
                         </div>
-                      ))}
-                      {!systemFields.length && (
-                        <p className="text-sm text-muted-foreground">Select a row to view system metadata.</p>
-                      )}
+                      </div>
+                    </section>
+                  </div>
+                  <div className="grid gap-3 lg:grid-cols-[320px_minmax(0,1fr)]">
+                    <section className="space-y-2 rounded bg-white p-3">
+                      <p className="text-[11px] text-slate-600">Aircraft definition</p>
+                      <div className="space-y-1">
+                        <Label htmlFor="aircraft-registration" className="text-[12px]">Registration</Label>
+                        <Input
+                          id="aircraft-registration"
+                          ref={firstFieldRef}
+                          value={String(formValues.registration ?? '')}
+                          onChange={(event) => {
+                            const value = event.target.value.toUpperCase();
+                            setFieldValue('registration', value);
+                            if (!String(formValues.tail_number ?? '').trim()) {
+                              setFieldValue('tail_number', value);
+                            }
+                          }}
+                          className={cn('h-8 text-[12px]', formErrors.registration && 'border-destructive')}
+                        />
+                        {formErrors.registration ? <p className="mdm-template-danger">{formErrors.registration}</p> : null}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Checkbox id="aircraft-no-serial" checked={aircraftNoSerialNumber} onCheckedChange={(value) => handleAircraftNoSerialChange(Boolean(value))} />
+                        <Label htmlFor="aircraft-no-serial" className="text-[12px] font-normal">No Serial number</Label>
+                      </div>
+                      <div className="space-y-1">
+                        <Label htmlFor="aircraft-serial" className="text-[12px]">Serial number</Label>
+                        <Input
+                          id="aircraft-serial"
+                          value={String(formValues.serial_number ?? '')}
+                          onChange={(event) => setFieldValue('serial_number', event.target.value.toUpperCase())}
+                          disabled={aircraftNoSerialNumber}
+                          className={cn('h-8 text-[12px]', formErrors.serial_number && 'border-destructive')}
+                        />
+                        {formErrors.serial_number ? <p className="mdm-template-danger">{formErrors.serial_number}</p> : null}
+                      </div>
+                      <div className="space-y-1">
+                        <Label htmlFor="aircraft-manufacturing-date" className="text-[12px]">Manufacturing Date</Label>
+                        <div className="relative">
+                          <Input
+                            id="aircraft-manufacturing-date"
+                            type="date"
+                            value={aircraftManufacturingDate}
+                            onChange={(event) => {
+                              setAircraftManufacturingDate(event.target.value);
+                              setAircraftAuxField('manufacturing_date', event.target.value);
+                            }}
+                            className="h-8 pr-8 text-[12px]"
+                          />
+                          <CalendarDays className="pointer-events-none absolute right-2 top-2 h-3.5 w-3.5 text-slate-400" />
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[12px]">Base</Label>
+                        <Select
+                          value={aircraftBase}
+                          onValueChange={(value) => {
+                            setAircraftBase(value);
+                            setAircraftAuxField('base_location', value);
+                          }}
+                        >
+                          <SelectTrigger className="h-8 text-[12px]"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {AIRCRAFT_BASE_OPTIONS.map((option) => (
+                              <SelectItem key={option} value={option}>{option}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[12px]">Owner</Label>
+                        <Select
+                          value={aircraftOwner}
+                          onValueChange={(value) => {
+                            setAircraftOwner(value);
+                            setAircraftAuxField('owner_name', value);
+                          }}
+                        >
+                          <SelectTrigger className="h-8 text-[12px]"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {AIRCRAFT_OWNER_OPTIONS.map((option) => (
+                              <SelectItem key={option} value={option}>{option}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label htmlFor="aircraft-line-number" className="text-[12px]">Line number</Label>
+                        <Input
+                          id="aircraft-line-number"
+                          value={aircraftLineNumber}
+                          onChange={(event) => {
+                            setAircraftLineNumber(event.target.value);
+                            setAircraftAuxField('line_number', event.target.value);
+                          }}
+                          className="h-8 text-[12px]"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label htmlFor="aircraft-variable-number" className="text-[12px]">Variable number</Label>
+                        <Input
+                          id="aircraft-variable-number"
+                          value={aircraftVariableNumber}
+                          onChange={(event) => {
+                            setAircraftVariableNumber(event.target.value);
+                            setAircraftAuxField('variable_number', event.target.value);
+                            if (!String(formValues.tail_number ?? '').trim()) {
+                              setFieldValue('tail_number', event.target.value.toUpperCase());
+                            }
+                          }}
+                          className={cn('h-8 text-[12px]', formErrors.tail_number && 'border-destructive')}
+                        />
+                        {formErrors.tail_number ? <p className="mdm-template-danger">{formErrors.tail_number}</p> : null}
+                      </div>
+                    </section>
+                    <section className="rounded bg-white p-3">
+                      <p className="mb-2 text-[11px] text-slate-600">Counters</p>
+                      <div className="overflow-x-auto border border-slate-200">
+                        <table className="w-full text-[12px]">
+                          <thead className="bg-slate-50">
+                            <tr className="text-left text-slate-800">
+                              <th className="px-2 py-2 font-semibold">Name</th>
+                              <th className="px-2 py-2 font-semibold">Serial number</th>
+                              <th className="px-2 py-2 font-semibold">Model</th>
+                              <th className="px-2 py-2 font-semibold">Initial Value / Initial Date</th>
+                              <th className="px-2 py-2 font-semibold"></th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {aircraftCounterRows.map((row) => (
+                              <tr key={row.key} className="border-t border-slate-100 align-top">
+                                <td className="px-2 py-2 text-slate-700">{row.name}</td>
+                                <td className="px-2 py-2 text-slate-700">{row.serialNumber}</td>
+                                <td className="px-2 py-2 text-slate-700">{row.model}</td>
+                                <td className="px-2 py-1">
+                                  <div className="grid gap-1 sm:grid-cols-[130px_150px]">
+                                    <Input
+                                      value={row.initialValue}
+                                      onChange={(event) => setAircraftCounterValue(row.key, 'initialValue', event.target.value)}
+                                      className="h-8 text-[12px]"
+                                    />
+                                    <div className="relative">
+                                      <Input
+                                        type="date"
+                                        value={row.initialDate}
+                                        onChange={(event) => setAircraftCounterValue(row.key, 'initialDate', event.target.value)}
+                                        className="h-8 pr-8 text-[12px]"
+                                      />
+                                      <CalendarDays className="pointer-events-none absolute right-2 top-2 h-3.5 w-3.5 text-slate-400" />
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="px-2 py-2 text-slate-600">{row.unit}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </section>
+                  </div>
+                  <section className="space-y-2 rounded bg-white p-3">
+                    <p className="text-[11px] text-slate-600">Approved maintenance program</p>
+                    <div className="space-y-1">
+                      <Label htmlFor="aircraft-maintenance-program" className="text-[12px]">Maintenance Program</Label>
+                      <Input
+                        id="aircraft-maintenance-program"
+                        value={String(formValues.maintenance_program ?? '')}
+                        onChange={(event) => setFieldValue('maintenance_program', event.target.value)}
+                        className={cn('h-8 text-[12px]', formErrors.maintenance_program && 'border-destructive')}
+                      />
+                      {formErrors.maintenance_program ? <p className="mdm-template-danger">{formErrors.maintenance_program}</p> : null}
                     </div>
-                  ) : null}
-                </div>
-              )}
-              {entity === 'aircraft' ? (
-                <div className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-muted/20 p-3">
-                  <p className="text-[12px] font-semibold text-[hsl(var(--mdm-template-heading))]">Audit Trail Summary</p>
-                  <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                    <div className="grid gap-2 md:grid-cols-2">
+                      <div className="space-y-1">
+                        <Label htmlFor="aircraft-maintenance-revision-number" className="text-[12px]">Revision number</Label>
+                        <Input
+                          id="aircraft-maintenance-revision-number"
+                          value={aircraftMaintenanceRevisionNumber}
+                          onChange={(event) => {
+                            setAircraftMaintenanceRevisionNumber(event.target.value);
+                            setAircraftAuxField('maintenance_revision_number', event.target.value);
+                          }}
+                          className="h-8 text-[12px]"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label htmlFor="aircraft-maintenance-amendment-number" className="text-[12px]">Amendment number</Label>
+                        <Input
+                          id="aircraft-maintenance-amendment-number"
+                          value={aircraftAmendmentNumber}
+                          onChange={(event) => {
+                            setAircraftAmendmentNumber(event.target.value);
+                            setAircraftAuxField('amendment_number', event.target.value);
+                          }}
+                          className="h-8 text-[12px]"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label htmlFor="aircraft-maintenance-revision-date" className="text-[12px]">Revision date</Label>
+                        <Input
+                          id="aircraft-maintenance-revision-date"
+                          type="date"
+                          value={aircraftMaintenanceRevisionDate}
+                          onChange={(event) => {
+                            setAircraftMaintenanceRevisionDate(event.target.value);
+                            setAircraftAuxField('maintenance_revision_date', event.target.value);
+                          }}
+                          className="h-8 text-[12px]"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label htmlFor="aircraft-maintenance-amendment-date" className="text-[12px]">Amendment date</Label>
+                        <Input
+                          id="aircraft-maintenance-amendment-date"
+                          type="date"
+                          value={aircraftAmendmentDate}
+                          onChange={(event) => {
+                            setAircraftAmendmentDate(event.target.value);
+                            setAircraftAuxField('amendment_date', event.target.value);
+                          }}
+                          className="h-8 text-[12px]"
+                        />
+                      </div>
+                    </div>
+                  </section>
+                  <div className="grid gap-2 sm:grid-cols-3">
                     {aircraftAuditTimeline.map((item) => (
-                      <div key={item.label} className="rounded border border-[hsl(var(--mdm-template-border))] bg-background px-2 py-1">
-                        <p className="text-[10px] text-[hsl(var(--mdm-template-muted))]">{item.label}</p>
-                        <p className="text-[11px] text-[hsl(var(--mdm-template-heading))]">{item.value}</p>
+                      <div key={item.label} className="rounded border border-white/40 bg-white/90 px-2 py-1 text-slate-700">
+                        <p className="text-[10px]">{item.label}</p>
+                        <p className="text-[11px] font-medium">{item.value}</p>
                       </div>
                     ))}
                   </div>
                 </div>
-              ) : null}
+              ) : (
+                <>
+                  <div
+                    className="mdm-template-tab-rail mdm-template-tab-rail-inline"
+                    role="tablist"
+                    aria-label="Master data form sections"
+                    onKeyDown={(event) => {
+                      if (event.key === 'ArrowRight') {
+                        event.preventDefault();
+                        cycleFormTab('next');
+                      }
+                      if (event.key === 'ArrowLeft') {
+                        event.preventDefault();
+                        cycleFormTab('prev');
+                      }
+                    }}
+                  >
+                    <button
+                      type="button"
+                      role="tab"
+                      id="master-data-tab-basic"
+                      aria-selected={activeFormTab === 'basic'}
+                      aria-controls="master-data-panel-basic"
+                      className={tabLabelClass('basic')}
+                      data-state={activeFormTab === 'basic' ? 'active' : 'inactive'}
+                      onClick={() => setActiveFormTab('basic')}
+                    >
+                      Basic Information
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      id="master-data-tab-configuration"
+                      aria-selected={activeFormTab === 'configuration'}
+                      aria-controls="master-data-panel-configuration"
+                      className={tabLabelClass('configuration')}
+                      data-state={activeFormTab === 'configuration' ? 'active' : 'inactive'}
+                      onClick={() => setActiveFormTab('configuration')}
+                    >
+                      Configuration Settings
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      id="master-data-tab-system"
+                      aria-selected={activeFormTab === 'system'}
+                      aria-controls="master-data-panel-system"
+                      className={tabLabelClass('system')}
+                      data-state={activeFormTab === 'system' ? 'active' : 'inactive'}
+                      onClick={() => setActiveFormTab('system')}
+                    >
+                      System Information
+                    </button>
+                  </div>
+                  {activeFormTab === 'basic' && (
+                    <div className="space-y-6" role="tabpanel" id="master-data-panel-basic" aria-labelledby="master-data-tab-basic">
+                      {!collapsedFormPanels.basic ? (
+                        <div className={sectionGridClass} data-testid="amro-master-data-basic-grid">
+                          {basicSectionFields.map((field, index) => renderEditableField(field, 'basic', index))}
+                        </div>
+                      ) : null}
+                    </div>
+                  )}
+                  {activeFormTab === 'configuration' && (
+                    <div className="space-y-6" role="tabpanel" id="master-data-panel-configuration" aria-labelledby="master-data-tab-configuration">
+                      {!collapsedFormPanels.configuration ? (
+                        <div className={sectionGridClass} data-testid="amro-master-data-configuration-grid">
+                          {configurationSectionFields.map((field) => renderEditableField(field, 'configuration'))}
+                        </div>
+                      ) : null}
+                    </div>
+                  )}
+                  {activeFormTab === 'system' && (
+                    <div className="space-y-6" role="tabpanel" id="master-data-panel-system" aria-labelledby="master-data-tab-system">
+                      {!collapsedFormPanels.system ? (
+                        <div className={sectionGridClass}>
+                          {systemFields.map((field) => (
+                            <div key={field} className={sectionFieldClass}>
+                              <Label htmlFor={`master-data-system-${field}`} className="mdm-template-label">{field}</Label>
+                              <Input id={`master-data-system-${field}`} value={String(selectedRow?.[field] ?? '')} readOnly className="mdm-template-readonly" />
+                            </div>
+                          ))}
+                          {!systemFields.length && (
+                            <p className="text-sm text-muted-foreground">Select a row to view system metadata.</p>
+                          )}
+                        </div>
+                      ) : null}
+                    </div>
+                  )}
+                </>
+              )}
               <div className="flex flex-wrap items-center justify-end gap-3 border-t border-[hsl(var(--mdm-template-border))] pt-4">
                 <Button variant="outline" onClick={() => setModalOpen(false)}>Cancel</Button>
                 {entity === 'aircraft' ? (
