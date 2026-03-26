@@ -6,6 +6,7 @@ import AmroSettingsMasterDataPage, {
   buildPayloadFromForm,
   verifyReferenceExists,
 } from './AmroSettingsMasterDataPage';
+import { buildFlightLogPayload, getDefaultFlightLogFormValues, validateFlightLogFormValues } from './FlightLogForm';
 
 const mockGetSession = vi.fn();
 const mockRefreshSession = vi.fn();
@@ -52,6 +53,14 @@ describe('AmroSettingsMasterDataPage', () => {
   const renderAircraftPage = () =>
     render(
       <MemoryRouter initialEntries={['/dashboard/amro/settings/master-data/aircraft']}>
+        <Routes>
+          <Route path="/dashboard/amro/settings/master-data/:entity" element={<AmroSettingsMasterDataPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+  const renderFlightLogsPage = () =>
+    render(
+      <MemoryRouter initialEntries={['/dashboard/amro/settings/master-data/flight-logs']}>
         <Routes>
           <Route path="/dashboard/amro/settings/master-data/:entity" element={<AmroSettingsMasterDataPage />} />
         </Routes>
@@ -492,6 +501,30 @@ describe('AmroSettingsMasterDataPage', () => {
     expect(requests.some((requestUrl) => requestUrl.includes('/api/v2/amro/flight-logs'))).toBe(true);
   });
 
+  it('creates flight log records from new flight logs flow using shared form', async () => {
+    renderFlightLogsPage();
+
+    await screen.findByLabelText('Flight Date From');
+    fireEvent.click(screen.getByRole('button', { name: 'New Flight Logs' }));
+
+    expect(await screen.findByRole('heading', { name: 'New Flight Logs' })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Aircraft Id'), { target: { value: 'ac-1' } });
+    fireEvent.change(screen.getByLabelText('Departure Airport'), { target: { value: 'DEL' } });
+    fireEvent.change(screen.getByLabelText('Arrival Airport'), { target: { value: 'BLR' } });
+    fireEvent.change(screen.getByLabelText('Flight Hours'), { target: { value: '1.8' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create Flight Logs Record' }));
+
+    await waitFor(() => {
+      expect(mockToastSuccess).toHaveBeenCalledWith('Flight Logs record created');
+    });
+
+    const postRequests = vi
+      .mocked(fetch)
+      .mock.calls.filter(([, init]) => (init?.method || 'GET') === 'POST')
+      .map(([input]) => String(input));
+    expect(postRequests.some((requestUrl) => requestUrl.includes('/api/v2/amro/master-data/flight_logs'))).toBe(true);
+  });
+
   it('opens aircraft-scoped multi-record flight log view from aircraft list action', async () => {
     renderAircraftPage();
 
@@ -607,5 +640,42 @@ describe('AmroSettingsMasterDataPage', () => {
     const headers = new Headers({ 'Content-Type': 'application/json' });
     await expect(verifyReferenceExists(headers, 'suppliers', 'SUP-MISSING', ['id', 'supplier_code'])).resolves.toBe(false);
     await expect(verifyReferenceExists(headers, 'maintenance_facilities', 'FAC-MISSING', ['id', 'facility_code'])).resolves.toBe(false);
+  });
+});
+
+describe('FlightLogForm utilities', () => {
+  it('validates required aircraft and usage constraints', () => {
+    const values = getDefaultFlightLogFormValues({
+      aircraftId: '',
+      departureAirport: 'DEL',
+      arrivalAirport: 'DEL',
+      flightHours: '0',
+      blockHours: '0',
+      flightCycles: '0',
+    });
+    const errors = validateFlightLogFormValues(values);
+    expect(errors.aircraftId).toBe('Aircraft Id is required');
+    expect(errors.arrivalAirport).toBe('Arrival airport must be different from departure airport');
+    expect(errors.flightHours).toBe('Provide at least one positive usage metric');
+  });
+
+  it('builds normalized payload for submission', () => {
+    const values = getDefaultFlightLogFormValues({
+      aircraftId: ' ac-1 ',
+      departureAirport: 'del',
+      arrivalAirport: 'cCu',
+      regulatoryAuthority: 'dgca',
+      flightHours: '2.5',
+      blockHours: '3.1',
+      flightCycles: '1',
+      fuelBurnKg: '1400',
+      oilUpliftLiters: '4',
+    });
+    const payload = buildFlightLogPayload(values, 'test-source');
+    expect(payload.aircraft_id).toBe('ac-1');
+    expect(payload.departure_airport).toBe('DEL');
+    expect(payload.arrival_airport).toBe('CCU');
+    expect(payload.regulatory_authority).toBe('DGCA');
+    expect(payload.metadata.source).toBe('test-source');
   });
 });

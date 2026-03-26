@@ -40,6 +40,16 @@ import { AlertTriangle, ArrowDown, ArrowUp, ArrowUpDown, CalendarDays, CheckSqua
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import {
+  FlightLogForm,
+  buildFlightLogPayload,
+  getDefaultFlightLogFormValues,
+  type FlightLogFormConfig,
+  type FlightLogFormMode,
+  type FlightLogFormSubmitInput,
+  type FlightLogFormValues,
+  validateFlightLogFormValues,
+} from './FlightLogForm';
 
 export type MasterEntity =
   | 'aircraft'
@@ -215,22 +225,6 @@ type AircraftWorkPackageSnapshot = {
   completed: number;
   rtsBlockers: number;
   slaRisk: number;
-};
-
-type FlightLogFormValues = {
-  flightDate: string;
-  flightNumber: string;
-  pilotName: string;
-  departureAirport: string;
-  arrivalAirport: string;
-  flightHours: string;
-  blockHours: string;
-  flightCycles: string;
-  crewDetails: string;
-  fuelBurnKg: string;
-  oilUpliftLiters: string;
-  pirepDiscrepancy: string;
-  regulatoryAuthority: string;
 };
 
 const AIRCRAFT_NAV_RAIL = [
@@ -750,25 +744,6 @@ function getDefaultAircraftWorkPackageValues(stationHint?: string): AircraftWork
   };
 }
 
-function getDefaultFlightLogValues(): FlightLogFormValues {
-  const today = new Date().toISOString().slice(0, 10);
-  return {
-    flightDate: today,
-    flightNumber: '',
-    pilotName: '',
-    departureAirport: '',
-    arrivalAirport: '',
-    flightHours: '0',
-    blockHours: '0',
-    flightCycles: '1',
-    crewDetails: '',
-    fuelBurnKg: '0',
-    oilUpliftLiters: '0',
-    pirepDiscrepancy: '',
-    regulatoryAuthority: 'DGCA',
-  };
-}
-
 function parseWorkPackageItems(payload: Record<string, unknown>): Record<string, unknown>[] {
   const data = payload.data;
   if (data && typeof data === 'object') {
@@ -1075,10 +1050,10 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
   const [aircraftWorkPackageErrors, setAircraftWorkPackageErrors] = useState<Record<string, string>>({});
   const [aircraftWorkPackageSubmitting, setAircraftWorkPackageSubmitting] = useState(false);
   const [flightLogDialogOpen, setFlightLogDialogOpen] = useState(false);
-  const [flightLogValues, setFlightLogValues] = useState<FlightLogFormValues>(getDefaultFlightLogValues());
-  const [flightLogErrors, setFlightLogErrors] = useState<Record<string, string>>({});
   const [flightLogSubmitting, setFlightLogSubmitting] = useState(false);
-  const [flightLogAircraftId, setFlightLogAircraftId] = useState<string | null>(null);
+  const [flightLogMode, setFlightLogMode] = useState<FlightLogFormMode>('add');
+  const [flightLogInitialValues, setFlightLogInitialValues] = useState<Partial<FlightLogFormValues>>(getDefaultFlightLogFormValues());
+  const [flightLogDialogInstance, setFlightLogDialogInstance] = useState(0);
   const [flightLogDetailOpen, setFlightLogDetailOpen] = useState(false);
   const [flightLogDetailRow, setFlightLogDetailRow] = useState<RecordRow | null>(null);
   const [busyAction, setBusyAction] = useState<'refresh' | 'export' | 'export_pdf' | 'create' | null>(null);
@@ -1706,10 +1681,10 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
   );
   const selectedFlightLogAircraft = useMemo(
     () =>
-      flightLogAircraftId
-        ? rows.find((row) => row.id === flightLogAircraftId) || selectedAircraft
+      String(flightLogInitialValues.aircraftId || '').trim()
+        ? rows.find((row) => row.id === String(flightLogInitialValues.aircraftId || '').trim()) || selectedAircraft
         : selectedAircraft,
-    [flightLogAircraftId, rows, selectedAircraft],
+    [flightLogInitialValues.aircraftId, rows, selectedAircraft],
   );
   const manufacturerSelectOptions = useMemo<SelectOption[]>(
     () =>
@@ -2037,6 +2012,16 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
 
   const handleOpenCreateModal = useCallback(() => {
     setBusyAction('create');
+    if (entity === 'flight_logs') {
+      const aircraftIdHint = flightAircraftFilter.trim();
+      setFlightLogMode('new');
+      setFlightLogInitialValues(getDefaultFlightLogFormValues({ aircraftId: aircraftIdHint }));
+      setFlightLogSubmitting(false);
+      setFlightLogDialogInstance((previous) => previous + 1);
+      setFlightLogDialogOpen(true);
+      setBusyAction(null);
+      return;
+    }
     setModalMode('create');
     setSelectedId(null);
     setFormValues(getInitialFormValues(entity));
@@ -2044,7 +2029,7 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
     setActiveFormTab('basic');
     setModalOpen(true);
     setBusyAction(null);
-  }, [entity]);
+  }, [entity, flightAircraftFilter]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -2301,106 +2286,52 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
     [aircraftWorkPackageValues, loadAircraftWorkPackageSnapshot, navigate, scope, selectedAircraft],
   );
 
-  const setFlightLogField = useCallback((key: keyof FlightLogFormValues, value: string) => {
-    setFlightLogValues((previous) => ({ ...previous, [key]: value }));
-    setFlightLogErrors((previous) => ({ ...previous, [key]: '' }));
-  }, []);
-
   const openFlightLogDialog = useCallback((rowId: string) => {
-    setFlightLogAircraftId(rowId);
-    setFlightLogValues(getDefaultFlightLogValues());
-    setFlightLogErrors({});
-    setFlightLogDialogOpen(true);
-  }, []);
-
-  const handleFlightLogSubmit = useCallback(async () => {
-    const aircraftId = String(flightLogAircraftId || '').trim();
+    const aircraftId = rowId.trim();
     if (!aircraftId) {
       toast.error('Select an aircraft record first');
       return;
     }
-    const errors: Record<string, string> = {};
-    if (!flightLogValues.flightDate.trim()) {
-      errors.flightDate = 'Flight date is required';
-    }
-    if (!flightLogValues.departureAirport.trim()) {
-      errors.departureAirport = 'Departure airport is required';
-    }
-    if (!flightLogValues.arrivalAirport.trim()) {
-      errors.arrivalAirport = 'Arrival airport is required';
-    }
-    if (flightLogValues.departureAirport.trim() && flightLogValues.arrivalAirport.trim() && flightLogValues.departureAirport.trim() === flightLogValues.arrivalAirport.trim()) {
-      errors.arrivalAirport = 'Arrival airport must be different from departure airport';
-    }
-    const flightHours = Number(flightLogValues.flightHours || '0');
-    const blockHours = Number(flightLogValues.blockHours || '0');
-    const flightCycles = Number(flightLogValues.flightCycles || '0');
-    if (!Number.isFinite(flightHours) || flightHours < 0) {
-      errors.flightHours = 'Flight hours must be a non-negative number';
-    }
-    if (!Number.isFinite(blockHours) || blockHours < 0) {
-      errors.blockHours = 'Block hours must be a non-negative number';
-    }
-    if (!Number.isFinite(flightCycles) || flightCycles < 0 || !Number.isInteger(flightCycles)) {
-      errors.flightCycles = 'Flight cycles must be a non-negative whole number';
-    }
-    if ((flightHours <= 0 && blockHours <= 0 && flightCycles <= 0) && !errors.flightHours && !errors.blockHours && !errors.flightCycles) {
-      errors.flightHours = 'Provide at least one positive usage metric';
-    }
-    const fuelBurnKg = Number(flightLogValues.fuelBurnKg || '0');
-    const oilUpliftLiters = Number(flightLogValues.oilUpliftLiters || '0');
-    if (!Number.isFinite(fuelBurnKg) || fuelBurnKg < 0) {
-      errors.fuelBurnKg = 'Fuel burn must be a non-negative number';
-    }
-    if (!Number.isFinite(oilUpliftLiters) || oilUpliftLiters < 0) {
-      errors.oilUpliftLiters = 'Oil uplift must be a non-negative number';
-    }
-    setFlightLogErrors(errors);
+    setFlightLogMode('add');
+    setFlightLogInitialValues(getDefaultFlightLogFormValues({ aircraftId }));
+    setFlightLogSubmitting(false);
+    setFlightLogDialogInstance((previous) => previous + 1);
+    setFlightLogDialogOpen(true);
+  }, []);
+
+  const handleFlightLogSubmit = useCallback(async ({ mode, payload, values }: FlightLogFormSubmitInput) => {
+    const errors = validateFlightLogFormValues(values);
     if (Object.keys(errors).length > 0) {
       toast.error('Please resolve flight log validation errors');
-      return;
+      throw new Error('Please resolve flight log validation errors');
     }
-
     setFlightLogSubmitting(true);
     try {
       const headers = await buildApiHeaders(scope);
-      const response = await fetch('/api/v2/amro/flight-logs', {
+      const normalizedPayload = buildFlightLogPayload(values, payload.metadata.source);
+      const endpoint = mode === 'add' ? '/api/v2/amro/flight-logs' : '/api/v2/amro/master-data/flight_logs';
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers,
-        body: JSON.stringify({
-          aircraft_id: aircraftId,
-          flight_date: flightLogValues.flightDate,
-          flight_number: flightLogValues.flightNumber.trim() || null,
-          pilot_name: flightLogValues.pilotName.trim() || null,
-          departure_airport: flightLogValues.departureAirport.trim(),
-          arrival_airport: flightLogValues.arrivalAirport.trim(),
-          flight_hours: flightHours,
-          block_hours: blockHours,
-          flight_cycles: flightCycles,
-          crew_details: flightLogValues.crewDetails.trim() || null,
-          fuel_burn_kg: fuelBurnKg,
-          oil_uplift_liters: oilUpliftLiters,
-          pirep_discrepancy: flightLogValues.pirepDiscrepancy.trim() || null,
-          regulatory_authority: flightLogValues.regulatoryAuthority.trim() || null,
-          metadata: {
-            source: 'amro.aircraft.master-data.ui',
-          },
-        }),
+        body: JSON.stringify(normalizedPayload),
       });
-      const payload = await parseApiPayload(response);
+      const parsedPayload = await parseApiPayload(response);
       if (!response.ok) {
-        throw new Error(String(payload.error || 'Failed to save flight log'));
+        throw new Error(String(parsedPayload.error || 'Failed to save flight log'));
       }
-      toast.success('Flight log recorded');
+      toast.success(mode === 'add' ? 'Flight log recorded' : 'Flight Logs record created');
       setFlightLogDialogOpen(false);
       await loadRecords();
-      await loadAircraftWorkPackageSnapshot();
+      if (mode === 'add') {
+        await loadAircraftWorkPackageSnapshot();
+      }
     } catch (error) {
       toast.error(String((error as Error).message || 'Failed to save flight log'));
+      throw error;
     } finally {
       setFlightLogSubmitting(false);
     }
-  }, [flightLogAircraftId, flightLogValues, loadAircraftWorkPackageSnapshot, loadRecords, scope]);
+  }, [loadAircraftWorkPackageSnapshot, loadRecords, scope]);
 
   const aircraftRiskScore = useMemo(() => {
     const status = String(selectedAircraft?.status || '').toLowerCase();
@@ -2423,6 +2354,25 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
     if (status === 'inactive') return 'Dormant fleet profile indicates schedule-due campaign review';
     return 'Operationally stable with low anomaly confidence';
   }, [selectedAircraft]);
+  const flightLogDialogConfig = useMemo<FlightLogFormConfig>(() => {
+    if (flightLogMode === 'new') {
+      return {
+        mode: 'new',
+        title: 'New Flight Logs',
+        description: 'Create an AMRO flight log master record with complete sector and usage details.',
+        submitLabel: 'Create Flight Logs Record',
+        metadataSource: 'amro.flight-logs.master-data.ui',
+      };
+    }
+    return {
+      mode: 'add',
+      title: `Add Flight Logs (Aircraft: ${String(selectedFlightLogAircraft?.tail_number || selectedFlightLogAircraft?.id || 'N/A')})`,
+      description: 'Record operational totals, sector details, and pilot discrepancy reports for MRO maintenance tracking.',
+      submitLabel: 'Save Flight Log',
+      metadataSource: 'amro.aircraft.master-data.ui',
+      aircraftReadOnly: true,
+    };
+  }, [flightLogMode, selectedFlightLogAircraft?.id, selectedFlightLogAircraft?.tail_number]);
 
   const sectionGridClass = 'mdm-template-form-grid';
   const sectionFieldClass = 'mdm-template-form-field';
@@ -3244,182 +3194,14 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
         </Dialog>
         <Dialog open={flightLogDialogOpen} onOpenChange={setFlightLogDialogOpen}>
           <DialogContent className="mdm-template-dialog mdm-template-dialog-large">
-            <DialogHeader className="border-b border-[hsl(var(--mdm-template-border))] px-6 py-4">
-              <DialogTitle className="text-[15px] font-semibold text-[hsl(var(--mdm-template-heading))]">
-                Add Flight Logs (Aircraft: {String(selectedFlightLogAircraft?.tail_number || selectedFlightLogAircraft?.id || 'N/A')})
-              </DialogTitle>
-              <DialogDescription className="text-[12px] text-[hsl(var(--mdm-template-muted))]">
-                Record operational totals, sector details, and pilot discrepancy reports for MRO maintenance tracking.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-5 px-6 pb-6 pt-4">
-              <div className="mdm-template-form-grid">
-                <div className={sectionFieldClass}>
-                  <Label htmlFor="flight-log-date" className="mdm-template-label">Flight Date</Label>
-                  <Input
-                    id="flight-log-date"
-                    type="date"
-                    value={flightLogValues.flightDate}
-                    onChange={(event) => setFlightLogField('flightDate', event.target.value)}
-                    className={cn('mdm-template-input', flightLogErrors.flightDate && 'border-destructive')}
-                    aria-invalid={Boolean(flightLogErrors.flightDate)}
-                  />
-                  {flightLogErrors.flightDate ? <p className="mdm-template-danger">{flightLogErrors.flightDate}</p> : null}
-                </div>
-                <div className={sectionFieldClass}>
-                  <Label htmlFor="flight-log-number" className="mdm-template-label">Flight Number</Label>
-                  <Input
-                    id="flight-log-number"
-                    value={flightLogValues.flightNumber}
-                    onChange={(event) => setFlightLogField('flightNumber', event.target.value)}
-                    className="mdm-template-input"
-                    placeholder="AI203"
-                  />
-                </div>
-                <div className={sectionFieldClass}>
-                  <Label htmlFor="flight-log-pilot" className="mdm-template-label">Pilot Name</Label>
-                  <Input
-                    id="flight-log-pilot"
-                    value={flightLogValues.pilotName}
-                    onChange={(event) => setFlightLogField('pilotName', event.target.value)}
-                    className="mdm-template-input"
-                    placeholder="Captain / PIC"
-                  />
-                </div>
-                <div className={sectionFieldClass}>
-                  <Label htmlFor="flight-log-departure" className="mdm-template-label">Departure Airport</Label>
-                  <Input
-                    id="flight-log-departure"
-                    value={flightLogValues.departureAirport}
-                    onChange={(event) => setFlightLogField('departureAirport', event.target.value.toUpperCase())}
-                    className={cn('mdm-template-input', flightLogErrors.departureAirport && 'border-destructive')}
-                    aria-invalid={Boolean(flightLogErrors.departureAirport)}
-                    placeholder="DEL"
-                  />
-                  {flightLogErrors.departureAirport ? <p className="mdm-template-danger">{flightLogErrors.departureAirport}</p> : null}
-                </div>
-                <div className={sectionFieldClass}>
-                  <Label htmlFor="flight-log-arrival" className="mdm-template-label">Arrival Airport</Label>
-                  <Input
-                    id="flight-log-arrival"
-                    value={flightLogValues.arrivalAirport}
-                    onChange={(event) => setFlightLogField('arrivalAirport', event.target.value.toUpperCase())}
-                    className={cn('mdm-template-input', flightLogErrors.arrivalAirport && 'border-destructive')}
-                    aria-invalid={Boolean(flightLogErrors.arrivalAirport)}
-                    placeholder="CCU"
-                  />
-                  {flightLogErrors.arrivalAirport ? <p className="mdm-template-danger">{flightLogErrors.arrivalAirport}</p> : null}
-                </div>
-                <div className={sectionFieldClass}>
-                  <Label htmlFor="flight-log-hours" className="mdm-template-label">Flight Hours</Label>
-                  <Input
-                    id="flight-log-hours"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={flightLogValues.flightHours}
-                    onChange={(event) => setFlightLogField('flightHours', event.target.value)}
-                    className={cn('mdm-template-input', flightLogErrors.flightHours && 'border-destructive')}
-                    aria-invalid={Boolean(flightLogErrors.flightHours)}
-                  />
-                  {flightLogErrors.flightHours ? <p className="mdm-template-danger">{flightLogErrors.flightHours}</p> : null}
-                </div>
-                <div className={sectionFieldClass}>
-                  <Label htmlFor="flight-log-block-hours" className="mdm-template-label">Block Hours</Label>
-                  <Input
-                    id="flight-log-block-hours"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={flightLogValues.blockHours}
-                    onChange={(event) => setFlightLogField('blockHours', event.target.value)}
-                    className={cn('mdm-template-input', flightLogErrors.blockHours && 'border-destructive')}
-                    aria-invalid={Boolean(flightLogErrors.blockHours)}
-                  />
-                  {flightLogErrors.blockHours ? <p className="mdm-template-danger">{flightLogErrors.blockHours}</p> : null}
-                </div>
-                <div className={sectionFieldClass}>
-                  <Label htmlFor="flight-log-cycles" className="mdm-template-label">Flight Cycles</Label>
-                  <Input
-                    id="flight-log-cycles"
-                    type="number"
-                    min="0"
-                    step="1"
-                    value={flightLogValues.flightCycles}
-                    onChange={(event) => setFlightLogField('flightCycles', event.target.value)}
-                    className={cn('mdm-template-input', flightLogErrors.flightCycles && 'border-destructive')}
-                    aria-invalid={Boolean(flightLogErrors.flightCycles)}
-                  />
-                  {flightLogErrors.flightCycles ? <p className="mdm-template-danger">{flightLogErrors.flightCycles}</p> : null}
-                </div>
-                <div className={sectionFieldClass}>
-                  <Label htmlFor="flight-log-fuel-burn" className="mdm-template-label">Fuel Burn (Kg)</Label>
-                  <Input
-                    id="flight-log-fuel-burn"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={flightLogValues.fuelBurnKg}
-                    onChange={(event) => setFlightLogField('fuelBurnKg', event.target.value)}
-                    className={cn('mdm-template-input', flightLogErrors.fuelBurnKg && 'border-destructive')}
-                    aria-invalid={Boolean(flightLogErrors.fuelBurnKg)}
-                  />
-                  {flightLogErrors.fuelBurnKg ? <p className="mdm-template-danger">{flightLogErrors.fuelBurnKg}</p> : null}
-                </div>
-                <div className={sectionFieldClass}>
-                  <Label htmlFor="flight-log-oil-uplift" className="mdm-template-label">Oil Uplift (Liters)</Label>
-                  <Input
-                    id="flight-log-oil-uplift"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={flightLogValues.oilUpliftLiters}
-                    onChange={(event) => setFlightLogField('oilUpliftLiters', event.target.value)}
-                    className={cn('mdm-template-input', flightLogErrors.oilUpliftLiters && 'border-destructive')}
-                    aria-invalid={Boolean(flightLogErrors.oilUpliftLiters)}
-                  />
-                  {flightLogErrors.oilUpliftLiters ? <p className="mdm-template-danger">{flightLogErrors.oilUpliftLiters}</p> : null}
-                </div>
-                <div className={sectionFieldClass}>
-                  <Label htmlFor="flight-log-authority" className="mdm-template-label">Regulatory Authority</Label>
-                  <Input
-                    id="flight-log-authority"
-                    value={flightLogValues.regulatoryAuthority}
-                    onChange={(event) => setFlightLogField('regulatoryAuthority', event.target.value.toUpperCase())}
-                    className="mdm-template-input"
-                    placeholder="DGCA / FAA / EASA"
-                  />
-                </div>
-                <div className={fullWidthSectionFieldClass}>
-                  <Label htmlFor="flight-log-crew" className="mdm-template-label">Crew Details</Label>
-                  <Textarea
-                    id="flight-log-crew"
-                    value={flightLogValues.crewDetails}
-                    onChange={(event) => setFlightLogField('crewDetails', event.target.value)}
-                    className="mdm-template-input min-h-[80px]"
-                    placeholder="Captain, First Officer, etc."
-                  />
-                </div>
-                <div className={fullWidthSectionFieldClass}>
-                  <Label htmlFor="flight-log-pirep" className="mdm-template-label">PIREP / Discrepancy</Label>
-                  <Textarea
-                    id="flight-log-pirep"
-                    value={flightLogValues.pirepDiscrepancy}
-                    onChange={(event) => setFlightLogField('pirepDiscrepancy', event.target.value)}
-                    className="mdm-template-input min-h-[110px]"
-                    placeholder="Pilot reported discrepancy or snag details"
-                  />
-                </div>
-              </div>
-              <div className="flex flex-wrap items-center justify-end gap-3 border-t border-[hsl(var(--mdm-template-border))] pt-4">
-                <Button variant="outline" onClick={() => setFlightLogDialogOpen(false)} disabled={flightLogSubmitting}>
-                  Cancel
-                </Button>
-                <Button onClick={() => void handleFlightLogSubmit()} disabled={flightLogSubmitting}>
-                  {flightLogSubmitting ? 'Saving...' : 'Save Flight Log'}
-                </Button>
-              </div>
-            </div>
+            <FlightLogForm
+              key={flightLogDialogInstance}
+              config={flightLogDialogConfig}
+              initialValues={flightLogInitialValues}
+              onCancel={() => setFlightLogDialogOpen(false)}
+              onSubmit={handleFlightLogSubmit}
+              submitting={flightLogSubmitting}
+            />
           </DialogContent>
         </Dialog>
         <Dialog open={flightLogDetailOpen} onOpenChange={setFlightLogDetailOpen}>
