@@ -41,7 +41,6 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useCRM } from '@/hooks/useCRM';
 import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import {
   AlertTriangle,
@@ -75,6 +74,27 @@ import {
   type FlightLogFormValues,
   validateFlightLogFormValues,
 } from './FlightLogForm';
+import { buildApiHeaders, parseApiPayload, verifyReferenceExists } from './amro-settings-master-data/services';
+import {
+  buildAircraftPresenceCollaborators,
+  buildAircraftWorkPackageSnapshot,
+  buildPayloadFromForm,
+  createSeedRecords,
+  createDefaultBulkText,
+  createRowsRenderSignature,
+  getDefaultAircraftWorkPackageValues,
+  getInitialFormValues,
+  getPayloadImportedCount,
+  getPayloadRecords,
+  normalizeFeatureFlag,
+  isBlank,
+  parseWorkPackageItems,
+  pickFormValuesFromRow,
+} from './amro-settings-master-data/utils';
+import { FlightLogsFilters } from './amro-settings-master-data/components/FlightLogsFilters';
+
+export { buildPayloadFromForm } from './amro-settings-master-data/utils';
+export { verifyReferenceExists } from './amro-settings-master-data/services';
 
 export type MasterEntity =
   | 'aircraft'
@@ -655,488 +675,6 @@ const ENTITY_DEFAULT_VALUES: Record<MasterEntity, FormValues> = {
   },
 };
 
-function getPayloadRecords(payload: Record<string, unknown>): RecordRow[] {
-  const output = payload.output;
-  if (!output || typeof output !== 'object') {
-    return [];
-  }
-  const outputRecord = output as Record<string, unknown>;
-  const outputRecords = outputRecord['records'];
-  if (!Array.isArray(outputRecords)) {
-    return [];
-  }
-  return outputRecords.filter((record): record is RecordRow => Boolean(record) && typeof record === 'object');
-}
-
-function getPayloadImportedCount(payload: Record<string, unknown>): number {
-  const output = payload.output;
-  if (!output || typeof output !== 'object') {
-    return 0;
-  }
-  const outputRecord = output as Record<string, unknown>;
-  const count = Number(outputRecord['imported_count']);
-  return Number.isFinite(count) ? count : 0;
-}
-
-function createSeedRecords(entity: MasterEntity): Record<string, unknown>[] {
-  if (entity === 'regulator_profiles') {
-    return [
-      {
-        regulator_code: 'FAA',
-        regulator_name: 'Federal Aviation Administration',
-        jurisdiction: 'US',
-        policy_version: '2026.1',
-        effective_from: new Date().toISOString().slice(0, 10),
-        effective_to: null,
-        is_active: true,
-        metadata: { authority_scope: 'airworthiness', priority: 'high', source: 'master_data_seed_ui' },
-      },
-      {
-        regulator_code: 'EASA',
-        regulator_name: 'European Union Aviation Safety Agency',
-        jurisdiction: 'EU',
-        policy_version: '2026.2',
-        effective_from: new Date().toISOString().slice(0, 10),
-        effective_to: null,
-        is_active: true,
-        metadata: { authority_scope: 'continuing_airworthiness', priority: 'high', source: 'master_data_seed_ui' },
-      },
-    ];
-  }
-  if (entity === 'shift_calendars') {
-    return [
-      {
-        station_code: 'DXB',
-        shift_name: 'DAY_A',
-        shift_start_time: '06:00:00',
-        shift_end_time: '14:00:00',
-        capacity: 6,
-        effective_from: new Date().toISOString().slice(0, 10),
-        effective_to: null,
-        is_active: true,
-      },
-      {
-        station_code: 'DXB',
-        shift_name: 'SWING_B',
-        shift_start_time: '14:00:00',
-        shift_end_time: '22:00:00',
-        capacity: 5,
-        effective_from: new Date().toISOString().slice(0, 10),
-        effective_to: null,
-        is_active: true,
-      },
-    ];
-  }
-  if (entity === 'work_package_templates') {
-    return [
-      {
-        template_code: 'TMP-A320-LINE-48H',
-        version: 1,
-        active: true,
-        template_name: 'A320 48H Transit Check',
-        maintenance_type: 'line',
-        scope_json: [
-          { phase: 'pre_docking', estimated_minutes: 45, station_scope: 'gate' },
-          { phase: 'inspection', estimated_minutes: 120, regulators: ['FAA', 'EASA'] },
-          { phase: 'close_out', estimated_minutes: 35, requires_authority_signoff: true },
-        ],
-        tasks_json: [
-          { task_code: 'LINE-001', title: 'Exterior Walkaround', skill_codes: ['LIC-B1'], critical: true },
-          { task_code: 'LINE-014', title: 'Brake Wear Inspection', skill_codes: ['LIC-B1', 'NDT-L1'], critical: true },
-        ],
-      },
-      {
-        template_code: 'TMP-HEAVY-CHECK-PLANNING',
-        version: 2,
-        active: true,
-        template_name: 'Base Heavy Check Planning Pack',
-        maintenance_type: 'base',
-        scope_json: [
-          { phase: 'slotting', estimated_minutes: 90, depends_on: ['manpower_forecast', 'dock_availability'] },
-          { phase: 'material_readiness', estimated_minutes: 240, requires_procurement_sync: true },
-        ],
-        tasks_json: [
-          { task_code: 'BASE-010', title: 'Structural Inspection Program', skill_codes: ['STRUCT-L2'], critical: true },
-          { task_code: 'BASE-121', title: 'Cabin Systems Functional Tests', skill_codes: ['AVIONICS-L2'], critical: false },
-        ],
-      },
-    ];
-  }
-  if (entity === 'manufacturers') {
-    const seen = new Set<string>();
-    const records = MANUFACTURER_SEED_NAMES.map((name) => {
-      const normalized = name.trim().toLowerCase();
-      if (!normalized || seen.has(normalized)) {
-        return null;
-      }
-      seen.add(normalized);
-      const token = normalized.toUpperCase().replace(/[^A-Z0-9]+/g, '_').slice(0, 18);
-      let hash = 0;
-      for (let index = 0; index < normalized.length; index += 1) {
-        hash = (hash << 5) - hash + normalized.charCodeAt(index);
-        hash |= 0;
-      }
-      const suffix = Math.abs(hash).toString(16).slice(0, 4);
-      return {
-        manufacturer_code: `${token}-${suffix}`,
-        name,
-        is_active: true,
-        metadata: { source: 'master_data_seed_ui' },
-      };
-    }).filter(
-      (record): record is { manufacturer_code: string; name: string; is_active: boolean; metadata: { source: string } } =>
-        Boolean(record),
-    );
-    return records as Record<string, unknown>[];
-  }
-  return [];
-}
-
-function createDefaultBulkText(entity: MasterEntity): string {
-  const seedRecords = createSeedRecords(entity);
-  if (seedRecords.length > 0) {
-    return JSON.stringify(seedRecords, null, 2);
-  }
-  return '[\n  {}\n]';
-}
-
-function normalizeFeatureFlag(value: string | undefined, fallback: boolean): boolean {
-  if (typeof value !== 'string') return fallback;
-  const normalized = value.trim().toLowerCase();
-  if (normalized === 'true' || normalized === '1' || normalized === 'on') return true;
-  if (normalized === 'false' || normalized === '0' || normalized === 'off') return false;
-  return fallback;
-}
-
-function toDateTimeInputValue(value: Date): string {
-  const local = new Date(value.getTime() - value.getTimezoneOffset() * 60000);
-  return local.toISOString().slice(0, 16);
-}
-
-function getDefaultAircraftWorkPackageValues(stationHint?: string): AircraftWorkPackageFormValues {
-  const now = new Date();
-  const end = new Date(now.getTime() + 4 * 60 * 60 * 1000);
-  return {
-    source: 'schedule_due',
-    maintenanceType: 'line',
-    priority: 'medium',
-    plannedStart: toDateTimeInputValue(now),
-    plannedEnd: toDateTimeInputValue(end),
-    station: stationHint || '',
-    scopeItemsText: 'General inspection',
-  };
-}
-
-function parseWorkPackageItems(payload: Record<string, unknown>): Record<string, unknown>[] {
-  const data = payload.data;
-  if (data && typeof data === 'object') {
-    const workPackages = (data as Record<string, unknown>).workPackages;
-    if (Array.isArray(workPackages)) {
-      return workPackages.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object');
-    }
-  }
-  const items = payload.items;
-  if (Array.isArray(items)) {
-    return items.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object');
-  }
-  return getPayloadRecords(payload);
-}
-
-function buildAircraftWorkPackageSnapshot(items: Record<string, unknown>[]): AircraftWorkPackageSnapshot {
-  let open = 0;
-  let inProgress = 0;
-  let deferred = 0;
-  let completed = 0;
-  let rtsBlockers = 0;
-  let slaRisk = 0;
-
-  items.forEach((item) => {
-    const status = String(item.status || item.lifecycle_stage || '').trim().toLowerCase();
-    if (status.includes('defer')) {
-      deferred += 1;
-      return;
-    }
-    if (status.includes('progress') || status.includes('wip') || status.includes('execution')) {
-      inProgress += 1;
-      return;
-    }
-    if (status.includes('complete') || status.includes('closed') || status.includes('rts')) {
-      completed += 1;
-      return;
-    }
-    open += 1;
-  });
-
-  rtsBlockers = deferred;
-  slaRisk = items.filter((item) => String(item.priority || '').toLowerCase() === 'critical').length;
-  return { open, inProgress, deferred, completed, rtsBlockers, slaRisk };
-}
-
-function getInitialFormValues(entity: MasterEntity): FormValues {
-  return { ...ENTITY_DEFAULT_VALUES[entity] };
-}
-
-function computePresenceHash(value: string): number {
-  let hash = 0;
-  for (let index = 0; index < value.length; index += 1) {
-    hash = (hash << 5) - hash + value.charCodeAt(index);
-    hash |= 0;
-  }
-  return Math.abs(hash);
-}
-
-function getInitials(value: string): string {
-  const tokens = value
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
-  if (!tokens.length) return 'NA';
-  if (tokens.length === 1) return tokens[0].slice(0, 2).toUpperCase();
-  return `${tokens[0][0] || ''}${tokens[1][0] || ''}`.toUpperCase();
-}
-
-function buildAircraftPresenceCollaborators(row: RecordRow): AircraftPresenceCollaborator[] {
-  const seed = `${String(row.id || '')}|${String(row.tail_number || '')}|${String(row.registration || '')}`;
-  const hash = computePresenceHash(seed);
-  const collaboratorCount = (hash % 3) + 1;
-  return Array.from({ length: collaboratorCount }, (_, index) => {
-    const collaborator = AIRCRAFT_PRESENCE_COLLABORATOR_POOL[(hash + index * 7) % AIRCRAFT_PRESENCE_COLLABORATOR_POOL.length];
-    const badgeClass = AIRCRAFT_PRESENCE_BADGE_CLASSES[(hash + index * 11) % AIRCRAFT_PRESENCE_BADGE_CLASSES.length];
-    return {
-      id: `${collaborator.id}-${index}`,
-      name: collaborator.name,
-      role: collaborator.role,
-      initials: getInitials(collaborator.name),
-      badgeClass,
-    };
-  });
-}
-
-function asInputString(value: unknown): string {
-  if (value === null || value === undefined) return '';
-  return typeof value === 'string' ? value : String(value);
-}
-
-function normalizeFormValue(field: EntityFormField, value: unknown): unknown {
-  if (field.type === 'boolean') {
-    return Boolean(value);
-  }
-  if (field.type === 'json') {
-    if (typeof value === 'string') return value;
-    if (value === null || value === undefined || value === '') return '';
-    try {
-      return JSON.stringify(value, null, 2);
-    } catch {
-      return '';
-    }
-  }
-  if (field.type === 'number') {
-    if (value === null || value === undefined || value === '') return '';
-    const num = Number(value);
-    return Number.isFinite(num) ? String(num) : '';
-  }
-  return asInputString(value);
-}
-
-function pickFormValuesFromRow(entity: MasterEntity, row: RecordRow): FormValues {
-  const fields = ENTITY_FORM_FIELDS[entity];
-  const next = getInitialFormValues(entity);
-  fields.forEach((field) => {
-    if (Object.prototype.hasOwnProperty.call(row, field.key)) {
-      next[field.key] = normalizeFormValue(field, row[field.key]);
-    }
-  });
-  return next;
-}
-
-async function buildApiHeaders(scope: { tenantId?: string | null; franchiseId?: string | null; userId?: string | null }) {
-  const { data: sessionData } = await supabase.auth.getSession();
-  let token = sessionData?.session?.access_token || '';
-  if (!token) {
-    const { data: refreshed } = await supabase.auth.refreshSession();
-    token = refreshed?.session?.access_token || '';
-  }
-  const headers = new Headers({
-    'Content-Type': 'application/json',
-  });
-  if (token) headers.set('Authorization', `Bearer ${token}`);
-  if (scope.tenantId) headers.set('x-tenant-id', scope.tenantId);
-  if (scope.franchiseId) headers.set('x-franchise-id', scope.franchiseId);
-  if (scope.userId) headers.set('x-user-id', scope.userId);
-  headers.set('x-domain-id', 'AMRO');
-  return headers;
-}
-
-async function parseApiPayload(response: Response): Promise<Record<string, unknown>> {
-  const text = await response.text();
-  if (!text.trim()) {
-    return {};
-  }
-  try {
-    const parsed = JSON.parse(text);
-    if (parsed && typeof parsed === 'object') {
-      return parsed as Record<string, unknown>;
-    }
-    return {};
-  } catch (error) {
-    if (response.ok) {
-      return {};
-    }
-    throw new Error(`Invalid response format (${response.status})`);
-  }
-}
-
-function isBlank(value: unknown): boolean {
-  return value === null || value === undefined || String(value).trim() === '';
-}
-
-function toTimeComparable(value: string): number {
-  const normalized = value.trim().length === 5 ? `${value.trim()}:00` : value.trim();
-  const [hourText, minuteText, secondText] = normalized.split(':');
-  const hour = Number(hourText);
-  const minute = Number(minuteText);
-  const second = Number(secondText || 0);
-  if (!Number.isFinite(hour) || !Number.isFinite(minute) || !Number.isFinite(second)) return -1;
-  if (hour < 0 || hour > 23 || minute < 0 || minute > 59 || second < 0 || second > 59) return -1;
-  return hour * 3600 + minute * 60 + second;
-}
-
-export function buildPayloadFromForm(entity: MasterEntity, values: FormValues): { payload: Record<string, unknown>; errors: Record<string, string> } {
-  const fields = ENTITY_FORM_FIELDS[entity];
-  const errors: Record<string, string> = {};
-  const payload: Record<string, unknown> = {};
-  fields.forEach((field) => {
-    const raw = values[field.key];
-    if (field.required && isBlank(raw) && field.type !== 'boolean') {
-      errors[field.key] = `${field.label} is required`;
-      return;
-    }
-    if (field.type === 'boolean') {
-      payload[field.key] = Boolean(raw);
-      return;
-    }
-    if (isBlank(raw)) {
-      return;
-    }
-    const textValue = String(raw).trim();
-    if (field.type === 'email') {
-      const validEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(textValue);
-      if (!validEmail) {
-        errors[field.key] = `${field.label} is invalid`;
-        return;
-      }
-      payload[field.key] = textValue;
-      return;
-    }
-    if (field.type === 'number') {
-      const numberValue = Number(textValue);
-      if (!Number.isFinite(numberValue)) {
-        errors[field.key] = `${field.label} must be numeric`;
-        return;
-      }
-      if (typeof field.min === 'number' && numberValue < field.min) {
-        errors[field.key] = `${field.label} must be at least ${field.min}`;
-        return;
-      }
-      payload[field.key] = numberValue;
-      return;
-    }
-    if (field.type === 'json') {
-      try {
-        payload[field.key] = JSON.parse(textValue);
-      } catch {
-        errors[field.key] = `${field.label} must be valid JSON`;
-      }
-      return;
-    }
-    if (field.type === 'date') {
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(textValue)) {
-        errors[field.key] = `${field.label} must be in YYYY-MM-DD format`;
-        return;
-      }
-      payload[field.key] = textValue;
-      return;
-    }
-    if (field.type === 'time') {
-      if (toTimeComparable(textValue) < 0) {
-        errors[field.key] = `${field.label} must be in HH:mm or HH:mm:ss format`;
-        return;
-      }
-      payload[field.key] = textValue.trim().length === 5 ? `${textValue.trim()}:00` : textValue;
-      return;
-    }
-    payload[field.key] = textValue;
-  });
-
-  if (entity === 'shift_calendars' && !errors.shift_start_time && !errors.shift_end_time) {
-    const start = toTimeComparable(String(payload.shift_start_time || ''));
-    const end = toTimeComparable(String(payload.shift_end_time || ''));
-    if (start >= 0 && end >= 0 && start >= end) {
-      errors.shift_end_time = 'Shift End must be after Shift Start';
-    }
-  }
-
-  if (entity === 'aircraft') {
-    if (payload.tail_number) {
-      const normalizedTailNumber = String(payload.tail_number).trim().toUpperCase();
-      payload.tail_number = normalizedTailNumber;
-      if (!/^[A-Z0-9-]{3,12}$/.test(normalizedTailNumber)) {
-        errors.tail_number = 'Tail Number must be 3-12 characters (A-Z, 0-9, hyphen)';
-      }
-    }
-    if (payload.registration) {
-      const normalizedRegistration = String(payload.registration).trim().toUpperCase();
-      payload.registration = normalizedRegistration;
-      if (!/^[A-Z0-9-]{3,12}$/.test(normalizedRegistration)) {
-        errors.registration = 'Registration must be 3-12 characters (A-Z, 0-9, hyphen)';
-      }
-    }
-    if (payload.serial_number) {
-      const serialNumber = String(payload.serial_number).trim().toUpperCase();
-      payload.serial_number = serialNumber;
-      if (serialNumber.length < 3) {
-        errors.serial_number = 'Serial Number must be at least 3 characters';
-      }
-    }
-    if (payload.aircraft_type && !AIRCRAFT_TYPE_OPTIONS.includes(String(payload.aircraft_type))) {
-      errors.aircraft_type = 'Aircraft Type is invalid';
-    }
-    if (payload.status && !AIRCRAFT_STATUS_OPTIONS.includes(String(payload.status) as (typeof AIRCRAFT_STATUS_OPTIONS)[number])) {
-      errors.status = 'Status is invalid';
-    }
-    if (payload.maintenance_program && String(payload.maintenance_program).trim().length < 3) {
-      errors.maintenance_program = 'Maintenance Program must be at least 3 characters';
-    }
-    if (payload.configuration_code && String(payload.configuration_code).trim().length > 24) {
-      errors.configuration_code = 'Configuration Code cannot exceed 24 characters';
-    }
-  }
-
-  return { payload, errors };
-}
-
-type ReferenceEntity = MasterEntity | 'assembly_types';
-
-export async function verifyReferenceExists(headers: Headers, entity: ReferenceEntity, searchTerm: string, fieldKeys: string[]): Promise<boolean> {
-  const query = new URLSearchParams({
-    search: searchTerm,
-    page: '1',
-    page_size: '20',
-  });
-  const response = await fetch(`/api/v2/amro/master-data/${entity}?${query.toString()}`, {
-    method: 'GET',
-    headers,
-  });
-  const payload = await parseApiPayload(response);
-  if (!response.ok) {
-    const label = (ENTITY_LABEL as Record<string, string>)[entity] ?? 'reference';
-    throw new Error(String(payload.error || `Failed to validate ${label} reference`));
-  }
-  const records = getPayloadRecords(payload);
-  const normalized = searchTerm.trim().toLowerCase();
-  return records.some((record) => fieldKeys.some((fieldKey) => String(record[fieldKey] || '').trim().toLowerCase() === normalized));
-}
-
 type AmroSettingsMasterDataPageProps = {
   entityOverride?: MasterEntity;
 };
@@ -1164,6 +702,7 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
   const [rows, setRows] = useState<RecordRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState(searchParams.get('search') || '');
+  const [debouncedSearch, setDebouncedSearch] = useState(searchParams.get('search') || '');
   const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || 'all');
   const [flightDateFrom, setFlightDateFrom] = useState(searchParams.get('flight_from') || '');
   const [flightDateTo, setFlightDateTo] = useState(searchParams.get('flight_to') || '');
@@ -1171,6 +710,14 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
   const [flightRegistrationFilter, setFlightRegistrationFilter] = useState(searchParams.get('flight_registration') || searchParams.get('aircraft_registration') || '');
   const [flightPilotFilter, setFlightPilotFilter] = useState(searchParams.get('flight_pilot') || '');
   const [flightNumberFilter, setFlightNumberFilter] = useState(searchParams.get('flight_number') || '');
+  const [debouncedFlightFilters, setDebouncedFlightFilters] = useState({
+    flightDateFrom: searchParams.get('flight_from') || '',
+    flightDateTo: searchParams.get('flight_to') || '',
+    flightAircraftFilter: searchParams.get('flight_aircraft') || searchParams.get('aircraft_id') || '',
+    flightRegistrationFilter: searchParams.get('flight_registration') || searchParams.get('aircraft_registration') || '',
+    flightPilotFilter: searchParams.get('flight_pilot') || '',
+    flightNumberFilter: searchParams.get('flight_number') || '',
+  });
   const [columnFilters, setColumnFilters] = useState<Record<string, string>>(() => {
     const filters: Record<string, string> = {};
     searchParams.forEach((value, key) => {
@@ -1231,6 +778,9 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
   });
   const clickDelayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const firstFieldRef = useRef<HTMLInputElement | null>(null);
+  const recordsRequestControllerRef = useRef<AbortController | null>(null);
+  const recordsRequestIdRef = useRef(0);
+  const rowsRenderSignatureRef = useRef('');
   const manufacturerSeedAttemptedRef = useRef(false);
   const selectionAnchorRef = useRef<string | null>(null);
   const aircraftEnhancementEnabled = normalizeFeatureFlag(import.meta.env.VITE_AMRO_AIRCRAFT_FORM_ENHANCEMENTS, true);
@@ -1427,24 +977,39 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
   }, [fetchAssemblyModelOptions, scope]);
 
   const loadRecords = useCallback(async () => {
-    setLoading(true);
+    const requestId = recordsRequestIdRef.current + 1;
+    recordsRequestIdRef.current = requestId;
+    recordsRequestControllerRef.current?.abort();
+    const controller = typeof AbortController === 'undefined' ? null : new AbortController();
+    recordsRequestControllerRef.current = controller;
+    const shouldShowLoading = rowsRenderSignatureRef.current.length === 0;
+    if (shouldShowLoading) {
+      setLoading(true);
+    }
     try {
       const headers = await buildApiHeaders(scope);
       const query = new URLSearchParams({
-        search,
+        search: debouncedSearch,
         page: String(page),
         page_size: pageSize,
         sort_by: sortColumn,
         sort_dir: sortDirection,
       });
-      if (entity === 'flight_logs' && flightDateFrom.trim()) query.set('flight_from', flightDateFrom.trim());
-      if (entity === 'flight_logs' && flightDateTo.trim()) query.set('flight_to', flightDateTo.trim());
-      if (entity === 'flight_logs' && flightAircraftFilter.trim()) query.set('aircraft_id', flightAircraftFilter.trim());
-      if (entity === 'flight_logs' && flightRegistrationFilter.trim()) query.set('aircraft_registration', flightRegistrationFilter.trim());
-      if (entity === 'flight_logs' && flightPilotFilter.trim()) query.set('pilot_name', flightPilotFilter.trim());
-      if (entity === 'flight_logs' && flightNumberFilter.trim()) query.set('flight_number', flightNumberFilter.trim());
-      const response = await fetch(`/api/v2/amro/master-data/${entity}?${query.toString()}`, { method: 'GET', headers });
+      if (entity === 'flight_logs' && debouncedFlightFilters.flightDateFrom.trim()) query.set('flight_from', debouncedFlightFilters.flightDateFrom.trim());
+      if (entity === 'flight_logs' && debouncedFlightFilters.flightDateTo.trim()) query.set('flight_to', debouncedFlightFilters.flightDateTo.trim());
+      if (entity === 'flight_logs' && debouncedFlightFilters.flightAircraftFilter.trim()) query.set('aircraft_id', debouncedFlightFilters.flightAircraftFilter.trim());
+      if (entity === 'flight_logs' && debouncedFlightFilters.flightRegistrationFilter.trim()) query.set('aircraft_registration', debouncedFlightFilters.flightRegistrationFilter.trim());
+      if (entity === 'flight_logs' && debouncedFlightFilters.flightPilotFilter.trim()) query.set('pilot_name', debouncedFlightFilters.flightPilotFilter.trim());
+      if (entity === 'flight_logs' && debouncedFlightFilters.flightNumberFilter.trim()) query.set('flight_number', debouncedFlightFilters.flightNumberFilter.trim());
+      const response = await fetch(`/api/v2/amro/master-data/${entity}?${query.toString()}`, {
+        method: 'GET',
+        headers,
+        signal: controller?.signal,
+      });
       const payload = await parseApiPayload(response);
+      if (recordsRequestIdRef.current !== requestId) {
+        return;
+      }
       if (!response.ok) throw new Error(String(payload.error || 'Failed to load records'));
       let records = getPayloadRecords(payload);
       if (statusFilter !== 'all') {
@@ -1453,21 +1018,69 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
             String(record.status ?? record.is_active ?? record.active).toLowerCase() === statusFilter.toLowerCase(),
         );
       }
-      setRows(records);
+      const nextSignature = createRowsRenderSignature(records);
+      if (nextSignature !== rowsRenderSignatureRef.current) {
+        rowsRenderSignatureRef.current = nextSignature;
+        setRows(records);
+      }
     } catch (error) {
+      if ((error as Error).name === 'AbortError') {
+        return;
+      }
       toast.error(String((error as Error).message || 'Failed to load records'));
     } finally {
-      setLoading(false);
+      if (recordsRequestIdRef.current === requestId) {
+        recordsRequestControllerRef.current = null;
+        if (shouldShowLoading) {
+          setLoading(false);
+        }
+      }
     }
-  }, [entity, flightAircraftFilter, flightDateFrom, flightDateTo, flightPilotFilter, flightRegistrationFilter, flightNumberFilter, page, pageSize, scope, search, sortColumn, sortDirection, statusFilter]);
+  }, [debouncedFlightFilters, debouncedSearch, entity, page, pageSize, scope, sortColumn, sortDirection, statusFilter]);
 
   useEffect(() => {
     setEntity(resolvedRouteEntity);
   }, [resolvedRouteEntity]);
 
   useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search.trim());
+    }, 220);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  useEffect(() => {
+    if (entity !== 'flight_logs') {
+      setDebouncedFlightFilters({
+        flightDateFrom: '',
+        flightDateTo: '',
+        flightAircraftFilter: '',
+        flightRegistrationFilter: '',
+        flightPilotFilter: '',
+        flightNumberFilter: '',
+      });
+      return;
+    }
+    const timer = setTimeout(() => {
+      setDebouncedFlightFilters({
+        flightDateFrom: flightDateFrom.trim(),
+        flightDateTo: flightDateTo.trim(),
+        flightAircraftFilter: flightAircraftFilter.trim(),
+        flightRegistrationFilter: flightRegistrationFilter.trim(),
+        flightPilotFilter: flightPilotFilter.trim(),
+        flightNumberFilter: flightNumberFilter.trim(),
+      });
+    }, 220);
+    return () => clearTimeout(timer);
+  }, [entity, flightAircraftFilter, flightDateFrom, flightDateTo, flightPilotFilter, flightRegistrationFilter, flightNumberFilter]);
+
+  useEffect(() => {
     void loadRecords();
   }, [loadRecords]);
+
+  useEffect(() => {
+    rowsRenderSignatureRef.current = createRowsRenderSignature(rows);
+  }, [rows]);
 
   useEffect(() => {
     setSelectedId(searchParams.get('selected'));
@@ -1648,6 +1261,7 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
       if (clickDelayTimerRef.current) {
         clearTimeout(clickDelayTimerRef.current);
       }
+      recordsRequestControllerRef.current?.abort();
     },
     [],
   );
@@ -3338,68 +2952,20 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
               </Select>
             </div>
             {entity === 'flight_logs' ? (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="flight-date-from-filter" className="mdm-template-label">Flight Date From</Label>
-                  <Input
-                    id="flight-date-from-filter"
-                    type="date"
-                    value={flightDateFrom}
-                    onChange={(event) => setFlightDateFrom(event.target.value)}
-                    className="mdm-template-input"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="flight-date-to-filter" className="mdm-template-label">Flight Date To</Label>
-                  <Input
-                    id="flight-date-to-filter"
-                    type="date"
-                    value={flightDateTo}
-                    onChange={(event) => setFlightDateTo(event.target.value)}
-                    className="mdm-template-input"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="flight-aircraft-filter" className="mdm-template-label">Aircraft Id</Label>
-                  <Input
-                    id="flight-aircraft-filter"
-                    value={flightAircraftFilter}
-                    onChange={(event) => setFlightAircraftFilter(event.target.value)}
-                    className="mdm-template-input"
-                    placeholder="Filter by aircraft id"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="flight-pilot-filter" className="mdm-template-label">Pilot</Label>
-                  <Input
-                    id="flight-pilot-filter"
-                    value={flightPilotFilter}
-                    onChange={(event) => setFlightPilotFilter(event.target.value)}
-                    className="mdm-template-input"
-                    placeholder="Filter by pilot name"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="flight-registration-filter" className="mdm-template-label">Aircraft Registration</Label>
-                  <Input
-                    id="flight-registration-filter"
-                    value={flightRegistrationFilter}
-                    onChange={(event) => setFlightRegistrationFilter(event.target.value)}
-                    className="mdm-template-input"
-                    placeholder="Filter by tail number"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="flight-number-filter" className="mdm-template-label">Flight Number</Label>
-                  <Input
-                    id="flight-number-filter"
-                    value={flightNumberFilter}
-                    onChange={(event) => setFlightNumberFilter(event.target.value)}
-                    className="mdm-template-input"
-                    placeholder="Filter by flight number"
-                  />
-                </div>
-              </>
+              <FlightLogsFilters
+                flightDateFrom={flightDateFrom}
+                setFlightDateFrom={setFlightDateFrom}
+                flightDateTo={flightDateTo}
+                setFlightDateTo={setFlightDateTo}
+                flightAircraftFilter={flightAircraftFilter}
+                setFlightAircraftFilter={setFlightAircraftFilter}
+                flightPilotFilter={flightPilotFilter}
+                setFlightPilotFilter={setFlightPilotFilter}
+                flightRegistrationFilter={flightRegistrationFilter}
+                setFlightRegistrationFilter={setFlightRegistrationFilter}
+                flightNumberFilter={flightNumberFilter}
+                setFlightNumberFilter={setFlightNumberFilter}
+              />
             ) : null}
           </CardContent>
         </Card>
