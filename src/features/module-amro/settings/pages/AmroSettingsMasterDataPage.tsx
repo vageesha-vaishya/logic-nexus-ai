@@ -41,6 +41,7 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useCRM } from '@/hooks/useCRM';
 import { useAuth } from '@/hooks/useAuth';
+import { logger } from '@/lib/logger';
 import { cn } from '@/lib/utils';
 import {
   AlertTriangle,
@@ -278,6 +279,10 @@ type AircraftPresenceCollaborator = {
   role: string;
   initials: string;
   badgeClass: string;
+  latestFlightNumber?: string;
+  latestFlightDate?: string;
+  latestRoute?: string;
+  source: 'flight_logs' | 'fallback';
 };
 
 const AIRCRAFT_NAV_RAIL = [
@@ -289,20 +294,6 @@ const AIRCRAFT_NAV_RAIL = [
   { label: 'Audit', path: '/dashboard/amro/audit' },
 ] as const;
 
-const AIRCRAFT_PRESENCE_COLLABORATOR_POOL = [
-  { id: 'planner', name: 'Priya Nair', role: 'Maintenance Planner' },
-  { id: 'records', name: 'Liam Carter', role: 'Technical Records' },
-  { id: 'qa', name: 'Ana Flores', role: 'QA Inspector' },
-  { id: 'line', name: 'Marcus Allen', role: 'Line Maintenance' },
-  { id: 'ops', name: 'Noah Kim', role: 'Operations Control' },
-] as const;
-const AIRCRAFT_PRESENCE_BADGE_CLASSES = [
-  'bg-emerald-600',
-  'bg-sky-600',
-  'bg-violet-600',
-  'bg-amber-600',
-  'bg-rose-600',
-] as const;
 
 const MANUFACTURER_SEED_NAMES = [
   'AIRBUS',
@@ -366,6 +357,7 @@ const AIRCRAFT_FIELD_HELP: Partial<Record<string, string>> = {
 const SYSTEM_TEMPLATE_MODEL_OPTIONS = ['B737-800 template', 'A320neo template', 'ATR72 template', 'B787-9 template'];
 const AIRCRAFT_BASE_OPTIONS = ['Nothing selected', 'DXB', 'LHR', 'JFK', 'SIN'];
 const AIRCRAFT_OWNER_OPTIONS = ['Nothing selected', 'Owned', 'Leased', 'Wet Lease'];
+const AIRCRAFT_PRESENCE_CACHE_TTL_MS = 120000;
 
 type AircraftCounterRow = {
   key: string;
@@ -776,6 +768,10 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
     rtsBlockers: 0,
     slaRisk: 0,
   });
+  const [aircraftPresenceByRowId, setAircraftPresenceByRowId] = useState<Record<string, AircraftPresenceCollaborator[]>>({});
+  const [aircraftPresenceLoading, setAircraftPresenceLoading] = useState(false);
+  const [aircraftPresenceError, setAircraftPresenceError] = useState('');
+  const aircraftPresenceCacheRef = useRef<{ key: string; fetchedAt: number; map: Record<string, AircraftPresenceCollaborator[]> } | null>(null);
   const clickDelayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const firstFieldRef = useRef<HTMLInputElement | null>(null);
   const recordsRequestControllerRef = useRef<AbortController | null>(null);
@@ -1861,15 +1857,102 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
 
   const renderedRows = supportsColumnFilters ? filteredRows : rows;
   const renderedRowIds = useMemo(() => renderedRows.map((row) => row.id), [renderedRows]);
-  const aircraftPresenceByRowId = useMemo(() => {
-    if (entity !== 'aircraft') {
-      return {} as Record<string, AircraftPresenceCollaborator[]>;
-    }
-    return Object.fromEntries(renderedRows.map((row) => [row.id, buildAircraftPresenceCollaborators(row)]));
-  }, [entity, renderedRows]);
   const renderedRowIdSet = useMemo(() => new Set(renderedRowIds), [renderedRowIds]);
 
   const aircraftHeaderColumns = useMemo(() => tableColumns, [tableColumns]);
+
+  useEffect(() => {
+    if (entity !== 'aircraft') {
+      setAircraftPresenceByRowId({});
+      setAircraftPresenceError('');
+      return;
+    }
+    const aircraftRows = renderedRows;
+    const aircraftIds = aircraftRows.map((row) => String(row.id || '')).filter(Boolean);
+    if (aircraftIds.length === 0) {
+      setAircraftPresenceByRowId({});
+      setAircraftPresenceError('');
+      return;
+    }
+    const sortedIds = [...aircraftIds].sort();
+    const cacheKey = `amro:aircraft-presence:${scope.tenantId || 'tenant'}:${scope.franchiseId || 'franchise'}:${sortedIds.join(',')}`;
+    const now = Date.now();
+    const inMemoryCache = aircraftPresenceCacheRef.current;
+    if (inMemoryCache && inMemoryCache.key === cacheKey && now - inMemoryCache.fetchedAt < AIRCRAFT_PRESENCE_CACHE_TTL_MS) {
+      setAircraftPresenceByRowId(inMemoryCache.map);
+      setAircraftPresenceError('');
+      return;
+    }
+    try {
+      const cachedValue = sessionStorage.getItem(cacheKey);
+      if (cachedValue) {
+        const parsed = JSON.parse(cachedValue) as { fetchedAt: number; map: Record<string, AircraftPresenceCollaborator[]> };
+        if (now - Number(parsed.fetchedAt || 0) < AIRCRAFT_PRESENCE_CACHE_TTL_MS) {
+          aircraftPresenceCacheRef.current = { key: cacheKey, fetchedAt: parsed.fetchedAt, map: parsed.map || {} };
+          setAircraftPresenceByRowId(parsed.map || {});
+          setAircraftPresenceError('');
+          return;
+        }
+      }
+    } catch (error) {
+      logger.warn('Failed to parse aircraft collaborator cache', {
+        component: 'AmroSettingsMasterDataPage',
+        error: String((error as Error)?.message || error),
+      });
+    }
+
+    let cancelled = false;
+    const loadPresence = async () => {
+      setAircraftPresenceLoading(true);
+      setAircraftPresenceError('');
+      const startedAt = performance.now();
+      try {
+        const headers = await buildApiHeaders(scope);
+        const query = new URLSearchParams({ page: '1', page_size: '1000', sort_by: 'flight_date', sort_dir: 'desc' });
+        const response = await fetch(`/api/v2/amro/master-data/flight_logs?${query.toString()}`, { method: 'GET', headers });
+        const payload = await parseApiPayload(response);
+        if (!response.ok) throw new Error(String(payload.error || 'Failed to load flight logs for collaborators'));
+        const flightLogs = getPayloadRecords(payload);
+        const map = Object.fromEntries(
+          aircraftRows.map((row) => {
+            const rowId = String(row.id || '');
+            const rowLogs = flightLogs.filter((log) => String(log.aircraft_id || '') === rowId);
+            return [rowId, buildAircraftPresenceCollaborators(row, rowLogs)];
+          }),
+        ) as Record<string, AircraftPresenceCollaborator[]>;
+        if (cancelled) return;
+        setAircraftPresenceByRowId(map);
+        aircraftPresenceCacheRef.current = { key: cacheKey, fetchedAt: Date.now(), map };
+        try {
+          sessionStorage.setItem(cacheKey, JSON.stringify({ fetchedAt: Date.now(), map }));
+        } catch (error) {
+          logger.warn('Failed to persist aircraft collaborator cache', {
+            component: 'AmroSettingsMasterDataPage',
+            error: String((error as Error)?.message || error),
+          });
+        }
+        logger.info('Aircraft collaborator presence loaded', {
+          component: 'AmroSettingsMasterDataPage',
+          aircraftCount: aircraftRows.length,
+          flightLogCount: flightLogs.length,
+          durationMs: Math.round(performance.now() - startedAt),
+        });
+      } catch (error) {
+        const message = String((error as Error).message || 'Failed to load collaborator presence');
+        if (cancelled) return;
+        setAircraftPresenceError(message);
+        const fallback = Object.fromEntries(aircraftRows.map((row) => [String(row.id || ''), buildAircraftPresenceCollaborators(row, [])])) as Record<string, AircraftPresenceCollaborator[]>;
+        setAircraftPresenceByRowId(fallback);
+        logger.warn('Aircraft collaborator presence fallback applied', { component: 'AmroSettingsMasterDataPage', message, aircraftCount: aircraftRows.length });
+      } finally {
+        if (!cancelled) setAircraftPresenceLoading(false);
+      }
+    };
+    void loadPresence();
+    return () => {
+      cancelled = true;
+    };
+  }, [entity, renderedRows, scope]);
 
   const toggleSort = useCallback(
     (column: string) => {
@@ -2399,15 +2482,42 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
     try {
       const headers = await buildApiHeaders(scope);
       const normalizedPayload = buildFlightLogPayload(values, payload.metadata.source);
-      const endpoint = mode === 'add' ? '/api/v2/amro/flight-logs' : '/api/v2/amro/master-data/flight_logs';
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(normalizedPayload),
-      });
-      const parsedPayload = await parseApiPayload(response);
-      if (!response.ok) {
-        throw new Error(String(parsedPayload.error || 'Failed to save flight log'));
+      const endpoints = mode === 'add'
+        ? ['/api/v2/amro/flight-logs', '/api/v2/amro/master-data/flight_logs']
+        : ['/api/v2/amro/master-data/flight_logs'];
+      let saved = false;
+      let lastErrorMessage = 'Failed to save flight log';
+      for (let index = 0; index < endpoints.length; index += 1) {
+        const endpoint = endpoints[index];
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(normalizedPayload),
+        });
+        const parsedPayload = await parseApiPayload(response);
+        if (response.ok) {
+          saved = true;
+          break;
+        }
+        const apiMessage = String(parsedPayload.error || 'Failed to save flight log');
+        if (response.status === 404 && index < endpoints.length - 1) {
+          logger.warn('Primary flight log endpoint unavailable, retrying fallback endpoint', {
+            component: 'AmroSettingsMasterDataPage',
+            endpoint,
+            fallbackEndpoint: endpoints[index + 1],
+            aircraftId: String(normalizedPayload.aircraft_id || ''),
+          });
+          continue;
+        }
+        if (response.status === 404) {
+          lastErrorMessage = `Aircraft ${String(normalizedPayload.aircraft_id || '').trim() || 'record'} was not found or is outside your access scope`;
+          throw new Error(lastErrorMessage);
+        }
+        lastErrorMessage = apiMessage;
+        throw new Error(apiMessage);
+      }
+      if (!saved) {
+        throw new Error(lastErrorMessage);
       }
       toast.success(mode === 'add' ? 'Flight log recorded' : 'Flight Logs record created');
       setFlightLogDialogOpen(false);
@@ -2416,8 +2526,13 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
         await loadAircraftWorkPackageSnapshot();
       }
     } catch (error) {
+      logger.error('Flight log save failed', {
+        component: 'AmroSettingsMasterDataPage',
+        mode,
+        aircraftId: String(values.aircraftId || ''),
+        error: error as Error,
+      });
       toast.error(String((error as Error).message || 'Failed to save flight log'));
-      throw error;
     } finally {
       setFlightLogSubmitting(false);
     }
@@ -3097,6 +3212,8 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
                                 className="flex items-center -space-x-2"
                                 role="group"
                                 aria-label={`Collaborators for aircraft ${String(row.tail_number || row.registration || row.id)}`}
+                                aria-busy={aircraftPresenceLoading}
+                                data-presence-error={aircraftPresenceError ? 'true' : 'false'}
                               >
                                 {(aircraftPresenceByRowId[row.id] || []).map((collaborator) => (
                                   <Tooltip key={`${row.id}-${collaborator.id}`}>
@@ -3107,7 +3224,16 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
                                         </AvatarFallback>
                                       </Avatar>
                                     </TooltipTrigger>
-                                    <TooltipContent>{collaborator.name} · {collaborator.role}</TooltipContent>
+                                    <TooltipContent>
+                                      <div className="flex flex-col gap-0.5">
+                                        <span>{collaborator.name} · {collaborator.role}</span>
+                                        {collaborator.latestFlightNumber || collaborator.latestFlightDate || collaborator.latestRoute ? (
+                                          <span className="text-[11px] text-[hsl(var(--mdm-template-muted))]">
+                                            {[collaborator.latestFlightNumber, collaborator.latestFlightDate, collaborator.latestRoute].filter(Boolean).join(' • ')}
+                                          </span>
+                                        ) : null}
+                                      </div>
+                                    </TooltipContent>
                                   </Tooltip>
                                 ))}
                               </div>

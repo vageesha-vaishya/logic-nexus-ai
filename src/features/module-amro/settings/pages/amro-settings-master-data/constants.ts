@@ -78,14 +78,6 @@ export const AIRCRAFT_NAV_RAIL = [
   { label: 'Audit', path: '/dashboard/amro/audit' },
 ] as const;
 
-export const AIRCRAFT_PRESENCE_COLLABORATOR_POOL = [
-  { id: 'planner', name: 'Priya Nair', role: 'Maintenance Planner' },
-  { id: 'records', name: 'Liam Carter', role: 'Technical Records' },
-  { id: 'qa', name: 'Ana Flores', role: 'QA Inspector' },
-  { id: 'line', name: 'Marcus Allen', role: 'Line Maintenance' },
-  { id: 'ops', name: 'Noah Kim', role: 'Operations Control' },
-] as const;
-
 export const AIRCRAFT_PRESENCE_BADGE_CLASSES = ['bg-emerald-600', 'bg-sky-600', 'bg-violet-600', 'bg-amber-600', 'bg-rose-600'] as const;
 
 export const MANUFACTURER_SEED_NAMES = [

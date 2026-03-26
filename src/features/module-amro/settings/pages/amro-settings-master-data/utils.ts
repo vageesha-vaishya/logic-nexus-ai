@@ -9,7 +9,6 @@ import type {
 } from './types';
 import {
   AIRCRAFT_PRESENCE_BADGE_CLASSES,
-  AIRCRAFT_PRESENCE_COLLABORATOR_POOL,
   AIRCRAFT_STATUS_OPTIONS,
   AIRCRAFT_TYPE_OPTIONS,
   ENTITY_DEFAULT_VALUES,
@@ -257,40 +256,68 @@ export function getInitialFormValues(entity: MasterEntity): FormValues {
   return { ...ENTITY_DEFAULT_VALUES[entity] };
 }
 
-function computePresenceHash(value: string): number {
-  let hash = 0;
-  for (let index = 0; index < value.length; index += 1) {
-    hash = (hash << 5) - hash + value.charCodeAt(index);
-    hash |= 0;
-  }
-  return Math.abs(hash);
-}
-
 function getInitials(value: string): string {
-  const tokens = value
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
+  const tokens = value.trim().split(/\s+/).filter(Boolean);
   if (!tokens.length) return 'NA';
   if (tokens.length === 1) return tokens[0].slice(0, 2).toUpperCase();
   return `${tokens[0][0] || ''}${tokens[1][0] || ''}`.toUpperCase();
 }
 
-export function buildAircraftPresenceCollaborators(row: RecordRow): AircraftPresenceCollaborator[] {
-  const seed = `${String(row.id || '')}|${String(row.tail_number || '')}|${String(row.registration || '')}`;
-  const hash = computePresenceHash(seed);
-  const collaboratorCount = (hash % 3) + 1;
-  return Array.from({ length: collaboratorCount }, (_, index) => {
-    const collaborator = AIRCRAFT_PRESENCE_COLLABORATOR_POOL[(hash + index * 7) % AIRCRAFT_PRESENCE_COLLABORATOR_POOL.length];
-    const badgeClass = AIRCRAFT_PRESENCE_BADGE_CLASSES[(hash + index * 11) % AIRCRAFT_PRESENCE_BADGE_CLASSES.length];
-    return {
-      id: `${collaborator.id}-${index}`,
-      name: collaborator.name,
-      role: collaborator.role,
-      initials: getInitials(collaborator.name),
-      badgeClass,
-    };
+function deriveRoleFromNameToken(name: string): string {
+  const normalized = name.trim().toLowerCase();
+  if (normalized.startsWith('captain')) return 'Captain';
+  if (normalized.startsWith('fo ') || normalized.startsWith('first officer')) return 'First Officer';
+  if (normalized.startsWith('engineer')) return 'Engineer';
+  if (normalized.startsWith('inspector')) return 'Inspector';
+  return 'Crew';
+}
+
+function extractCrewNames(raw: unknown): string[] {
+  return String(raw || '')
+    .split(/[\n,;/]+/)
+    .map((token) => token.trim())
+    .filter(Boolean);
+}
+
+export function buildAircraftPresenceCollaborators(row: RecordRow, flightLogs: RecordRow[] = []): AircraftPresenceCollaborator[] {
+  const sortedLogs = [...flightLogs].sort((left, right) => String(right.flight_date || '').localeCompare(String(left.flight_date || '')));
+  const seen = new Set<string>();
+  const collaborators: AircraftPresenceCollaborator[] = [];
+
+  sortedLogs.forEach((log) => {
+    const people = [String(log.pilot_name || '').trim(), ...extractCrewNames(log.crew_details)].filter(Boolean);
+    people.forEach((person) => {
+      const key = person.toLowerCase();
+      if (seen.has(key)) return;
+      seen.add(key);
+      const index = collaborators.length % AIRCRAFT_PRESENCE_BADGE_CLASSES.length;
+      collaborators.push({
+        id: `${String(log.id || row.id)}-${key.replace(/[^a-z0-9]+/g, '-')}`,
+        name: person,
+        role: deriveRoleFromNameToken(person),
+        initials: getInitials(person),
+        badgeClass: AIRCRAFT_PRESENCE_BADGE_CLASSES[index],
+        latestFlightNumber: String(log.flight_number || '').trim() || undefined,
+        latestFlightDate: String(log.flight_date || '').trim() || undefined,
+        latestRoute: [String(log.departure_airport || '').trim(), String(log.arrival_airport || '').trim()].filter(Boolean).join(' → ') || undefined,
+        source: 'flight_logs',
+      });
+    });
   });
+
+  if (collaborators.length > 0) {
+    return collaborators.slice(0, 3);
+  }
+
+  const fallbackName = String(row.owner_name || row.tail_number || row.registration || row.id || 'Ops Team').trim();
+  return [{
+    id: `fallback-${String(row.id || 'aircraft')}`,
+    name: fallbackName,
+    role: 'No Flight Log Crew',
+    initials: getInitials(fallbackName),
+    badgeClass: AIRCRAFT_PRESENCE_BADGE_CLASSES[0],
+    source: 'fallback',
+  }];
 }
 
 function asInputString(value: unknown): string {

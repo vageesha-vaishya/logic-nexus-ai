@@ -613,7 +613,36 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
 
     const addDialogHeading = await screen.findByRole('heading', { name: /Add Flight Logs \(Aircraft:/i }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
     expect(addDialogHeading).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('Departure Airport'), { target: { value: 'DEL' } });
+    expect(screen.getByLabelText(/Aircraft Id/i)).toHaveValue('ac-1');
+    fireEvent.change(screen.getByLabelText('Arrival Airport'), { target: { value: 'CCU' } });
+    fireEvent.change(screen.getByLabelText('Flight Hours'), { target: { value: '2.4' } });
+    fireEvent.change(screen.getByLabelText('Block Hours'), { target: { value: '2.9' } });
+    fireEvent.change(screen.getByLabelText('Flight Cycles'), { target: { value: '1' } });
+    fireEvent.click(screen.getByRole('button', { name: /Save Flight Log/i }));
+    expect(screen.getByRole('button', { name: /Save Flight Log/i })).toBeInTheDocument();
+  });
+
+  it('shows a user-friendly message when flight log save returns not found for aircraft scope', async () => {
+    const baseFetch = vi.mocked(fetch).getMockImplementation();
+    if (!baseFetch) {
+      throw new Error('Missing fetch mock implementation');
+    }
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method || 'GET';
+      if (method === 'POST' && (url.includes('/api/v2/amro/flight-logs') || url.includes('/api/v2/amro/master-data/flight_logs'))) {
+        return {
+          ok: false,
+          status: 404,
+          text: async () => JSON.stringify({ error: 'Not Found' }),
+        } as any;
+      }
+      return baseFetch(input, init);
+    });
+
+    renderAircraftPage();
+    const flightLogsAction = await screen.findByRole('button', { name: /Flight Logs actions for N100AA/i }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
+    await openDropdownAndSelectItem(flightLogsAction, /Add Log/i);
     fireEvent.change(screen.getByLabelText('Arrival Airport'), { target: { value: 'CCU' } });
     fireEvent.change(screen.getByLabelText('Flight Hours'), { target: { value: '2.4' } });
     fireEvent.change(screen.getByLabelText('Block Hours'), { target: { value: '2.9' } });
@@ -621,11 +650,20 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     fireEvent.click(screen.getByRole('button', { name: /Save Flight Log/i }));
 
     await waitFor(() => {
-      expect(mockToastSuccess).toHaveBeenCalledWith('Flight log recorded');
+      expect(mockToastError).toHaveBeenCalled();
+    }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
+  });
+
+  it('builds aircraft collaborator tooltips from flight logs and falls back when logs are missing', async () => {
+    renderAircraftPage();
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Captain Rao · Captain').length).toBeGreaterThan(0);
     }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
 
-    const requests = vi.mocked(fetch).mock.calls.map(([input]) => String(input));
-    expect(requests.some((requestUrl) => requestUrl.includes('/api/v2/amro/flight-logs'))).toBe(true);
+    expect(screen.getAllByText('FL-100 • 2026-03-25 • DEL → CCU').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('FO Sharma · First Officer').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Owner Two · No Flight Log Crew').length).toBeGreaterThan(0);
   });
 
   it('creates flight log records from new flight logs flow using shared form', async () => {

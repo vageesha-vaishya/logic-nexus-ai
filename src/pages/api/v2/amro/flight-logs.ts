@@ -72,6 +72,47 @@ function parseMetadata(value: unknown): Record<string, unknown> {
   throw new Error('metadata must be an object');
 }
 
+type AircraftLookupRow = {
+  id: string;
+  franchise_id: string | null;
+  tail_number: string | null;
+  registration: string | null;
+};
+
+async function findAircraftByField(
+  supabase: ReturnType<typeof getSupabaseAdminClient>,
+  tenantId: string,
+  field: 'id' | 'tail_number' | 'registration',
+  value: string,
+): Promise<AircraftLookupRow | null> {
+  const { data, error } = await supabase
+    .from('aircraft')
+    .select('id,franchise_id,tail_number,registration')
+    .eq('tenant_id', tenantId)
+    .eq(field, value)
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    throw new Error(error.message || 'Failed to resolve aircraft');
+  }
+  if (!data) {
+    return null;
+  }
+  return data as unknown as AircraftLookupRow;
+}
+
+async function resolveAircraft(
+  supabase: ReturnType<typeof getSupabaseAdminClient>,
+  tenantId: string,
+  identifier: string,
+): Promise<AircraftLookupRow | null> {
+  const idMatch = await findAircraftByField(supabase, tenantId, 'id', identifier);
+  if (idMatch) return idMatch;
+  const tailMatch = await findAircraftByField(supabase, tenantId, 'tail_number', identifier);
+  if (tailMatch) return tailMatch;
+  return findAircraftByField(supabase, tenantId, 'registration', identifier);
+}
+
 export default async function handler(req: ApiRequest, res: ApiResponse) {
   applyCors(req, res, { methods: ['POST', 'OPTIONS'] });
   if (handlePreflight(req, res)) return;
@@ -110,7 +151,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     const userId = String(auth.userId || '').trim();
     const body = parseBody(req.body);
 
-    const aircraftId = parseRequiredString(body.aircraft_id, 'aircraft_id');
+    const aircraftIdentifier = parseRequiredString(body.aircraft_id, 'aircraft_id');
     const flightDate = parseRequiredDate(body.flight_date, 'flight_date');
     const flightNumber = parseOptionalString(body.flight_number);
     const departureAirport = parseRequiredString(body.departure_airport, 'departure_airport');
@@ -137,6 +178,23 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     }
 
     const supabase = getSupabaseAdminClient();
+    const aircraft = await resolveAircraft(supabase, tenantId, aircraftIdentifier);
+    if (!aircraft) {
+      return res.status(404).json({
+        error: `Aircraft ${aircraftIdentifier} not found`,
+        correlationId: ctx.correlationId,
+        version: 'v2',
+      });
+    }
+    const aircraftFranchiseId = aircraft.franchise_id ? String(aircraft.franchise_id).trim() : '';
+    if (franchiseId && aircraftFranchiseId && aircraftFranchiseId !== franchiseId) {
+      return res.status(403).json({
+        error: `Forbidden for aircraft ${aircraftIdentifier}`,
+        correlationId: ctx.correlationId,
+        version: 'v2',
+      });
+    }
+    const aircraftId = String(aircraft.id || '').trim();
     const { data, error } = await supabase.rpc('amro_record_flight_log', {
       p_tenant_id: tenantId,
       p_franchise_id: franchiseId,

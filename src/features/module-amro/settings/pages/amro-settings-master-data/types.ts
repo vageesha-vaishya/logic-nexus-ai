@@ -95,6 +95,10 @@ export type AircraftPresenceCollaborator = {
   role: string;
   initials: string;
   badgeClass: string;
+  latestFlightNumber?: string;
+  latestFlightDate?: string;
+  latestRoute?: string;
+  source: 'flight_logs' | 'fallback';
 };
 
 export type AircraftCounterRow = {
