@@ -1,7 +1,7 @@
 import express, { Express, NextFunction, Request, Response } from 'express';
 import cors from 'cors';
 import { randomUUID } from 'crypto';
-import { authMiddleware } from './middleware/auth.middleware';
+import { authMiddleware, getAuthHeaderMonitoringSnapshot } from './middleware/auth.middleware';
 import leadsRoutes from './routes/leads.routes';
 import invoicesRoutes from './routes/invoices.routes';
 import taxRoutes from './routes/tax.routes';
@@ -37,7 +37,11 @@ app.use((req: Request, _res: Response, next: NextFunction) => {
   const correlationIdHeader = req.header('x-correlation-id')?.trim();
   request.correlationId = correlationIdHeader || randomUUID();
   _res.setHeader('x-correlation-id', request.correlationId);
-  logger.info(`${req.method} ${req.path}`, { correlationId: request.correlationId });
+  logger.info(`${req.method} ${req.path}`, {
+    correlationId: request.correlationId,
+    authorizationHeaderPresent: Boolean(String(req.headers.authorization || '').trim()),
+    authorizationScheme: String(req.headers.authorization || '').trim().split(/\s+/)[0]?.toLowerCase() || null,
+  });
   next();
 });
 
@@ -45,7 +49,8 @@ app.get('/health', (_req: Request, res: Response) => {
   res.json({
     status: 'ok',
     service: 'crm-api',
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    authHeaderMonitoring: getAuthHeaderMonitoringSnapshot(),
   });
 });
 

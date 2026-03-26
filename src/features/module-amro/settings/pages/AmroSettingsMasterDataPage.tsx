@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,6 +24,12 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
@@ -36,7 +42,24 @@ import { useCRM } from '@/hooks/useCRM';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
-import { AlertTriangle, ArrowDown, ArrowUp, ArrowUpDown, CalendarDays, CheckSquare, ExternalLink, FileCheck, FileText, TimerReset } from 'lucide-react';
+import {
+  AlertTriangle,
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  CalendarDays,
+  CheckSquare,
+  Eye,
+  FileCheck,
+  FileDown,
+  FileText,
+  FileUp,
+  ListChecks,
+  Plus,
+  RefreshCw,
+  TimerReset,
+  Trash2,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -159,7 +182,7 @@ const ENTITY_TABLE_COLUMNS: Record<MasterEntity, string[]> = {
 };
 
 const ENTITY_HIDDEN_COLUMNS: Partial<Record<MasterEntity, string[]>> = {
-  aircraft: ['id', 'updated_at', 'tenant_id', 'franchise_id'],
+  aircraft: ['id', 'created_at', 'updated_at', 'tenant_id', 'franchise_id'],
   flight_logs: ['tenant_id', 'franchise_id', 'is_deleted', 'deleted_at', 'deleted_by', 'created_by', 'updated_by', 'metadata'],
 };
 
@@ -1072,6 +1095,7 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
   const clickDelayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const firstFieldRef = useRef<HTMLInputElement | null>(null);
   const manufacturerSeedAttemptedRef = useRef(false);
+  const selectionAnchorRef = useRef<string | null>(null);
   const aircraftEnhancementEnabled = normalizeFeatureFlag(import.meta.env.VITE_AMRO_AIRCRAFT_FORM_ENHANCEMENTS, true);
   const canCreateWorkPackage = hasPermission('create_maintenance_request');
   const canScheduleWorkPackage = hasPermission('edit_aircraft_records');
@@ -1291,6 +1315,8 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
 
   useEffect(() => {
     setSelectedId(searchParams.get('selected'));
+    setSelectedRowIds([]);
+    selectionAnchorRef.current = null;
     setFormValues(getInitialFormValues(entity));
     setFormErrors({});
     setBulkText(createDefaultBulkText(entity));
@@ -1878,6 +1904,8 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
   }, [columnFilters, entity, flightAircraftFilter, flightDateFrom, flightDateTo, flightPilotFilter, flightRegistrationFilter, flightNumberFilter, rows, supportsColumnFilters]);
 
   const renderedRows = supportsColumnFilters ? filteredRows : rows;
+  const renderedRowIds = useMemo(() => renderedRows.map((row) => row.id), [renderedRows]);
+  const renderedRowIdSet = useMemo(() => new Set(renderedRowIds), [renderedRowIds]);
 
   const aircraftHeaderColumns = useMemo(() => tableColumns, [tableColumns]);
 
@@ -1907,15 +1935,40 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
     });
   }, []);
 
+  const toggleRowSelectionRange = useCallback(
+    (startRowId: string, endRowId: string, checked: boolean) => {
+      const startIndex = renderedRows.findIndex((row) => row.id === startRowId);
+      const endIndex = renderedRows.findIndex((row) => row.id === endRowId);
+      if (startIndex < 0 || endIndex < 0) {
+        toggleRowSelection(endRowId, checked);
+        return;
+      }
+      const [from, to] = startIndex <= endIndex ? [startIndex, endIndex] : [endIndex, startIndex];
+      const rangeIds = renderedRows.slice(from, to + 1).map((row) => row.id);
+      setSelectedRowIds((previous) => {
+        const next = new Set(previous);
+        rangeIds.forEach((id) => {
+          if (checked) {
+            next.add(id);
+          } else {
+            next.delete(id);
+          }
+        });
+        return Array.from(next);
+      });
+    },
+    [renderedRows, toggleRowSelection],
+  );
+
   const toggleSelectAllRows = useCallback(
     (checked: boolean) => {
       if (checked) {
-        setSelectedRowIds(renderedRows.map((row) => row.id));
+        setSelectedRowIds((previous) => Array.from(new Set([...previous, ...renderedRowIds])));
         return;
       }
-      setSelectedRowIds([]);
+      setSelectedRowIds((previous) => previous.filter((id) => !renderedRowIdSet.has(id)));
     },
-    [renderedRows],
+    [renderedRowIdSet, renderedRowIds],
   );
 
   const handleInlineEditStart = useCallback((rowId: string, column: string, currentValue: unknown) => {
@@ -1967,17 +2020,32 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
   );
 
   const handleRowSingleClick = useCallback(
-    (row: RecordRow) => {
+    (row: RecordRow, event: MouseEvent<HTMLTableRowElement>) => {
+      if (event.shiftKey || event.metaKey || event.ctrlKey) {
+        const checked = !selectedRowIds.includes(row.id);
+        if (event.shiftKey && selectionAnchorRef.current) {
+          toggleRowSelectionRange(selectionAnchorRef.current, row.id, checked);
+        } else {
+          toggleRowSelection(row.id, checked);
+        }
+        selectionAnchorRef.current = row.id;
+        setSelectedId(row.id);
+        setFormValues(pickFormValuesFromRow(entity, row));
+        setFormErrors({});
+        return;
+      }
       if (clickDelayTimerRef.current) {
         clearTimeout(clickDelayTimerRef.current);
       }
       clickDelayTimerRef.current = setTimeout(() => {
+        setSelectedRowIds([row.id]);
+        selectionAnchorRef.current = row.id;
         setSelectedId(row.id);
         setFormValues(pickFormValuesFromRow(entity, row));
         setFormErrors({});
       }, 300);
     },
-    [entity],
+    [entity, selectedRowIds, toggleRowSelection, toggleRowSelectionRange],
   );
 
   const openUpdateModal = useCallback(
@@ -2496,8 +2564,66 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
     }
   }, [aircraftHeaderColumns, entity, getColumnLabel, renderedRows, resolveTableCellValue, tableColumns]);
 
-  const allRowsSelected = renderedRows.length > 0 && renderedRows.every((row) => selectedRowIds.includes(row.id));
-  const someRowsSelected = !allRowsSelected && selectedRowIds.length > 0;
+  const selectedRows = useMemo(() => rows.filter((row) => selectedRowIds.includes(row.id)), [rows, selectedRowIds]);
+  const allRowsSelected = renderedRowIds.length > 0 && renderedRowIds.every((id) => selectedRowIds.includes(id));
+  const someRowsSelected = renderedRowIds.some((id) => selectedRowIds.includes(id)) && !allRowsSelected;
+
+  const handleExportSelectedCsv = useCallback(() => {
+    if (!selectedRows.length) {
+      toast.error('Select at least one record to export');
+      return;
+    }
+    const csvColumns = (entity === 'aircraft' ? aircraftHeaderColumns : tableColumns).filter((column) => column !== 'id');
+    const escapeCell = (value: string) => `"${value.replace(/"/g, '""')}"`;
+    const header = csvColumns.map((column) => escapeCell(getColumnLabel(column))).join(',');
+    const body = selectedRows
+      .map((row) => csvColumns.map((column) => escapeCell(String(resolveTableCellValue(row, column) || ''))).join(','))
+      .join('\n');
+    const csvText = `${header}\n${body}`;
+    const blob = new Blob([csvText], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `amro-${entity}-selected.csv`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    toast.success(`Exported ${selectedRows.length} selected ${ENTITY_LABEL[entity]} records`);
+  }, [aircraftHeaderColumns, entity, getColumnLabel, resolveTableCellValue, selectedRows, tableColumns]);
+
+  const handleDeleteSelected = useCallback(async () => {
+    if (!selectedRowIds.length) {
+      toast.error('Select at least one record to delete');
+      return;
+    }
+    try {
+      const headers = await buildApiHeaders(scope);
+      const results = await Promise.allSettled(
+        selectedRowIds.map(async (rowId) => {
+          const response = await fetch(`/api/v2/amro/master-data/${entity}/${rowId}`, {
+            method: 'DELETE',
+            headers,
+          });
+          const payload = await parseApiPayload(response);
+          if (!response.ok) {
+            throw new Error(String(payload.error || `Delete failed for ${rowId}`));
+          }
+        }),
+      );
+      const failedCount = results.filter((result) => result.status === 'rejected').length;
+      const deletedCount = results.length - failedCount;
+      if (deletedCount > 0) {
+        toast.success(`Deleted ${deletedCount} ${ENTITY_LABEL[entity]} records`);
+      }
+      if (failedCount > 0) {
+        toast.error(`${failedCount} record deletions failed`);
+      }
+      setSelectedRowIds((previous) => previous.filter((id) => !selectedRowIds.includes(id)));
+      selectionAnchorRef.current = null;
+      await loadRecords();
+    } catch (error) {
+      toast.error(String((error as Error).message || 'Bulk delete failed'));
+    }
+  }, [entity, loadRecords, scope, selectedRowIds]);
 
   const renderSortIcon = useCallback(
     (column: string) => {
@@ -2514,7 +2640,8 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
 
   return (
     <DashboardLayout>
-      <div className="mdm-template-page" data-testid="amro-master-data-template">
+      <TooltipProvider delayDuration={300}>
+        <div className="mdm-template-page" data-testid="amro-master-data-template">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <nav className="mb-1 flex items-center gap-1 text-xs text-[hsl(var(--mdm-template-muted))]" aria-label="Breadcrumb">
@@ -2537,31 +2664,53 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
                 Settings Dashboard
               </Link>
             </Button>
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setBusyAction('refresh');
-                void loadRecords().finally(() => setBusyAction(null));
-              }}
-              disabled={loading || busyAction === 'refresh'}
-              aria-label="Refresh records"
-            >
-              {busyAction === 'refresh' ? 'Refreshing...' : 'Refresh'}
-            </Button>
-            <Button variant="outline" onClick={() => void handleExport()} disabled={busyAction === 'export'} aria-label="Export records CSV">
-              {busyAction === 'export' ? 'Exporting...' : 'Export CSV'}
-            </Button>
-            <Button variant="outline" onClick={() => void handleExportPdf()} disabled={busyAction === 'export_pdf'} aria-label="Export records PDF">
-              {busyAction === 'export_pdf' ? 'Exporting...' : 'Export PDF'}
-            </Button>
-            <Button
-              className="bg-[hsl(var(--mdm-template-focus))] text-white hover:bg-[hsl(var(--mdm-template-focus))/0.9]"
-              onClick={handleOpenCreateModal}
-              disabled={busyAction === 'create'}
-              aria-label={`New ${ENTITY_LABEL[entity]}`}
-            >
-              {busyAction === 'create' ? 'Opening...' : `New ${ENTITY_LABEL[entity]}`}
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="secondary"
+                  size="icon"
+                  onClick={() => {
+                    setBusyAction('refresh');
+                    void loadRecords().finally(() => setBusyAction(null));
+                  }}
+                  disabled={loading || busyAction === 'refresh'}
+                  aria-label="Refresh records"
+                >
+                  <RefreshCw className={cn('h-4 w-4', busyAction === 'refresh' && 'animate-spin')} aria-hidden="true" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Refresh</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="outline" size="icon" onClick={() => void handleExport()} disabled={busyAction === 'export'} aria-label="Export records CSV">
+                  <FileUp className="h-4 w-4" aria-hidden="true" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Export CSV</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="outline" size="icon" onClick={() => void handleExportPdf()} disabled={busyAction === 'export_pdf'} aria-label="Export records PDF">
+                  <FileDown className="h-4 w-4" aria-hidden="true" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Export PDF</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  className="bg-[hsl(var(--mdm-template-focus))] text-white hover:bg-[hsl(var(--mdm-template-focus))/0.9]"
+                  size="icon"
+                  onClick={handleOpenCreateModal}
+                  disabled={busyAction === 'create'}
+                  aria-label={`New ${ENTITY_LABEL[entity]}`}
+                >
+                  <Plus className="h-4 w-4" aria-hidden="true" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{`New ${ENTITY_LABEL[entity]}`}</TooltipContent>
+            </Tooltip>
           </div>
         </div>
 
@@ -2624,13 +2773,28 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
                     <Button size="sm" onClick={openAircraftWorkPackageDialog} disabled={!canCreateWorkPackage}>
                       Create Work Package
                     </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => openAircraftFlightLogsList(String(selectedAircraft?.id || ''))}
-                    >
-                      View Flight Logs
-                    </Button>
+                    <DropdownMenu>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <DropdownMenuTrigger asChild>
+                            <Button size="sm" variant="outline" aria-label="Flight Logs">
+                              <ListChecks className="h-3.5 w-3.5" aria-hidden="true" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                        </TooltipTrigger>
+                        <TooltipContent>Flight Logs</TooltipContent>
+                      </Tooltip>
+                      <DropdownMenuContent align="start">
+                        <DropdownMenuItem onClick={() => openAircraftFlightLogsList(String(selectedAircraft?.id || ''))}>
+                          <Eye className="mr-2 h-3.5 w-3.5" aria-hidden="true" />
+                          View Logs
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => openFlightLogDialog(String(selectedAircraft?.id || ''))}>
+                          <Plus className="mr-2 h-3.5 w-3.5" aria-hidden="true" />
+                          Add Log
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                     <Button size="sm" variant="outline" onClick={() => handleAircraftContextNavigation('/dashboard/amro/work-packages')}>
                       View Active Packages
                     </Button>
@@ -2803,7 +2967,6 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
           </CardHeader>
           <CardContent className="mdm-template-panel-body space-y-3">
             <div className="overflow-auto rounded-md border max-h-[560px]">
-              <TooltipProvider delayDuration={300}>
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-[#F8FAFC]">
@@ -2816,7 +2979,14 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
                       </TableHead>
                       {entity === 'aircraft' ? (
                         <TableHead className="sticky top-0 z-20 h-auto min-w-[180px] bg-[#F8FAFC] px-3 py-2 text-left text-[13px] font-semibold text-[#64748B]">
-                          Flight Logs
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="inline-flex items-center">
+                                <ListChecks className="h-4 w-4" aria-label="Flight Logs column" />
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent>Flight Logs</TooltipContent>
+                          </Tooltip>
                         </TableHead>
                       ) : null}
                       {(entity === 'aircraft' ? aircraftHeaderColumns : tableColumns).map((column) => (
@@ -2860,8 +3030,9 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
                           'cursor-pointer transition-colors duration-200 ease-in-out hover:bg-[#F1F7FF]',
                           rowIndex % 2 === 0 ? 'bg-white' : 'bg-[#F8FAFC]',
                           row.id === selectedId && 'bg-[hsl(var(--mdm-template-focus))/0.12]',
+                          selectedRowIds.includes(row.id) && 'ring-1 ring-[hsl(var(--mdm-template-focus))/0.55] ring-inset',
                         )}
-                        onClick={() => handleRowSingleClick(row)}
+                        onClick={(event) => handleRowSingleClick(row, event)}
                         onDoubleClick={() => handleRowDoubleClick(row)}
                       >
                         <TableCell className="px-3 py-2 align-middle">
@@ -2875,26 +3046,42 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
                         {entity === 'aircraft' ? (
                           <TableCell className="px-3 py-2 align-middle">
                             <div className="flex items-center gap-2">
-                              <Button
-                                variant="outline"
-                                className="h-8 whitespace-nowrap"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  openAircraftFlightLogsList(String(row.id));
-                                }}
-                              >
-                                View Flight Logs
-                              </Button>
-                              <Button
-                                variant="outline"
-                                className="h-8 whitespace-nowrap"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  openFlightLogDialog(String(row.id));
-                                }}
-                              >
-                                Add Flight Logs
-                              </Button>
+                              <DropdownMenu>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button
+                                        variant="outline"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        aria-label={`Flight Logs actions for ${String(row.tail_number || row.registration || row.id)}`}
+                                        onClick={(event) => event.stopPropagation()}
+                                      >
+                                        <ListChecks className="h-4 w-4" aria-hidden="true" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Flight Logs</TooltipContent>
+                                </Tooltip>
+                                <DropdownMenuContent align="start">
+                                  <DropdownMenuItem
+                                    onSelect={() => {
+                                      openAircraftFlightLogsList(String(row.id));
+                                    }}
+                                  >
+                                    <Eye className="mr-2 h-3.5 w-3.5" aria-hidden="true" />
+                                    View Logs
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onSelect={() => {
+                                      openFlightLogDialog(String(row.id));
+                                    }}
+                                  >
+                                    <Plus className="mr-2 h-3.5 w-3.5" aria-hidden="true" />
+                                    Add Log
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             </div>
                           </TableCell>
                         ) : null}
@@ -2926,7 +3113,7 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
                                       autoFocus
                                       className="h-8 mdm-template-input"
                                     />
-                                  ) : column === 'id' || column === 'tail_number' || column === 'registration' ? (
+                                  ) : column === 'id' ? (
                                     <Link
                                       to={`/dashboard/amro/settings/master-data/${ENTITY_ROUTE_SEGMENT[entity]}?selected=${row.id}`}
                                       target="_blank"
@@ -2935,7 +3122,6 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
                                       onClick={(event) => event.stopPropagation()}
                                     >
                                       <span className="truncate">{resolveTableCellValue(row, column)}</span>
-                                      <ExternalLink className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                     </Link>
                                   ) : (
                                     <span className="block truncate">{resolveTableCellValue(row, column)}</span>
@@ -2973,12 +3159,37 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
                     ))}
                   </TableBody>
                 </Table>
-              </TooltipProvider>
             </div>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-sm text-muted-foreground">
                 Selected: {selectedId || 'none'} | Checked: {selectedRowIds.length} | Records: {renderedRows.length}
               </p>
+              <div className="flex items-center gap-2">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="outline" size="icon" onClick={handleExportSelectedCsv} disabled={!selectedRowIds.length} aria-label="Export selected records">
+                      <FileUp className="h-4 w-4" aria-hidden="true" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Export Selected</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="outline" size="icon" onClick={() => setSelectedRowIds([])} disabled={!selectedRowIds.length} aria-label="Clear selected records">
+                      <CheckSquare className="h-4 w-4" aria-hidden="true" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Clear Selection</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="destructive" size="icon" onClick={() => void handleDeleteSelected()} disabled={!selectedRowIds.length} aria-label="Delete selected records">
+                      <Trash2 className="h-4 w-4" aria-hidden="true" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Delete Selected</TooltipContent>
+                </Tooltip>
+              </div>
               <div className="flex items-center gap-2">
                 <Button variant="outline" onClick={() => setPage((previous) => Math.max(1, previous - 1))}>Previous</Button>
                 <Badge variant="secondary">Page {page}</Badge>
@@ -3285,7 +3496,8 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-      </div>
+        </div>
+      </TooltipProvider>
     </DashboardLayout>
   );
 }

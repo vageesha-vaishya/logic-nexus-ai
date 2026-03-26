@@ -8,7 +8,7 @@ import cors from 'cors';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { authMiddleware, AuthRequest } from './middleware/auth.middleware';
+import { authMiddleware, AuthRequest, getAuthHeaderMonitoringSnapshot } from './middleware/auth.middleware';
 import masterDataRoutes from './routes/master-data.routes';
 import workOrdersRoutes from './routes/work-orders.routes';
 import { ErrorResponse } from './types/amro.types';
@@ -338,6 +338,8 @@ app.use((req: Request, res: Response, next: NextFunction) => {
     method: req.method,
     path: req.path,
     ip: req.ip,
+    authorizationHeaderPresent: Boolean(String(req.headers.authorization || '').trim()),
+    authorizationScheme: String(req.headers.authorization || '').trim().split(/\s+/)[0]?.toLowerCase() || null,
   });
 
   res.on('finish', () => {
@@ -396,6 +398,7 @@ app.get('/health', (_req: Request, res: Response) => {
     timestamp: new Date().toISOString(),
     uptimeSec: Math.floor(process.uptime()),
     resilience: getResilienceStatus(),
+    authHeaderMonitoring: getAuthHeaderMonitoringSnapshot(),
   });
 });
 
@@ -425,6 +428,7 @@ app.get('/health/metrics', (_req: Request, res: Response) => {
       alert5xxPercent: monitoringOptions.alert5xxPercent,
     },
     resilience: getResilienceStatus(),
+    authHeaderMonitoring: getAuthHeaderMonitoringSnapshot(),
   });
 });
 
@@ -599,6 +603,7 @@ app.get('/api/v2/amro/health/metrics', (_req: Request, res: Response) => {
       errors5xx: monitoringState.total5xx,
     },
     resilience: getResilienceStatus(),
+    authHeaderMonitoring: getAuthHeaderMonitoringSnapshot(),
   });
 });
 

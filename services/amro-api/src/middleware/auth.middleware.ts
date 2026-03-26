@@ -35,6 +35,33 @@ type TenantRoleScope = {
   franchise_id: string | null;
 };
 
+type ParsedAuthorizationHeader = {
+  present: boolean;
+  rawLength: number;
+  scheme: string | null;
+  token: string | null;
+  tokenLength: number;
+  parseError: 'missing' | 'malformed' | 'unsupported_scheme' | null;
+};
+
+type AuthHeaderSource = 'authorization' | 'query' | 'none';
+
+const authHeaderMonitoringOptions = {
+  windowMs: Number(process.env.AMRO_AUTH_HEADER_MONITORING_WINDOW_MS || 300000),
+  minSamples: Number(process.env.AMRO_AUTH_HEADER_MONITORING_MIN_SAMPLES || 30),
+  alertFailurePercent: Number(process.env.AMRO_AUTH_HEADER_ALERT_FAILURE_PERCENT || 2),
+  minAlertIntervalMs: Number(process.env.AMRO_AUTH_HEADER_MIN_ALERT_INTERVAL_MS || 60000),
+};
+
+const authHeaderMonitoringState = {
+  totalChecks: 0,
+  totalSuccess: 0,
+  totalFailure: 0,
+  failuresByReason: {} as Record<string, number>,
+  lastAlertAt: 0,
+  window: [] as Array<{ at: number; success: boolean; reason: string }>,
+};
+
 function isRecoverableLookupError(error: unknown): boolean {
   const code = String((error as { code?: unknown } | null)?.code || '').trim();
   const message = String((error as { message?: unknown } | null)?.message || '').toLowerCase();
@@ -50,13 +77,167 @@ function isRecoverableLookupError(error: unknown): boolean {
 /**
  * Extract Bearer token from Authorization header
  */
-function extractToken(authHeader?: string): string | null {
-  if (!authHeader) return null;
-  const parts = authHeader.split(' ');
-  if (parts.length !== 2 || parts[0] !== 'Bearer') {
-    return null;
+function parseAuthorizationHeader(authHeader: string | string[] | undefined): ParsedAuthorizationHeader {
+  const raw = typeof authHeader === 'string'
+    ? authHeader
+    : Array.isArray(authHeader)
+      ? String(authHeader[0] || '')
+      : '';
+  const normalized = raw.trim();
+  if (!normalized) {
+    return {
+      present: false,
+      rawLength: 0,
+      scheme: null,
+      token: null,
+      tokenLength: 0,
+      parseError: 'missing',
+    };
   }
-  return parts[1];
+  const parts = normalized.split(/\s+/);
+  if (parts.length !== 2) {
+    return {
+      present: true,
+      rawLength: normalized.length,
+      scheme: null,
+      token: null,
+      tokenLength: 0,
+      parseError: 'malformed',
+    };
+  }
+  const [rawScheme, rawToken] = parts;
+  const scheme = String(rawScheme || '').toLowerCase();
+  const token = String(rawToken || '').trim();
+  if (!token) {
+    return {
+      present: true,
+      rawLength: normalized.length,
+      scheme,
+      token: null,
+      tokenLength: 0,
+      parseError: 'malformed',
+    };
+  }
+  if (scheme !== 'bearer') {
+    return {
+      present: true,
+      rawLength: normalized.length,
+      scheme,
+      token: null,
+      tokenLength: token.length,
+      parseError: 'unsupported_scheme',
+    };
+  }
+  return {
+    present: true,
+    rawLength: normalized.length,
+    scheme,
+    token,
+    tokenLength: token.length,
+    parseError: null,
+  };
+}
+
+function parseFlag(value: string | undefined, fallback: boolean): boolean {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (!normalized) return fallback;
+  return normalized === 'true' || normalized === '1' || normalized === 'on';
+}
+
+function isAuthFlowLoggingEnabled(): boolean {
+  return parseFlag(process.env.AMRO_AUTH_HEADER_FLOW_LOG, true);
+}
+
+function recordAuthHeaderResult(success: boolean, reason: string, requestId: string, pathName: string): void {
+  const now = Date.now();
+  authHeaderMonitoringState.totalChecks += 1;
+  if (success) {
+    authHeaderMonitoringState.totalSuccess += 1;
+  } else {
+    authHeaderMonitoringState.totalFailure += 1;
+    authHeaderMonitoringState.failuresByReason[reason] =
+      (authHeaderMonitoringState.failuresByReason[reason] || 0) + 1;
+  }
+  authHeaderMonitoringState.window.push({ at: now, success, reason });
+  authHeaderMonitoringState.window = authHeaderMonitoringState.window.filter(
+    (entry) => now - entry.at <= authHeaderMonitoringOptions.windowMs,
+  );
+  const sampleCount = authHeaderMonitoringState.window.length;
+  const failureCount = authHeaderMonitoringState.window.filter((entry) => !entry.success).length;
+  const failurePercent = sampleCount > 0 ? (failureCount / sampleCount) * 100 : 0;
+  const shouldAlert = sampleCount >= authHeaderMonitoringOptions.minSamples
+    && failurePercent >= authHeaderMonitoringOptions.alertFailurePercent
+    && now - authHeaderMonitoringState.lastAlertAt >= authHeaderMonitoringOptions.minAlertIntervalMs;
+  if (shouldAlert) {
+    authHeaderMonitoringState.lastAlertAt = now;
+    logger.error('[Monitoring Alert] Elevated authentication header failure rate', {
+      requestId,
+      path: pathName,
+      windowMs: authHeaderMonitoringOptions.windowMs,
+      sampleCount,
+      failureCount,
+      failurePercent: Number(failurePercent.toFixed(2)),
+      thresholdPercent: authHeaderMonitoringOptions.alertFailurePercent,
+    });
+  }
+}
+
+function resolveToken(req: Request): { token: string | null; source: AuthHeaderSource; parsedHeader: ParsedAuthorizationHeader } {
+  const parsedHeader = parseAuthorizationHeader(req.headers.authorization);
+  if (parsedHeader.token) {
+    return {
+      token: parsedHeader.token,
+      source: 'authorization',
+      parsedHeader,
+    };
+  }
+  const queryToken = extractTokenFromQuery(req);
+  if (queryToken) {
+    return {
+      token: queryToken,
+      source: 'query',
+      parsedHeader,
+    };
+  }
+  return {
+    token: null,
+    source: 'none',
+    parsedHeader,
+  };
+}
+
+export function getAuthHeaderMonitoringSnapshot(): {
+  totals: { checks: number; success: number; failure: number };
+  failuresByReason: Record<string, number>;
+  window: {
+    sampleCount: number;
+    failureCount: number;
+    failurePercent: number;
+    windowMs: number;
+  };
+  options: typeof authHeaderMonitoringOptions;
+} {
+  const now = Date.now();
+  const windowEntries = authHeaderMonitoringState.window.filter(
+    (entry) => now - entry.at <= authHeaderMonitoringOptions.windowMs,
+  );
+  const failureCount = windowEntries.filter((entry) => !entry.success).length;
+  const sampleCount = windowEntries.length;
+  return {
+    totals: {
+      checks: authHeaderMonitoringState.totalChecks,
+      success: authHeaderMonitoringState.totalSuccess,
+      failure: authHeaderMonitoringState.totalFailure,
+    },
+    failuresByReason: { ...authHeaderMonitoringState.failuresByReason },
+    window: {
+      sampleCount,
+      failureCount,
+      failurePercent: sampleCount > 0 ? Number(((failureCount / sampleCount) * 100).toFixed(2)) : 0,
+      windowMs: authHeaderMonitoringOptions.windowMs,
+    },
+    options: authHeaderMonitoringOptions,
+  };
 }
 
 function extractTokenFromQuery(req: Request): string | null {
@@ -91,10 +272,23 @@ export async function authMiddleware(
         ? String(fallbackTenantHeader[0] || '').trim()
         : '';
 
-    // Extract token from Authorization header
-    const token = extractToken(req.headers.authorization) ?? extractTokenFromQuery(req);
+    const { token, source, parsedHeader } = resolveToken(req);
+    if (isAuthFlowLoggingEnabled()) {
+      logger.info('Auth header flow check', {
+        requestId,
+        path: req.path,
+        method: req.method,
+        headerPresent: parsedHeader.present,
+        headerLength: parsedHeader.rawLength,
+        scheme: parsedHeader.scheme,
+        tokenSource: source,
+        parseError: parsedHeader.parseError,
+        tokenLength: parsedHeader.tokenLength,
+      });
+    }
     if (!token) {
       if (process.env.NODE_ENV !== 'production' && fallbackUserId && fallbackTenantId) {
+        recordAuthHeaderResult(true, 'fallback_headers', requestId, req.path);
         req.userId = fallbackUserId;
         req.tenantId = fallbackTenantId;
         req.user = {
@@ -105,6 +299,16 @@ export async function authMiddleware(
         next();
         return;
       }
+      recordAuthHeaderResult(false, parsedHeader.parseError || 'missing', requestId, req.path);
+      logger.warn('Authorization header validation failed', {
+        requestId,
+        path: req.path,
+        method: req.method,
+        headerPresent: parsedHeader.present,
+        scheme: parsedHeader.scheme,
+        parseError: parsedHeader.parseError,
+        tokenSource: source,
+      });
       res.status(401).json({
         error: 'Missing or malformed Authorization header',
         code: 'MISSING_TOKEN',
@@ -123,6 +327,7 @@ export async function authMiddleware(
       async () => supabase.auth.getUser(token),
     );
     if (error || !data.user) {
+      recordAuthHeaderResult(false, 'invalid_token', requestId, req.path);
       res.status(401).json({
         error: 'Invalid or expired token',
         code: 'INVALID_TOKEN',
@@ -316,6 +521,7 @@ export async function authMiddleware(
     }
 
     req.tenantId = resolvedTenantId;
+    recordAuthHeaderResult(true, source === 'authorization' ? 'authorization' : source === 'query' ? 'query' : 'fallback', requestId, req.path);
     next();
   } catch (err) {
     const statusCode = Number((err as { statusCode?: unknown } | null)?.statusCode || 500);

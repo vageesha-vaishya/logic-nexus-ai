@@ -342,6 +342,59 @@ export function parseHeaderValue(value: string | string[] | undefined): string {
   return value || '';
 }
 
+type ParsedAuthorizationHeader = {
+  present: boolean;
+  scheme: string | null;
+  token: string;
+  parseError: 'missing' | 'malformed' | 'unsupported_scheme' | null;
+};
+
+function parseAuthorizationHeader(value: string | string[] | undefined): ParsedAuthorizationHeader {
+  const authHeader = parseHeaderValue(value).trim();
+  if (!authHeader) {
+    return {
+      present: false,
+      scheme: null,
+      token: '',
+      parseError: 'missing',
+    };
+  }
+  const parts = authHeader.split(/\s+/);
+  if (parts.length !== 2) {
+    return {
+      present: true,
+      scheme: null,
+      token: '',
+      parseError: 'malformed',
+    };
+  }
+  const [rawScheme, rawToken] = parts;
+  const scheme = String(rawScheme || '').toLowerCase();
+  const token = String(rawToken || '').trim();
+  if (!token) {
+    return {
+      present: true,
+      scheme,
+      token: '',
+      parseError: 'malformed',
+    };
+  }
+  if (scheme !== 'bearer') {
+    return {
+      present: true,
+      scheme,
+      token: '',
+      parseError: 'unsupported_scheme',
+    };
+  }
+  return {
+    present: true,
+    scheme,
+    token,
+    parseError: null,
+  };
+}
+
 export function getCorrelationId(req: ApiRequest): string {
   const fromHeader = parseHeaderValue(req.headers['x-correlation-id']);
   return fromHeader || crypto.randomUUID();
@@ -543,8 +596,8 @@ export function sanitizeQueryId(value: unknown, fieldName: string): string {
 }
 
 export async function authenticateRequest(req: ApiRequest): Promise<{ userId: string; role: string; permissions: string[] }> {
-  const authHeader = parseHeaderValue(req.headers.authorization);
-  const headerToken = authHeader.startsWith('Bearer ') ? authHeader.slice('Bearer '.length).trim() : '';
+  const parsedAuthorizationHeader = parseAuthorizationHeader(req.headers.authorization);
+  const headerToken = parsedAuthorizationHeader.token;
   const queryToken = Array.isArray(req.query.access_token)
     ? String(req.query.access_token[0] || '').trim()
     : String(req.query.access_token || '').trim();
@@ -556,6 +609,15 @@ export async function authenticateRequest(req: ApiRequest): Promise<{ userId: st
   const fallbackUserId = parseHeaderValue(req.headers['x-user-id']);
   const fallbackPermissions = parsePermissionHeader(parseHeaderValue(req.headers['x-user-permissions']));
   if (!token) {
+    logger.warn('[AccessControl] authorization token unavailable', {
+      authorizationHeaderPresent: parsedAuthorizationHeader.present,
+      authorizationScheme: parsedAuthorizationHeader.scheme,
+      parseError: parsedAuthorizationHeader.parseError,
+      usedQueryToken: Boolean(queryToken),
+      usedBodyToken: Boolean(bodyToken),
+      path: req.url || '',
+      method: req.method || '',
+    });
     if ((process.env.NODE_ENV !== 'production' || isLoopbackRequest(req)) && fallbackUserId) {
       return {
         userId: fallbackUserId,

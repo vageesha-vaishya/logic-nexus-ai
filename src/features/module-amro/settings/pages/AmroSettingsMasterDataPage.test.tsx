@@ -251,6 +251,18 @@ describe('AmroSettingsMasterDataPage', () => {
               }),
           };
         }
+        if (method === 'PUT' && url.includes('/api/v2/amro/master-data/aircraft/')) {
+          return {
+            ok: true,
+            text: async () =>
+              JSON.stringify({
+                output: {
+                  entity: 'aircraft',
+                  record: { id: 'ac-1', tail_number: 'N100AB' },
+                },
+              }),
+          };
+        }
         if (method === 'POST' && url.includes('/api/v2/amro/flight-logs')) {
           return {
             ok: true,
@@ -446,44 +458,38 @@ describe('AmroSettingsMasterDataPage', () => {
   it('supports aircraft column filtering and row selection controls', async () => {
     renderAircraftPage();
 
-    await screen.findByRole('link', { name: /A1/ });
-    expect(screen.getByRole('link', { name: /A2/ })).toBeInTheDocument();
+    await screen.findByText('N100AA');
+    expect(screen.queryByRole('link', { name: /A1/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /N100AA/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('columnheader', { name: /^ID$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: /^Created At$/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('columnheader', { name: /^Updated At$/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('columnheader', { name: /^Tenant Id$/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('columnheader', { name: /^Franchise Id$/i })).not.toBeInTheDocument();
-
-    fireEvent.change(screen.getByLabelText('Filter Registration'), { target: { value: 'A2' } });
-    await waitFor(() => {
-      expect(screen.queryByRole('link', { name: /A1/ })).not.toBeInTheDocument();
-      expect(screen.getByRole('link', { name: /A2/ })).toBeInTheDocument();
-    });
 
     const rowCheckboxes = screen.getAllByRole('checkbox', { name: /Select row/ });
     fireEvent.click(rowCheckboxes[0]);
     expect(screen.getByText(/Checked: 1/)).toBeInTheDocument();
   });
 
-  it('supports inline cell editing for aircraft editable columns', async () => {
+  it('opens aircraft update form on row double click', async () => {
     renderAircraftPage();
 
-    const editableCell = await screen.findByRole('link', { name: /A1/ });
-    fireEvent.doubleClick(editableCell);
-    const inlineInput = await screen.findByDisplayValue('A1');
-    fireEvent.change(inlineInput, { target: { value: 'A1X' } });
-    fireEvent.keyDown(inlineInput, { key: 'Enter', code: 'Enter' });
+    const table = await screen.findByRole('table');
+    const dataRows = within(table).getAllByRole('row').filter((row) => row.querySelector('td'));
+    expect(dataRows.length).toBeGreaterThan(0);
 
-    await waitFor(() => {
-      expect(mockToastSuccess).toHaveBeenCalledWith('Cell updated');
-    });
+    fireEvent.doubleClick(dataRows[0]);
+    expect(await screen.findByRole('heading', { name: 'Update Aircraft' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save Changes' })).toBeInTheDocument();
   });
 
   it('records flight logs from the aircraft row action', async () => {
     renderAircraftPage();
 
-    await screen.findByRole('link', { name: /A1/ });
-    const addButtons = screen.getAllByRole('button', { name: 'Add Flight Logs' });
-    fireEvent.click(addButtons[0]);
+    const flightLogsAction = await screen.findByRole('button', { name: /Flight Logs actions for N100AA/ });
+    fireEvent.pointerDown(flightLogsAction);
+    fireEvent.click(await screen.findByRole('menuitem', { name: /Add Log/i }));
 
     expect(await screen.findByRole('heading', { name: /Add Flight Logs \(Aircraft:/ })).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Departure Airport'), { target: { value: 'DEL' } });
@@ -508,11 +514,12 @@ describe('AmroSettingsMasterDataPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'New Flight Logs' }));
 
     expect(await screen.findByRole('heading', { name: 'New Flight Logs' })).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('Aircraft Id'), { target: { value: 'ac-1' } });
-    fireEvent.change(screen.getByLabelText('Departure Airport'), { target: { value: 'DEL' } });
-    fireEvent.change(screen.getByLabelText('Arrival Airport'), { target: { value: 'BLR' } });
-    fireEvent.change(screen.getByLabelText('Flight Hours'), { target: { value: '1.8' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create Flight Logs Record' }));
+    const dialog = screen.getByRole('dialog');
+    fireEvent.change(within(dialog).getByLabelText('Aircraft Id'), { target: { value: 'ac-1' } });
+    fireEvent.change(within(dialog).getByLabelText('Departure Airport'), { target: { value: 'DEL' } });
+    fireEvent.change(within(dialog).getByLabelText('Arrival Airport'), { target: { value: 'BLR' } });
+    fireEvent.change(within(dialog).getByLabelText('Flight Hours'), { target: { value: '1.8' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Create Flight Logs Record' }));
 
     await waitFor(() => {
       expect(mockToastSuccess).toHaveBeenCalledWith('Flight Logs record created');
@@ -528,10 +535,9 @@ describe('AmroSettingsMasterDataPage', () => {
   it('opens aircraft-scoped multi-record flight log view from aircraft list action', async () => {
     renderAircraftPage();
 
-    const aircraftLink = await screen.findByRole('link', { name: /A1/ });
-    const aircraftRow = aircraftLink.closest('tr');
-    expect(aircraftRow).toBeTruthy();
-    fireEvent.click(within(aircraftRow as HTMLTableRowElement).getByRole('button', { name: 'View Flight Logs' }));
+    const flightLogsAction = await screen.findByRole('button', { name: /Flight Logs actions for N100AA/ });
+    fireEvent.pointerDown(flightLogsAction);
+    fireEvent.click(await screen.findByRole('menuitem', { name: /View Logs/i }));
 
     expect(await screen.findByLabelText('Flight Date From')).toBeInTheDocument();
     await waitFor(() => {
@@ -573,6 +579,19 @@ describe('AmroSettingsMasterDataPage', () => {
     await waitFor(() => {
       expect(screen.getByText(/Selected: ac-2/)).toBeInTheDocument();
     });
+  });
+
+  it('supports icon-based actions and shows selection state feedback', async () => {
+    renderAircraftPage();
+
+    await screen.findByRole('button', { name: 'Refresh records' });
+    expect(screen.getByRole('button', { name: 'Export records CSV' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Export records PDF' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /New Aircraft/ })).toBeInTheDocument();
+
+    const rowCheckboxes = screen.getAllByRole('checkbox', { name: /Select row/ });
+    fireEvent.click(rowCheckboxes[0]);
+    expect(screen.getByText(/Checked: 1/)).toBeInTheDocument();
   });
 
   it('enforces required fields and rejects malformed date, time, and json values', () => {

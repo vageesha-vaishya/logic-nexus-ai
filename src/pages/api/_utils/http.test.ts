@@ -675,6 +675,70 @@ describe('http domain and scope guards', () => {
     });
   });
 
+  it('authenticates with lowercase bearer authorization scheme', async () => {
+    const supabaseMock = {
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: {
+            user: {
+              id: 'lowercase-bearer-user',
+              email: 'lowercase-bearer@example.com',
+              app_metadata: { role: 'tenant_admin', permissions: ['dashboards.view'] },
+            },
+          },
+          error: null,
+        }),
+      },
+    } as any;
+    vi.mocked(getSupabaseAdminClient).mockReturnValue(supabaseMock);
+
+    await expect(
+      authenticateRequest(
+        createMockRequest({
+          authorization: 'bearer lowercase-token',
+        })
+      )
+    ).resolves.toEqual({
+      userId: 'lowercase-bearer-user',
+      role: 'tenant_admin',
+      permissions: ['dashboards.view'],
+    });
+  });
+
+  it('uses query access_token when authorization header uses basic scheme', async () => {
+    const supabaseMock = {
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: {
+            user: {
+              id: 'basic-fallback-user',
+              email: 'basic-fallback@example.com',
+              app_metadata: { role: 'tenant_admin', permissions: ['dashboards.view'] },
+            },
+          },
+          error: null,
+        }),
+      },
+    } as any;
+    vi.mocked(getSupabaseAdminClient).mockReturnValue(supabaseMock);
+
+    await expect(
+      authenticateRequest({
+        headers: {
+          authorization: 'Basic ZGVtbzpkZW1v',
+        },
+        method: 'GET',
+        query: {
+          access_token: 'query-token-for-basic',
+        },
+      } as any)
+    ).resolves.toEqual({
+      userId: 'basic-fallback-user',
+      role: 'tenant_admin',
+      permissions: ['dashboards.view'],
+    });
+  });
+
   it('rejects expired JWT during authentication', async () => {
     const supabaseMock = {
       auth: {

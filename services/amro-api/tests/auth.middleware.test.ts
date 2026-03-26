@@ -109,6 +109,50 @@ describe('authMiddleware', () => {
     expect(next).not.toHaveBeenCalled();
   });
 
+  it('accepts lowercase bearer authorization scheme', async () => {
+    const { authMiddleware } = await import('../src/middleware/auth.middleware');
+    mockGetUser.mockResolvedValueOnce({
+      data: { user: { id: 'user-1', email: 'u@example.com', app_metadata: {}, user_metadata: {} } },
+      error: null,
+    });
+    mockRoleLookup.mockReturnValueOnce({
+      data: [{ role: 'tenant_admin', tenant_id: 'tenant-1', franchise_id: null }],
+      error: null,
+    });
+    const req = createRequest({ authorization: 'bearer ok-token' });
+    const res = createResponse();
+    const next = jest.fn() as unknown as NextFunction;
+
+    await authMiddleware(req as any, res, next);
+
+    expect(mockGetUser).toHaveBeenCalledWith('ok-token');
+    expect((req as any).tenantId).toBe('tenant-1');
+    expect(next).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses query access_token when authorization scheme is unsupported', async () => {
+    const { authMiddleware } = await import('../src/middleware/auth.middleware');
+    mockGetUser.mockResolvedValueOnce({
+      data: { user: { id: 'user-1', email: 'u@example.com', app_metadata: {}, user_metadata: {} } },
+      error: null,
+    });
+    mockRoleLookup.mockReturnValueOnce({
+      data: [{ role: 'tenant_admin', tenant_id: 'tenant-1', franchise_id: null }],
+      error: null,
+    });
+    const req = createRequest(
+      { authorization: 'Basic ZGVtbzpkZW1v' },
+      { access_token: 'query-token' },
+    );
+    const res = createResponse();
+    const next = jest.fn() as unknown as NextFunction;
+
+    await authMiddleware(req as any, res, next);
+
+    expect(mockGetUser).toHaveBeenCalledWith('query-token');
+    expect(next).toHaveBeenCalledTimes(1);
+  });
+
   it('returns 401 when user has no tenant assignment', async () => {
     const { authMiddleware } = await import('../src/middleware/auth.middleware');
     mockGetUser.mockResolvedValueOnce({

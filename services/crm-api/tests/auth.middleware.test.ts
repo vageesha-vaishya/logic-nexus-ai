@@ -140,6 +140,73 @@ describe('authMiddleware tenant-aware scope resolution', () => {
     expect(req.franchiseId).toBe('franchise-7');
   });
 
+  it('returns 401 when authorization header is missing', async () => {
+    const req = {
+      headers: {}
+    } as unknown as AuthRequest;
+    const res = createMockResponse();
+    const next = jest.fn();
+
+    await authMiddleware(req, res as any, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ code: 'MISSING_TOKEN' }));
+  });
+
+  it('returns 401 when authorization header is malformed', async () => {
+    const req = {
+      headers: {
+        authorization: 'Bearer'
+      }
+    } as unknown as AuthRequest;
+    const res = createMockResponse();
+    const next = jest.fn();
+
+    await authMiddleware(req, res as any, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ code: 'MISSING_TOKEN' }));
+  });
+
+  it('returns 401 when authorization scheme is basic', async () => {
+    const req = {
+      headers: {
+        authorization: 'Basic ZGVtbzpkZW1v'
+      }
+    } as unknown as AuthRequest;
+    const res = createMockResponse();
+    const next = jest.fn();
+
+    await authMiddleware(req, res as any, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ code: 'MISSING_TOKEN' }));
+  });
+
+  it('accepts lowercase bearer authorization scheme', async () => {
+    eq.mockResolvedValue({
+      data: [
+        { role: 'tenant_admin', tenant_id: 'tenant-1', franchise_id: null }
+      ],
+      error: null
+    });
+    const req = {
+      headers: {
+        authorization: 'bearer token-1'
+      }
+    } as unknown as AuthRequest;
+    const res = createMockResponse();
+    const next = jest.fn();
+
+    await authMiddleware(req, res as any, next);
+
+    expect(next).toHaveBeenCalledTimes(1);
+    expect(getUser).toHaveBeenCalledWith('token-1');
+  });
+
   it('accepts SUPABASE_SERVICE_KEY when SUPABASE_SERVICE_ROLE_KEY is absent', async () => {
     process.env.SUPABASE_SERVICE_ROLE_KEY = '';
     process.env.SUPABASE_SERVICE_KEY = 'fallback-service-key';
