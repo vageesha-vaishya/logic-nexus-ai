@@ -3,7 +3,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Database, Plane, Settings2 } from 'lucide-react';
+import { Database, Package, Plane } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 
 export function AmroSettingsPage() {
@@ -59,16 +59,18 @@ export function AmroSettingsPage() {
 
           <Card>
             <CardHeader className="space-y-2">
-              <div className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-muted text-muted-foreground">
-                <Settings2 className="h-5 w-5" />
+              <div className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-primary/10 text-primary">
+                <Package className="h-5 w-5" />
               </div>
-              <CardTitle>Module Configuration</CardTitle>
+              <CardTitle>Work Package Templates</CardTitle>
               <CardDescription>
-                Use this area to centralize additional AMRO configuration surfaces as they are introduced.
+                Configure reusable work package templates for aircraft maintenance planning and execution.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Badge variant="outline">Extensible settings catalog</Badge>
+              <Button asChild variant="outline">
+                <Link to="/dashboard/amro/settings/master-data/work-packages">Open Work Package Templates</Link>
+              </Button>
             </CardContent>
           </Card>
         </div>

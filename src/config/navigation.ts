@@ -95,6 +95,7 @@ export const APP_MENU: MenuModule[] = [
     items: [
       { name: 'Overview', path: '/dashboard/amro/overview', icon: BarChart3, description: 'Maintenance overview and KPI shell', permissions: ['view_amro_dashboard'] },
       { name: 'Aircraft', path: '/dashboard/amro/aircraft', icon: Database, description: 'Aircraft fleet records, forms, and flight-log-linked operations', permissions: ['edit_aircraft_records'] },
+      { name: 'Aircraft Work Packages', path: '/dashboard/amro/settings/master-data/work-packages', icon: Package, description: 'Work package templates linked to aircraft operations', permissions: ['edit_aircraft_records'] },
       { name: 'Work Packages', path: '/dashboard/amro/work-packages', icon: CheckSquare, description: 'Maintenance work package execution board', permissions: ['create_maintenance_request'] },
       { name: 'Task Execution', path: '/dashboard/amro/task-execution', icon: CheckSquare, description: 'Technician task execution operations', permissions: ['create_maintenance_request'] },
       { name: 'Scheduling', path: '/dashboard/amro/scheduling', icon: CalendarDays, description: 'Maintenance scheduling shell', permissions: ['edit_aircraft_records'] },

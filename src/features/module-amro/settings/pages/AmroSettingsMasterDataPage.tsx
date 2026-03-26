@@ -287,7 +287,7 @@ type AircraftPresenceCollaborator = {
 
 const AIRCRAFT_NAV_RAIL = [
   { label: 'Overview', path: '/dashboard/amro/overview' },
-  { label: 'Work Packages', path: '/dashboard/amro/work-packages' },
+  { label: 'Work Packages', path: '/dashboard/amro/aircraft/work-packages' },
   { label: 'Scheduling', path: '/dashboard/amro/scheduling' },
   { label: 'Compliance', path: '/dashboard/amro/compliance' },
   { label: 'Task Execution', path: '/dashboard/amro/task-execution' },
@@ -2503,7 +2503,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
           const query = new URLSearchParams();
           query.set('aircraft_id', String(selectedAircraft.id));
           if (workPackageId) query.set('focus', workPackageId);
-          navigate(`/dashboard/amro/work-packages?${query.toString()}`);
+          navigate(`/dashboard/amro/aircraft/work-packages?${query.toString()}`);
         }
       } catch (error) {
         localStorage.setItem(
@@ -3038,7 +3038,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
-                    <Button size="sm" variant="outline" onClick={() => handleAircraftContextNavigation('/dashboard/amro/work-packages')}>
+                    <Button size="sm" variant="outline" onClick={() => handleAircraftContextNavigation('/dashboard/amro/aircraft/work-packages')}>
                       View Active Packages
                     </Button>
                   </div>

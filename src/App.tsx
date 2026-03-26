@@ -204,6 +204,7 @@ const AmroModelMasterData = lazy(() => import("./features/module-amro/settings/p
 const AmroRegulatorProfilesMasterData = lazy(() => import("./features/module-amro/settings/pages/AmroMasterDataEntityPages").then((module) => ({ default: module.RegulatorProfilesMasterDataPage })));
 const AmroShiftCalendarsMasterData = lazy(() => import("./features/module-amro/settings/pages/AmroMasterDataEntityPages").then((module) => ({ default: module.ShiftCalendarsMasterDataPage })));
 const AmroWorkPackageTemplatesMasterData = lazy(() => import("./features/module-amro/settings/pages/AmroMasterDataEntityPages").then((module) => ({ default: module.WorkPackageTemplatesMasterDataPage })));
+const AmroWorkPackagesMasterData = lazy(() => import("./features/module-amro/settings/pages/AmroMasterDataEntityPages").then((module) => ({ default: module.WorkPackagesMasterDataPage })));
 const AmroWorkspaceDocumentation = lazy(() => import("./features/module-amro").then((module) => ({ default: module.AmroWorkspaceDocumentationPage })));
 const MigrationBaselineDashboard = lazy(() => import("./pages/dashboard/MigrationBaselineDashboard"));
 
@@ -875,6 +876,7 @@ const App = () => (
             <Route path="/dashboard/amro" element={<Navigate to="/dashboard/amro/overview" replace />} />
             <Route path="/dashboard/amro/overview" element={<ProtectedRoute requiredDomainCode="AMRO"><AmroOverview /></ProtectedRoute>} />
             <Route path="/dashboard/amro/aircraft" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroAircraftSubModule /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/aircraft/work-packages" element={<ProtectedRoute requiredDomainCode="AMRO"><AmroWorkPackages /></ProtectedRoute>} />
             <Route path="/dashboard/amro/work-packages" element={<ProtectedRoute requiredDomainCode="AMRO"><AmroWorkPackages /></ProtectedRoute>} />
             <Route path="/dashboard/amro/task-execution" element={<ProtectedRoute requiredDomainCode="AMRO"><AmroTaskExecution /></ProtectedRoute>} />
             <Route path="/dashboard/amro/scheduling" element={<ProtectedRoute requiredDomainCode="AMRO"><AmroScheduling /></ProtectedRoute>} />
@@ -896,6 +898,7 @@ const App = () => (
             <Route path="/dashboard/amro/settings/master-data/model" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroModelMasterData /></ProtectedRoute>} />
             <Route path="/dashboard/amro/settings/master-data/regulator-profiles" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroRegulatorProfilesMasterData /></ProtectedRoute>} />
             <Route path="/dashboard/amro/settings/master-data/shift-calendars" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroShiftCalendarsMasterData /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/settings/master-data/work-packages" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroWorkPackagesMasterData /></ProtectedRoute>} />
             <Route path="/dashboard/amro/settings/master-data/work-package-templates" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroWorkPackageTemplatesMasterData /></ProtectedRoute>} />
             <Route path="/dashboard/amro/settings/master-data/:entity" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroMasterData /></ProtectedRoute>} />
             <Route path="/dashboard/amro/master-data" element={<ProtectedRoute requiredDomainCode="AMRO"><Navigate to="/dashboard/amro/settings/master-data/aircraft" replace /></ProtectedRoute>} />

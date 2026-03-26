@@ -10,6 +10,7 @@ import {
   ShiftCalendarsMasterDataPage,
   SkillCodesMasterDataPage,
   SuppliersMasterDataPage,
+  WorkPackagesMasterDataPage,
   WorkCentersMasterDataPage,
   WorkPackageTemplatesMasterDataPage,
 } from './AmroMasterDataEntityPages';
@@ -39,6 +40,7 @@ describe('AmroMasterDataEntityPages', () => {
       { component: ManufacturersMasterDataPage, expected: 'manufacturers:master-data' },
       { component: RegulatorProfilesMasterDataPage, expected: 'regulator_profiles:master-data' },
       { component: ShiftCalendarsMasterDataPage, expected: 'shift_calendars:master-data' },
+      { component: WorkPackagesMasterDataPage, expected: 'work_package_templates:master-data' },
       { component: WorkPackageTemplatesMasterDataPage, expected: 'work_package_templates:master-data' },
     ];
 

@@ -47,3 +47,7 @@ export function ShiftCalendarsMasterDataPage() {
 export function WorkPackageTemplatesMasterDataPage() {
   return <AmroSettingsMasterDataPage entityOverride="work_package_templates" />;
 }
+
+export function WorkPackagesMasterDataPage() {
+  return <AmroSettingsMasterDataPage entityOverride="work_package_templates" />;
+}
