@@ -377,7 +377,7 @@ describe('AmroSettingsMasterDataPage', () => {
     fireEvent.change(within(dialog).getByLabelText(/^Serial Number/), { target: { value: 'SN-200' } });
     fireEvent.click(within(dialog).getByLabelText(/^Aircraft Type/));
     fireEvent.click(await screen.findByText('NarrowBody'));
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Configuration Settings' }));
+    fireEvent.click(within(dialog).getByRole('tab', { name: 'Configuration Settings' }));
     fireEvent.click(within(dialog).getByLabelText(/Manufacturer/));
     fireEvent.click(await screen.findByText('Boeing (BOE)'));
     fireEvent.click(within(dialog).getByLabelText(/^Aircraft Model/));

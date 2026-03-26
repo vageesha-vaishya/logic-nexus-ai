@@ -47,8 +47,10 @@ import {
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
+  BookOpenCheck,
   CalendarDays,
   CheckSquare,
+  ClipboardList,
   Eye,
   FileCheck,
   FileDown,
@@ -57,8 +59,10 @@ import {
   ListChecks,
   Plus,
   RefreshCw,
+  ShieldCheck,
   TimerReset,
   Trash2,
+  Users,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
@@ -250,6 +254,15 @@ type AircraftWorkPackageSnapshot = {
   slaRisk: number;
 };
 
+type AircraftResearchPattern = {
+  platform: string;
+  layout: string;
+  validation: string;
+  workflow: string;
+  accessibility: string;
+  adoption: string;
+};
+
 const AIRCRAFT_NAV_RAIL = [
   { label: 'Overview', path: '/dashboard/amro/overview' },
   { label: 'Work Packages', path: '/dashboard/amro/work-packages' },
@@ -304,6 +317,69 @@ const MANUFACTURER_SEED_NAMES = [
 ];
 
 const AIRCRAFT_TYPE_OPTIONS = ['NarrowBody', 'RegionalJet', 'Turboprop', 'WideBody', 'auto_seeded'];
+const AIRCRAFT_STATUS_OPTIONS = ['active', 'inactive', 'grounded', 'maintenance'] as const;
+const AIRCRAFT_FORM_SECTION_FIELD_KEYS: Record<FormSectionKey, string[]> = {
+  basic: ['tail_number', 'registration', 'serial_number', 'aircraft_type', 'manufacturer_id'],
+  configuration: ['aircraft_model', 'configuration_code', 'maintenance_program', 'status'],
+};
+const AIRCRAFT_MASTER_RESEARCH_PATTERNS: AircraftResearchPattern[] = [
+  {
+    platform: 'SAP iMRO/4',
+    layout: 'Workbench-led layout with induction, planning, and execution in one operational context',
+    validation: 'Compliance, material readiness, and progress checkpoints are embedded before release flow',
+    workflow: 'Event-induction and progress controls reduce turnaround delays and improve planning rhythm',
+    accessibility: 'High-density cockpit style requires explicit keyboard focus and clear status emphasis',
+    adoption: 'AMRO uses progress-centric panels and quick actions tied to aircraft context',
+  },
+  {
+    platform: 'IBM Maximo Aviation',
+    layout: 'Task-card and work-package structure with technical records aligned to planning applications',
+    validation: 'Task-card consistency and maintenance-library checks support recurring compliance workflows',
+    workflow: 'Library-driven maintenance planning keeps operator programs and fleet records synchronized',
+    accessibility: 'Action-first screens benefit from predictable tab order and concise error prompts',
+    adoption: 'AMRO emphasizes guided create flow with inline validation and readiness indicators',
+  },
+  {
+    platform: 'Oracle Aviation MRO',
+    layout: 'Role-guided workbenches with deep planning, forecasting, and compliance visibility',
+    validation: 'Regulatory and configuration checks are enforced with audit-oriented data traceability',
+    workflow: 'Forecasting plus package planning links technical records, materials, and schedule windows',
+    accessibility: 'Complex journeys need contextual guidance and progressive disclosure to reduce overload',
+    adoption: 'AMRO maps fields by role sensitivity and keeps focused tab sections by task intent',
+  },
+  {
+    platform: 'Ramco Aviation',
+    layout: 'Persona-aware, mobile-friendly workspace with planning and execution shortcuts',
+    validation: 'Catalog and relationship mapping support reliable downstream reporting and fewer mismatches',
+    workflow: 'Digital and mobile workflows accelerate updates from line maintenance to planning teams',
+    accessibility: 'Usability-forward approach favors clear controls, fast actions, and low-friction navigation',
+    adoption: 'AMRO adds smart defaults, autosave, and rapid quick-action surfaces for operators',
+  },
+  {
+    platform: 'OASES MRO',
+    layout: 'Compact connected modules with unified records and grid-plus-form operational updates',
+    validation: 'Detailed auditable records and traceability-first data model strengthen compliance evidence',
+    workflow: 'Single connected data flow supports planning, execution, inventory, and reporting continuity',
+    accessibility: 'Simple consistent interaction patterns improve learnability across mixed user profiles',
+    adoption: 'AMRO keeps a compact benchmark card, audit visibility, and integrated training checklist',
+  },
+];
+const AIRCRAFT_RESEARCH_BEST_PRACTICES = [
+  'Use role-guided multi-step forms with visible completion progress.',
+  'Keep validation inline and pair every error with corrective guidance.',
+  'Prefer compact dashboard cards for aircraft identity, risk, and readiness.',
+  'Combine grid speed with form depth using tabbed and collapsible sections.',
+  'Expose audit evidence, training guidance, and test checklist near the workflow.',
+] as const;
+const AIRCRAFT_FIELD_HELP: Partial<Record<string, string>> = {
+  tail_number: 'Use 3-12 uppercase letters, numbers, or hyphen.',
+  registration: 'Registration should align with authority records and paint scheme.',
+  serial_number: 'Enter manufacturer serial number with at least 3 characters.',
+  manufacturer_id: 'Choose the approved manufacturer before selecting aircraft model.',
+  aircraft_model: 'Model list is filtered by selected manufacturer.',
+  maintenance_program: 'Attach approved program code used by planning and compliance teams.',
+  status: 'Status drives risk scoring and available operational quick actions.',
+};
 
 const ENTITY_FORM_FIELDS: Record<MasterEntity, EntityFormField[]> = {
   aircraft: [
@@ -980,6 +1056,42 @@ export function buildPayloadFromForm(entity: MasterEntity, values: FormValues): 
     }
   }
 
+  if (entity === 'aircraft') {
+    if (payload.tail_number) {
+      const normalizedTailNumber = String(payload.tail_number).trim().toUpperCase();
+      payload.tail_number = normalizedTailNumber;
+      if (!/^[A-Z0-9-]{3,12}$/.test(normalizedTailNumber)) {
+        errors.tail_number = 'Tail Number must be 3-12 characters (A-Z, 0-9, hyphen)';
+      }
+    }
+    if (payload.registration) {
+      const normalizedRegistration = String(payload.registration).trim().toUpperCase();
+      payload.registration = normalizedRegistration;
+      if (!/^[A-Z0-9-]{3,12}$/.test(normalizedRegistration)) {
+        errors.registration = 'Registration must be 3-12 characters (A-Z, 0-9, hyphen)';
+      }
+    }
+    if (payload.serial_number) {
+      const serialNumber = String(payload.serial_number).trim().toUpperCase();
+      payload.serial_number = serialNumber;
+      if (serialNumber.length < 3) {
+        errors.serial_number = 'Serial Number must be at least 3 characters';
+      }
+    }
+    if (payload.aircraft_type && !AIRCRAFT_TYPE_OPTIONS.includes(String(payload.aircraft_type))) {
+      errors.aircraft_type = 'Aircraft Type is invalid';
+    }
+    if (payload.status && !AIRCRAFT_STATUS_OPTIONS.includes(String(payload.status) as (typeof AIRCRAFT_STATUS_OPTIONS)[number])) {
+      errors.status = 'Status is invalid';
+    }
+    if (payload.maintenance_program && String(payload.maintenance_program).trim().length < 3) {
+      errors.maintenance_program = 'Maintenance Program must be at least 3 characters';
+    }
+    if (payload.configuration_code && String(payload.configuration_code).trim().length > 24) {
+      errors.configuration_code = 'Configuration Code cannot exceed 24 characters';
+    }
+  }
+
   return { payload, errors };
 }
 
@@ -1059,6 +1171,11 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'create' | 'update'>('create');
   const [activeFormTab, setActiveFormTab] = useState<'basic' | 'configuration' | 'system'>('basic');
+  const [collapsedFormPanels, setCollapsedFormPanels] = useState<Record<'basic' | 'configuration' | 'system', boolean>>({
+    basic: false,
+    configuration: false,
+    system: false,
+  });
   const [manufacturerOptions, setManufacturerOptions] = useState<ManufacturerOption[]>([]);
   const [manufacturerOptionsLoading, setManufacturerOptionsLoading] = useState(false);
   const [manufacturerOptionsError, setManufacturerOptionsError] = useState('');
@@ -1097,6 +1214,12 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
   const manufacturerSeedAttemptedRef = useRef(false);
   const selectionAnchorRef = useRef<string | null>(null);
   const aircraftEnhancementEnabled = normalizeFeatureFlag(import.meta.env.VITE_AMRO_AIRCRAFT_FORM_ENHANCEMENTS, true);
+  const aircraftFormDraftKey = useMemo(
+    () => `amro:aircraft-form-draft:${modalMode}:${selectedId || 'new'}`,
+    [modalMode, selectedId],
+  );
+  const [aircraftFormDraftStatus, setAircraftFormDraftStatus] = useState<'idle' | 'restored' | 'saved'>('idle');
+  const [aircraftFormLastSavedAt, setAircraftFormLastSavedAt] = useState('');
   const canCreateWorkPackage = hasPermission('create_maintenance_request');
   const canScheduleWorkPackage = hasPermission('edit_aircraft_records');
   const canExportAircraftOps = hasPermission('delete_flight_logs');
@@ -1419,6 +1542,55 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
     return () => clearTimeout(timeout);
   }, [modalOpen]);
 
+  useEffect(() => {
+    if (!modalOpen || entity !== 'aircraft') {
+      return;
+    }
+    const raw = localStorage.getItem(aircraftFormDraftKey);
+    if (!raw) {
+      return;
+    }
+    try {
+      const parsed = JSON.parse(raw) as {
+        values?: FormValues;
+        activeTab?: 'basic' | 'configuration' | 'system';
+        savedAt?: string;
+      };
+      if (parsed.values && typeof parsed.values === 'object') {
+        setFormValues((previous) => ({ ...previous, ...parsed.values }));
+      }
+      if (parsed.activeTab === 'basic' || parsed.activeTab === 'configuration' || parsed.activeTab === 'system') {
+        setActiveFormTab(parsed.activeTab);
+      }
+      if (parsed.savedAt) {
+        setAircraftFormLastSavedAt(parsed.savedAt);
+      }
+      setAircraftFormDraftStatus('restored');
+    } catch {
+      localStorage.removeItem(aircraftFormDraftKey);
+    }
+  }, [aircraftFormDraftKey, entity, modalOpen]);
+
+  useEffect(() => {
+    if (!modalOpen || entity !== 'aircraft') {
+      return;
+    }
+    const timer = setTimeout(() => {
+      const savedAt = new Date().toISOString();
+      localStorage.setItem(
+        aircraftFormDraftKey,
+        JSON.stringify({
+          values: formValues,
+          activeTab: activeFormTab,
+          savedAt,
+        }),
+      );
+      setAircraftFormLastSavedAt(savedAt);
+      setAircraftFormDraftStatus('saved');
+    }, 550);
+    return () => clearTimeout(timer);
+  }, [activeFormTab, aircraftFormDraftKey, entity, formValues, modalOpen]);
+
   useEffect(
     () => () => {
       if (clickDelayTimerRef.current) {
@@ -1689,8 +1861,30 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
   }, [entity, rows]);
 
   const formFields = ENTITY_FORM_FIELDS[entity];
-  const basicSectionFields = useMemo(() => formFields.slice(0, Math.min(formFields.length, 4)), [formFields]);
-  const configurationSectionFields = useMemo(() => formFields.slice(Math.min(formFields.length, 4)), [formFields]);
+  const basicSectionFields = useMemo(() => {
+    if (entity !== 'aircraft') {
+      return formFields.slice(0, Math.min(formFields.length, 4));
+    }
+    const keyOrder = AIRCRAFT_FORM_SECTION_FIELD_KEYS.basic;
+    const mapped = keyOrder
+      .map((key) => formFields.find((field) => field.key === key))
+      .filter((field): field is EntityFormField => Boolean(field));
+    const extras = formFields.filter((field) => !keyOrder.includes(field.key) && !AIRCRAFT_FORM_SECTION_FIELD_KEYS.configuration.includes(field.key));
+    return [...mapped, ...extras];
+  }, [entity, formFields]);
+  const configurationSectionFields = useMemo(() => {
+    if (entity !== 'aircraft') {
+      return formFields.slice(Math.min(formFields.length, 4));
+    }
+    const keyOrder = AIRCRAFT_FORM_SECTION_FIELD_KEYS.configuration;
+    const mapped = keyOrder
+      .map((key) => formFields.find((field) => field.key === key))
+      .filter((field): field is EntityFormField => Boolean(field));
+    if (entity !== 'aircraft' || canScheduleWorkPackage) {
+      return mapped;
+    }
+    return mapped.filter((field) => !['maintenance_program', 'configuration_code'].includes(field.key));
+  }, [canScheduleWorkPackage, entity, formFields]);
   const systemFields = useMemo(
     () =>
       tableColumns.filter(
@@ -1712,6 +1906,37 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
         : selectedAircraft,
     [flightLogInitialValues.aircraftId, rows, selectedAircraft],
   );
+  const aircraftRequiredProgress = useMemo(() => {
+    if (entity !== 'aircraft') {
+      return { total: 0, completed: 0, percent: 0 };
+    }
+    const requiredFields = formFields.filter((field) => field.required);
+    const completed = requiredFields.filter((field) => !isBlank(formValues[field.key])).length;
+    const total = requiredFields.length;
+    const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
+    return { total, completed, percent };
+  }, [entity, formFields, formValues]);
+  const aircraftValidationSummary = useMemo(() => {
+    if (entity !== 'aircraft') {
+      return { errorCount: 0 };
+    }
+    const preview = buildPayloadFromForm('aircraft', formValues);
+    return { errorCount: Object.keys(preview.errors).length };
+  }, [entity, formValues]);
+  const tabSequence: Array<'basic' | 'configuration' | 'system'> = ['basic', 'configuration', 'system'];
+  const cycleFormTab = useCallback(
+    (direction: 'next' | 'prev') => {
+      const currentIndex = tabSequence.indexOf(activeFormTab);
+      const offset = direction === 'next' ? 1 : -1;
+      const nextIndex = (currentIndex + offset + tabSequence.length) % tabSequence.length;
+      setActiveFormTab(tabSequence[nextIndex]);
+    },
+    [activeFormTab, tabSequence],
+  );
+  const toggleFormPanel = useCallback((panel: 'basic' | 'configuration' | 'system') => {
+    setCollapsedFormPanels((previous) => ({ ...previous, [panel]: !previous[panel] }));
+  }, []);
+  const hasRestrictedAircraftFields = entity === 'aircraft' && !canScheduleWorkPackage;
   const manufacturerSelectOptions = useMemo<SelectOption[]>(
     () =>
       manufacturerOptions.map((option) => ({
@@ -2123,9 +2348,14 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
   const handleSubmitModal = useCallback(async () => {
     const ok = modalMode === 'create' ? await handleCreate() : await handleUpdate();
     if (ok) {
+      if (entity === 'aircraft') {
+        localStorage.removeItem(aircraftFormDraftKey);
+        setAircraftFormDraftStatus('idle');
+        setAircraftFormLastSavedAt('');
+      }
       setModalOpen(false);
     }
-  }, [handleCreate, handleUpdate, modalMode]);
+  }, [aircraftFormDraftKey, entity, handleCreate, handleUpdate, modalMode]);
 
   const loadAircraftWorkPackageSnapshot = useCallback(async () => {
     if (!aircraftEnhancementEnabled || entity !== 'aircraft') {
@@ -2452,21 +2682,48 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
       activeFormTab === tab ? 'text-[hsl(var(--mdm-template-heading))]' : 'text-[hsl(var(--mdm-template-muted))]',
     );
 
+  const clearAircraftDraft = useCallback(() => {
+    localStorage.removeItem(aircraftFormDraftKey);
+    setAircraftFormDraftStatus('idle');
+    setAircraftFormLastSavedAt('');
+    setFormValues(getInitialFormValues(entity));
+    setFormErrors({});
+    setActiveFormTab('basic');
+  }, [aircraftFormDraftKey, entity]);
+
   const renderEditableField = useCallback(
     (field: EntityFormField, section: FormSectionKey, index?: number) => {
       const fieldId = `master-data-${section}-${field.key}`;
+      const fieldErrorId = `${fieldId}-error`;
       const fieldClass = field.type === 'textarea' || field.type === 'json' ? fullWidthSectionFieldClass : sectionFieldClass;
       const hasError = Boolean(formErrors[field.key]);
 
       return (
         <div key={field.key} className={fieldClass}>
-          <Label htmlFor={fieldId} className="mdm-template-label">
-            {field.label}
-            {field.required ? ' *' : ''}
-          </Label>
+          <div className="flex items-center justify-between gap-2">
+            <Label htmlFor={fieldId} className="mdm-template-label">
+              {field.label}
+              {field.required ? ' *' : ''}
+            </Label>
+            {AIRCRAFT_FIELD_HELP[field.key] ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button type="button" variant="ghost" size="icon" className="h-5 w-5" aria-label={`Help for ${field.label}`}>
+                    <FileText className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{AIRCRAFT_FIELD_HELP[field.key]}</TooltipContent>
+              </Tooltip>
+            ) : null}
+          </div>
           {field.type === 'select' && (
             <Select value={String(formValues[field.key] ?? '')} onValueChange={(value) => setFieldValue(field.key, value)}>
-              <SelectTrigger id={fieldId} className={cn('mdm-template-input', hasError && 'border-destructive')} aria-invalid={hasError}>
+              <SelectTrigger
+                id={fieldId}
+                className={cn('mdm-template-input', hasError && 'border-destructive')}
+                aria-invalid={hasError}
+                aria-describedby={hasError ? fieldErrorId : undefined}
+              >
                 <SelectValue placeholder={field.placeholder ?? `Select ${field.label}`} />
               </SelectTrigger>
               <SelectContent>
@@ -2480,7 +2737,12 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
           )}
           {field.type === 'boolean' && (
             <div className="mdm-template-input flex items-center rounded-md px-3">
-              <Switch id={fieldId} checked={Boolean(formValues[field.key])} onCheckedChange={(checked) => setFieldValue(field.key, checked)} />
+              <Switch
+                id={fieldId}
+                checked={Boolean(formValues[field.key])}
+                onCheckedChange={(checked) => setFieldValue(field.key, checked)}
+                aria-describedby={hasError ? fieldErrorId : undefined}
+              />
             </div>
           )}
           {(field.type === 'textarea' || field.type === 'json') && (
@@ -2492,6 +2754,7 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
               placeholder={field.placeholder}
               className={cn('mdm-template-input min-h-[110px]', hasError && 'border-destructive')}
               aria-invalid={hasError}
+              aria-describedby={hasError ? fieldErrorId : undefined}
             />
           )}
           {['text', 'email', 'number', 'date', 'time'].includes(field.type) && (
@@ -2506,9 +2769,14 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
               step={field.type === 'number' ? 'any' : undefined}
               className={cn('mdm-template-input', hasError && 'border-destructive')}
               aria-invalid={hasError}
+              aria-describedby={hasError ? fieldErrorId : undefined}
             />
           )}
-          {formErrors[field.key] ? <p className="mdm-template-danger">{formErrors[field.key]}</p> : null}
+          {formErrors[field.key] ? (
+            <p id={fieldErrorId} className="mdm-template-danger">
+              {formErrors[field.key]}
+            </p>
+          ) : null}
           {field.type === 'select' && field.key === 'manufacturer_id' && manufacturerOptionsError ? (
             <p className="mdm-template-danger">{manufacturerOptionsError}</p>
           ) : null}
@@ -2854,6 +3122,64 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
                     </Button>
                   );
                 })}
+              </div>
+            </CardContent>
+          </Card>
+        ) : null}
+        {entity === 'aircraft' && aircraftEnhancementEnabled ? (
+          <Card className="mdm-template-panel">
+            <CardHeader className="mdm-template-panel-head">
+              <CardTitle className="mdm-template-panel-title">Aircraft Master Data Benchmark and Delivery Guides</CardTitle>
+            </CardHeader>
+            <CardContent className="mdm-template-panel-body space-y-4">
+              <div className="grid gap-4 lg:grid-cols-2">
+                <div className="space-y-2 rounded-md border border-[hsl(var(--mdm-template-border))] p-4">
+                  <p className="inline-flex items-center gap-2 text-[13px] font-semibold text-[hsl(var(--mdm-template-heading))]">
+                    <BookOpenCheck className="h-4 w-4" />
+                    World-Class MRO Patterns
+                  </p>
+                  {AIRCRAFT_MASTER_RESEARCH_PATTERNS.map((entry) => (
+                    <div key={entry.platform} className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-muted/20 p-2 text-[12px]">
+                      <p className="font-semibold text-[hsl(var(--mdm-template-heading))]">{entry.platform}</p>
+                      <p className="text-[hsl(var(--mdm-template-muted))]"><span className="font-medium text-[hsl(var(--mdm-template-heading))]">Layout:</span> {entry.layout}</p>
+                      <p className="text-[hsl(var(--mdm-template-muted))]"><span className="font-medium text-[hsl(var(--mdm-template-heading))]">Validation:</span> {entry.validation}</p>
+                      <p className="text-[hsl(var(--mdm-template-muted))]"><span className="font-medium text-[hsl(var(--mdm-template-heading))]">Workflow:</span> {entry.workflow}</p>
+                      <p className="text-[hsl(var(--mdm-template-muted))]"><span className="font-medium text-[hsl(var(--mdm-template-heading))]">Accessibility:</span> {entry.accessibility}</p>
+                      <p className="text-[hsl(var(--mdm-template-muted))]"><span className="font-medium text-[hsl(var(--mdm-template-heading))]">AMRO Adoption:</span> {entry.adoption}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="space-y-3 rounded-md border border-[hsl(var(--mdm-template-border))] p-4">
+                  <div className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-muted/20 p-3">
+                    <p className="inline-flex items-center gap-2 text-[13px] font-semibold text-[hsl(var(--mdm-template-heading))]">
+                      <FileCheck className="h-4 w-4" />
+                      Comparative Best Practices
+                    </p>
+                    <div className="space-y-1 pt-1">
+                      {AIRCRAFT_RESEARCH_BEST_PRACTICES.map((item) => (
+                        <p key={item} className="text-[12px] text-[hsl(var(--mdm-template-muted))]">• {item}</p>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-muted/20 p-3">
+                    <p className="inline-flex items-center gap-2 text-[13px] font-semibold text-[hsl(var(--mdm-template-heading))]">
+                      <ClipboardList className="h-4 w-4" />
+                      User Training Guide
+                    </p>
+                    <p className="text-[12px] text-[hsl(var(--mdm-template-muted))]">
+                      Step flow: create aircraft profile → validate required fields → verify model/manufacturer linkage → save and review snapshot.
+                    </p>
+                  </div>
+                  <div className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-muted/20 p-3">
+                    <p className="inline-flex items-center gap-2 text-[13px] font-semibold text-[hsl(var(--mdm-template-heading))]">
+                      <ShieldCheck className="h-4 w-4" />
+                      Testing Checklist
+                    </p>
+                    <p className="text-[12px] text-[hsl(var(--mdm-template-muted))]">
+                      Validate required completion, tail/serial format, manufacturer-model consistency, autosave recovery, and role-based work package actions.
+                    </p>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -3232,54 +3558,154 @@ export function AmroSettingsMasterDataPage({ entityOverride }: AmroSettingsMaste
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-6 px-6 pb-6 pt-4">
-              <div className="mdm-template-tab-rail mdm-template-tab-rail-inline">
-                <button type="button" className={tabLabelClass('basic')} data-state={activeFormTab === 'basic' ? 'active' : 'inactive'} onClick={() => setActiveFormTab('basic')}>Basic Information</button>
-                <button type="button" className={tabLabelClass('configuration')} data-state={activeFormTab === 'configuration' ? 'active' : 'inactive'} onClick={() => setActiveFormTab('configuration')}>Configuration Settings</button>
-                <button type="button" className={tabLabelClass('system')} data-state={activeFormTab === 'system' ? 'active' : 'inactive'} onClick={() => setActiveFormTab('system')}>System Information</button>
+              {entity === 'aircraft' ? (
+                <div className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-muted/20 p-3" data-testid="amro-aircraft-form-progress">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-[12px] font-semibold text-[hsl(var(--mdm-template-heading))]">
+                      Required Completion {aircraftRequiredProgress.completed}/{aircraftRequiredProgress.total} ({aircraftRequiredProgress.percent}%)
+                    </p>
+                    <div className="flex items-center gap-2 text-[11px] text-[hsl(var(--mdm-template-muted))]">
+                      <Users className="h-3.5 w-3.5" />
+                      <span>Collaboration: {selectedRowIds.length > 1 ? 'Batch Review' : 'Single Record'}</span>
+                      {aircraftFormDraftStatus !== 'idle' ? (
+                        <span>
+                          Draft {aircraftFormDraftStatus === 'restored' ? 'restored' : 'saved'} {aircraftFormLastSavedAt ? new Date(aircraftFormLastSavedAt).toLocaleTimeString() : ''}
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className="mt-2 h-2 overflow-hidden rounded bg-[hsl(var(--mdm-template-border))]">
+                    <div className="h-full bg-[hsl(var(--mdm-template-focus))] transition-all" style={{ width: `${aircraftRequiredProgress.percent}%` }} />
+                  </div>
+                  <p className="mt-2 text-[11px] text-[hsl(var(--mdm-template-muted))]" aria-live="polite">
+                    Current validation blockers: {aircraftValidationSummary.errorCount}
+                  </p>
+                </div>
+              ) : null}
+              <div
+                className="mdm-template-tab-rail mdm-template-tab-rail-inline"
+                role="tablist"
+                aria-label="Master data form sections"
+                onKeyDown={(event) => {
+                  if (event.key === 'ArrowRight') {
+                    event.preventDefault();
+                    cycleFormTab('next');
+                  }
+                  if (event.key === 'ArrowLeft') {
+                    event.preventDefault();
+                    cycleFormTab('prev');
+                  }
+                }}
+              >
+                <button
+                  type="button"
+                  role="tab"
+                  id="master-data-tab-basic"
+                  aria-selected={activeFormTab === 'basic'}
+                  aria-controls="master-data-panel-basic"
+                  className={tabLabelClass('basic')}
+                  data-state={activeFormTab === 'basic' ? 'active' : 'inactive'}
+                  onClick={() => setActiveFormTab('basic')}
+                >
+                  Basic Information
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  id="master-data-tab-configuration"
+                  aria-selected={activeFormTab === 'configuration'}
+                  aria-controls="master-data-panel-configuration"
+                  className={tabLabelClass('configuration')}
+                  data-state={activeFormTab === 'configuration' ? 'active' : 'inactive'}
+                  onClick={() => setActiveFormTab('configuration')}
+                >
+                  Configuration Settings
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  id="master-data-tab-system"
+                  aria-selected={activeFormTab === 'system'}
+                  aria-controls="master-data-panel-system"
+                  className={tabLabelClass('system')}
+                  data-state={activeFormTab === 'system' ? 'active' : 'inactive'}
+                  onClick={() => setActiveFormTab('system')}
+                >
+                  System Information
+                </button>
               </div>
               {activeFormTab === 'basic' && (
-                <div className="space-y-6">
-                  <div>
+                <div className="space-y-6" role="tabpanel" id="master-data-panel-basic" aria-labelledby="master-data-tab-basic">
+                  <div className="flex items-start justify-between gap-3">
                     <h3 className="text-[14px] font-semibold text-[hsl(var(--mdm-template-heading))]">Basic Information</h3>
-                    <p className="text-[12px] text-[hsl(var(--mdm-template-muted))]">Use the same required-field and validation flow as the Leads form.</p>
+                    <Button type="button" variant="ghost" size="sm" onClick={() => toggleFormPanel('basic')} aria-expanded={!collapsedFormPanels.basic}>
+                      {collapsedFormPanels.basic ? 'Expand Panel' : 'Collapse Panel'}
+                    </Button>
                   </div>
-                  <div className={sectionGridClass} data-testid="amro-master-data-basic-grid">
-                    {basicSectionFields.map((field, index) => renderEditableField(field, 'basic', index))}
-                  </div>
+                  <p className="text-[12px] text-[hsl(var(--mdm-template-muted))]">
+                    Capture aircraft identity and manufacturer attributes with mandatory validation.
+                  </p>
+                  {!collapsedFormPanels.basic ? (
+                    <div className={sectionGridClass} data-testid="amro-master-data-basic-grid">
+                      {basicSectionFields.map((field, index) => renderEditableField(field, 'basic', index))}
+                    </div>
+                  ) : null}
                 </div>
               )}
               {activeFormTab === 'configuration' && (
-                <div className="space-y-6">
-                  <div>
+                <div className="space-y-6" role="tabpanel" id="master-data-panel-configuration" aria-labelledby="master-data-tab-configuration">
+                  <div className="flex items-start justify-between gap-3">
                     <h3 className="text-[14px] font-semibold text-[hsl(var(--mdm-template-heading))]">Configuration Settings</h3>
-                    <p className="text-[12px] text-[hsl(var(--mdm-template-muted))]">Keep layout, spacing, and error presentation consistent with Leads.</p>
+                    <Button type="button" variant="ghost" size="sm" onClick={() => toggleFormPanel('configuration')} aria-expanded={!collapsedFormPanels.configuration}>
+                      {collapsedFormPanels.configuration ? 'Expand Panel' : 'Collapse Panel'}
+                    </Button>
                   </div>
-                  <div className={sectionGridClass} data-testid="amro-master-data-configuration-grid">
-                    {configurationSectionFields.map((field) => renderEditableField(field, 'configuration'))}
-                  </div>
+                  <p className="text-[12px] text-[hsl(var(--mdm-template-muted))]">
+                    Configure maintenance profile, model selection, and operational status for planning and execution flows.
+                  </p>
+                  {hasRestrictedAircraftFields ? (
+                    <p className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-muted/20 px-3 py-2 text-[11px] text-[hsl(var(--mdm-template-muted))]">
+                      Some configuration fields are hidden for your current role.
+                    </p>
+                  ) : null}
+                  {!collapsedFormPanels.configuration ? (
+                    <div className={sectionGridClass} data-testid="amro-master-data-configuration-grid">
+                      {configurationSectionFields.map((field) => renderEditableField(field, 'configuration'))}
+                    </div>
+                  ) : null}
                 </div>
               )}
               {activeFormTab === 'system' && (
-                <div className="space-y-6">
-                  <div>
+                <div className="space-y-6" role="tabpanel" id="master-data-panel-system" aria-labelledby="master-data-tab-system">
+                  <div className="flex items-start justify-between gap-3">
                     <h3 className="text-[14px] font-semibold text-[hsl(var(--mdm-template-heading))]">System Information</h3>
-                    <p className="text-[12px] text-[hsl(var(--mdm-template-muted))]">Read-only fields follow the same grid and spacing contract.</p>
+                    <Button type="button" variant="ghost" size="sm" onClick={() => toggleFormPanel('system')} aria-expanded={!collapsedFormPanels.system}>
+                      {collapsedFormPanels.system ? 'Expand Panel' : 'Collapse Panel'}
+                    </Button>
                   </div>
-                  <div className={sectionGridClass}>
-                    {systemFields.map((field) => (
-                      <div key={field} className={sectionFieldClass}>
-                        <Label htmlFor={`master-data-system-${field}`} className="mdm-template-label">{field}</Label>
-                        <Input id={`master-data-system-${field}`} value={String(selectedRow?.[field] ?? '')} readOnly className="mdm-template-readonly" />
-                      </div>
-                    ))}
-                    {!systemFields.length && (
-                      <p className="text-sm text-muted-foreground">Select a row to view system metadata.</p>
-                    )}
-                  </div>
+                  <p className="text-[12px] text-[hsl(var(--mdm-template-muted))]">Read-only fields follow the same grid and spacing contract.</p>
+                  {!collapsedFormPanels.system ? (
+                    <div className={sectionGridClass}>
+                      {systemFields.map((field) => (
+                        <div key={field} className={sectionFieldClass}>
+                          <Label htmlFor={`master-data-system-${field}`} className="mdm-template-label">{field}</Label>
+                          <Input id={`master-data-system-${field}`} value={String(selectedRow?.[field] ?? '')} readOnly className="mdm-template-readonly" />
+                        </div>
+                      ))}
+                      {!systemFields.length && (
+                        <p className="text-sm text-muted-foreground">Select a row to view system metadata.</p>
+                      )}
+                    </div>
+                  ) : null}
                 </div>
               )}
               <div className="flex flex-wrap items-center justify-end gap-3 border-t border-[hsl(var(--mdm-template-border))] pt-4">
                 <Button variant="outline" onClick={() => setModalOpen(false)}>Cancel</Button>
+                {entity === 'aircraft' ? (
+                  <Button variant="outline" onClick={clearAircraftDraft}>
+                    Discard Draft
+                  </Button>
+                ) : null}
                 <Button variant="destructive" onClick={() => void handleDelete()} disabled={!selectedId}>Delete</Button>
                 <Button onClick={() => void handleSubmitModal()}>
                   {modalMode === 'create' ? 'Save' : 'Save Changes'}
