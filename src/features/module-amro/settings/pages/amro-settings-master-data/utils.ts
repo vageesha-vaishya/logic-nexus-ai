@@ -244,6 +244,66 @@ export function parseWorkPackageItems(payload: Record<string, unknown>): Record<
   return getPayloadRecords(payload);
 }
 
+function parseJsonLikeValue(value: unknown): unknown {
+  if (typeof value !== 'string') {
+    return value;
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    return value;
+  }
+}
+
+function toRecordArray(value: unknown): Record<string, unknown>[] {
+  const parsed = parseJsonLikeValue(value);
+  if (Array.isArray(parsed)) {
+    return parsed.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object');
+  }
+  if (parsed && typeof parsed === 'object') {
+    return [parsed as Record<string, unknown>];
+  }
+  return [];
+}
+
+function readTemplateTextCandidate(record: Record<string, unknown>, keys: string[]): string {
+  for (const key of keys) {
+    const value = String(record[key] ?? '').trim();
+    if (value) {
+      return value;
+    }
+  }
+  return '';
+}
+
+export function normalizeTemplateScopeItems(scopeSource: unknown): string[] {
+  const scopeRows = toRecordArray(scopeSource);
+  const items = scopeRows
+    .map((row) => readTemplateTextCandidate(row, ['description', 'title', 'phase', 'task', 'name']))
+    .filter(Boolean);
+  return Array.from(new Set(items));
+}
+
+export function normalizeTemplateTaskRows(tasksSource: unknown): Array<{
+  taskNumber: string;
+  ataCode: string;
+  serialNumber: string;
+  partNumber: string;
+  description: string;
+}> {
+  return toRecordArray(tasksSource).map((row, index) => ({
+    taskNumber: readTemplateTextCandidate(row, ['task_number', 'taskNumber', 'task_code', 'code']) || `TASK-${index + 1}`,
+    ataCode: readTemplateTextCandidate(row, ['ata_code', 'ataCode']) || '05-20-TIME LIMITS/MAINTENANCE CHECKS',
+    serialNumber: readTemplateTextCandidate(row, ['serial_number', 'serialNumber']),
+    partNumber: readTemplateTextCandidate(row, ['part_number', 'partNumber']),
+    description: readTemplateTextCandidate(row, ['description', 'title', 'task', 'phase']),
+  }));
+}
+
 export function buildAircraftWorkPackageSnapshot(items: Record<string, unknown>[]): AircraftWorkPackageSnapshot {
   let open = 0;
   let inProgress = 0;

@@ -650,11 +650,16 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     await screen.findByText('Aircraft Operations Snapshot');
     fireEvent.click(screen.getByRole('button', { name: 'Create Work Package' }));
     expect(await screen.findByText('Add work package')).toBeInTheDocument();
+    const workPackageDialog = await screen.findByTestId('amro-aircraft-work-package-dialog');
 
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     await waitFor(() => {
       expect(mockToastError).toHaveBeenCalledWith('Please resolve aircraft work package validation errors');
     }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
+
+    expect(await within(workPackageDialog).findByLabelText('Template registry')).toBeInTheDocument();
+    fireEvent.click(within(workPackageDialog).getByLabelText('Template registry'));
+    fireEvent.click(await screen.findByRole('option', { name: 'WP-LINE-001' }));
 
     fireEvent.change(screen.getByLabelText('Number'), { target: { value: '145' } });
     fireEvent.change(screen.getByLabelText('Topic'), { target: { value: 'Hydraulic inspection campaign' } });

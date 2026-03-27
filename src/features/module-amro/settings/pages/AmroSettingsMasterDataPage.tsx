@@ -88,6 +88,8 @@ import {
   getPayloadImportedCount,
   getPayloadRecords,
   normalizeFeatureFlag,
+  normalizeTemplateScopeItems,
+  normalizeTemplateTaskRows,
   isBlank,
   parseWorkPackageItems,
   pickFormValuesFromRow,
@@ -303,6 +305,24 @@ type AircraftPresenceCollaborator = {
   latestFlightDate?: string;
   latestRoute?: string;
   source: 'flight_logs' | 'fallback';
+};
+
+type WorkPackageTemplateRegistryItem = {
+  id: string;
+  templateCode: string;
+  templateName: string;
+  maintenanceType: 'line' | 'base' | 'hangar' | 'shop';
+  version: string;
+  active: boolean;
+  scopeItems: string[];
+  taskRows: Array<{
+    id: string;
+    taskNumber: string;
+    ataCode: string;
+    serialNumber: string;
+    partNumber: string;
+    description: string;
+  }>;
 };
 
 const AIRCRAFT_NAV_RAIL = [
@@ -785,6 +805,10 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   const [aircraftWorkPackageTaskSortDirection, setAircraftWorkPackageTaskSortDirection] = useState<SortDirection>('asc');
   const [aircraftWorkPackageTaskPage, setAircraftWorkPackageTaskPage] = useState(1);
   const [aircraftWorkPackageSelectedTaskIds, setAircraftWorkPackageSelectedTaskIds] = useState<string[]>([]);
+  const [workPackageTemplateRegistry, setWorkPackageTemplateRegistry] = useState<WorkPackageTemplateRegistryItem[]>([]);
+  const [workPackageTemplateRegistryLoading, setWorkPackageTemplateRegistryLoading] = useState(false);
+  const [workPackageTemplateRegistryError, setWorkPackageTemplateRegistryError] = useState('');
+  const [selectedWorkPackageTemplateId, setSelectedWorkPackageTemplateId] = useState('');
   const [flightLogDialogOpen, setFlightLogDialogOpen] = useState(false);
   const [flightLogSubmitting, setFlightLogSubmitting] = useState(false);
   const [flightLogMode, setFlightLogMode] = useState<FlightLogFormMode>('add');
@@ -851,6 +875,32 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     [context.franchiseId, context.tenantId, context.userId],
   );
   const sessionAccessToken = useMemo(() => String(session?.access_token || '').trim(), [session?.access_token]);
+  const trackWorkPackageTemplateAdoption = useCallback(
+    (event: string, details: Record<string, unknown> = {}) => {
+      const payload = {
+        event,
+        tenantId: scope.tenantId || '',
+        franchiseId: scope.franchiseId || '',
+        userId: scope.userId || '',
+        timestamp: new Date().toISOString(),
+        ...details,
+      };
+      logger.info('Aircraft work package template adoption metric', {
+        component: 'AmroSettingsMasterDataPage',
+        ...payload,
+      });
+      try {
+        const key = 'amro:work-package-template-adoption-metrics';
+        const previousRaw = localStorage.getItem(key);
+        const previous = previousRaw ? JSON.parse(previousRaw) : [];
+        const next = Array.isArray(previous) ? [...previous, payload].slice(-100) : [payload];
+        localStorage.setItem(key, JSON.stringify(next));
+      } catch {
+        return;
+      }
+    },
+    [scope.franchiseId, scope.tenantId, scope.userId],
+  );
 
   const fetchManufacturerOptions = useCallback(async (headers: Headers): Promise<ManufacturerOption[]> => {
     const query = new URLSearchParams({
@@ -1646,6 +1696,10 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     () => (entity === 'aircraft' ? (selectedRow || rows[0] || null) : null),
     [entity, rows, selectedRow],
   );
+  const selectedWorkPackageTemplate = useMemo(
+    () => workPackageTemplateRegistry.find((item) => item.id === selectedWorkPackageTemplateId) || null,
+    [selectedWorkPackageTemplateId, workPackageTemplateRegistry],
+  );
   const selectedFlightLogAircraft = useMemo(
     () =>
       String(flightLogInitialValues.aircraftId || '').trim()
@@ -2435,6 +2489,83 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     }
   }, [aircraftEnhancementEnabled, entity, scope, selectedAircraft, selectedId, sessionAccessToken]);
 
+  const loadWorkPackageTemplateRegistry = useCallback(async () => {
+    if (entity !== 'aircraft' || !canCreateWorkPackage) {
+      return;
+    }
+    setWorkPackageTemplateRegistryLoading(true);
+    setWorkPackageTemplateRegistryError('');
+    try {
+      const headers = await buildApiHeaders(scope, {
+        fallbackAccessToken: sessionAccessToken,
+        requestTag: 'aircraft-work-package-template-registry',
+        requestUrl: '/api/v2/amro/master-data/work_package_templates',
+        requestMethod: 'GET',
+      });
+      const query = new URLSearchParams({
+        page: '1',
+        page_size: '100',
+        sort_by: 'updated_at',
+        sort_dir: 'desc',
+      });
+      const response = await fetch(`/api/v2/amro/master-data/work_package_templates?${query.toString()}`, {
+        method: 'GET',
+        headers,
+      });
+      const payload = await parseApiPayload(response);
+      if (!response.ok) {
+        throw new Error(String(payload.error || 'Failed to load work package templates'));
+      }
+      const registry = getPayloadRecords(payload)
+        .map((record) => {
+          const id = String(record.id || '').trim();
+          if (!id) {
+            return null;
+          }
+          const taskRows = normalizeTemplateTaskRows(record.tasks_json).map((taskRow, index) => ({
+            id: `${id}-task-${index + 1}`,
+            ...taskRow,
+          }));
+          const maintenanceTypeText = String(record.maintenance_type || '').trim().toLowerCase();
+          const maintenanceType = (['line', 'base', 'hangar', 'shop'].includes(maintenanceTypeText) ? maintenanceTypeText : 'line') as WorkPackageTemplateRegistryItem['maintenanceType'];
+          return {
+            id,
+            templateCode: String(record.template_code || '').trim(),
+            templateName: String(record.template_name || '').trim(),
+            maintenanceType,
+            version: String(record.version || '1').trim() || '1',
+            active: Boolean(record.active ?? true),
+            scopeItems: normalizeTemplateScopeItems(record.scope_json),
+            taskRows,
+          };
+        })
+        .filter((item): item is WorkPackageTemplateRegistryItem => Boolean(item) && item.active);
+      setWorkPackageTemplateRegistry(registry);
+      if (registry.length === 0) {
+        setWorkPackageTemplateRegistryError('No active work package templates found');
+      }
+      trackWorkPackageTemplateAdoption('registry_loaded', {
+        activeTemplateCount: registry.length,
+      });
+      setSelectedWorkPackageTemplateId((previous) => {
+        if (previous && registry.some((item) => item.id === previous)) {
+          return previous;
+        }
+        return registry[0]?.id || '';
+      });
+    } catch (error) {
+      const message = String((error as Error).message || 'Failed to load template registry');
+      setWorkPackageTemplateRegistry([]);
+      setSelectedWorkPackageTemplateId('');
+      setWorkPackageTemplateRegistryError(message);
+      trackWorkPackageTemplateAdoption('registry_load_failed', {
+        errorMessage: message,
+      });
+    } finally {
+      setWorkPackageTemplateRegistryLoading(false);
+    }
+  }, [canCreateWorkPackage, entity, scope, sessionAccessToken, trackWorkPackageTemplateAdoption]);
+
   useEffect(() => {
     void loadAircraftWorkPackageSnapshot();
   }, [loadAircraftWorkPackageSnapshot]);
@@ -2447,6 +2578,16 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     setAircraftWorkPackageValues(getDefaultAircraftWorkPackageValues(stationHint));
     setAircraftWorkPackageErrors({});
   }, [entity, selectedAircraft]);
+
+  useEffect(() => {
+    if (entity !== 'aircraft' || !aircraftWorkPackageDialogOpen) {
+      return;
+    }
+    if (workPackageTemplateRegistry.length > 0) {
+      return;
+    }
+    void loadWorkPackageTemplateRegistry();
+  }, [aircraftWorkPackageDialogOpen, entity, loadWorkPackageTemplateRegistry, workPackageTemplateRegistry.length]);
 
   const handleAircraftContextNavigation = useCallback(
     (path: string) => {
@@ -2478,6 +2619,10 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   );
 
   const openAircraftWorkPackageDialog = useCallback(() => {
+    if (!canCreateWorkPackage) {
+      toast.error('You do not have permission to create work packages');
+      return;
+    }
     const stationHint = String(selectedAircraft?.station_code || '').trim();
     setAircraftWorkPackageValues(getDefaultAircraftWorkPackageValues(stationHint));
     setAircraftWorkPackageErrors({});
@@ -2487,16 +2632,85 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     setAircraftWorkPackageTaskSortDirection('asc');
     setAircraftWorkPackageTaskPage(1);
     setAircraftWorkPackageSelectedTaskIds([]);
+    setSelectedWorkPackageTemplateId((previous) => previous || workPackageTemplateRegistry[0]?.id || '');
     setAircraftWorkPackageDialogOpen(true);
-  }, [selectedAircraft]);
+    trackWorkPackageTemplateAdoption('dialog_opened', {
+      hasTemplateRegistry: workPackageTemplateRegistry.length > 0,
+      preselectedTemplateId: selectedWorkPackageTemplateId || workPackageTemplateRegistry[0]?.id || '',
+    });
+  }, [canCreateWorkPackage, selectedAircraft, selectedWorkPackageTemplateId, trackWorkPackageTemplateAdoption, workPackageTemplateRegistry]);
 
   const setAircraftWorkPackageField = useCallback((key: keyof AircraftWorkPackageFormValues, value: string) => {
     setAircraftWorkPackageValues((previous) => ({ ...previous, [key]: value }));
     setAircraftWorkPackageErrors((previous) => ({ ...previous, [key]: '' }));
   }, []);
 
+  const handleAircraftWorkPackageTemplateSelect = useCallback(
+    (templateId: string) => {
+      if (!canCreateWorkPackage) {
+        toast.error('You do not have permission to apply templates');
+        return;
+      }
+      setSelectedWorkPackageTemplateId(templateId);
+      const template = workPackageTemplateRegistry.find((item) => item.id === templateId);
+      if (!template) {
+        return;
+      }
+      setAircraftWorkPackageValues((previous) => {
+        const firstTask = template.taskRows[0];
+        return {
+          ...previous,
+          maintenanceType: template.maintenanceType,
+          scopeItemsText: template.scopeItems.length > 0 ? template.scopeItems.join('\n') : previous.scopeItemsText,
+          selectedTaskNumber: firstTask?.taskNumber || previous.selectedTaskNumber,
+          selectedTaskAtaCode: firstTask?.ataCode || previous.selectedTaskAtaCode,
+          selectedTaskSerialNumber: firstTask?.serialNumber || previous.selectedTaskSerialNumber,
+          selectedTaskPartNumber: firstTask?.partNumber || previous.selectedTaskPartNumber,
+          selectedTaskDescription: firstTask?.description || previous.selectedTaskDescription,
+        };
+      });
+      if (template.taskRows.length > 0) {
+        setAircraftWorkPackageSelectedTaskIds(template.taskRows.map((task) => task.id));
+      } else {
+        setAircraftWorkPackageSelectedTaskIds([]);
+      }
+      setAircraftWorkPackageErrors((previous) => ({ ...previous, selectedTaskDescription: '', scopeItemsText: '' }));
+      trackWorkPackageTemplateAdoption('template_selected', {
+        templateId: template.id,
+        templateCode: template.templateCode,
+        taskCount: template.taskRows.length,
+      });
+    },
+    [canCreateWorkPackage, trackWorkPackageTemplateAdoption, workPackageTemplateRegistry],
+  );
+
+  useEffect(() => {
+    if (!aircraftWorkPackageDialogOpen) {
+      return;
+    }
+    if (!selectedWorkPackageTemplateId) {
+      return;
+    }
+    if (aircraftWorkPackageSelectedTaskIds.length > 0) {
+      return;
+    }
+    handleAircraftWorkPackageTemplateSelect(selectedWorkPackageTemplateId);
+  }, [
+    aircraftWorkPackageDialogOpen,
+    aircraftWorkPackageSelectedTaskIds.length,
+    handleAircraftWorkPackageTemplateSelect,
+    selectedWorkPackageTemplateId,
+  ]);
+
   const handleAircraftWorkPackageSubmit = useCallback(
     async (action: WorkPackageCreateAction) => {
+      if (!canCreateWorkPackage) {
+        toast.error('You do not have permission to create work packages');
+        trackWorkPackageTemplateAdoption('submit_denied_permission', {
+          action,
+        });
+        return;
+      }
       if (!selectedAircraft?.id) {
         toast.error('Select an aircraft record first');
         return;
@@ -2539,6 +2753,10 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         .split('\n')
         .map((item) => item.trim())
         .filter(Boolean);
+      const templateScopeItems = selectedWorkPackageTemplate?.scopeItems || [];
+      if (scopeItems.length === 0 && templateScopeItems.length > 0) {
+        scopeItems.push(...templateScopeItems);
+      }
       if (scopeItems.length === 0 && aircraftWorkPackageValues.selectedTaskDescription.trim()) {
         scopeItems.push(aircraftWorkPackageValues.selectedTaskDescription.trim());
       }
@@ -2582,6 +2800,11 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       setAircraftWorkPackageErrors(errors);
       if (Object.keys(errors).length > 0) {
         toast.error('Please resolve aircraft work package validation errors');
+        trackWorkPackageTemplateAdoption('submit_validation_failed', {
+          action,
+          errorCount: Object.keys(errors).length,
+          usesTemplate: Boolean(selectedWorkPackageTemplate?.id),
+        });
         return;
       }
 
@@ -2617,6 +2840,8 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         planned_window: `${new Date(aircraftWorkPackageValues.plannedStart).toISOString()}|${new Date(aircraftWorkPackageValues.plannedEnd).toISOString()}`,
         scope_items: scopeItems,
         selected_task_ids: aircraftWorkPackageSelectedTaskIds,
+        template_id: selectedWorkPackageTemplate?.id || undefined,
+        template_code: selectedWorkPackageTemplate?.templateCode || undefined,
         reference_id: String(selectedAircraft.id),
         triggered_at: new Date().toISOString(),
       };
@@ -2624,6 +2849,10 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       if (action === 'save_draft') {
         localStorage.setItem(`amro:aircraft-wp-draft:${selectedAircraft.id}`, JSON.stringify(workPackagePayload));
         toast.success('Aircraft work package draft saved');
+        trackWorkPackageTemplateAdoption('draft_saved', {
+          usesTemplate: Boolean(selectedWorkPackageTemplate?.id),
+          selectedTaskCount: aircraftWorkPackageSelectedTaskIds.length,
+        });
         setAircraftWorkPackageDialogOpen(false);
         return;
       }
@@ -2651,6 +2880,13 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         const output = payload.output && typeof payload.output === 'object' ? (payload.output as Record<string, unknown>) : {};
         const workPackageId = String(output.work_package_id || output.id || '');
         toast.success('Aircraft work package created');
+        trackWorkPackageTemplateAdoption('submit_succeeded', {
+          action,
+          usesTemplate: Boolean(selectedWorkPackageTemplate?.id),
+          templateId: selectedWorkPackageTemplate?.id || '',
+          selectedTaskCount: aircraftWorkPackageSelectedTaskIds.length,
+          workPackageId,
+        });
         setAircraftWorkPackageDialogOpen(false);
         await loadAircraftWorkPackageSnapshot();
         if (action === 'create_schedule') {
@@ -2672,14 +2908,22 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
           JSON.stringify(workPackagePayload),
         );
         toast.error(String((error as Error).message || 'Work package service degraded. Draft captured locally.'));
+        trackWorkPackageTemplateAdoption('submit_failed', {
+          action,
+          usesTemplate: Boolean(selectedWorkPackageTemplate?.id),
+          templateId: selectedWorkPackageTemplate?.id || '',
+          selectedTaskCount: aircraftWorkPackageSelectedTaskIds.length,
+          errorMessage: String((error as Error).message || error),
+        });
       } finally {
         setAircraftWorkPackageSubmitting(false);
       }
     },
-    [aircraftWorkPackageSelectedTaskIds, aircraftWorkPackageValues, loadAircraftWorkPackageSnapshot, navigate, scope, selectedAircraft],
+    [aircraftWorkPackageSelectedTaskIds, aircraftWorkPackageValues, canCreateWorkPackage, loadAircraftWorkPackageSnapshot, navigate, scope, selectedAircraft, selectedWorkPackageTemplate, trackWorkPackageTemplateAdoption],
   );
 
   const aircraftWorkPackageSelectedTasks = useMemo(() => {
+    const templateRows = selectedWorkPackageTemplate?.taskRows || [];
     const scopeRows = aircraftWorkPackageValues.scopeItemsText
       .split('\n')
       .map((item) => item.trim())
@@ -2694,22 +2938,34 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       }));
 
     const selectedRowDescription = aircraftWorkPackageValues.selectedTaskDescription.trim();
-    if (!selectedRowDescription) {
-      return scopeRows;
-    }
-
-    return [
-      {
+    const merged = [...templateRows];
+    const seenKeys = new Set(
+      merged.map((item) => `${item.taskNumber}|${item.ataCode}|${item.serialNumber}|${item.partNumber}|${item.description}`.toLowerCase()),
+    );
+    if (selectedRowDescription) {
+      const selectedTaskRow = {
         id: 'selected-task',
         taskNumber: aircraftWorkPackageValues.selectedTaskNumber || 'Choose One',
         ataCode: aircraftWorkPackageValues.selectedTaskAtaCode || '05-20-TIME LIMITS/MAINTENANCE CHECKS',
         serialNumber: aircraftWorkPackageValues.selectedTaskSerialNumber || '',
         partNumber: aircraftWorkPackageValues.selectedTaskPartNumber || '',
         description: selectedRowDescription,
-      },
-      ...scopeRows,
-    ];
-  }, [aircraftWorkPackageValues]);
+      };
+      const key = `${selectedTaskRow.taskNumber}|${selectedTaskRow.ataCode}|${selectedTaskRow.serialNumber}|${selectedTaskRow.partNumber}|${selectedTaskRow.description}`.toLowerCase();
+      if (!seenKeys.has(key)) {
+        merged.push(selectedTaskRow);
+        seenKeys.add(key);
+      }
+    }
+    scopeRows.forEach((row) => {
+      const key = `${row.taskNumber}|${row.ataCode}|${row.serialNumber}|${row.partNumber}|${row.description}`.toLowerCase();
+      if (!seenKeys.has(key)) {
+        merged.push(row);
+        seenKeys.add(key);
+      }
+    });
+    return merged;
+  }, [aircraftWorkPackageValues, selectedWorkPackageTemplate]);
 
   const aircraftWorkPackageFilteredTasks = useMemo(() => {
     const normalizedSearch = aircraftWorkPackageTaskSearch.trim().toLowerCase();
@@ -4483,6 +4739,29 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                     <div className="overflow-hidden rounded-sm border border-[#e5e5e5] bg-white">
                       <div className="border-b border-[#efefef] bg-[#fafafa] px-[10px] py-[6px] text-[13px] font-semibold text-[#757575]">Selected task</div>
                       <div className="space-y-2 p-3">
+                        <div className="space-y-1">
+                          <Label htmlFor="aircraft-wp-template-inline" className="text-[11px] font-medium text-[#696969]">
+                            Template registry
+                          </Label>
+                          <Select value={selectedWorkPackageTemplateId} onValueChange={handleAircraftWorkPackageTemplateSelect}>
+                            <SelectTrigger id="aircraft-wp-template-inline" className="h-7 rounded-none border-[#e7e7e7] bg-white px-2 text-[11px] text-[#4f4f4f]">
+                              <SelectValue placeholder={workPackageTemplateRegistryLoading ? 'Loading templates...' : 'Choose template'} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {workPackageTemplateRegistry.map((template) => (
+                                <SelectItem key={template.id} value={template.id}>
+                                  {template.templateCode || template.templateName || template.id}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {workPackageTemplateRegistryError ? <p className="mdm-template-danger">{workPackageTemplateRegistryError}</p> : null}
+                        </div>
+                        {selectedWorkPackageTemplate ? (
+                          <div className="rounded-sm border border-[#e8f2f3] bg-[#f4fbfb] px-2 py-1 text-[11px] text-[#346569]">
+                            {selectedWorkPackageTemplate.templateCode || selectedWorkPackageTemplate.templateName} · v{selectedWorkPackageTemplate.version}
+                          </div>
+                        ) : null}
                         <div className="flex items-center -space-x-1">
                           <Avatar className="h-4 w-4 border border-white">
                             <AvatarFallback className="bg-[#2ab8bd] p-0 text-white">
@@ -4617,8 +4896,46 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                   </div>
                   </div>
                 </TabsContent>
-                <TabsContent value="new-wp" className="rounded-md border p-6 text-sm text-muted-foreground">
-                  New WP list will be populated from the selected template registry.
+                <TabsContent value="new-wp" className="space-y-3 rounded-md border p-4">
+                  <div className="grid gap-3 md:grid-cols-[2fr_1fr_1fr_1fr]">
+                    <div className="space-y-1">
+                      <Label htmlFor="aircraft-wp-template" className="text-[12px] font-medium text-[#696969]">
+                        Template registry
+                      </Label>
+                      <Select value={selectedWorkPackageTemplateId} onValueChange={handleAircraftWorkPackageTemplateSelect}>
+                        <SelectTrigger id="aircraft-wp-template" className="h-8 rounded-none border-[#e7e7e7] bg-white text-[12px] text-[#4f4f4f]">
+                          <SelectValue placeholder={workPackageTemplateRegistryLoading ? 'Loading templates...' : 'Choose template'} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {workPackageTemplateRegistry.map((template) => (
+                            <SelectItem key={template.id} value={template.id}>
+                              {template.templateCode || template.templateName || template.id}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {workPackageTemplateRegistryError ? <p className="mdm-template-danger">{workPackageTemplateRegistryError}</p> : null}
+                    </div>
+                    <div className="rounded-sm border border-[#efefef] bg-white px-3 py-2">
+                      <p className="text-[10px] uppercase tracking-wide text-[#8a8a8a]">Maintenance</p>
+                      <p className="text-[12px] font-semibold text-[#4f4f4f]">{selectedWorkPackageTemplate?.maintenanceType || aircraftWorkPackageValues.maintenanceType}</p>
+                    </div>
+                    <div className="rounded-sm border border-[#efefef] bg-white px-3 py-2">
+                      <p className="text-[10px] uppercase tracking-wide text-[#8a8a8a]">Scope items</p>
+                      <p className="text-[12px] font-semibold text-[#4f4f4f]">{selectedWorkPackageTemplate?.scopeItems.length || 0}</p>
+                    </div>
+                    <div className="rounded-sm border border-[#efefef] bg-white px-3 py-2">
+                      <p className="text-[10px] uppercase tracking-wide text-[#8a8a8a]">Tasks</p>
+                      <p className="text-[12px] font-semibold text-[#4f4f4f]">{selectedWorkPackageTemplate?.taskRows.length || 0}</p>
+                    </div>
+                  </div>
+                  <div className="rounded-sm border border-[#efefef] bg-[#fafafa] p-3">
+                    <p className="text-[11px] font-medium text-[#6a6a6a]">
+                      {selectedWorkPackageTemplate
+                        ? `${selectedWorkPackageTemplate.templateName || selectedWorkPackageTemplate.templateCode} selected. Open "Selected task" to review and adjust mapped tasks before submitting.`
+                        : 'Choose a template to prefill maintenance type, scope, and task selections.'}
+                    </p>
+                  </div>
                 </TabsContent>
                 <TabsContent value="existing-wp" className="rounded-md border p-6 text-sm text-muted-foreground">
                   Existing WP will be loaded from previous maintenance records.
