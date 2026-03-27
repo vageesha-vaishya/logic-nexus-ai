@@ -107,6 +107,22 @@ type AmroRoleVariant = {
   restrictedActions: string;
 };
 
+type WorkPackageCreateTab = 'wp' | 'besting_wp' | 'task_payload' | 'workflow';
+
+type WorkPackageCreateFormState = {
+  workPackageDetails: string;
+  revision: string;
+  selectedTaskId: string;
+  maintenanceType: 'line' | 'base' | 'hangar' | 'shop';
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  plannedStartDate: string;
+  plannedEndDate: string;
+  assignedRole: 'planner' | 'engineer' | 'inspector' | 'technician';
+  workflowStatus: 'planning' | 'scheduled' | 'in_progress' | 'blocked';
+};
+
+type WorkPackageCreateFormErrors = Partial<Record<keyof WorkPackageCreateFormState, string>>;
+
 const amroRoleVariants: Record<AmroUxRole, AmroRoleVariant> = {
   technician: {
     primaryViews: 'Task cards, assigned work package details',
@@ -133,6 +149,22 @@ const amroRoleVariants: Record<AmroUxRole, AmroRoleVariant> = {
     coreActions: 'Monitor KPIs, approve exceptions',
     restrictedActions: 'Direct task execution',
   },
+};
+
+const createDefaultWorkPackageCreateFormState = (): WorkPackageCreateFormState => {
+  const start = new Date();
+  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+  return {
+    workPackageDetails: '',
+    revision: '1',
+    selectedTaskId: '',
+    maintenanceType: 'line',
+    priority: 'medium',
+    plannedStartDate: start.toISOString().slice(0, 10),
+    plannedEndDate: end.toISOString().slice(0, 10),
+    assignedRole: 'planner',
+    workflowStatus: 'planning',
+  };
 };
 
 export function AmroOwnedWorkspace({
@@ -167,6 +199,11 @@ export function AmroOwnedWorkspace({
   const [manualWorkPackageOrder, setManualWorkPackageOrder] = useState<string[]>([]);
   const [draggingWorkPackageId, setDraggingWorkPackageId] = useState<string | null>(null);
   const [lastWorkspaceExportAt, setLastWorkspaceExportAt] = useState<string | null>(null);
+  const [workPackageCreateDialogOpen, setWorkPackageCreateDialogOpen] = useState(false);
+  const [workPackageCreateTab, setWorkPackageCreateTab] = useState<WorkPackageCreateTab>('wp');
+  const [workPackageCreateForm, setWorkPackageCreateForm] = useState<WorkPackageCreateFormState>(() => createDefaultWorkPackageCreateFormState());
+  const [workPackageCreateErrors, setWorkPackageCreateErrors] = useState<WorkPackageCreateFormErrors>({});
+  const workPackageCreateDraftCacheRef = useRef<Map<WorkPackageCreateTab, WorkPackageCreateFormState>>(new Map());
   const workspaceLoadStartedAtRef = useRef(typeof performance !== 'undefined' ? performance.now() : Date.now());
   const workspaceLoadMetricPublishedRef = useRef(false);
   const filterApplyStartedAtRef = useRef<number | null>(null);
@@ -475,6 +512,12 @@ export function AmroOwnedWorkspace({
   const visibleWorkspaceError = state.workPackagesError?.trim().toLowerCase() === 'not found' ? null : state.workPackagesError;
   const taskActionDisabledReason = canDirectTaskExecution ? '' : 'Disabled by policy: management role cannot submit technician execution actions.';
   const selectedWorkPackageAssignee = state.selectedWorkPackage?.tasks?.[0]?.assignedRole || 'Unassigned';
+  const taskSelectionOptions = state.workPackages.flatMap((workPackage) =>
+    (workPackage.tasks || []).map((task) => ({
+      value: task.id,
+      label: `${workPackage.packageNumber} · ${task.title}`,
+    })),
+  );
   const formatDateTime = (value: string | number) => new Intl.DateTimeFormat(workspaceLocale, {
     dateStyle: 'medium',
     timeStyle: 'short',
@@ -808,6 +851,134 @@ export function AmroOwnedWorkspace({
     const ok = await state.createWorkPackage(newWorkPackageTitle);
     if (ok) {
       setNewWorkPackageTitle('');
+    }
+  };
+
+  const handleOpenWorkPackageCreateDialog = () => {
+    const cached = workPackageCreateDraftCacheRef.current.get(workPackageCreateTab);
+    const defaultState = createDefaultWorkPackageCreateFormState();
+    const initialTaskId = taskSelectionOptions[0]?.value || '';
+    setWorkPackageCreateForm({
+      ...defaultState,
+      selectedTaskId: cached?.selectedTaskId || initialTaskId,
+      ...cached,
+    });
+    setWorkPackageCreateErrors({});
+    setWorkPackageCreateDialogOpen(true);
+  };
+
+  const handleWorkPackageCreateTabChange = (nextTab: WorkPackageCreateTab) => {
+    workPackageCreateDraftCacheRef.current.set(workPackageCreateTab, workPackageCreateForm);
+    const cachedNext = workPackageCreateDraftCacheRef.current.get(nextTab);
+    if (cachedNext) {
+      setWorkPackageCreateForm(cachedNext);
+    }
+    setWorkPackageCreateTab(nextTab);
+  };
+
+  const handleWorkPackageCreateFormChange = <K extends keyof WorkPackageCreateFormState>(key: K, value: WorkPackageCreateFormState[K]) => {
+    setWorkPackageCreateForm((current) => ({
+      ...current,
+      [key]: value,
+    }));
+    setWorkPackageCreateErrors((current) => {
+      if (!current[key]) {
+        return current;
+      }
+      const nextErrors = { ...current };
+      delete nextErrors[key];
+      return nextErrors;
+    });
+  };
+
+  const validateWorkPackageCreateForm = (values: WorkPackageCreateFormState): WorkPackageCreateFormErrors => {
+    const nextErrors: WorkPackageCreateFormErrors = {};
+    if (!values.workPackageDetails.trim()) {
+      nextErrors.workPackageDetails = 'Work package details is required.';
+    }
+    const revisionValue = Number(values.revision);
+    if (!Number.isInteger(revisionValue) || revisionValue < 1) {
+      nextErrors.revision = 'Revision must be a positive integer.';
+    }
+    if (!values.selectedTaskId.trim()) {
+      nextErrors.selectedTaskId = 'Selected task is required.';
+    }
+    if (!values.plannedStartDate) {
+      nextErrors.plannedStartDate = 'Planned start date is required.';
+    }
+    if (!values.plannedEndDate) {
+      nextErrors.plannedEndDate = 'Planned end date is required.';
+    }
+    if (values.plannedStartDate && values.plannedEndDate && values.plannedStartDate > values.plannedEndDate) {
+      nextErrors.plannedEndDate = 'Planned end date must be on or after planned start date.';
+    }
+    return nextErrors;
+  };
+
+  const handleSubmitWorkPackageCreateForm = async () => {
+    const validationErrors = validateWorkPackageCreateForm(workPackageCreateForm);
+    if (Object.keys(validationErrors).length > 0) {
+      setWorkPackageCreateErrors(validationErrors);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('amro:work-package-form-validation-error', {
+          detail: {
+            errors: validationErrors,
+            submittedAt: new Date().toISOString(),
+          },
+        }));
+      }
+      setLastInteractionMessage('Fix validation errors before adding a work package.');
+      toast.error('Validation failed for work package form.');
+      return;
+    }
+    const selectedTaskLabel = taskSelectionOptions.find((task) => task.value === workPackageCreateForm.selectedTaskId)?.label || '';
+    const ok = await state.createWorkPackage(workPackageCreateForm.workPackageDetails, {
+      maintenanceType: workPackageCreateForm.maintenanceType,
+      priority: workPackageCreateForm.priority,
+      plannedStartIso: `${workPackageCreateForm.plannedStartDate}T00:00:00.000Z`,
+      plannedEndIso: `${workPackageCreateForm.plannedEndDate}T23:59:59.000Z`,
+      station: selectedStationFilter === 'all' ? undefined : selectedStationFilter,
+      scopeItems: [workPackageCreateForm.workPackageDetails, selectedTaskLabel].filter((item) => item.trim().length > 0),
+      taskPlan: [workPackageCreateForm.selectedTaskId],
+      revision: workPackageCreateForm.revision,
+      assignedRole: workPackageCreateForm.assignedRole,
+      workflowStatus: workPackageCreateForm.workflowStatus,
+    });
+    if (!ok) {
+      setLastInteractionMessage('Unable to add work package. Retry after resolving API issues.');
+      toast.error('Unable to add work package.');
+      return;
+    }
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('amro:work-package-created', {
+        detail: {
+          source: 'work-package-create-dialog',
+          ...workPackageCreateForm,
+          createdAt: new Date().toISOString(),
+        },
+      }));
+    }
+    workPackageCreateDraftCacheRef.current.clear();
+    setWorkPackageCreateForm(createDefaultWorkPackageCreateFormState());
+    setWorkPackageCreateErrors({});
+    setWorkPackageCreateDialogOpen(false);
+    setLastInteractionMessage('Work package added successfully.');
+    toast.success('Work package added.');
+  };
+
+  const handleDeleteWorkPackage = async (workPackageId: string, packageNumber: string) => {
+    state.setSelectedWorkPackageId(workPackageId);
+    setBusyWorkPackageActionId(`delete-${workPackageId}`);
+    try {
+      const ok = await state.deleteSelectedWorkPackage();
+      setLastInteractionMessage(ok ? `Deleted work package ${packageNumber}.` : `Unable to delete work package ${packageNumber}.`);
+      if (ok) {
+        toast.success(`Deleted ${packageNumber}.`);
+      } else {
+        toast.error(`Unable to delete ${packageNumber}.`);
+      }
+    } finally {
+      setBusyWorkPackageActionId(null);
     }
   };
 
@@ -1223,6 +1394,9 @@ export function AmroOwnedWorkspace({
                 <Button onClick={() => void handleCreateStarterWorkPackage()} disabled={!state.canCreateWorkPackage}>
                   New WP
                 </Button>
+                <Button onClick={handleOpenWorkPackageCreateDialog} disabled={!state.canCreateWorkPackage}>
+                  Add WP
+                </Button>
               </div>
             </div>
             <div className="mt-2 flex flex-wrap gap-2 text-xs">
@@ -1359,6 +1533,15 @@ export function AmroOwnedWorkspace({
                         disabled={busyWorkPackageActionId !== null}
                       >
                         Export
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        aria-label={`Delete work package ${workPackage.packageNumber}`}
+                        onClick={() => void handleDeleteWorkPackage(workPackage.id, workPackage.packageNumber)}
+                        disabled={busyWorkPackageActionId !== null || !state.canDeleteWorkPackage}
+                      >
+                        Delete
                       </Button>
                       <Button
                         variant="outline"
@@ -2358,6 +2541,172 @@ export function AmroOwnedWorkspace({
             />
             <Button onClick={() => void handleConfirmWorkPackageClosure()} disabled={!closureRationale.trim()} aria-label="Confirm closure with rationale">
               Confirm Closure
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={workPackageCreateDialogOpen} onOpenChange={setWorkPackageCreateDialogOpen}>
+        <DialogContent className="mdm-template-dialog max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Add Work Package</DialogTitle>
+          </DialogHeader>
+          <Tabs value={workPackageCreateTab} onValueChange={(value) => handleWorkPackageCreateTabChange(value as WorkPackageCreateTab)}>
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="wp">WP</TabsTrigger>
+              <TabsTrigger value="besting_wp">Besting WP</TabsTrigger>
+              <TabsTrigger value="task_payload">Task Payload</TabsTrigger>
+              <TabsTrigger value="workflow">Workflow</TabsTrigger>
+            </TabsList>
+            <TabsContent value="wp" className="space-y-3 pt-2">
+              <div className="space-y-1">
+                <Label htmlFor="wp-details">Work Package Details</Label>
+                <Textarea
+                  id="wp-details"
+                  value={workPackageCreateForm.workPackageDetails}
+                  onChange={(event) => handleWorkPackageCreateFormChange('workPackageDetails', event.target.value)}
+                  placeholder="Enter work package details"
+                  aria-invalid={Boolean(workPackageCreateErrors.workPackageDetails)}
+                />
+                {workPackageCreateErrors.workPackageDetails ? (
+                  <p className="text-xs text-destructive">{workPackageCreateErrors.workPackageDetails}</p>
+                ) : null}
+              </div>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <div className="space-y-1">
+                  <Label htmlFor="wp-revision">Revision</Label>
+                  <Input
+                    id="wp-revision"
+                    type="number"
+                    min={1}
+                    value={workPackageCreateForm.revision}
+                    onChange={(event) => handleWorkPackageCreateFormChange('revision', event.target.value)}
+                    aria-invalid={Boolean(workPackageCreateErrors.revision)}
+                  />
+                  {workPackageCreateErrors.revision ? (
+                    <p className="text-xs text-destructive">{workPackageCreateErrors.revision}</p>
+                  ) : null}
+                </div>
+                <div className="space-y-1">
+                  <Label>Selected Task</Label>
+                  <Select value={workPackageCreateForm.selectedTaskId} onValueChange={(value) => handleWorkPackageCreateFormChange('selectedTaskId', value)}>
+                    <SelectTrigger aria-label="Selected task" aria-invalid={Boolean(workPackageCreateErrors.selectedTaskId)}>
+                      <SelectValue placeholder="Select task" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {taskSelectionOptions.map((task) => (
+                        <SelectItem key={task.value} value={task.value}>
+                          {task.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {workPackageCreateErrors.selectedTaskId ? (
+                    <p className="text-xs text-destructive">{workPackageCreateErrors.selectedTaskId}</p>
+                  ) : null}
+                </div>
+              </div>
+            </TabsContent>
+            <TabsContent value="besting_wp" className="space-y-3 pt-2">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <div className="space-y-1">
+                  <Label>Maintenance Type</Label>
+                  <Select value={workPackageCreateForm.maintenanceType} onValueChange={(value) => handleWorkPackageCreateFormChange('maintenanceType', value as WorkPackageCreateFormState['maintenanceType'])}>
+                    <SelectTrigger aria-label="Maintenance type">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="line">Line</SelectItem>
+                      <SelectItem value="base">Base</SelectItem>
+                      <SelectItem value="hangar">Hangar</SelectItem>
+                      <SelectItem value="shop">Shop</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label>Priority</Label>
+                  <Select value={workPackageCreateForm.priority} onValueChange={(value) => handleWorkPackageCreateFormChange('priority', value as WorkPackageCreateFormState['priority'])}>
+                    <SelectTrigger aria-label="Priority">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Low</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                      <SelectItem value="critical">Critical</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </TabsContent>
+            <TabsContent value="task_payload" className="space-y-3 pt-2">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <div className="space-y-1">
+                  <Label htmlFor="wp-planned-start">Planned Start</Label>
+                  <Input
+                    id="wp-planned-start"
+                    type="date"
+                    value={workPackageCreateForm.plannedStartDate}
+                    onChange={(event) => handleWorkPackageCreateFormChange('plannedStartDate', event.target.value)}
+                    aria-invalid={Boolean(workPackageCreateErrors.plannedStartDate)}
+                  />
+                  {workPackageCreateErrors.plannedStartDate ? (
+                    <p className="text-xs text-destructive">{workPackageCreateErrors.plannedStartDate}</p>
+                  ) : null}
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="wp-planned-end">Planned End</Label>
+                  <Input
+                    id="wp-planned-end"
+                    type="date"
+                    value={workPackageCreateForm.plannedEndDate}
+                    onChange={(event) => handleWorkPackageCreateFormChange('plannedEndDate', event.target.value)}
+                    aria-invalid={Boolean(workPackageCreateErrors.plannedEndDate)}
+                  />
+                  {workPackageCreateErrors.plannedEndDate ? (
+                    <p className="text-xs text-destructive">{workPackageCreateErrors.plannedEndDate}</p>
+                  ) : null}
+                </div>
+              </div>
+            </TabsContent>
+            <TabsContent value="workflow" className="space-y-3 pt-2">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <div className="space-y-1">
+                  <Label>Assigned Role</Label>
+                  <Select value={workPackageCreateForm.assignedRole} onValueChange={(value) => handleWorkPackageCreateFormChange('assignedRole', value as WorkPackageCreateFormState['assignedRole'])}>
+                    <SelectTrigger aria-label="Assigned role">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="planner">Planner</SelectItem>
+                      <SelectItem value="engineer">Engineer</SelectItem>
+                      <SelectItem value="inspector">Inspector</SelectItem>
+                      <SelectItem value="technician">Technician</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label>Workflow Status</Label>
+                  <Select value={workPackageCreateForm.workflowStatus} onValueChange={(value) => handleWorkPackageCreateFormChange('workflowStatus', value as WorkPackageCreateFormState['workflowStatus'])}>
+                    <SelectTrigger aria-label="Workflow status">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="planning">Planning</SelectItem>
+                      <SelectItem value="scheduled">Scheduled</SelectItem>
+                      <SelectItem value="in_progress">In Progress</SelectItem>
+                      <SelectItem value="blocked">Blocked</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </TabsContent>
+          </Tabs>
+          <div className="flex items-center justify-end gap-2">
+            <Button variant="outline" onClick={() => setWorkPackageCreateDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={() => void handleSubmitWorkPackageCreateForm()}>
+              Add
             </Button>
           </div>
         </DialogContent>

@@ -74,9 +74,28 @@ export type AircraftWorkPackageFormValues = {
   source: WorkPackageTrigger;
   maintenanceType: 'line' | 'base' | 'hangar' | 'shop';
   priority: 'low' | 'medium' | 'high' | 'critical';
+  status: '' | 'planning' | 'scheduled' | 'in_progress' | 'blocked';
+  validationState: '' | 'pending' | 'validated' | 'not_validated';
   plannedStart: string;
   plannedEnd: string;
   station: string;
+  workPackageNumber: string;
+  topic: string;
+  ttafHours: string;
+  openingDate: string;
+  revisionNumber: string;
+  revisionDate: string;
+  transmissionDate: string;
+  maintenanceReleaseDate: string;
+  workReportNumber: string;
+  expectedReceptionDate: string;
+  workReceptionDate: string;
+  comments: string;
+  selectedTaskNumber: string;
+  selectedTaskAtaCode: string;
+  selectedTaskSerialNumber: string;
+  selectedTaskPartNumber: string;
+  selectedTaskDescription: string;
   scopeItemsText: string;
 };
 

@@ -269,6 +269,20 @@ type CertificationTemplateState = {
   deferMaxDays: number;
 };
 
+type CreateWorkPackageOptions = {
+  aircraftId?: string;
+  maintenanceType?: 'line' | 'base' | 'hangar' | 'shop';
+  priority?: 'low' | 'medium' | 'high' | 'critical';
+  plannedStartIso?: string;
+  plannedEndIso?: string;
+  station?: string;
+  scopeItems?: string[];
+  taskPlan?: string[];
+  revision?: string;
+  assignedRole?: string;
+  workflowStatus?: 'planning' | 'scheduled' | 'in_progress' | 'blocked';
+};
+
 async function parseJsonSafe<T>(response: Response): Promise<T | null> {
   const raw = await response.text();
   if (!raw.trim()) {
@@ -1786,7 +1800,7 @@ export function useAmroWorkspaceState() {
   };
 
   const createWorkPackage = useCallback(
-    async (title: string) => {
+    async (title: string, options?: CreateWorkPackageOptions) => {
       if (!authHeaders) return createLocalWorkPackage(title);
       const cleanTitle = title.trim();
       if (!cleanTitle) return false;
@@ -1798,20 +1812,28 @@ export function useAmroWorkspaceState() {
         return false;
       }
       try {
-        const v2AircraftId = defaultAircraftId || seededAircraftId || 'amro-fallback-aircraft';
+        const v2AircraftId = String(options?.aircraftId || defaultAircraftId || seededAircraftId || 'amro-fallback-aircraft').trim();
         const now = Date.now();
-        const plannedWindow = `${new Date(now).toISOString()}|${new Date(now + 86400000).toISOString()}`;
-        const defaultStation = String(import.meta.env.VITE_AMRO_DEFAULT_STATION || 'station-a').trim() || 'station-a';
+        const plannedStart = options?.plannedStartIso ? new Date(options.plannedStartIso).toISOString() : new Date(now).toISOString();
+        const plannedEnd = options?.plannedEndIso ? new Date(options.plannedEndIso).toISOString() : new Date(now + 86400000).toISOString();
+        const plannedWindow = `${plannedStart}|${plannedEnd}`;
+        const defaultStation = String(options?.station || import.meta.env.VITE_AMRO_DEFAULT_STATION || 'station-a').trim() || 'station-a';
+        const scopeItems = Array.isArray(options?.scopeItems) && options.scopeItems.length > 0 ? options.scopeItems : [cleanTitle];
+        const taskPlan = Array.isArray(options?.taskPlan) && options.taskPlan.length > 0 ? options.taskPlan : scopeItems;
         const v2Response = await fetch(`${apiBaseUrl}/api/v2/amro/work-packages?interface=create-work-package`, {
           method: 'POST',
           headers: authHeaders,
           body: JSON.stringify({
             aircraft_id: v2AircraftId,
-            maintenance_type: 'line',
+            maintenance_type: options?.maintenanceType || 'line',
             planned_window: plannedWindow,
             station: defaultStation,
-            priority: 'medium',
-            scope_items: [cleanTitle],
+            priority: options?.priority || 'medium',
+            scope_items: scopeItems,
+            task_plan: taskPlan,
+            revision: options?.revision || '1',
+            assigned_role: options?.assignedRole || 'planner',
+            workflow_status: options?.workflowStatus || 'planning',
             idempotency_key: `wp-create-${now}`,
             decision_trace_id: `wp-create-${now}`,
             scope_context: {

@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -207,6 +207,7 @@ const ENTITY_TABLE_COLUMNS: Record<MasterEntity, string[]> = {
 const ENTITY_HIDDEN_COLUMNS: Partial<Record<MasterEntity, string[]>> = {
   aircraft: ['id', 'created_at', 'updated_at', 'tenant_id', 'franchise_id'],
   flight_logs: ['tenant_id', 'franchise_id', 'is_deleted', 'deleted_at', 'deleted_by', 'created_by', 'updated_by', 'metadata'],
+  work_package_templates: ['id', 'created_at', 'updated_at', 'tenant_id', 'franchise_id', 'scope_json'],
 };
 
 const AIRCRAFT_EDITABLE_COLUMNS = new Set(['registration', 'tail_number', 'serial_number', 'aircraft_type', 'aircraft_model', 'maintenance_program', 'status']);
@@ -258,9 +259,28 @@ type AircraftWorkPackageFormValues = {
   source: WorkPackageTrigger;
   maintenanceType: 'line' | 'base' | 'hangar' | 'shop';
   priority: 'low' | 'medium' | 'high' | 'critical';
+  status: '' | 'planning' | 'scheduled' | 'in_progress' | 'blocked';
+  validationState: '' | 'pending' | 'validated' | 'not_validated';
   plannedStart: string;
   plannedEnd: string;
   station: string;
+  workPackageNumber: string;
+  topic: string;
+  ttafHours: string;
+  openingDate: string;
+  revisionNumber: string;
+  revisionDate: string;
+  transmissionDate: string;
+  maintenanceReleaseDate: string;
+  workReportNumber: string;
+  expectedReceptionDate: string;
+  workReceptionDate: string;
+  comments: string;
+  selectedTaskNumber: string;
+  selectedTaskAtaCode: string;
+  selectedTaskSerialNumber: string;
+  selectedTaskPartNumber: string;
+  selectedTaskDescription: string;
   scopeItemsText: string;
 };
 
@@ -759,6 +779,12 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   const [aircraftWorkPackageValues, setAircraftWorkPackageValues] = useState<AircraftWorkPackageFormValues>(getDefaultAircraftWorkPackageValues());
   const [aircraftWorkPackageErrors, setAircraftWorkPackageErrors] = useState<Record<string, string>>({});
   const [aircraftWorkPackageSubmitting, setAircraftWorkPackageSubmitting] = useState(false);
+  const [aircraftWorkPackageActiveTab, setAircraftWorkPackageActiveTab] = useState('selected-task');
+  const [aircraftWorkPackageTaskSearch, setAircraftWorkPackageTaskSearch] = useState('');
+  const [aircraftWorkPackageTaskSort, setAircraftWorkPackageTaskSort] = useState<'taskNumber' | 'ataCode' | 'description'>('taskNumber');
+  const [aircraftWorkPackageTaskSortDirection, setAircraftWorkPackageTaskSortDirection] = useState<SortDirection>('asc');
+  const [aircraftWorkPackageTaskPage, setAircraftWorkPackageTaskPage] = useState(1);
+  const [aircraftWorkPackageSelectedTaskIds, setAircraftWorkPackageSelectedTaskIds] = useState<string[]>([]);
   const [flightLogDialogOpen, setFlightLogDialogOpen] = useState(false);
   const [flightLogSubmitting, setFlightLogSubmitting] = useState(false);
   const [flightLogMode, setFlightLogMode] = useState<FlightLogFormMode>('add');
@@ -1573,6 +1599,49 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     [entity, tableColumns],
   );
   const selectedRow = useMemo(() => rows.find((row) => row.id === selectedId) || null, [rows, selectedId]);
+  const selectedRecordLabel = useMemo(() => {
+    if (!selectedRow) {
+      return 'None';
+    }
+    if (entity === 'work_package_templates') {
+      return String(selectedRow.template_code || selectedRow.template_name || selectedRow.id || 'None');
+    }
+    if (entity === 'aircraft') {
+      return String(selectedRow.tail_number || selectedRow.registration || selectedRow.id || 'None');
+    }
+    if (entity === 'flight_logs') {
+      return String(selectedRow.flight_number || selectedRow.id || 'None');
+    }
+    return String(selectedRow.id || 'None');
+  }, [entity, selectedRow]);
+  const workPackageTemplateTaskItems = useMemo(() => {
+    if (entity !== 'work_package_templates') {
+      return [] as Array<Record<string, unknown>>;
+    }
+    const source = formValues.tasks_json;
+    if (Array.isArray(source)) {
+      return source.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object');
+    }
+    if (source && typeof source === 'object') {
+      return [source as Record<string, unknown>];
+    }
+    const raw = String(source || '').trim();
+    if (!raw) {
+      return [] as Array<Record<string, unknown>>;
+    }
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return parsed.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object');
+      }
+      if (parsed && typeof parsed === 'object') {
+        return [parsed as Record<string, unknown>];
+      }
+      return [] as Array<Record<string, unknown>>;
+    } catch {
+      return [] as Array<Record<string, unknown>>;
+    }
+  }, [entity, formValues.tasks_json]);
   const selectedAircraft = useMemo(
     () => (entity === 'aircraft' ? (selectedRow || rows[0] || null) : null),
     [entity, rows, selectedRow],
@@ -2123,12 +2192,27 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       if (clickDelayTimerRef.current) {
         clearTimeout(clickDelayTimerRef.current);
       }
-      setSelectedId(row.id);
-      setFormValues(pickFormValuesFromRow(entity, row));
-      setFormErrors({});
-      setModalMode('update');
-      setActiveFormTab('basic');
-      setModalOpen(true);
+      try {
+        const rowId = String(row.id || '').trim();
+        if (!rowId) {
+          throw new Error('Unable to open form for this record');
+        }
+        setSelectedId(rowId);
+        setFormValues(pickFormValuesFromRow(entity, row));
+        setFormErrors({});
+        setModalMode('update');
+        setActiveFormTab('basic');
+        setModalOpen(true);
+      } catch (error) {
+        const message = String((error as Error).message || 'Unable to open form');
+        logger.warn('Master data row open failed', {
+          component: 'AmroSettingsMasterDataPage',
+          entity,
+          rowId: String(row.id || ''),
+          message,
+        });
+        toast.error(message);
+      }
     },
     [entity],
   );
@@ -2397,6 +2481,12 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     const stationHint = String(selectedAircraft?.station_code || '').trim();
     setAircraftWorkPackageValues(getDefaultAircraftWorkPackageValues(stationHint));
     setAircraftWorkPackageErrors({});
+    setAircraftWorkPackageActiveTab('selected-task');
+    setAircraftWorkPackageTaskSearch('');
+    setAircraftWorkPackageTaskSort('taskNumber');
+    setAircraftWorkPackageTaskSortDirection('asc');
+    setAircraftWorkPackageTaskPage(1);
+    setAircraftWorkPackageSelectedTaskIds([]);
     setAircraftWorkPackageDialogOpen(true);
   }, [selectedAircraft]);
 
@@ -2412,28 +2502,82 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         return;
       }
       const errors: Record<string, string> = {};
-      if (!aircraftWorkPackageValues.station.trim()) {
-        errors.station = 'Station is required';
+      if (!aircraftWorkPackageValues.workPackageNumber.trim()) {
+        errors.workPackageNumber = 'Work package number is required';
       }
-      if (!aircraftWorkPackageValues.plannedStart.trim()) {
-        errors.plannedStart = 'Planned start is required';
+      if (!aircraftWorkPackageValues.topic.trim()) {
+        errors.topic = 'Topic is required';
       }
-      if (!aircraftWorkPackageValues.plannedEnd.trim()) {
-        errors.plannedEnd = 'Planned end is required';
+      if (!aircraftWorkPackageValues.openingDate.trim()) {
+        errors.openingDate = 'Opening date is required';
       }
-      const startTime = Date.parse(aircraftWorkPackageValues.plannedStart);
-      const endTime = Date.parse(aircraftWorkPackageValues.plannedEnd);
-      if (Number.isNaN(startTime) || Number.isNaN(endTime)) {
-        errors.plannedEnd = 'Planned window must be valid date-time values';
-      } else if (startTime >= endTime) {
-        errors.plannedEnd = 'Planned end must be after planned start';
+      if (!aircraftWorkPackageValues.revisionNumber.trim()) {
+        errors.revisionNumber = 'Revision number is required';
+      }
+      if (!aircraftWorkPackageValues.ttafHours.trim()) {
+        errors.ttafHours = 'TTAF is required';
+      }
+      if (!aircraftWorkPackageValues.status) {
+        errors.status = 'Status is required';
+      }
+      if (!aircraftWorkPackageValues.validationState) {
+        errors.validationState = 'Validation is required';
+      }
+      if (!aircraftWorkPackageValues.transmissionDate.trim()) {
+        errors.transmissionDate = 'Transmission date is required';
+      }
+      if (!aircraftWorkPackageValues.expectedReceptionDate.trim()) {
+        errors.expectedReceptionDate = 'Expected reception date is required';
+      }
+      if (!aircraftWorkPackageValues.maintenanceReleaseDate.trim()) {
+        errors.maintenanceReleaseDate = 'Maintenance release date is required';
+      }
+      if (!aircraftWorkPackageValues.workReceptionDate.trim()) {
+        errors.workReceptionDate = 'Work reception date is required';
       }
       const scopeItems = aircraftWorkPackageValues.scopeItemsText
         .split('\n')
         .map((item) => item.trim())
         .filter(Boolean);
+      if (scopeItems.length === 0 && aircraftWorkPackageValues.selectedTaskDescription.trim()) {
+        scopeItems.push(aircraftWorkPackageValues.selectedTaskDescription.trim());
+      }
+      if (scopeItems.length === 0 && aircraftWorkPackageValues.comments.trim()) {
+        scopeItems.push(aircraftWorkPackageValues.comments.trim());
+      }
       if (scopeItems.length === 0) {
         errors.scopeItemsText = 'Add at least one scope item';
+      }
+      const openingDateTime = Date.parse(aircraftWorkPackageValues.openingDate);
+      if (Number.isNaN(openingDateTime)) {
+        errors.openingDate = 'Opening date must be a valid date';
+      }
+      const revisionDateTime = Date.parse(aircraftWorkPackageValues.revisionDate);
+      if (aircraftWorkPackageValues.revisionDate.trim() && Number.isNaN(revisionDateTime)) {
+        errors.revisionDate = 'Revision date must be a valid date';
+      }
+      const ttafValue = Number(aircraftWorkPackageValues.ttafHours);
+      if (!Number.isFinite(ttafValue) || ttafValue < 0) {
+        errors.ttafHours = 'TTAF must be a non-negative number';
+      }
+      const transmissionDateTime = Date.parse(aircraftWorkPackageValues.transmissionDate);
+      if (Number.isNaN(transmissionDateTime)) {
+        errors.transmissionDate = 'Transmission date must be a valid date';
+      }
+      const maintenanceReleaseDateTime = Date.parse(aircraftWorkPackageValues.maintenanceReleaseDate);
+      if (Number.isNaN(maintenanceReleaseDateTime)) {
+        errors.maintenanceReleaseDate = 'Maintenance release date must be a valid date';
+      }
+      const expectedReceptionDateTime = Date.parse(aircraftWorkPackageValues.expectedReceptionDate);
+      if (Number.isNaN(expectedReceptionDateTime)) {
+        errors.expectedReceptionDate = 'Expected reception date must be a valid date';
+      }
+      const workReceptionDateTime = Date.parse(aircraftWorkPackageValues.workReceptionDate);
+      if (Number.isNaN(workReceptionDateTime)) {
+        errors.workReceptionDate = 'Work reception date must be a valid date';
+      }
+      if (aircraftWorkPackageSelectedTaskIds.length === 0) {
+        errors.selectedTaskDescription = 'Select at least one task';
       }
       setAircraftWorkPackageErrors(errors);
       if (Object.keys(errors).length > 0) {
@@ -2441,19 +2585,44 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         return;
       }
 
+      const workPackagePayload = {
+        aircraft_id: String(selectedAircraft.id),
+        work_order_number: aircraftWorkPackageValues.workPackageNumber.trim(),
+        title: aircraftWorkPackageValues.topic.trim(),
+        opening_date: new Date(aircraftWorkPackageValues.openingDate).toISOString(),
+        revision_number: aircraftWorkPackageValues.revisionNumber.trim(),
+        revision_date: aircraftWorkPackageValues.revisionDate.trim()
+          ? new Date(aircraftWorkPackageValues.revisionDate).toISOString()
+          : null,
+        transmission_date: new Date(aircraftWorkPackageValues.transmissionDate).toISOString(),
+        expected_reception_date: new Date(aircraftWorkPackageValues.expectedReceptionDate).toISOString(),
+        maintenance_release_date: new Date(aircraftWorkPackageValues.maintenanceReleaseDate).toISOString(),
+        work_reception_date: new Date(aircraftWorkPackageValues.workReceptionDate).toISOString(),
+        work_report_number: aircraftWorkPackageValues.workReportNumber.trim(),
+        comments: aircraftWorkPackageValues.comments.trim(),
+        ttaf_hours: Number(aircraftWorkPackageValues.ttafHours),
+        validation_state: aircraftWorkPackageValues.validationState,
+        selected_task: {
+          task_number: aircraftWorkPackageValues.selectedTaskNumber.trim(),
+          ata_code: aircraftWorkPackageValues.selectedTaskAtaCode.trim(),
+          serial_number: aircraftWorkPackageValues.selectedTaskSerialNumber.trim(),
+          part_number: aircraftWorkPackageValues.selectedTaskPartNumber.trim(),
+          description: aircraftWorkPackageValues.selectedTaskDescription.trim() || scopeItems[0] || '',
+        },
+        source: aircraftWorkPackageValues.source,
+        maintenance_type: aircraftWorkPackageValues.maintenanceType,
+        station: aircraftWorkPackageValues.station.trim(),
+        priority: aircraftWorkPackageValues.priority,
+        status: aircraftWorkPackageValues.status,
+        planned_window: `${new Date(aircraftWorkPackageValues.plannedStart).toISOString()}|${new Date(aircraftWorkPackageValues.plannedEnd).toISOString()}`,
+        scope_items: scopeItems,
+        selected_task_ids: aircraftWorkPackageSelectedTaskIds,
+        reference_id: String(selectedAircraft.id),
+        triggered_at: new Date().toISOString(),
+      };
+
       if (action === 'save_draft') {
-        const draft = {
-          aircraft_id: String(selectedAircraft.id),
-          source: aircraftWorkPackageValues.source,
-          maintenance_type: aircraftWorkPackageValues.maintenanceType,
-          station: aircraftWorkPackageValues.station.trim(),
-          priority: aircraftWorkPackageValues.priority,
-          planned_window: `${new Date(aircraftWorkPackageValues.plannedStart).toISOString()}|${new Date(aircraftWorkPackageValues.plannedEnd).toISOString()}`,
-          scope_items: scopeItems,
-          reference_id: String(selectedAircraft.id),
-          triggered_at: new Date().toISOString(),
-        };
-        localStorage.setItem(`amro:aircraft-wp-draft:${selectedAircraft.id}`, JSON.stringify(draft));
+        localStorage.setItem(`amro:aircraft-wp-draft:${selectedAircraft.id}`, JSON.stringify(workPackagePayload));
         toast.success('Aircraft work package draft saved');
         setAircraftWorkPackageDialogOpen(false);
         return;
@@ -2467,15 +2636,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
           method: 'POST',
           headers,
           body: JSON.stringify({
-            aircraft_id: String(selectedAircraft.id),
-            maintenance_type: aircraftWorkPackageValues.maintenanceType,
-            planned_window: `${new Date(aircraftWorkPackageValues.plannedStart).toISOString()}|${new Date(aircraftWorkPackageValues.plannedEnd).toISOString()}`,
-            station: aircraftWorkPackageValues.station.trim(),
-            priority: aircraftWorkPackageValues.priority,
-            scope_items: scopeItems,
-            source: aircraftWorkPackageValues.source,
-            reference_id: String(selectedAircraft.id),
-            triggered_at: new Date().toISOString(),
+            ...workPackagePayload,
             idempotency_key: `aircraft-wp-create-${now}`,
             decision_trace_id: `aircraft-wp-${selectedAircraft.id}-${now}`,
             scope_context: {
@@ -2508,25 +2669,84 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       } catch (error) {
         localStorage.setItem(
           `amro:aircraft-wp-draft:${selectedAircraft.id}`,
-          JSON.stringify({
-            aircraft_id: String(selectedAircraft.id),
-            source: aircraftWorkPackageValues.source,
-            maintenance_type: aircraftWorkPackageValues.maintenanceType,
-            station: aircraftWorkPackageValues.station.trim(),
-            priority: aircraftWorkPackageValues.priority,
-            planned_window: `${new Date(aircraftWorkPackageValues.plannedStart).toISOString()}|${new Date(aircraftWorkPackageValues.plannedEnd).toISOString()}`,
-            scope_items: scopeItems,
-            reference_id: String(selectedAircraft.id),
-            triggered_at: new Date().toISOString(),
-          }),
+          JSON.stringify(workPackagePayload),
         );
         toast.error(String((error as Error).message || 'Work package service degraded. Draft captured locally.'));
       } finally {
         setAircraftWorkPackageSubmitting(false);
       }
     },
-    [aircraftWorkPackageValues, loadAircraftWorkPackageSnapshot, navigate, scope, selectedAircraft],
+    [aircraftWorkPackageSelectedTaskIds, aircraftWorkPackageValues, loadAircraftWorkPackageSnapshot, navigate, scope, selectedAircraft],
   );
+
+  const aircraftWorkPackageSelectedTasks = useMemo(() => {
+    const scopeRows = aircraftWorkPackageValues.scopeItemsText
+      .split('\n')
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .map((description, index) => ({
+        id: `scope-${index + 1}`,
+        taskNumber: aircraftWorkPackageValues.selectedTaskNumber || `TASK-${index + 1}`,
+        ataCode: aircraftWorkPackageValues.selectedTaskAtaCode || '05-20-TIME LIMITS/MAINTENANCE CHECKS',
+        serialNumber: aircraftWorkPackageValues.selectedTaskSerialNumber || '',
+        partNumber: aircraftWorkPackageValues.selectedTaskPartNumber || '',
+        description,
+      }));
+
+    const selectedRowDescription = aircraftWorkPackageValues.selectedTaskDescription.trim();
+    if (!selectedRowDescription) {
+      return scopeRows;
+    }
+
+    return [
+      {
+        id: 'selected-task',
+        taskNumber: aircraftWorkPackageValues.selectedTaskNumber || 'Choose One',
+        ataCode: aircraftWorkPackageValues.selectedTaskAtaCode || '05-20-TIME LIMITS/MAINTENANCE CHECKS',
+        serialNumber: aircraftWorkPackageValues.selectedTaskSerialNumber || '',
+        partNumber: aircraftWorkPackageValues.selectedTaskPartNumber || '',
+        description: selectedRowDescription,
+      },
+      ...scopeRows,
+    ];
+  }, [aircraftWorkPackageValues]);
+
+  const aircraftWorkPackageFilteredTasks = useMemo(() => {
+    const normalizedSearch = aircraftWorkPackageTaskSearch.trim().toLowerCase();
+    const next = normalizedSearch
+      ? aircraftWorkPackageSelectedTasks.filter((task) =>
+          [task.taskNumber, task.ataCode, task.serialNumber, task.partNumber, task.description]
+            .some((value) => value.toLowerCase().includes(normalizedSearch)),
+        )
+      : aircraftWorkPackageSelectedTasks;
+    const sorted = [...next].sort((left, right) => {
+      const leftValue = String(left[aircraftWorkPackageTaskSort] || '').toLowerCase();
+      const rightValue = String(right[aircraftWorkPackageTaskSort] || '').toLowerCase();
+      if (leftValue === rightValue) {
+        return left.id.localeCompare(right.id);
+      }
+      return aircraftWorkPackageTaskSortDirection === 'asc'
+        ? leftValue.localeCompare(rightValue)
+        : rightValue.localeCompare(leftValue);
+    });
+    return sorted;
+  }, [
+    aircraftWorkPackageSelectedTasks,
+    aircraftWorkPackageTaskSearch,
+    aircraftWorkPackageTaskSort,
+    aircraftWorkPackageTaskSortDirection,
+  ]);
+
+  const aircraftWorkPackageTaskPageSize = 5;
+  const aircraftWorkPackageTaskTotalPages = Math.max(1, Math.ceil(aircraftWorkPackageFilteredTasks.length / aircraftWorkPackageTaskPageSize));
+  useEffect(() => {
+    setAircraftWorkPackageTaskPage((previous) => Math.min(previous, aircraftWorkPackageTaskTotalPages));
+  }, [aircraftWorkPackageTaskTotalPages]);
+  const aircraftWorkPackagePagedTasks = useMemo(() => {
+    const normalizedPage = Math.min(Math.max(aircraftWorkPackageTaskPage, 1), aircraftWorkPackageTaskTotalPages);
+    const start = (normalizedPage - 1) * aircraftWorkPackageTaskPageSize;
+    return aircraftWorkPackageFilteredTasks.slice(start, start + aircraftWorkPackageTaskPageSize);
+  }, [aircraftWorkPackageFilteredTasks, aircraftWorkPackageTaskPage, aircraftWorkPackageTaskTotalPages]);
 
   const openFlightLogDialog = useCallback((rowId: string) => {
     const aircraftId = rowId.trim();
@@ -3385,7 +3605,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
             </div>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-sm text-muted-foreground">
-                Selected: {selectedId || 'none'} | Checked: {selectedRowIds.length} | Records: {renderedRows.length}
+                Selection Summary: Active Record {selectedRecordLabel} | Checked: {selectedRowIds.length} | Records: {renderedRows.length}
               </p>
               <div className="flex items-center gap-2">
                 <Tooltip>
@@ -3787,6 +4007,170 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                     ))}
                   </div>
                 </div>
+              ) : entity === 'work_package_templates' ? (
+                <div className="space-y-3">
+                  <div className="grid gap-2 lg:grid-cols-[1fr_1fr]">
+                    <section className="overflow-hidden rounded-sm border border-[#e5e5e5] bg-white">
+                      <div className="border-b border-[#efefef] bg-[#fafafa] px-[10px] py-[6px] text-[13px] font-semibold text-[#757575]">Work Package Details</div>
+                      <div className="grid gap-2 p-2 lg:grid-cols-2">
+                        <div className="space-y-1">
+                          <Label htmlFor="wpt-template-code" className="text-[12px] font-medium text-[#696969]">Template Code</Label>
+                          <Input
+                            id="wpt-template-code"
+                            ref={firstFieldRef}
+                            value={String(formValues.template_code ?? '')}
+                            onChange={(event) => setFieldValue('template_code', event.target.value)}
+                            className={cn('h-7 rounded-none border-[#eeeeee] bg-white px-2 text-[12px] text-[#525252] shadow-none', formErrors.template_code && 'border-destructive')}
+                            aria-invalid={Boolean(formErrors.template_code)}
+                            placeholder="WP-LINE-001"
+                          />
+                          {formErrors.template_code ? <p className="mdm-template-danger">{formErrors.template_code}</p> : null}
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="wpt-version" className="text-[12px] font-medium text-[#696969]">Version</Label>
+                          <Input
+                            id="wpt-version"
+                            type="number"
+                            min={1}
+                            value={String(formValues.version ?? '')}
+                            onChange={(event) => setFieldValue('version', event.target.value)}
+                            className={cn('h-7 rounded-none border-[#eeeeee] bg-white px-2 text-[12px] text-[#525252] shadow-none', formErrors.version && 'border-destructive')}
+                            aria-invalid={Boolean(formErrors.version)}
+                            placeholder="1"
+                          />
+                          {formErrors.version ? <p className="mdm-template-danger">{formErrors.version}</p> : null}
+                        </div>
+                        <div className="space-y-1 lg:col-span-2">
+                          <Label htmlFor="wpt-template-name" className="text-[12px] font-medium text-[#696969]">Template Name</Label>
+                          <Input
+                            id="wpt-template-name"
+                            value={String(formValues.template_name ?? '')}
+                            onChange={(event) => setFieldValue('template_name', event.target.value)}
+                            className={cn('h-7 rounded-none border-[#eeeeee] bg-white px-2 text-[12px] text-[#525252] shadow-none', formErrors.template_name && 'border-destructive')}
+                            aria-invalid={Boolean(formErrors.template_name)}
+                            placeholder="Line Check Package"
+                          />
+                          {formErrors.template_name ? <p className="mdm-template-danger">{formErrors.template_name}</p> : null}
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="wpt-maintenance-type" className="text-[12px] font-medium text-[#696969]">Maintenance Type</Label>
+                          <Select value={String(formValues.maintenance_type ?? '')} onValueChange={(value) => setFieldValue('maintenance_type', value)}>
+                            <SelectTrigger
+                              id="wpt-maintenance-type"
+                              className={cn(
+                                'h-7 rounded-none border-[#eeeeee] bg-white px-2 text-[12px] text-[#525252] shadow-none',
+                                formErrors.maintenance_type && 'border-destructive',
+                              )}
+                              aria-invalid={Boolean(formErrors.maintenance_type)}
+                            >
+                              <SelectValue placeholder="Select type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {resolveSelectOptions({ key: 'maintenance_type', label: 'Maintenance Type', type: 'select', options: ['line', 'base', 'hangar', 'shop'] }).map((option) => (
+                                <SelectItem key={option.value} value={option.value} disabled={option.disabled}>
+                                  {option.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {formErrors.maintenance_type ? <p className="mdm-template-danger">{formErrors.maintenance_type}</p> : null}
+                        </div>
+                        <div className="flex items-end">
+                          <div className="flex h-7 items-center gap-2 rounded-none border border-[#eeeeee] bg-white px-2 text-[12px] text-[#525252]">
+                            <Checkbox
+                              id="wpt-active"
+                              checked={Boolean(formValues.active)}
+                              onCheckedChange={(value) => setFieldValue('active', Boolean(value))}
+                            />
+                            <Label htmlFor="wpt-active" className="text-[12px] font-medium text-[#696969]">Active</Label>
+                          </div>
+                        </div>
+                        <div className="space-y-1 lg:col-span-2">
+                          <Label htmlFor="wpt-policy-snapshot-id" className="text-[12px] font-medium text-[#696969]">Policy Snapshot ID</Label>
+                          <Input
+                            id="wpt-policy-snapshot-id"
+                            value={String(formValues.policy_snapshot_id ?? '')}
+                            onChange={(event) => setFieldValue('policy_snapshot_id', event.target.value)}
+                            className="h-7 rounded-none border-[#eeeeee] bg-white px-2 text-[12px] text-[#525252] shadow-none"
+                            placeholder="POLICY-2026-001"
+                          />
+                        </div>
+                      </div>
+                    </section>
+                    <section className="overflow-hidden rounded-sm border border-[#e5e5e5] bg-white">
+                      <div className="border-b border-[#efefef] bg-[#fafafa] px-[10px] py-[6px] text-[13px] font-semibold text-[#757575]">Selected Tasks</div>
+                      <div className="space-y-2 p-2">
+                        <div className="overflow-x-auto border border-[#eeeeee]">
+                          <table className="w-full text-[12px]">
+                            <thead className="bg-[#fafafa] text-left text-[#696969]">
+                              <tr>
+                                <th className="px-2 py-1.5 font-semibold">Task number</th>
+                                <th className="px-2 py-1.5 font-semibold">ATA code</th>
+                                <th className="px-2 py-1.5 font-semibold">Serial number</th>
+                                <th className="px-2 py-1.5 font-semibold">Part number</th>
+                                <th className="px-2 py-1.5 font-semibold">Description</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {workPackageTemplateTaskItems.length ? workPackageTemplateTaskItems.map((task, index) => (
+                                <tr key={`${String(task.id || task.task_number || index)}-${index}`} className="border-t border-[#f1f1f1] text-[#555555]">
+                                  <td className="px-2 py-1.5">{String(task.task_number || task.taskNumber || '-')}</td>
+                                  <td className="px-2 py-1.5">{String(task.ata_code || task.ataCode || '-')}</td>
+                                  <td className="px-2 py-1.5">{String(task.serial_number || task.serialNumber || '-')}</td>
+                                  <td className="px-2 py-1.5">{String(task.part_number || task.partNumber || '-')}</td>
+                                  <td className="px-2 py-1.5">{String(task.description || '-')}</td>
+                                </tr>
+                              )) : (
+                                <tr>
+                                  <td className="px-2 py-2 text-[#8b8b8b]" colSpan={5}>No task rows available</td>
+                                </tr>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                        {formErrors.tasks_json ? <p className="mdm-template-danger">{formErrors.tasks_json}</p> : null}
+                      </div>
+                    </section>
+                  </div>
+                  <div className="grid gap-2 lg:grid-cols-2">
+                    <section className="overflow-hidden rounded-sm border border-[#e5e5e5] bg-white">
+                      <div className="border-b border-[#efefef] bg-[#fafafa] px-[10px] py-[6px] text-[13px] font-semibold text-[#757575]">Scope Definition</div>
+                      <div className="p-2">
+                        <Label htmlFor="wpt-scope-json" className="sr-only">Scope JSON</Label>
+                        <Textarea
+                          id="wpt-scope-json"
+                          value={String(formValues.scope_json ?? '')}
+                          onChange={(event) => setFieldValue('scope_json', event.target.value)}
+                          className={cn(
+                            'min-h-[118px] rounded-none border-[#eeeeee] bg-white px-2 py-1.5 text-[12px] text-[#525252] shadow-none',
+                            formErrors.scope_json && 'border-destructive',
+                          )}
+                          aria-invalid={Boolean(formErrors.scope_json)}
+                          placeholder='[{"phase":"inspection"}]'
+                        />
+                        {formErrors.scope_json ? <p className="mt-1 mdm-template-danger">{formErrors.scope_json}</p> : null}
+                      </div>
+                    </section>
+                    <section className="overflow-hidden rounded-sm border border-[#e5e5e5] bg-white">
+                      <div className="border-b border-[#efefef] bg-[#fafafa] px-[10px] py-[6px] text-[13px] font-semibold text-[#757575]">Tasks JSON</div>
+                      <div className="p-2">
+                        <Label htmlFor="wpt-tasks-json" className="sr-only">Tasks JSON</Label>
+                        <Textarea
+                          id="wpt-tasks-json"
+                          value={String(formValues.tasks_json ?? '')}
+                          onChange={(event) => setFieldValue('tasks_json', event.target.value)}
+                          className={cn(
+                            'min-h-[118px] rounded-none border-[#eeeeee] bg-white px-2 py-1.5 text-[12px] text-[#525252] shadow-none',
+                            formErrors.tasks_json && 'border-destructive',
+                          )}
+                          aria-invalid={Boolean(formErrors.tasks_json)}
+                          placeholder='[{"task_number":"05-20","description":"Scheduled Maintenance Checks"}]'
+                        />
+                        {formErrors.tasks_json ? <p className="mt-1 mdm-template-danger">{formErrors.tasks_json}</p> : null}
+                      </div>
+                    </section>
+                  </div>
+                </div>
               ) : (
                 <>
                   <div
@@ -3894,115 +4278,364 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
           </DialogContent>
         </Dialog>
         <Dialog open={aircraftWorkPackageDialogOpen} onOpenChange={setAircraftWorkPackageDialogOpen}>
-          <DialogContent className="mdm-template-dialog">
-            <DialogHeader className="border-b border-[hsl(var(--mdm-template-border))] px-6 py-4">
-              <DialogTitle className="text-[15px] font-semibold text-[hsl(var(--mdm-template-heading))]">
-                Create Work Package (Aircraft: {String(selectedAircraft?.tail_number || 'N/A')})
+          <DialogContent className="mdm-template-dialog mdm-template-dialog-large w-[99vw] max-w-[1960px]" data-testid="amro-aircraft-work-package-dialog">
+            <DialogHeader className="border-b border-[#efefef] px-4 py-3">
+              <DialogTitle className="text-[36px] font-semibold leading-none text-[#4c4c4c]">
+                Add work package
               </DialogTitle>
-              <DialogDescription className="text-[12px] text-[hsl(var(--mdm-template-muted))]">
-                Aircraft context is pre-bound with trigger metadata for auditable package creation.
-              </DialogDescription>
             </DialogHeader>
-            <div className="space-y-5 px-6 pb-6 pt-4">
-              <div className="mdm-template-form-grid">
-                <div className={sectionFieldClass}>
-                  <Label className="mdm-template-label">Source Trigger</Label>
-                  <Select value={aircraftWorkPackageValues.source} onValueChange={(value) => setAircraftWorkPackageField('source', value)}>
-                    <SelectTrigger className="mdm-template-input">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="schedule_due">Schedule Due</SelectItem>
-                      <SelectItem value="defect">Defect</SelectItem>
-                      <SelectItem value="campaign">Campaign</SelectItem>
-                      <SelectItem value="predictive_alert">Predictive Alert</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className={sectionFieldClass}>
-                  <Label className="mdm-template-label">Maintenance Type</Label>
-                  <Select value={aircraftWorkPackageValues.maintenanceType} onValueChange={(value) => setAircraftWorkPackageField('maintenanceType', value)}>
-                    <SelectTrigger className="mdm-template-input">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="line">Line</SelectItem>
-                      <SelectItem value="base">Base</SelectItem>
-                      <SelectItem value="hangar">Hangar</SelectItem>
-                      <SelectItem value="shop">Shop</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className={sectionFieldClass}>
-                  <Label className="mdm-template-label">Priority</Label>
-                  <Select value={aircraftWorkPackageValues.priority} onValueChange={(value) => setAircraftWorkPackageField('priority', value)}>
-                    <SelectTrigger className="mdm-template-input">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="low">Low</SelectItem>
-                      <SelectItem value="medium">Medium</SelectItem>
-                      <SelectItem value="high">High</SelectItem>
-                      <SelectItem value="critical">Critical</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className={sectionFieldClass}>
-                  <Label className="mdm-template-label">Station</Label>
-                  <Input
-                    value={aircraftWorkPackageValues.station}
-                    onChange={(event) => setAircraftWorkPackageField('station', event.target.value)}
-                    className={cn('mdm-template-input', aircraftWorkPackageErrors.station && 'border-destructive')}
-                    aria-invalid={Boolean(aircraftWorkPackageErrors.station)}
-                  />
-                  {aircraftWorkPackageErrors.station ? <p className="mdm-template-danger">{aircraftWorkPackageErrors.station}</p> : null}
-                </div>
-                <div className={sectionFieldClass}>
-                  <Label className="mdm-template-label">Planned Start</Label>
-                  <Input
-                    type="datetime-local"
-                    value={aircraftWorkPackageValues.plannedStart}
-                    onChange={(event) => setAircraftWorkPackageField('plannedStart', event.target.value)}
-                    className={cn('mdm-template-input', aircraftWorkPackageErrors.plannedStart && 'border-destructive')}
-                    aria-invalid={Boolean(aircraftWorkPackageErrors.plannedStart)}
-                  />
-                  {aircraftWorkPackageErrors.plannedStart ? <p className="mdm-template-danger">{aircraftWorkPackageErrors.plannedStart}</p> : null}
-                </div>
-                <div className={sectionFieldClass}>
-                  <Label className="mdm-template-label">Planned End</Label>
-                  <Input
-                    type="datetime-local"
-                    value={aircraftWorkPackageValues.plannedEnd}
-                    onChange={(event) => setAircraftWorkPackageField('plannedEnd', event.target.value)}
-                    className={cn('mdm-template-input', aircraftWorkPackageErrors.plannedEnd && 'border-destructive')}
-                    aria-invalid={Boolean(aircraftWorkPackageErrors.plannedEnd)}
-                  />
-                  {aircraftWorkPackageErrors.plannedEnd ? <p className="mdm-template-danger">{aircraftWorkPackageErrors.plannedEnd}</p> : null}
-                </div>
-                <div className={fullWidthSectionFieldClass}>
-                  <Label className="mdm-template-label">Scope Builder</Label>
-                  <Textarea
-                    value={aircraftWorkPackageValues.scopeItemsText}
-                    onChange={(event) => setAircraftWorkPackageField('scopeItemsText', event.target.value)}
-                    className={cn('mdm-template-input min-h-[130px]', aircraftWorkPackageErrors.scopeItemsText && 'border-destructive')}
-                    placeholder="One scope item per line"
-                    aria-invalid={Boolean(aircraftWorkPackageErrors.scopeItemsText)}
-                  />
-                  {aircraftWorkPackageErrors.scopeItemsText ? <p className="mdm-template-danger">{aircraftWorkPackageErrors.scopeItemsText}</p> : null}
-                </div>
-              </div>
-              <div className="flex flex-wrap items-center justify-end gap-3 border-t border-[hsl(var(--mdm-template-border))] pt-4">
-                <Button variant="outline" onClick={() => setAircraftWorkPackageDialogOpen(false)} disabled={aircraftWorkPackageSubmitting}>
+            <div className="space-y-2 px-2 pb-1 pt-1">
+              <Tabs value={aircraftWorkPackageActiveTab} onValueChange={setAircraftWorkPackageActiveTab}>
+                <TabsList className="h-auto w-full justify-start gap-0 overflow-x-auto rounded-none bg-transparent p-0">
+                  <TabsTrigger value="new-wp" className="h-[18px] rounded-none border border-r-0 border-[#d7d7d7] px-[6px] text-[9px] font-medium leading-none text-[#6a6a6a] data-[state=active]:border-[#12aeb1] data-[state=active]:bg-[#12aeb1] data-[state=active]:text-white">New WP</TabsTrigger>
+                  <TabsTrigger value="existing-wp" className="h-[18px] rounded-none border border-r-0 border-[#d7d7d7] px-[6px] text-[9px] font-medium leading-none text-[#6a6a6a] data-[state=active]:border-[#12aeb1] data-[state=active]:bg-[#12aeb1] data-[state=active]:text-white">Existing WP</TabsTrigger>
+                  <TabsTrigger value="non-performed-tasks" className="h-[18px] rounded-none border border-r-0 border-[#d7d7d7] px-[6px] text-[9px] font-medium leading-none text-[#6a6a6a] data-[state=active]:border-[#12aeb1] data-[state=active]:bg-[#12aeb1] data-[state=active]:text-white">Non performed tasks</TabsTrigger>
+                  <TabsTrigger value="selected-task" className="h-[18px] rounded-none border border-r-0 border-[#d7d7d7] px-[6px] text-[9px] font-medium leading-none text-[#6a6a6a] data-[state=active]:border-[#12aeb1] data-[state=active]:bg-[#12aeb1] data-[state=active]:text-white">Selected task</TabsTrigger>
+                  <TabsTrigger value="all-tasks" className="h-[18px] rounded-none border border-[#d7d7d7] px-[6px] text-[9px] font-medium leading-none text-[#6a6a6a] data-[state=active]:border-[#12aeb1] data-[state=active]:bg-[#12aeb1] data-[state=active]:text-white">All Tasks</TabsTrigger>
+                </TabsList>
+                <TabsContent value="selected-task" className="space-y-2 pt-1">
+                  <div className="grid gap-2 lg:grid-cols-[1fr_1fr]">
+                    <div className="overflow-hidden rounded-sm border border-[#e5e5e5] bg-white">
+                      <div className="border-b border-[#efefef] bg-[#fafafa] px-[10px] py-[6px] text-[13px] font-semibold text-[#757575]">Work Package details</div>
+                      <div className="grid gap-2 p-2 lg:grid-cols-2">
+                        <div className="space-y-1">
+                          <div className="space-y-1">
+                            <Label htmlFor="aircraft-wp-number" className="text-[12px] font-medium text-[#696969]">Number</Label>
+                            <Input
+                              id="aircraft-wp-number"
+                              value={aircraftWorkPackageValues.workPackageNumber}
+                              onChange={(event) => setAircraftWorkPackageField('workPackageNumber', event.target.value)}
+                              className={cn('h-7 rounded-none border-[#eeeeee] bg-white px-2 text-[12px] text-[#525252] shadow-none', aircraftWorkPackageErrors.workPackageNumber && 'border-destructive')}
+                              aria-invalid={Boolean(aircraftWorkPackageErrors.workPackageNumber)}
+                              placeholder="145"
+                            />
+                            {aircraftWorkPackageErrors.workPackageNumber ? <p className="mdm-template-danger">{aircraftWorkPackageErrors.workPackageNumber}</p> : null}
+                          </div>
+                          <div className="space-y-1">
+                            <Label htmlFor="aircraft-wp-topic" className="text-[12px] font-medium text-[#696969]">Topic</Label>
+                            <Input
+                              id="aircraft-wp-topic"
+                              value={aircraftWorkPackageValues.topic}
+                              onChange={(event) => setAircraftWorkPackageField('topic', event.target.value)}
+                              className={cn('h-7 rounded-none border-[#eeeeee] bg-white px-2 text-[12px] text-[#525252] shadow-none', aircraftWorkPackageErrors.topic && 'border-destructive')}
+                              aria-invalid={Boolean(aircraftWorkPackageErrors.topic)}
+                              placeholder="400 Hour Inspection"
+                            />
+                            {aircraftWorkPackageErrors.topic ? <p className="mdm-template-danger">{aircraftWorkPackageErrors.topic}</p> : null}
+                          </div>
+                          <div className="space-y-1">
+                            <Label htmlFor="aircraft-wp-ttaf" className="text-[12px] font-medium text-[#696969]">TTAF</Label>
+                            <Input
+                              id="aircraft-wp-ttaf"
+                              value={aircraftWorkPackageValues.ttafHours}
+                              onChange={(event) => setAircraftWorkPackageField('ttafHours', event.target.value)}
+                              className={cn('h-7 rounded-none border-[#eeeeee] bg-white px-2 text-[12px] text-[#525252] shadow-none', aircraftWorkPackageErrors.ttafHours && 'border-destructive')}
+                              aria-invalid={Boolean(aircraftWorkPackageErrors.ttafHours)}
+                              placeholder="406.30 hours"
+                            />
+                            {aircraftWorkPackageErrors.ttafHours ? <p className="mdm-template-danger">{aircraftWorkPackageErrors.ttafHours}</p> : null}
+                          </div>
+                          <div className="space-y-1">
+                            <Label htmlFor="aircraft-wp-validation" className="text-[12px] font-medium text-[#696969]">Validation</Label>
+                            <Select value={aircraftWorkPackageValues.validationState} onValueChange={(value) => setAircraftWorkPackageField('validationState', value)}>
+                              <SelectTrigger id="aircraft-wp-validation" className={cn('h-7 rounded-none border-[#eeeeee] bg-white px-2 text-[12px] text-[#525252] shadow-none', aircraftWorkPackageErrors.validationState && 'border-destructive')}>
+                                <SelectValue placeholder="NEEDED" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="pending">Pending</SelectItem>
+                                <SelectItem value="validated">Validated</SelectItem>
+                                <SelectItem value="not_validated">Not Validated</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            {aircraftWorkPackageErrors.validationState ? <p className="mdm-template-danger">{aircraftWorkPackageErrors.validationState}</p> : null}
+                          </div>
+                          <div className="space-y-1">
+                            <Label htmlFor="aircraft-wp-transmission-date" className="text-[12px] font-medium text-[#696969]">Transmission date</Label>
+                            <div className="relative">
+                              <Input
+                                id="aircraft-wp-transmission-date"
+                                type="text"
+                                value={aircraftWorkPackageValues.transmissionDate}
+                                onChange={(event) => setAircraftWorkPackageField('transmissionDate', event.target.value)}
+                                className={cn('h-7 rounded-none border-[#eeeeee] bg-white px-2 pr-7 text-[12px] text-[#525252] shadow-none', aircraftWorkPackageErrors.transmissionDate && 'border-destructive')}
+                                aria-invalid={Boolean(aircraftWorkPackageErrors.transmissionDate)}
+                                placeholder="yyyy-mm-dd"
+                              />
+                              <CalendarDays className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#e36c59]" />
+                            </div>
+                            {aircraftWorkPackageErrors.transmissionDate ? <p className="mdm-template-danger">{aircraftWorkPackageErrors.transmissionDate}</p> : null}
+                          </div>
+                          <div className="space-y-1">
+                            <Label htmlFor="aircraft-wp-maintenance-release" className="text-[12px] font-medium text-[#696969]">Maintenance release date</Label>
+                            <div className="relative">
+                              <Input
+                                id="aircraft-wp-maintenance-release"
+                                type="text"
+                                value={aircraftWorkPackageValues.maintenanceReleaseDate}
+                                onChange={(event) => setAircraftWorkPackageField('maintenanceReleaseDate', event.target.value)}
+                                className={cn('h-7 rounded-none border-[#eeeeee] bg-white px-2 pr-7 text-[12px] text-[#525252] shadow-none', aircraftWorkPackageErrors.maintenanceReleaseDate && 'border-destructive')}
+                                aria-invalid={Boolean(aircraftWorkPackageErrors.maintenanceReleaseDate)}
+                                placeholder="yyyy-mm-dd"
+                              />
+                              <CalendarDays className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#e36c59]" />
+                            </div>
+                            {aircraftWorkPackageErrors.maintenanceReleaseDate ? <p className="mdm-template-danger">{aircraftWorkPackageErrors.maintenanceReleaseDate}</p> : null}
+                          </div>
+                          <div className="space-y-1">
+                            <Label htmlFor="aircraft-wp-work-report" className="text-[12px] font-medium text-[#696969]">Work report number</Label>
+                            <Input
+                              id="aircraft-wp-work-report"
+                              value={aircraftWorkPackageValues.workReportNumber}
+                              onChange={(event) => setAircraftWorkPackageField('workReportNumber', event.target.value)}
+                              className="h-7 rounded-none border-[#eeeeee] bg-white px-2 text-[12px] text-[#525252] shadow-none"
+                              placeholder=" "
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label htmlFor="aircraft-wp-comments" className="text-[12px] font-medium text-[#696969]">Comments</Label>
+                            <Textarea
+                              id="aircraft-wp-comments"
+                              value={aircraftWorkPackageValues.comments}
+                              onChange={(event) => setAircraftWorkPackageField('comments', event.target.value)}
+                              className="min-h-[42px] rounded-none border-[#eeeeee] px-2 py-1 text-[12px] text-[#525252] shadow-none"
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <div className="space-y-1">
+                            <Label htmlFor="aircraft-wp-revision-number" className="text-[12px] font-medium text-[#696969]">Revision</Label>
+                            <Input
+                              id="aircraft-wp-revision-number"
+                              value={aircraftWorkPackageValues.revisionNumber}
+                              onChange={(event) => setAircraftWorkPackageField('revisionNumber', event.target.value)}
+                              className={cn('h-7 rounded-none border-[#eeeeee] bg-white px-2 text-[12px] text-[#525252] shadow-none', aircraftWorkPackageErrors.revisionNumber && 'border-destructive')}
+                              aria-invalid={Boolean(aircraftWorkPackageErrors.revisionNumber)}
+                              placeholder="2"
+                            />
+                            {aircraftWorkPackageErrors.revisionNumber ? <p className="mdm-template-danger">{aircraftWorkPackageErrors.revisionNumber}</p> : null}
+                          </div>
+                          <div className="space-y-1">
+                            <Label htmlFor="aircraft-wp-opening-date" className="text-[12px] font-medium text-[#696969]">Opening date</Label>
+                            <div className="relative">
+                              <Input
+                                id="aircraft-wp-opening-date"
+                                type="text"
+                                value={aircraftWorkPackageValues.openingDate}
+                                onChange={(event) => setAircraftWorkPackageField('openingDate', event.target.value)}
+                                className={cn('h-7 rounded-none border-[#eeeeee] bg-white px-2 pr-7 text-[12px] text-[#525252] shadow-none', aircraftWorkPackageErrors.openingDate && 'border-destructive')}
+                                aria-invalid={Boolean(aircraftWorkPackageErrors.openingDate)}
+                                placeholder="yyyy-mm-dd"
+                              />
+                              <CalendarDays className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#e36c59]" />
+                            </div>
+                            {aircraftWorkPackageErrors.openingDate ? <p className="mdm-template-danger">{aircraftWorkPackageErrors.openingDate}</p> : null}
+                          </div>
+                          <div className="space-y-1">
+                            <Label htmlFor="aircraft-wp-status" className="text-[12px] font-medium text-[#696969]">Status</Label>
+                            <Select value={aircraftWorkPackageValues.status} onValueChange={(value) => setAircraftWorkPackageField('status', value)}>
+                              <SelectTrigger id="aircraft-wp-status" className={cn('h-7 rounded-none border-[#eeeeee] bg-white px-2 text-[12px] text-[#525252] shadow-none', aircraftWorkPackageErrors.status && 'border-destructive')}>
+                                <SelectValue placeholder="OPEN" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="planning">Planning</SelectItem>
+                                <SelectItem value="scheduled">Scheduled</SelectItem>
+                                <SelectItem value="in_progress">In Progress</SelectItem>
+                                <SelectItem value="blocked">Blocked</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            {aircraftWorkPackageErrors.status ? <p className="mdm-template-danger">{aircraftWorkPackageErrors.status}</p> : null}
+                          </div>
+                          <div className="space-y-1">
+                            <Label htmlFor="aircraft-wp-expected-reception" className="text-[12px] font-medium text-[#696969]">Expected reception date</Label>
+                            <div className="relative">
+                              <Input
+                                id="aircraft-wp-expected-reception"
+                                type="text"
+                                value={aircraftWorkPackageValues.expectedReceptionDate}
+                                onChange={(event) => setAircraftWorkPackageField('expectedReceptionDate', event.target.value)}
+                                className={cn('h-7 rounded-none border-[#eeeeee] bg-white px-2 pr-7 text-[12px] text-[#525252] shadow-none', aircraftWorkPackageErrors.expectedReceptionDate && 'border-destructive')}
+                                aria-invalid={Boolean(aircraftWorkPackageErrors.expectedReceptionDate)}
+                                placeholder="yyyy-mm-dd"
+                              />
+                              <CalendarDays className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#e36c59]" />
+                            </div>
+                            {aircraftWorkPackageErrors.expectedReceptionDate ? <p className="mdm-template-danger">{aircraftWorkPackageErrors.expectedReceptionDate}</p> : null}
+                          </div>
+                          <div className="space-y-1">
+                            <Label htmlFor="aircraft-wp-work-reception" className="text-[12px] font-medium text-[#696969]">Work reception date</Label>
+                            <div className="relative">
+                              <Input
+                                id="aircraft-wp-work-reception"
+                                type="text"
+                                value={aircraftWorkPackageValues.workReceptionDate}
+                                onChange={(event) => setAircraftWorkPackageField('workReceptionDate', event.target.value)}
+                                className={cn('h-7 rounded-none border-[#eeeeee] bg-white px-2 pr-7 text-[12px] text-[#525252] shadow-none', aircraftWorkPackageErrors.workReceptionDate && 'border-destructive')}
+                                aria-invalid={Boolean(aircraftWorkPackageErrors.workReceptionDate)}
+                                placeholder="yyyy-mm-dd"
+                              />
+                              <CalendarDays className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#e36c59]" />
+                            </div>
+                            {aircraftWorkPackageErrors.workReceptionDate ? <p className="mdm-template-danger">{aircraftWorkPackageErrors.workReceptionDate}</p> : null}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="overflow-hidden rounded-sm border border-[#e5e5e5] bg-white">
+                      <div className="border-b border-[#efefef] bg-[#fafafa] px-[10px] py-[6px] text-[13px] font-semibold text-[#757575]">Selected task</div>
+                      <div className="space-y-2 p-3">
+                        <div className="flex items-center -space-x-1">
+                          <Avatar className="h-4 w-4 border border-white">
+                            <AvatarFallback className="bg-[#2ab8bd] p-0 text-white">
+                              <Users className="h-2.5 w-2.5" />
+                            </AvatarFallback>
+                          </Avatar>
+                          <Avatar className="h-4 w-4 border border-white">
+                            <AvatarFallback className="bg-[#2ab8bd] p-0 text-white">
+                              <Users className="h-2.5 w-2.5" />
+                            </AvatarFallback>
+                          </Avatar>
+                        </div>
+                        {aircraftWorkPackageErrors.selectedTaskDescription ? <p className="mdm-template-danger">{aircraftWorkPackageErrors.selectedTaskDescription}</p> : null}
+                    <div className="rounded-none border border-[#eeeeee]">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-[56px]">
+                              <div className="flex items-center gap-2">
+                                <Checkbox
+                                  aria-label="Select all tasks in page"
+                                  checked={aircraftWorkPackagePagedTasks.length > 0 && aircraftWorkPackagePagedTasks.every((task) => aircraftWorkPackageSelectedTaskIds.includes(task.id))}
+                                  onCheckedChange={(checked) => {
+                                    if (checked) {
+                                      setAircraftWorkPackageSelectedTaskIds((previous) => Array.from(new Set([...previous, ...aircraftWorkPackagePagedTasks.map((task) => task.id)])));
+                                    } else {
+                                      setAircraftWorkPackageSelectedTaskIds((previous) => previous.filter((id) => !aircraftWorkPackagePagedTasks.some((task) => task.id === id)));
+                                    }
+                                  }}
+                                />
+                                <span className="text-[12px] font-semibold text-[#4f4f4f]">Select</span>
+                              </div>
+                            </TableHead>
+                            <TableHead>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (aircraftWorkPackageTaskSort === 'taskNumber') {
+                                    setAircraftWorkPackageTaskSortDirection((previous) => (previous === 'asc' ? 'desc' : 'asc'));
+                                    return;
+                                  }
+                                  setAircraftWorkPackageTaskSort('taskNumber');
+                                  setAircraftWorkPackageTaskSortDirection('asc');
+                                }}
+                                className="inline-flex items-center gap-1 text-left text-[12px] font-semibold text-[#4f4f4f]"
+                              >
+                                Task number
+                                <ArrowDown className="h-3 w-3 text-[#888888]" />
+                              </button>
+                            </TableHead>
+                            <TableHead>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (aircraftWorkPackageTaskSort === 'ataCode') {
+                                    setAircraftWorkPackageTaskSortDirection((previous) => (previous === 'asc' ? 'desc' : 'asc'));
+                                    return;
+                                  }
+                                  setAircraftWorkPackageTaskSort('ataCode');
+                                  setAircraftWorkPackageTaskSortDirection('asc');
+                                }}
+                                className="inline-flex items-center gap-1 text-left text-[12px] font-semibold text-[#4f4f4f]"
+                              >
+                                ATA code
+                                <ArrowDown className="h-3 w-3 text-[#888888]" />
+                              </button>
+                            </TableHead>
+                            <TableHead className="text-[12px] font-semibold text-[#4f4f4f]">Serial Number</TableHead>
+                            <TableHead className="text-[12px] font-semibold text-[#4f4f4f]">Part number</TableHead>
+                            <TableHead>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (aircraftWorkPackageTaskSort === 'description') {
+                                    setAircraftWorkPackageTaskSortDirection((previous) => (previous === 'asc' ? 'desc' : 'asc'));
+                                    return;
+                                  }
+                                  setAircraftWorkPackageTaskSort('description');
+                                  setAircraftWorkPackageTaskSortDirection('asc');
+                                }}
+                                className="inline-flex items-center gap-1 text-left text-[12px] font-semibold text-[#4f4f4f]"
+                              >
+                                Description
+                                <ArrowDown className="h-3 w-3 text-[#888888]" />
+                              </button>
+                            </TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {aircraftWorkPackagePagedTasks.map((task) => (
+                            <TableRow key={task.id}>
+                              <TableCell>
+                                <Checkbox
+                                  aria-label={`Select task ${task.taskNumber || task.id}`}
+                                  checked={aircraftWorkPackageSelectedTaskIds.includes(task.id)}
+                                  onCheckedChange={(checked) => {
+                                    if (checked) {
+                                      setAircraftWorkPackageSelectedTaskIds((previous) => Array.from(new Set([...previous, task.id])));
+                                      return;
+                                    }
+                                    setAircraftWorkPackageSelectedTaskIds((previous) => previous.filter((id) => id !== task.id));
+                                  }}
+                                />
+                              </TableCell>
+                              <TableCell className="text-[12px] text-[#5a5a5a]">{task.taskNumber || '1'}</TableCell>
+                              <TableCell className="text-[12px] text-[#5a5a5a]">{task.ataCode || '05-20 TIME LIMITS/MAINTENANCE CHECKS'}</TableCell>
+                              <TableCell className="text-[12px] text-[#5a5a5a]">{task.serialNumber || 'T34-AMS1'}</TableCell>
+                              <TableCell className="text-[12px] text-[#5a5a5a]">{task.partNumber || ''}</TableCell>
+                              <TableCell className="text-[12px] text-[#5a5a5a]">{task.description || '400 Hour inspection'}</TableCell>
+                            </TableRow>
+                          ))}
+                          {aircraftWorkPackagePagedTasks.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={6} className="text-center text-muted-foreground">
+                                No tasks match the current filter.
+                              </TableCell>
+                            </TableRow>
+                          ) : null}
+                        </TableBody>
+                      </Table>
+                    </div>
+                    <div className="flex items-center text-[11px] font-semibold text-[#6f6f6f]">
+                      <div className="flex items-center gap-1">
+                        <button type="button" onClick={() => setAircraftWorkPackageTaskPage(1)} disabled={aircraftWorkPackageTaskPage <= 1}>{'<<'}</button>
+                        <button type="button" onClick={() => setAircraftWorkPackageTaskPage((previous) => Math.max(1, previous - 1))} disabled={aircraftWorkPackageTaskPage <= 1}>{'<'}</button>
+                        <span>{Math.min(aircraftWorkPackageTaskPage, aircraftWorkPackageTaskTotalPages)}</span>
+                        <button type="button" onClick={() => setAircraftWorkPackageTaskPage((previous) => Math.min(aircraftWorkPackageTaskTotalPages, previous + 1))} disabled={aircraftWorkPackageTaskPage >= aircraftWorkPackageTaskTotalPages}>{'>'}</button>
+                        <button type="button" onClick={() => setAircraftWorkPackageTaskPage(aircraftWorkPackageTaskTotalPages)} disabled={aircraftWorkPackageTaskPage >= aircraftWorkPackageTaskTotalPages}>{'>>'}</button>
+                      </div>
+                    </div>
+                  </div>
+                  </div>
+                  </div>
+                </TabsContent>
+                <TabsContent value="new-wp" className="rounded-md border p-6 text-sm text-muted-foreground">
+                  New WP list will be populated from the selected template registry.
+                </TabsContent>
+                <TabsContent value="existing-wp" className="rounded-md border p-6 text-sm text-muted-foreground">
+                  Existing WP will be loaded from previous maintenance records.
+                </TabsContent>
+                <TabsContent value="non-performed-tasks" className="rounded-md border p-6 text-sm text-muted-foreground">
+                  Non performed tasks will be listed based on previous package history.
+                </TabsContent>
+                <TabsContent value="all-tasks" className="rounded-md border p-6 text-sm text-muted-foreground">
+                  All Tasks shows complete task catalog scoped to aircraft maintenance profile.
+                </TabsContent>
+              </Tabs>
+              <div className="flex flex-wrap items-center justify-end gap-2 border-t border-[#ececec] pb-0 pt-1.5">
+                <Button variant="outline" className="h-7 rounded-full border-[#b6d2d4] px-4 text-[11px] text-[#2b8f95]" onClick={() => setAircraftWorkPackageDialogOpen(false)} disabled={aircraftWorkPackageSubmitting}>
                   Cancel
                 </Button>
-                <Button variant="outline" onClick={() => void handleAircraftWorkPackageSubmit('save_draft')} disabled={aircraftWorkPackageSubmitting || !canCreateWorkPackage}>
-                  Save Draft
-                </Button>
-                <Button variant="outline" onClick={() => void handleAircraftWorkPackageSubmit('create_schedule')} disabled={aircraftWorkPackageSubmitting || !canScheduleWorkPackage}>
-                  Create & Schedule
-                </Button>
-                <Button onClick={() => void handleAircraftWorkPackageSubmit('create_open')} disabled={aircraftWorkPackageSubmitting || !canCreateWorkPackage}>
-                  Create & Open Work Package
+                <Button className="h-7 rounded-full bg-[#0ea5a6] px-4 text-[11px] text-white hover:bg-[#0d9394]" onClick={() => void handleAircraftWorkPackageSubmit('create_open')} disabled={aircraftWorkPackageSubmitting || !canCreateWorkPackage}>
+                  Add
                 </Button>
               </div>
             </div>

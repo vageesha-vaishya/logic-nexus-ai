@@ -198,13 +198,33 @@ export function toDateTimeInputValue(value: Date): string {
 export function getDefaultAircraftWorkPackageValues(stationHint?: string): AircraftWorkPackageFormValues {
   const now = new Date();
   const end = new Date(now.getTime() + 4 * 60 * 60 * 1000);
+  const nowDate = now.toISOString().slice(0, 10);
   return {
     source: 'schedule_due',
     maintenanceType: 'line',
     priority: 'medium',
+    status: 'planning',
+    validationState: 'pending',
     plannedStart: toDateTimeInputValue(now),
     plannedEnd: toDateTimeInputValue(end),
     station: stationHint || '',
+    workPackageNumber: '',
+    topic: '',
+    ttafHours: '',
+    openingDate: nowDate,
+    revisionNumber: '',
+    revisionDate: nowDate,
+    transmissionDate: nowDate,
+    maintenanceReleaseDate: nowDate,
+    workReportNumber: '',
+    expectedReceptionDate: nowDate,
+    workReceptionDate: nowDate,
+    comments: '',
+    selectedTaskNumber: '',
+    selectedTaskAtaCode: '',
+    selectedTaskSerialNumber: '',
+    selectedTaskPartNumber: '',
+    selectedTaskDescription: '',
     scopeItemsText: 'General inspection',
   };
 }

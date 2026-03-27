@@ -13,6 +13,7 @@ const mockGetSession = vi.fn();
 const mockRefreshSession = vi.fn();
 const mockToastError = vi.fn();
 const mockToastSuccess = vi.fn();
+const mockHasPermission = vi.fn((_permission: string) => true);
 let mockAuthAccessToken = 'token-1';
 const ASYNC_WAIT_TIMEOUT_MS = 4000;
 
@@ -32,7 +33,7 @@ vi.mock('@/hooks/useCRM', () => ({
 
 vi.mock('@/hooks/useAuth', () => ({
   useAuth: () => ({
-    hasPermission: () => true,
+    hasPermission: (permission: string) => mockHasPermission(permission),
     session: mockAuthAccessToken ? { access_token: mockAuthAccessToken } : null,
   }),
 }));
@@ -149,6 +150,14 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
         </Routes>
       </MemoryRouter>,
     );
+  const renderWorkPackageTemplatesPage = () =>
+    render(
+      <MemoryRouter initialEntries={['/dashboard/amro/settings/master-data/work-package-templates']} future={memoryRouterFuture}>
+        <Routes>
+          <Route path="/dashboard/amro/settings/master-data/:entity" element={<AmroSettingsMasterDataPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
   const renderAircraftSubModulePage = () =>
     render(
       <MemoryRouter initialEntries={['/dashboard/amro/aircraft']} future={memoryRouterFuture}>
@@ -201,6 +210,7 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     localStorage.clear();
     sessionStorage.clear();
     mockAuthAccessToken = 'token-1';
+    mockHasPermission.mockImplementation(() => true);
     mockGetSession.mockResolvedValue({
       data: {
         session: {
@@ -344,6 +354,46 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
                       name: 'B737-800',
                       manufacturer_id: 'manu-1',
                       is_active: true,
+                    },
+                  ],
+                },
+              }),
+          };
+        }
+        if (method === 'GET' && url.includes('/api/v2/amro/master-data/work_package_templates')) {
+          return {
+            ok: true,
+            text: async () =>
+              JSON.stringify({
+                output: {
+                  records: [
+                    {
+                      id: 'wpt-1',
+                      template_code: 'WP-LINE-001',
+                      template_name: 'Line Check Package',
+                      maintenance_type: 'line',
+                      version: 1,
+                      active: true,
+                      created_at: '2026-03-20T12:00:00.000Z',
+                      updated_at: '2026-03-25T12:00:00.000Z',
+                      tenant_id: 'tenant-1',
+                      franchise_id: 'franchise-1',
+                      scope_json: '{"phase":"line"}',
+                      tasks_json: '[{"task_number":"05-20","ata_code":"05-20","serial_number":"T34-AMS1","part_number":"PN-001","description":"Scheduled Maintenance Checks"}]',
+                    },
+                    {
+                      id: 'wpt-2',
+                      template_code: 'WP-BASE-002',
+                      template_name: 'Base Check Package',
+                      maintenance_type: 'base',
+                      version: 2,
+                      active: true,
+                      created_at: '2026-03-21T12:00:00.000Z',
+                      updated_at: '2026-03-26T12:00:00.000Z',
+                      tenant_id: 'tenant-1',
+                      franchise_id: 'franchise-1',
+                      scope_json: '{"phase":"base"}',
+                      tasks_json: '[{"task":"TASK-2"}]',
                     },
                   ],
                 },
@@ -599,17 +649,29 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
 
     await screen.findByText('Aircraft Operations Snapshot');
     fireEvent.click(screen.getByRole('button', { name: 'Create Work Package' }));
-    expect(await screen.findByText(/Create Work Package \(Aircraft:/)).toBeInTheDocument();
+    expect(await screen.findByText('Add work package')).toBeInTheDocument();
 
-    fireEvent.change(screen.getByPlaceholderText('One scope item per line'), { target: { value: '' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create & Open Work Package' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     await waitFor(() => {
       expect(mockToastError).toHaveBeenCalledWith('Please resolve aircraft work package validation errors');
     }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
 
-    fireEvent.change(screen.getByPlaceholderText('One scope item per line'), { target: { value: 'Hydraulic check' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save Draft' }));
-    expect(screen.getByRole('button', { name: 'Save Draft' })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Number'), { target: { value: '145' } });
+    fireEvent.change(screen.getByLabelText('Topic'), { target: { value: 'Hydraulic inspection campaign' } });
+    fireEvent.change(screen.getByLabelText('Revision'), { target: { value: 'R2' } });
+    fireEvent.change(screen.getByLabelText('TTAF'), { target: { value: '120.5' } });
+
+    fireEvent.click(screen.getByLabelText('Status'));
+    fireEvent.click(await screen.findByRole('option', { name: 'Planning' }));
+
+    fireEvent.click(screen.getByLabelText('Validation'));
+    fireEvent.click(await screen.findByRole('option', { name: 'Pending' }));
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select all tasks in page' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await waitFor(() => {
+      expect(mockToastSuccess).toHaveBeenCalledWith('Aircraft work package created');
+    }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
   });
 
   it('supports aircraft column filtering and row selection controls', async () => {
@@ -639,6 +701,107 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     fireEvent.doubleClick(dataRows[0]);
     expect(await screen.findByRole('heading', { name: 'Update Aircraft' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Save Changes' })).toBeInTheDocument();
+  });
+
+  it('hides configured work package columns while preserving filter and export actions', async () => {
+    renderWorkPackageTemplatesPage();
+
+    await screen.findByText('WP-LINE-001');
+    expect(screen.queryByRole('columnheader', { name: /^ID$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: /^Created At$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: /^Updated At$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: /^Tenant Id$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: /^Franchise Id$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: /^Scope Json$/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/Selection Summary:/)).toBeInTheDocument();
+
+    expect(screen.getByText('WP-BASE-002')).toBeInTheDocument();
+
+    const exportButton = screen.getByLabelText(/Export records CSV/i);
+    expect(exportButton).toBeInTheDocument();
+    fireEvent.click(exportButton);
+  });
+
+  it('opens work package update form on row double click with prepopulated data and CRUD controls', async () => {
+    renderWorkPackageTemplatesPage();
+
+    const table = await screen.findByRole('table');
+    const dataRows = within(table).getAllByRole('row').filter((row) => row.querySelector('td'));
+    expect(dataRows.length).toBeGreaterThan(0);
+
+    fireEvent.doubleClick(dataRows[0]);
+    expect(await screen.findByRole('heading', { name: 'Update Work Package Templates' })).toBeInTheDocument();
+    expect(screen.getByText('Work Package Details')).toBeInTheDocument();
+    expect(screen.getByText('Selected Tasks')).toBeInTheDocument();
+    expect(screen.getByText('Scope Definition')).toBeInTheDocument();
+    expect(screen.getAllByText('Tasks JSON').length).toBeGreaterThan(0);
+    expect(screen.getByLabelText('Template Code')).toHaveValue('WP-LINE-001');
+    expect(screen.getByLabelText('Template Name')).toHaveValue('Line Check Package');
+    expect(screen.getAllByText('05-20').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Scheduled Maintenance Checks').length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: 'Save Changes' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument();
+  });
+
+  it('shows navigation error toast when double-clicked work package row has no record id', async () => {
+    const baseFetch = vi.mocked(fetch).getMockImplementation();
+    if (!baseFetch) {
+      throw new Error('Missing fetch mock implementation');
+    }
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method || 'GET';
+      if (method === 'GET' && url.includes('/api/v2/amro/master-data/work_package_templates')) {
+        return {
+          ok: true,
+          text: async () =>
+            JSON.stringify({
+              output: {
+                records: [
+                  {
+                    id: '',
+                    template_code: 'WP-NO-ID',
+                    template_name: 'Missing Id Package',
+                    maintenance_type: 'line',
+                    version: 1,
+                    active: true,
+                    tasks_json: '[]',
+                  },
+                ],
+              },
+            }),
+        } as any;
+      }
+      return baseFetch(input, init);
+    });
+
+    renderWorkPackageTemplatesPage();
+    const table = await screen.findByRole('table');
+    const dataRows = within(table).getAllByRole('row').filter((row) => row.querySelector('td'));
+    fireEvent.doubleClick(dataRows[0]);
+
+    await waitFor(() => {
+      expect(mockToastError).toHaveBeenCalledWith('Unable to open form for this record');
+    }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
+  });
+
+  it('keeps work package list behavior consistent across permission profiles', async () => {
+    const permissionProfiles = [
+      { name: 'admin', hasPermission: () => true },
+      { name: 'viewer', hasPermission: () => false },
+    ];
+
+    for (const profile of permissionProfiles) {
+      mockHasPermission.mockImplementation(profile.hasPermission);
+      const view = renderWorkPackageTemplatesPage();
+      await screen.findByText('WP-LINE-001');
+      expect(screen.queryByRole('columnheader', { name: /^ID$/i })).not.toBeInTheDocument();
+      const table = await screen.findByRole('table');
+      const dataRows = within(table).getAllByRole('row').filter((row) => row.querySelector('td'));
+      fireEvent.doubleClick(dataRows[0]);
+      expect(await screen.findByRole('heading', { name: 'Update Work Package Templates' })).toBeInTheDocument();
+      view.unmount();
+    }
   });
 
   it('includes Bearer Authorization header on aircraft row-triggered work package snapshot requests', async () => {
@@ -810,7 +973,7 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText(/Selected: ac-2/)).toBeInTheDocument();
+      expect(screen.getByText(/Selection Summary: Active Record N200AA \| Checked: 0 \| Records: 2/)).toBeInTheDocument();
     }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
   });
 

@@ -275,6 +275,26 @@ describe('AmroOwnedWorkspace', () => {
     expect(screen.queryByText('Work Packages Redesign Baseline')).toBeNull();
   });
 
+  it('validates and submits add work package dialog flow', async () => {
+    const createWorkPackage = vi.fn().mockResolvedValue(true);
+    mockUseAmroWorkspaceState.mockReturnValue(createWorkspaceState({ createWorkPackage }));
+    render(<AmroOwnedWorkspace moduleKey="work-packages" />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add WP' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    expect(screen.getByText('Work package details is required.')).toBeTruthy();
+    expect(createWorkPackage).toHaveBeenCalledTimes(0);
+
+    fireEvent.change(screen.getByLabelText('Work Package Details'), { target: { value: 'C-Check package for fleet A1' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    await waitFor(() => {
+      expect(createWorkPackage).toHaveBeenCalledWith('C-Check package for fleet A1', expect.objectContaining({
+        maintenanceType: 'line',
+        priority: 'medium',
+      }));
+    });
+  });
+
   it('shows UX-AMRO-005 detail tabs and side panel headings on work-packages route', () => {
     mockUseAmroWorkspaceState.mockReturnValue(createWorkspaceState());
     render(<AmroOwnedWorkspace moduleKey="work-packages" />);
