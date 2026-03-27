@@ -53,6 +53,7 @@ Organization Hierarchy:
 CREATE TABLE ata_codes (
   id UUID PRIMARY KEY,
   tenant_id UUID NOT NULL,
+  franchise_id uuid null,
   code VARCHAR(20) NOT NULL,  -- e.g., "21", "21-10", "21-10-01"
   description TEXT,
   parent_id UUID REFERENCES ata_codes(id),  -- NULL for root (Chapter)
@@ -65,8 +66,37 @@ CREATE TABLE ata_codes (
   is_active BOOLEAN DEFAULT true,
 
   UNIQUE(tenant_id, code),
-  FOREIGN KEY (tenant_id) REFERENCES tenants(id)
+  constraint ata_codes_tenant_id_fkey foreign KEY (tenant_id) references tenants (id) on delete CASCADE,
+  constraint ata_codes_franchise_id_fkey foreign KEY (franchise_id) references franchises (id) on delete set null
 );
+
+//Sarvesh : start
+we will be using the recursive table and do not use flat structure or table ata_codes_flat any where. 
+CREATE TABLE public.ata_codes_flat (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL,
+  franchise_id uuid null,
+  chapter VARCHAR(2) NOT NULL,    -- e.g., '21' (Air Conditioning)
+  section VARCHAR(2) NOT NULL,    -- e.g., '10' (Compression)
+  subject VARCHAR(2) DEFAULT '00',-- e.g., '01'
+  title TEXT NOT NULL,
+  description TEXT,
+  full_code VARCHAR(10) GENERATED ALWAYS AS (chapter || '-' || section || '-' || subject) STORED,
+  -- Enterprise tracking
+  created_at TIMESTAMP,
+  updated_at TIMESTAMP,
+  is_active BOOLEAN DEFAULT true,
+
+  UNIQUE(chapter, section, subject),
+  constraint ata_codes_flat_tenant_id_fkey foreign KEY (tenant_id) references tenants (id) on delete CASCADE,
+  constraint ata_codes_flat_franchise_id_fkey foreign KEY (franchise_id) references franchises (id) on delete set null
+);
+
+-- Index for fast lookup by code
+CREATE INDEX idx_ata_codes_flat_full_code ON public.ata_codes_flat(full_code);
+
+//sarvesh : end
+
 ```
 
 **Benefit:** Recursive structure enables cost/man-hour rollup from task→section→chapter. Example query:
@@ -121,6 +151,39 @@ CREATE TABLE maintenance_tasks (
   FOREIGN KEY (franchise_id) REFERENCES franchises(id)
 );
 ```
+//Sarvesh : start
+task table is already present , so below sql will run to update existing task table to catere the AMRO requirements
+
+-- 1. Add Regulatory and Versioning Columns
+ALTER TABLE public.tasks 
+  ADD COLUMN IF NOT EXISTS ata_code_id UUID, -- Requires a separate ata_codes table
+  ADD COLUMN IF NOT EXISTS mtoss_code VARCHAR(20),
+  ADD COLUMN IF NOT EXISTS skill_type VARCHAR(50), -- e.g., AIRFRAME, ENGINE
+  ADD COLUMN IF NOT EXISTS version_number INT DEFAULT 1,
+  ADD COLUMN IF NOT EXISTS superseded_by_id UUID,
+  ADD COLUMN IF NOT EXISTS effective_date DATE DEFAULT CURRENT_DATE,
+  ADD COLUMN IF NOT EXISTS obsolete_date DATE,
+  ADD COLUMN IF NOT EXISTS applicability_rules JSONB DEFAULT '{}'::jsonb,
+  ADD COLUMN IF NOT EXISTS source_type VARCHAR(50), -- MPD, AD, SB, MRB
+  ADD COLUMN IF NOT EXISTS revision_date DATE;
+
+-- 2. Add Foreign Key for Versioning (Self-referencing)
+ALTER TABLE public.tasks
+  ADD CONSTRAINT tasks_superseded_by_id_fkey 
+  FOREIGN KEY (superseded_by_id) REFERENCES public.tasks(id);
+
+-- 3. Add Indexes for Performance
+CREATE INDEX IF NOT EXISTS idx_tasks_ata_code ON public.tasks (ata_code_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_mtoss_code ON public.tasks (mtoss_code);
+CREATE INDEX IF NOT EXISTS idx_tasks_source_type ON public.tasks (source_type);
+
+-- 4. Update the Unique Constraint (Optional but Recommended)
+-- This ensures you don't have two active versions of the same task number for one tenant
+-- Note: This might fail if you have existing duplicates.
+-- CREATE UNIQUE INDEX uq_tasks_versioning ON public.tasks (tenant_id, task_number, version_number) 
+-- WHERE (deleted_at IS NULL);
+//Sarvesh : end
+
 
 ### 2.3 Task Intervals (The "When") - Normalized Separation
 
