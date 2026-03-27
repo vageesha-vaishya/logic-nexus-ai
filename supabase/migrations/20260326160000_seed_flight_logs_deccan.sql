@@ -14,7 +14,9 @@ CREATE TEMP TABLE temp_flight_logs_import (
   flight_hours text,
   cycles_landings text,
   total_airframe_hours_at_landing text,
-  total_cycles_at_landing text
+  total_cycles_at_landing text,
+  flight_log_insert_status text,
+  flight_log_insert_notice text
 ) ON COMMIT DROP;
 
 
@@ -2289,15 +2291,25 @@ DECLARE
   v_total_cycles integer;
   v_cycles integer;
   v_log_type public."LogType";
+  v_inserted_count integer;
+  v_insert_notice text;
   has_tail_number boolean := EXISTS (
     SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='aircraft' AND column_name='tail_number'
   );
 BEGIN
-  FOR rec IN SELECT * FROM temp_flight_logs_import LOOP
+  FOR rec IN
+    SELECT ctid AS row_ctid, *
+    FROM temp_flight_logs_import
+    WHERE lower(coalesce(trim(flight_log_insert_status), '')) <> 'success'
+  LOOP
     BEGIN
       v_log_type := rec.log_type::public."LogType";
     EXCEPTION WHEN OTHERS THEN
       RAISE NOTICE 'Skipping row due to invalid log type: %', rec.log_type;
+      UPDATE temp_flight_logs_import
+      SET flight_log_insert_status = 'failed',
+          flight_log_insert_notice = format('Insert failed for log_selection_no %s: %s', rec.log_selection_no, 'Invalid log type')
+      WHERE ctid = rec.row_ctid;
       CONTINUE;
     END;
 
@@ -2305,6 +2317,10 @@ BEGIN
       v_flight_date := to_date(rec.flight_date, 'FMDD-Mon-YY');
     EXCEPTION WHEN OTHERS THEN
       RAISE NOTICE 'Skipping row due to invalid flight date: %', rec.flight_date;
+      UPDATE temp_flight_logs_import
+      SET flight_log_insert_status = 'failed',
+          flight_log_insert_notice = format('Insert failed for log_selection_no %s: %s', rec.log_selection_no, 'Invalid flight date')
+      WHERE ctid = rec.row_ctid;
       CONTINUE;
     END;
 
@@ -2392,10 +2408,19 @@ BEGIN
 
     IF v_aircraft_id IS NULL OR v_departure_airport IS NULL OR v_arrival_airport IS NULL OR v_flight_date IS NULL THEN
       RAISE NOTICE 'Skipping row due to missing references: aircraft %, departure %, arrival %', rec.aircraft_id, rec.departure_airport, rec.arrival_airport;
+      UPDATE temp_flight_logs_import
+      SET flight_log_insert_status = 'failed',
+          flight_log_insert_notice = format(
+            'Insert failed for log_selection_no %s: %s',
+            rec.log_selection_no,
+            format('Missing references (aircraft %s, departure %s, arrival %s)', rec.aircraft_id, rec.departure_airport, rec.arrival_airport)
+          )
+      WHERE ctid = rec.row_ctid;
       CONTINUE;
     END IF;
 
     BEGIN
+      v_inserted_count := 0;
       INSERT INTO public.flight_logs (
         tenant_id,
         franchise_id,
@@ -2439,7 +2464,24 @@ BEGIN
         jsonb_build_object('source', 'migration:flightLogDeccan-Sheet1')
       )
       ON CONFLICT DO NOTHING;
+      GET DIAGNOSTICS v_inserted_count = ROW_COUNT;
+      IF v_inserted_count > 0 THEN
+        UPDATE temp_flight_logs_import
+        SET flight_log_insert_status = 'success',
+            flight_log_insert_notice = NULL
+        WHERE ctid = rec.row_ctid;
+      ELSE
+        UPDATE temp_flight_logs_import
+        SET flight_log_insert_status = 'failed',
+            flight_log_insert_notice = format('Insert failed for log_selection_no %s: %s', rec.log_selection_no, 'No row inserted (conflict or duplicate)')
+        WHERE ctid = rec.row_ctid;
+      END IF;
     EXCEPTION WHEN OTHERS THEN
+      v_insert_notice := format('Insert failed for log_selection_no %s: %s', rec.log_selection_no, SQLERRM);
+      UPDATE temp_flight_logs_import
+      SET flight_log_insert_status = 'failed',
+          flight_log_insert_notice = v_insert_notice
+      WHERE ctid = rec.row_ctid;
       RAISE NOTICE 'Insert failed for log_selection_no %: %', rec.log_selection_no, SQLERRM;
     END;
   END LOOP;
