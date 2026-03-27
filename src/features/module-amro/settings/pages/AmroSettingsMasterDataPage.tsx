@@ -66,6 +66,19 @@ import { toast } from 'sonner';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import {
+  Area,
+  AreaChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip as RechartsTooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
+import {
   FlightLogForm,
   buildFlightLogPayload,
   getDefaultFlightLogFormValues,
@@ -95,6 +108,7 @@ import {
   pickFormValuesFromRow,
 } from './amro-settings-master-data/utils';
 import { FlightLogsFilters } from './amro-settings-master-data/components/FlightLogsFilters';
+import { AircraftLeadsManager } from './amro-settings-master-data/components/AircraftLeadsManager';
 
 export { buildPayloadFromForm } from './amro-settings-master-data/utils';
 export { verifyReferenceExists } from './amro-settings-master-data/services';
@@ -325,6 +339,44 @@ type WorkPackageTemplateRegistryItem = {
   }>;
 };
 
+type AircraftDashboardKpis = {
+  fleet_size: number;
+  open_work_packages: number;
+  due_within_window: number;
+  overdue_work_packages: number;
+  open_defects: number;
+  total_flight_hours: number;
+  total_cycles: number;
+  compliance_ready_pct: number;
+};
+
+type AircraftDashboardTrendPoint = {
+  day: string;
+  flight_hours?: number;
+  cycles?: number;
+  opened?: number;
+  resolved?: number;
+};
+
+type AircraftDashboardOutput = {
+  metadata?: {
+    role_view?: string;
+    cache?: string;
+    generated_at?: string;
+  };
+  kpis?: Partial<AircraftDashboardKpis>;
+  aircraft_status?: Array<Record<string, unknown>>;
+  maintenance_schedule?: Array<Record<string, unknown>>;
+  flight_logs?: Array<Record<string, unknown>>;
+  defect_tracking?: Array<Record<string, unknown>>;
+  compliance_status?: Record<string, unknown>;
+  performance_metrics?: {
+    flight_hours_trend?: AircraftDashboardTrendPoint[];
+    defect_trend?: AircraftDashboardTrendPoint[];
+    signal_severity_index?: number;
+  };
+};
+
 const AIRCRAFT_NAV_RAIL = [
   { label: 'Overview', path: '/dashboard/amro/overview' },
   { label: 'Work Packages', path: '/dashboard/amro/aircraft/work-packages' },
@@ -333,6 +385,19 @@ const AIRCRAFT_NAV_RAIL = [
   { label: 'Task Execution', path: '/dashboard/amro/task-execution' },
   { label: 'Audit', path: '/dashboard/amro/audit' },
 ] as const;
+
+const DEFAULT_AIRCRAFT_DASHBOARD_KPIS: AircraftDashboardKpis = {
+  fleet_size: 0,
+  open_work_packages: 0,
+  due_within_window: 0,
+  overdue_work_packages: 0,
+  open_defects: 0,
+  total_flight_hours: 0,
+  total_cycles: 0,
+  compliance_ready_pct: 0,
+};
+
+const AIRCRAFT_DASHBOARD_DUE_WINDOW_OPTIONS = ['7', '14', '30', '60'] as const;
 
 
 const MANUFACTURER_SEED_NAMES = [
@@ -829,6 +894,13 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     rtsBlockers: 0,
     slaRisk: 0,
   });
+  const [aircraftDashboardLoading, setAircraftDashboardLoading] = useState(false);
+  const [aircraftDashboardError, setAircraftDashboardError] = useState('');
+  const [aircraftDashboard, setAircraftDashboard] = useState<AircraftDashboardOutput | null>(null);
+  const [aircraftDashboardSearch, setAircraftDashboardSearch] = useState('');
+  const [aircraftDashboardStatusFilter, setAircraftDashboardStatusFilter] = useState<'all' | 'active' | 'maintenance' | 'grounded'>('all');
+  const [aircraftDashboardDueWindowDays, setAircraftDashboardDueWindowDays] = useState<(typeof AIRCRAFT_DASHBOARD_DUE_WINDOW_OPTIONS)[number]>('30');
+  const [aircraftDashboardTrendDays, setAircraftDashboardTrendDays] = useState<'7' | '14' | '30'>('14');
   const [aircraftPresenceByRowId, setAircraftPresenceByRowId] = useState<Record<string, AircraftPresenceCollaborator[]>>({});
   const [aircraftPresenceLoading, setAircraftPresenceLoading] = useState(false);
   const [aircraftPresenceError, setAircraftPresenceError] = useState('');
@@ -865,6 +937,8 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   const canScheduleWorkPackage = hasPermission('edit_aircraft_records');
   const canExportAircraftOps = hasPermission('delete_flight_logs');
   const canEscalateAircraftOps = hasPermission('approve_work_orders');
+  const canManageAircraftLeads = hasPermission('edit_aircraft_records') || hasPermission('create_maintenance_request');
+  const canDeleteAircraftLeads = hasPermission('approve_work_orders') || hasPermission('delete_flight_logs');
 
   const scope = useMemo(
     () => ({
@@ -2489,6 +2563,72 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     }
   }, [aircraftEnhancementEnabled, entity, scope, selectedAircraft, selectedId, sessionAccessToken]);
 
+  const loadAircraftLeadDashboard = useCallback(async () => {
+    if (!aircraftEnhancementEnabled || entity !== 'aircraft') {
+      return;
+    }
+    const aircraftId = String(selectedAircraft?.id || '').trim();
+    if (!aircraftId) {
+      setAircraftDashboard(null);
+      setAircraftDashboardError('');
+      return;
+    }
+    setAircraftDashboardLoading(true);
+    setAircraftDashboardError('');
+    try {
+      const headers = await buildApiHeaders(scope, {
+        fallbackAccessToken: sessionAccessToken,
+        requestTag: 'aircraft-lead-dashboard',
+        requestUrl: '/api/v2/amro/aircraft-dashboard',
+        requestMethod: 'GET',
+      });
+      const query = new URLSearchParams({
+        aircraft_id: aircraftId,
+        status: aircraftDashboardStatusFilter,
+        due_within_days: aircraftDashboardDueWindowDays,
+        trend_days: aircraftDashboardTrendDays,
+      });
+      if (aircraftDashboardSearch.trim()) {
+        query.set('search', aircraftDashboardSearch.trim());
+      }
+      const response = await fetch(`/api/v2/amro/aircraft-dashboard?${query.toString()}`, {
+        method: 'GET',
+        headers,
+      });
+      const payload = await parseApiPayload(response);
+      if (!response.ok) {
+        throw new Error(String(payload.error || 'Failed to load aircraft dashboard'));
+      }
+      const output = payload.output && typeof payload.output === 'object' ? (payload.output as AircraftDashboardOutput) : null;
+      setAircraftDashboard(output);
+      trackWorkPackageTemplateAdoption('dashboard_loaded', {
+        selectedAircraftId: aircraftId,
+        cacheState: String(output?.metadata?.cache || 'unknown'),
+      });
+    } catch (error) {
+      const message = String((error as Error).message || 'Failed to load aircraft dashboard');
+      setAircraftDashboard(null);
+      setAircraftDashboardError(message);
+      trackWorkPackageTemplateAdoption('dashboard_load_failed', {
+        errorMessage: message,
+        selectedAircraftId: aircraftId,
+      });
+    } finally {
+      setAircraftDashboardLoading(false);
+    }
+  }, [
+    aircraftDashboardDueWindowDays,
+    aircraftDashboardSearch,
+    aircraftDashboardStatusFilter,
+    aircraftDashboardTrendDays,
+    aircraftEnhancementEnabled,
+    entity,
+    scope,
+    selectedAircraft,
+    sessionAccessToken,
+    trackWorkPackageTemplateAdoption,
+  ]);
+
   const loadWorkPackageTemplateRegistry = useCallback(async () => {
     if (entity !== 'aircraft' || !canCreateWorkPackage) {
       return;
@@ -2569,6 +2709,10 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   useEffect(() => {
     void loadAircraftWorkPackageSnapshot();
   }, [loadAircraftWorkPackageSnapshot]);
+
+  useEffect(() => {
+    void loadAircraftLeadDashboard();
+  }, [loadAircraftLeadDashboard]);
 
   useEffect(() => {
     if (entity !== 'aircraft') {
@@ -2707,6 +2851,13 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       if (!canCreateWorkPackage) {
         toast.error('You do not have permission to create work packages');
         trackWorkPackageTemplateAdoption('submit_denied_permission', {
+          action,
+        });
+        return;
+      }
+      if (action === 'create_schedule' && !canScheduleWorkPackage) {
+        toast.error('You do not have permission to schedule work packages');
+        trackWorkPackageTemplateAdoption('submit_denied_schedule_permission', {
           action,
         });
         return;
@@ -2919,7 +3070,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         setAircraftWorkPackageSubmitting(false);
       }
     },
-    [aircraftWorkPackageSelectedTaskIds, aircraftWorkPackageValues, canCreateWorkPackage, loadAircraftWorkPackageSnapshot, navigate, scope, selectedAircraft, selectedWorkPackageTemplate, trackWorkPackageTemplateAdoption],
+    [aircraftWorkPackageSelectedTaskIds, aircraftWorkPackageValues, canCreateWorkPackage, canScheduleWorkPackage, loadAircraftWorkPackageSnapshot, navigate, scope, selectedAircraft, selectedWorkPackageTemplate, trackWorkPackageTemplateAdoption],
   );
 
   const aircraftWorkPackageSelectedTasks = useMemo(() => {
@@ -3082,6 +3233,36 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       setFlightLogSubmitting(false);
     }
   }, [loadAircraftWorkPackageSnapshot, loadRecords, scope]);
+
+  const aircraftDashboardKpis = useMemo<AircraftDashboardKpis>(() => {
+    const source = aircraftDashboard?.kpis || {};
+    return {
+      fleet_size: Number(source.fleet_size || 0),
+      open_work_packages: Number(source.open_work_packages || 0),
+      due_within_window: Number(source.due_within_window || 0),
+      overdue_work_packages: Number(source.overdue_work_packages || 0),
+      open_defects: Number(source.open_defects || 0),
+      total_flight_hours: Number(source.total_flight_hours || 0),
+      total_cycles: Number(source.total_cycles || 0),
+      compliance_ready_pct: Number(source.compliance_ready_pct || 0),
+    };
+  }, [aircraftDashboard]);
+  const aircraftDashboardFlightHoursTrend = useMemo(
+    () => (Array.isArray(aircraftDashboard?.performance_metrics?.flight_hours_trend) ? aircraftDashboard?.performance_metrics?.flight_hours_trend : []),
+    [aircraftDashboard],
+  );
+  const aircraftDashboardDefectTrend = useMemo(
+    () => (Array.isArray(aircraftDashboard?.performance_metrics?.defect_trend) ? aircraftDashboard?.performance_metrics?.defect_trend : []),
+    [aircraftDashboard],
+  );
+  const aircraftDashboardDefectRows = useMemo(
+    () => (Array.isArray(aircraftDashboard?.defect_tracking) ? aircraftDashboard.defect_tracking.slice(0, 5) : []),
+    [aircraftDashboard],
+  );
+  const aircraftDashboardMaintenanceRows = useMemo(
+    () => (Array.isArray(aircraftDashboard?.maintenance_schedule) ? aircraftDashboard.maintenance_schedule.slice(0, 6) : []),
+    [aircraftDashboard],
+  );
 
   const aircraftRiskScore = useMemo(() => {
     const status = String(selectedAircraft?.status || '').toLowerCase();
@@ -3574,8 +3755,134 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                   );
                 })}
               </div>
+              <div className="space-y-3 rounded-md border border-[hsl(var(--mdm-template-border))] p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="text-[14px] font-semibold text-[hsl(var(--mdm-template-heading))]">Lead Dashboard</h3>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Input
+                      value={aircraftDashboardSearch}
+                      onChange={(event) => setAircraftDashboardSearch(event.target.value)}
+                      placeholder="Search maintenance or defects"
+                      className="h-8 w-[220px] text-[12px]"
+                    />
+                    <Select value={aircraftDashboardStatusFilter} onValueChange={(value) => setAircraftDashboardStatusFilter(value as 'all' | 'active' | 'maintenance' | 'grounded')}>
+                      <SelectTrigger className="h-8 w-[130px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All status</SelectItem>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="maintenance">Maintenance</SelectItem>
+                        <SelectItem value="grounded">Grounded</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Select value={aircraftDashboardDueWindowDays} onValueChange={(value) => setAircraftDashboardDueWindowDays(value as (typeof AIRCRAFT_DASHBOARD_DUE_WINDOW_OPTIONS)[number])}>
+                      <SelectTrigger className="h-8 w-[130px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {AIRCRAFT_DASHBOARD_DUE_WINDOW_OPTIONS.map((value) => (
+                          <SelectItem key={value} value={value}>
+                            Due {value} days
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select value={aircraftDashboardTrendDays} onValueChange={(value) => setAircraftDashboardTrendDays(value as '7' | '14' | '30')}>
+                      <SelectTrigger className="h-8 w-[130px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="7">Trend 7d</SelectItem>
+                        <SelectItem value="14">Trend 14d</SelectItem>
+                        <SelectItem value="30">Trend 30d</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                {aircraftDashboardError ? (
+                  <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-700">{aircraftDashboardError}</div>
+                ) : null}
+                <div className="grid gap-2 md:grid-cols-4">
+                  <div className="rounded-md bg-muted/40 p-2 text-[12px]">Fleet Size: <span className="font-semibold">{aircraftDashboardKpis.fleet_size || DEFAULT_AIRCRAFT_DASHBOARD_KPIS.fleet_size}</span></div>
+                  <div className="rounded-md bg-muted/40 p-2 text-[12px]">Open Packages: <span className="font-semibold">{aircraftDashboardKpis.open_work_packages || DEFAULT_AIRCRAFT_DASHBOARD_KPIS.open_work_packages}</span></div>
+                  <div className="rounded-md bg-muted/40 p-2 text-[12px]">Open Defects: <span className="font-semibold">{aircraftDashboardKpis.open_defects || DEFAULT_AIRCRAFT_DASHBOARD_KPIS.open_defects}</span></div>
+                  <div className="rounded-md bg-muted/40 p-2 text-[12px]">Compliance: <span className="font-semibold">{aircraftDashboardKpis.compliance_ready_pct || DEFAULT_AIRCRAFT_DASHBOARD_KPIS.compliance_ready_pct}%</span></div>
+                </div>
+                <div className="grid gap-3 xl:grid-cols-2">
+                  <div className="rounded-md border border-[hsl(var(--mdm-template-border))] p-2">
+                    <p className="mb-1 text-[12px] font-medium text-[hsl(var(--mdm-template-heading))]">Flight Hours & Cycles</p>
+                    <div className="h-[220px] w-full" aria-busy={aircraftDashboardLoading}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={aircraftDashboardFlightHoursTrend}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="day" />
+                          <YAxis />
+                          <RechartsTooltip />
+                          <Line type="monotone" dataKey="flight_hours" stroke="#0ea5a6" strokeWidth={2} dot={false} />
+                          <Line type="monotone" dataKey="cycles" stroke="#1d4ed8" strokeWidth={2} dot={false} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                  <div className="rounded-md border border-[hsl(var(--mdm-template-border))] p-2">
+                    <p className="mb-1 text-[12px] font-medium text-[hsl(var(--mdm-template-heading))]">Defect Open vs Resolved</p>
+                    <div className="h-[220px] w-full" aria-busy={aircraftDashboardLoading}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={aircraftDashboardDefectTrend}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="day" />
+                          <YAxis />
+                          <RechartsTooltip />
+                          <Bar dataKey="opened" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                          <Bar dataKey="resolved" fill="#10b981" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                </div>
+                <div className="grid gap-3 xl:grid-cols-2">
+                  <div className="rounded-md border border-[hsl(var(--mdm-template-border))] p-2">
+                    <p className="mb-1 text-[12px] font-medium text-[hsl(var(--mdm-template-heading))]">Maintenance Due Window</p>
+                    <div className="h-[200px] w-full" aria-busy={aircraftDashboardLoading}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={aircraftDashboardMaintenanceRows}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="work_package_number" />
+                          <YAxis />
+                          <RechartsTooltip />
+                          <Area type="monotone" dataKey="due_in_days" stroke="#9333ea" fill="#ddd6fe" />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                  <div className="rounded-md border border-[hsl(var(--mdm-template-border))] p-2">
+                    <p className="mb-1 text-[12px] font-medium text-[hsl(var(--mdm-template-heading))]">Defect Tracker</p>
+                    <div className="space-y-2 text-[12px]">
+                      {aircraftDashboardDefectRows.length > 0 ? (
+                        aircraftDashboardDefectRows.map((row, index) => (
+                          <div key={`${String(row.id || row.title || index)}`} className="flex items-center justify-between rounded bg-muted/30 px-2 py-1">
+                            <span className="truncate pr-2">{String(row.title || 'Defect')}</span>
+                            <span className="text-[hsl(var(--mdm-template-muted))]">{String(row.severity || 'medium')} · {String(row.status || 'open')}</span>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-[hsl(var(--mdm-template-muted))]">No defect records for the selected filters.</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
             </CardContent>
           </Card>
+        ) : null}
+        {entity === 'aircraft' && aircraftEnhancementEnabled ? (
+          <AircraftLeadsManager
+            scope={scope}
+            sessionAccessToken={sessionAccessToken}
+            canManage={canManageAircraftLeads}
+            canDelete={canDeleteAircraftLeads}
+          />
         ) : null}
         <Card className="mdm-template-panel">
           <CardHeader className="mdm-template-panel-head">

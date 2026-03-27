@@ -400,6 +400,51 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
               }),
           };
         }
+        if (method === 'GET' && url.includes('/api/v2/amro/aircraft-leads')) {
+          const query = new URL(url, 'http://localhost');
+          if (query.searchParams.get('autocomplete') === '1') {
+            return {
+              ok: true,
+              text: async () =>
+                JSON.stringify({
+                  output: {
+                    suggestions: ['Hydraulic Inspection', 'A320'],
+                  },
+                }),
+            };
+          }
+          return {
+            ok: true,
+            text: async () =>
+              JSON.stringify({
+                output: {
+                  records: [
+                    {
+                      id: 'lead-1',
+                      aircraft_id: 'ac-1',
+                      aircraft_registration: 'A1',
+                      aircraft_type: 'A320',
+                      title: 'Hydraulic Inspection',
+                      description: 'Recurring hydraulic pressure variance',
+                      status: 'new',
+                      priority: 'high',
+                      source: 'inspection',
+                      score: 80,
+                      assigned_to: 'Engineer Rao',
+                      maintenance_due_at: '2026-04-03T00:00:00.000Z',
+                      next_action_due_at: '2026-03-31T00:00:00.000Z',
+                      compliance_state: 'review',
+                      regulatory_authority: 'DGCA',
+                      tags: ['hydraulic', 'phase-a'],
+                      created_at: '2026-03-27T10:00:00.000Z',
+                      updated_at: '2026-03-27T10:05:00.000Z',
+                    },
+                  ],
+                  total_count: 1,
+                },
+              }),
+          };
+        }
         if (method === 'GET') {
           if (url.includes('/api/v2/amro/work-packages')) {
             return {
@@ -452,6 +497,35 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
                   flight_log: {
                     flight_log_id: 'fl-1',
                     maintenance_flags: [],
+                  },
+                },
+              }),
+          };
+        }
+        if (method === 'POST' && url.includes('/api/v2/amro/aircraft-leads')) {
+          return {
+            ok: true,
+            text: async () =>
+              JSON.stringify({
+                output: {
+                  record: {
+                    id: 'lead-new',
+                  },
+                  updated_count: 1,
+                  deleted_count: 1,
+                },
+              }),
+          };
+        }
+        if (method === 'PUT' && url.includes('/api/v2/amro/aircraft-leads')) {
+          return {
+            ok: true,
+            text: async () =>
+              JSON.stringify({
+                output: {
+                  record: {
+                    id: 'lead-1',
+                    title: 'Hydraulic Inspection Updated',
                   },
                 },
               }),
@@ -677,6 +751,19 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     await waitFor(() => {
       expect(mockToastSuccess).toHaveBeenCalledWith('Aircraft work package created');
     }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
+  });
+
+  it('renders aircraft leads workspace with list, detail tabs, and wizard entrypoint', async () => {
+    renderAircraftPage();
+
+    expect(await screen.findByText('Aircraft Leads Workspace')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'List' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Wizard' })).toBeInTheDocument();
+    expect(await screen.findByText('Hydraulic Inspection')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'New Lead' }));
+    expect(screen.getByText('Step 1')).toBeInTheDocument();
+    expect(screen.getByLabelText('Lead Title')).toBeInTheDocument();
   });
 
   it('supports aircraft column filtering and row selection controls', async () => {
