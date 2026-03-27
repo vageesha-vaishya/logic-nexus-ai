@@ -286,6 +286,9 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
                     {
                       id: 'fl-1',
                       aircraft_id: 'ac-1',
+                      aircraft_label: 'N100AA',
+                      departure_airport_label: 'Indira Gandhi International (VIDP)',
+                      arrival_airport_label: 'Netaji Subhas Chandra Bose (VECC)',
                       flight_date: '2026-03-25',
                       flight_number: 'FL-100',
                       pilot_name: 'Captain Rao',
@@ -1059,6 +1062,23 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
 
     expect(await screen.findByRole('heading', { name: 'Flight Log Detail' })).toBeInTheDocument();
     expect(screen.getByDisplayValue('Captain Rao')).toBeInTheDocument();
+  });
+
+  it('filters flight logs by displayed aircraft and airport labels', async () => {
+    renderFlightLogsPage();
+
+    expect(await screen.findByText('N100AA')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Filter Aircraft'), { target: { value: 'N100AA' } });
+    expect(await screen.findByText('N100AA')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Filter Aircraft'), { target: { value: '' } });
+    fireEvent.change(screen.getByLabelText('Filter Departure'), { target: { value: 'Indira' } });
+    expect(await screen.findByText('Indira Gandhi International (VIDP)')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Filter Departure'), { target: { value: '' } });
+    fireEvent.change(screen.getByLabelText('Filter Arrival'), { target: { value: 'Netaji' } });
+    expect(await screen.findByText('Netaji Subhas Chandra Bose (VECC)')).toBeInTheDocument();
   });
 
   it('hydrates selected row from deep link query parameter', async () => {

@@ -2099,6 +2099,17 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       const columnMatch = Object.entries(columnFilters).every(([column, rawValue]) => {
         const value = rawValue.trim().toLowerCase();
         if (!value) return true;
+        if (entity === 'flight_logs') {
+          if (column === 'aircraft_id') {
+            return resolveFlightLogAircraftLabel(row).toLowerCase().includes(value);
+          }
+          if (column === 'departure_airport') {
+            return resolveFlightLogAirportLabel(row, 'departure_airport_label', 'departure_airport_ref', 'departure_airport').toLowerCase().includes(value);
+          }
+          if (column === 'arrival_airport') {
+            return resolveFlightLogAirportLabel(row, 'arrival_airport_label', 'arrival_airport_ref', 'arrival_airport').toLowerCase().includes(value);
+          }
+        }
         if (!(column in row)) return true;
         return String(row[column] ?? '').toLowerCase().includes(value);
       });
