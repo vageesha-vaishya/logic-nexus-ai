@@ -1,15 +1,32 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
+import { EditableText } from '@/components/ui/editable-text';
+import { ArrowDown, ArrowUp, Download, Upload } from 'lucide-react';
 import { toast } from 'sonner';
+import { parseFileRows, exportCsv, exportExcel } from '@/lib/import-export';
+import { themeStyleFromPreset } from '@/lib/theme-utils';
+import { THEME_PRESETS } from '@/theme/themes';
+import type { Lead } from '@/pages/dashboard/leads-data';
+import type { ColumnType } from '@/components/kanban/KanbanBoard';
+import type { KanbanItem } from '@/components/kanban/KanbanCard';
 import { parseApiPayload } from '../services';
+
+const LazyKanbanBoard = lazy(() =>
+  import('@/components/kanban/KanbanBoard').then((module) => ({ default: module.KanbanBoard })),
+);
+const LazyPipelineAnalytics = lazy(() =>
+  import('@/components/analytics/PipelineAnalytics').then((module) => ({ default: module.PipelineAnalytics })),
+);
 
 type AircraftLeadRecord = {
   id: string;
@@ -73,6 +90,8 @@ type AircraftLeadsManagerProps = {
   canDelete: boolean;
 };
 
+type AircraftLeadsTab = 'pipeline' | 'list' | 'grid' | 'card' | 'analytics' | 'import_export' | 'detail' | 'wizard';
+
 const DEFAULT_WIZARD_VALUES: AircraftLeadWizardValues = {
   id: '',
   aircraft_id: '',
@@ -99,6 +118,23 @@ const AIRCRAFT_LEADS_SORT_OPTIONS = [
   { label: 'Due Date', value: 'maintenance_due_at' },
   { label: 'Title', value: 'title' },
 ];
+const AIRCRAFT_LEAD_IMPORT_FIELDS = [
+  'title',
+  'aircraft_id',
+  'aircraft_registration',
+  'aircraft_type',
+  'status',
+  'priority',
+  'source',
+  'assigned_to',
+  'score',
+  'maintenance_due_at',
+  'next_action_due_at',
+  'compliance_state',
+  'regulatory_authority',
+  'description',
+  'tags',
+] as const;
 
 function normalizeLeadRecord(value: unknown): AircraftLeadRecord {
   const row = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
@@ -179,9 +215,17 @@ export function AircraftLeadsManager({ scope, sessionAccessToken, canManage, can
   const [pageSize, setPageSize] = useState('25');
   const [totalCount, setTotalCount] = useState(0);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [activeTab, setActiveTab] = useState<'list' | 'detail' | 'wizard'>('list');
+  const [activeTab, setActiveTab] = useState<AircraftLeadsTab>('list');
   const [detailTab, setDetailTab] = useState<'overview' | 'compliance' | 'workflow'>('overview');
   const [selectedLeadId, setSelectedLeadId] = useState('');
+  const [gridColumns, setGridColumns] = useState<'2' | '3' | '4'>('3');
+  const [activeTheme, setActiveTheme] = useState('Default Simple');
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
+  const [importFileName, setImportFileName] = useState('');
+  const [importHeaders, setImportHeaders] = useState<string[]>([]);
+  const [importRows, setImportRows] = useState<Array<Record<string, string>>>([]);
+  const [fieldMapping, setFieldMapping] = useState<Record<string, string>>({});
+  const [importSubmitting, setImportSubmitting] = useState(false);
   const [wizardStep, setWizardStep] = useState(1);
   const [wizardValues, setWizardValues] = useState<AircraftLeadWizardValues>(DEFAULT_WIZARD_VALUES);
   const [wizardErrors, setWizardErrors] = useState<Record<string, string>>({});
@@ -329,6 +373,66 @@ export function AircraftLeadsManager({ scope, sessionAccessToken, canManage, can
 
   const totalPages = Math.max(1, Math.ceil(totalCount / Number(pageSize || '25')));
   const allSelected = rows.length > 0 && rows.every((row) => selectedIds.includes(row.id));
+  const themeStyle = useMemo(() => themeStyleFromPreset(activeTheme), [activeTheme]);
+  const pipelineColumns = useMemo<ColumnType[]>(
+    () => [
+      { id: 'new', title: 'New' },
+      { id: 'qualified', title: 'Qualified' },
+      { id: 'in_progress', title: 'In Progress' },
+      { id: 'closed', title: 'Closed' },
+    ],
+    [],
+  );
+  const pipelineItems = useMemo<KanbanItem[]>(
+    () =>
+      rows.map((row) => ({
+        id: row.id,
+        title: row.title || 'Untitled',
+        subtitle: `${row.aircraft_registration || row.aircraft_id || '-'} · ${row.aircraft_type || '-'}`,
+        status: row.status || 'new',
+        priority: (row.priority as 'low' | 'medium' | 'high' | 'critical') || 'medium',
+        value: row.score,
+        assignee: row.assigned_to ? { name: row.assigned_to } : undefined,
+        tags: row.tags,
+        updatedAt: row.updated_at,
+      })),
+    [rows],
+  );
+  const analyticsLeads = useMemo<Lead[]>(
+    () =>
+      rows.map((row) => ({
+        id: row.id,
+        first_name: row.title || 'Lead',
+        last_name: row.aircraft_registration || row.aircraft_id || 'Aircraft',
+        email: '',
+        company: row.aircraft_type || '',
+        status: row.status || 'new',
+        source: row.source || 'manual',
+        estimated_value: Number(row.score || 0),
+        created_at: row.created_at || new Date().toISOString(),
+        updated_at: row.updated_at || new Date().toISOString(),
+      })) as Lead[],
+    [rows],
+  );
+  const rowCountByStatus = useMemo(
+    () =>
+      pipelineColumns.map((column) => ({
+        id: column.id,
+        label: column.title,
+        value: rows.filter((row) => row.status === column.id).length,
+      })),
+    [pipelineColumns, rows],
+  );
+
+  useEffect(() => {
+    if (!autoRefreshEnabled) {
+      return;
+    }
+    const timer = window.setInterval(() => {
+      void loadLeads();
+    }, 30000);
+    return () => window.clearInterval(timer);
+  }, [autoRefreshEnabled, loadLeads]);
 
   const applySavedFilters = useCallback((savedFilterId: string) => {
     if (savedFilterId === 'none') {
@@ -536,18 +640,252 @@ export function AircraftLeadsManager({ scope, sessionAccessToken, canManage, can
     }
   }, [buildHeaders, canDelete, loadLeads, selectedIds]);
 
+  const handleInlineUpdate = useCallback(
+    async (row: AircraftLeadRecord, patch: Partial<AircraftLeadRecord>) => {
+      if (!canManage) {
+        toast.error('You do not have permission to manage aircraft leads');
+        return;
+      }
+      const next = { ...row, ...patch };
+      setRows((previous) => previous.map((item) => (item.id === row.id ? next : item)));
+      try {
+        const response = await fetch('/api/v2/amro/aircraft-leads', {
+          method: 'PUT',
+          headers: buildHeaders(),
+          body: JSON.stringify({
+            id: next.id,
+            aircraft_id: next.aircraft_id,
+            aircraft_registration: next.aircraft_registration,
+            aircraft_type: next.aircraft_type,
+            title: next.title,
+            description: next.description,
+            status: next.status,
+            priority: next.priority,
+            source: next.source,
+            score: Number(next.score || 0),
+            assigned_to: next.assigned_to,
+            maintenance_due_at: next.maintenance_due_at,
+            next_action_due_at: next.next_action_due_at,
+            compliance_state: next.compliance_state,
+            regulatory_authority: next.regulatory_authority,
+            tags: next.tags,
+          }),
+        });
+        const payload = await parseApiPayload(response);
+        if (!response.ok) {
+          throw new Error(String(payload.error || 'Failed to update lead'));
+        }
+      } catch (inlineUpdateError) {
+        toast.error(String((inlineUpdateError as Error).message || 'Failed to update lead'));
+        await loadLeads();
+      }
+    },
+    [buildHeaders, canManage, loadLeads],
+  );
+
+  const handleSortChange = useCallback((nextSortBy: string) => {
+    setSortBy((previousSortBy) => {
+      if (previousSortBy === nextSortBy) {
+        setSortDirection((previousDirection) => (previousDirection === 'asc' ? 'desc' : 'asc'));
+        return previousSortBy;
+      }
+      setSortDirection('asc');
+      return nextSortBy;
+    });
+  }, []);
+
+  const handlePipelineDragEnd = useCallback(
+    async (activeId: string, _overId: string, newStatus: string) => {
+      const row = rows.find((item) => item.id === activeId);
+      if (!row || row.status === newStatus) {
+        return;
+      }
+      await handleInlineUpdate(row, { status: newStatus });
+    },
+    [handleInlineUpdate, rows],
+  );
+
+  const handleExport = useCallback(
+    (format: 'csv' | 'excel') => {
+      const headers = [...AIRCRAFT_LEAD_IMPORT_FIELDS];
+      const payloadRows = rows.map((row) => ({
+        ...row,
+        tags: row.tags.join(', '),
+      }));
+      if (format === 'csv') {
+        exportCsv(`aircraft-leads-${Date.now()}.csv`, headers as string[], payloadRows);
+      } else {
+        exportExcel(`aircraft-leads-${Date.now()}.xlsx`, headers as string[], payloadRows);
+      }
+      toast.success(`Aircraft leads exported to ${format.toUpperCase()}`);
+    },
+    [rows],
+  );
+
+  const handleImportFileChange = useCallback(async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+    try {
+      const parsed = await parseFileRows(file);
+      if (parsed.length < 2) {
+        toast.error('Import file must include header and at least one data row');
+        return;
+      }
+      const headers = parsed[0].map((header) => String(header || '').trim());
+      const nextRows = parsed.slice(1).map((row) => {
+        const record: Record<string, string> = {};
+        headers.forEach((header, index) => {
+          record[header] = String(row[index] || '').trim();
+        });
+        return record;
+      });
+      const guessedMapping: Record<string, string> = {};
+      AIRCRAFT_LEAD_IMPORT_FIELDS.forEach((field) => {
+        const normalizedField = field.toLowerCase();
+        const bestHeader = headers.find((header) => header.toLowerCase().replace(/\s+/g, '_') === normalizedField);
+        guessedMapping[field] = bestHeader || '';
+      });
+      setImportFileName(file.name);
+      setImportHeaders(headers);
+      setImportRows(nextRows);
+      setFieldMapping(guessedMapping);
+      toast.success(`Loaded ${nextRows.length} rows for mapping`);
+    } catch (importError) {
+      toast.error(String((importError as Error).message || 'Failed to parse import file'));
+    }
+  }, []);
+
+  const handleSubmitImport = useCallback(async () => {
+    if (!canManage) {
+      toast.error('You do not have permission to import aircraft leads');
+      return;
+    }
+    if (importRows.length === 0) {
+      toast.error('Upload a CSV or Excel file first');
+      return;
+    }
+    const required = ['title', 'aircraft_id'];
+    const unmappedRequired = required.filter((field) => !fieldMapping[field]);
+    if (unmappedRequired.length > 0) {
+      toast.error(`Required mapping missing: ${unmappedRequired.join(', ')}`);
+      return;
+    }
+    setImportSubmitting(true);
+    try {
+      const records = importRows.map((row) => {
+        const mappedRecord: Record<string, unknown> = {};
+        AIRCRAFT_LEAD_IMPORT_FIELDS.forEach((field) => {
+          const sourceHeader = fieldMapping[field];
+          if (!sourceHeader) {
+            return;
+          }
+          mappedRecord[field] = row[sourceHeader] || '';
+        });
+        if (mappedRecord.tags && typeof mappedRecord.tags === 'string') {
+          mappedRecord.tags = String(mappedRecord.tags)
+            .split(',')
+            .map((item) => item.trim())
+            .filter(Boolean);
+        }
+        return mappedRecord;
+      });
+      const response = await fetch('/api/v2/amro/aircraft-leads', {
+        method: 'POST',
+        headers: buildHeaders(),
+        body: JSON.stringify({
+          operation: 'bulk_import',
+          records,
+        }),
+      });
+      const payload = await parseApiPayload(response);
+      if (!response.ok) {
+        throw new Error(String(payload.error || 'Failed to import aircraft leads'));
+      }
+      toast.success('Aircraft leads imported');
+      setImportRows([]);
+      setImportHeaders([]);
+      setFieldMapping({});
+      setImportFileName('');
+      await loadLeads();
+      setActiveTab('list');
+    } catch (submitImportError) {
+      toast.error(String((submitImportError as Error).message || 'Failed to import aircraft leads'));
+    } finally {
+      setImportSubmitting(false);
+    }
+  }, [buildHeaders, canManage, fieldMapping, importRows, loadLeads]);
+
   return (
-    <Card className="mdm-template-panel">
+    <Card className="mdm-template-panel" style={themeStyle}>
       <CardHeader className="mdm-template-panel-head">
         <CardTitle className="mdm-template-panel-title">Aircraft Leads Workspace</CardTitle>
       </CardHeader>
       <CardContent className="mdm-template-panel-body space-y-3">
-        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'list' | 'detail' | 'wizard')}>
-          <TabsList className="h-8">
+        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as AircraftLeadsTab)}>
+          <TabsList className="h-8 flex-wrap">
+            <TabsTrigger value="pipeline">Pipeline</TabsTrigger>
             <TabsTrigger value="list">List</TabsTrigger>
+            <TabsTrigger value="grid">Grid</TabsTrigger>
+            <TabsTrigger value="card">Card</TabsTrigger>
+            <TabsTrigger value="analytics">Analytics</TabsTrigger>
+            <TabsTrigger value="import_export">Import/Export</TabsTrigger>
             <TabsTrigger value="detail" disabled={!selectedLead}>Detail</TabsTrigger>
             <TabsTrigger value="wizard">Wizard</TabsTrigger>
           </TabsList>
+          <div className="mt-3 grid gap-2 lg:grid-cols-12">
+            <div className="lg:col-span-4">
+              <Label htmlFor="aircraft-leads-theme" className="text-[11px]">Theme</Label>
+              <Select value={activeTheme} onValueChange={setActiveTheme}>
+                <SelectTrigger id="aircraft-leads-theme" className="h-8 text-[12px]"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {THEME_PRESETS.map((theme) => (
+                    <SelectItem key={theme.name} value={theme.name}>{theme.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-end gap-2 lg:col-span-3">
+              <Switch id="aircraft-leads-auto-refresh" checked={autoRefreshEnabled} onCheckedChange={setAutoRefreshEnabled} />
+              <Label htmlFor="aircraft-leads-auto-refresh" className="text-[11px]">Auto refresh (30s)</Label>
+            </div>
+            <div className="flex items-end gap-2 lg:col-span-5">
+              <Button type="button" size="sm" variant="outline" className="h-8" onClick={() => handleExport('csv')}>
+                <Download className="mr-1 h-3.5 w-3.5" />
+                Export CSV
+              </Button>
+              <Button type="button" size="sm" variant="outline" className="h-8" onClick={() => handleExport('excel')}>
+                <Download className="mr-1 h-3.5 w-3.5" />
+                Export Excel
+              </Button>
+            </div>
+          </div>
+          <TabsContent value="pipeline" className="space-y-3 pt-3">
+            {loading ? (
+              <div className="grid gap-3 lg:grid-cols-4">
+                {Array.from({ length: 4 }).map((_, index) => (
+                  <Skeleton key={`pipeline-skeleton-${index}`} className="h-[320px] w-full" />
+                ))}
+              </div>
+            ) : (
+              <Suspense fallback={<Skeleton className="h-[360px] w-full" />}>
+                <LazyKanbanBoard
+                  columns={pipelineColumns}
+                  items={pipelineItems}
+                  onDragEnd={(activeId, overId, newStatus) => {
+                    void handlePipelineDragEnd(activeId, overId, newStatus);
+                  }}
+                  onItemClick={(id) => {
+                    setSelectedLeadId(id);
+                    setActiveTab('detail');
+                  }}
+                  className="h-[460px]"
+                  scrollPersistenceKey={`aircraft-leads-kanban:${scope.tenantId}:${scope.franchiseId}`}
+                />
+              </Suspense>
+            )}
+          </TabsContent>
           <TabsContent value="list" className="space-y-3 pt-3">
             <div className="grid gap-2 lg:grid-cols-12">
               <div className="lg:col-span-3">
@@ -646,7 +984,7 @@ export function AircraftLeadsManager({ scope, sessionAccessToken, canManage, can
               </div>
               <div className="lg:col-span-2">
                 <Label className="text-[11px]">Sort</Label>
-                <Select value={sortBy} onValueChange={setSortBy}>
+                <Select value={sortBy} onValueChange={handleSortChange}>
                   <SelectTrigger className="h-8 text-[12px]"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {AIRCRAFT_LEADS_SORT_OPTIONS.map((option) => (
@@ -667,7 +1005,7 @@ export function AircraftLeadsManager({ scope, sessionAccessToken, canManage, can
                     </SelectContent>
                   </Select>
                   <Button size="sm" variant="outline" className="h-8" onClick={() => setSortDirection((previous) => (previous === 'asc' ? 'desc' : 'asc'))}>
-                    {sortDirection === 'asc' ? 'Asc' : 'Desc'}
+                    {sortDirection === 'asc' ? <ArrowUp className="h-3.5 w-3.5" /> : <ArrowDown className="h-3.5 w-3.5" />}
                   </Button>
                 </div>
               </div>
@@ -769,6 +1107,137 @@ export function AircraftLeadsManager({ scope, sessionAccessToken, canManage, can
                 <Button size="sm" variant="outline" className="h-7 px-2" disabled={page >= totalPages} onClick={() => setPage((previous) => Math.min(totalPages, previous + 1))}>Next</Button>
               </div>
             </div>
+          </TabsContent>
+          <TabsContent value="grid" className="space-y-3 pt-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Label className="text-[11px]">Columns</Label>
+                <Select value={gridColumns} onValueChange={(value) => setGridColumns(value as '2' | '3' | '4')}>
+                  <SelectTrigger className="h-8 w-[92px] text-[12px]"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="2">2</SelectItem>
+                    <SelectItem value="3">3</SelectItem>
+                    <SelectItem value="4">4</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button size="sm" variant="outline" onClick={() => setActiveTab('wizard')} disabled={!canManage}>New Lead</Button>
+            </div>
+            <div className={gridColumns === '2' ? 'grid gap-3 md:grid-cols-2' : gridColumns === '3' ? 'grid gap-3 md:grid-cols-2 xl:grid-cols-3' : 'grid gap-3 md:grid-cols-2 xl:grid-cols-4'}>
+              {rows.map((row) => (
+                <Card key={`grid-${row.id}`} className="border border-[hsl(var(--mdm-template-border))]">
+                  <CardContent className="space-y-2 p-3 text-[12px]">
+                    <EditableText value={row.title || ''} onSave={async (value) => handleInlineUpdate(row, { title: value })} className="font-semibold" />
+                    <p>{row.aircraft_registration || row.aircraft_id || '-'}</p>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary">{row.status || 'new'}</Badge>
+                      <Badge variant="outline">{row.priority || 'medium'}</Badge>
+                    </div>
+                    <EditableText value={row.assigned_to || ''} onSave={async (value) => handleInlineUpdate(row, { assigned_to: value })} placeholder="Assignee" />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7"
+                      onClick={() => {
+                        setSelectedLeadId(row.id);
+                        setActiveTab('detail');
+                      }}
+                    >
+                      Open Detail
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </TabsContent>
+          <TabsContent value="card" className="space-y-3 pt-3">
+            <div className="grid gap-2">
+              {rows.map((row) => (
+                <button
+                  key={`card-${row.id}`}
+                  type="button"
+                  className="rounded-md border border-[hsl(var(--mdm-template-border))] p-3 text-left transition-colors hover:bg-muted/30"
+                  onClick={() => {
+                    setSelectedLeadId(row.id);
+                    setActiveTab('detail');
+                  }}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="text-[13px] font-semibold">{row.title || 'Untitled'}</p>
+                      <p className="text-[12px] text-muted-foreground">{row.aircraft_registration || row.aircraft_id || '-'} · {row.aircraft_type || '-'}</p>
+                    </div>
+                    <Badge variant="secondary">{row.status || 'new'}</Badge>
+                  </div>
+                  <div className="mt-2 flex items-center gap-2 text-[12px]">
+                    <Badge variant="outline">{row.priority || 'medium'}</Badge>
+                    <span>Score: {row.score}</span>
+                    <span>Assignee: {row.assigned_to || '-'}</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </TabsContent>
+          <TabsContent value="analytics" className="space-y-3 pt-3">
+            <div className="grid gap-3 md:grid-cols-4">
+              {rowCountByStatus.map((metric) => (
+                <Card key={`metric-${metric.id}`}>
+                  <CardContent className="p-3">
+                    <p className="text-[11px] text-muted-foreground">{metric.label}</p>
+                    <p className="text-[18px] font-semibold">{metric.value}</p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+            <Suspense fallback={<Skeleton className="h-[420px] w-full" />}>
+              <LazyPipelineAnalytics leads={analyticsLeads} />
+            </Suspense>
+          </TabsContent>
+          <TabsContent value="import_export" className="space-y-3 pt-3">
+            <div className="flex flex-wrap items-end gap-2">
+              <Button size="sm" variant="outline" onClick={() => handleExport('csv')}>
+                <Download className="mr-1 h-3.5 w-3.5" />
+                Export CSV
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => handleExport('excel')}>
+                <Download className="mr-1 h-3.5 w-3.5" />
+                Export Excel
+              </Button>
+              <Label htmlFor="aircraft-leads-import-file" className="inline-flex h-8 cursor-pointer items-center rounded-md border px-3 text-[12px]">
+                <Upload className="mr-1 h-3.5 w-3.5" />
+                Upload File
+              </Label>
+              <input id="aircraft-leads-import-file" type="file" accept=".csv,.xlsx,.xls" className="hidden" onChange={(event) => void handleImportFileChange(event)} />
+              <Button size="sm" onClick={() => void handleSubmitImport()} disabled={importSubmitting || importRows.length === 0 || !canManage}>
+                Import Mapped Rows
+              </Button>
+            </div>
+            {importFileName ? <p className="text-[12px] text-muted-foreground">Loaded file: {importFileName} ({importRows.length} rows)</p> : null}
+            {importHeaders.length > 0 ? (
+              <div className="grid gap-2 md:grid-cols-2">
+                {AIRCRAFT_LEAD_IMPORT_FIELDS.map((field) => (
+                  <div key={field} className="space-y-1">
+                    <Label className="text-[11px]">{field}</Label>
+                    <Select
+                      value={fieldMapping[field] || 'unmapped'}
+                      onValueChange={(value) => {
+                        setFieldMapping((previous) => ({ ...previous, [field]: value === 'unmapped' ? '' : value }));
+                      }}
+                    >
+                      <SelectTrigger className="h-8 text-[12px]"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="unmapped">Unmapped</SelectItem>
+                        {importHeaders.map((header) => (
+                          <SelectItem key={`${field}-${header}`} value={header}>{header}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-[12px] text-muted-foreground">Upload a CSV/Excel file to map fields.</p>
+            )}
           </TabsContent>
 
           <TabsContent value="detail" className="space-y-3 pt-3">

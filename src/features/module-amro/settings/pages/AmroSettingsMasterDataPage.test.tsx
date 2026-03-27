@@ -171,8 +171,6 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     );
 
   const openDropdownAndSelectItem = async (trigger: HTMLElement, itemName: RegExp) => {
-    fireEvent.pointerDown(trigger);
-    fireEvent.mouseDown(trigger);
     fireEvent.click(trigger);
     if (screen.queryAllByRole('menuitem', { name: itemName }).length === 0) {
       fireEvent.keyDown(trigger, { key: 'Enter' });
@@ -753,17 +751,24 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
   });
 
-  it('renders aircraft leads workspace with list, detail tabs, and wizard entrypoint', async () => {
+  it('renders aircraft leads workspace with parity tabs, theme controls, and wizard entrypoint', async () => {
     renderAircraftPage();
 
     expect(await screen.findByText('Aircraft Leads Workspace')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Pipeline' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'List' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Grid' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Card' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Analytics' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Import/Export' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Wizard' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Theme')).toBeInTheDocument();
+    expect(screen.getByLabelText('Auto refresh (30s)')).toBeInTheDocument();
     expect(await screen.findByText('Hydraulic Inspection')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'New Lead' }));
     expect(screen.getByText('Step 1')).toBeInTheDocument();
-    expect(screen.getByLabelText('Lead Title')).toBeInTheDocument();
+    expect(screen.getByText('Lead Title')).toBeInTheDocument();
   });
 
   it('supports aircraft column filtering and row selection controls', async () => {
@@ -786,11 +791,12 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
   it('opens aircraft update form on row double click', async () => {
     renderAircraftPage();
 
-    const table = await screen.findByRole('table');
-    const dataRows = within(table).getAllByRole('row').filter((row) => row.querySelector('td'));
-    expect(dataRows.length).toBeGreaterThan(0);
-
-    fireEvent.doubleClick(dataRows[0]);
+    const listTab = await screen.findByRole('tab', { name: 'List' });
+    fireEvent.click(listTab);
+    const rowCheckbox = await screen.findByRole('checkbox', { name: 'Select row ac-1' });
+    const aircraftRow = rowCheckbox.closest('tr');
+    expect(aircraftRow).not.toBeNull();
+    fireEvent.doubleClick(aircraftRow as HTMLElement);
     expect(await screen.findByRole('heading', { name: 'Update Aircraft' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Save Changes' })).toBeInTheDocument();
   });

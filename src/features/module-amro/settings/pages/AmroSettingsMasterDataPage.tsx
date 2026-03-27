@@ -254,6 +254,14 @@ const COLUMN_LABEL_OVERRIDES: Record<string, string> = {
   regulatory_authority: 'Regulatory Authority',
 };
 
+const isAbortLikeError = (error: unknown): boolean => {
+  if (!error) return false;
+  const name = String((error as { name?: unknown }).name ?? '').toLowerCase();
+  if (name === 'aborterror') return true;
+  const message = String((error as { message?: unknown }).message ?? '').toLowerCase();
+  return message.includes('aborted') || message.includes('signal is aborted');
+};
+
 type FormFieldType = 'text' | 'email' | 'number' | 'date' | 'time' | 'textarea' | 'select' | 'boolean' | 'json';
 
 type EntityFormField = {
@@ -1183,7 +1191,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         setRows(records);
       }
     } catch (error) {
-      if ((error as Error).name === 'AbortError') {
+      if (isAbortLikeError(error)) {
         return;
       }
       toast.error(String((error as Error).message || 'Failed to load records'));

@@ -1,9 +1,19 @@
+import React from 'react';
 import { cleanup } from '@testing-library/react';
-import { afterEach, vi, expect } from 'vitest';
+import { afterAll, afterEach, beforeAll, vi, expect } from 'vitest';
 import '@testing-library/jest-dom';
 import { toHaveNoViolations } from 'jest-axe';
 
 expect.extend(toHaveNoViolations);
+
+vi.mock('recharts', async () => {
+  const actual = await vi.importActual<Record<string, unknown>>('recharts');
+  return {
+    ...actual,
+    ResponsiveContainer: ({ children }: { children: React.ReactNode }) =>
+      React.createElement('div', { style: { width: '100%', minWidth: 320, height: 320, minHeight: 320 } }, children),
+  };
+});
 
 // Mock localStorage
 const localStorageMock = (function() {
@@ -37,6 +47,29 @@ if (typeof window !== 'undefined') {
   }
   window.ResizeObserver = ResizeObserver;
 }
+
+const originalConsoleError = console.error;
+const originalConsoleWarn = console.warn;
+
+const isChartDimensionWarning = (message: unknown) =>
+  typeof message === 'string' && message.includes('The width(0) and height(0) of chart should be greater than 0');
+
+beforeAll(() => {
+  vi.spyOn(console, 'error').mockImplementation((...args) => {
+    const [firstArg] = args;
+    if (isChartDimensionWarning(firstArg)) {
+      return;
+    }
+    originalConsoleError(...args);
+  });
+  vi.spyOn(console, 'warn').mockImplementation((...args) => {
+    const [firstArg] = args;
+    if (isChartDimensionWarning(firstArg)) {
+      return;
+    }
+    originalConsoleWarn(...args);
+  });
+});
 
 // Mock scrollIntoView for Radix UI / cmdk
 if (typeof Element !== 'undefined') {
@@ -178,4 +211,8 @@ if (typeof window !== 'undefined') {
 
 afterEach(() => {
   cleanup();
+});
+
+afterAll(() => {
+  vi.restoreAllMocks();
 });
