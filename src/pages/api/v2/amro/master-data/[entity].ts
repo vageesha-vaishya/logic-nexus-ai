@@ -43,6 +43,10 @@ function normalizeManufacturerToken(value: string): string {
   return value.trim().toLowerCase();
 }
 
+function normalizeLookupToken(value: string): string {
+  return value.trim().toLowerCase();
+}
+
 type ManufacturerRecord = {
   id: string;
   manufacturer_code: string | null;
@@ -56,6 +60,67 @@ type AssemblyReferenceRecord = {
   franchise_id: string | null;
   is_active: boolean | null;
 };
+
+type AirportRecord = {
+  id: string;
+  name: string | null;
+  icao_code: string | null;
+};
+
+function extractJoinedRecord(value: unknown): Record<string, unknown> | null {
+  if (Array.isArray(value)) {
+    const first = value.find((entry) => Boolean(entry) && typeof entry === 'object');
+    return first && typeof first === 'object' ? (first as Record<string, unknown>) : null;
+  }
+  if (value && typeof value === 'object') {
+    return value as Record<string, unknown>;
+  }
+  return null;
+}
+
+async function loadAircraftByField(
+  supabase: ReturnType<typeof getSupabaseAdminClient>,
+  field: 'id' | 'registration' | 'tail_number',
+  values: string[],
+  tenantId: string | null,
+): Promise<Record<string, unknown>[]> {
+  if (values.length === 0) return [];
+  let query = supabase
+    .from('aircraft')
+    .select('id,registration,tail_number,status')
+    .in(field, values);
+  if (tenantId) {
+    query = query.eq('tenant_id', tenantId);
+  } else if (typeof query.is === 'function') {
+    query = query.is('tenant_id', null);
+  } else {
+    query = query.eq('tenant_id', null);
+  }
+  const { data } = await query;
+  return Array.isArray(data) ? (data as Record<string, unknown>[]) : [];
+}
+
+async function loadAirportsByField(
+  supabase: ReturnType<typeof getSupabaseAdminClient>,
+  field: 'id' | 'icao_code' | 'name',
+  values: string[],
+  tenantId: string | null,
+): Promise<AirportRecord[]> {
+  if (values.length === 0) return [];
+  let query = supabase
+    .from('airports')
+    .select('id,name,icao_code')
+    .in(field, values);
+  if (tenantId) {
+    query = query.eq('tenant_id', tenantId);
+  } else if (typeof query.is === 'function') {
+    query = query.is('tenant_id', null);
+  } else {
+    query = query.eq('tenant_id', null);
+  }
+  const { data } = await query;
+  return Array.isArray(data) ? (data as AirportRecord[]) : [];
+}
 
 async function loadManufacturers(
   supabase: ReturnType<typeof getSupabaseAdminClient>,
@@ -264,6 +329,14 @@ function getSelectClause(entity: string, listColumns: string): string {
   if (!columns.length) {
     return '*';
   }
+  if (entity === 'flight_logs') {
+    return [
+      ...columns,
+      'aircraft_ref:aircraft!flight_logs_aircraft_id_fkey(id,registration,tail_number,status)',
+      'departure_airport_ref:airports!flight_logs_departure_airport_fkey(id,name,icao_code)',
+      'arrival_airport_ref:airports!flight_logs_arrival_airport_fkey(id,name,icao_code)',
+    ].join(',');
+  }
   return columns.join(',');
 }
 
@@ -396,40 +469,158 @@ async function enrichFlightLogRowsWithAircraftData(
   tenantId: string,
   rows: Record<string, unknown>[],
 ): Promise<Record<string, unknown>[]> {
-  const aircraftIds = Array.from(
+  const identifiers = Array.from(
     new Set(
       rows
         .map((row) => asNullableString(row.aircraft_id))
         .filter((value): value is string => Boolean(value)),
     ),
   );
-  if (aircraftIds.length === 0) {
-    return rows;
-  }
-  const { data, error } = await supabase
-    .from('aircraft')
-    .select('id,tail_number,status')
-    .eq('tenant_id', tenantId)
-    .in('id', aircraftIds);
-  if (error || !Array.isArray(data)) {
+  if (identifiers.length === 0) {
     return rows;
   }
   const aircraftById = new Map<string, Record<string, unknown>>();
-  data.forEach((row) => {
-    const id = asNullableString((row as Record<string, unknown>).id);
+  const aircraftByToken = new Map<string, Record<string, unknown>>();
+  const registerAircraft = (record: Record<string, unknown>) => {
+    const id = asNullableString(record.id);
     if (id) {
-      aircraftById.set(id, row as Record<string, unknown>);
+      aircraftById.set(id, record);
     }
-  });
+    const registration = asNullableString(record.registration);
+    if (registration) {
+      aircraftByToken.set(normalizeLookupToken(registration), record);
+    }
+    const tailNumber = asNullableString(record.tail_number);
+    if (tailNumber) {
+      aircraftByToken.set(normalizeLookupToken(tailNumber), record);
+    }
+  };
+
+  const idMatches = await loadAircraftByField(supabase, 'id', identifiers, tenantId);
+  idMatches.forEach((record) => registerAircraft(record));
+  let unresolved = identifiers.filter((value) => !aircraftById.has(value));
+  if (unresolved.length > 0) {
+    const registrationMatches = await loadAircraftByField(supabase, 'registration', unresolved, tenantId);
+    registrationMatches.forEach((record) => registerAircraft(record));
+    const tailMatches = await loadAircraftByField(supabase, 'tail_number', unresolved, tenantId);
+    tailMatches.forEach((record) => registerAircraft(record));
+    unresolved = unresolved.filter((value) => !aircraftById.has(value) && !aircraftByToken.has(normalizeLookupToken(value)));
+  }
+  if (unresolved.length > 0) {
+    const globalIdMatches = await loadAircraftByField(supabase, 'id', unresolved, null);
+    globalIdMatches.forEach((record) => registerAircraft(record));
+    const globalRegistrationMatches = await loadAircraftByField(supabase, 'registration', unresolved, null);
+    globalRegistrationMatches.forEach((record) => registerAircraft(record));
+    const globalTailMatches = await loadAircraftByField(supabase, 'tail_number', unresolved, null);
+    globalTailMatches.forEach((record) => registerAircraft(record));
+  }
+
   return rows.map((row) => {
     const aircraftId = asNullableString(row.aircraft_id);
-    if (!aircraftId) return row;
-    const aircraft = aircraftById.get(aircraftId);
-    if (!aircraft) return row;
+    const joinedAircraft = extractJoinedRecord(row.aircraft_ref);
+    const joinedRegistration =
+      asNullableString(joinedAircraft?.registration) || asNullableString(joinedAircraft?.tail_number);
+    const joinedStatus = asNullableString(joinedAircraft?.status);
+    const baseRow = { ...row };
+    if (!aircraftId) return baseRow;
+    if (joinedAircraft) {
+      return {
+        ...baseRow,
+        aircraft_registration: joinedRegistration,
+        aircraft_label: joinedRegistration || aircraftId,
+        aircraft_status: joinedStatus,
+      };
+    }
+    const aircraft =
+      aircraftById.get(aircraftId) || aircraftByToken.get(normalizeLookupToken(aircraftId));
+    if (!aircraft) return baseRow;
+    const registration = asNullableString(aircraft.registration) || asNullableString(aircraft.tail_number);
     return {
-      ...row,
-      aircraft_registration: asNullableString(aircraft.tail_number),
+      ...baseRow,
+      aircraft_registration: registration,
+      aircraft_label: registration || aircraftId,
       aircraft_status: asNullableString(aircraft.status),
+    };
+  });
+}
+
+function formatAirportLabel(airport: AirportRecord | null, fallback: string): string {
+  const name = airport ? asNullableString(airport.name) : null;
+  const code = airport ? asNullableString(airport.icao_code) : null;
+  if (name && code) return `${name} (${code})`;
+  if (name) return name;
+  if (code) return code;
+  return fallback;
+}
+
+async function enrichFlightLogRowsWithAirportData(
+  supabase: ReturnType<typeof getSupabaseAdminClient>,
+  tenantId: string,
+  rows: Record<string, unknown>[],
+): Promise<Record<string, unknown>[]> {
+  const identifiers = Array.from(
+    new Set(
+      rows
+        .flatMap((row) => [asNullableString(row.departure_airport), asNullableString(row.arrival_airport)])
+        .filter((value): value is string => Boolean(value)),
+    ),
+  );
+  if (identifiers.length === 0) {
+    return rows;
+  }
+  const airportById = new Map<string, AirportRecord>();
+  const airportByToken = new Map<string, AirportRecord>();
+  const registerAirport = (record: AirportRecord) => {
+    const id = asNullableString(record.id);
+    if (id) {
+      airportById.set(id, record);
+    }
+    const name = asNullableString(record.name);
+    if (name) {
+      airportByToken.set(normalizeLookupToken(name), record);
+    }
+    const code = asNullableString(record.icao_code);
+    if (code) {
+      airportByToken.set(normalizeLookupToken(code), record);
+    }
+  };
+
+  const idMatches = await loadAirportsByField(supabase, 'id', identifiers, tenantId);
+  idMatches.forEach((record) => registerAirport(record));
+  let unresolved = identifiers.filter((value) => !airportById.has(value));
+  if (unresolved.length > 0) {
+    const codeMatches = await loadAirportsByField(supabase, 'icao_code', unresolved, tenantId);
+    codeMatches.forEach((record) => registerAirport(record));
+    const nameMatches = await loadAirportsByField(supabase, 'name', unresolved, tenantId);
+    nameMatches.forEach((record) => registerAirport(record));
+    unresolved = unresolved.filter((value) => !airportById.has(value) && !airportByToken.has(normalizeLookupToken(value)));
+  }
+  if (unresolved.length > 0) {
+    const globalIdMatches = await loadAirportsByField(supabase, 'id', unresolved, null);
+    globalIdMatches.forEach((record) => registerAirport(record));
+    const globalCodeMatches = await loadAirportsByField(supabase, 'icao_code', unresolved, null);
+    globalCodeMatches.forEach((record) => registerAirport(record));
+    const globalNameMatches = await loadAirportsByField(supabase, 'name', unresolved, null);
+    globalNameMatches.forEach((record) => registerAirport(record));
+  }
+  return rows.map((row) => {
+    const departureId = asNullableString(row.departure_airport);
+    const arrivalId = asNullableString(row.arrival_airport);
+    const departureFallback = departureId || '';
+    const arrivalFallback = arrivalId || '';
+    const joinedDepartureAirport = extractJoinedRecord(row.departure_airport_ref) as AirportRecord | null;
+    const joinedArrivalAirport = extractJoinedRecord(row.arrival_airport_ref) as AirportRecord | null;
+    const baseRow = { ...row };
+    const departureAirport = departureId
+      ? joinedDepartureAirport || airportById.get(departureId) || airportByToken.get(normalizeLookupToken(departureId)) || null
+      : null;
+    const arrivalAirport = arrivalId
+      ? joinedArrivalAirport || airportById.get(arrivalId) || airportByToken.get(normalizeLookupToken(arrivalId)) || null
+      : null;
+    return {
+      ...baseRow,
+      departure_airport_label: formatAirportLabel(departureAirport, departureFallback),
+      arrival_airport_label: formatAirportLabel(arrivalAirport, arrivalFallback),
     };
   });
 }
@@ -644,7 +835,11 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       }
 
       const rawRows = entity === 'flight_logs'
-        ? await enrichFlightLogRowsWithAircraftData(supabase, tenantId, (finalData || []) as Record<string, unknown>[])
+        ? await enrichFlightLogRowsWithAirportData(
+            supabase,
+            tenantId,
+            await enrichFlightLogRowsWithAircraftData(supabase, tenantId, (finalData || []) as Record<string, unknown>[]),
+          )
         : ((finalData || []) as Record<string, unknown>[]);
       const activeSearchableColumns = getActiveSearchableColumns(entity, entityConfig.searchableColumns);
       const rows = franchiseId && search ? rawRows.filter((row) => matchesSearch(row, activeSearchableColumns, search)) : rawRows;

@@ -14,6 +14,12 @@ type AssemblyReferenceRecord = {
   is_active: boolean | null;
 };
 
+type AirportRecord = {
+  id: string;
+  name: string | null;
+  icao_code: string | null;
+};
+
 type MasterEntity =
   | 'aircraft'
   | 'flight_logs'
@@ -461,7 +467,56 @@ function getSelectClause(entity: MasterEntity): string {
   if (!columns.length) {
     return '*';
   }
+  if (entity === 'flight_logs') {
+    return [
+      ...columns,
+      'aircraft_ref:aircraft!flight_logs_aircraft_id_fkey(id,registration,tail_number,status)',
+      'departure_airport_ref:airports!flight_logs_departure_airport_fkey(id,name,icao_code)',
+      'arrival_airport_ref:airports!flight_logs_arrival_airport_fkey(id,name,icao_code)',
+    ].join(',');
+  }
   return columns.join(',');
+}
+
+function extractJoinedRecord(value: unknown): JsonRecord | null {
+  if (Array.isArray(value)) {
+    const first = value.find((entry) => Boolean(entry) && typeof entry === 'object');
+    return first && typeof first === 'object' ? (first as JsonRecord) : null;
+  }
+  if (value && typeof value === 'object') {
+    return value as JsonRecord;
+  }
+  return null;
+}
+
+function formatAirportLabel(airport: AirportRecord | null, fallback: string): string {
+  const name = airport ? asNullableString(airport.name) : null;
+  const code = airport ? asNullableString(airport.icao_code) : null;
+  if (name && code) return `${name} (${code})`;
+  if (name) return name;
+  if (code) return code;
+  return fallback;
+}
+
+function enrichFlightLogRows(rows: JsonRecord[]): JsonRecord[] {
+  return rows.map((row) => {
+    const aircraftId = asNullableString(row.aircraft_id);
+    const departureId = asNullableString(row.departure_airport);
+    const arrivalId = asNullableString(row.arrival_airport);
+    const joinedAircraft = extractJoinedRecord(row.aircraft_ref);
+    const joinedDepartureAirport = extractJoinedRecord(row.departure_airport_ref) as AirportRecord | null;
+    const joinedArrivalAirport = extractJoinedRecord(row.arrival_airport_ref) as AirportRecord | null;
+    const aircraftRegistration =
+      asNullableString(joinedAircraft?.registration) || asNullableString(joinedAircraft?.tail_number);
+    return {
+      ...row,
+      aircraft_registration: aircraftRegistration,
+      aircraft_label: aircraftRegistration || aircraftId || '',
+      aircraft_status: asNullableString(joinedAircraft?.status),
+      departure_airport_label: formatAirportLabel(joinedDepartureAirport, departureId || ''),
+      arrival_airport_label: formatAirportLabel(joinedArrivalAirport, arrivalId || ''),
+    };
+  });
 }
 
 function markMissingColumn(entity: MasterEntity, rawColumnName: string): boolean {
@@ -1069,8 +1124,9 @@ router.get(
       throw toHttpError(error);
     }
     const rawRows = Array.isArray(finalData) ? (finalData as unknown as JsonRecord[]) : [];
+    const enrichedRows = entity === 'flight_logs' ? enrichFlightLogRows(rawRows) : rawRows;
     const activeSearchableColumns = getActiveSearchableColumns(entity);
-    const rows = franchiseId && search ? rawRows.filter((row) => matchesSearch(row, activeSearchableColumns, search)) : rawRows;
+    const rows = franchiseId && search ? enrichedRows.filter((row) => matchesSearch(row, activeSearchableColumns, search)) : enrichedRows;
 
     if (exportRequested) {
       const csv = buildCsv(rows);

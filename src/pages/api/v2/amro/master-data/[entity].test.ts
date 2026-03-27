@@ -143,12 +143,12 @@ describe('/api/v2/amro/master-data/[entity]', () => {
     const rangeMock = vi.fn().mockReturnValue({ eq: eqTenantMock });
     const orderMock = vi.fn().mockReturnValue({ range: rangeMock });
     const selectMock = vi.fn().mockReturnValue({ order: orderMock });
-    const aircraftEnrichIn = vi.fn().mockResolvedValue({
+    const aircraftEnrichEqTenant = vi.fn().mockResolvedValue({
       data: [{ id: 'ac-1', tail_number: 'N100AA', status: 'active' }],
       error: null,
     });
-    const aircraftEnrichEqTenant = vi.fn().mockReturnValue({ in: aircraftEnrichIn });
-    const aircraftEnrichSelect = vi.fn().mockReturnValue({ eq: aircraftEnrichEqTenant });
+    const aircraftEnrichIn = vi.fn().mockReturnValue({ eq: aircraftEnrichEqTenant });
+    const aircraftEnrichSelect = vi.fn().mockReturnValue({ in: aircraftEnrichIn });
     const fromMock = vi
       .fn()
       .mockReturnValueOnce({ select: selectMock })
@@ -212,12 +212,12 @@ describe('/api/v2/amro/master-data/[entity]', () => {
     const aircraftRegistrationEqTenant = vi.fn().mockReturnValue({ ilike: aircraftRegistrationIlike });
     const aircraftRegistrationSelect = vi.fn().mockReturnValue({ eq: aircraftRegistrationEqTenant });
 
-    const aircraftEnrichIn = vi.fn().mockResolvedValue({
+    const aircraftEnrichEqTenant = vi.fn().mockResolvedValue({
       data: [{ id: 'ac-1', tail_number: 'N900LN', status: 'active' }],
       error: null,
     });
-    const aircraftEnrichEqTenant = vi.fn().mockReturnValue({ in: aircraftEnrichIn });
-    const aircraftEnrichSelect = vi.fn().mockReturnValue({ eq: aircraftEnrichEqTenant });
+    const aircraftEnrichIn = vi.fn().mockReturnValue({ eq: aircraftEnrichEqTenant });
+    const aircraftEnrichSelect = vi.fn().mockReturnValue({ in: aircraftEnrichIn });
 
     const fromMock = vi
       .fn()

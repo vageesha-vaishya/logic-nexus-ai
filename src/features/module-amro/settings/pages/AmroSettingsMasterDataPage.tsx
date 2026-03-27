@@ -183,6 +183,46 @@ type SelectOption = {
   disabled?: boolean;
 };
 
+const extractJoinedRecord = (value: unknown): Record<string, unknown> | null => {
+  if (Array.isArray(value)) {
+    const first = value.find((entry) => Boolean(entry) && typeof entry === 'object');
+    return first && typeof first === 'object' ? (first as Record<string, unknown>) : null;
+  }
+  if (value && typeof value === 'object') {
+    return value as Record<string, unknown>;
+  }
+  return null;
+};
+
+const formatAirportLabel = (record: Record<string, unknown> | null, fallback: string): string => {
+  if (!record) return fallback;
+  const name = String(record.name || '').trim();
+  const code = String(record.icao_code || '').trim();
+  if (name && code) return `${name} (${code})`;
+  if (name) return name;
+  if (code) return code;
+  return fallback;
+};
+
+const resolveFlightLogAircraftLabel = (row: RecordRow): string => {
+  const ref = extractJoinedRecord(row.aircraft_ref);
+  const refRegistration = String(ref?.registration || ref?.tail_number || '').trim();
+  return String(row.aircraft_label || row.aircraft_registration || refRegistration || row.aircraft_id || '');
+};
+
+const resolveFlightLogAirportLabel = (
+  row: RecordRow,
+  labelKey: 'departure_airport_label' | 'arrival_airport_label',
+  refKey: 'departure_airport_ref' | 'arrival_airport_ref',
+  fallbackKey: 'departure_airport' | 'arrival_airport',
+): string => {
+  const explicitLabel = String(row[labelKey] || '').trim();
+  if (explicitLabel) return explicitLabel;
+  const ref = extractJoinedRecord(row[refKey]);
+  const fallback = String(row[fallbackKey] || '');
+  return formatAirportLabel(ref, fallback);
+};
+
 const ENTITY_TABLE_COLUMNS: Record<MasterEntity, string[]> = {
   aircraft: [
     'registration',
@@ -2287,6 +2327,17 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         if (column === 'assembly_type_id') {
           const raw = String(row[column] ?? '').trim();
           return assemblyTypeLabelById.get(raw) ?? raw;
+        }
+      }
+      if (entity === 'flight_logs') {
+        if (column === 'aircraft_id') {
+          return resolveFlightLogAircraftLabel(row);
+        }
+        if (column === 'departure_airport') {
+          return resolveFlightLogAirportLabel(row, 'departure_airport_label', 'departure_airport_ref', 'departure_airport');
+        }
+        if (column === 'arrival_airport') {
+          return resolveFlightLogAirportLabel(row, 'arrival_airport_label', 'arrival_airport_ref', 'arrival_airport');
         }
       }
       return String(row[column] ?? '');
