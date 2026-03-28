@@ -180,12 +180,12 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
         </Routes>
       </MemoryRouter>,
     );
-  const renderAircraftSubModulePage = () =>
+  const renderAircraftSubModulePage = (path = '/dashboard/amro/aircraft/list') =>
     render(
-      <MemoryRouter initialEntries={['/dashboard/amro/aircraft']} future={memoryRouterFuture}>
+      <MemoryRouter initialEntries={[path]} future={memoryRouterFuture}>
         <Routes>
           <Route
-            path="/dashboard/amro/aircraft"
+            path="/dashboard/amro/aircraft/*"
             element={<AmroSettingsMasterDataPage entityOverride="aircraft" variant="aircraft-sub-module" />}
           />
         </Routes>
@@ -464,6 +464,97 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
                     },
                   ],
                   total_count: 1,
+                },
+              }),
+          };
+        }
+        if (method === 'GET' && url.includes('/api/v2/amro/aircraft-dashboard')) {
+          return {
+            ok: true,
+            text: async () =>
+              JSON.stringify({
+                output: {
+                  metadata: {
+                    cache: 'miss',
+                  },
+                  kpis: {
+                    open_work_packages: 4,
+                    open_defects: 2,
+                    total_flight_hours: 95.4,
+                  },
+                  maintenance_schedule: [
+                    { title: 'Hydraulic manifold replacement', status: 'open', due_in_days: 4, compliance_state: 'pending' },
+                  ],
+                  defect_tracking: [
+                    { title: 'N2 vibration exceedance', severity: 'high', status: 'open', due_in_days: 2 },
+                  ],
+                  performance_metrics: {
+                    flight_hours_trend: [{ day: '2026-03-25', flight_hours: 6.2, cycles: 3 }],
+                    defect_trend: [{ day: '2026-03-25', opened: 1, resolved: 0 }],
+                  },
+                  alerts: [
+                    {
+                      module: 'engine',
+                      code: 'ENGINE_TBO_THRESHOLD',
+                      severity: 'warning',
+                      message: 'Engine TBO remaining 480h is within maintenance threshold',
+                      due_in_days: 18,
+                    },
+                    {
+                      module: 'components',
+                      code: 'COMPONENT_AD_SB_PENDING',
+                      severity: 'warning',
+                      message: '2 AD/SB obligations remain pending',
+                      due_in_days: 7,
+                    },
+                  ],
+                  engine_module: {
+                    kpis: {
+                      monitored_engines: 2,
+                      tbo_remaining_hours: 480,
+                      llp_avg_remaining_cycles: 620,
+                      oil_consumption_lph: 0.41,
+                      vibration_ips: 0.62,
+                    },
+                    statuses: {
+                      tbo: 'warning',
+                      vibration: 'warning',
+                    },
+                    trend: [
+                      { day: '2026-03-24', tbo_remaining_hours: 496, vibration_ips: 0.58, oil_consumption_lph: 0.37 },
+                      { day: '2026-03-25', tbo_remaining_hours: 490, vibration_ips: 0.6, oil_consumption_lph: 0.39 },
+                      { day: '2026-03-26', tbo_remaining_hours: 485, vibration_ips: 0.61, oil_consumption_lph: 0.4 },
+                    ],
+                    drilldown: {
+                      defect_drivers: [{ title: 'N2 vibration exceedance', severity: 'high', due_in_days: 2 }],
+                    },
+                  },
+                  components_module: {
+                    kpis: {
+                      tracked_components: 28,
+                      ad_sb_compliance_pct: 92,
+                      ad_sb_pending_count: 2,
+                      mtbur_hours: 78.4,
+                      repeat_discrepancy_rate: 24.1,
+                    },
+                    statuses: {
+                      ad_sb_compliance: 'warning',
+                      reliability: 'warning',
+                    },
+                    trend: [
+                      { day: '2026-03-24', replacements: 1, compliance_breaches: 0, defects_opened: 1 },
+                      { day: '2026-03-25', replacements: 2, compliance_breaches: 1, defects_opened: 1 },
+                    ],
+                    lifecycle_tracking: [
+                      { title: 'Fuel pump unit', compliance_state: 'pending', due_in_days: 6 },
+                    ],
+                    replacement_history: [
+                      { title: 'Valve assembly replacement', status: 'open', reported_at: '2026-03-25T00:00:00.000Z' },
+                    ],
+                    drilldown: {
+                      open_defects: [{ title: 'Fuel pump leak', severity: 'medium', status: 'open' }],
+                    },
+                  },
                 },
               }),
           };
@@ -775,6 +866,47 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     await waitFor(() => {
       expect(mockToastSuccess).toHaveBeenCalledWith('Aircraft work package created');
     }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
+  });
+
+  it('renders engine and components monitoring sections with alerts in aircraft operations snapshot', async () => {
+    renderAircraftPage();
+
+    await screen.findByText('Aircraft Operations Snapshot');
+    expect(await screen.findByText('Engine Monitoring')).toBeInTheDocument();
+    expect(screen.getByText('Components Monitoring')).toBeInTheDocument();
+    expect(screen.getByText('Automated Alerts')).toBeInTheDocument();
+    expect(screen.getByText(/Engine TBO remaining 480h/i)).toBeInTheDocument();
+    expect(screen.getByText(/2 AD\/SB obligations remain pending/i)).toBeInTheDocument();
+    expect(screen.getByText(/Lifecycle Tracking/i)).toBeInTheDocument();
+    expect(screen.getByText(/Replacement History/i)).toBeInTheDocument();
+  });
+
+  it('routes each aircraft sub-module to its dedicated interface without cross-module content leakage', async () => {
+    renderAircraftSubModulePage('/dashboard/amro/aircraft/list');
+    expect(await screen.findByText(/Aircraft Search and Filter/i, {}, { timeout: ASYNC_WAIT_TIMEOUT_MS })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Engine' }));
+    expect(await screen.findByText(/View: engine/i, {}, { timeout: ASYNC_WAIT_TIMEOUT_MS })).toBeInTheDocument();
+    expect(screen.getByText(/TBO Remaining:/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Components Monitoring/i)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Components' }));
+    expect(await screen.findByText(/View: components/i, {}, { timeout: ASYNC_WAIT_TIMEOUT_MS })).toBeInTheDocument();
+    expect(screen.getByText(/AD\/SB Compliance:/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Document Repository/i)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Documents' }));
+    expect(await screen.findByText(/Documents Management/i, {}, { timeout: ASYNC_WAIT_TIMEOUT_MS })).toBeInTheDocument();
+    expect(screen.getByText(/Document Repository/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Engine Drill-down/i)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'AD/SB' }));
+    expect(await screen.findByText(/AD\/SB Management/i, {}, { timeout: ASYNC_WAIT_TIMEOUT_MS })).toBeInTheDocument();
+    expect(screen.getByText(/AD\/SB Compliance Management/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Document Repository/i)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Aircraft List' }));
+    expect(await screen.findByText(/Aircraft Search and Filter/i)).toBeInTheDocument();
   });
 
   it('renders aircraft navigation view buttons without duplicates and supports search-oriented list behavior', async () => {

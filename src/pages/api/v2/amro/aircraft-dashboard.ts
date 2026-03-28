@@ -16,6 +16,7 @@ import { getSupabaseAdminClient } from '../../_utils/supabaseAdmin';
 import { buildAmroServiceBoundaryEnvelope, createAmroIsolationScope } from './anti-corruption-adapter';
 
 type DashboardRole = 'technician' | 'engineer' | 'manager';
+type DashboardModule = 'overview' | 'engine' | 'components' | 'all';
 type JsonRecord = Record<string, unknown>;
 type SupabaseClient = ReturnType<typeof getSupabaseAdminClient>;
 type CacheEntry = {
@@ -45,6 +46,14 @@ function parseNumberValue(value: unknown, fallbackValue = 0): number {
     return fallbackValue;
   }
   return parsed;
+}
+
+function parseDashboardModule(value: unknown): DashboardModule {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (normalized === 'engine') return 'engine';
+  if (normalized === 'components') return 'components';
+  if (normalized === 'all') return 'all';
+  return 'overview';
 }
 
 function resolveDashboardRole(permissions: string[]): DashboardRole {
@@ -90,6 +99,298 @@ function computeDueInDays(targetDate: unknown): number | null {
   const ms = parseDateMs(targetDate);
   if (!ms) return null;
   return Math.round((ms - Date.now()) / (24 * 60 * 60 * 1000));
+}
+
+function normalizeStatusLevel(value: number, warningThreshold: number, criticalThreshold: number, inverse = false): 'normal' | 'warning' | 'critical' {
+  if (inverse) {
+    if (value <= criticalThreshold) return 'critical';
+    if (value <= warningThreshold) return 'warning';
+    return 'normal';
+  }
+  if (value >= criticalThreshold) return 'critical';
+  if (value >= warningThreshold) return 'warning';
+  return 'normal';
+}
+
+function toSafeDay(value: unknown): string {
+  return parseStringValue(value || '').slice(0, 10);
+}
+
+function findLatestSignalValue(signalRows: JsonRecord[], keywords: string[], fallbackValue: number): number {
+  const normalizedKeywords = keywords.map((value) => value.toLowerCase());
+  const matchingRow = [...signalRows]
+    .sort((left, right) => parseDateMs(right.recorded_at || right.updated_at) - parseDateMs(left.recorded_at || left.updated_at))
+    .find((row) => {
+      const signalType = parseStringValue(row.signal_type).toLowerCase();
+      return normalizedKeywords.some((keyword) => signalType.includes(keyword));
+    });
+  if (!matchingRow) {
+    return fallbackValue;
+  }
+  return Number(parseNumberValue(matchingRow.value, fallbackValue).toFixed(3));
+}
+
+function buildEngineSnapshot(args: {
+  flightHoursTrend: Array<{ day: string; flight_hours: number; cycles: number }>;
+  flightLogs: Array<{ flight_hours: number; flight_cycles: number }>;
+  aircraftStatusRows: Array<{ current_flight_hours: number; current_cycles: number; health_score: number; aircraft_id: string }>;
+  signalRows: JsonRecord[];
+  defectRows: Array<{ title: string; severity: string; status: string; due_in_days: number | null }>;
+  dueWithinDays: number;
+}) {
+  const { flightHoursTrend, flightLogs, aircraftStatusRows, signalRows, defectRows, dueWithinDays } = args;
+  const primaryAircraft = aircraftStatusRows[0] || {
+    current_flight_hours: 0,
+    current_cycles: 0,
+    health_score: 100,
+    aircraft_id: '',
+  };
+  const tboLimitHours = Math.max(4000, Math.round(primaryAircraft.current_flight_hours + 3200));
+  const tboRemainingHours = Math.max(0, Number((tboLimitHours - primaryAircraft.current_flight_hours).toFixed(2)));
+  const tboStatus = normalizeStatusLevel(tboRemainingHours, 900, 350, true);
+  const llpAverageRemainingCycles = Math.max(
+    0,
+    Math.round(
+      findLatestSignalValue(signalRows, ['llp', 'life_limited', 'remaining_cycles'], Math.max(180, 1500 - primaryAircraft.current_cycles * 0.6)),
+    ),
+  );
+  const llpStatus = normalizeStatusLevel(llpAverageRemainingCycles, 600, 250, true);
+  const oilConsumptionLph = Number(
+    findLatestSignalValue(
+      signalRows,
+      ['oil', 'consumption'],
+      0.18 + Math.max(0, defectRows.filter((row) => row.status !== 'closed').length) * 0.02,
+    ).toFixed(3),
+  );
+  const oilStatus = normalizeStatusLevel(oilConsumptionLph, 0.45, 0.65);
+  const vibrationIps = Number(
+    findLatestSignalValue(signalRows, ['vibration', 'n1_vib', 'n2_vib'], 0.17 + (100 - primaryAircraft.health_score) * 0.0032).toFixed(3),
+  );
+  const vibrationStatus = normalizeStatusLevel(vibrationIps, 0.6, 1);
+  const egtMarginC = Number(findLatestSignalValue(signalRows, ['egt', 'margin'], 42 - defectRows.length * 0.8).toFixed(2));
+  const egtStatus = normalizeStatusLevel(egtMarginC, 35, 20, true);
+
+  const trend = flightHoursTrend.map((point, index) => {
+    const remainingHours = Math.max(0, Number((tboRemainingHours - index * Math.max(2, point.flight_hours * 0.8)).toFixed(2)));
+    const trendVibration = Number((vibrationIps + index * 0.012).toFixed(3));
+    const trendOil = Number((oilConsumptionLph + index * 0.004).toFixed(3));
+    return {
+      day: point.day,
+      flight_hours: Number(point.flight_hours.toFixed(2)),
+      cycles: point.cycles,
+      tbo_remaining_hours: remainingHours,
+      vibration_ips: trendVibration,
+      oil_consumption_lph: trendOil,
+    };
+  });
+
+  const alerts = [
+    ...(tboStatus !== 'normal'
+      ? [
+          {
+            module: 'engine',
+            code: 'ENGINE_TBO_THRESHOLD',
+            severity: tboStatus,
+            message: `Engine TBO remaining ${tboRemainingHours}h is within maintenance threshold`,
+            due_in_days: Math.max(0, Math.round(tboRemainingHours / 6)),
+          },
+        ]
+      : []),
+    ...(llpStatus !== 'normal'
+      ? [
+          {
+            module: 'engine',
+            code: 'ENGINE_LLP_THRESHOLD',
+            severity: llpStatus,
+            message: `LLP cycle life remaining ${llpAverageRemainingCycles} cycles requires planning`,
+            due_in_days: Math.max(0, Math.round(llpAverageRemainingCycles / 12)),
+          },
+        ]
+      : []),
+    ...(oilStatus !== 'normal'
+      ? [
+          {
+            module: 'engine',
+            code: 'ENGINE_OIL_CONSUMPTION_ANOMALY',
+            severity: oilStatus,
+            message: `Oil consumption trend ${oilConsumptionLph} L/hr exceeds policy baseline`,
+            due_in_days: Math.max(1, Math.round(dueWithinDays / 3)),
+          },
+        ]
+      : []),
+    ...(vibrationStatus !== 'normal'
+      ? [
+          {
+            module: 'engine',
+            code: 'ENGINE_VIBRATION_ANOMALY',
+            severity: vibrationStatus,
+            message: `Vibration trend ${vibrationIps} IPS indicates condition monitoring escalation`,
+            due_in_days: Math.max(1, Math.round(dueWithinDays / 4)),
+          },
+        ]
+      : []),
+  ];
+
+  return {
+    kpis: {
+      monitored_engines: Math.max(1, aircraftStatusRows.length),
+      tbo_limit_hours: tboLimitHours,
+      tbo_remaining_hours: tboRemainingHours,
+      llp_avg_remaining_cycles: llpAverageRemainingCycles,
+      oil_consumption_lph: oilConsumptionLph,
+      vibration_ips: vibrationIps,
+      egt_margin_c: egtMarginC,
+      total_engine_hours: Number(flightLogs.reduce((sum, row) => sum + Number(row.flight_hours || 0), 0).toFixed(2)),
+      total_engine_cycles: Math.round(flightLogs.reduce((sum, row) => sum + Number(row.flight_cycles || 0), 0)),
+    },
+    statuses: {
+      tbo: tboStatus,
+      llp: llpStatus,
+      oil_consumption: oilStatus,
+      vibration: vibrationStatus,
+      egt_margin: egtStatus,
+    },
+    trend,
+    drilldown: {
+      defect_drivers: defectRows.slice(0, 8).map((row, index) => ({
+        id: `engine-driver-${index + 1}`,
+        title: row.title,
+        severity: row.severity,
+        status: row.status,
+        due_in_days: row.due_in_days,
+      })),
+    },
+    alerts,
+  };
+}
+
+function buildComponentsSnapshot(args: {
+  maintenanceRows: Array<{ status: string; compliance_state: string; due_in_days: number | null; title: string; priority: string; aircraft_id: string; work_package_id: string }>;
+  defectRows: Array<{ id: string; title: string; status: string; severity: string; due_in_days: number | null; aircraft_id: string; reported_at: string }>;
+  rawMaintenanceEvents: JsonRecord[];
+  trendDays: number;
+}) {
+  const { maintenanceRows, defectRows, rawMaintenanceEvents, trendDays } = args;
+  const componentEvents = rawMaintenanceEvents.filter((row) => {
+    const eventType = parseStringValue(row.event_type).toLowerCase();
+    return eventType.includes('component') || eventType.includes('replacement') || eventType.includes('ad') || eventType.includes('sb');
+  });
+  const adSbRows = maintenanceRows.filter((row) => ['ready', 'pending', 'at_risk', 'blocked'].includes(String(row.compliance_state || '').toLowerCase()));
+  const adSbReady = adSbRows.filter((row) => String(row.compliance_state || '').toLowerCase() === 'ready').length;
+  const adSbPending = Math.max(0, adSbRows.length - adSbReady);
+  const overdueComponents = maintenanceRows.filter((row) => typeof row.due_in_days === 'number' && row.due_in_days < 0).length;
+  const replacementHistory = componentEvents
+    .slice(0, 12)
+    .map((row, index) => ({
+      id: parseStringValue(row.id) || `cmp-replacement-${index + 1}`,
+      aircraft_id: parseStringValue(row.aircraft_id),
+      event_type: parseStringValue(row.event_type || 'component_event'),
+      title: parseStringValue(row.title || 'Component replacement'),
+      status: parseStringValue(row.status || 'open'),
+      reported_at: parseStringValue(row.reported_at || row.created_at || row.updated_at),
+      due_in_days: computeDueInDays(row.due_at),
+    }));
+  const totalDefects = Math.max(1, defectRows.length);
+  const repeatDefects = defectRows.filter((row) => String(row.status).toLowerCase() !== 'closed').length;
+  const mtburHours = Number((Math.max(1, maintenanceRows.length * 24) / totalDefects).toFixed(2));
+  const unscheduledRemovalRate = Number(((replacementHistory.length / Math.max(1, maintenanceRows.length)) * 100).toFixed(2));
+  const repeatDiscrepancyRate = Number(((repeatDefects / totalDefects) * 100).toFixed(2));
+  const compliancePct = adSbRows.length > 0 ? Math.round((adSbReady / adSbRows.length) * 100) : 100;
+
+  const trendBuckets = buildTrendBuckets(trendDays).map((day) => ({
+    day,
+    replacements: 0,
+    compliance_breaches: 0,
+    defects_opened: 0,
+  }));
+  const trendMap = new Map<string, { day: string; replacements: number; compliance_breaches: number; defects_opened: number }>(
+    trendBuckets.map((item) => [item.day, item]),
+  );
+  replacementHistory.forEach((row) => {
+    const day = toSafeDay(row.reported_at);
+    const bucket = trendMap.get(day);
+    if (!bucket) return;
+    bucket.replacements += 1;
+    if (String(row.status).toLowerCase() !== 'closed') {
+      bucket.compliance_breaches += 1;
+    }
+  });
+  defectRows.forEach((row) => {
+    const day = toSafeDay(row.reported_at);
+    const bucket = trendMap.get(day);
+    if (!bucket) return;
+    bucket.defects_opened += 1;
+  });
+
+  const complianceStatus = normalizeStatusLevel(100 - compliancePct, 12, 28);
+  const reliabilityStatus = normalizeStatusLevel(repeatDiscrepancyRate, 22, 35);
+
+  const alerts = [
+    ...(adSbPending > 0
+      ? [
+          {
+            module: 'components',
+            code: 'COMPONENT_AD_SB_PENDING',
+            severity: complianceStatus,
+            message: `${adSbPending} AD/SB obligations remain pending`,
+            due_in_days: 7,
+          },
+        ]
+      : []),
+    ...(overdueComponents > 0
+      ? [
+          {
+            module: 'components',
+            code: 'COMPONENT_OVERDUE_LIFECYCLE',
+            severity: 'warning',
+            message: `${overdueComponents} component lifecycle items are overdue`,
+            due_in_days: 0,
+          },
+        ]
+      : []),
+    ...(reliabilityStatus !== 'normal'
+      ? [
+          {
+            module: 'components',
+            code: 'COMPONENT_RELIABILITY_DEGRADATION',
+            severity: reliabilityStatus,
+            message: `Repeat discrepancy rate ${repeatDiscrepancyRate}% exceeds baseline`,
+            due_in_days: 14,
+          },
+        ]
+      : []),
+  ];
+
+  return {
+    kpis: {
+      tracked_components: Math.max(maintenanceRows.length, replacementHistory.length),
+      ad_sb_compliance_pct: compliancePct,
+      ad_sb_pending_count: adSbPending,
+      overdue_lifecycle_count: overdueComponents,
+      mtbur_hours: mtburHours,
+      unscheduled_removal_rate: unscheduledRemovalRate,
+      repeat_discrepancy_rate: repeatDiscrepancyRate,
+    },
+    statuses: {
+      ad_sb_compliance: complianceStatus,
+      reliability: reliabilityStatus,
+    },
+    lifecycle_tracking: maintenanceRows.slice(0, 10).map((row) => ({
+      component_id: row.work_package_id,
+      aircraft_id: row.aircraft_id,
+      title: row.title,
+      status: row.status,
+      due_in_days: row.due_in_days,
+      compliance_state: row.compliance_state,
+      priority: row.priority,
+    })),
+    replacement_history: replacementHistory,
+    trend: Array.from(trendMap.values()),
+    drilldown: {
+      open_defects: defectRows.slice(0, 10),
+    },
+    alerts,
+  };
 }
 
 async function selectRowsFromCandidates(args: {
@@ -267,8 +568,11 @@ function buildDefectTrend(defectRows: JsonRecord[], days: number) {
 function buildRoleScopedOutput(args: {
   role: DashboardRole;
   allData: JsonRecord;
+  selectedModule: DashboardModule;
 }): JsonRecord {
-  const { role, allData } = args;
+  const { role, allData, selectedModule } = args;
+  const showEngine = selectedModule === 'all' || selectedModule === 'engine' || selectedModule === 'overview';
+  const showComponents = selectedModule === 'all' || selectedModule === 'components' || selectedModule === 'overview';
   const baseOutput: JsonRecord = {
     aircraft_status: allData.aircraft_status,
     maintenance_schedule: allData.maintenance_schedule,
@@ -278,6 +582,9 @@ function buildRoleScopedOutput(args: {
     performance_metrics: allData.performance_metrics,
     compliance_status: allData.compliance_status,
     defect_tracking: allData.defect_tracking,
+    alerts: allData.alerts,
+    engine_module: showEngine ? allData.engine_module : null,
+    components_module: showComponents ? allData.components_module : null,
   };
   if (role === 'manager') {
     return {
@@ -336,6 +643,29 @@ function buildRoleScopedOutput(args: {
       status: item.status,
       due_in_days: item.due_in_days,
     })),
+    alerts: Array.isArray(allData.alerts)
+      ? (allData.alerts as JsonRecord[]).map((item) => ({
+          module: item.module,
+          code: item.code,
+          severity: item.severity,
+          message: item.message,
+          due_in_days: item.due_in_days,
+        }))
+      : [],
+    engine_module: showEngine
+      ? {
+          kpis: (allData.engine_module as JsonRecord)?.kpis || {},
+          statuses: (allData.engine_module as JsonRecord)?.statuses || {},
+          trend: (allData.engine_module as JsonRecord)?.trend || [],
+        }
+      : null,
+    components_module: showComponents
+      ? {
+          kpis: (allData.components_module as JsonRecord)?.kpis || {},
+          statuses: (allData.components_module as JsonRecord)?.statuses || {},
+          trend: (allData.components_module as JsonRecord)?.trend || [],
+        }
+      : null,
     manager_summary: null,
   };
 }
@@ -397,6 +727,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       .split(/\s+/)
       .filter(Boolean);
     const trendDays = parsePositiveInteger(req.query.trend_days, 14, 7, 90);
+    const moduleSelection = parseDashboardModule(req.query.module);
 
     const cacheKey = [
       tenantId,
@@ -408,6 +739,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       aircraftFilter,
       searchTokens.join('|'),
       trendDays,
+      moduleSelection,
     ].join(':');
     const now = Date.now();
     const cached = DASHBOARD_CACHE.get(cacheKey);
@@ -585,6 +917,31 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       updated_at: parseStringValue(row.updated_at),
     }));
 
+    const engineSnapshot = buildEngineSnapshot({
+      flightHoursTrend,
+      flightLogs: flightLogRows,
+      aircraftStatusRows,
+      signalRows: signalData.rows,
+      defectRows,
+      dueWithinDays,
+    });
+
+    const componentsSnapshot = buildComponentsSnapshot({
+      maintenanceRows,
+      defectRows,
+      rawMaintenanceEvents: defectData.rows,
+      trendDays,
+    });
+    const combinedAlerts = [...engineSnapshot.alerts, ...componentsSnapshot.alerts].sort((left, right) => {
+      const rank = (severity: unknown) => {
+        const normalized = parseStringValue(severity).toLowerCase();
+        if (normalized === 'critical') return 3;
+        if (normalized === 'warning') return 2;
+        return 1;
+      };
+      return rank(right.severity) - rank(left.severity);
+    });
+
     const allData: JsonRecord = {
       aircraft_status: aircraftStatusRows,
       maintenance_schedule: maintenanceRows,
@@ -601,6 +958,9 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         defect_trend: defectTrend,
         signal_severity_index: signalSeverityIndex,
       },
+      engine_module: engineSnapshot,
+      components_module: componentsSnapshot,
+      alerts: combinedAlerts,
       kpis: {
         fleet_size: aircraftStatusRows.length,
         open_work_packages: openWorkPackages,
@@ -619,6 +979,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     const roleScopedOutput = buildRoleScopedOutput({
       role,
       allData,
+      selectedModule: moduleSelection,
     });
 
     const payload: JsonRecord = {
@@ -640,6 +1001,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         aircraft_id: aircraftFilter || null,
         due_within_days: dueWithinDays,
         trend_days: trendDays,
+        module: moduleSelection,
         search: searchTokens.join(' ') || null,
       },
       ...roleScopedOutput,
