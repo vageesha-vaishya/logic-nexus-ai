@@ -609,8 +609,7 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
       }
     }
 
-    expect(await screen.findByRole('button', { name: /New Aircraft/ })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /New Aircraft/ })).toBeInTheDocument();
+    expect(await screen.findByLabelText(/Refresh records/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Run Bulk Import/ })).toBeInTheDocument();
   });
 
@@ -621,7 +620,7 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     expect(screen.queryByRole('link', { name: 'AMRO Overview' })).not.toBeInTheDocument();
     expect(screen.queryByText('Tenant-scoped aircraft operations management with governed CRUD controls, validation, filtering, and exports.')).not.toBeInTheDocument();
     expect(screen.queryByText(/Tenant:/)).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /New Aircraft/ })).toBeInTheDocument();
+    expect(screen.getByLabelText(/Refresh records/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Run Bulk Import/ })).toBeInTheDocument();
     expect(screen.queryByRole('tab', { name: 'Parts Inventory' })).not.toBeInTheDocument();
   });
@@ -713,7 +712,7 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
   it('supports bulk import from aircraft baseline controls', async () => {
     renderAircraftPage();
 
-    await screen.findByRole('button', { name: /New Aircraft/ });
+    await screen.findByRole('button', { name: /Run Bulk Import/ });
 
     fireEvent.click(screen.getByText('Run Bulk Import'));
     await waitFor(() => {
@@ -767,8 +766,6 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     expect(screen.getAllByRole('button', { name: 'Card' })).toHaveLength(1);
     expect(screen.getAllByRole('button', { name: 'Analytics' })).toHaveLength(1);
     expect(screen.getAllByRole('button', { name: 'Import/Export' })).toHaveLength(1);
-    expect(screen.getAllByRole('button', { name: 'Wizard' })).toHaveLength(1);
-
     fireEvent.click(screen.getByRole('button', { name: 'Pipeline' }));
     expect(await screen.findByText('Aircraft Leads Workspace')).toBeInTheDocument();
 
@@ -821,9 +818,9 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
 
     expect(screen.getByText('WP-BASE-002')).toBeInTheDocument();
 
-    const exportButton = screen.getByLabelText(/Export records/i);
-    expect(exportButton).toBeInTheDocument();
-    fireEvent.click(exportButton);
+    const exportButtons = screen.getAllByLabelText(/Export records/i);
+    expect(exportButtons.length).toBeGreaterThan(0);
+    fireEvent.click(exportButtons[0]);
   });
 
   it('opens work package update form on row double click with prepopulated data and CRUD controls', async () => {
@@ -1102,8 +1099,8 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     renderAircraftPage();
 
     await screen.findByLabelText(/Refresh records/i, {}, { timeout: ASYNC_WAIT_TIMEOUT_MS });
-    expect(screen.getByLabelText(/Export records/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /New Aircraft/ })).toBeInTheDocument();
+    expect(screen.getAllByLabelText(/Export records/i).length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: /Run Bulk Import/ })).toBeInTheDocument();
 
     const rowCheckboxes = await screen.findAllByRole('checkbox', { name: /Select row/ }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
     fireEvent.click(rowCheckboxes[0]);

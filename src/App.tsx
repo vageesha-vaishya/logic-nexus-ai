@@ -876,6 +876,7 @@ const App = () => (
             <Route path="/dashboard/amro" element={<Navigate to="/dashboard/amro/overview" replace />} />
             <Route path="/dashboard/amro/overview" element={<ProtectedRoute requiredDomainCode="AMRO"><AmroOverview /></ProtectedRoute>} />
             <Route path="/dashboard/amro/aircraft" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroAircraftSubModule /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/aircraft/:view" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroAircraftSubModule /></ProtectedRoute>} />
             <Route path="/dashboard/amro/aircraft/work-packages" element={<ProtectedRoute requiredDomainCode="AMRO"><AmroWorkPackages /></ProtectedRoute>} />
             <Route path="/dashboard/amro/work-packages" element={<ProtectedRoute requiredDomainCode="AMRO"><AmroWorkPackages /></ProtectedRoute>} />
             <Route path="/dashboard/amro/task-execution" element={<ProtectedRoute requiredDomainCode="AMRO"><AmroTaskExecution /></ProtectedRoute>} />

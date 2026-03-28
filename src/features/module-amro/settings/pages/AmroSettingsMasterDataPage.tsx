@@ -109,6 +109,7 @@ import {
 } from './amro-settings-master-data/utils';
 import { FlightLogsFilters } from './amro-settings-master-data/components/FlightLogsFilters';
 import { AircraftLeadsManager, type AircraftLeadsTab } from './amro-settings-master-data/components/AircraftLeadsManager';
+import { AircraftActionPalette, type AircraftPaletteAction } from './amro-settings-master-data/components/AircraftActionPalette';
 
 export { buildPayloadFromForm } from './amro-settings-master-data/utils';
 export { verifyReferenceExists } from './amro-settings-master-data/services';
@@ -426,13 +427,22 @@ type AircraftDashboardOutput = {
 };
 
 const AIRCRAFT_NAV_RAIL = [
-  { label: 'Overview', path: '/dashboard/amro/overview' },
-  { label: 'Work Packages', path: '/dashboard/amro/aircraft/work-packages' },
-  { label: 'Scheduling', path: '/dashboard/amro/scheduling' },
-  { label: 'Compliance', path: '/dashboard/amro/compliance' },
-  { label: 'Task Execution', path: '/dashboard/amro/task-execution' },
-  { label: 'Audit', path: '/dashboard/amro/audit' },
+  { label: 'Aircraft List', path: '/dashboard/amro/aircraft/list', view: 'list' as const, icon: TimerReset },
+  { label: 'Engine', path: '/dashboard/amro/aircraft/engine', view: 'analytics' as const, icon: CheckSquare },
+  { label: 'Components', path: '/dashboard/amro/aircraft/components', view: 'grid' as const, icon: CheckSquare },
+  { label: 'Documents', path: '/dashboard/amro/aircraft/documents', view: 'import_export' as const, icon: FileText },
+  { label: 'AD/SB', path: '/dashboard/amro/aircraft/ad-sb', view: 'pipeline' as const, icon: FileCheck },
+  { label: 'Maintenance Planning', path: '/dashboard/amro/aircraft/work-packages', view: 'card' as const, icon: CalendarDays },
 ] as const;
+
+const AIRCRAFT_SUBMODULE_VIEW_MAP: Record<string, 'module' | AircraftLeadsTab> = {
+  list: 'module',
+  engine: 'analytics',
+  components: 'grid',
+  documents: 'import_export',
+  'ad-sb': 'pipeline',
+  'work-packages': 'card',
+};
 
 const DEFAULT_AIRCRAFT_DASHBOARD_KPIS: AircraftDashboardKpis = {
   fleet_size: 0,
@@ -952,7 +962,6 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   const [aircraftDashboardTrendDays, setAircraftDashboardTrendDays] = useState<'7' | '14' | '30'>('14');
   const [aircraftLeadsActiveTab, setAircraftLeadsActiveTab] = useState<AircraftLeadsTab>('list');
   const [aircraftNavigationView, setAircraftNavigationView] = useState<'module' | AircraftLeadsTab>('module');
-  const [canOpenAircraftLeadDetail, setCanOpenAircraftLeadDetail] = useState(false);
   const [aircraftPresenceByRowId, setAircraftPresenceByRowId] = useState<Record<string, AircraftPresenceCollaborator[]>>({});
   const [aircraftPresenceLoading, setAircraftPresenceLoading] = useState(false);
   const [aircraftPresenceError, setAircraftPresenceError] = useState('');
@@ -1001,12 +1010,30 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     [context.franchiseId, context.tenantId, context.userId],
   );
   const sessionAccessToken = useMemo(() => String(session?.access_token || '').trim(), [session?.access_token]);
+  const aircraftSubModuleSegment = useMemo(() => {
+    if (!isAircraftSubModule) {
+      return 'list';
+    }
+    if (!location.pathname.startsWith('/dashboard/amro/aircraft')) {
+      return 'list';
+    }
+    const segment = location.pathname.replace('/dashboard/amro/aircraft', '').replace(/^\/+/, '');
+    return segment || 'list';
+  }, [isAircraftSubModule, location.pathname]);
+  const currentAircraftNavPath = useMemo(
+    () => (aircraftSubModuleSegment === 'list' ? '/dashboard/amro/aircraft/list' : `/dashboard/amro/aircraft/${aircraftSubModuleSegment}`),
+    [aircraftSubModuleSegment],
+  );
   const showAircraftLeadWorkspace =
     entity === 'aircraft'
     && aircraftEnhancementEnabled
     && aircraftNavigationView !== 'module';
   const showAircraftMasterRecords = !showAircraftLeadWorkspace;
   const handleAircraftViewNavigation = useCallback((tab: AircraftLeadsTab) => {
+    if (isAircraftSubModule) {
+      const nextPath = AIRCRAFT_NAV_RAIL.find((item) => item.view === tab)?.path || '/dashboard/amro/aircraft/list';
+      navigate(`${nextPath}${location.search}`, { replace: true });
+    }
     if (tab === 'list') {
       setAircraftLeadsActiveTab(tab);
       setAircraftNavigationView('module');
@@ -1017,7 +1044,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     }
     setAircraftLeadsActiveTab(tab);
     setAircraftNavigationView(tab);
-  }, []);
+  }, [isAircraftSubModule, location.search, navigate]);
 
   useEffect(() => {
     if (entity !== 'aircraft') {
@@ -1025,6 +1052,19 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       setAircraftLeadsActiveTab('list');
     }
   }, [entity]);
+  useEffect(() => {
+    if (!isAircraftSubModule) {
+      return;
+    }
+    const view = AIRCRAFT_SUBMODULE_VIEW_MAP[aircraftSubModuleSegment] || 'module';
+    if (view === 'module') {
+      setAircraftLeadsActiveTab('list');
+      setAircraftNavigationView('module');
+      return;
+    }
+    setAircraftLeadsActiveTab(view);
+    setAircraftNavigationView(view);
+  }, [aircraftSubModuleSegment, isAircraftSubModule]);
   const trackWorkPackageTemplateAdoption = useCallback(
     (event: string, details: Record<string, unknown> = {}) => {
       const payload = {
@@ -3636,6 +3676,150 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     },
     [sortColumn, sortDirection],
   );
+  const headerPaletteActions = useMemo<AircraftPaletteAction[]>(
+    () => {
+      const actions: AircraftPaletteAction[] = [
+        {
+          id: 'refresh-records',
+          label: 'Refresh',
+          icon: <RefreshCw className={cn('h-4 w-4', busyAction === 'refresh' && 'animate-spin')} aria-hidden="true" />,
+          group: 'contextual',
+          variant: 'secondary',
+          disabled: loading,
+          loading: busyAction === 'refresh',
+          ariaLabel: 'Refresh records',
+          onAction: async () => {
+            setBusyAction('refresh');
+            await loadRecords();
+            setBusyAction(null);
+          },
+          errorMessage: 'Refresh failed',
+        },
+        {
+          id: 'export-csv',
+          label: 'Export CSV',
+          icon: <FileUp className="h-4 w-4" aria-hidden="true" />,
+          group: 'secondary',
+          variant: 'outline',
+          loading: busyAction === 'export',
+          disabled: busyAction === 'export_pdf',
+          ariaLabel: 'Export records CSV',
+          onAction: async () => {
+            await handleExport();
+          },
+        },
+        {
+          id: 'export-pdf',
+          label: 'Export PDF',
+          icon: <FileDown className="h-4 w-4" aria-hidden="true" />,
+          group: 'secondary',
+          variant: 'outline',
+          loading: busyAction === 'export_pdf',
+          disabled: busyAction === 'export',
+          ariaLabel: 'Export records PDF',
+          onAction: async () => {
+            await handleExportPdf();
+          },
+        },
+      ];
+      if (entity !== 'aircraft') {
+        actions.push({
+          id: 'new-record',
+          label: `New ${ENTITY_LABEL[entity]}`,
+          icon: <Plus className="h-4 w-4" aria-hidden="true" />,
+          group: 'primary',
+          loading: busyAction === 'create',
+          ariaLabel: `New ${ENTITY_LABEL[entity]}`,
+          onAction: async () => {
+            handleOpenCreateModal();
+          },
+        });
+      }
+      return actions;
+    },
+    [busyAction, entity, handleExport, handleExportPdf, handleOpenCreateModal, loadRecords, loading],
+  );
+  const aircraftStatusPaletteActions = useMemo<AircraftPaletteAction[]>(
+    () => [
+      {
+        id: 'create-work-package',
+        label: 'Create Work Package',
+        icon: <CheckSquare className="h-3.5 w-3.5" aria-hidden="true" />,
+        group: 'primary',
+        variant: 'default',
+        permission: 'create_maintenance_request',
+        onAction: async () => {
+          openAircraftWorkPackageDialog();
+        },
+      },
+      {
+        id: 'view-flight-logs',
+        label: 'View Logs',
+        icon: <Eye className="h-3.5 w-3.5" aria-hidden="true" />,
+        group: 'secondary',
+        permission: 'edit_aircraft_records',
+        onAction: async () => {
+          openAircraftFlightLogsList(String(selectedAircraft?.id || ''));
+        },
+      },
+      {
+        id: 'add-flight-log',
+        label: 'Add Log',
+        icon: <Plus className="h-3.5 w-3.5" aria-hidden="true" />,
+        group: 'secondary',
+        permission: 'create_maintenance_request',
+        onAction: async () => {
+          openFlightLogDialog(String(selectedAircraft?.id || ''));
+        },
+      },
+      {
+        id: 'view-active-packages',
+        label: 'View Active Packages',
+        icon: <ListChecks className="h-3.5 w-3.5" aria-hidden="true" />,
+        group: 'contextual',
+        permission: 'edit_aircraft_records',
+        onAction: async () => {
+          handleAircraftContextNavigation('/dashboard/amro/aircraft/work-packages');
+        },
+      },
+    ],
+    [handleAircraftContextNavigation, openAircraftFlightLogsList, openAircraftWorkPackageDialog, openFlightLogDialog, selectedAircraft?.id],
+  );
+  const aircraftKpiPaletteActions = useMemo<AircraftPaletteAction[]>(
+    () => [
+      {
+        id: 'replan',
+        label: 'Replan',
+        icon: <TimerReset className="h-3.5 w-3.5" aria-hidden="true" />,
+        group: 'secondary',
+        permission: 'edit_aircraft_records',
+        onAction: async () => {
+          handleAircraftContextNavigation('/dashboard/amro/scheduling');
+        },
+      },
+      {
+        id: 'escalate',
+        label: 'Escalate',
+        icon: <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />,
+        group: 'secondary',
+        permission: 'approve_work_orders',
+        onAction: async () => {
+          handleAircraftContextNavigation('/dashboard/amro/compliance');
+        },
+      },
+      {
+        id: 'export-kpi',
+        label: 'Export',
+        icon: <FileText className="h-3.5 w-3.5" aria-hidden="true" />,
+        group: 'contextual',
+        permission: 'delete_flight_logs',
+        onAction: async () => {
+          await handleExport();
+        },
+      },
+    ],
+    [handleAircraftContextNavigation, handleExport],
+  );
 
   return (
     <DashboardLayout>
@@ -3671,8 +3855,6 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                   ['card', 'Card'],
                   ['analytics', 'Analytics'],
                   ['import_export', 'Import/Export'],
-                  ['detail', 'Detail'],
-                  ['wizard', 'Wizard'],
                 ] as const).map(([value, label]) => {
                   const isActive = value === 'list'
                     ? aircraftNavigationView === 'module'
@@ -3685,7 +3867,6 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                       size="sm"
                       className="h-9 px-3"
                       onClick={() => handleAircraftViewNavigation(value)}
-                      disabled={value === 'detail' && !canOpenAircraftLeadDetail}
                     >
                       {label}
                     </Button>
@@ -3693,66 +3874,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                 })}
               </div>
             ) : null}
-            <div className="order-2 flex items-center gap-2">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="secondary"
-                    size="icon"
-                    onClick={() => {
-                      setBusyAction('refresh');
-                      void loadRecords().finally(() => setBusyAction(null));
-                    }}
-                    disabled={loading || busyAction === 'refresh'}
-                    aria-label="Refresh records"
-                  >
-                    <RefreshCw className={cn('h-4 w-4', busyAction === 'refresh' && 'animate-spin')} aria-hidden="true" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Refresh</TooltipContent>
-              </Tooltip>
-              <DropdownMenu>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        disabled={busyAction === 'export' || busyAction === 'export_pdf'}
-                        aria-label="Export records"
-                      >
-                        <FileUp className="h-4 w-4" aria-hidden="true" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                  </TooltipTrigger>
-                  <TooltipContent>Export</TooltipContent>
-                </Tooltip>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => void handleExport()} disabled={busyAction === 'export' || busyAction === 'export_pdf'}>
-                    <FileUp className="mr-2 h-4 w-4" aria-hidden="true" />
-                    Export CSV
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => void handleExportPdf()} disabled={busyAction === 'export' || busyAction === 'export_pdf'}>
-                    <FileDown className="mr-2 h-4 w-4" aria-hidden="true" />
-                    Export PDF
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    className="bg-[hsl(var(--mdm-template-focus))] text-white hover:bg-[hsl(var(--mdm-template-focus))/0.9]"
-                    size="icon"
-                    onClick={handleOpenCreateModal}
-                    disabled={busyAction === 'create'}
-                    aria-label={`New ${ENTITY_LABEL[entity]}`}
-                  >
-                    <Plus className="h-4 w-4" aria-hidden="true" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>{`New ${ENTITY_LABEL[entity]}`}</TooltipContent>
-              </Tooltip>
-            </div>
+            <AircraftActionPalette actions={headerPaletteActions} hasPermission={hasPermission} className="order-2" compact buttonClassName="h-9 px-3" />
           </div>
         </div>
 
@@ -3813,36 +3935,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                   <p className="text-[12px] text-[hsl(var(--mdm-template-muted))]">
                     Confidence {Math.round(aircraftRiskConfidence * 100)}% · {aircraftRiskMessage}
                   </p>
-                  <div className="flex flex-wrap gap-2 pt-2">
-                    <Button size="sm" onClick={openAircraftWorkPackageDialog} disabled={!canCreateWorkPackage}>
-                      Create Work Package
-                    </Button>
-                    <DropdownMenu>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <DropdownMenuTrigger asChild>
-                            <Button size="sm" variant="outline" aria-label="Flight Logs">
-                              <ListChecks className="h-3.5 w-3.5" aria-hidden="true" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                        </TooltipTrigger>
-                        <TooltipContent>Flight Logs</TooltipContent>
-                      </Tooltip>
-                      <DropdownMenuContent align="start">
-                        <DropdownMenuItem onClick={() => openAircraftFlightLogsList(String(selectedAircraft?.id || ''))}>
-                          <Eye className="mr-2 h-3.5 w-3.5" aria-hidden="true" />
-                          View Logs
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => openFlightLogDialog(String(selectedAircraft?.id || ''))}>
-                          <Plus className="mr-2 h-3.5 w-3.5" aria-hidden="true" />
-                          Add Log
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                    <Button size="sm" variant="outline" onClick={() => handleAircraftContextNavigation('/dashboard/amro/aircraft/work-packages')}>
-                      View Active Packages
-                    </Button>
-                  </div>
+                  <AircraftActionPalette actions={aircraftStatusPaletteActions} hasPermission={hasPermission} compact buttonClassName="h-8" className="pt-2" />
                 </div>
                 <div className="space-y-3 rounded-md border border-[hsl(var(--mdm-template-border))] p-4">
                   <h3 className="text-[14px] font-semibold text-[hsl(var(--mdm-template-heading))]">KPI Cards</h3>
@@ -3854,41 +3947,17 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                     <div className="rounded-md bg-muted/40 p-2">RTS Blockers: <span className="font-semibold">{aircraftWorkPackageSnapshot.rtsBlockers}</span></div>
                     <div className="rounded-md bg-muted/40 p-2">SLA Risk: <span className="font-semibold">{aircraftWorkPackageSnapshot.slaRisk}</span></div>
                   </div>
-                  <div className="flex flex-wrap gap-2 pt-1">
-                    <Button size="sm" variant="outline" onClick={() => handleAircraftContextNavigation('/dashboard/amro/scheduling')} disabled={!canScheduleWorkPackage}>
-                      <TimerReset className="mr-1 h-3.5 w-3.5" />
-                      Replan
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => handleAircraftContextNavigation('/dashboard/amro/compliance')} disabled={!canEscalateAircraftOps}>
-                      <AlertTriangle className="mr-1 h-3.5 w-3.5" />
-                      Escalate
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => void handleExport()} disabled={!canExportAircraftOps}>
-                      <FileText className="mr-1 h-3.5 w-3.5" />
-                      Export
-                    </Button>
-                  </div>
+                  <AircraftActionPalette actions={aircraftKpiPaletteActions} hasPermission={hasPermission} compact buttonClassName="h-8" className="pt-1" />
                 </div>
               </div>
               <div className="flex flex-wrap gap-2 rounded-md border border-[hsl(var(--mdm-template-border))] bg-muted/20 p-2">
                 {AIRCRAFT_NAV_RAIL.map((item) => {
-                  const Icon =
-                    item.label === 'Work Packages'
-                      ? CheckSquare
-                      : item.label === 'Scheduling'
-                        ? CalendarDays
-                        : item.label === 'Compliance'
-                          ? FileCheck
-                          : item.label === 'Task Execution'
-                            ? CheckSquare
-                            : item.label === 'Audit'
-                              ? FileText
-                              : TimerReset;
+                  const Icon = item.icon;
                   return (
                     <Button
                       key={item.path}
                       type="button"
-                      variant="outline"
+                      variant={currentAircraftNavPath === item.path ? 'default' : 'outline'}
                       size="sm"
                       className="h-8"
                       onClick={() => handleAircraftContextNavigation(item.path)}
@@ -3910,7 +3979,6 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
             canDelete={canDeleteAircraftLeads}
             activeTab={aircraftLeadsActiveTab}
             onActiveTabChange={setAircraftLeadsActiveTab}
-            onDetailAvailabilityChange={setCanOpenAircraftLeadDetail}
           />
         ) : null}
         {showAircraftMasterRecords ? (

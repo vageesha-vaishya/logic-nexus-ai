@@ -8,8 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Textarea } from '@/components/ui/textarea';
+import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { EditableText } from '@/components/ui/editable-text';
 import { ArrowDown, ArrowUp, Download, Upload } from 'lucide-react';
 import { toast } from 'sonner';
@@ -49,25 +48,6 @@ type AircraftLeadRecord = {
   updated_at: string;
 };
 
-type AircraftLeadWizardValues = {
-  id: string;
-  aircraft_id: string;
-  aircraft_registration: string;
-  aircraft_type: string;
-  title: string;
-  description: string;
-  status: string;
-  priority: string;
-  source: string;
-  score: string;
-  assigned_to: string;
-  maintenance_due_at: string;
-  next_action_due_at: string;
-  compliance_state: string;
-  regulatory_authority: string;
-  tags: string;
-};
-
 type SavedFilter = {
   id: string;
   name: string;
@@ -90,29 +70,9 @@ type AircraftLeadsManagerProps = {
   canDelete: boolean;
   activeTab?: AircraftLeadsTab;
   onActiveTabChange?: (tab: AircraftLeadsTab) => void;
-  onDetailAvailabilityChange?: (enabled: boolean) => void;
 };
 
-export type AircraftLeadsTab = 'pipeline' | 'list' | 'grid' | 'card' | 'analytics' | 'import_export' | 'detail' | 'wizard';
-
-const DEFAULT_WIZARD_VALUES: AircraftLeadWizardValues = {
-  id: '',
-  aircraft_id: '',
-  aircraft_registration: '',
-  aircraft_type: '',
-  title: '',
-  description: '',
-  status: 'new',
-  priority: 'medium',
-  source: 'manual',
-  score: '0',
-  assigned_to: '',
-  maintenance_due_at: '',
-  next_action_due_at: '',
-  compliance_state: 'monitoring',
-  regulatory_authority: 'DGCA',
-  tags: '',
-};
+export type AircraftLeadsTab = 'pipeline' | 'list' | 'grid' | 'card' | 'analytics' | 'import_export';
 
 const PAGE_SIZE_OPTIONS = ['25', '50', '100'];
 const AIRCRAFT_LEADS_SORT_OPTIONS = [
@@ -163,45 +123,6 @@ function normalizeLeadRecord(value: unknown): AircraftLeadRecord {
   };
 }
 
-function mapLeadToWizardValues(record: AircraftLeadRecord): AircraftLeadWizardValues {
-  return {
-    id: record.id,
-    aircraft_id: record.aircraft_id,
-    aircraft_registration: record.aircraft_registration,
-    aircraft_type: record.aircraft_type,
-    title: record.title,
-    description: record.description,
-    status: record.status,
-    priority: record.priority,
-    source: record.source,
-    score: String(record.score || 0),
-    assigned_to: record.assigned_to,
-    maintenance_due_at: record.maintenance_due_at ? String(record.maintenance_due_at).slice(0, 10) : '',
-    next_action_due_at: record.next_action_due_at ? String(record.next_action_due_at).slice(0, 10) : '',
-    compliance_state: record.compliance_state,
-    regulatory_authority: record.regulatory_authority,
-    tags: record.tags.join(', '),
-  };
-}
-
-function validateWizardStep(values: AircraftLeadWizardValues, step: number): Record<string, string> {
-  const errors: Record<string, string> = {};
-  if (step === 1) {
-    if (!values.title.trim()) errors.title = 'Title is required';
-    if (!values.aircraft_id.trim()) errors.aircraft_id = 'Aircraft ID is required';
-  }
-  if (step === 2) {
-    if (!values.aircraft_type.trim()) errors.aircraft_type = 'Aircraft type is required';
-    if (!values.compliance_state.trim()) errors.compliance_state = 'Compliance state is required';
-    if (!values.regulatory_authority.trim()) errors.regulatory_authority = 'Regulatory authority is required';
-  }
-  if (step === 3) {
-    if (!values.status.trim()) errors.status = 'Status is required';
-    if (!values.priority.trim()) errors.priority = 'Priority is required';
-  }
-  return errors;
-}
-
 export function AircraftLeadsManager({
   scope,
   sessionAccessToken,
@@ -209,7 +130,6 @@ export function AircraftLeadsManager({
   canDelete,
   activeTab: activeTabProp,
   onActiveTabChange,
-  onDetailAvailabilityChange,
 }: AircraftLeadsManagerProps) {
   const [rows, setRows] = useState<AircraftLeadRecord[]>([]);
   const [loading, setLoading] = useState(false);
@@ -227,8 +147,6 @@ export function AircraftLeadsManager({
   const [totalCount, setTotalCount] = useState(0);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [internalActiveTab, setInternalActiveTab] = useState<AircraftLeadsTab>('list');
-  const [detailTab, setDetailTab] = useState<'overview' | 'compliance' | 'workflow'>('overview');
-  const [selectedLeadId, setSelectedLeadId] = useState('');
   const [gridColumns, setGridColumns] = useState<'2' | '3' | '4'>('3');
   const [activeTheme, setActiveTheme] = useState('Default Simple');
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
@@ -237,10 +155,6 @@ export function AircraftLeadsManager({
   const [importRows, setImportRows] = useState<Array<Record<string, string>>>([]);
   const [fieldMapping, setFieldMapping] = useState<Record<string, string>>({});
   const [importSubmitting, setImportSubmitting] = useState(false);
-  const [wizardStep, setWizardStep] = useState(1);
-  const [wizardValues, setWizardValues] = useState<AircraftLeadWizardValues>(DEFAULT_WIZARD_VALUES);
-  const [wizardErrors, setWizardErrors] = useState<Record<string, string>>({});
-  const [wizardSubmitting, setWizardSubmitting] = useState(false);
   const [savedFilters, setSavedFilters] = useState<SavedFilter[]>([]);
   const [savedFilterName, setSavedFilterName] = useState('');
   const [selectedSavedFilterId, setSelectedSavedFilterId] = useState('none');
@@ -297,12 +211,6 @@ export function AircraftLeadsManager({
       const nextRows = (Array.isArray(output.records) ? output.records : []).map(normalizeLeadRecord);
       setRows(nextRows);
       setTotalCount(Number(output.total_count || 0));
-      if (!selectedLeadId && nextRows.length > 0) {
-        setSelectedLeadId(nextRows[0].id);
-      }
-      if (selectedLeadId && nextRows.every((row) => row.id !== selectedLeadId) && nextRows.length > 0) {
-        setSelectedLeadId(nextRows[0].id);
-      }
     } catch (fetchError) {
       setError(String((fetchError as Error).message || 'Failed to load aircraft leads'));
     } finally {
@@ -316,7 +224,6 @@ export function AircraftLeadsManager({
     pageSize,
     priorityFilter,
     search,
-    selectedLeadId,
     sortBy,
     sortDirection,
     statusFilter,
@@ -383,15 +290,6 @@ export function AircraftLeadsManager({
       setSavedFilters([]);
     }
   }, [savedFiltersStorageKey]);
-
-  const selectedLead = useMemo(
-    () => rows.find((row) => row.id === selectedLeadId) || null,
-    [rows, selectedLeadId],
-  );
-
-  useEffect(() => {
-    onDetailAvailabilityChange?.(Boolean(selectedLead));
-  }, [onDetailAvailabilityChange, selectedLead]);
 
   const totalPages = Math.max(1, Math.ceil(totalCount / Number(pageSize || '25')));
   const allSelected = rows.length > 0 && rows.every((row) => selectedIds.includes(row.id));
@@ -492,114 +390,6 @@ export function AircraftLeadsManager({
     localStorage.setItem(savedFiltersStorageKey, JSON.stringify(next));
     toast.success('Saved filter');
   }, [aircraftTypeFilter, complianceStateFilter, priorityFilter, savedFilterName, savedFilters, savedFiltersStorageKey, statusFilter]);
-
-  const resetWizard = useCallback(() => {
-    setWizardValues(DEFAULT_WIZARD_VALUES);
-    setWizardErrors({});
-    setWizardStep(1);
-  }, []);
-
-  const handleCreateWizard = useCallback(() => {
-    setActiveTab('wizard');
-    resetWizard();
-  }, [resetWizard]);
-
-  const handleEditWizard = useCallback(() => {
-    if (!selectedLead) return;
-    setWizardValues(mapLeadToWizardValues(selectedLead));
-    setWizardErrors({});
-    setWizardStep(1);
-    setActiveTab('wizard');
-  }, [selectedLead]);
-
-  const handleWizardChange = useCallback((key: keyof AircraftLeadWizardValues, value: string) => {
-    setWizardValues((previous) => ({
-      ...previous,
-      [key]: value,
-    }));
-    setWizardErrors((previous) => {
-      if (!previous[key]) return previous;
-      const next = { ...previous };
-      delete next[key];
-      return next;
-    });
-  }, []);
-
-  const handleNextStep = useCallback(() => {
-    const errors = validateWizardStep(wizardValues, wizardStep);
-    if (Object.keys(errors).length > 0) {
-      setWizardErrors(errors);
-      return;
-    }
-    setWizardErrors({});
-    setWizardStep((previous) => Math.min(3, previous + 1));
-  }, [wizardStep, wizardValues]);
-
-  const handlePreviousStep = useCallback(() => {
-    setWizardStep((previous) => Math.max(1, previous - 1));
-  }, []);
-
-  const handleSubmitWizard = useCallback(async () => {
-    const stepOneErrors = validateWizardStep(wizardValues, 1);
-    const stepTwoErrors = validateWizardStep(wizardValues, 2);
-    const stepThreeErrors = validateWizardStep(wizardValues, 3);
-    const errors = {
-      ...stepOneErrors,
-      ...stepTwoErrors,
-      ...stepThreeErrors,
-    };
-    if (Object.keys(errors).length > 0) {
-      setWizardErrors(errors);
-      setWizardStep(1);
-      return;
-    }
-    if (!canManage) {
-      toast.error('You do not have permission to manage aircraft leads');
-      return;
-    }
-    setWizardSubmitting(true);
-    try {
-      const body = {
-        id: wizardValues.id || undefined,
-        aircraft_id: wizardValues.aircraft_id,
-        aircraft_registration: wizardValues.aircraft_registration,
-        aircraft_type: wizardValues.aircraft_type,
-        title: wizardValues.title,
-        description: wizardValues.description,
-        status: wizardValues.status,
-        priority: wizardValues.priority,
-        source: wizardValues.source,
-        score: Number(wizardValues.score || '0'),
-        assigned_to: wizardValues.assigned_to,
-        maintenance_due_at: wizardValues.maintenance_due_at,
-        next_action_due_at: wizardValues.next_action_due_at,
-        compliance_state: wizardValues.compliance_state,
-        regulatory_authority: wizardValues.regulatory_authority,
-        tags: wizardValues.tags
-          .split(',')
-          .map((item) => item.trim())
-          .filter(Boolean),
-      };
-      const method = wizardValues.id ? 'PUT' : 'POST';
-      const response = await fetch('/api/v2/amro/aircraft-leads', {
-        method,
-        headers: buildHeaders(),
-        body: JSON.stringify(body),
-      });
-      const payload = await parseApiPayload(response);
-      if (!response.ok) {
-        throw new Error(String(payload.error || 'Failed to save aircraft lead'));
-      }
-      toast.success(wizardValues.id ? 'Aircraft lead updated' : 'Aircraft lead created');
-      setActiveTab('list');
-      resetWizard();
-      await loadLeads();
-    } catch (saveError) {
-      toast.error(String((saveError as Error).message || 'Failed to save aircraft lead'));
-    } finally {
-      setWizardSubmitting(false);
-    }
-  }, [buildHeaders, canManage, loadLeads, resetWizard, wizardValues]);
 
   const handleBulkStatusUpdate = useCallback(async (nextStatus: string) => {
     if (!canManage) {
@@ -890,7 +680,7 @@ export function AircraftLeadsManager({
                   }}
                   onItemClick={(id) => {
                     setSelectedLeadId(id);
-                    setActiveTab('detail');
+                    setActiveTab('list');
                   }}
                   className="h-[460px]"
                   scrollPersistenceKey={`aircraft-leads-kanban:${scope.tenantId}:${scope.franchiseId}`}
@@ -1024,7 +814,6 @@ export function AircraftLeadsManager({
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <Button size="sm" onClick={handleCreateWizard} disabled={!canManage}>New Lead</Button>
               <Button size="sm" variant="outline" onClick={() => void loadLeads()}>Refresh</Button>
               {selectedIds.length > 0 ? (
                 <>
@@ -1067,14 +856,7 @@ export function AircraftLeadsManager({
                 </TableHeader>
                 <TableBody>
                   {rows.map((row) => (
-                    <TableRow
-                      key={row.id}
-                      className={selectedLeadId === row.id ? 'bg-muted/40' : ''}
-                      onClick={() => {
-                        setSelectedLeadId(row.id);
-                        setActiveTab('detail');
-                      }}
-                    >
+                    <TableRow key={row.id}>
                       <TableCell onClick={(event) => event.stopPropagation()}>
                         <input
                           type="checkbox"
@@ -1133,7 +915,6 @@ export function AircraftLeadsManager({
                   </SelectContent>
                 </Select>
               </div>
-              <Button size="sm" variant="outline" onClick={() => setActiveTab('wizard')} disabled={!canManage}>New Lead</Button>
             </div>
             <div className={gridColumns === '2' ? 'grid gap-3 md:grid-cols-2' : gridColumns === '3' ? 'grid gap-3 md:grid-cols-2 xl:grid-cols-3' : 'grid gap-3 md:grid-cols-2 xl:grid-cols-4'}>
               {rows.map((row) => (
@@ -1146,17 +927,6 @@ export function AircraftLeadsManager({
                       <Badge variant="outline">{row.priority || 'medium'}</Badge>
                     </div>
                     <EditableText value={row.assigned_to || ''} onSave={async (value) => handleInlineUpdate(row, { assigned_to: value })} placeholder="Assignee" />
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-7"
-                      onClick={() => {
-                        setSelectedLeadId(row.id);
-                        setActiveTab('detail');
-                      }}
-                    >
-                      Open Detail
-                    </Button>
                   </CardContent>
                 </Card>
               ))}
@@ -1165,14 +935,9 @@ export function AircraftLeadsManager({
           <TabsContent value="card" className="space-y-3 pt-3">
             <div className="grid gap-2">
               {rows.map((row) => (
-                <button
+                <div
                   key={`card-${row.id}`}
-                  type="button"
                   className="rounded-md border border-[hsl(var(--mdm-template-border))] p-3 text-left transition-colors hover:bg-muted/30"
-                  onClick={() => {
-                    setSelectedLeadId(row.id);
-                    setActiveTab('detail');
-                  }}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div>
@@ -1186,7 +951,7 @@ export function AircraftLeadsManager({
                     <span>Score: {row.score}</span>
                     <span>Assignee: {row.assigned_to || '-'}</span>
                   </div>
-                </button>
+                </div>
               ))}
             </div>
           </TabsContent>
@@ -1252,183 +1017,6 @@ export function AircraftLeadsManager({
             )}
           </TabsContent>
 
-          <TabsContent value="detail" className="space-y-3 pt-3">
-            {!selectedLead ? (
-              <p className="text-[12px] text-muted-foreground">Select a lead from list view.</p>
-            ) : (
-              <>
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <p className="text-[15px] font-semibold">{selectedLead.title}</p>
-                    <p className="text-[12px] text-muted-foreground">{selectedLead.aircraft_registration || selectedLead.aircraft_id} · {selectedLead.aircraft_type || 'Unknown Type'}</p>
-                  </div>
-                  <Button size="sm" variant="outline" onClick={handleEditWizard} disabled={!canManage}>Edit in Wizard</Button>
-                </div>
-                <Tabs value={detailTab} onValueChange={(value) => setDetailTab(value as 'overview' | 'compliance' | 'workflow')}>
-                  <TabsList className="h-8">
-                    <TabsTrigger value="overview">Overview</TabsTrigger>
-                    <TabsTrigger value="compliance">Compliance</TabsTrigger>
-                    <TabsTrigger value="workflow">Workflow</TabsTrigger>
-                  </TabsList>
-                  <TabsContent value="overview" className="grid gap-2 pt-3 md:grid-cols-2">
-                    <div className="rounded-md border bg-muted/20 p-2 text-[12px]">Status: <span className="font-semibold">{selectedLead.status}</span></div>
-                    <div className="rounded-md border bg-muted/20 p-2 text-[12px]">Priority: <span className="font-semibold">{selectedLead.priority}</span></div>
-                    <div className="rounded-md border bg-muted/20 p-2 text-[12px]">Score: <span className="font-semibold">{selectedLead.score}</span></div>
-                    <div className="rounded-md border bg-muted/20 p-2 text-[12px]">Source: <span className="font-semibold">{selectedLead.source || '-'}</span></div>
-                    <div className="rounded-md border bg-muted/20 p-2 text-[12px]">Assignee: <span className="font-semibold">{selectedLead.assigned_to || '-'}</span></div>
-                    <div className="rounded-md border bg-muted/20 p-2 text-[12px]">Tags: <span className="font-semibold">{selectedLead.tags.join(', ') || '-'}</span></div>
-                    <div className="rounded-md border bg-muted/20 p-2 text-[12px] md:col-span-2">Description: <span className="font-semibold">{selectedLead.description || '-'}</span></div>
-                  </TabsContent>
-                  <TabsContent value="compliance" className="grid gap-2 pt-3 md:grid-cols-2">
-                    <div className="rounded-md border bg-muted/20 p-2 text-[12px]">Maintenance Due: <span className="font-semibold">{selectedLead.maintenance_due_at ? String(selectedLead.maintenance_due_at).slice(0, 10) : '-'}</span></div>
-                    <div className="rounded-md border bg-muted/20 p-2 text-[12px]">Next Action Due: <span className="font-semibold">{selectedLead.next_action_due_at ? String(selectedLead.next_action_due_at).slice(0, 10) : '-'}</span></div>
-                    <div className="rounded-md border bg-muted/20 p-2 text-[12px]">Compliance State: <span className="font-semibold">{selectedLead.compliance_state || '-'}</span></div>
-                    <div className="rounded-md border bg-muted/20 p-2 text-[12px]">Regulatory Authority: <span className="font-semibold">{selectedLead.regulatory_authority || '-'}</span></div>
-                  </TabsContent>
-                  <TabsContent value="workflow" className="grid gap-2 pt-3 md:grid-cols-2">
-                    <div className="rounded-md border bg-muted/20 p-2 text-[12px]">Created: <span className="font-semibold">{selectedLead.created_at ? new Date(selectedLead.created_at).toLocaleString() : '-'}</span></div>
-                    <div className="rounded-md border bg-muted/20 p-2 text-[12px]">Updated: <span className="font-semibold">{selectedLead.updated_at ? new Date(selectedLead.updated_at).toLocaleString() : '-'}</span></div>
-                    <div className="rounded-md border bg-muted/20 p-2 text-[12px] md:col-span-2">Aircraft Workflow: <span className="font-semibold">Inspection → Planning → Compliance Review → Work Package</span></div>
-                  </TabsContent>
-                </Tabs>
-              </>
-            )}
-          </TabsContent>
-
-          <TabsContent value="wizard" className="space-y-3 pt-3">
-            <div className="flex items-center gap-2 text-[12px]">
-              <Badge variant={wizardStep === 1 ? 'default' : 'secondary'}>Step 1</Badge>
-              <Badge variant={wizardStep === 2 ? 'default' : 'secondary'}>Step 2</Badge>
-              <Badge variant={wizardStep === 3 ? 'default' : 'secondary'}>Step 3</Badge>
-            </div>
-
-            {wizardStep === 1 ? (
-              <div className="grid gap-3 md:grid-cols-2">
-                <div className="space-y-1">
-                  <Label className="text-[11px]">Lead Title</Label>
-                  <Input value={wizardValues.title} onChange={(event) => handleWizardChange('title', event.target.value)} className="h-8 text-[12px]" />
-                  {wizardErrors.title ? <p className="text-[11px] text-red-600">{wizardErrors.title}</p> : null}
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[11px]">Aircraft ID</Label>
-                  <Input value={wizardValues.aircraft_id} onChange={(event) => handleWizardChange('aircraft_id', event.target.value)} className="h-8 text-[12px]" />
-                  {wizardErrors.aircraft_id ? <p className="text-[11px] text-red-600">{wizardErrors.aircraft_id}</p> : null}
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[11px]">Aircraft Registration</Label>
-                  <Input value={wizardValues.aircraft_registration} onChange={(event) => handleWizardChange('aircraft_registration', event.target.value)} className="h-8 text-[12px]" />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[11px]">Source</Label>
-                  <Select value={wizardValues.source} onValueChange={(value) => handleWizardChange('source', value)}>
-                    <SelectTrigger className="h-8 text-[12px]"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="manual">Manual</SelectItem>
-                      <SelectItem value="inspection">Inspection</SelectItem>
-                      <SelectItem value="flight_log">Flight Log</SelectItem>
-                      <SelectItem value="sensor_alert">Sensor Alert</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            ) : null}
-
-            {wizardStep === 2 ? (
-              <div className="grid gap-3 md:grid-cols-2">
-                <div className="space-y-1">
-                  <Label className="text-[11px]">Aircraft Type</Label>
-                  <Input value={wizardValues.aircraft_type} onChange={(event) => handleWizardChange('aircraft_type', event.target.value)} className="h-8 text-[12px]" />
-                  {wizardErrors.aircraft_type ? <p className="text-[11px] text-red-600">{wizardErrors.aircraft_type}</p> : null}
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[11px]">Maintenance Due</Label>
-                  <Input type="date" value={wizardValues.maintenance_due_at} onChange={(event) => handleWizardChange('maintenance_due_at', event.target.value)} className="h-8 text-[12px]" />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[11px]">Compliance State</Label>
-                  <Select value={wizardValues.compliance_state} onValueChange={(value) => handleWizardChange('compliance_state', value)}>
-                    <SelectTrigger className="h-8 text-[12px]"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="monitoring">Monitoring</SelectItem>
-                      <SelectItem value="review">Review</SelectItem>
-                      <SelectItem value="at_risk">At Risk</SelectItem>
-                      <SelectItem value="compliant">Compliant</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {wizardErrors.compliance_state ? <p className="text-[11px] text-red-600">{wizardErrors.compliance_state}</p> : null}
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[11px]">Regulatory Authority</Label>
-                  <Input value={wizardValues.regulatory_authority} onChange={(event) => handleWizardChange('regulatory_authority', event.target.value)} className="h-8 text-[12px]" />
-                  {wizardErrors.regulatory_authority ? <p className="text-[11px] text-red-600">{wizardErrors.regulatory_authority}</p> : null}
-                </div>
-              </div>
-            ) : null}
-
-            {wizardStep === 3 ? (
-              <div className="grid gap-3 md:grid-cols-2">
-                <div className="space-y-1">
-                  <Label className="text-[11px]">Status</Label>
-                  <Select value={wizardValues.status} onValueChange={(value) => handleWizardChange('status', value)}>
-                    <SelectTrigger className="h-8 text-[12px]"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="new">New</SelectItem>
-                      <SelectItem value="qualified">Qualified</SelectItem>
-                      <SelectItem value="in_progress">In Progress</SelectItem>
-                      <SelectItem value="closed">Closed</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {wizardErrors.status ? <p className="text-[11px] text-red-600">{wizardErrors.status}</p> : null}
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[11px]">Priority</Label>
-                  <Select value={wizardValues.priority} onValueChange={(value) => handleWizardChange('priority', value)}>
-                    <SelectTrigger className="h-8 text-[12px]"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="low">Low</SelectItem>
-                      <SelectItem value="medium">Medium</SelectItem>
-                      <SelectItem value="high">High</SelectItem>
-                      <SelectItem value="critical">Critical</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {wizardErrors.priority ? <p className="text-[11px] text-red-600">{wizardErrors.priority}</p> : null}
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[11px]">Assignee</Label>
-                  <Input value={wizardValues.assigned_to} onChange={(event) => handleWizardChange('assigned_to', event.target.value)} className="h-8 text-[12px]" />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[11px]">Score</Label>
-                  <Input value={wizardValues.score} onChange={(event) => handleWizardChange('score', event.target.value)} className="h-8 text-[12px]" />
-                </div>
-                <div className="space-y-1 md:col-span-2">
-                  <Label className="text-[11px]">Next Action Due</Label>
-                  <Input type="date" value={wizardValues.next_action_due_at} onChange={(event) => handleWizardChange('next_action_due_at', event.target.value)} className="h-8 text-[12px]" />
-                </div>
-                <div className="space-y-1 md:col-span-2">
-                  <Label className="text-[11px]">Description</Label>
-                  <Textarea value={wizardValues.description} onChange={(event) => handleWizardChange('description', event.target.value)} className="text-[12px]" />
-                </div>
-                <div className="space-y-1 md:col-span-2">
-                  <Label className="text-[11px]">Tags (comma separated)</Label>
-                  <Input value={wizardValues.tags} onChange={(event) => handleWizardChange('tags', event.target.value)} className="h-8 text-[12px]" />
-                </div>
-              </div>
-            ) : null}
-
-            <div className="flex justify-between">
-              <Button size="sm" variant="outline" disabled={wizardStep === 1} onClick={handlePreviousStep}>Back</Button>
-              <div className="flex gap-2">
-                {wizardStep < 3 ? (
-                  <Button size="sm" onClick={handleNextStep}>Next</Button>
-                ) : (
-                  <Button size="sm" onClick={() => void handleSubmitWizard()} disabled={wizardSubmitting || !canManage}>
-                    {wizardValues.id ? 'Update Lead' : 'Create Lead'}
-                  </Button>
-                )}
-              </div>
-            </div>
-          </TabsContent>
         </Tabs>
       </CardContent>
     </Card>
