@@ -1,0 +1,23 @@
+tenant_id,franchise_id,code,description,parent_id,level,chapter_code,parent_code_ref
+e42ec6fd-6b88-4721-befe-4443d9743120,,05-10,Time Limits,,2,5,5
+e42ec6fd-6b88-4721-befe-4443d9743120,,05-20,Scheduled Maintenance Checks,,2,5,5
+e42ec6fd-6b88-4721-befe-4443d9743120,,05-50,Unscheduled Maintenance Checks,,2,5,5
+e42ec6fd-6b88-4721-befe-4443d9743120,,12-10,Replenishing,,2,12,12
+e42ec6fd-6b88-4721-befe-4443d9743120,,12-20,Scheduled Servicing,,2,12,12
+e42ec6fd-6b88-4721-befe-4443d9743120,,21-10,Compression,,2,21,21
+e42ec6fd-6b88-4721-befe-4443d9743120,,21-20,Distribution,,2,21,21
+e42ec6fd-6b88-4721-befe-4443d9743120,,21-30,Pressurization Control,,2,21,21
+e42ec6fd-6b88-4721-befe-4443d9743120,,21-50,Cooling,,2,21,21
+e42ec6fd-6b88-4721-befe-4443d9743120,,24-10,Generator Drive,,2,24,24
+e42ec6fd-6b88-4721-befe-4443d9743120,,24-20,AC Generation,,2,24,24
+e42ec6fd-6b88-4721-befe-4443d9743120,,24-30,DC Generation,,2,24,24
+e42ec6fd-6b88-4721-befe-4443d9743120,,27-10,Aileron and Tab,,2,27,27
+e42ec6fd-6b88-4721-befe-4443d9743120,,27-20,Rudder and Tab,,2,27,27
+e42ec6fd-6b88-4721-befe-4443d9743120,,27-30,Elevator and Tab,,2,27,27
+e42ec6fd-6b88-4721-befe-4443d9743120,,32-10,Main Gear and Doors,,2,32,32
+e42ec6fd-6b88-4721-befe-4443d9743120,,32-20,Nose Gear and Doors,,2,32,32
+e42ec6fd-6b88-4721-befe-4443d9743120,,32-40,Wheels and Brakes,,2,32,32
+e42ec6fd-6b88-4721-befe-4443d9743120,,52-10,Passenger / Crew Doors,,2,52,52
+e42ec6fd-6b88-4721-befe-4443d9743120,,52-30,Cargo Doors,,2,52,52
+e42ec6fd-6b88-4721-befe-4443d9743120,,71-10,Cowling,,2,71,71
+e42ec6fd-6b88-4721-befe-4443d9743120,,71-20,Engine Mounts,,2,71,71
