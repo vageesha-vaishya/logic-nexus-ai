@@ -1323,6 +1323,67 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
       expect(result.errors[field]).toBe(message);
     });
 
+    const aircraftStatuses = AMRO_MASTER_ENTITY_FORM_FIELDS.aircraft
+      .find((field) => field.key === 'status')
+      ?.options ?? [];
+    expect(aircraftStatuses).toEqual(['active', 'maintenance', 'grounded', 'retired', 'storage']);
+
+    const aircraftRetiredStatus = buildPayloadFromForm('aircraft', {
+      tail_number: 'N909AA',
+      serial_number: 'SN-909',
+      aircraft_type: 'NarrowBody',
+      manufacturer_id: 'manu-1',
+      aircraft_model: 'A320-200',
+      status: 'retired',
+    });
+    expect(aircraftRetiredStatus.errors.status).toBeUndefined();
+
+    const aircraftInvalidStatus = buildPayloadFromForm('aircraft', {
+      tail_number: 'N909AB',
+      serial_number: 'SN-910',
+      aircraft_type: 'NarrowBody',
+      manufacturer_id: 'manu-1',
+      aircraft_model: 'A320-200',
+      status: 'inactive',
+    });
+    expect(aircraftInvalidStatus.errors.status).toBe('Status is invalid');
+
+    const aircraftOperationalFields = buildPayloadFromForm('aircraft', {
+      tail_number: 'N909AC',
+      serial_number: 'SN-911',
+      aircraft_type: 'NarrowBody',
+      manufacturer_id: 'manu-1',
+      aircraft_model: 'A320-200',
+      status: 'active',
+      line_number: 'LN-77',
+      manufacturing_date: '2026-03-11',
+      base_location: 'DXB',
+      owner_name: 'Owned',
+      current_flight_hours: '2401.7',
+      current_cycles: '901',
+    });
+    expect(aircraftOperationalFields.errors.line_number).toBeUndefined();
+    expect(aircraftOperationalFields.errors.manufacturing_date).toBeUndefined();
+    expect(aircraftOperationalFields.payload.line_number).toBe('LN-77');
+    expect(aircraftOperationalFields.payload.manufacturing_date).toBe('2026-03-11');
+    expect(aircraftOperationalFields.payload.base_location).toBe('DXB');
+    expect(aircraftOperationalFields.payload.owner_name).toBe('Owned');
+    expect(aircraftOperationalFields.payload.current_flight_hours).toBe(2401.7);
+    expect(aircraftOperationalFields.payload.current_cycles).toBe(901);
+
+    const aircraftOptionalPlaceholders = buildPayloadFromForm('aircraft', {
+      tail_number: 'N909AD',
+      serial_number: 'SN-912',
+      aircraft_type: 'NarrowBody',
+      manufacturer_id: 'manu-1',
+      aircraft_model: 'A320-200',
+      status: 'active',
+      base_location: 'Nothing selected',
+      owner_name: 'Nothing selected',
+    });
+    expect(aircraftOptionalPlaceholders.payload.base_location).toBeUndefined();
+    expect(aircraftOptionalPlaceholders.payload.owner_name).toBeUndefined();
+
     const supplierMalformed = buildPayloadFromForm('suppliers', {
       supplier_code: 'SUP-1',
       name: 'Supplier One',

@@ -57,7 +57,7 @@ const ENTITY_CONFIG: Record<AmroMasterDataEntity, EntityConfig> = {
       'restrictions',
     ],
     listColumns:
-      'id,tenant_id,franchise_id,registration,tail_number,serial_number,aircraft_type,aircraft_model,manufacturer,manufacturer_id,model,msn,line_number,configuration_code,maintenance_program,status,operator_code,station_code,engine_type,base_location,owner_name,defect_count,first_limit_remaining,restrictions,current_flight_hours,current_cycles,current_flight_hours_since_new,current_cycles_since_new,created_at,updated_at',
+      'id,tenant_id,franchise_id,registration,tail_number,serial_number,aircraft_type,aircraft_model,manufacturer,manufacturer_id,model,msn,line_number,configuration_code,maintenance_program,status,operator_code,station_code,engine_type,manufacturing_date,base_location,owner_name,defect_count,first_limit_remaining,restrictions,current_flight_hours,current_cycles,current_flight_hours_since_new,current_cycles_since_new,created_at,updated_at',
     requiredCreateFields: ['tail_number', 'serial_number', 'aircraft_type', 'aircraft_model', 'manufacturer_id'],
     writeAllowedFields: [
       'registration',
@@ -77,6 +77,7 @@ const ENTITY_CONFIG: Record<AmroMasterDataEntity, EntityConfig> = {
       'station_code',
       'base_location',
       'owner_name',
+      'manufacturing_date',
       'defect_count',
       'first_limit_remaining',
       'restrictions',
@@ -410,7 +411,15 @@ export function parseBulkOperation(body: unknown): { isBulkImport: boolean; reco
 
 function normalizeAircraft(payload: Record<string, unknown>) {
   const tailNumber = asString(payload.tail_number || payload.registration);
-  const serialNumber = asString(payload.serial_number || payload.msn);
+  const serialSource = asString(payload.serial_number || payload.msn);
+  const serialToken = serialSource.toUpperCase();
+  const requiresSyntheticSerial = !serialSource || serialToken === 'N/A' || serialToken === 'NA' || serialToken === '-';
+  const serialFallbackToken = asString(payload.tail_number || payload.registration)
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '');
+  const serialNumber = requiresSyntheticSerial
+    ? `NSN-${serialFallbackToken || 'UNSPECIFIED'}`
+    : serialSource;
   const aircraftType = asString(payload.aircraft_type || payload.engine_type);
   const aircraftModel = asString(payload.aircraft_model || payload.model);
   const normalizedStatusToken = asString(payload.status).toLowerCase();
@@ -433,6 +442,7 @@ function normalizeAircraft(payload: Record<string, unknown>) {
     station_code: asNullableString(payload.station_code),
     base_location: asNullableString(payload.base_location),
     owner_name: asNullableString(payload.owner_name),
+    manufacturing_date: asNullableString(payload.manufacturing_date),
     defect_count: asNumber(payload.defect_count) ?? 0,
     first_limit_remaining: asNumber(payload.first_limit_remaining),
     restrictions: asNullableString(payload.restrictions),
@@ -641,6 +651,13 @@ export type MasterDataValidationIssue = {
 export function validatePayload(entity: AmroMasterDataEntity, payload: Record<string, unknown>): MasterDataValidationIssue[] {
   const issues: MasterDataValidationIssue[] = [];
   if (entity === 'aircraft') {
+    const manufacturingDate = asNullableString(payload.manufacturing_date);
+    if (manufacturingDate && !/^\d{4}-\d{2}-\d{2}$/.test(manufacturingDate)) {
+      issues.push({
+        field: 'manufacturing_date',
+        message: 'manufacturing_date must be in YYYY-MM-DD format',
+      });
+    }
     const statusRaw = asString(payload.status).toLowerCase();
     const normalizedStatus = AIRCRAFT_STATUS_ALIASES[statusRaw] || statusRaw;
     if (statusRaw && !AIRCRAFT_ALLOWED_STATUSES.has(normalizedStatus)) {

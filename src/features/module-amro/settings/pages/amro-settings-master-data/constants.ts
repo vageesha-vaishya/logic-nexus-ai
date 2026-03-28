@@ -85,7 +85,7 @@ export const MANUFACTURER_SEED_NAMES = [
 ];
 
 export const AIRCRAFT_TYPE_OPTIONS = ['NarrowBody', 'RegionalJet', 'Turboprop', 'WideBody', 'auto_seeded'];
-export const AIRCRAFT_STATUS_OPTIONS = ['active', 'inactive', 'grounded', 'maintenance'] as const;
+export const AIRCRAFT_STATUS_OPTIONS = ['active', 'maintenance', 'grounded', 'retired', 'storage'] as const;
 export const AIRCRAFT_FORM_SECTION_FIELD_KEYS: Record<FormSectionKey, string[]> = {
   basic: ['tail_number', 'registration', 'serial_number', 'aircraft_type', 'manufacturer_id'],
   configuration: ['aircraft_model', 'configuration_code', 'maintenance_program', 'status'],
@@ -121,7 +121,7 @@ export const ENTITY_FORM_FIELDS: Record<MasterEntity, EntityFormField[]> = {
     { key: 'aircraft_model', label: 'Aircraft Model', type: 'select', required: true },
     { key: 'configuration_code', label: 'Configuration Code', type: 'text' },
     { key: 'maintenance_program', label: 'Maintenance Program', type: 'text' },
-    { key: 'status', label: 'Status', type: 'select', required: true, options: ['active', 'inactive', 'grounded', 'maintenance'] },
+    { key: 'status', label: 'Status', type: 'select', required: true, options: ['active', 'maintenance', 'grounded', 'retired', 'storage'] },
   ],
   flight_logs: [
     { key: 'aircraft_id', label: 'Aircraft Id', type: 'text', required: true },

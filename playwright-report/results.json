@@ -11,7 +11,7 @@
     "grepInvert": null,
     "maxFailures": 0,
     "metadata": {
-      "actualWorkers": 5
+      "actualWorkers": 1
     },
     "preserveOutput": "always",
     "reporter": [
@@ -46,7 +46,7 @@
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
-          "actualWorkers": 5
+          "actualWorkers": 1
         },
         "id": "chromium",
         "name": "chromium",
@@ -64,7 +64,7 @@
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
-          "actualWorkers": 5
+          "actualWorkers": 1
         },
         "id": "chrome-latest",
         "name": "chrome-latest",
@@ -82,7 +82,7 @@
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
-          "actualWorkers": 5
+          "actualWorkers": 1
         },
         "id": "msedge-latest",
         "name": "msedge-latest",
@@ -100,7 +100,7 @@
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
-          "actualWorkers": 5
+          "actualWorkers": 1
         },
         "id": "firefox",
         "name": "firefox",
@@ -118,7 +118,7 @@
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
-          "actualWorkers": 5
+          "actualWorkers": 1
         },
         "id": "webkit",
         "name": "webkit",
@@ -136,7 +136,7 @@
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
-          "actualWorkers": 5
+          "actualWorkers": 1
         },
         "id": "ios-mobile",
         "name": "ios-mobile",
@@ -154,7 +154,7 @@
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
-          "actualWorkers": 5
+          "actualWorkers": 1
         },
         "id": "android-mobile",
         "name": "android-mobile",
@@ -174,11 +174,7 @@
     "updateSourceMethod": "patch",
     "version": "1.57.0",
     "workers": 5,
-    "webServer": {
-      "command": "npm run dev -- --host 0.0.0.0 --port 4173",
-      "url": "http://localhost:4173",
-      "reuseExistingServer": true
-    }
+    "webServer": null
   },
   "suites": [
     {
@@ -189,13 +185,13 @@
       "specs": [],
       "suites": [
         {
-          "title": "amro overview dashboard",
+          "title": "amro aircraft CRUD smoke",
           "file": "tests/e2e/amro-overview-dashboard.spec.ts",
-          "line": 28,
+          "line": 91,
           "column": 6,
           "specs": [
             {
-              "title": "renders overview surfaces with filters, charts, and export controls",
+              "title": "creates, updates, and deletes an aircraft record from master data page",
               "ok": true,
               "tags": [],
               "tests": [
@@ -204,10 +200,10 @@
                   "annotations": [
                     {
                       "type": "skip",
-                      "description": "AMRO overview dashboard surface is not available for this account or environment",
+                      "description": "AMRO master data surface is unavailable in this environment profile",
                       "location": {
                         "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/amro-overview-dashboard.spec.ts",
-                        "line": 34,
+                        "line": 81,
                         "column": 10
                       }
                     }
@@ -220,277 +216,19 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "skipped",
-                      "duration": 2425,
+                      "duration": 1044,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-03-23T18:15:26.276Z",
+                      "startTime": "2026-03-28T13:17:32.514Z",
                       "annotations": [
                         {
                           "type": "skip",
-                          "description": "AMRO overview dashboard surface is not available for this account or environment",
+                          "description": "AMRO master data surface is unavailable in this environment profile",
                           "location": {
                             "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/amro-overview-dashboard.spec.ts",
-                            "line": 34,
-                            "column": 10
-                          }
-                        }
-                      ],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
-                },
-                {
-                  "timeout": 30000,
-                  "annotations": [
-                    {
-                      "type": "skip",
-                      "description": "AMRO overview dashboard surface is not available for this account or environment",
-                      "location": {
-                        "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/amro-overview-dashboard.spec.ts",
-                        "line": 34,
-                        "column": 10
-                      }
-                    }
-                  ],
-                  "expectedStatus": "skipped",
-                  "projectId": "chrome-latest",
-                  "projectName": "chrome-latest",
-                  "results": [
-                    {
-                      "workerIndex": 2,
-                      "parallelIndex": 2,
-                      "status": "skipped",
-                      "duration": 4860,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-03-23T18:15:26.276Z",
-                      "annotations": [
-                        {
-                          "type": "skip",
-                          "description": "AMRO overview dashboard surface is not available for this account or environment",
-                          "location": {
-                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/amro-overview-dashboard.spec.ts",
-                            "line": 34,
-                            "column": 10
-                          }
-                        }
-                      ],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
-                },
-                {
-                  "timeout": 30000,
-                  "annotations": [
-                    {
-                      "type": "skip",
-                      "description": "AMRO overview dashboard surface is not available for this account or environment",
-                      "location": {
-                        "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/amro-overview-dashboard.spec.ts",
-                        "line": 34,
-                        "column": 10
-                      }
-                    }
-                  ],
-                  "expectedStatus": "skipped",
-                  "projectId": "msedge-latest",
-                  "projectName": "msedge-latest",
-                  "results": [
-                    {
-                      "workerIndex": 4,
-                      "parallelIndex": 4,
-                      "status": "skipped",
-                      "duration": 2433,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-03-23T18:15:26.279Z",
-                      "annotations": [
-                        {
-                          "type": "skip",
-                          "description": "AMRO overview dashboard surface is not available for this account or environment",
-                          "location": {
-                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/amro-overview-dashboard.spec.ts",
-                            "line": 34,
-                            "column": 10
-                          }
-                        }
-                      ],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
-                },
-                {
-                  "timeout": 30000,
-                  "annotations": [
-                    {
-                      "type": "skip",
-                      "description": "AMRO overview dashboard surface is not available for this account or environment",
-                      "location": {
-                        "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/amro-overview-dashboard.spec.ts",
-                        "line": 34,
-                        "column": 10
-                      }
-                    }
-                  ],
-                  "expectedStatus": "skipped",
-                  "projectId": "firefox",
-                  "projectName": "firefox",
-                  "results": [
-                    {
-                      "workerIndex": 6,
-                      "parallelIndex": 3,
-                      "status": "skipped",
-                      "duration": 2127,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-03-23T18:15:29.662Z",
-                      "annotations": [
-                        {
-                          "type": "skip",
-                          "description": "AMRO overview dashboard surface is not available for this account or environment",
-                          "location": {
-                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/amro-overview-dashboard.spec.ts",
-                            "line": 34,
-                            "column": 10
-                          }
-                        }
-                      ],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
-                },
-                {
-                  "timeout": 30000,
-                  "annotations": [
-                    {
-                      "type": "skip",
-                      "description": "AMRO overview dashboard surface is not available for this account or environment",
-                      "location": {
-                        "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/amro-overview-dashboard.spec.ts",
-                        "line": 34,
-                        "column": 10
-                      }
-                    }
-                  ],
-                  "expectedStatus": "skipped",
-                  "projectId": "webkit",
-                  "projectName": "webkit",
-                  "results": [
-                    {
-                      "workerIndex": 8,
-                      "parallelIndex": 4,
-                      "status": "skipped",
-                      "duration": 1175,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-03-23T18:15:29.701Z",
-                      "annotations": [
-                        {
-                          "type": "skip",
-                          "description": "AMRO overview dashboard surface is not available for this account or environment",
-                          "location": {
-                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/amro-overview-dashboard.spec.ts",
-                            "line": 34,
-                            "column": 10
-                          }
-                        }
-                      ],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
-                },
-                {
-                  "timeout": 30000,
-                  "annotations": [
-                    {
-                      "type": "skip",
-                      "description": "AMRO overview dashboard surface is not available for this account or environment",
-                      "location": {
-                        "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/amro-overview-dashboard.spec.ts",
-                        "line": 34,
-                        "column": 10
-                      }
-                    }
-                  ],
-                  "expectedStatus": "skipped",
-                  "projectId": "ios-mobile",
-                  "projectName": "ios-mobile",
-                  "results": [
-                    {
-                      "workerIndex": 9,
-                      "parallelIndex": 2,
-                      "status": "skipped",
-                      "duration": 1318,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-03-23T18:15:32.194Z",
-                      "annotations": [
-                        {
-                          "type": "skip",
-                          "description": "AMRO overview dashboard surface is not available for this account or environment",
-                          "location": {
-                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/amro-overview-dashboard.spec.ts",
-                            "line": 34,
-                            "column": 10
-                          }
-                        }
-                      ],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
-                },
-                {
-                  "timeout": 30000,
-                  "annotations": [
-                    {
-                      "type": "skip",
-                      "description": "AMRO overview dashboard surface is not available for this account or environment",
-                      "location": {
-                        "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/amro-overview-dashboard.spec.ts",
-                        "line": 34,
-                        "column": 10
-                      }
-                    }
-                  ],
-                  "expectedStatus": "skipped",
-                  "projectId": "android-mobile",
-                  "projectName": "android-mobile",
-                  "results": [
-                    {
-                      "workerIndex": 11,
-                      "parallelIndex": 4,
-                      "status": "skipped",
-                      "duration": 1005,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-03-23T18:15:32.336Z",
-                      "annotations": [
-                        {
-                          "type": "skip",
-                          "description": "AMRO overview dashboard surface is not available for this account or environment",
-                          "location": {
-                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/amro-overview-dashboard.spec.ts",
-                            "line": 34,
+                            "line": 81,
                             "column": 10
                           }
                         }
@@ -501,321 +239,9 @@
                   "status": "skipped"
                 }
               ],
-              "id": "29b7b4c4b3ccbdec0fdb-e89f769acebf711a17dc",
+              "id": "29b7b4c4b3ccbdec0fdb-6745df44779737be3e3c",
               "file": "tests/e2e/amro-overview-dashboard.spec.ts",
-              "line": 29,
-              "column": 3
-            },
-            {
-              "title": "stays responsive and keyboard accessible on mobile",
-              "ok": true,
-              "tags": [],
-              "tests": [
-                {
-                  "timeout": 30000,
-                  "annotations": [
-                    {
-                      "type": "skip",
-                      "description": "AMRO overview dashboard surface is not available for this account or environment",
-                      "location": {
-                        "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/amro-overview-dashboard.spec.ts",
-                        "line": 58,
-                        "column": 10
-                      }
-                    }
-                  ],
-                  "expectedStatus": "skipped",
-                  "projectId": "chromium",
-                  "projectName": "chromium",
-                  "results": [
-                    {
-                      "workerIndex": 1,
-                      "parallelIndex": 1,
-                      "status": "skipped",
-                      "duration": 2415,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-03-23T18:15:26.285Z",
-                      "annotations": [
-                        {
-                          "type": "skip",
-                          "description": "AMRO overview dashboard surface is not available for this account or environment",
-                          "location": {
-                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/amro-overview-dashboard.spec.ts",
-                            "line": 58,
-                            "column": 10
-                          }
-                        }
-                      ],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
-                },
-                {
-                  "timeout": 30000,
-                  "annotations": [
-                    {
-                      "type": "skip",
-                      "description": "AMRO overview dashboard surface is not available for this account or environment",
-                      "location": {
-                        "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/amro-overview-dashboard.spec.ts",
-                        "line": 58,
-                        "column": 10
-                      }
-                    }
-                  ],
-                  "expectedStatus": "skipped",
-                  "projectId": "chrome-latest",
-                  "projectName": "chrome-latest",
-                  "results": [
-                    {
-                      "workerIndex": 3,
-                      "parallelIndex": 3,
-                      "status": "skipped",
-                      "duration": 2421,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-03-23T18:15:26.290Z",
-                      "annotations": [
-                        {
-                          "type": "skip",
-                          "description": "AMRO overview dashboard surface is not available for this account or environment",
-                          "location": {
-                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/amro-overview-dashboard.spec.ts",
-                            "line": 58,
-                            "column": 10
-                          }
-                        }
-                      ],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
-                },
-                {
-                  "timeout": 30000,
-                  "annotations": [
-                    {
-                      "type": "skip",
-                      "description": "AMRO overview dashboard surface is not available for this account or environment",
-                      "location": {
-                        "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/amro-overview-dashboard.spec.ts",
-                        "line": 58,
-                        "column": 10
-                      }
-                    }
-                  ],
-                  "expectedStatus": "skipped",
-                  "projectId": "msedge-latest",
-                  "projectName": "msedge-latest",
-                  "results": [
-                    {
-                      "workerIndex": 5,
-                      "parallelIndex": 1,
-                      "status": "skipped",
-                      "duration": 1896,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-03-23T18:15:29.664Z",
-                      "annotations": [
-                        {
-                          "type": "skip",
-                          "description": "AMRO overview dashboard surface is not available for this account or environment",
-                          "location": {
-                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/amro-overview-dashboard.spec.ts",
-                            "line": 58,
-                            "column": 10
-                          }
-                        }
-                      ],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
-                },
-                {
-                  "timeout": 30000,
-                  "annotations": [
-                    {
-                      "type": "skip",
-                      "description": "AMRO overview dashboard surface is not available for this account or environment",
-                      "location": {
-                        "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/amro-overview-dashboard.spec.ts",
-                        "line": 58,
-                        "column": 10
-                      }
-                    }
-                  ],
-                  "expectedStatus": "skipped",
-                  "projectId": "firefox",
-                  "projectName": "firefox",
-                  "results": [
-                    {
-                      "workerIndex": 7,
-                      "parallelIndex": 0,
-                      "status": "skipped",
-                      "duration": 2466,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-03-23T18:15:29.670Z",
-                      "annotations": [
-                        {
-                          "type": "skip",
-                          "description": "AMRO overview dashboard surface is not available for this account or environment",
-                          "location": {
-                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/amro-overview-dashboard.spec.ts",
-                            "line": 58,
-                            "column": 10
-                          }
-                        }
-                      ],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
-                },
-                {
-                  "timeout": 30000,
-                  "annotations": [
-                    {
-                      "type": "skip",
-                      "description": "AMRO overview dashboard surface is not available for this account or environment",
-                      "location": {
-                        "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/amro-overview-dashboard.spec.ts",
-                        "line": 58,
-                        "column": 10
-                      }
-                    }
-                  ],
-                  "expectedStatus": "skipped",
-                  "projectId": "webkit",
-                  "projectName": "webkit",
-                  "results": [
-                    {
-                      "workerIndex": 8,
-                      "parallelIndex": 4,
-                      "status": "skipped",
-                      "duration": 667,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-03-23T18:15:31.104Z",
-                      "annotations": [
-                        {
-                          "type": "skip",
-                          "description": "AMRO overview dashboard surface is not available for this account or environment",
-                          "location": {
-                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/amro-overview-dashboard.spec.ts",
-                            "line": 58,
-                            "column": 10
-                          }
-                        }
-                      ],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
-                },
-                {
-                  "timeout": 30000,
-                  "annotations": [
-                    {
-                      "type": "skip",
-                      "description": "AMRO overview dashboard surface is not available for this account or environment",
-                      "location": {
-                        "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/amro-overview-dashboard.spec.ts",
-                        "line": 58,
-                        "column": 10
-                      }
-                    }
-                  ],
-                  "expectedStatus": "skipped",
-                  "projectId": "ios-mobile",
-                  "projectName": "ios-mobile",
-                  "results": [
-                    {
-                      "workerIndex": 10,
-                      "parallelIndex": 1,
-                      "status": "skipped",
-                      "duration": 1306,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-03-23T18:15:32.255Z",
-                      "annotations": [
-                        {
-                          "type": "skip",
-                          "description": "AMRO overview dashboard surface is not available for this account or environment",
-                          "location": {
-                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/amro-overview-dashboard.spec.ts",
-                            "line": 58,
-                            "column": 10
-                          }
-                        }
-                      ],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
-                },
-                {
-                  "timeout": 30000,
-                  "annotations": [
-                    {
-                      "type": "skip",
-                      "description": "AMRO overview dashboard surface is not available for this account or environment",
-                      "location": {
-                        "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/amro-overview-dashboard.spec.ts",
-                        "line": 58,
-                        "column": 10
-                      }
-                    }
-                  ],
-                  "expectedStatus": "skipped",
-                  "projectId": "android-mobile",
-                  "projectName": "android-mobile",
-                  "results": [
-                    {
-                      "workerIndex": 12,
-                      "parallelIndex": 3,
-                      "status": "skipped",
-                      "duration": 458,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-03-23T18:15:34.258Z",
-                      "annotations": [
-                        {
-                          "type": "skip",
-                          "description": "AMRO overview dashboard surface is not available for this account or environment",
-                          "location": {
-                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/amro-overview-dashboard.spec.ts",
-                            "line": 58,
-                            "column": 10
-                          }
-                        }
-                      ],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
-                }
-              ],
-              "id": "29b7b4c4b3ccbdec0fdb-38c74e35cca2574348d3",
-              "file": "tests/e2e/amro-overview-dashboard.spec.ts",
-              "line": 68,
+              "line": 92,
               "column": 3
             }
           ]
@@ -825,10 +251,10 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-03-23T18:15:24.320Z",
-    "duration": 10608.488,
+    "startTime": "2026-03-28T13:17:31.981Z",
+    "duration": 3552.895,
     "expected": 0,
-    "skipped": 14,
+    "skipped": 1,
     "unexpected": 0,
     "flaky": 0
   }

@@ -599,7 +599,7 @@ const MANUFACTURER_SEED_NAMES = [
 ];
 
 const AIRCRAFT_TYPE_OPTIONS = ['NarrowBody', 'RegionalJet', 'Turboprop', 'WideBody', 'auto_seeded'];
-const AIRCRAFT_STATUS_OPTIONS = ['active', 'inactive', 'grounded', 'maintenance'] as const;
+const AIRCRAFT_STATUS_OPTIONS = ['active', 'maintenance', 'grounded', 'retired', 'storage'] as const;
 const AIRCRAFT_FORM_SECTION_FIELD_KEYS: Record<FormSectionKey, string[]> = {
   basic: ['tail_number', 'registration', 'serial_number', 'aircraft_type', 'manufacturer_id'],
   configuration: ['aircraft_model', 'configuration_code', 'maintenance_program', 'status'],
@@ -646,7 +646,7 @@ const ENTITY_FORM_FIELDS: Record<MasterEntity, EntityFormField[]> = {
     { key: 'aircraft_model', label: 'Aircraft Model', type: 'select', required: true },
     { key: 'configuration_code', label: 'Configuration Code', type: 'text' },
     { key: 'maintenance_program', label: 'Maintenance Program', type: 'text' },
-    { key: 'status', label: 'Status', type: 'select', required: true, options: ['active', 'inactive', 'grounded', 'maintenance'] },
+    { key: 'status', label: 'Status', type: 'select', required: true, options: ['active', 'maintenance', 'grounded', 'retired', 'storage'] },
   ],
   flight_logs: [
     { key: 'aircraft_id', label: 'Aircraft Id', type: 'text', required: true },
@@ -1664,9 +1664,58 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     [],
   );
 
+  const getFormValuesForSubmit = useCallback(
+    (values: FormValues): FormValues => {
+      if (entity !== 'aircraft') {
+        return values;
+      }
+      const findCounterValue = (key: string): string => {
+        const row = aircraftCounterRows.find((entry) => entry.key === key);
+        return String(row?.initialValue ?? '').trim();
+      };
+      const flightHoursValue = findCounterValue('flight_hours');
+      const landingValue = findCounterValue('landing');
+      const normalizedBase = String(values.base_location ?? aircraftBase ?? '').trim();
+      const normalizedOwner = String(values.owner_name ?? aircraftOwner ?? '').trim();
+      return {
+        ...values,
+        line_number: String(values.line_number ?? aircraftLineNumber ?? '').trim(),
+        manufacturing_date: String(values.manufacturing_date ?? aircraftManufacturingDate ?? '').trim(),
+        base_location: normalizedBase === AIRCRAFT_BASE_OPTIONS[0] ? '' : normalizedBase,
+        owner_name: normalizedOwner === AIRCRAFT_OWNER_OPTIONS[0] ? '' : normalizedOwner,
+        current_flight_hours: String(values.current_flight_hours ?? flightHoursValue).trim(),
+        current_cycles: String(values.current_cycles ?? landingValue).trim(),
+      };
+    },
+    [aircraftBase, aircraftCounterRows, aircraftLineNumber, aircraftManufacturingDate, aircraftOwner, entity],
+  );
+  const extractValidationErrors = useCallback((responsePayload: Record<string, unknown>): Record<string, string> => {
+    const output = responsePayload.output;
+    if (!output || typeof output !== 'object') {
+      return {};
+    }
+    const validation = (output as Record<string, unknown>).validation;
+    if (!validation || typeof validation !== 'object') {
+      return {};
+    }
+    const issues = (validation as Record<string, unknown>).issues;
+    if (!Array.isArray(issues)) {
+      return {};
+    }
+    return issues.reduce<Record<string, string>>((accumulator, issue) => {
+      if (!issue || typeof issue !== 'object') return accumulator;
+      const field = String((issue as Record<string, unknown>).field || '').trim();
+      const message = String((issue as Record<string, unknown>).message || '').trim();
+      if (!field || !message || accumulator[field]) return accumulator;
+      accumulator[field] = message;
+      return accumulator;
+    }, {});
+  }, []);
+
   const handleCreate = useCallback(async () => {
     try {
-      const { payload, errors } = buildPayloadFromForm(entity, formValues);
+      const submitValues = getFormValuesForSubmit(formValues);
+      const { payload, errors } = buildPayloadFromForm(entity, submitValues);
       setFormErrors(errors);
       if (Object.keys(errors).length > 0) {
         toast.error('Please resolve form validation errors');
@@ -1735,7 +1784,13 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         body: JSON.stringify(payload),
       });
       const responsePayload = await parseApiPayload(response);
-      if (!response.ok) throw new Error(String(responsePayload.error || 'Create failed'));
+      if (!response.ok) {
+        const validationErrors = extractValidationErrors(responsePayload);
+        if (Object.keys(validationErrors).length > 0) {
+          setFormErrors((previous) => ({ ...previous, ...validationErrors }));
+        }
+        throw new Error(String(responsePayload.error || 'Create failed'));
+      }
       toast.success(`${ENTITY_LABEL[entity]} record created`);
       setFormErrors({});
       setFormValues(getInitialFormValues(entity));
@@ -1743,10 +1798,14 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       await loadRecords();
       return true;
     } catch (error) {
-      toast.error(String((error as Error).message || 'Create failed'));
+      const message = String((error as Error).message || 'Create failed');
+      if (entity === 'aircraft' && /serial_number|duplicate key|already exists/i.test(message)) {
+        setFormErrors((previous) => ({ ...previous, serial_number: 'Serial Number already exists' }));
+      }
+      toast.error(message);
       return false;
     }
-  }, [entity, formValues, loadRecords, scope]);
+  }, [entity, extractValidationErrors, formValues, getFormValuesForSubmit, loadRecords, scope]);
 
   const handleUpdate = useCallback(async () => {
     if (!selectedId) {
@@ -1754,7 +1813,8 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       return false;
     }
     try {
-      const { payload, errors } = buildPayloadFromForm(entity, formValues);
+      const submitValues = getFormValuesForSubmit(formValues);
+      const { payload, errors } = buildPayloadFromForm(entity, submitValues);
       setFormErrors(errors);
       if (Object.keys(errors).length > 0) {
         toast.error('Please resolve form validation errors');
@@ -1823,16 +1883,26 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         body: JSON.stringify(payload),
       });
       const responsePayload = await parseApiPayload(response);
-      if (!response.ok) throw new Error(String(responsePayload.error || 'Update failed'));
+      if (!response.ok) {
+        const validationErrors = extractValidationErrors(responsePayload);
+        if (Object.keys(validationErrors).length > 0) {
+          setFormErrors((previous) => ({ ...previous, ...validationErrors }));
+        }
+        throw new Error(String(responsePayload.error || 'Update failed'));
+      }
       toast.success(`${ENTITY_LABEL[entity]} record updated`);
       setFormErrors({});
       await loadRecords();
       return true;
     } catch (error) {
-      toast.error(String((error as Error).message || 'Update failed'));
+      const message = String((error as Error).message || 'Update failed');
+      if (entity === 'aircraft' && /serial_number|duplicate key|already exists/i.test(message)) {
+        setFormErrors((previous) => ({ ...previous, serial_number: 'Serial Number already exists' }));
+      }
+      toast.error(message);
       return false;
     }
-  }, [entity, formValues, loadRecords, scope, selectedId]);
+  }, [entity, extractValidationErrors, formValues, getFormValuesForSubmit, loadRecords, scope, selectedId]);
 
   const handleDelete = useCallback(async () => {
     if (!selectedId) {

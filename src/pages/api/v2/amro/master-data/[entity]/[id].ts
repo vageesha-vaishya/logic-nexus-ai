@@ -341,7 +341,20 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       return;
     }
     if (issues.length > 0) {
-      throw new HttpError('Validation failed', 422);
+      res.status(422).json({
+        version: 'v2',
+        correlationId: ctx.correlationId,
+        error: 'Validation failed',
+        output: {
+          entity,
+          validation: {
+            mode: 'single-update',
+            is_valid: false,
+            issues,
+          },
+        },
+      });
+      return;
     }
     const updatePayload = {
       ...payload,

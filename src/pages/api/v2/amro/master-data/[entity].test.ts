@@ -515,6 +515,7 @@ describe('/api/v2/amro/master-data/[entity]', () => {
         aircraft_model: 'A320neo',
         manufacturer: 'Boeing',
         status: 'inactive',
+        manufacturing_date: '2026-03-01',
       },
       headers: {},
     };
@@ -526,7 +527,99 @@ describe('/api/v2/amro/master-data/[entity]', () => {
     expect(insertPayload?.status).toBe('retired');
     expect(insertPayload?.model).toBe('A320neo');
     expect(insertPayload?.manufacturer_id).toBe('man-1');
+    expect(insertPayload?.manufacturing_date).toBe('2026-03-01');
     expect(res.statusCode).toBe(201);
+  });
+
+  it('generates a deterministic placeholder serial when aircraft is submitted without serial number', async () => {
+    const manufacturersSelectMock = vi.fn().mockResolvedValue({
+      data: [{ id: 'man-1', manufacturer_code: 'BOE', name: 'Boeing', is_active: true }],
+      error: null,
+    });
+    const insertMaybeSingleMock = vi.fn().mockResolvedValue({
+      data: {
+        id: 'ac-3',
+        tail_number: 'N300AA',
+        serial_number: 'NSN-N300AA',
+        aircraft_type: 'A320',
+        aircraft_model: 'A320neo',
+        manufacturer_id: 'man-1',
+        status: 'active',
+      },
+      error: null,
+    });
+    const insertSelectMock = vi.fn().mockReturnValue({ maybeSingle: insertMaybeSingleMock });
+    const insertMock = vi.fn().mockReturnValue({ select: insertSelectMock });
+    const auditInsertMock = vi.fn().mockResolvedValue({ error: null });
+    const fromMock = vi.fn((table: string) => {
+      if (table === 'manufacturers') {
+        return { select: manufacturersSelectMock };
+      }
+      if (table === 'aircraft') {
+        return { insert: insertMock };
+      }
+      if (table === 'maintenance_events') {
+        return { insert: auditInsertMock };
+      }
+      return {};
+    });
+    vi.mocked(getSupabaseAdminClient).mockReturnValue({
+      from: fromMock,
+    } as any);
+
+    const req: ApiRequest = {
+      method: 'POST',
+      query: {
+        entity: 'aircraft',
+      },
+      body: {
+        tail_number: 'N300AA',
+        serial_number: 'N/A',
+        aircraft_type: 'A320',
+        aircraft_model: 'A320neo',
+        manufacturer: 'Boeing',
+        status: 'active',
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    const insertPayload = insertMock.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(insertPayload?.serial_number).toBe('NSN-N300AA');
+    expect(res.statusCode).toBe(201);
+  });
+
+  it('returns aircraft validation issue when manufacturing_date format is invalid', async () => {
+    const req: ApiRequest = {
+      method: 'POST',
+      query: {
+        entity: 'aircraft',
+        validate_only: 'true',
+      },
+      body: {
+        tail_number: 'N400AA',
+        serial_number: 'SN-400',
+        aircraft_type: 'A320',
+        aircraft_model: 'A320neo',
+        manufacturer_id: 'man-1',
+        status: 'active',
+        manufacturing_date: '03-28-2026',
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.output?.validation?.is_valid).toBe(false);
+    expect(
+      ((res.jsonBody as any)?.output?.validation?.issues || []).some(
+        (issue: any) => issue?.field === 'manufacturing_date' && String(issue?.message || '').includes('YYYY-MM-DD'),
+      ),
+    ).toBe(true);
   });
 
   it('rejects assembly models with cross-tenant references', async () => {
@@ -572,5 +665,7 @@ describe('/api/v2/amro/master-data/[entity]', () => {
 
     expect(res.statusCode).toBe(422);
     expect((res.jsonBody as any)?.error).toContain('Validation failed');
+    expect((res.jsonBody as any)?.output?.validation?.is_valid).toBe(false);
+    expect(((res.jsonBody as any)?.output?.validation?.issues || []).length).toBeGreaterThan(0);
   });
 });

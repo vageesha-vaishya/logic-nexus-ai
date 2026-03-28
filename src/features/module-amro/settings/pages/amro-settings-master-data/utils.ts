@@ -8,6 +8,8 @@ import type {
   RecordRow,
 } from './types';
 import {
+  AIRCRAFT_BASE_OPTIONS,
+  AIRCRAFT_OWNER_OPTIONS,
   AIRCRAFT_PRESENCE_BADGE_CLASSES,
   AIRCRAFT_STATUS_OPTIONS,
   AIRCRAFT_TYPE_OPTIONS,
@@ -560,6 +562,52 @@ export function buildPayloadFromForm(entity: MasterEntity, values: FormValues): 
     }
     if (payload.configuration_code && String(payload.configuration_code).trim().length > 24) {
       errors.configuration_code = 'Configuration Code cannot exceed 24 characters';
+    }
+
+    const aircraftOptionalTextFields = [
+      'line_number',
+      'operator_code',
+      'station_code',
+      'restrictions',
+      'engine_type',
+      'manufacturing_date',
+    ];
+    aircraftOptionalTextFields.forEach((field) => {
+      const raw = values[field];
+      if (isBlank(raw)) return;
+      payload[field] = String(raw).trim();
+    });
+
+    const baseLocationRaw = String(values.base_location ?? '').trim();
+    if (baseLocationRaw && baseLocationRaw !== AIRCRAFT_BASE_OPTIONS[0]) {
+      payload.base_location = baseLocationRaw;
+    }
+    const ownerNameRaw = String(values.owner_name ?? '').trim();
+    if (ownerNameRaw && ownerNameRaw !== AIRCRAFT_OWNER_OPTIONS[0]) {
+      payload.owner_name = ownerNameRaw;
+    }
+
+    const aircraftOptionalNumberFields = [
+      'defect_count',
+      'current_flight_hours',
+      'current_cycles',
+      'first_limit_remaining',
+      'current_flight_hours_since_new',
+      'current_cycles_since_new',
+    ];
+    aircraftOptionalNumberFields.forEach((field) => {
+      const raw = values[field];
+      if (isBlank(raw)) return;
+      const numericValue = Number(String(raw).trim());
+      if (!Number.isFinite(numericValue) || numericValue < 0) {
+        errors[field] = `${field.replace(/_/g, ' ')} must be a non-negative number`;
+        return;
+      }
+      payload[field] = numericValue;
+    });
+
+    if (payload.manufacturing_date && !/^\d{4}-\d{2}-\d{2}$/.test(String(payload.manufacturing_date))) {
+      errors.manufacturing_date = 'Manufacturing Date must be in YYYY-MM-DD format';
     }
   }
 

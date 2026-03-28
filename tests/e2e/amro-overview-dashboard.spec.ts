@@ -66,3 +66,74 @@ test.describe('amro overview dashboard', () => {
     await expect(firstAction).toBeFocused();
   });
 });
+
+test.describe('amro aircraft CRUD smoke', () => {
+  test('creates, updates, and deletes an aircraft record from master data page', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/dashboard/amro/settings/master-data/aircraft');
+    if (page.url().includes('/auth')) {
+      await login(page);
+      await page.goto('/dashboard/amro/settings/master-data/aircraft');
+    }
+    test.skip(page.url().includes('/auth'), 'Authentication failed for AMRO aircraft CRUD environment');
+
+    const masterDataRoot = page.getByTestId('amro-master-data-template');
+    test.skip((await masterDataRoot.count()) === 0, 'AMRO master data surface is unavailable in this environment profile');
+    await expect(masterDataRoot.first()).toBeVisible();
+
+    const runKey = Date.now().toString().slice(-8);
+    const tailNumber = `N9${runKey}`;
+    const serialNumber = `SN-${runKey}`;
+    const updatedMaintenanceProgram = `MP-UPDATED-${runKey}`;
+
+    const logStep = async (label: string) => {
+      process.stdout.write(`[AIRCRAFT-CRUD-SMOKE] ${label}\n`);
+    };
+
+    await logStep(`Open create modal for tail_number=${tailNumber}`);
+    await page.getByRole('button', { name: /new aircraft record|new/i }).first().click();
+    const formDialog = page.getByTestId('amro-master-data-form-dialog');
+    await expect(formDialog).toBeVisible();
+
+    await page.locator('#master-data-basic-tail_number').fill(tailNumber);
+    await page.locator('#master-data-basic-serial_number').fill(serialNumber);
+    await page.locator('#master-data-basic-aircraft_type').click();
+    await page.getByRole('option', { name: /NarrowBody|A320|B737/i }).first().click();
+    await page.locator('#master-data-basic-aircraft_model').fill('A320-200');
+    await page.locator('#master-data-basic-maintenance_program').fill(`MP-${runKey}`);
+    await page.locator('#master-data-basic-status').click();
+    await page.getByRole('option', { name: /^active$/i }).first().click();
+    await page.locator('#master-data-basic-manufacturer_id').click();
+    const manufacturerOption = page.getByRole('option', { name: /Boeing|Airbus|Lockheed Martin|GE Aerospace|Rolls-Royce/i }).first();
+    test.skip((await manufacturerOption.count()) === 0, 'Manufacturer options are unavailable in this environment');
+    await manufacturerOption.click();
+    await page.locator('#master-data-configuration-line_number').fill(`LN-${runKey}`);
+    await page.locator('#master-data-configuration-manufacturing_date').fill('2026-03-15');
+    await page.locator('#master-data-configuration-current_flight_hours').fill('1200.5');
+    await page.locator('#master-data-configuration-current_cycles').fill('420');
+
+    await logStep('Create aircraft record');
+    await page.getByRole('button', { name: /^save$/i }).click();
+    await expect(formDialog).toBeHidden({ timeout: 20000 });
+    await expect(page.getByRole('cell', { name: tailNumber }).first()).toBeVisible({ timeout: 30000 });
+
+    await logStep('Open update modal and modify maintenance program');
+    const createdRow = page.locator('tr', { hasText: tailNumber }).first();
+    await createdRow.dblclick();
+    await expect(formDialog).toBeVisible();
+    await page.locator('#master-data-basic-maintenance_program').fill(updatedMaintenanceProgram);
+    await page.getByRole('button', { name: /save changes/i }).click();
+    await expect(formDialog).toBeHidden({ timeout: 20000 });
+    await expect(page.locator('tr', { hasText: tailNumber }).first()).toContainText(updatedMaintenanceProgram, { timeout: 30000 });
+
+    await logStep('Delete aircraft record');
+    const updatedRow = page.locator('tr', { hasText: tailNumber }).first();
+    await updatedRow.dblclick();
+    await expect(formDialog).toBeVisible();
+    await page.getByRole('button', { name: /^delete$/i }).click();
+    await page.getByRole('button', { name: /confirm delete/i }).click();
+    await expect(formDialog).toBeHidden({ timeout: 20000 });
+    await expect(page.locator('tr', { hasText: tailNumber })).toHaveCount(0, { timeout: 30000 });
+    await logStep(`CRUD smoke completed for tail_number=${tailNumber}`);
+  });
+});
