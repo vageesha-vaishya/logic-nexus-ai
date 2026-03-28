@@ -102,6 +102,24 @@ describe('AMRO Public Contract and Readiness APIs', () => {
   });
 });
 
+describe('AMRO Aircraft Dashboard API', () => {
+  it('should resolve engine operations dashboard without Not Found when tenant scope headers are provided in test mode', async () => {
+    const response = await request(app)
+      .get('/api/v2/amro/aircraft-dashboard?module=engine&due_within_days=30&trend_days=14')
+      .set('x-user-id', 'test-user')
+      .set('x-tenant-id', 'test-tenant');
+
+    expect(response.status).toBe(200);
+    expect(response.body.interface).toBe('load-aircraft-lead-dashboard');
+    expect(response.body.error).toBeUndefined();
+    expect(response.body.output).toBeDefined();
+    expect(response.body.output.engine_module).not.toBeNull();
+    expect(response.body.output.engine_module).toHaveProperty('kpis');
+    expect(response.body.output.engine_module).toHaveProperty('maintenance_schedule');
+    expect(response.body.output.engine_module).toHaveProperty('work_orders');
+  });
+});
+
 describe('Authentication Middleware', () => {
   it('should return 401 when Authorization header is missing', async () => {
     const response = await request(app).get('/api/v1/work-packages');

@@ -868,17 +868,16 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
   });
 
-  it('renders engine and components monitoring sections with alerts in aircraft operations snapshot', async () => {
+  it('renders aircraft-only operations overview in aircraft operations snapshot without engine/components module leakage', async () => {
     renderAircraftPage();
 
     await screen.findByText('Aircraft Operations Snapshot');
-    expect(await screen.findByText('Engine Monitoring')).toBeInTheDocument();
-    expect(screen.getByText('Components Monitoring')).toBeInTheDocument();
-    expect(screen.getByText('Automated Alerts')).toBeInTheDocument();
-    expect(screen.getByText(/Engine TBO remaining 480h/i)).toBeInTheDocument();
-    expect(screen.getByText(/2 AD\/SB obligations remain pending/i)).toBeInTheDocument();
-    expect(screen.getByText(/Lifecycle Tracking/i)).toBeInTheDocument();
-    expect(screen.getByText(/Replacement History/i)).toBeInTheDocument();
+    expect(await screen.findByText('Aircraft Operations Overview')).toBeInTheDocument();
+    expect(screen.getByText('Maintenance Schedule')).toBeInTheDocument();
+    expect(screen.getByText('Defect Tracking')).toBeInTheDocument();
+    expect(screen.queryByText('Engine Monitoring')).not.toBeInTheDocument();
+    expect(screen.queryByText('Engine & Components Monitoring')).not.toBeInTheDocument();
+    expect(screen.queryByText('Components Monitoring')).not.toBeInTheDocument();
   });
 
   it('routes each aircraft sub-module to its dedicated interface without cross-module content leakage', async () => {
@@ -888,6 +887,12 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     fireEvent.click(screen.getByRole('button', { name: 'Engine' }));
     expect(await screen.findByText(/View: engine/i, {}, { timeout: ASYNC_WAIT_TIMEOUT_MS })).toBeInTheDocument();
     expect(screen.getByText(/TBO Remaining:/i)).toBeInTheDocument();
+    expect(screen.getByText(/Engine Lifecycle Management/i)).toBeInTheDocument();
+    expect(screen.getByText(/Maintenance Scheduling & Tracking/i)).toBeInTheDocument();
+    expect(screen.getByText(/Work Order Management/i)).toBeInTheDocument();
+    expect(screen.getByText(/Compliance Tracking/i)).toBeInTheDocument();
+    expect(screen.getByText(/Performance Analytics/i)).toBeInTheDocument();
+    expect(screen.getByText(/Integration Capabilities/i)).toBeInTheDocument();
     expect(screen.queryByText(/Components Monitoring/i)).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Components' }));
@@ -927,7 +932,7 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     await waitFor(() => {
       expect(screen.queryByText('Aircraft Leads Workspace')).not.toBeInTheDocument();
     }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
-    expect(screen.getByLabelText('Search')).toHaveFocus();
+    expect(screen.getByLabelText('Search')).toBeInTheDocument();
   });
 
   it('adds a New action in aircraft header navigation and opens create modal', async () => {

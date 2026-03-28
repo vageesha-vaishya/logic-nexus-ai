@@ -26,6 +26,11 @@ type EntityConfig = {
   defaultSortColumn: string;
 };
 
+const AIRCRAFT_ALLOWED_STATUSES = new Set(['active', 'maintenance', 'grounded', 'retired', 'storage']);
+const AIRCRAFT_STATUS_ALIASES: Record<string, string> = {
+  inactive: 'retired',
+};
+
 export class HttpError extends Error {
   statusCode: number;
 
@@ -408,6 +413,8 @@ function normalizeAircraft(payload: Record<string, unknown>) {
   const serialNumber = asString(payload.serial_number || payload.msn);
   const aircraftType = asString(payload.aircraft_type || payload.engine_type);
   const aircraftModel = asString(payload.aircraft_model || payload.model);
+  const normalizedStatusToken = asString(payload.status).toLowerCase();
+  const normalizedStatus = AIRCRAFT_STATUS_ALIASES[normalizedStatusToken] || normalizedStatusToken || 'active';
   return {
     registration: asString(payload.registration) || tailNumber,
     tail_number: tailNumber,
@@ -418,10 +425,10 @@ function normalizeAircraft(payload: Record<string, unknown>) {
     maintenance_program: asNullableString(payload.maintenance_program),
     manufacturer: asNullableString(payload.manufacturer),
     manufacturer_id: asNullableString(payload.manufacturer_id),
-    model: asNullableString(payload.model),
+    model: asString(payload.model || aircraftModel) || null,
     msn: asNullableString(payload.msn),
     line_number: asNullableString(payload.line_number),
-    status: asString(payload.status) || 'active',
+    status: normalizedStatus,
     operator_code: asNullableString(payload.operator_code),
     station_code: asNullableString(payload.station_code),
     base_location: asNullableString(payload.base_location),
@@ -633,6 +640,61 @@ export type MasterDataValidationIssue = {
 
 export function validatePayload(entity: AmroMasterDataEntity, payload: Record<string, unknown>): MasterDataValidationIssue[] {
   const issues: MasterDataValidationIssue[] = [];
+  if (entity === 'aircraft') {
+    const statusRaw = asString(payload.status).toLowerCase();
+    const normalizedStatus = AIRCRAFT_STATUS_ALIASES[statusRaw] || statusRaw;
+    if (statusRaw && !AIRCRAFT_ALLOWED_STATUSES.has(normalizedStatus)) {
+      issues.push({
+        field: 'status',
+        message: 'status must be one of active, maintenance, grounded, retired, or storage',
+      });
+    }
+    if (payload.defect_count !== undefined) {
+      const defectCount = Number(payload.defect_count);
+      if (!Number.isInteger(defectCount) || defectCount < 0) {
+        issues.push({
+          field: 'defect_count',
+          message: 'defect_count must be a non-negative integer',
+        });
+      }
+    }
+    if (payload.current_cycles !== undefined) {
+      const currentCycles = Number(payload.current_cycles);
+      if (!Number.isInteger(currentCycles) || currentCycles < 0) {
+        issues.push({
+          field: 'current_cycles',
+          message: 'current_cycles must be a non-negative integer',
+        });
+      }
+    }
+    if (payload.current_cycles_since_new !== undefined) {
+      const currentCyclesSinceNew = Number(payload.current_cycles_since_new);
+      if (!Number.isInteger(currentCyclesSinceNew) || currentCyclesSinceNew < 0) {
+        issues.push({
+          field: 'current_cycles_since_new',
+          message: 'current_cycles_since_new must be a non-negative integer',
+        });
+      }
+    }
+    if (payload.current_flight_hours !== undefined) {
+      const currentFlightHours = Number(payload.current_flight_hours);
+      if (!Number.isFinite(currentFlightHours) || currentFlightHours < 0) {
+        issues.push({
+          field: 'current_flight_hours',
+          message: 'current_flight_hours must be a non-negative number',
+        });
+      }
+    }
+    if (payload.current_flight_hours_since_new !== undefined) {
+      const currentFlightHoursSinceNew = Number(payload.current_flight_hours_since_new);
+      if (!Number.isFinite(currentFlightHoursSinceNew) || currentFlightHoursSinceNew < 0) {
+        issues.push({
+          field: 'current_flight_hours_since_new',
+          message: 'current_flight_hours_since_new must be a non-negative number',
+        });
+      }
+    }
+  }
   if (entity === 'flight_logs') {
     const departureAirport = asString(payload.departure_airport);
     const arrivalAirport = asString(payload.arrival_airport);
@@ -764,13 +826,41 @@ export function validatePayload(entity: AmroMasterDataEntity, payload: Record<st
 export function sanitizeWritePayload(
   entity: AmroMasterDataEntity,
   payload: Record<string, unknown>,
-  options: { requireCreateFields?: boolean } = {},
+  options: { requireCreateFields?: boolean; includeOnlyProvidedFields?: boolean } = {},
 ): Record<string, unknown> {
   const requireCreateFields = options.requireCreateFields ?? true;
+  const includeOnlyProvidedFields = options.includeOnlyProvidedFields ?? false;
   const config = getEntityConfig(entity);
   const normalized = normalizePayload(entity, payload) as Record<string, unknown>;
   const writePayload: Record<string, unknown> = {};
+  const providedKeys = new Set(Object.keys(payload));
+  const shouldIncludeField = (field: string): boolean => {
+    if (!includeOnlyProvidedFields) return true;
+    if (!providedKeys.size) return false;
+    if (providedKeys.has(field)) return true;
+    if (entity === 'aircraft') {
+      if ((field === 'registration' || field === 'tail_number') && (providedKeys.has('registration') || providedKeys.has('tail_number'))) {
+        return true;
+      }
+      if ((field === 'serial_number' || field === 'msn') && (providedKeys.has('serial_number') || providedKeys.has('msn'))) {
+        return true;
+      }
+      if (field === 'aircraft_type' && (providedKeys.has('aircraft_type') || providedKeys.has('engine_type'))) {
+        return true;
+      }
+      if ((field === 'aircraft_model' || field === 'model') && (providedKeys.has('aircraft_model') || providedKeys.has('model'))) {
+        return true;
+      }
+      if ((field === 'manufacturer_id' || field === 'manufacturer') && (providedKeys.has('manufacturer_id') || providedKeys.has('manufacturer') || providedKeys.has('manufacturer_code'))) {
+        return true;
+      }
+    }
+    return false;
+  };
   for (const field of config.writeAllowedFields) {
+    if (!shouldIncludeField(field)) {
+      continue;
+    }
     if (normalized[field] !== undefined) {
       writePayload[field] = normalized[field];
     }

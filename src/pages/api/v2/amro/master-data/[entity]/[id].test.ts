@@ -92,10 +92,14 @@ describe('/api/v2/amro/master-data/[entity]/[id]', () => {
       data: { id: 'ac-1', tail_number: 'N100AA', tenant_id: 'tenant-1' },
       error: null,
     });
-    const eqTenantMock = vi.fn().mockReturnValue({ maybeSingle: maybeSingleMock });
-    const limitMock = vi.fn().mockReturnValue({ eq: eqTenantMock });
-    const eqIdMock = vi.fn().mockReturnValue({ limit: limitMock });
-    const selectMock = vi.fn().mockReturnValue({ eq: eqIdMock });
+    const existingQuery: any = {
+      eq: vi.fn(),
+      limit: vi.fn(),
+      maybeSingle: maybeSingleMock,
+    };
+    existingQuery.eq.mockReturnValue(existingQuery);
+    existingQuery.limit.mockReturnValue(existingQuery);
+    const selectMock = vi.fn().mockReturnValue(existingQuery);
     const fromMock = vi.fn().mockReturnValue({ select: selectMock });
     vi.mocked(getSupabaseAdminClient).mockReturnValue({
       from: fromMock,
@@ -124,10 +128,14 @@ describe('/api/v2/amro/master-data/[entity]/[id]', () => {
       data: null,
       error: null,
     });
-    const eqTenantMock = vi.fn().mockReturnValue({ maybeSingle: maybeSingleMock });
-    const limitMock = vi.fn().mockReturnValue({ eq: eqTenantMock });
-    const eqIdMock = vi.fn().mockReturnValue({ limit: limitMock });
-    const selectMock = vi.fn().mockReturnValue({ eq: eqIdMock });
+    const existingQuery: any = {
+      eq: vi.fn(),
+      limit: vi.fn(),
+      maybeSingle: maybeSingleMock,
+    };
+    existingQuery.eq.mockReturnValue(existingQuery);
+    existingQuery.limit.mockReturnValue(existingQuery);
+    const selectMock = vi.fn().mockReturnValue(existingQuery);
     const fromMock = vi.fn().mockReturnValue({ select: selectMock });
     vi.mocked(getSupabaseAdminClient).mockReturnValue({
       from: fromMock,
@@ -151,10 +159,14 @@ describe('/api/v2/amro/master-data/[entity]/[id]', () => {
       data: { id: 'inv-1', part_number: 'PN-100', tenant_id: 'tenant-1' },
       error: null,
     });
-    const eqTenantMock = vi.fn().mockReturnValue({ maybeSingle: maybeSingleMock });
-    const limitMock = vi.fn().mockReturnValue({ eq: eqTenantMock });
-    const eqIdMock = vi.fn().mockReturnValue({ limit: limitMock });
-    const selectMock = vi.fn().mockReturnValue({ eq: eqIdMock });
+    const existingQuery: any = {
+      eq: vi.fn(),
+      limit: vi.fn(),
+      maybeSingle: maybeSingleMock,
+    };
+    existingQuery.eq.mockReturnValue(existingQuery);
+    existingQuery.limit.mockReturnValue(existingQuery);
+    const selectMock = vi.fn().mockReturnValue(existingQuery);
     const fromMock = vi.fn().mockReturnValue({ select: selectMock });
     vi.mocked(getSupabaseAdminClient).mockReturnValue({
       from: fromMock,
@@ -177,5 +189,88 @@ describe('/api/v2/amro/master-data/[entity]/[id]', () => {
     expect((res.jsonBody as any)?.output?.validation?.is_valid).toBe(false);
     expect((res.jsonBody as any)?.output?.validation?.issues?.length).toBeGreaterThan(0);
     expect(fromMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('updates only provided PATCH fields for aircraft records', async () => {
+    const existingMaybeSingleMock = vi.fn().mockResolvedValue({
+      data: {
+        id: 'ac-1',
+        tenant_id: 'tenant-1',
+        tail_number: 'N100AA',
+        registration: 'N100AA',
+        serial_number: 'SN-100',
+        aircraft_type: 'A320',
+        aircraft_model: 'A320-200',
+        model: 'A320-200',
+        status: 'active',
+      },
+      error: null,
+    });
+    const existingQuery: any = {
+      eq: vi.fn(),
+      limit: vi.fn(),
+      maybeSingle: existingMaybeSingleMock,
+    };
+    existingQuery.eq.mockReturnValue(existingQuery);
+    existingQuery.limit.mockReturnValue(existingQuery);
+    const existingSelectMock = vi.fn().mockReturnValue(existingQuery);
+
+    const updateMaybeSingleMock = vi.fn().mockResolvedValue({
+      data: {
+        id: 'ac-1',
+        tenant_id: 'tenant-1',
+        tail_number: 'N100AB',
+        registration: 'N100AB',
+      },
+      error: null,
+    });
+    const updateQuery: any = {
+      eq: vi.fn(),
+      select: vi.fn(),
+      limit: vi.fn(),
+      maybeSingle: updateMaybeSingleMock,
+    };
+    updateQuery.eq.mockReturnValue(updateQuery);
+    updateQuery.select.mockReturnValue(updateQuery);
+    updateQuery.limit.mockReturnValue(updateQuery);
+    const updateMock = vi.fn().mockReturnValue(updateQuery);
+
+    const auditInsertMock = vi.fn().mockResolvedValue({ error: null });
+    const fromMock = vi.fn((table: string) => {
+      if (table === 'aircraft') {
+        if (fromMock.mock.calls.length === 1) {
+          return { select: existingSelectMock };
+        }
+        return { update: updateMock };
+      }
+      if (table === 'maintenance_events') {
+        return { insert: auditInsertMock };
+      }
+      return {};
+    });
+    vi.mocked(getSupabaseAdminClient).mockReturnValue({
+      from: fromMock,
+    } as any);
+
+    const req: ApiRequest = {
+      method: 'PATCH',
+      query: { entity: 'aircraft', id: 'ac-1' },
+      body: {
+        tail_number: 'N100AB',
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    const updatePayload = updateMock.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(updatePayload.tail_number).toBe('N100AB');
+    expect(updatePayload.registration).toBe('N100AB');
+    expect(updatePayload.status).toBeUndefined();
+    expect(updatePayload.model).toBeUndefined();
+    expect(updatePayload.manufacturer_id).toBeUndefined();
+    expect(updatePayload.updated_by).toBe('user-1');
+    expect(res.statusCode).toBe(200);
   });
 });

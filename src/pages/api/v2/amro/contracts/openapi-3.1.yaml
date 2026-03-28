@@ -1678,6 +1678,50 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ScreenInventoryResponse'
+  /api/v2/amro/aircraft-dashboard:
+    get:
+      operationId: loadAmroAircraftOperationsSnapshot
+      tags: [AMRO]
+      parameters:
+        - in: query
+          name: module
+          required: false
+          schema:
+            type: string
+            enum: [all, engine, components]
+        - in: query
+          name: aircraft_id
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: due_within_days
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 365
+        - in: query
+          name: trend_days
+          required: false
+          schema:
+            type: integer
+            minimum: 7
+            maximum: 90
+      responses:
+        '200':
+          description: Aircraft operations snapshot including engine module and components module telemetry
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AircraftDashboardResponse'
+        '400':
+          description: Validation error for filter range or module-specific constraints
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
   /api/v2/amro/health:
     get:
       operationId: getAmroHealth
@@ -1929,6 +1973,254 @@ components:
         output:
           type: object
           additionalProperties: true
+    AircraftDashboardResponse:
+      type: object
+      required: [version, interface, correlationId, output]
+      properties:
+        version:
+          type: string
+          const: v2
+        interface:
+          type: string
+          const: load-aircraft-lead-dashboard
+        correlationId:
+          type: string
+        compatMode:
+          type: string
+        output:
+          type: object
+          required: [metadata]
+          properties:
+            metadata:
+              type: object
+              additionalProperties: true
+            filters:
+              type: object
+              additionalProperties: true
+            engine_module:
+              oneOf:
+                - $ref: '#/components/schemas/AircraftDashboardEngineModule'
+                - type: 'null'
+            components_module:
+              oneOf:
+                - type: object
+                  additionalProperties: true
+                - type: 'null'
+            alerts:
+              type: array
+              items:
+                type: object
+                additionalProperties: true
+          additionalProperties: true
+    AircraftDashboardEngineModule:
+      type: object
+      properties:
+        kpis:
+          type: object
+          additionalProperties:
+            oneOf:
+              - type: number
+              - type: string
+        statuses:
+          type: object
+          additionalProperties:
+            type: string
+        lifecycle_management:
+          type: array
+          items:
+            $ref: '#/components/schemas/AircraftDashboardEngineLifecycleRow'
+        maintenance_schedule:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        maintenance_planning:
+          $ref: '#/components/schemas/AircraftDashboardEngineMaintenancePlanning'
+        lifecycle_traceability:
+          type: array
+          items:
+            $ref: '#/components/schemas/AircraftDashboardEngineTraceabilityRecord'
+        component_monitoring:
+          $ref: '#/components/schemas/AircraftDashboardEngineComponentMonitoring'
+        work_orders:
+          $ref: '#/components/schemas/AircraftDashboardEngineWorkOrders'
+        compliance_tracking:
+          $ref: '#/components/schemas/AircraftDashboardEngineComplianceTracking'
+        performance_analytics:
+          $ref: '#/components/schemas/AircraftDashboardEnginePerformanceAnalytics'
+        integration_capabilities:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        integration_resilience:
+          type: object
+          additionalProperties: true
+        standards_alignment:
+          type: object
+          additionalProperties:
+            type: string
+        validation:
+          type: object
+          additionalProperties: true
+        alerts:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+      additionalProperties: true
+    AircraftDashboardEngineLifecycleRow:
+      type: object
+      required: [aircraft_id, registration, lifecycle_stage, health_score]
+      properties:
+        aircraft_id:
+          type: string
+        registration:
+          type: string
+        lifecycle_stage:
+          type: string
+        health_score:
+          type: number
+        total_hours:
+          type: number
+        total_cycles:
+          type: number
+        next_event_due_in_days:
+          oneOf:
+            - type: integer
+            - type: 'null'
+      additionalProperties: true
+    AircraftDashboardEngineMaintenancePlanning:
+      type: object
+      properties:
+        predictive_candidates:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        scheduled_windows:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        conflicts:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        resolution_actions:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        resource_allocation:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+      additionalProperties: true
+    AircraftDashboardEngineTraceabilityRecord:
+      type: object
+      required: [engine_asset_id, trace_id, stages]
+      properties:
+        engine_asset_id:
+          type: string
+        trace_id:
+          type: string
+        installation_reference:
+          type: object
+          additionalProperties: true
+        stages:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        retirement_readiness_score:
+          type: number
+      additionalProperties: true
+    AircraftDashboardEngineComponentMonitoring:
+      type: object
+      properties:
+        statuses:
+          type: object
+          additionalProperties:
+            oneOf:
+              - type: string
+              - type: number
+        realtime_updated_at:
+          type: string
+        source:
+          type: string
+        sensor_data:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        anomaly_detection:
+          type: object
+          additionalProperties: true
+      additionalProperties: true
+    AircraftDashboardEngineWorkOrders:
+      type: object
+      properties:
+        totals:
+          type: object
+          additionalProperties:
+            type: number
+        recent:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        digital_signature_workflow:
+          type: object
+          additionalProperties: true
+        parts_tracking:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+      additionalProperties: true
+    AircraftDashboardEngineComplianceTracking:
+      type: object
+      properties:
+        ready_count:
+          type: number
+        pending_count:
+          type: number
+        overdue_count:
+          type: number
+        compliance_pct:
+          type: number
+        ad_sb_tracking:
+          type: object
+          additionalProperties: true
+        regulatory_profiles:
+          type: object
+          additionalProperties: true
+        standards:
+          type: array
+          items:
+            type: string
+      additionalProperties: true
+    AircraftDashboardEnginePerformanceAnalytics:
+      type: object
+      properties:
+        utilization_pct:
+          type: number
+        anomaly_index:
+          type: number
+        forecast_risk:
+          type: string
+        trend_summary:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        failure_prediction:
+          type: object
+          additionalProperties: true
+      additionalProperties: true
     MigrationPlanResponse:
       allOf:
         - $ref: '#/components/schemas/ApiEnvelope'

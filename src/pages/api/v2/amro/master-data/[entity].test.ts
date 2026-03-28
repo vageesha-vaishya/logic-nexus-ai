@@ -466,6 +466,69 @@ describe('/api/v2/amro/master-data/[entity]', () => {
     expect(fromMock).not.toHaveBeenCalled();
   });
 
+  it('normalizes aircraft status alias and model fallback during create', async () => {
+    const manufacturersSelectMock = vi.fn().mockResolvedValue({
+      data: [{ id: 'man-1', manufacturer_code: 'BOE', name: 'Boeing', is_active: true }],
+      error: null,
+    });
+    const insertMaybeSingleMock = vi.fn().mockResolvedValue({
+      data: {
+        id: 'ac-2',
+        tail_number: 'N200AA',
+        serial_number: 'SN-200',
+        aircraft_type: 'A320',
+        aircraft_model: 'A320neo',
+        model: 'A320neo',
+        status: 'retired',
+        manufacturer_id: 'man-1',
+      },
+      error: null,
+    });
+    const insertSelectMock = vi.fn().mockReturnValue({ maybeSingle: insertMaybeSingleMock });
+    const insertMock = vi.fn().mockReturnValue({ select: insertSelectMock });
+    const auditInsertMock = vi.fn().mockResolvedValue({ error: null });
+    const fromMock = vi.fn((table: string) => {
+      if (table === 'manufacturers') {
+        return { select: manufacturersSelectMock };
+      }
+      if (table === 'aircraft') {
+        return { insert: insertMock };
+      }
+      if (table === 'maintenance_events') {
+        return { insert: auditInsertMock };
+      }
+      return {};
+    });
+    vi.mocked(getSupabaseAdminClient).mockReturnValue({
+      from: fromMock,
+    } as any);
+
+    const req: ApiRequest = {
+      method: 'POST',
+      query: {
+        entity: 'aircraft',
+      },
+      body: {
+        tail_number: 'N200AA',
+        serial_number: 'SN-200',
+        aircraft_type: 'A320',
+        aircraft_model: 'A320neo',
+        manufacturer: 'Boeing',
+        status: 'inactive',
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    const insertPayload = insertMock.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(insertPayload?.status).toBe('retired');
+    expect(insertPayload?.model).toBe('A320neo');
+    expect(insertPayload?.manufacturer_id).toBe('man-1');
+    expect(res.statusCode).toBe(201);
+  });
+
   it('rejects assembly models with cross-tenant references', async () => {
     const manufacturersInMock = vi.fn().mockResolvedValue({ data: [], error: null });
     const manufacturersEqMock = vi.fn().mockReturnValue({ in: manufacturersInMock });

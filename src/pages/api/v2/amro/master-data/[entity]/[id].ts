@@ -300,7 +300,10 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     enforceAnyPermission(auth.permissions || [], ['edit_aircraft_records', 'create_maintenance_request']);
     const body = asBodyObject(req.body);
     const validationOnly = isValidationOnly(req, body);
-    let payload = sanitizeWritePayload(entity, body, { requireCreateFields: false });
+    let payload = sanitizeWritePayload(entity, body, {
+      requireCreateFields: false,
+      includeOnlyProvidedFields: true,
+    });
     let manufacturerIssues: { field: string; message: string }[] = [];
     if (entity === 'aircraft' && (payload.manufacturer_id || payload.manufacturer || payload.manufacturer_code)) {
       const resolved = await resolveAircraftManufacturerUpdate(supabase, payload);

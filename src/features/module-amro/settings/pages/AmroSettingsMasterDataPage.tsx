@@ -427,6 +427,49 @@ type AircraftDashboardEngineModule = {
   kpis?: Record<string, number | string>;
   statuses?: Record<string, string>;
   trend?: AircraftDashboardTrendPoint[];
+  lifecycle_management?: Array<Record<string, unknown>>;
+  maintenance_schedule?: Array<Record<string, unknown>>;
+  maintenance_planning?: {
+    predictive_candidates?: Array<Record<string, unknown>>;
+    scheduled_windows?: Array<Record<string, unknown>>;
+    conflicts?: Array<Record<string, unknown>>;
+    resolution_actions?: Array<Record<string, unknown>>;
+    resource_allocation?: Array<Record<string, unknown>>;
+  };
+  lifecycle_traceability?: Array<Record<string, unknown>>;
+  component_monitoring?: {
+    statuses?: Record<string, string | number>;
+    realtime_updated_at?: string;
+    source?: string;
+    sensor_data?: Array<Record<string, unknown>>;
+    anomaly_detection?: Record<string, unknown>;
+  };
+  work_orders?: {
+    totals?: Record<string, number>;
+    recent?: Array<Record<string, unknown>>;
+    digital_signature_workflow?: Record<string, unknown>;
+    parts_tracking?: Array<Record<string, unknown>>;
+  };
+  compliance_tracking?: {
+    ready_count?: number;
+    pending_count?: number;
+    overdue_count?: number;
+    compliance_pct?: number;
+    ad_sb_tracking?: Record<string, unknown>;
+    regulatory_profiles?: Record<string, unknown>;
+    standards?: string[];
+  };
+  performance_analytics?: {
+    utilization_pct?: number;
+    anomaly_index?: number;
+    forecast_risk?: string;
+    trend_summary?: Array<Record<string, unknown>>;
+    failure_prediction?: Record<string, unknown>;
+  };
+  integration_capabilities?: Array<Record<string, unknown>>;
+  integration_resilience?: Record<string, unknown>;
+  standards_alignment?: Record<string, string>;
+  validation?: Record<string, unknown>;
   drilldown?: {
     defect_drivers?: Array<Record<string, unknown>>;
   };
@@ -1092,7 +1135,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   const aircraftDashboardModule = useMemo<AircraftDashboardModuleFilter>(() => {
     if (aircraftSubModuleSegment === 'engine') return 'engine';
     if (aircraftSubModuleSegment === 'components') return 'components';
-    if (aircraftSubModuleSegment === 'list') return 'all';
+    if (aircraftSubModuleSegment === 'list') return 'overview';
     return 'overview';
   }, [aircraftSubModuleSegment]);
   const showAircraftLeadWorkspace =
@@ -1102,8 +1145,8 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   const showAircraftMasterRecords = entity === 'aircraft'
     ? (!isAircraftSubModule || aircraftSubModuleSegment === 'list')
     : !showAircraftLeadWorkspace;
-  const showAircraftEngineWorkspace = entity === 'aircraft' && aircraftEnhancementEnabled && (!isAircraftSubModule || aircraftSubModuleSegment === 'engine');
-  const showAircraftComponentsWorkspace = entity === 'aircraft' && aircraftEnhancementEnabled && (!isAircraftSubModule || aircraftSubModuleSegment === 'components');
+  const showAircraftEngineWorkspace = entity === 'aircraft' && aircraftEnhancementEnabled && isAircraftSubModule && aircraftSubModuleSegment === 'engine';
+  const showAircraftComponentsWorkspace = entity === 'aircraft' && aircraftEnhancementEnabled && isAircraftSubModule && aircraftSubModuleSegment === 'components';
   const showAircraftDocumentsWorkspace = entity === 'aircraft' && aircraftEnhancementEnabled && isAircraftSubModule && aircraftSubModuleSegment === 'documents';
   const showAircraftAdSbWorkspace = entity === 'aircraft' && aircraftEnhancementEnabled && isAircraftSubModule && aircraftSubModuleSegment === 'ad-sb';
   const handleAircraftViewNavigation = useCallback((tab: AircraftLeadsTab) => {
@@ -3625,6 +3668,110 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     () => (Array.isArray(aircraftDashboardEngineModule?.drilldown?.defect_drivers) ? aircraftDashboardEngineModule.drilldown.defect_drivers.slice(0, 6) : []),
     [aircraftDashboardEngineModule],
   );
+  const aircraftEngineLifecycleRows = useMemo(
+    () => (Array.isArray(aircraftDashboardEngineModule?.lifecycle_management) ? aircraftDashboardEngineModule.lifecycle_management.slice(0, 6) : []),
+    [aircraftDashboardEngineModule],
+  );
+  const aircraftEngineMaintenanceRows = useMemo(
+    () => (Array.isArray(aircraftDashboardEngineModule?.maintenance_schedule) ? aircraftDashboardEngineModule.maintenance_schedule.slice(0, 8) : []),
+    [aircraftDashboardEngineModule],
+  );
+  const aircraftEngineWorkOrderTotals = useMemo(() => {
+    const totals = aircraftDashboardEngineModule?.work_orders?.totals || {};
+    return {
+      open: Number(totals.open || 0),
+      in_progress: Number(totals.in_progress || 0),
+      blocked: Number(totals.blocked || 0),
+      completed: Number(totals.completed || 0),
+    };
+  }, [aircraftDashboardEngineModule]);
+  const aircraftEngineRecentWorkOrders = useMemo(
+    () => (Array.isArray(aircraftDashboardEngineModule?.work_orders?.recent) ? aircraftDashboardEngineModule.work_orders.recent.slice(0, 6) : []),
+    [aircraftDashboardEngineModule],
+  );
+  const aircraftEngineComplianceSummary = useMemo(() => {
+    const source = aircraftDashboardEngineModule?.compliance_tracking || {};
+    return {
+      readyCount: Number(source.ready_count || 0),
+      pendingCount: Number(source.pending_count || 0),
+      overdueCount: Number(source.overdue_count || 0),
+      compliancePct: Number(source.compliance_pct || 0),
+    };
+  }, [aircraftDashboardEngineModule]);
+  const aircraftEnginePerformanceSummary = useMemo(() => {
+    const source = aircraftDashboardEngineModule?.performance_analytics || {};
+    return {
+      utilizationPct: Number(source.utilization_pct || 0),
+      anomalyIndex: Number(source.anomaly_index || 0),
+      forecastRisk: String(source.forecast_risk || 'stable'),
+      trendSummary: Array.isArray(source.trend_summary) ? source.trend_summary.slice(0, 6) : [],
+    };
+  }, [aircraftDashboardEngineModule]);
+  const aircraftEngineIntegrationRows = useMemo(
+    () => (Array.isArray(aircraftDashboardEngineModule?.integration_capabilities) ? aircraftDashboardEngineModule.integration_capabilities.slice(0, 6) : []),
+    [aircraftDashboardEngineModule],
+  );
+  const aircraftEngineRealtimeStatuses = useMemo(() => {
+    const source = aircraftDashboardEngineModule?.component_monitoring?.statuses || {};
+    return Object.entries(source).slice(0, 6);
+  }, [aircraftDashboardEngineModule]);
+  const aircraftEngineAnomalies = useMemo(
+    () =>
+      Array.isArray((aircraftDashboardEngineModule?.component_monitoring?.anomaly_detection as { anomalies?: unknown[] } | undefined)?.anomalies)
+        ? (((aircraftDashboardEngineModule?.component_monitoring?.anomaly_detection as { anomalies?: unknown[] }).anomalies || []) as Array<Record<string, unknown>>).slice(0, 4)
+        : [],
+    [aircraftDashboardEngineModule],
+  );
+  const aircraftEngineDigitalSignatures = useMemo(() => {
+    const workflow = aircraftDashboardEngineModule?.work_orders?.digital_signature_workflow || {};
+    return {
+      totalRequired: Number((workflow as Record<string, unknown>).total_required || 0),
+      completed: Number((workflow as Record<string, unknown>).completed || 0),
+      pending: Number((workflow as Record<string, unknown>).pending || 0),
+    };
+  }, [aircraftDashboardEngineModule]);
+  const aircraftEnginePartsTracking = useMemo(
+    () => (Array.isArray(aircraftDashboardEngineModule?.work_orders?.parts_tracking) ? aircraftDashboardEngineModule.work_orders.parts_tracking.slice(0, 4) : []),
+    [aircraftDashboardEngineModule],
+  );
+  const aircraftEngineRegulatoryProfiles = useMemo(() => {
+    const profiles = aircraftDashboardEngineModule?.compliance_tracking?.regulatory_profiles;
+    return profiles && typeof profiles === 'object' ? (profiles as Record<string, unknown>) : {};
+  }, [aircraftDashboardEngineModule]);
+  const aircraftEngineAdSbTracking = useMemo(() => {
+    const source = aircraftDashboardEngineModule?.compliance_tracking?.ad_sb_tracking;
+    return source && typeof source === 'object' ? (source as Record<string, unknown>) : {};
+  }, [aircraftDashboardEngineModule]);
+  const aircraftEngineComplianceStandards = useMemo(
+    () => (Array.isArray(aircraftDashboardEngineModule?.compliance_tracking?.standards) ? aircraftDashboardEngineModule.compliance_tracking.standards.slice(0, 4) : []),
+    [aircraftDashboardEngineModule],
+  );
+  const aircraftEngineFailurePrediction = useMemo(() => {
+    const prediction = aircraftDashboardEngineModule?.performance_analytics?.failure_prediction;
+    return prediction && typeof prediction === 'object' ? (prediction as Record<string, unknown>) : {};
+  }, [aircraftDashboardEngineModule]);
+  const aircraftEngineMaintenanceConflicts = useMemo(
+    () => (Array.isArray(aircraftDashboardEngineModule?.maintenance_planning?.conflicts) ? aircraftDashboardEngineModule.maintenance_planning.conflicts.slice(0, 4) : []),
+    [aircraftDashboardEngineModule],
+  );
+  const aircraftEngineResourceAllocation = useMemo(
+    () => (Array.isArray(aircraftDashboardEngineModule?.maintenance_planning?.resource_allocation) ? aircraftDashboardEngineModule.maintenance_planning.resource_allocation.slice(0, 4) : []),
+    [aircraftDashboardEngineModule],
+  );
+  const aircraftEngineIntegrationResilience = useMemo(() => {
+    const resilience = aircraftDashboardEngineModule?.integration_resilience;
+    return resilience && typeof resilience === 'object' ? (resilience as Record<string, unknown>) : {};
+  }, [aircraftDashboardEngineModule]);
+  const aircraftEngineStandardsAlignment = useMemo(() => {
+    const standards = aircraftDashboardEngineModule?.standards_alignment;
+    return standards && typeof standards === 'object' ? (standards as Record<string, string>) : {};
+  }, [aircraftDashboardEngineModule]);
+  const aircraftEngineValidationLayers = useMemo(() => {
+    const validation = aircraftDashboardEngineModule?.validation;
+    if (!validation || typeof validation !== 'object') return {};
+    const layers = (validation as Record<string, unknown>).validation_layers;
+    return layers && typeof layers === 'object' ? (layers as Record<string, unknown>) : {};
+  }, [aircraftDashboardEngineModule]);
   const aircraftComponentsOpenDefects = useMemo(
     () => (Array.isArray(aircraftDashboardComponentsModule?.drilldown?.open_defects) ? aircraftDashboardComponentsModule.drilldown.open_defects.slice(0, 6) : []),
     [aircraftDashboardComponentsModule],
@@ -3669,7 +3816,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     if (showAircraftComponentsWorkspace && !showAircraftEngineWorkspace) {
       return aircraftDashboardAlerts.filter((alert) => String(alert.module || '').toLowerCase() === 'components');
     }
-    return aircraftDashboardAlerts;
+    return [] as AircraftDashboardAlert[];
   }, [
     aircraftDashboardAlerts,
     showAircraftAdSbWorkspace,
@@ -4309,10 +4456,10 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                       : showAircraftAdSbWorkspace
                         ? 'AD/SB Management'
                         : showAircraftEngineWorkspace && !showAircraftComponentsWorkspace
-                          ? 'Engine Monitoring'
+                          ? 'Engine Operations'
                           : showAircraftComponentsWorkspace && !showAircraftEngineWorkspace
                             ? 'Components Monitoring'
-                            : 'Engine & Components Monitoring'}
+                            : 'Aircraft Operations Overview'}
                   </h3>
                   <Badge variant="secondary">View: {aircraftDashboardModule}</Badge>
                 </div>
@@ -4323,12 +4470,44 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                   <p className="text-[12px] text-destructive">{aircraftDashboardError}</p>
                 ) : null}
               </div>
+              {!showAircraftEngineWorkspace && !showAircraftComponentsWorkspace && !showAircraftDocumentsWorkspace && !showAircraftAdSbWorkspace ? (
+                <div className="grid gap-4 xl:grid-cols-2">
+                  <div className="space-y-3 rounded-md border border-[hsl(var(--mdm-template-border))] p-4">
+                    <h4 className="text-[13px] font-semibold text-[hsl(var(--mdm-template-heading))]">Maintenance Schedule</h4>
+                    {aircraftDashboardMaintenanceRows.length === 0 ? (
+                      <p className="text-[12px] text-[hsl(var(--mdm-template-muted))]">No maintenance packages in the selected window.</p>
+                    ) : (
+                      <div className="grid gap-2 text-[12px]">
+                        {aircraftDashboardMaintenanceRows.map((row, index) => (
+                          <div key={`ops-maintenance-row-${index + 1}`} className="rounded-md border border-[hsl(var(--mdm-template-border))] px-2 py-1">
+                            {String(row.work_package_number || row.title || 'Work package')} · {String(row.status || 'open')} · due {String(row.due_in_days ?? '-')}d
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div className="space-y-3 rounded-md border border-[hsl(var(--mdm-template-border))] p-4">
+                    <h4 className="text-[13px] font-semibold text-[hsl(var(--mdm-template-heading))]">Defect Tracking</h4>
+                    {aircraftDashboardDefectRows.length === 0 ? (
+                      <p className="text-[12px] text-[hsl(var(--mdm-template-muted))]">No defects reported in the selected window.</p>
+                    ) : (
+                      <div className="grid gap-2 text-[12px]">
+                        {aircraftDashboardDefectRows.map((row, index) => (
+                          <div key={`ops-defect-row-${index + 1}`} className="rounded-md border border-[hsl(var(--mdm-template-border))] px-2 py-1">
+                            {String(row.title || 'Defect')} · {String(row.severity || 'medium')} · {String(row.status || 'open')}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : null}
               {showAircraftEngineWorkspace || showAircraftComponentsWorkspace ? (
                 <div className={`grid gap-4 ${showAircraftEngineWorkspace && showAircraftComponentsWorkspace ? 'xl:grid-cols-2' : ''}`}>
                   {showAircraftEngineWorkspace ? (
                     <div className="space-y-3 rounded-md border border-[hsl(var(--mdm-template-border))] p-4">
                       <div className="flex items-center justify-between gap-2">
-                        <h4 className="text-[13px] font-semibold text-[hsl(var(--mdm-template-heading))]">Engine Monitoring</h4>
+                        <h4 className="text-[13px] font-semibold text-[hsl(var(--mdm-template-heading))]">Engine Lifecycle Management</h4>
                         <div className="flex items-center gap-1">
                           {Object.entries(aircraftDashboardEngineModule?.statuses || {}).slice(0, 3).map(([key, value]) => (
                             <Badge key={`engine-status-${key}`} variant={mapStatusToBadgeVariant(value)}>
@@ -4355,6 +4534,191 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                             <Line type="monotone" dataKey="oil_consumption_lph" stroke="#0891B2" strokeWidth={2} dot={false} />
                           </LineChart>
                         </ResponsiveContainer>
+                      </div>
+                      <div className="grid gap-2 text-[12px] md:grid-cols-2">
+                        <div className="space-y-1 rounded-md border border-[hsl(var(--mdm-template-border))] p-2">
+                          <p className="font-medium text-[hsl(var(--mdm-template-heading))]">Maintenance Scheduling & Tracking</p>
+                          {aircraftEngineMaintenanceRows.length === 0 ? (
+                            <p className="text-[hsl(var(--mdm-template-muted))]">No engine schedule rows in selected window.</p>
+                          ) : (
+                            aircraftEngineMaintenanceRows.map((row, index) => (
+                              <div key={`engine-maintenance-row-${index + 1}`} className="rounded-md border border-[hsl(var(--mdm-template-border))] px-2 py-1">
+                                {String(row.work_package_number || row.title || 'Engine work order')} · {String(row.status || 'open')} · due {String(row.due_in_days ?? '-')}d
+                              </div>
+                            ))
+                          )}
+                          <div className="rounded-md bg-muted/40 p-2">
+                            Conflicts: <span className="font-semibold">{aircraftEngineMaintenanceConflicts.length}</span> · Allocated Resources: <span className="font-semibold">{aircraftEngineResourceAllocation.length}</span>
+                          </div>
+                          {aircraftEngineMaintenanceConflicts.length > 0 ? (
+                            <div className="grid gap-1" role="status" aria-live="polite" aria-label="Engine maintenance conflicts">
+                              {aircraftEngineMaintenanceConflicts.map((row, index) => (
+                                <div key={`engine-conflict-row-${index + 1}`} className="rounded-md border border-[hsl(var(--mdm-template-border))] px-2 py-1">
+                                  {String(row.conflict_type || 'conflict')} · resolution {String(row.resolution || 'monitor')} · {String(row.auto_resolution_status || 'queued')}
+                                </div>
+                              ))}
+                            </div>
+                          ) : null}
+                          {aircraftEngineResourceAllocation.length > 0 ? (
+                            <div className="grid gap-1">
+                              {aircraftEngineResourceAllocation.map((row, index) => (
+                                <div key={`engine-allocation-row-${index + 1}`} className="rounded-md border border-[hsl(var(--mdm-template-border))] px-2 py-1">
+                                  {String(row.assigned_team || 'unassigned')} · {String(row.required_skill || 'skill')} · {String(row.allocation_status || 'allocated')}
+                                </div>
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
+                        <div className="space-y-1 rounded-md border border-[hsl(var(--mdm-template-border))] p-2">
+                          <p className="font-medium text-[hsl(var(--mdm-template-heading))]">Component Monitoring</p>
+                          <p className="text-[hsl(var(--mdm-template-muted))]">
+                            Real-time source {String(aircraftDashboardEngineModule?.component_monitoring?.source || 'aircraft-dashboard')} · updated {String(aircraftDashboardEngineModule?.component_monitoring?.realtime_updated_at || aircraftDashboard?.metadata?.generated_at || '').slice(0, 19).replace('T', ' ')}
+                          </p>
+                          {aircraftEngineRealtimeStatuses.length === 0 ? (
+                            <p className="text-[hsl(var(--mdm-template-muted))]">No live component signals received.</p>
+                          ) : (
+                            <div className="grid gap-1">
+                              {aircraftEngineRealtimeStatuses.map(([key, value], index) => (
+                                <div key={`engine-realtime-status-${index + 1}`} className="rounded-md border border-[hsl(var(--mdm-template-border))] px-2 py-1">
+                                  {key.replace(/_/g, ' ')}: {String(value)}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="grid gap-2 text-[12px] md:grid-cols-2">
+                        <div className="space-y-1 rounded-md border border-[hsl(var(--mdm-template-border))] p-2">
+                          <p className="font-medium text-[hsl(var(--mdm-template-heading))]">Work Order Management</p>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="rounded-md bg-muted/40 p-2">Open: <span className="font-semibold">{aircraftEngineWorkOrderTotals.open}</span></div>
+                            <div className="rounded-md bg-muted/40 p-2">In Progress: <span className="font-semibold">{aircraftEngineWorkOrderTotals.in_progress}</span></div>
+                            <div className="rounded-md bg-muted/40 p-2">Blocked: <span className="font-semibold">{aircraftEngineWorkOrderTotals.blocked}</span></div>
+                            <div className="rounded-md bg-muted/40 p-2">Completed: <span className="font-semibold">{aircraftEngineWorkOrderTotals.completed}</span></div>
+                          </div>
+                          {aircraftEngineRecentWorkOrders.length > 0 ? (
+                            <div className="grid gap-1 pt-1">
+                              {aircraftEngineRecentWorkOrders.map((row, index) => (
+                                <div key={`engine-work-order-row-${index + 1}`} className="rounded-md border border-[hsl(var(--mdm-template-border))] px-2 py-1">
+                                  {String(row.work_package_number || row.title || 'Work order')} · {String(row.status || 'open')}
+                                </div>
+                              ))}
+                            </div>
+                          ) : null}
+                          <div className="rounded-md bg-muted/40 p-2">
+                            Digital Signatures: <span className="font-semibold">{aircraftEngineDigitalSignatures.completed}/{aircraftEngineDigitalSignatures.totalRequired}</span> · Pending {aircraftEngineDigitalSignatures.pending}
+                          </div>
+                          {aircraftEnginePartsTracking.length > 0 ? (
+                            <div className="grid gap-1 pt-1">
+                              {aircraftEnginePartsTracking.map((row, index) => (
+                                <div key={`engine-part-track-${index + 1}`} className="rounded-md border border-[hsl(var(--mdm-template-border))] px-2 py-1">
+                                  {String(row.part_number || 'Part')} · {String(row.status || 'reserved')} · Qty {String(row.quantity_issued ?? 0)}/{String(row.quantity_required ?? 0)}
+                                </div>
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
+                        <div className="space-y-1 rounded-md border border-[hsl(var(--mdm-template-border))] p-2">
+                          <p className="font-medium text-[hsl(var(--mdm-template-heading))]">Compliance Tracking</p>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="rounded-md bg-muted/40 p-2">Ready: <span className="font-semibold">{aircraftEngineComplianceSummary.readyCount}</span></div>
+                            <div className="rounded-md bg-muted/40 p-2">Pending: <span className="font-semibold">{aircraftEngineComplianceSummary.pendingCount}</span></div>
+                            <div className="rounded-md bg-muted/40 p-2">Overdue: <span className="font-semibold">{aircraftEngineComplianceSummary.overdueCount}</span></div>
+                            <div className="rounded-md bg-muted/40 p-2">Compliance: <span className="font-semibold">{aircraftEngineComplianceSummary.compliancePct}%</span></div>
+                          </div>
+                          <div className="rounded-md bg-muted/40 p-2">
+                            Forecast Risk: <span className="font-semibold">{aircraftEnginePerformanceSummary.forecastRisk}</span> · Utilization {aircraftEnginePerformanceSummary.utilizationPct}%
+                          </div>
+                          <div className="rounded-md bg-muted/40 p-2">
+                            AD/SB: <span className="font-semibold">{String(aircraftEngineAdSbTracking.pending_obligations ?? 0)}</span> pending of {String(aircraftEngineAdSbTracking.total_obligations ?? 0)}
+                          </div>
+                          <div className="grid gap-1 pt-1">
+                            {Object.entries(aircraftEngineRegulatoryProfiles).slice(0, 3).map(([authority, details]) => (
+                              <div key={`engine-regulatory-${authority}`} className="rounded-md border border-[hsl(var(--mdm-template-border))] px-2 py-1">
+                                {authority.toUpperCase()}: {String(((details as Record<string, unknown>) || {}).status || 'monitoring')}
+                              </div>
+                            ))}
+                          </div>
+                          {aircraftEngineComplianceStandards.length > 0 ? (
+                            <div className="rounded-md border border-[hsl(var(--mdm-template-border))] px-2 py-1">
+                              Standards: {aircraftEngineComplianceStandards.join(', ')}
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
+                      <div className="grid gap-2 text-[12px] md:grid-cols-2">
+                        <div className="space-y-1 rounded-md border border-[hsl(var(--mdm-template-border))] p-2">
+                          <p className="font-medium text-[hsl(var(--mdm-template-heading))]">Performance Analytics</p>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="rounded-md bg-muted/40 p-2">Anomaly Index: <span className="font-semibold">{aircraftEnginePerformanceSummary.anomalyIndex}</span></div>
+                            <div className="rounded-md bg-muted/40 p-2">Trend Points: <span className="font-semibold">{aircraftEnginePerformanceSummary.trendSummary.length || aircraftEngineTrend.length}</span></div>
+                          </div>
+                          <div className="rounded-md bg-muted/40 p-2">
+                            Failure Prediction: <span className="font-semibold">{String(aircraftEngineFailurePrediction.risk_score || 0)}</span> score · confidence {String(aircraftEngineFailurePrediction.confidence_pct || 0)}%
+                          </div>
+                          <div className="rounded-md bg-muted/40 p-2">
+                            Detected Anomalies: <span className="font-semibold">{aircraftEngineAnomalies.length}</span>
+                          </div>
+                          {aircraftEngineAnomalies.length > 0 ? (
+                            <div className="grid gap-1" role="status" aria-live="polite" aria-label="Engine anomaly detections">
+                              {aircraftEngineAnomalies.map((row, index) => (
+                                <div key={`engine-anomaly-row-${index + 1}`} className="rounded-md border border-[hsl(var(--mdm-template-border))] px-2 py-1">
+                                  {String(row.signal_type || 'signal')} · score {String(row.anomaly_score || 0)} · z {String(row.z_score || 0)}
+                                </div>
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
+                        <div className="space-y-1 rounded-md border border-[hsl(var(--mdm-template-border))] p-2">
+                          <p className="font-medium text-[hsl(var(--mdm-template-heading))]">Integration Capabilities</p>
+                          {aircraftEngineIntegrationRows.length === 0 ? (
+                            <p className="text-[hsl(var(--mdm-template-muted))]">No integration adapters reported.</p>
+                          ) : (
+                            <div className="grid gap-1">
+                              {aircraftEngineIntegrationRows.map((row, index) => (
+                                <div key={`engine-integration-row-${index + 1}`} className="rounded-md border border-[hsl(var(--mdm-template-border))] px-2 py-1">
+                                  {String(row.system || row.name || 'Integration')} · {String(row.direction || 'bi-directional')} · {String(row.protocol || 'rest')} · {String(row.status || 'active')} · latency {String(row.latency_ms ?? '-')}ms
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          <div className="rounded-md bg-muted/40 p-2">
+                            Channels: REST {String(aircraftEngineIntegrationResilience.rest_channels || 0)} · MQ {String(aircraftEngineIntegrationResilience.message_queue_channels || 0)} · Retry backlog {String(aircraftEngineIntegrationResilience.retry_backlog || 0)}
+                          </div>
+                          <div className="rounded-md bg-muted/40 p-2">
+                            Circuit Breaker: state {String(((aircraftEngineIntegrationResilience.circuit_breaker as Record<string, unknown>) || {}).state || 'closed')} · threshold {String(((aircraftEngineIntegrationResilience.circuit_breaker as Record<string, unknown>) || {}).failure_threshold || 0)} · retry attempts {String(((aircraftEngineIntegrationResilience.retry_policy as Record<string, unknown>) || {}).attempts || 0)}
+                          </div>
+                          {Object.keys(aircraftEngineStandardsAlignment).length > 0 ? (
+                            <div className="grid gap-1">
+                              {Object.entries(aircraftEngineStandardsAlignment).map(([key, value]) => (
+                                <div key={`engine-standard-alignment-${key}`} className="rounded-md border border-[hsl(var(--mdm-template-border))] px-2 py-1">
+                                  {key.replace(/_/g, ' ').toUpperCase()}: {String(value)}
+                                </div>
+                              ))}
+                            </div>
+                          ) : null}
+                          {Object.keys(aircraftEngineValidationLayers).length > 0 ? (
+                            <div className="grid gap-1">
+                              {Object.entries(aircraftEngineValidationLayers).map(([key, value]) => (
+                                <div key={`engine-validation-layer-${key}`} className="rounded-md border border-[hsl(var(--mdm-template-border))] px-2 py-1">
+                                  {key.replace(/_/g, ' ')}: {String(value)}
+                                </div>
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
+                      <div className="space-y-1 text-[12px]">
+                        <p className="font-medium text-[hsl(var(--mdm-template-heading))]">Engine Lifecycle Records</p>
+                        {aircraftEngineLifecycleRows.length === 0 ? (
+                          <p className="text-[hsl(var(--mdm-template-muted))]">No lifecycle records in selected window.</p>
+                        ) : (
+                          aircraftEngineLifecycleRows.map((row, index) => (
+                            <div key={`engine-lifecycle-row-${index + 1}`} className="rounded-md border border-[hsl(var(--mdm-template-border))] px-2 py-1">
+                              {String(row.asset || row.registration || row.aircraft_id || 'Engine asset')} · {String(row.phase || row.lifecycle_stage || 'active')} · due {String(row.next_event_due_in_days ?? '-')}d · health {String(row.health_score ?? '-')}
+                            </div>
+                          ))
+                        )}
                       </div>
                       <div className="space-y-1 text-[12px]">
                         <p className="font-medium text-[hsl(var(--mdm-template-heading))]">Engine Drill-down</p>
@@ -5543,34 +5907,34 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
           </DialogContent>
         </Dialog>
         <Dialog open={aircraftWorkPackageDialogOpen} onOpenChange={setAircraftWorkPackageDialogOpen}>
-          <DialogContent className="mdm-template-dialog mdm-template-dialog-large w-[99vw] max-w-[1960px]" data-testid="amro-aircraft-work-package-dialog">
-            <DialogHeader className="border-b border-[#efefef] px-4 py-3">
+          <DialogContent className="mdm-template-dialog mdm-template-dialog-large h-[96vh] w-[98.5vw] max-h-[96vh] max-w-[1840px] overflow-hidden p-0" data-testid="amro-aircraft-work-package-dialog">
+            <DialogHeader className="border-b border-[#efefef] px-5 py-3">
               <DialogTitle className="text-[36px] font-semibold leading-none text-[#4c4c4c]">
                 Add work package
               </DialogTitle>
             </DialogHeader>
-            <div className="space-y-2 px-2 pb-1 pt-1">
+            <div className="flex h-full flex-col space-y-1 bg-[#f8f8f8] px-3 pb-2 pt-1">
               <Tabs value={aircraftWorkPackageActiveTab} onValueChange={setAircraftWorkPackageActiveTab}>
                 <TabsList className="h-auto w-full justify-start gap-0 overflow-x-auto rounded-none bg-transparent p-0">
-                  <TabsTrigger value="new-wp" className="h-[18px] rounded-none border border-r-0 border-[#d7d7d7] px-[6px] text-[9px] font-medium leading-none text-[#6a6a6a] data-[state=active]:border-[#12aeb1] data-[state=active]:bg-[#12aeb1] data-[state=active]:text-white">New WP</TabsTrigger>
-                  <TabsTrigger value="existing-wp" className="h-[18px] rounded-none border border-r-0 border-[#d7d7d7] px-[6px] text-[9px] font-medium leading-none text-[#6a6a6a] data-[state=active]:border-[#12aeb1] data-[state=active]:bg-[#12aeb1] data-[state=active]:text-white">Existing WP</TabsTrigger>
-                  <TabsTrigger value="non-performed-tasks" className="h-[18px] rounded-none border border-r-0 border-[#d7d7d7] px-[6px] text-[9px] font-medium leading-none text-[#6a6a6a] data-[state=active]:border-[#12aeb1] data-[state=active]:bg-[#12aeb1] data-[state=active]:text-white">Non performed tasks</TabsTrigger>
-                  <TabsTrigger value="selected-task" className="h-[18px] rounded-none border border-r-0 border-[#d7d7d7] px-[6px] text-[9px] font-medium leading-none text-[#6a6a6a] data-[state=active]:border-[#12aeb1] data-[state=active]:bg-[#12aeb1] data-[state=active]:text-white">Selected task</TabsTrigger>
-                  <TabsTrigger value="all-tasks" className="h-[18px] rounded-none border border-[#d7d7d7] px-[6px] text-[9px] font-medium leading-none text-[#6a6a6a] data-[state=active]:border-[#12aeb1] data-[state=active]:bg-[#12aeb1] data-[state=active]:text-white">All Tasks</TabsTrigger>
+                  <TabsTrigger value="new-wp" className="h-[20px] rounded-none border border-r-0 border-[#d7d7d7] px-[7px] text-[10px] font-semibold leading-none text-[#6a6a6a] data-[state=active]:border-[#12aeb1] data-[state=active]:bg-[#12aeb1] data-[state=active]:text-white">New WP</TabsTrigger>
+                  <TabsTrigger value="existing-wp" className="h-[20px] rounded-none border border-r-0 border-[#d7d7d7] px-[7px] text-[10px] font-semibold leading-none text-[#6a6a6a] data-[state=active]:border-[#12aeb1] data-[state=active]:bg-[#12aeb1] data-[state=active]:text-white">Existing WP</TabsTrigger>
+                  <TabsTrigger value="non-performed-tasks" className="h-[20px] rounded-none border border-r-0 border-[#d7d7d7] px-[7px] text-[10px] font-semibold leading-none text-[#6a6a6a] data-[state=active]:border-[#12aeb1] data-[state=active]:bg-[#12aeb1] data-[state=active]:text-white">Non performed tasks</TabsTrigger>
+                  <TabsTrigger value="selected-task" className="h-[20px] rounded-none border border-r-0 border-[#d7d7d7] px-[7px] text-[10px] font-semibold leading-none text-[#6a6a6a] data-[state=active]:border-[#12aeb1] data-[state=active]:bg-[#12aeb1] data-[state=active]:text-white">Selected task</TabsTrigger>
+                  <TabsTrigger value="all-tasks" className="h-[20px] rounded-none border border-[#d7d7d7] px-[7px] text-[10px] font-semibold leading-none text-[#6a6a6a] data-[state=active]:border-[#12aeb1] data-[state=active]:bg-[#12aeb1] data-[state=active]:text-white">All Tasks</TabsTrigger>
                 </TabsList>
                 <TabsContent value="selected-task" className="space-y-2 pt-1">
-                  <div className="grid gap-2 lg:grid-cols-[1fr_1fr]">
-                    <div className="overflow-hidden rounded-sm border border-[#e5e5e5] bg-white">
+                  <div className="grid gap-2 lg:grid-cols-[1.06fr_0.94fr]">
+                    <div className="overflow-hidden border border-[#e5e5e5] bg-white">
                       <div className="border-b border-[#efefef] bg-[#fafafa] px-[10px] py-[6px] text-[13px] font-semibold text-[#757575]">Work Package details</div>
-                      <div className="grid gap-2 p-2 lg:grid-cols-2">
-                        <div className="space-y-1">
+                      <div className="grid gap-2 p-2.5 lg:grid-cols-2">
+                        <div className="space-y-[6px]">
                           <div className="space-y-1">
                             <Label htmlFor="aircraft-wp-number" className="text-[12px] font-medium text-[#696969]">Number</Label>
                             <Input
                               id="aircraft-wp-number"
                               value={aircraftWorkPackageValues.workPackageNumber}
                               onChange={(event) => setAircraftWorkPackageField('workPackageNumber', event.target.value)}
-                              className={cn('h-7 rounded-none border-[#eeeeee] bg-white px-2 text-[12px] text-[#525252] shadow-none', aircraftWorkPackageErrors.workPackageNumber && 'border-destructive')}
+                              className={cn('h-[26px] rounded-none border-[#eeeeee] bg-white px-2 text-[11px] text-[#525252] shadow-none', aircraftWorkPackageErrors.workPackageNumber && 'border-destructive')}
                               aria-invalid={Boolean(aircraftWorkPackageErrors.workPackageNumber)}
                               placeholder="145"
                             />
@@ -5582,7 +5946,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                               id="aircraft-wp-topic"
                               value={aircraftWorkPackageValues.topic}
                               onChange={(event) => setAircraftWorkPackageField('topic', event.target.value)}
-                              className={cn('h-7 rounded-none border-[#eeeeee] bg-white px-2 text-[12px] text-[#525252] shadow-none', aircraftWorkPackageErrors.topic && 'border-destructive')}
+                              className={cn('h-[26px] rounded-none border-[#eeeeee] bg-white px-2 text-[11px] text-[#525252] shadow-none', aircraftWorkPackageErrors.topic && 'border-destructive')}
                               aria-invalid={Boolean(aircraftWorkPackageErrors.topic)}
                               placeholder="400 Hour Inspection"
                             />
@@ -5594,7 +5958,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                               id="aircraft-wp-ttaf"
                               value={aircraftWorkPackageValues.ttafHours}
                               onChange={(event) => setAircraftWorkPackageField('ttafHours', event.target.value)}
-                              className={cn('h-7 rounded-none border-[#eeeeee] bg-white px-2 text-[12px] text-[#525252] shadow-none', aircraftWorkPackageErrors.ttafHours && 'border-destructive')}
+                              className={cn('h-[26px] rounded-none border-[#eeeeee] bg-white px-2 text-[11px] text-[#525252] shadow-none', aircraftWorkPackageErrors.ttafHours && 'border-destructive')}
                               aria-invalid={Boolean(aircraftWorkPackageErrors.ttafHours)}
                               placeholder="406.30 hours"
                             />
@@ -5603,7 +5967,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                           <div className="space-y-1">
                             <Label htmlFor="aircraft-wp-validation" className="text-[12px] font-medium text-[#696969]">Validation</Label>
                             <Select value={aircraftWorkPackageValues.validationState} onValueChange={(value) => setAircraftWorkPackageField('validationState', value)}>
-                              <SelectTrigger id="aircraft-wp-validation" className={cn('h-7 rounded-none border-[#eeeeee] bg-white px-2 text-[12px] text-[#525252] shadow-none', aircraftWorkPackageErrors.validationState && 'border-destructive')}>
+                              <SelectTrigger id="aircraft-wp-validation" className={cn('h-[26px] rounded-none border-[#eeeeee] bg-white px-2 text-[11px] text-[#525252] shadow-none', aircraftWorkPackageErrors.validationState && 'border-destructive')}>
                                 <SelectValue placeholder="NEEDED" />
                               </SelectTrigger>
                               <SelectContent>
@@ -5622,7 +5986,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                                 type="text"
                                 value={aircraftWorkPackageValues.transmissionDate}
                                 onChange={(event) => setAircraftWorkPackageField('transmissionDate', event.target.value)}
-                                className={cn('h-7 rounded-none border-[#eeeeee] bg-white px-2 pr-7 text-[12px] text-[#525252] shadow-none', aircraftWorkPackageErrors.transmissionDate && 'border-destructive')}
+                                className={cn('h-[26px] rounded-none border-[#eeeeee] bg-white px-2 pr-7 text-[11px] text-[#525252] shadow-none', aircraftWorkPackageErrors.transmissionDate && 'border-destructive')}
                                 aria-invalid={Boolean(aircraftWorkPackageErrors.transmissionDate)}
                                 placeholder="yyyy-mm-dd"
                               />
@@ -5638,7 +6002,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                                 type="text"
                                 value={aircraftWorkPackageValues.maintenanceReleaseDate}
                                 onChange={(event) => setAircraftWorkPackageField('maintenanceReleaseDate', event.target.value)}
-                                className={cn('h-7 rounded-none border-[#eeeeee] bg-white px-2 pr-7 text-[12px] text-[#525252] shadow-none', aircraftWorkPackageErrors.maintenanceReleaseDate && 'border-destructive')}
+                                className={cn('h-[26px] rounded-none border-[#eeeeee] bg-white px-2 pr-7 text-[11px] text-[#525252] shadow-none', aircraftWorkPackageErrors.maintenanceReleaseDate && 'border-destructive')}
                                 aria-invalid={Boolean(aircraftWorkPackageErrors.maintenanceReleaseDate)}
                                 placeholder="yyyy-mm-dd"
                               />
@@ -5652,7 +6016,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                               id="aircraft-wp-work-report"
                               value={aircraftWorkPackageValues.workReportNumber}
                               onChange={(event) => setAircraftWorkPackageField('workReportNumber', event.target.value)}
-                              className="h-7 rounded-none border-[#eeeeee] bg-white px-2 text-[12px] text-[#525252] shadow-none"
+                              className="h-[26px] rounded-none border-[#eeeeee] bg-white px-2 text-[11px] text-[#525252] shadow-none"
                               placeholder=" "
                             />
                           </div>
@@ -5662,18 +6026,18 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                               id="aircraft-wp-comments"
                               value={aircraftWorkPackageValues.comments}
                               onChange={(event) => setAircraftWorkPackageField('comments', event.target.value)}
-                              className="min-h-[42px] rounded-none border-[#eeeeee] px-2 py-1 text-[12px] text-[#525252] shadow-none"
+                              className="min-h-[48px] rounded-none border-[#eeeeee] px-2 py-1 text-[11px] text-[#525252] shadow-none"
                             />
                           </div>
                         </div>
-                        <div className="space-y-1">
+                        <div className="space-y-[6px]">
                           <div className="space-y-1">
                             <Label htmlFor="aircraft-wp-revision-number" className="text-[12px] font-medium text-[#696969]">Revision</Label>
                             <Input
                               id="aircraft-wp-revision-number"
                               value={aircraftWorkPackageValues.revisionNumber}
                               onChange={(event) => setAircraftWorkPackageField('revisionNumber', event.target.value)}
-                              className={cn('h-7 rounded-none border-[#eeeeee] bg-white px-2 text-[12px] text-[#525252] shadow-none', aircraftWorkPackageErrors.revisionNumber && 'border-destructive')}
+                              className={cn('h-[26px] rounded-none border-[#eeeeee] bg-white px-2 text-[11px] text-[#525252] shadow-none', aircraftWorkPackageErrors.revisionNumber && 'border-destructive')}
                               aria-invalid={Boolean(aircraftWorkPackageErrors.revisionNumber)}
                               placeholder="2"
                             />
@@ -5687,7 +6051,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                                 type="text"
                                 value={aircraftWorkPackageValues.openingDate}
                                 onChange={(event) => setAircraftWorkPackageField('openingDate', event.target.value)}
-                                className={cn('h-7 rounded-none border-[#eeeeee] bg-white px-2 pr-7 text-[12px] text-[#525252] shadow-none', aircraftWorkPackageErrors.openingDate && 'border-destructive')}
+                                className={cn('h-[26px] rounded-none border-[#eeeeee] bg-white px-2 pr-7 text-[11px] text-[#525252] shadow-none', aircraftWorkPackageErrors.openingDate && 'border-destructive')}
                                 aria-invalid={Boolean(aircraftWorkPackageErrors.openingDate)}
                                 placeholder="yyyy-mm-dd"
                               />
@@ -5698,7 +6062,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                           <div className="space-y-1">
                             <Label htmlFor="aircraft-wp-status" className="text-[12px] font-medium text-[#696969]">Status</Label>
                             <Select value={aircraftWorkPackageValues.status} onValueChange={(value) => setAircraftWorkPackageField('status', value)}>
-                              <SelectTrigger id="aircraft-wp-status" className={cn('h-7 rounded-none border-[#eeeeee] bg-white px-2 text-[12px] text-[#525252] shadow-none', aircraftWorkPackageErrors.status && 'border-destructive')}>
+                              <SelectTrigger id="aircraft-wp-status" className={cn('h-[26px] rounded-none border-[#eeeeee] bg-white px-2 text-[11px] text-[#525252] shadow-none', aircraftWorkPackageErrors.status && 'border-destructive')}>
                                 <SelectValue placeholder="OPEN" />
                               </SelectTrigger>
                               <SelectContent>
@@ -5718,7 +6082,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                                 type="text"
                                 value={aircraftWorkPackageValues.expectedReceptionDate}
                                 onChange={(event) => setAircraftWorkPackageField('expectedReceptionDate', event.target.value)}
-                                className={cn('h-7 rounded-none border-[#eeeeee] bg-white px-2 pr-7 text-[12px] text-[#525252] shadow-none', aircraftWorkPackageErrors.expectedReceptionDate && 'border-destructive')}
+                                className={cn('h-[26px] rounded-none border-[#eeeeee] bg-white px-2 pr-7 text-[11px] text-[#525252] shadow-none', aircraftWorkPackageErrors.expectedReceptionDate && 'border-destructive')}
                                 aria-invalid={Boolean(aircraftWorkPackageErrors.expectedReceptionDate)}
                                 placeholder="yyyy-mm-dd"
                               />
@@ -5734,7 +6098,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                                 type="text"
                                 value={aircraftWorkPackageValues.workReceptionDate}
                                 onChange={(event) => setAircraftWorkPackageField('workReceptionDate', event.target.value)}
-                                className={cn('h-7 rounded-none border-[#eeeeee] bg-white px-2 pr-7 text-[12px] text-[#525252] shadow-none', aircraftWorkPackageErrors.workReceptionDate && 'border-destructive')}
+                                className={cn('h-[26px] rounded-none border-[#eeeeee] bg-white px-2 pr-7 text-[11px] text-[#525252] shadow-none', aircraftWorkPackageErrors.workReceptionDate && 'border-destructive')}
                                 aria-invalid={Boolean(aircraftWorkPackageErrors.workReceptionDate)}
                                 placeholder="yyyy-mm-dd"
                               />
@@ -5745,15 +6109,15 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                         </div>
                       </div>
                     </div>
-                    <div className="overflow-hidden rounded-sm border border-[#e5e5e5] bg-white">
+                    <div className="overflow-hidden border border-[#e5e5e5] bg-white">
                       <div className="border-b border-[#efefef] bg-[#fafafa] px-[10px] py-[6px] text-[13px] font-semibold text-[#757575]">Selected task</div>
-                      <div className="space-y-2 p-3">
+                      <div className="space-y-2 p-2.5">
                         <div className="space-y-1">
                           <Label htmlFor="aircraft-wp-template-inline" className="text-[11px] font-medium text-[#696969]">
                             Template registry
                           </Label>
                           <Select value={selectedWorkPackageTemplateId} onValueChange={handleAircraftWorkPackageTemplateSelect}>
-                            <SelectTrigger id="aircraft-wp-template-inline" className="h-7 rounded-none border-[#e7e7e7] bg-white px-2 text-[11px] text-[#4f4f4f]">
+                            <SelectTrigger id="aircraft-wp-template-inline" className="h-[26px] rounded-none border-[#e7e7e7] bg-white px-2 text-[11px] text-[#4f4f4f]">
                               <SelectValue placeholder={workPackageTemplateRegistryLoading ? 'Loading templates...' : 'Choose template'} />
                             </SelectTrigger>
                             <SelectContent>
@@ -5784,11 +6148,11 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                           </Avatar>
                         </div>
                         {aircraftWorkPackageErrors.selectedTaskDescription ? <p className="mdm-template-danger">{aircraftWorkPackageErrors.selectedTaskDescription}</p> : null}
-                    <div className="rounded-none border border-[#eeeeee]">
+                    <div className="rounded-none border border-[#eeeeee] bg-white">
                       <Table>
                         <TableHeader>
-                          <TableRow>
-                            <TableHead className="w-[56px]">
+                          <TableRow className="border-b border-[#ededed] bg-[#f9f9f9]">
+                            <TableHead className="h-[30px] w-[56px] px-2">
                               <div className="flex items-center gap-2">
                                 <Checkbox
                                   aria-label="Select all tasks in page"
@@ -5804,7 +6168,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                                 <span className="text-[12px] font-semibold text-[#4f4f4f]">Select</span>
                               </div>
                             </TableHead>
-                            <TableHead>
+                            <TableHead className="h-[30px] px-2">
                               <button
                                 type="button"
                                 onClick={() => {
@@ -5821,7 +6185,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                                 <ArrowDown className="h-3 w-3 text-[#888888]" />
                               </button>
                             </TableHead>
-                            <TableHead>
+                            <TableHead className="h-[30px] px-2">
                               <button
                                 type="button"
                                 onClick={() => {
@@ -5838,9 +6202,9 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                                 <ArrowDown className="h-3 w-3 text-[#888888]" />
                               </button>
                             </TableHead>
-                            <TableHead className="text-[12px] font-semibold text-[#4f4f4f]">Serial Number</TableHead>
-                            <TableHead className="text-[12px] font-semibold text-[#4f4f4f]">Part number</TableHead>
-                            <TableHead>
+                            <TableHead className="h-[30px] px-2 text-[12px] font-semibold text-[#4f4f4f]">Serial Number</TableHead>
+                            <TableHead className="h-[30px] px-2 text-[12px] font-semibold text-[#4f4f4f]">Part number</TableHead>
+                            <TableHead className="h-[30px] px-2">
                               <button
                                 type="button"
                                 onClick={() => {
@@ -5861,8 +6225,8 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                         </TableHeader>
                         <TableBody>
                           {aircraftWorkPackagePagedTasks.map((task) => (
-                            <TableRow key={task.id}>
-                              <TableCell>
+                            <TableRow key={task.id} className="h-[30px] border-b border-[#f0f0f0]">
+                              <TableCell className="px-2 py-1">
                                 <Checkbox
                                   aria-label={`Select task ${task.taskNumber || task.id}`}
                                   checked={aircraftWorkPackageSelectedTaskIds.includes(task.id)}
@@ -5875,11 +6239,11 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                                   }}
                                 />
                               </TableCell>
-                              <TableCell className="text-[12px] text-[#5a5a5a]">{task.taskNumber || '1'}</TableCell>
-                              <TableCell className="text-[12px] text-[#5a5a5a]">{task.ataCode || '05-20 TIME LIMITS/MAINTENANCE CHECKS'}</TableCell>
-                              <TableCell className="text-[12px] text-[#5a5a5a]">{task.serialNumber || 'T34-AMS1'}</TableCell>
-                              <TableCell className="text-[12px] text-[#5a5a5a]">{task.partNumber || ''}</TableCell>
-                              <TableCell className="text-[12px] text-[#5a5a5a]">{task.description || '400 Hour inspection'}</TableCell>
+                              <TableCell className="px-2 py-1 text-[12px] text-[#5a5a5a]">{task.taskNumber || '1'}</TableCell>
+                              <TableCell className="px-2 py-1 text-[12px] text-[#5a5a5a]">{task.ataCode || '05-20 TIME LIMITS/MAINTENANCE CHECKS'}</TableCell>
+                              <TableCell className="px-2 py-1 text-[12px] text-[#5a5a5a]">{task.serialNumber || 'T34-AMS1'}</TableCell>
+                              <TableCell className="px-2 py-1 text-[12px] text-[#5a5a5a]">{task.partNumber || ''}</TableCell>
+                              <TableCell className="px-2 py-1 text-[12px] text-[#5a5a5a]">{task.description || '400 Hour inspection'}</TableCell>
                             </TableRow>
                           ))}
                           {aircraftWorkPackagePagedTasks.length === 0 ? (
@@ -5956,11 +6320,11 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                   All Tasks shows complete task catalog scoped to aircraft maintenance profile.
                 </TabsContent>
               </Tabs>
-              <div className="flex flex-wrap items-center justify-end gap-2 border-t border-[#ececec] pb-0 pt-1.5">
-                <Button variant="outline" className="h-7 rounded-full border-[#b6d2d4] px-4 text-[11px] text-[#2b8f95]" onClick={() => setAircraftWorkPackageDialogOpen(false)} disabled={aircraftWorkPackageSubmitting}>
+              <div className="mt-auto flex flex-wrap items-center justify-end gap-2 border-t border-[#ececec] bg-white py-2">
+                <Button variant="outline" className="h-[26px] rounded-none border-[#b6d2d4] px-4 text-[11px] text-[#2b8f95]" onClick={() => setAircraftWorkPackageDialogOpen(false)} disabled={aircraftWorkPackageSubmitting}>
                   Cancel
                 </Button>
-                <Button className="h-7 rounded-full bg-[#0ea5a6] px-4 text-[11px] text-white hover:bg-[#0d9394]" onClick={() => void handleAircraftWorkPackageSubmit('create_open')} disabled={aircraftWorkPackageSubmitting || !canCreateWorkPackage}>
+                <Button className="h-[26px] rounded-none bg-[#0ea5a6] px-4 text-[11px] text-white hover:bg-[#0d9394]" onClick={() => void handleAircraftWorkPackageSubmit('create_open')} disabled={aircraftWorkPackageSubmitting || !canCreateWorkPackage}>
                   Add
                 </Button>
               </div>
