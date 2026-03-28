@@ -1,0 +1,8 @@
+tenant_id,franchise_id,code,description,parent_id,level,chapter_code,parent_code_ref,is_active
+e42ec6fd-6b88-4721-befe-4443d9743120,,21-10-01,Cabin Compressor,null,3,21,21-10,TRUE
+e42ec6fd-6b88-4721-befe-4443d9743120,,21-30-01,Outflow Valve,null,3,21,21-30,TRUE
+e42ec6fd-6b88-4721-befe-4443d9743120,,24-20-01,Generator/IDG,null,3,24,24-20,TRUE
+e42ec6fd-6b88-4721-befe-4443d9743120,,27-10-01,Aileron Actuator,null,3,27,27-10,TRUE
+e42ec6fd-6b88-4721-befe-4443d9743120,,32-40-01,Brake Assembly,null,3,32,32-40,TRUE
+e42ec6fd-6b88-4721-befe-4443d9743120,,32-40-02,Main Wheel,null,3,32,32-40,TRUE
+e42ec6fd-6b88-4721-befe-4443d9743120,,52-10-01,Forward Passenger Door,null,3,52,52-10,TRUE
