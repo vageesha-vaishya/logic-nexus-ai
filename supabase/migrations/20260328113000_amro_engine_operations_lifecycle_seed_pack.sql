@@ -32,6 +32,105 @@ BEGIN
     RAISE EXCEPTION 'No auth.users row exists; engine operations lifecycle seed requires at least one user';
   END IF;
 
+  INSERT INTO public.manufacturers (
+    manufacturer_code,
+    name,
+    is_active,
+    metadata,
+    created_by,
+    updated_by
+  )
+  VALUES
+    ('AIR', 'Airbus', true, jsonb_build_object('seed_source', 'engine_ops_lifecycle_v1'), actor_user_id, actor_user_id),
+    ('BOE', 'Boeing', true, jsonb_build_object('seed_source', 'engine_ops_lifecycle_v1'), actor_user_id, actor_user_id),
+    ('EMB', 'Embraer', true, jsonb_build_object('seed_source', 'engine_ops_lifecycle_v1'), actor_user_id, actor_user_id),
+    ('ATR', 'ATR', true, jsonb_build_object('seed_source', 'engine_ops_lifecycle_v1'), actor_user_id, actor_user_id)
+  ON CONFLICT (manufacturer_code) WHERE deleted_at IS NULL DO UPDATE
+  SET
+    name = EXCLUDED.name,
+    is_active = true,
+    metadata = EXCLUDED.metadata,
+    updated_by = EXCLUDED.updated_by,
+    updated_at = now(),
+    deleted_at = NULL;
+
+  INSERT INTO public.assembly_types (
+    assembly_code,
+    name,
+    description,
+    is_active,
+    metadata,
+    created_by,
+    updated_by
+  )
+  VALUES
+    (
+      'AIRFRAME',
+      'Airframe',
+      'Aircraft structure and certified type-level configuration for fuselage, wings, and control surfaces.',
+      true,
+      jsonb_build_object('seed_source', 'engine_ops_lifecycle_v1'),
+      actor_user_id,
+      actor_user_id
+    )
+  ON CONFLICT (assembly_code) DO UPDATE
+  SET
+    name = EXCLUDED.name,
+    description = EXCLUDED.description,
+    is_active = true,
+    metadata = EXCLUDED.metadata,
+    updated_by = EXCLUDED.updated_by,
+    updated_at = now();
+
+  WITH airframe_type AS (
+    SELECT id FROM public.assembly_types WHERE assembly_code = 'AIRFRAME' LIMIT 1
+  ),
+  model_seed AS (
+    SELECT manufacturer_code, model_code, model_name FROM (VALUES
+      ('AIR', 'A321NEO', 'A321neo'),
+      ('BOE', 'B787-9', 'B787-9'),
+      ('EMB', 'E190-E2', 'E190-E2'),
+      ('ATR', 'ATR72-600', 'ATR72-600')
+    ) AS data(manufacturer_code, model_code, model_name)
+  )
+  INSERT INTO public.assembly_models (
+    manufacturer_id,
+    assembly_type_id,
+    model_code,
+    name,
+    primary_model,
+    description,
+    is_active,
+    metadata,
+    created_by,
+    updated_by
+  )
+  SELECT
+    manufacturer.id,
+    airframe_type.id,
+    model_seed.model_code,
+    model_seed.model_name,
+    model_seed.model_name,
+    format('%s airframe model reference', model_seed.model_name),
+    true,
+    jsonb_build_object('seed_source', 'engine_ops_lifecycle_v1'),
+    actor_user_id,
+    actor_user_id
+  FROM model_seed
+  JOIN public.manufacturers AS manufacturer
+    ON manufacturer.manufacturer_code = model_seed.manufacturer_code
+   AND manufacturer.deleted_at IS NULL
+  CROSS JOIN airframe_type
+  ON CONFLICT (manufacturer_id, assembly_type_id, model_code) DO UPDATE
+  SET
+    name = EXCLUDED.name,
+    primary_model = EXCLUDED.primary_model,
+    description = EXCLUDED.description,
+    is_active = true,
+    metadata = EXCLUDED.metadata,
+    updated_by = EXCLUDED.updated_by,
+    updated_at = now();
+
   FOR t IN SELECT id FROM public.tenants LOOP
     tenant_key := upper(substring(replace(t.id::text, '-', '') from 1 for 6));
 
@@ -54,6 +153,7 @@ BEGIN
       aircraft_type,
       aircraft_model,
       manufacturer,
+      manufacturer_id,
       model,
       status,
       operator_code,
@@ -86,6 +186,7 @@ BEGIN
       CASE WHEN gs % 2 = 0 THEN 'NarrowBody' ELSE 'WideBody' END,
       CASE WHEN gs % 2 = 0 THEN 'A321neo' ELSE 'B787-9' END,
       CASE WHEN gs % 2 = 0 THEN 'Airbus' ELSE 'Boeing' END,
+      manufacturer_ref.id,
       CASE WHEN gs % 2 = 0 THEN 'A321neo' ELSE '787-9' END,
       CASE
         WHEN gs % 8 = 0 THEN 'storage'::public.aircraft_status
@@ -121,6 +222,14 @@ BEGIN
       actor_user_id,
       actor_user_id
     FROM generate_series(1, 12) AS gs
+    LEFT JOIN LATERAL (
+      SELECT id
+      FROM public.manufacturers
+      WHERE deleted_at IS NULL
+        AND lower(name) = CASE WHEN gs % 2 = 0 THEN 'airbus' ELSE 'boeing' END
+      ORDER BY updated_at DESC, created_at DESC
+      LIMIT 1
+    ) AS manufacturer_ref ON TRUE
     ON CONFLICT (id) DO UPDATE
     SET
       tenant_id = EXCLUDED.tenant_id,
@@ -132,6 +241,7 @@ BEGIN
       aircraft_type = EXCLUDED.aircraft_type,
       aircraft_model = EXCLUDED.aircraft_model,
       manufacturer = EXCLUDED.manufacturer,
+      manufacturer_id = EXCLUDED.manufacturer_id,
       model = EXCLUDED.model,
       status = EXCLUDED.status,
       operator_code = EXCLUDED.operator_code,

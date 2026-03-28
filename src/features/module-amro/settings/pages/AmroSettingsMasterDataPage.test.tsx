@@ -341,6 +341,12 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
                       name: 'Boeing',
                       is_active: true,
                     },
+                    {
+                      id: 'manu-2',
+                      manufacturer_code: 'AIR',
+                      name: 'Airbus',
+                      is_active: true,
+                    },
                   ],
                 },
               }),
@@ -376,6 +382,13 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
                       model_code: 'B737-800',
                       name: 'B737-800',
                       manufacturer_id: 'manu-1',
+                      is_active: true,
+                    },
+                    {
+                      id: 'amodel-2',
+                      model_code: 'A320-200',
+                      name: 'A320-200',
+                      manufacturer_id: 'manu-2',
                       is_active: true,
                     },
                   ],
@@ -997,6 +1010,198 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     fireEvent.doubleClick(aircraftRow as HTMLElement);
     expect(await screen.findByRole('heading', { name: 'Update Aircraft' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Save Changes' })).toBeInTheDocument();
+  });
+
+  it('includes existing base and owner values in aircraft listbox options', async () => {
+    renderAircraftPage();
+
+    const rowCheckbox = await screen.findByRole('checkbox', { name: 'Select row ac-1' });
+    const aircraftRow = rowCheckbox.closest('tr');
+    expect(aircraftRow).not.toBeNull();
+    fireEvent.doubleClick(aircraftRow as HTMLElement);
+    expect(await screen.findByRole('heading', { name: 'Update Aircraft' })).toBeInTheDocument();
+
+    const formDialog = screen.getByTestId('amro-master-data-form-dialog');
+    const baseLabel = within(formDialog).getByText(/^Base$/);
+    const baseTrigger = (baseLabel.parentElement as HTMLElement).querySelector('button[role="combobox"]');
+    expect(baseTrigger).not.toBeNull();
+    fireEvent.click(baseTrigger as HTMLElement);
+    expect(await screen.findByRole('option', { name: 'DEL' })).toBeInTheDocument();
+
+    const ownerLabel = within(formDialog).getByText(/^Owner$/);
+    const ownerTrigger = (ownerLabel.parentElement as HTMLElement).querySelector('button[role="combobox"]');
+    expect(ownerTrigger).not.toBeNull();
+    fireEvent.click(ownerTrigger as HTMLElement);
+    expect(await screen.findByRole('option', { name: 'Owner One' })).toBeInTheDocument();
+  });
+
+  it('filters aircraft model listbox options by selected manufacturer in aircraft create form', async () => {
+    renderAircraftPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: /New aircraft record/i }));
+    const dialog = await screen.findByTestId('amro-master-data-form-dialog');
+
+    const manufacturerTrigger = within(dialog).getByText('Manufacturer').closest('button');
+    expect(manufacturerTrigger).not.toBeNull();
+    fireEvent.click(manufacturerTrigger as HTMLElement);
+    fireEvent.click(await screen.findByRole('option', { name: 'Airbus (AIR)' }));
+
+    const modelTrigger = within(dialog).getByText('Aircraft model').closest('button');
+    expect(modelTrigger).not.toBeNull();
+    fireEvent.click(modelTrigger as HTMLElement);
+    expect(await screen.findByRole('option', { name: 'A320-200' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'B737-800' })).not.toBeInTheDocument();
+  });
+
+  it('creates aircraft with manufacturer-model selection and preserves those values when reopened', async () => {
+    const fetchImplementation = vi.mocked(fetch).getMockImplementation();
+    const aircraftRecords: Array<Record<string, unknown>> = [
+      {
+        id: 'ac-1',
+        registration: 'A1',
+        tail_number: 'N100AA',
+        serial_number: 'SN-100',
+        aircraft_type: 'A320',
+        aircraft_model: 'A320-200',
+        manufacturer_id: 'manu-1',
+        manufacturer: 'Boeing',
+        owner_name: 'Owner One',
+        base_location: 'DEL',
+        defect_count: 2,
+        current_flight_hours: 5020.5,
+        current_cycles: 2201,
+        status: 'active',
+      },
+      {
+        id: 'ac-2',
+        registration: 'A2',
+        tail_number: 'N200AA',
+        serial_number: 'SN-200',
+        aircraft_type: 'B737',
+        aircraft_model: 'B737-800',
+        manufacturer_id: 'manu-1',
+        manufacturer: 'Boeing',
+        owner_name: 'Owner Two',
+        base_location: 'BOM',
+        defect_count: 0,
+        current_flight_hours: 3010.25,
+        current_cycles: 1450,
+        status: 'inactive',
+      },
+    ];
+    let createdPayload: Record<string, unknown> | null = null;
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method || 'GET';
+      if (method === 'GET' && url.includes('/api/v2/amro/master-data/aircraft')) {
+        return {
+          ok: true,
+          text: async () =>
+            JSON.stringify({
+              output: {
+                records: aircraftRecords,
+              },
+            }),
+        } as Response;
+      }
+      if (method === 'POST' && url.includes('/api/v2/amro/master-data/aircraft')) {
+        createdPayload = JSON.parse(String(init?.body || '{}')) as Record<string, unknown>;
+        const manufacturerId = String(createdPayload.manufacturer_id || '');
+        const registration = String(createdPayload.registration || '').trim().toUpperCase();
+        const serialNumber = String(createdPayload.serial_number || '').trim().toUpperCase();
+        const aircraftModel = String(createdPayload.aircraft_model || '').trim();
+        const status = String(createdPayload.status || 'active').trim().toLowerCase() || 'active';
+        const createdRecord = {
+          id: 'ac-3',
+          registration,
+          tail_number: registration,
+          serial_number: serialNumber,
+          aircraft_type: String(createdPayload.aircraft_type || 'NarrowBody'),
+          aircraft_model: aircraftModel,
+          manufacturer_id: manufacturerId,
+          manufacturer: manufacturerId === 'manu-2' ? 'Airbus' : 'Boeing',
+          owner_name: '',
+          base_location: '',
+          defect_count: 0,
+          current_flight_hours: 0,
+          current_cycles: 0,
+          status,
+        };
+        aircraftRecords.unshift(createdRecord);
+        return {
+          ok: true,
+          text: async () =>
+            JSON.stringify({
+              output: {
+                entity: 'aircraft',
+                record: createdRecord,
+              },
+            }),
+        } as Response;
+      }
+      return fetchImplementation ? fetchImplementation(input, init) : Promise.reject(new Error('Missing fetch mock implementation'));
+    });
+
+    renderAircraftPage();
+    fireEvent.click(await screen.findByRole('button', { name: /New aircraft record/i }));
+    const createDialog = await screen.findByTestId('amro-master-data-form-dialog');
+
+    fireEvent.change(within(createDialog).getByLabelText(/^Registration/i), { target: { value: 'N300AA' } });
+    fireEvent.change(within(createDialog).getByLabelText(/^Serial number/i), { target: { value: 'SN-300' } });
+
+    const manufacturerTrigger = within(createDialog).getByText('Manufacturer').closest('button');
+    expect(manufacturerTrigger).not.toBeNull();
+    fireEvent.click(manufacturerTrigger as HTMLElement);
+    fireEvent.click(await screen.findByRole('option', { name: 'Airbus (AIR)' }));
+
+    const modelTrigger = within(createDialog).getByText('Aircraft model').closest('button');
+    expect(modelTrigger).not.toBeNull();
+    fireEvent.click(modelTrigger as HTMLElement);
+    fireEvent.click(await screen.findByRole('option', { name: 'A320-200' }));
+
+    fireEvent.click(within(createDialog).getByRole('button', { name: /Save/i }));
+
+    await waitFor(() => {
+      expect(mockToastSuccess).toHaveBeenCalledWith('Aircraft record created');
+    }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
+
+    expect(createdPayload?.manufacturer_id).toBe('manu-2');
+    expect(createdPayload?.aircraft_model).toBe('A320-200');
+
+    const createdRowCheckbox = await screen.findByRole('checkbox', { name: 'Select row ac-3' });
+    const createdRow = createdRowCheckbox.closest('tr');
+    expect(createdRow).not.toBeNull();
+    fireEvent.doubleClick(createdRow as HTMLElement);
+
+    const updateDialog = await screen.findByTestId('amro-master-data-form-dialog');
+    const comboTriggers = within(updateDialog).getAllByRole('combobox');
+    expect(comboTriggers.some((trigger) => /Airbus \(AIR\)|manu-2/i.test(trigger.textContent || ''))).toBe(true);
+    expect(comboTriggers.some((trigger) => /A320-200/i.test(trigger.textContent || ''))).toBe(true);
+  });
+
+  it('shows manufacturer listbox fallback option when manufacturer master data request fails', async () => {
+    const fetchImplementation = vi.mocked(fetch).getMockImplementation();
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method || 'GET';
+      if (method === 'GET' && url.includes('/api/v2/amro/master-data/manufacturers')) {
+        return {
+          ok: false,
+          status: 500,
+          text: async () => JSON.stringify({ message: 'error' }),
+        } as Response;
+      }
+      return fetchImplementation ? fetchImplementation(input, init) : Promise.reject(new Error('Missing fetch mock implementation'));
+    });
+
+    renderAircraftPage();
+    fireEvent.click(await screen.findByRole('button', { name: /New aircraft record/i }));
+    const dialog = await screen.findByTestId('amro-master-data-form-dialog');
+
+    const manufacturerTrigger = within(dialog).getByText('Manufacturer').closest('button');
+    expect(manufacturerTrigger).not.toBeNull();
+    fireEvent.click(manufacturerTrigger as HTMLElement);
+    expect(await screen.findByRole('option', { name: 'Unable to load manufacturers' })).toBeInTheDocument();
   });
 
   it('hides configured work package columns while preserving filter and export actions', async () => {

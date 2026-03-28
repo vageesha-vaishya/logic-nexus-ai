@@ -186,6 +186,8 @@ type SelectOption = {
   disabled?: boolean;
 };
 
+const isSystemSelectValue = (value: string): boolean => value.startsWith('__');
+
 const extractJoinedRecord = (value: unknown): Record<string, unknown> | null => {
   if (Array.isArray(value)) {
     const first = value.find((entry) => Boolean(entry) && typeof entry === 'object');
@@ -1070,6 +1072,8 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   const recordsRequestIdRef = useRef(0);
   const rowsRenderSignatureRef = useRef('');
   const manufacturerSeedAttemptedRef = useRef(false);
+  const assemblyTypeSeedAttemptedRef = useRef(false);
+  const assemblyModelSeedAttemptedRef = useRef(false);
   const selectionAnchorRef = useRef<string | null>(null);
   const aircraftSnapshotAuthToastShownRef = useRef(false);
   const aircraftEnhancementEnabled = normalizeFeatureFlag(import.meta.env.VITE_AMRO_AIRCRAFT_FORM_ENHANCEMENTS, true);
@@ -1317,6 +1321,127 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     return true;
   }, []);
 
+  const seedAssemblyTypesIfNeeded = useCallback(async (headers: Headers) => {
+    if (assemblyTypeSeedAttemptedRef.current) {
+      return false;
+    }
+    const response = await fetch('/api/v2/amro/master-data/assembly_types', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        operation: 'bulk_import',
+        records: [
+          {
+            assembly_code: 'AIRFRAME',
+            name: 'Airframe',
+            description: 'Aircraft structure and certified configuration reference',
+            is_active: true,
+            metadata: { source: 'master_data_seed_ui' },
+          },
+        ],
+      }),
+    });
+    const payload = await parseApiPayload(response);
+    assemblyTypeSeedAttemptedRef.current = true;
+    if (!response.ok) {
+      throw new Error(String(payload.error || 'Failed to seed assembly types'));
+    }
+    return true;
+  }, []);
+
+  const seedAssemblyModelsIfNeeded = useCallback(
+    async (headers: Headers, manufacturerReferenceOptions: ManufacturerOption[], assemblyTypeReferenceOptions: AssemblyTypeOption[]) => {
+      if (assemblyModelSeedAttemptedRef.current) {
+        return false;
+      }
+      const activeManufacturers = manufacturerReferenceOptions.filter((option) => option.active);
+      if (!activeManufacturers.length || !assemblyTypeReferenceOptions.length) {
+        assemblyModelSeedAttemptedRef.current = true;
+        return false;
+      }
+      const preferredAssemblyType =
+        assemblyTypeReferenceOptions.find((option) => option.label.toLowerCase().includes('airframe')) ||
+        assemblyTypeReferenceOptions.find((option) => option.active) ||
+        assemblyTypeReferenceOptions[0];
+      const assemblyTypeId = preferredAssemblyType?.id || '';
+      if (!assemblyTypeId) {
+        assemblyModelSeedAttemptedRef.current = true;
+        return false;
+      }
+      const normalize = (value: string) => value.trim().toLowerCase();
+      const findManufacturerId = (token: string) =>
+        activeManufacturers.find((option) => {
+          const name = normalize(option.name);
+          const code = normalize(option.code);
+          const label = normalize(option.label);
+          const target = normalize(token);
+          return name.includes(target) || code === target || label.includes(target);
+        })?.id;
+      const preferredBlueprints = [
+        { token: 'airbus', code: 'A320-200', name: 'A320-200' },
+        { token: 'boeing', code: 'B737-800', name: 'B737-800' },
+        { token: 'embraer', code: 'E190-E2', name: 'E190-E2' },
+        { token: 'atr', code: 'ATR72-600', name: 'ATR72-600' },
+      ];
+      const seededManufacturerIds = new Set<string>();
+      const records: Record<string, unknown>[] = [];
+      preferredBlueprints.forEach((blueprint) => {
+        const manufacturerId = findManufacturerId(blueprint.token);
+        if (!manufacturerId || seededManufacturerIds.has(manufacturerId)) {
+          return;
+        }
+        seededManufacturerIds.add(manufacturerId);
+        records.push({
+          manufacturer_id: manufacturerId,
+          assembly_type_id: assemblyTypeId,
+          model_code: blueprint.code,
+          name: blueprint.name,
+          primary_model: blueprint.name,
+          description: `${blueprint.name} airframe reference`,
+          is_active: true,
+          metadata: { source: 'master_data_seed_ui' },
+        });
+      });
+      if (!records.length) {
+        activeManufacturers.slice(0, 12).forEach((manufacturer, index) => {
+          const codeToken = String(manufacturer.code || 'MODEL')
+            .toUpperCase()
+            .replace(/[^A-Z0-9]+/g, '')
+            .slice(0, 8);
+          const suffix = String(index + 1).padStart(2, '0');
+          const modelCode = `${codeToken || 'MODEL'}-${suffix}`;
+          const modelName = `${manufacturer.name || manufacturer.label || 'Aircraft'} Series ${suffix}`;
+          records.push({
+            manufacturer_id: manufacturer.id,
+            assembly_type_id: assemblyTypeId,
+            model_code: modelCode,
+            name: modelName,
+            primary_model: modelName,
+            description: `${modelName} airframe reference`,
+            is_active: true,
+            metadata: { source: 'master_data_seed_ui' },
+          });
+        });
+      }
+      if (!records.length) {
+        assemblyModelSeedAttemptedRef.current = true;
+        return false;
+      }
+      const response = await fetch('/api/v2/amro/master-data/assembly_models', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ operation: 'bulk_import', records }),
+      });
+      const payload = await parseApiPayload(response);
+      assemblyModelSeedAttemptedRef.current = true;
+      if (!response.ok) {
+        throw new Error(String(payload.error || 'Failed to seed aircraft models'));
+      }
+      return true;
+    },
+    [],
+  );
+
   const loadManufacturerOptions = useCallback(async () => {
     setManufacturerOptionsLoading(true);
     setManufacturerOptionsError('');
@@ -1344,7 +1469,13 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     setAssemblyTypeOptionsError('');
     try {
       const headers = await buildApiHeaders(scope);
-      const options = await fetchAssemblyTypeOptions(headers);
+      let options = await fetchAssemblyTypeOptions(headers);
+      if (options.length === 0) {
+        const seeded = await seedAssemblyTypesIfNeeded(headers);
+        if (seeded) {
+          options = await fetchAssemblyTypeOptions(headers);
+        }
+      }
       setAssemblyTypeOptions(options);
     } catch (error) {
       const message = String((error as Error).message || 'Failed to load assembly types');
@@ -1353,14 +1484,46 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     } finally {
       setAssemblyTypeOptionsLoading(false);
     }
-  }, [fetchAssemblyTypeOptions, scope]);
+  }, [fetchAssemblyTypeOptions, scope, seedAssemblyTypesIfNeeded]);
 
   const loadAssemblyModelOptions = useCallback(async () => {
     setAssemblyModelOptionsLoading(true);
     setAssemblyModelOptionsError('');
     try {
       const headers = await buildApiHeaders(scope);
-      const options = await fetchAssemblyModelOptions(headers);
+      let options = await fetchAssemblyModelOptions(headers);
+      if (options.length === 0) {
+        let manufacturerReferenceOptions = manufacturerOptions;
+        if (manufacturerReferenceOptions.length === 0) {
+          manufacturerReferenceOptions = await fetchManufacturerOptions(headers);
+          if (manufacturerReferenceOptions.length === 0) {
+            const seededManufacturers = await seedManufacturersIfNeeded(headers);
+            if (seededManufacturers) {
+              manufacturerReferenceOptions = await fetchManufacturerOptions(headers);
+            }
+          }
+          if (manufacturerReferenceOptions.length > 0) {
+            setManufacturerOptions(manufacturerReferenceOptions);
+          }
+        }
+        let assemblyTypeReferenceOptions = assemblyTypeOptions;
+        if (assemblyTypeReferenceOptions.length === 0) {
+          assemblyTypeReferenceOptions = await fetchAssemblyTypeOptions(headers);
+          if (assemblyTypeReferenceOptions.length === 0) {
+            const seededAssemblyTypes = await seedAssemblyTypesIfNeeded(headers);
+            if (seededAssemblyTypes) {
+              assemblyTypeReferenceOptions = await fetchAssemblyTypeOptions(headers);
+            }
+          }
+          if (assemblyTypeReferenceOptions.length > 0) {
+            setAssemblyTypeOptions(assemblyTypeReferenceOptions);
+          }
+        }
+        const seededModels = await seedAssemblyModelsIfNeeded(headers, manufacturerReferenceOptions, assemblyTypeReferenceOptions);
+        if (seededModels) {
+          options = await fetchAssemblyModelOptions(headers);
+        }
+      }
       setAssemblyModelOptions(options);
     } catch (error) {
       const message = String((error as Error).message || 'Failed to load aircraft models');
@@ -1369,7 +1532,17 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     } finally {
       setAssemblyModelOptionsLoading(false);
     }
-  }, [fetchAssemblyModelOptions, scope]);
+  }, [
+    assemblyTypeOptions,
+    fetchAssemblyModelOptions,
+    fetchAssemblyTypeOptions,
+    fetchManufacturerOptions,
+    manufacturerOptions,
+    scope,
+    seedAssemblyModelsIfNeeded,
+    seedAssemblyTypesIfNeeded,
+    seedManufacturersIfNeeded,
+  ]);
 
   const loadRecords = useCallback(async () => {
     const requestId = recordsRequestIdRef.current + 1;
@@ -1511,13 +1684,13 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   }, [entity, loadManufacturerOptions, modalOpen]);
 
   useEffect(() => {
-    if (entity === 'assembly_models') {
+    if (entity === 'assembly_models' || entity === 'aircraft') {
       void loadAssemblyTypeOptions();
     }
   }, [entity, loadAssemblyTypeOptions]);
 
   useEffect(() => {
-    if (entity === 'assembly_models' && modalOpen) {
+    if ((entity === 'assembly_models' || entity === 'aircraft') && modalOpen) {
       void loadAssemblyTypeOptions();
     }
   }, [entity, loadAssemblyTypeOptions, modalOpen]);
@@ -2159,15 +2332,22 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     setCollapsedFormPanels((previous) => ({ ...previous, [panel]: !previous[panel] }));
   }, []);
   const hasRestrictedAircraftFields = entity === 'aircraft' && !canScheduleWorkPackage;
-  const manufacturerSelectOptions = useMemo<SelectOption[]>(
-    () =>
-      manufacturerOptions.map((option) => ({
-        value: option.id,
-        label: option.label,
-        disabled: !option.active,
-      })),
-    [manufacturerOptions],
-  );
+  const manufacturerSelectOptions = useMemo<SelectOption[]>(() => {
+    const options = manufacturerOptions.map((option) => ({
+      value: option.id,
+      label: option.label,
+      disabled: !option.active,
+    }));
+    const currentManufacturerId = String(formValues.manufacturer_id ?? '').trim();
+    if (currentManufacturerId && !options.some((option) => option.value === currentManufacturerId)) {
+      options.unshift({
+        value: currentManufacturerId,
+        label: currentManufacturerId,
+        disabled: false,
+      });
+    }
+    return options;
+  }, [formValues.manufacturer_id, manufacturerOptions]);
   const manufacturerMetaById = useMemo(() => new Map(manufacturerOptions.map((option) => [option.id, option])), [manufacturerOptions]);
   const manufacturerLabelById = useMemo(
     () => new Map(manufacturerOptions.map((option) => [option.id, option.label])),
@@ -2190,9 +2370,9 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     const normalize = (value: string) => value.trim().toLowerCase();
     const manufacturerId = String(formValues.manufacturer_id ?? '').trim();
     const manufacturer = manufacturerMetaById.get(manufacturerId);
-    const manufacturerTokens = manufacturer
-      ? [manufacturer.id, manufacturer.code, manufacturer.name, manufacturer.label].filter(Boolean).map(normalize)
-      : [];
+    const manufacturerTokens = [manufacturerId, manufacturer?.id, manufacturer?.code, manufacturer?.name, manufacturer?.label]
+      .filter(Boolean)
+      .map((token) => normalize(String(token)));
     const manufacturerTokenSet = new Set(manufacturerTokens);
     const filtered = manufacturerId
       ? assemblyModelOptions.filter((option) => {
@@ -2214,10 +2394,57 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     }
     return options;
   }, [assemblyModelOptions, formValues.aircraft_model, formValues.manufacturer_id, manufacturerMetaById]);
+  const aircraftBaseSelectOptions = useMemo<SelectOption[]>(() => {
+    const seen = new Set<string>();
+    const options: SelectOption[] = [];
+    const addOption = (rawValue: unknown) => {
+      const value = String(rawValue ?? '').trim();
+      if (!value) return;
+      const key = value.toLowerCase();
+      if (seen.has(key)) return;
+      seen.add(key);
+      options.push({ value, label: value });
+    };
+    AIRCRAFT_BASE_OPTIONS.forEach((option) => addOption(option));
+    rows.forEach((row) => addOption(row.base_location));
+    addOption(formValues.base_location);
+    return options;
+  }, [formValues.base_location, rows]);
+  const aircraftOwnerSelectOptions = useMemo<SelectOption[]>(() => {
+    const seen = new Set<string>();
+    const options: SelectOption[] = [];
+    const addOption = (rawValue: unknown) => {
+      const value = String(rawValue ?? '').trim();
+      if (!value) return;
+      const key = value.toLowerCase();
+      if (seen.has(key)) return;
+      seen.add(key);
+      options.push({ value, label: value });
+    };
+    AIRCRAFT_OWNER_OPTIONS.forEach((option) => addOption(option));
+    rows.forEach((row) => addOption(row.owner_name));
+    addOption(formValues.owner_name);
+    return options;
+  }, [formValues.owner_name, rows]);
 
   const setFieldValue = useCallback((fieldKey: string, value: unknown) => {
     setFormValues((previous) => ({ ...previous, [fieldKey]: value }));
     setFormErrors((previous) => ({ ...previous, [fieldKey]: '' }));
+  }, []);
+  const setSelectFieldValue = useCallback((fieldKey: string, value: string) => {
+    if (isSystemSelectValue(value)) {
+      return;
+    }
+    setFormValues((previous) => ({
+      ...previous,
+      [fieldKey]: value,
+      ...(fieldKey === 'manufacturer_id' ? { aircraft_model: '' } : {}),
+    }));
+    setFormErrors((previous) => ({
+      ...previous,
+      [fieldKey]: '',
+      ...(fieldKey === 'manufacturer_id' ? { aircraft_model: '' } : {}),
+    }));
   }, []);
   const setAircraftCounterValue = useCallback((key: string, field: 'initialValue' | 'initialDate', value: string) => {
     setAircraftCounterRows((previous) =>
@@ -2322,9 +2549,9 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     }
     const manufacturer = manufacturerMetaById.get(manufacturerId);
     const normalize = (value: string) => value.trim().toLowerCase();
-    const manufacturerTokens = manufacturer
-      ? [manufacturer.id, manufacturer.code, manufacturer.name, manufacturer.label].filter(Boolean).map(normalize)
-      : [];
+    const manufacturerTokens = [manufacturerId, manufacturer?.id, manufacturer?.code, manufacturer?.name, manufacturer?.label]
+      .filter(Boolean)
+      .map((token) => normalize(String(token)));
     const manufacturerTokenSet = new Set(manufacturerTokens);
     const match = assemblyModelOptions.some((option) => {
       const manufacturerMatch =
@@ -4004,7 +4231,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
             ) : null}
           </div>
           {field.type === 'select' && (
-            <Select value={String(formValues[field.key] ?? '')} onValueChange={(value) => setFieldValue(field.key, value)}>
+            <Select value={String(formValues[field.key] ?? '')} onValueChange={(value) => setSelectFieldValue(field.key, value)}>
               <SelectTrigger
                 id={fieldId}
                 className={cn('mdm-template-input', hasError && 'border-destructive')}
@@ -4082,6 +4309,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       manufacturerOptionsError,
       resolveSelectOptions,
       sectionFieldClass,
+      setSelectFieldValue,
       setFieldValue,
     ],
   );
@@ -5420,7 +5648,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                         <div className="border-r border-t border-slate-200 px-3 py-2 text-slate-700">{String(formValues.serial_number || '') || '-'}</div>
                         <div className="border-t border-slate-200 px-3 py-2">
                           <div className="grid gap-2 sm:grid-cols-2">
-                            <Select value={String(formValues.aircraft_type ?? '')} onValueChange={(value) => setFieldValue('aircraft_type', value)}>
+                            <Select value={String(formValues.aircraft_type ?? '')} onValueChange={(value) => setSelectFieldValue('aircraft_type', value)}>
                               <SelectTrigger className={cn('h-8 text-[12px]', formErrors.aircraft_type && 'border-destructive')}>
                                 <SelectValue placeholder="Aircraft type" />
                               </SelectTrigger>
@@ -5432,7 +5660,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                                 ))}
                               </SelectContent>
                             </Select>
-                            <Select value={String(formValues.status ?? '')} onValueChange={(value) => setFieldValue('status', value)}>
+                            <Select value={String(formValues.status ?? '')} onValueChange={(value) => setSelectFieldValue('status', value)}>
                               <SelectTrigger className={cn('h-8 text-[12px]', formErrors.status && 'border-destructive')}>
                                 <SelectValue placeholder="Status" />
                               </SelectTrigger>
@@ -5444,7 +5672,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                                 ))}
                               </SelectContent>
                             </Select>
-                            <Select value={String(formValues.manufacturer_id ?? '')} onValueChange={(value) => setFieldValue('manufacturer_id', value)}>
+                            <Select value={String(formValues.manufacturer_id ?? '')} onValueChange={(value) => setSelectFieldValue('manufacturer_id', value)}>
                               <SelectTrigger className={cn('h-8 text-[12px]', formErrors.manufacturer_id && 'border-destructive')}>
                                 <SelectValue placeholder="Manufacturer" />
                               </SelectTrigger>
@@ -5456,7 +5684,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                                 ))}
                               </SelectContent>
                             </Select>
-                            <Select value={String(formValues.aircraft_model ?? '')} onValueChange={(value) => setFieldValue('aircraft_model', value)}>
+                            <Select value={String(formValues.aircraft_model ?? '')} onValueChange={(value) => setSelectFieldValue('aircraft_model', value)}>
                               <SelectTrigger className={cn('h-8 text-[12px]', formErrors.aircraft_model && 'border-destructive')}>
                                 <SelectValue placeholder="Aircraft model" />
                               </SelectTrigger>
@@ -5535,8 +5763,8 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                         >
                           <SelectTrigger className="h-8 text-[12px]"><SelectValue /></SelectTrigger>
                           <SelectContent>
-                            {AIRCRAFT_BASE_OPTIONS.map((option) => (
-                              <SelectItem key={option} value={option}>{option}</SelectItem>
+                            {aircraftBaseSelectOptions.map((option) => (
+                              <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -5552,8 +5780,8 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                         >
                           <SelectTrigger className="h-8 text-[12px]"><SelectValue /></SelectTrigger>
                           <SelectContent>
-                            {AIRCRAFT_OWNER_OPTIONS.map((option) => (
-                              <SelectItem key={option} value={option}>{option}</SelectItem>
+                            {aircraftOwnerSelectOptions.map((option) => (
+                              <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
