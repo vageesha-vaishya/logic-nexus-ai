@@ -273,4 +273,58 @@ describe('/api/v2/amro/master-data/[entity]/[id]', () => {
     expect(updatePayload.updated_by).toBe('user-1');
     expect(res.statusCode).toBe(200);
   });
+
+  it('returns validation issue when updated aircraft_model does not belong to effective manufacturer', async () => {
+    const existingMaybeSingleMock = vi.fn().mockResolvedValue({
+      data: {
+        id: 'ac-2',
+        tenant_id: 'tenant-1',
+        manufacturer_id: 'man-2',
+        aircraft_model: 'A320-200',
+      },
+      error: null,
+    });
+    const existingQuery: any = {
+      eq: vi.fn(),
+      limit: vi.fn(),
+      maybeSingle: existingMaybeSingleMock,
+    };
+    existingQuery.eq.mockReturnValue(existingQuery);
+    existingQuery.limit.mockReturnValue(existingQuery);
+    const existingSelectMock = vi.fn().mockReturnValue(existingQuery);
+
+    const assemblyModelsEqManufacturerMock = vi.fn().mockResolvedValue({
+      data: [{ id: 'model-air-1', manufacturer_id: 'man-2', model_code: 'A320-200', name: 'A320-200', primary_model: 'A320-200', is_active: true }],
+      error: null,
+    });
+    const assemblyModelsEqTenantMock = vi.fn().mockReturnValue({ eq: assemblyModelsEqManufacturerMock });
+    const assemblyModelsSelectMock = vi.fn().mockReturnValue({ eq: assemblyModelsEqTenantMock });
+
+    const fromMock = vi.fn((table: string) => {
+      if (table === 'aircraft') {
+        return { select: existingSelectMock };
+      }
+      if (table === 'assembly_models') {
+        return { select: assemblyModelsSelectMock };
+      }
+      return {};
+    });
+    vi.mocked(getSupabaseAdminClient).mockReturnValue({ from: fromMock } as any);
+
+    const req: ApiRequest = {
+      method: 'PATCH',
+      query: { entity: 'aircraft', id: 'ac-2', validate_only: 'true' },
+      body: {
+        aircraft_model: 'B737-800',
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    const issues = ((res.jsonBody as any)?.output?.validation?.issues || []) as Array<{ field?: string; message?: string }>;
+    expect(issues.some((issue) => issue.field === 'aircraft_model' && String(issue.message || '').includes('selected manufacturer'))).toBe(true);
+  });
 });

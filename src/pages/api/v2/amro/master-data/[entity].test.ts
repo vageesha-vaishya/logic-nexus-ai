@@ -487,9 +487,18 @@ describe('/api/v2/amro/master-data/[entity]', () => {
     const insertSelectMock = vi.fn().mockReturnValue({ maybeSingle: insertMaybeSingleMock });
     const insertMock = vi.fn().mockReturnValue({ select: insertSelectMock });
     const auditInsertMock = vi.fn().mockResolvedValue({ error: null });
+    const assemblyModelsInMock = vi.fn().mockResolvedValue({
+      data: [{ id: 'model-1', manufacturer_id: 'man-1', model_code: 'A320neo', name: 'A320neo', primary_model: 'A320neo', is_active: true }],
+      error: null,
+    });
+    const assemblyModelsEqMock = vi.fn().mockReturnValue({ in: assemblyModelsInMock });
+    const assemblyModelsSelectMock = vi.fn().mockReturnValue({ eq: assemblyModelsEqMock });
     const fromMock = vi.fn((table: string) => {
       if (table === 'manufacturers') {
         return { select: manufacturersSelectMock };
+      }
+      if (table === 'assembly_models') {
+        return { select: assemblyModelsSelectMock };
       }
       if (table === 'aircraft') {
         return { insert: insertMock };
@@ -551,9 +560,18 @@ describe('/api/v2/amro/master-data/[entity]', () => {
     const insertSelectMock = vi.fn().mockReturnValue({ maybeSingle: insertMaybeSingleMock });
     const insertMock = vi.fn().mockReturnValue({ select: insertSelectMock });
     const auditInsertMock = vi.fn().mockResolvedValue({ error: null });
+    const assemblyModelsInMock = vi.fn().mockResolvedValue({
+      data: [{ id: 'model-1', manufacturer_id: 'man-1', model_code: 'A320neo', name: 'A320neo', primary_model: 'A320neo', is_active: true }],
+      error: null,
+    });
+    const assemblyModelsEqMock = vi.fn().mockReturnValue({ in: assemblyModelsInMock });
+    const assemblyModelsSelectMock = vi.fn().mockReturnValue({ eq: assemblyModelsEqMock });
     const fromMock = vi.fn((table: string) => {
       if (table === 'manufacturers') {
         return { select: manufacturersSelectMock };
+      }
+      if (table === 'assembly_models') {
+        return { select: assemblyModelsSelectMock };
       }
       if (table === 'aircraft') {
         return { insert: insertMock };
@@ -592,6 +610,27 @@ describe('/api/v2/amro/master-data/[entity]', () => {
   });
 
   it('returns aircraft validation issue when manufacturing_date format is invalid', async () => {
+    const manufacturersSelectMock = vi.fn().mockResolvedValue({
+      data: [{ id: 'man-1', manufacturer_code: 'BOE', name: 'Boeing', is_active: true }],
+      error: null,
+    });
+    const assemblyModelsInMock = vi.fn().mockResolvedValue({
+      data: [{ id: 'model-1', manufacturer_id: 'man-1', model_code: 'A320neo', name: 'A320neo', primary_model: 'A320neo', is_active: true }],
+      error: null,
+    });
+    const assemblyModelsEqMock = vi.fn().mockReturnValue({ in: assemblyModelsInMock });
+    const assemblyModelsSelectMock = vi.fn().mockReturnValue({ eq: assemblyModelsEqMock });
+    const fromMock = vi.fn((table: string) => {
+      if (table === 'manufacturers') {
+        return { select: manufacturersSelectMock };
+      }
+      if (table === 'assembly_models') {
+        return { select: assemblyModelsSelectMock };
+      }
+      return {};
+    });
+    vi.mocked(getSupabaseAdminClient).mockReturnValue({ from: fromMock } as any);
+
     const req: ApiRequest = {
       method: 'POST',
       query: {
@@ -667,5 +706,101 @@ describe('/api/v2/amro/master-data/[entity]', () => {
     expect((res.jsonBody as any)?.error).toContain('Validation failed');
     expect((res.jsonBody as any)?.output?.validation?.is_valid).toBe(false);
     expect(((res.jsonBody as any)?.output?.validation?.issues || []).length).toBeGreaterThan(0);
+  });
+
+  it('rejects aircraft create when aircraft_model does not belong to selected manufacturer', async () => {
+    const manufacturersSelectMock = vi.fn().mockResolvedValue({
+      data: [
+        { id: 'man-1', manufacturer_code: 'BOE', name: 'Boeing', is_active: true },
+        { id: 'man-2', manufacturer_code: 'AIR', name: 'Airbus', is_active: true },
+      ],
+      error: null,
+    });
+    const assemblyModelsInMock = vi.fn().mockResolvedValue({
+      data: [{ id: 'model-air-1', manufacturer_id: 'man-2', model_code: 'A320-200', name: 'A320-200', primary_model: 'A320-200', is_active: true }],
+      error: null,
+    });
+    const assemblyModelsEqMock = vi.fn().mockReturnValue({ in: assemblyModelsInMock });
+    const assemblyModelsSelectMock = vi.fn().mockReturnValue({ eq: assemblyModelsEqMock });
+    const fromMock = vi.fn((table: string) => {
+      if (table === 'manufacturers') {
+        return { select: manufacturersSelectMock };
+      }
+      if (table === 'assembly_models') {
+        return { select: assemblyModelsSelectMock };
+      }
+      return {};
+    });
+    vi.mocked(getSupabaseAdminClient).mockReturnValue({ from: fromMock } as any);
+
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { entity: 'aircraft' },
+      body: {
+        tail_number: 'N500AA',
+        serial_number: 'SN-500',
+        aircraft_type: 'NarrowBody',
+        manufacturer_id: 'man-2',
+        aircraft_model: 'B737-800',
+        status: 'active',
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(422);
+    const issues = ((res.jsonBody as any)?.output?.validation?.issues || []) as Array<{ field?: string; message?: string }>;
+    expect(issues.some((issue) => issue.field === 'aircraft_model' && String(issue.message || '').includes('selected manufacturer'))).toBe(true);
+  });
+
+  it('rejects aircraft bulk import rows with manufacturer-model dependency mismatch', async () => {
+    const manufacturersSelectMock = vi.fn().mockResolvedValue({
+      data: [{ id: 'man-1', manufacturer_code: 'BOE', name: 'Boeing', is_active: true }],
+      error: null,
+    });
+    const assemblyModelsInMock = vi.fn().mockResolvedValue({
+      data: [{ id: 'model-boe-1', manufacturer_id: 'man-1', model_code: 'B737-800', name: 'B737-800', primary_model: 'B737-800', is_active: true }],
+      error: null,
+    });
+    const assemblyModelsEqMock = vi.fn().mockReturnValue({ in: assemblyModelsInMock });
+    const assemblyModelsSelectMock = vi.fn().mockReturnValue({ eq: assemblyModelsEqMock });
+    const fromMock = vi.fn((table: string) => {
+      if (table === 'manufacturers') {
+        return { select: manufacturersSelectMock };
+      }
+      if (table === 'assembly_models') {
+        return { select: assemblyModelsSelectMock };
+      }
+      return {};
+    });
+    vi.mocked(getSupabaseAdminClient).mockReturnValue({ from: fromMock } as any);
+
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { entity: 'aircraft', validate_only: 'true' },
+      body: {
+        operation: 'bulk_import',
+        records: [
+          {
+            tail_number: 'N501AA',
+            serial_number: 'SN-501',
+            aircraft_type: 'NarrowBody',
+            manufacturer_id: 'man-1',
+            aircraft_model: 'A320-200',
+            status: 'active',
+          },
+        ],
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    const results = ((res.jsonBody as any)?.output?.validation?.results || []) as Array<{ issues?: Array<{ field?: string; message?: string }> }>;
+    expect(results[0]?.issues?.some((issue) => issue.field === 'aircraft_model' && String(issue.message || '').includes('selected manufacturer'))).toBe(true);
   });
 });

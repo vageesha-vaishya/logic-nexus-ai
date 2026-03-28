@@ -61,6 +61,17 @@ type AssemblyReferenceRecord = {
   is_active: boolean | null;
 };
 
+type AssemblyModelReferenceRecord = {
+  id: string;
+  tenant_id: string | null;
+  franchise_id: string | null;
+  manufacturer_id: string | null;
+  model_code: string | null;
+  name: string | null;
+  primary_model: string | null;
+  is_active: boolean | null;
+};
+
 type AirportRecord = {
   id: string;
   name: string | null;
@@ -153,10 +164,39 @@ async function loadAssemblyReferenceRecords(
   return Array.isArray(data) ? (data as AssemblyReferenceRecord[]) : [];
 }
 
+async function loadAssemblyModelReferenceRecords(
+  supabase: ReturnType<typeof getSupabaseAdminClient>,
+  tenantId: string,
+  manufacturerIds: string[],
+): Promise<AssemblyModelReferenceRecord[]> {
+  if (manufacturerIds.length === 0) return [];
+  const { data, error } = await supabase
+    .from('assembly_models')
+    .select('id,tenant_id,franchise_id,manufacturer_id,model_code,name,primary_model,is_active')
+    .eq('tenant_id', tenantId)
+    .in('manufacturer_id', manufacturerIds);
+  if (error) {
+    throw new HttpError(error.message, 400);
+  }
+  return Array.isArray(data) ? (data as AssemblyModelReferenceRecord[]) : [];
+}
+
 function validateReferenceFranchise(record: AssemblyReferenceRecord, franchiseId: string | null): boolean {
   if (!franchiseId) return true;
   if (!record.franchise_id) return true;
   return record.franchise_id === franchiseId;
+}
+
+function validateAssemblyModelFranchise(record: AssemblyModelReferenceRecord, franchiseId: string | null): boolean {
+  if (!franchiseId) return true;
+  if (!record.franchise_id) return true;
+  return record.franchise_id === franchiseId;
+}
+
+function collectAssemblyModelTokens(record: AssemblyModelReferenceRecord): string[] {
+  return [record.id, record.model_code, record.name, record.primary_model]
+    .filter((value): value is string => Boolean(asNullableString(value)))
+    .map((value) => normalizeLookupToken(value));
 }
 
 async function validateAssemblyModelReferences(
@@ -282,6 +322,60 @@ async function resolveAircraftManufacturerReferences(
     return record;
   });
   return { resolved, issues };
+}
+
+async function validateAircraftModelManufacturerReferences(
+  supabase: ReturnType<typeof getSupabaseAdminClient>,
+  tenantId: string,
+  franchiseId: string | null,
+  records: Record<string, unknown>[],
+): Promise<Map<number, { field: string; message: string }[]>> {
+  const manufacturerIds = Array.from(
+    new Set(
+      records
+        .map((record) => asNullableString(record.manufacturer_id))
+        .filter((value): value is string => Boolean(value)),
+    ),
+  );
+  const modelReferenceRecords = await loadAssemblyModelReferenceRecords(supabase, tenantId, manufacturerIds);
+  const modelsByManufacturerId = new Map<string, AssemblyModelReferenceRecord[]>();
+  modelReferenceRecords.forEach((record) => {
+    const manufacturerId = asNullableString(record.manufacturer_id);
+    if (!manufacturerId) return;
+    const bucket = modelsByManufacturerId.get(manufacturerId);
+    if (bucket) {
+      bucket.push(record);
+      return;
+    }
+    modelsByManufacturerId.set(manufacturerId, [record]);
+  });
+
+  const issues = new Map<number, { field: string; message: string }[]>();
+  records.forEach((record, index) => {
+    const modelToken = asNullableString(record.aircraft_model || record.model);
+    const manufacturerId = asNullableString(record.manufacturer_id);
+    if (!modelToken || !manufacturerId) {
+      return;
+    }
+    const normalizedToken = normalizeLookupToken(modelToken);
+    const manufacturerModels = modelsByManufacturerId.get(manufacturerId) || [];
+    const matchedModel = manufacturerModels.find((reference) => collectAssemblyModelTokens(reference).includes(normalizedToken));
+    if (!matchedModel) {
+      issues.set(index, [{ field: 'aircraft_model', message: 'aircraft_model must belong to the selected manufacturer' }]);
+      return;
+    }
+    const rowIssues: { field: string; message: string }[] = [];
+    if (matchedModel.is_active === false) {
+      rowIssues.push({ field: 'aircraft_model', message: 'aircraft_model must reference an active assembly model' });
+    }
+    if (!validateAssemblyModelFranchise(matchedModel, franchiseId)) {
+      rowIssues.push({ field: 'aircraft_model', message: 'aircraft_model must belong to current franchise scope' });
+    }
+    if (rowIssues.length > 0) {
+      issues.set(index, rowIssues);
+    }
+  });
+  return issues;
 }
 
 function isV2Enabled(): boolean {
@@ -878,11 +972,18 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       }
       let resolvedRecords = records;
       let manufacturerIssues = new Map<number, { field: string; message: string }[]>();
+      let aircraftModelIssues = new Map<number, { field: string; message: string }[]>();
       let assemblyModelIssues = new Map<number, { field: string; message: string }[]>();
       if (entity === 'aircraft') {
         const resolved = await resolveAircraftManufacturerReferences(supabase, records);
         resolvedRecords = resolved.resolved;
         manufacturerIssues = resolved.issues;
+        aircraftModelIssues = await validateAircraftModelManufacturerReferences(
+          supabase,
+          tenantId,
+          franchiseId,
+          resolvedRecords,
+        );
       }
       if (entity === 'assembly_models') {
         assemblyModelIssues = await validateAssemblyModelReferences(supabase, tenantId, franchiseId, records);
@@ -894,6 +995,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         index,
         issues: [
           ...(manufacturerIssues.get(index) || []),
+          ...(aircraftModelIssues.get(index) || []),
           ...(assemblyModelIssues.get(index) || []),
           ...buildRequiredFieldIssues(entity, record),
           ...validatePayload(entity, record),
@@ -955,10 +1057,13 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
 
     let resolvedBody = body;
     let manufacturerIssues: { field: string; message: string }[] = [];
+    let aircraftModelIssues: { field: string; message: string }[] = [];
     if (entity === 'aircraft') {
       const resolved = await resolveAircraftManufacturerReferences(supabase, [body]);
       resolvedBody = resolved.resolved[0] || body;
       manufacturerIssues = resolved.issues.get(0) || [];
+      const validation = await validateAircraftModelManufacturerReferences(supabase, tenantId, franchiseId, [resolvedBody]);
+      aircraftModelIssues = validation.get(0) || [];
     }
     const payload = sanitizeWritePayload(entity, resolvedBody, { requireCreateFields: entity !== 'aircraft' });
     let assemblyModelIssues: { field: string; message: string }[] = [];
@@ -968,6 +1073,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     }
     const issues = [
       ...manufacturerIssues,
+      ...aircraftModelIssues,
       ...assemblyModelIssues,
       ...buildRequiredFieldIssues(entity, payload),
       ...validatePayload(entity, payload),
