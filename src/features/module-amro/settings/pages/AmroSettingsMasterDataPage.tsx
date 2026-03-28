@@ -70,8 +70,6 @@ import { toast } from 'sonner';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import {
-  Area,
-  AreaChart,
   Bar,
   BarChart,
   CartesianGrid,
@@ -409,6 +407,50 @@ type AircraftDashboardTrendPoint = {
   cycles?: number;
   opened?: number;
   resolved?: number;
+  tbo_remaining_hours?: number;
+  vibration_ips?: number;
+  oil_consumption_lph?: number;
+  replacements?: number;
+  compliance_breaches?: number;
+  defects_opened?: number;
+};
+
+type AircraftDashboardAlert = {
+  module?: string;
+  code?: string;
+  severity?: string;
+  message?: string;
+  due_in_days?: number | null;
+};
+
+type AircraftDashboardEngineModule = {
+  kpis?: Record<string, number | string>;
+  statuses?: Record<string, string>;
+  trend?: AircraftDashboardTrendPoint[];
+  drilldown?: {
+    defect_drivers?: Array<Record<string, unknown>>;
+  };
+  alerts?: AircraftDashboardAlert[];
+};
+
+type AircraftDashboardComponentsModule = {
+  kpis?: Record<string, number | string>;
+  statuses?: Record<string, string>;
+  lifecycle_tracking?: Array<Record<string, unknown>>;
+  replacement_history?: Array<Record<string, unknown>>;
+  trend?: AircraftDashboardTrendPoint[];
+  drilldown?: {
+    open_defects?: Array<Record<string, unknown>>;
+  };
+  alerts?: AircraftDashboardAlert[];
+};
+
+type AircraftDashboardModuleFilter = 'overview' | 'engine' | 'components' | 'all';
+
+type AircraftDashboardReportSection = {
+  section: string;
+  metric: string;
+  value: string;
 };
 
 type AircraftDashboardOutput = {
@@ -428,6 +470,9 @@ type AircraftDashboardOutput = {
     defect_trend?: AircraftDashboardTrendPoint[];
     signal_severity_index?: number;
   };
+  alerts?: AircraftDashboardAlert[];
+  engine_module?: AircraftDashboardEngineModule | null;
+  components_module?: AircraftDashboardComponentsModule | null;
 };
 
 const AIRCRAFT_NAV_RAIL = [
@@ -438,6 +483,10 @@ const AIRCRAFT_NAV_RAIL = [
   { label: 'AD/SB', path: '/dashboard/amro/aircraft/ad-sb', view: 'pipeline' as const, icon: FileCheck },
   { label: 'Maintenance Planning', path: '/dashboard/amro/aircraft/work-packages', view: 'card' as const, icon: CalendarDays },
 ] as const;
+
+type AircraftSubModuleSegment = 'list' | 'engine' | 'components' | 'documents' | 'ad-sb' | 'work-packages';
+
+const AIRCRAFT_SUBMODULE_SEGMENTS: ReadonlyArray<AircraftSubModuleSegment> = ['list', 'engine', 'components', 'documents', 'ad-sb', 'work-packages'];
 
 const AIRCRAFT_SUBMODULE_VIEW_MAP: Record<string, 'module' | AircraftLeadsTab> = {
   list: 'module',
@@ -1020,7 +1069,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     [scope.franchiseId, scope.tenantId],
   );
   const [aircraftSelectedColumns, setAircraftSelectedColumns] = useState<string[]>([]);
-  const aircraftSubModuleSegment = useMemo(() => {
+  const aircraftSubModuleSegment = useMemo<AircraftSubModuleSegment>(() => {
     if (!isAircraftSubModule) {
       return 'list';
     }
@@ -1028,17 +1077,35 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       return 'list';
     }
     const segment = location.pathname.replace('/dashboard/amro/aircraft', '').replace(/^\/+/, '');
-    return segment || 'list';
+    if (!segment) {
+      return 'list';
+    }
+    if (AIRCRAFT_SUBMODULE_SEGMENTS.includes(segment as AircraftSubModuleSegment)) {
+      return segment as AircraftSubModuleSegment;
+    }
+    return 'list';
   }, [isAircraftSubModule, location.pathname]);
   const currentAircraftNavPath = useMemo(
     () => (aircraftSubModuleSegment === 'list' ? '/dashboard/amro/aircraft/list' : `/dashboard/amro/aircraft/${aircraftSubModuleSegment}`),
     [aircraftSubModuleSegment],
   );
+  const aircraftDashboardModule = useMemo<AircraftDashboardModuleFilter>(() => {
+    if (aircraftSubModuleSegment === 'engine') return 'engine';
+    if (aircraftSubModuleSegment === 'components') return 'components';
+    if (aircraftSubModuleSegment === 'list') return 'all';
+    return 'overview';
+  }, [aircraftSubModuleSegment]);
   const showAircraftLeadWorkspace =
     entity === 'aircraft'
     && aircraftEnhancementEnabled
-    && aircraftNavigationView !== 'module';
-  const showAircraftMasterRecords = !showAircraftLeadWorkspace;
+    && ((!isAircraftSubModule && aircraftNavigationView !== 'module') || aircraftSubModuleSegment === 'work-packages');
+  const showAircraftMasterRecords = entity === 'aircraft'
+    ? (!isAircraftSubModule || aircraftSubModuleSegment === 'list')
+    : !showAircraftLeadWorkspace;
+  const showAircraftEngineWorkspace = entity === 'aircraft' && aircraftEnhancementEnabled && (!isAircraftSubModule || aircraftSubModuleSegment === 'engine');
+  const showAircraftComponentsWorkspace = entity === 'aircraft' && aircraftEnhancementEnabled && (!isAircraftSubModule || aircraftSubModuleSegment === 'components');
+  const showAircraftDocumentsWorkspace = entity === 'aircraft' && aircraftEnhancementEnabled && isAircraftSubModule && aircraftSubModuleSegment === 'documents';
+  const showAircraftAdSbWorkspace = entity === 'aircraft' && aircraftEnhancementEnabled && isAircraftSubModule && aircraftSubModuleSegment === 'ad-sb';
   const handleAircraftViewNavigation = useCallback((tab: AircraftLeadsTab) => {
     if (isAircraftSubModule) {
       const nextPath = AIRCRAFT_NAV_RAIL.find((item) => item.view === tab)?.path || '/dashboard/amro/aircraft/list';
@@ -2844,6 +2911,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         status: aircraftDashboardStatusFilter,
         due_within_days: aircraftDashboardDueWindowDays,
         trend_days: aircraftDashboardTrendDays,
+        module: aircraftDashboardModule,
       });
       if (aircraftDashboardSearch.trim()) {
         query.set('search', aircraftDashboardSearch.trim());
@@ -2875,6 +2943,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     }
   }, [
     aircraftDashboardDueWindowDays,
+    aircraftDashboardModule,
     aircraftDashboardSearch,
     aircraftDashboardStatusFilter,
     aircraftDashboardTrendDays,
@@ -3520,6 +3589,117 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     () => (Array.isArray(aircraftDashboard?.maintenance_schedule) ? aircraftDashboard.maintenance_schedule.slice(0, 6) : []),
     [aircraftDashboard],
   );
+  const aircraftDashboardAlerts = useMemo<AircraftDashboardAlert[]>(
+    () => (Array.isArray(aircraftDashboard?.alerts) ? aircraftDashboard.alerts : []),
+    [aircraftDashboard],
+  );
+  const aircraftDashboardEngineModule = useMemo<AircraftDashboardEngineModule | null>(() => {
+    if (!aircraftDashboard?.engine_module || typeof aircraftDashboard.engine_module !== 'object') {
+      return null;
+    }
+    return aircraftDashboard.engine_module;
+  }, [aircraftDashboard]);
+  const aircraftDashboardComponentsModule = useMemo<AircraftDashboardComponentsModule | null>(() => {
+    if (!aircraftDashboard?.components_module || typeof aircraftDashboard.components_module !== 'object') {
+      return null;
+    }
+    return aircraftDashboard.components_module;
+  }, [aircraftDashboard]);
+  const aircraftEngineTrend = useMemo(
+    () => (Array.isArray(aircraftDashboardEngineModule?.trend) ? aircraftDashboardEngineModule.trend : []),
+    [aircraftDashboardEngineModule],
+  );
+  const aircraftComponentsTrend = useMemo(
+    () => (Array.isArray(aircraftDashboardComponentsModule?.trend) ? aircraftDashboardComponentsModule.trend : []),
+    [aircraftDashboardComponentsModule],
+  );
+  const aircraftComponentLifecycleRows = useMemo(
+    () => (Array.isArray(aircraftDashboardComponentsModule?.lifecycle_tracking) ? aircraftDashboardComponentsModule.lifecycle_tracking.slice(0, 6) : []),
+    [aircraftDashboardComponentsModule],
+  );
+  const aircraftComponentReplacementRows = useMemo(
+    () => (Array.isArray(aircraftDashboardComponentsModule?.replacement_history) ? aircraftDashboardComponentsModule.replacement_history.slice(0, 6) : []),
+    [aircraftDashboardComponentsModule],
+  );
+  const aircraftEngineDefectDrivers = useMemo(
+    () => (Array.isArray(aircraftDashboardEngineModule?.drilldown?.defect_drivers) ? aircraftDashboardEngineModule.drilldown.defect_drivers.slice(0, 6) : []),
+    [aircraftDashboardEngineModule],
+  );
+  const aircraftComponentsOpenDefects = useMemo(
+    () => (Array.isArray(aircraftDashboardComponentsModule?.drilldown?.open_defects) ? aircraftDashboardComponentsModule.drilldown.open_defects.slice(0, 6) : []),
+    [aircraftDashboardComponentsModule],
+  );
+  const aircraftDocumentRows = useMemo(
+    () => [
+      ...aircraftDashboardMaintenanceRows.map((row) => ({
+        title: String(row.title || 'Maintenance Scope Document'),
+        category: 'Maintenance',
+        status: String(row.status || 'open'),
+        date: String(row.updated_at || row.due_at || '').slice(0, 10),
+      })),
+      ...aircraftComponentReplacementRows.map((row) => ({
+        title: String(row.title || 'Component Replacement Record'),
+        category: 'Component',
+        status: String(row.status || 'open'),
+        date: String(row.reported_at || row.updated_at || '').slice(0, 10),
+      })),
+      ...aircraftDashboardDefectRows.map((row) => ({
+        title: String(row.title || 'Defect Report'),
+        category: 'Defect',
+        status: String(row.status || 'open'),
+        date: String(row.reported_at || row.updated_at || '').slice(0, 10),
+      })),
+    ].slice(0, 12),
+    [aircraftComponentReplacementRows, aircraftDashboardDefectRows, aircraftDashboardMaintenanceRows],
+  );
+  const aircraftAdSbRows = useMemo(
+    () => aircraftComponentLifecycleRows.filter((row) => String(row.compliance_state || '').toLowerCase() !== 'compliant').slice(0, 10),
+    [aircraftComponentLifecycleRows],
+  );
+  const visibleAircraftAlerts = useMemo(() => {
+    if (showAircraftAdSbWorkspace) {
+      return aircraftDashboardAlerts.filter((alert) => String(alert.module || '').toLowerCase() === 'components' || String(alert.code || '').toUpperCase().includes('AD_SB'));
+    }
+    if (showAircraftDocumentsWorkspace) {
+      return [] as AircraftDashboardAlert[];
+    }
+    if (showAircraftEngineWorkspace && !showAircraftComponentsWorkspace) {
+      return aircraftDashboardAlerts.filter((alert) => String(alert.module || '').toLowerCase() === 'engine');
+    }
+    if (showAircraftComponentsWorkspace && !showAircraftEngineWorkspace) {
+      return aircraftDashboardAlerts.filter((alert) => String(alert.module || '').toLowerCase() === 'components');
+    }
+    return aircraftDashboardAlerts;
+  }, [
+    aircraftDashboardAlerts,
+    showAircraftAdSbWorkspace,
+    showAircraftComponentsWorkspace,
+    showAircraftDocumentsWorkspace,
+    showAircraftEngineWorkspace,
+  ]);
+  const mapStatusToBadgeVariant = useCallback((statusValue: unknown): 'secondary' | 'destructive' => {
+    const normalized = String(statusValue || '').trim().toLowerCase();
+    if (normalized === 'critical' || normalized === 'warning' || normalized === 'at_risk' || normalized === 'blocked') {
+      return 'destructive';
+    }
+    return 'secondary';
+  }, []);
+  const aircraftOpsReportRows = useMemo<AircraftDashboardReportSection[]>(() => {
+    const engineKpis = aircraftDashboardEngineModule?.kpis || {};
+    const componentKpis = aircraftDashboardComponentsModule?.kpis || {};
+    return [
+      { section: 'Engine', metric: 'Monitored Engines', value: String(engineKpis.monitored_engines ?? '0') },
+      { section: 'Engine', metric: 'TBO Remaining Hours', value: String(engineKpis.tbo_remaining_hours ?? '0') },
+      { section: 'Engine', metric: 'LLP Remaining Cycles', value: String(engineKpis.llp_avg_remaining_cycles ?? '0') },
+      { section: 'Engine', metric: 'Oil Consumption (L/H)', value: String(engineKpis.oil_consumption_lph ?? '0') },
+      { section: 'Engine', metric: 'Vibration (IPS)', value: String(engineKpis.vibration_ips ?? '0') },
+      { section: 'Components', metric: 'Tracked Components', value: String(componentKpis.tracked_components ?? '0') },
+      { section: 'Components', metric: 'AD/SB Compliance %', value: String(componentKpis.ad_sb_compliance_pct ?? '0') },
+      { section: 'Components', metric: 'AD/SB Pending', value: String(componentKpis.ad_sb_pending_count ?? '0') },
+      { section: 'Components', metric: 'MTBUR Hours', value: String(componentKpis.mtbur_hours ?? '0') },
+      { section: 'Components', metric: 'Repeat Discrepancy %', value: String(componentKpis.repeat_discrepancy_rate ?? '0') },
+    ];
+  }, [aircraftDashboardComponentsModule, aircraftDashboardEngineModule]);
 
   const aircraftRiskScore = useMemo(() => {
     const status = String(selectedAircraft?.status || '').toLowerCase();
@@ -3721,6 +3901,42 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       setBusyAction(null);
     }
   }, [aircraftHeaderColumns, entity, getColumnLabel, renderedRows, resolveTableCellValue, tableColumns]);
+  const handleExportAircraftOpsReport = useCallback(async () => {
+    setBusyAction('export_pdf');
+    try {
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+      doc.setFontSize(12);
+      doc.text('Aircraft Operations Snapshot Report', 40, 36);
+      doc.setFontSize(9);
+      doc.text(`Generated ${new Date().toISOString()}`, 40, 52);
+      autoTable(doc, {
+        startY: 64,
+        head: [['Section', 'Metric', 'Value']],
+        body: aircraftOpsReportRows.map((row) => [row.section, row.metric, row.value]),
+        styles: { fontSize: 8, cellPadding: 4 },
+        headStyles: { fillColor: [17, 24, 39] },
+      });
+      autoTable(doc, {
+        startY: ((doc as unknown as { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY || 110) + 16,
+        head: [['Module', 'Severity', 'Code', 'Message', 'Due (Days)']],
+        body: aircraftDashboardAlerts.slice(0, 12).map((alert) => [
+          String(alert.module || ''),
+          String(alert.severity || ''),
+          String(alert.code || ''),
+          String(alert.message || ''),
+          String(alert.due_in_days ?? ''),
+        ]),
+        styles: { fontSize: 8, cellPadding: 4 },
+        headStyles: { fillColor: [51, 65, 85] },
+      });
+      doc.save(`amro-aircraft-operations-${String(selectedAircraft?.id || 'snapshot')}.pdf`);
+      toast.success('Exported Aircraft Operations Snapshot report');
+    } catch (error) {
+      toast.error(String((error as Error).message || 'Operations report export failed'));
+    } finally {
+      setBusyAction(null);
+    }
+  }, [aircraftDashboardAlerts, aircraftOpsReportRows, selectedAircraft?.id]);
 
   const selectedRows = useMemo(() => rows.filter((row) => selectedRowIds.includes(row.id)), [rows, selectedRowIds]);
   const allRowsSelected = renderedRowIds.length > 0 && renderedRowIds.every((id) => selectedRowIds.includes(id));
@@ -3931,11 +4147,11 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         group: 'contextual',
         permission: 'delete_flight_logs',
         onAction: async () => {
-          await handleExport();
+          await handleExportAircraftOpsReport();
         },
       },
     ],
-    [handleAircraftContextNavigation, handleExport],
+    [handleAircraftContextNavigation, handleExportAircraftOpsReport],
   );
 
   return (
@@ -4085,6 +4301,236 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                   );
                 })}
               </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="text-[14px] font-semibold text-[hsl(var(--mdm-template-heading))]">
+                    {showAircraftDocumentsWorkspace
+                      ? 'Documents Management'
+                      : showAircraftAdSbWorkspace
+                        ? 'AD/SB Management'
+                        : showAircraftEngineWorkspace && !showAircraftComponentsWorkspace
+                          ? 'Engine Monitoring'
+                          : showAircraftComponentsWorkspace && !showAircraftEngineWorkspace
+                            ? 'Components Monitoring'
+                            : 'Engine & Components Monitoring'}
+                  </h3>
+                  <Badge variant="secondary">View: {aircraftDashboardModule}</Badge>
+                </div>
+                {aircraftDashboardLoading ? (
+                  <p className="text-[12px] text-[hsl(var(--mdm-template-muted))]">Loading operations telemetry…</p>
+                ) : null}
+                {aircraftDashboardError ? (
+                  <p className="text-[12px] text-destructive">{aircraftDashboardError}</p>
+                ) : null}
+              </div>
+              {showAircraftEngineWorkspace || showAircraftComponentsWorkspace ? (
+                <div className={`grid gap-4 ${showAircraftEngineWorkspace && showAircraftComponentsWorkspace ? 'xl:grid-cols-2' : ''}`}>
+                  {showAircraftEngineWorkspace ? (
+                    <div className="space-y-3 rounded-md border border-[hsl(var(--mdm-template-border))] p-4">
+                      <div className="flex items-center justify-between gap-2">
+                        <h4 className="text-[13px] font-semibold text-[hsl(var(--mdm-template-heading))]">Engine Monitoring</h4>
+                        <div className="flex items-center gap-1">
+                          {Object.entries(aircraftDashboardEngineModule?.statuses || {}).slice(0, 3).map(([key, value]) => (
+                            <Badge key={`engine-status-${key}`} variant={mapStatusToBadgeVariant(value)}>
+                              {key.replace(/_/g, ' ')}: {String(value)}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-[12px]">
+                        <div className="rounded-md bg-muted/40 p-2">TBO Remaining: <span className="font-semibold">{String(aircraftDashboardEngineModule?.kpis?.tbo_remaining_hours ?? 0)}h</span></div>
+                        <div className="rounded-md bg-muted/40 p-2">LLP Remaining: <span className="font-semibold">{String(aircraftDashboardEngineModule?.kpis?.llp_avg_remaining_cycles ?? 0)}</span></div>
+                        <div className="rounded-md bg-muted/40 p-2">Oil Cons.: <span className="font-semibold">{String(aircraftDashboardEngineModule?.kpis?.oil_consumption_lph ?? 0)} L/H</span></div>
+                        <div className="rounded-md bg-muted/40 p-2">Vibration: <span className="font-semibold">{String(aircraftDashboardEngineModule?.kpis?.vibration_ips ?? 0)} IPS</span></div>
+                      </div>
+                      <div className="h-[210px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart data={aircraftEngineTrend}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="day" />
+                            <YAxis />
+                            <RechartsTooltip />
+                            <Line type="monotone" dataKey="tbo_remaining_hours" stroke="#2563EB" strokeWidth={2} dot={false} />
+                            <Line type="monotone" dataKey="vibration_ips" stroke="#DC2626" strokeWidth={2} dot={false} />
+                            <Line type="monotone" dataKey="oil_consumption_lph" stroke="#0891B2" strokeWidth={2} dot={false} />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
+                      <div className="space-y-1 text-[12px]">
+                        <p className="font-medium text-[hsl(var(--mdm-template-heading))]">Engine Drill-down</p>
+                        {aircraftEngineDefectDrivers.length === 0 ? (
+                          <p className="text-[hsl(var(--mdm-template-muted))]">No defect drivers in selected window.</p>
+                        ) : (
+                          aircraftEngineDefectDrivers.map((row, index) => (
+                            <div key={`engine-driver-row-${index + 1}`} className="rounded-md border border-[hsl(var(--mdm-template-border))] px-2 py-1">
+                              {String(row.title || 'Engine anomaly')} · {String(row.severity || 'medium')} · due {String(row.due_in_days ?? '-')}d
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  ) : null}
+                  {showAircraftComponentsWorkspace ? (
+                    <div className="space-y-3 rounded-md border border-[hsl(var(--mdm-template-border))] p-4">
+                      <div className="flex items-center justify-between gap-2">
+                        <h4 className="text-[13px] font-semibold text-[hsl(var(--mdm-template-heading))]">Components Monitoring</h4>
+                        <div className="flex items-center gap-1">
+                          {Object.entries(aircraftDashboardComponentsModule?.statuses || {}).slice(0, 3).map(([key, value]) => (
+                            <Badge key={`component-status-${key}`} variant={mapStatusToBadgeVariant(value)}>
+                              {key.replace(/_/g, ' ')}: {String(value)}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-[12px]">
+                        <div className="rounded-md bg-muted/40 p-2">AD/SB Compliance: <span className="font-semibold">{String(aircraftDashboardComponentsModule?.kpis?.ad_sb_compliance_pct ?? 0)}%</span></div>
+                        <div className="rounded-md bg-muted/40 p-2">AD/SB Pending: <span className="font-semibold">{String(aircraftDashboardComponentsModule?.kpis?.ad_sb_pending_count ?? 0)}</span></div>
+                        <div className="rounded-md bg-muted/40 p-2">MTBUR: <span className="font-semibold">{String(aircraftDashboardComponentsModule?.kpis?.mtbur_hours ?? 0)}h</span></div>
+                        <div className="rounded-md bg-muted/40 p-2">Repeat Defect: <span className="font-semibold">{String(aircraftDashboardComponentsModule?.kpis?.repeat_discrepancy_rate ?? 0)}%</span></div>
+                      </div>
+                      <div className="h-[210px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={aircraftComponentsTrend}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="day" />
+                            <YAxis />
+                            <RechartsTooltip />
+                            <Bar dataKey="replacements" fill="#0EA5E9" />
+                            <Bar dataKey="compliance_breaches" fill="#F97316" />
+                            <Bar dataKey="defects_opened" fill="#EF4444" />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                      <div className="grid gap-2 text-[12px] md:grid-cols-2">
+                        <div className="space-y-1">
+                          <p className="font-medium text-[hsl(var(--mdm-template-heading))]">Lifecycle Tracking</p>
+                          {aircraftComponentLifecycleRows.length === 0 ? (
+                            <p className="text-[hsl(var(--mdm-template-muted))]">No lifecycle rows in selected window.</p>
+                          ) : (
+                            aircraftComponentLifecycleRows.map((row, index) => (
+                              <div key={`component-lifecycle-row-${index + 1}`} className="rounded-md border border-[hsl(var(--mdm-template-border))] px-2 py-1">
+                                {String(row.title || 'Component')} · {String(row.compliance_state || 'pending')} · due {String(row.due_in_days ?? '-')}d
+                              </div>
+                            ))
+                          )}
+                        </div>
+                        <div className="space-y-1">
+                          <p className="font-medium text-[hsl(var(--mdm-template-heading))]">Replacement History</p>
+                          {aircraftComponentReplacementRows.length === 0 ? (
+                            <p className="text-[hsl(var(--mdm-template-muted))]">No replacement history in selected window.</p>
+                          ) : (
+                            aircraftComponentReplacementRows.map((row, index) => (
+                              <div key={`component-replacement-row-${index + 1}`} className="rounded-md border border-[hsl(var(--mdm-template-border))] px-2 py-1">
+                                {String(row.title || 'Replacement')} · {String(row.status || 'open')} · {String(row.reported_at || '').slice(0, 10)}
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+              {showAircraftDocumentsWorkspace ? (
+                <div className="space-y-3 rounded-md border border-[hsl(var(--mdm-template-border))] p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <h4 className="text-[13px] font-semibold text-[hsl(var(--mdm-template-heading))]">Document Repository</h4>
+                    <Badge variant="secondary">{aircraftDocumentRows.length} records</Badge>
+                  </div>
+                  <div className="grid gap-2 text-[12px] md:grid-cols-3">
+                    <div className="rounded-md bg-muted/40 p-2">Maintenance Docs: <span className="font-semibold">{aircraftDashboardMaintenanceRows.length}</span></div>
+                    <div className="rounded-md bg-muted/40 p-2">Component Records: <span className="font-semibold">{aircraftComponentReplacementRows.length}</span></div>
+                    <div className="rounded-md bg-muted/40 p-2">Defect Reports: <span className="font-semibold">{aircraftDashboardDefectRows.length}</span></div>
+                  </div>
+                  <div className="grid gap-2 text-[12px]">
+                    {aircraftDocumentRows.length === 0 ? (
+                      <p className="text-[hsl(var(--mdm-template-muted))]">No documents available in the selected window.</p>
+                    ) : (
+                      aircraftDocumentRows.map((row, index) => (
+                        <div key={`doc-row-${index + 1}`} className="grid grid-cols-12 gap-2 rounded-md border border-[hsl(var(--mdm-template-border))] px-2 py-1">
+                          <span className="col-span-6">{row.title}</span>
+                          <span className="col-span-2 text-[hsl(var(--mdm-template-muted))]">{row.category}</span>
+                          <span className="col-span-2 text-[hsl(var(--mdm-template-muted))]">{row.status}</span>
+                          <span className="col-span-2 text-right text-[hsl(var(--mdm-template-muted))]">{row.date || '-'}</span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    <Button size="sm" variant="outline" onClick={() => handleAircraftContextNavigation('/dashboard/amro/settings/master-data/work-package-templates')}>
+                      Open Template Records
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={handleExportAircraftOpsReport}>
+                      Export Document Snapshot
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+              {showAircraftAdSbWorkspace ? (
+                <div className="space-y-3 rounded-md border border-[hsl(var(--mdm-template-border))] p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <h4 className="text-[13px] font-semibold text-[hsl(var(--mdm-template-heading))]">AD/SB Compliance Management</h4>
+                    <Badge variant={Number(aircraftDashboardComponentsModule?.kpis?.ad_sb_pending_count || 0) > 0 ? 'destructive' : 'secondary'}>
+                      Pending {String(aircraftDashboardComponentsModule?.kpis?.ad_sb_pending_count ?? 0)}
+                    </Badge>
+                  </div>
+                  <div className="grid gap-2 text-[12px] md:grid-cols-3">
+                    <div className="rounded-md bg-muted/40 p-2">Compliance %: <span className="font-semibold">{String(aircraftDashboardComponentsModule?.kpis?.ad_sb_compliance_pct ?? 0)}%</span></div>
+                    <div className="rounded-md bg-muted/40 p-2">Tracked Components: <span className="font-semibold">{String(aircraftDashboardComponentsModule?.kpis?.tracked_components ?? 0)}</span></div>
+                    <div className="rounded-md bg-muted/40 p-2">Pending Directives: <span className="font-semibold">{aircraftAdSbRows.length}</span></div>
+                  </div>
+                  <div className="space-y-1 text-[12px]">
+                    {aircraftAdSbRows.length === 0 ? (
+                      <p className="text-[hsl(var(--mdm-template-muted))]">No pending AD/SB directives in the selected window.</p>
+                    ) : (
+                      aircraftAdSbRows.map((row, index) => (
+                        <div key={`ad-sb-row-${index + 1}`} className="rounded-md border border-[hsl(var(--mdm-template-border))] px-2 py-1">
+                          {String(row.title || 'Directive')} · {String(row.compliance_state || 'pending')} · due {String(row.due_in_days ?? '-')}d
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    <Button size="sm" variant="outline" onClick={() => handleAircraftContextNavigation('/dashboard/amro/compliance')}>
+                      Open AD/SB Registry
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={handleExportAircraftOpsReport}>
+                      Export AD/SB Report
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+              {visibleAircraftAlerts.length > 0 ? (
+                <div className="space-y-2 rounded-md border border-[hsl(var(--mdm-template-border))] p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <h4 className="text-[13px] font-semibold text-[hsl(var(--mdm-template-heading))]">Automated Alerts</h4>
+                  <Badge variant="secondary">{visibleAircraftAlerts.length} active</Badge>
+                </div>
+                <div className="grid gap-2 lg:grid-cols-2">
+                  {visibleAircraftAlerts.slice(0, 8).map((alert, index) => (
+                    <div key={`alert-${index + 1}`} className="rounded-md border border-[hsl(var(--mdm-template-border))] px-2 py-1 text-[12px]">
+                      <div className="flex items-center justify-between gap-2">
+                        <Badge variant={mapStatusToBadgeVariant(alert.severity)}>{String(alert.severity || 'normal')}</Badge>
+                        <span className="text-[hsl(var(--mdm-template-muted))]">Due {String(alert.due_in_days ?? '-')}d</span>
+                      </div>
+                      <p className="pt-1 text-[hsl(var(--mdm-template-heading))]">{String(alert.message || '')}</p>
+                    </div>
+                  ))}
+                </div>
+                {aircraftComponentsOpenDefects.length > 0 && showAircraftComponentsWorkspace ? (
+                  <div className="rounded-md border border-[hsl(var(--mdm-template-border))] p-2 text-[12px]">
+                    <p className="font-medium text-[hsl(var(--mdm-template-heading))]">Reliability Drill-down</p>
+                    <div className="grid gap-1 pt-1 md:grid-cols-2">
+                      {aircraftComponentsOpenDefects.slice(0, 4).map((row, index) => (
+                        <span key={`component-defect-${index + 1}`}>
+                          {String(row.title || 'Component discrepancy')} · {String(row.severity || 'medium')} · {String(row.status || 'open')}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+                </div>
+              ) : null}
             </CardContent>
           </Card>
         ) : null}

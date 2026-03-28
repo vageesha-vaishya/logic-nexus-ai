@@ -142,6 +142,9 @@ describe('/api/v2/amro/aircraft-dashboard', () => {
     expect((res.jsonBody as any)?.output?.kpis?.aircraft_leads_at_risk).toBe(1);
     expect((res.jsonBody as any)?.output?.aircraft_leads?.[0]?.title).toBe('A-check upsell');
     expect((res.jsonBody as any)?.output?.performance_metrics?.flight_hours_trend?.length).toBe(7);
+    expect((res.jsonBody as any)?.output?.engine_module?.kpis?.tbo_remaining_hours).toBeGreaterThanOrEqual(0);
+    expect((res.jsonBody as any)?.output?.components_module?.kpis?.ad_sb_compliance_pct).toBeGreaterThanOrEqual(0);
+    expect(Array.isArray((res.jsonBody as any)?.output?.alerts)).toBe(true);
     expect((res.jsonBody as any)?.output?.metadata?.cache).toBe('miss');
     expect((res.jsonBody as any)?.output?.manager_summary?.fleet_size).toBe(1);
     expect(enforceHttps).toHaveBeenCalledWith(req);
@@ -212,6 +215,55 @@ describe('/api/v2/amro/aircraft-dashboard', () => {
     expect((res.jsonBody as any)?.output?.manager_summary).toBeNull();
     expect((res.jsonBody as any)?.output?.maintenance_schedule?.[0]?.title).toBeUndefined();
     expect((res.jsonBody as any)?.output?.aircraft_leads?.[0]?.aircraft_type).toBeUndefined();
+    expect((res.jsonBody as any)?.output?.engine_module?.kpis).toBeDefined();
+    expect((res.jsonBody as any)?.output?.components_module?.kpis).toBeDefined();
+  });
+
+  it('returns module scoped output for engine module requests', async () => {
+    const supabaseMock = {
+      from: vi.fn((table: string) => {
+        if (table === 'aircraft') {
+          return createQueryChain([
+            { id: 'ac-4', registration: 'A6-ENG', status: 'active', defect_count: 2, current_flight_hours: 2111, current_cycles: 880, updated_at: '2026-03-27T10:00:00.000Z' },
+          ]);
+        }
+        if (table === 'work_packages') {
+          return createQueryChain([
+            { id: 'wp-4', aircraft_id: 'ac-4', work_package_number: 'WP-004', title: 'Engine borescope', status: 'open', priority: 'high', due_at: '2026-04-08T00:00:00.000Z', compliance_state: 'pending', updated_at: '2026-03-27T10:00:00.000Z' },
+          ]);
+        }
+        if (table === 'flight_logs') {
+          return createQueryChain([
+            { id: 'fl-4', aircraft_id: 'ac-4', flight_date: '2026-03-27', flight_hours: 2.4, flight_cycles: 1, updated_at: '2026-03-27T10:00:00.000Z' },
+          ]);
+        }
+        if (table === 'maintenance_events') {
+          return createQueryChain([
+            { id: 'df-4', aircraft_id: 'ac-4', event_type: 'defect', title: 'Oil delta trend', severity: 'high', status: 'open', due_at: '2026-03-30T00:00:00.000Z', reported_at: '2026-03-27T09:00:00.000Z', updated_at: '2026-03-27T10:00:00.000Z' },
+          ]);
+        }
+        if (table === 'asset_health_signals') {
+          return createQueryChain([
+            { id: 'sg-4', aircraft_id: 'ac-4', signal_type: 'vibration', value: 0.7, severity: 'high', recorded_at: '2026-03-27T10:00:00.000Z', updated_at: '2026-03-27T10:00:00.000Z' },
+          ]);
+        }
+        return createQueryChain([]);
+      }),
+    };
+    vi.mocked(getSupabaseAdminClient).mockReturnValue(supabaseMock as any);
+
+    const req: ApiRequest = {
+      method: 'GET',
+      query: { aircraft_id: 'ac-4', module: 'engine', trend_days: '7', due_within_days: '30' },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.output?.engine_module).toBeTruthy();
+    expect((res.jsonBody as any)?.output?.components_module).toBeNull();
   });
 
   it('falls back to maintenance events for aircraft leads when aircraft_leads table is empty', async () => {
