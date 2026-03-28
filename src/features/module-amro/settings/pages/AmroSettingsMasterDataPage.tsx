@@ -3653,7 +3653,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
             <h1 className="mdm-template-header-title">{pageTitle}</h1>
             {hideAircraftModuleHeaderMeta ? null : <p className="mdm-template-header-subtitle">{pageSubtitle}</p>}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             {hideAircraftModuleHeaderMeta ? null : <Badge variant="secondary">Tenant: {context.tenantId || 'unscoped'}</Badge>}
             {hideAircraftModuleHeaderMeta ? null : (
               <Button variant="ghost" asChild>
@@ -3662,6 +3662,37 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                 </Link>
               </Button>
             )}
+            {entity === 'aircraft' && aircraftEnhancementEnabled ? (
+              <div className="order-1 flex max-w-full flex-wrap items-center justify-end gap-2 rounded-md border border-[hsl(var(--mdm-template-border))] bg-muted/10 p-1.5">
+                {([
+                  ['pipeline', 'Pipeline'],
+                  ['list', 'List'],
+                  ['grid', 'Grid'],
+                  ['card', 'Card'],
+                  ['analytics', 'Analytics'],
+                  ['import_export', 'Import/Export'],
+                  ['detail', 'Detail'],
+                  ['wizard', 'Wizard'],
+                ] as const).map(([value, label]) => {
+                  const isActive = value === 'list'
+                    ? aircraftNavigationView === 'module'
+                    : aircraftNavigationView === value;
+                  return (
+                    <Button
+                      key={value}
+                      type="button"
+                      variant={isActive ? 'default' : 'outline'}
+                      size="sm"
+                      className="h-9 px-3"
+                      onClick={() => handleAircraftViewNavigation(value)}
+                      disabled={value === 'detail' && !canOpenAircraftLeadDetail}
+                    >
+                      {label}
+                    </Button>
+                  );
+                })}
+              </div>
+            ) : null}
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -3724,37 +3755,6 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
           </Tabs>
         ) : null}
 
-        {entity === 'aircraft' && aircraftEnhancementEnabled ? (
-          <div className="flex flex-wrap gap-2 rounded-md border border-[hsl(var(--mdm-template-border))] bg-muted/10 p-2">
-            {([
-              ['pipeline', 'Pipeline'],
-              ['list', 'List'],
-              ['grid', 'Grid'],
-              ['card', 'Card'],
-              ['analytics', 'Analytics'],
-              ['import_export', 'Import/Export'],
-              ['detail', 'Detail'],
-              ['wizard', 'Wizard'],
-            ] as const).map(([value, label]) => {
-              const isActive = value === 'list'
-                ? aircraftNavigationView === 'module'
-                : aircraftNavigationView === value;
-              return (
-                <Button
-                  key={value}
-                  type="button"
-                  variant={isActive ? 'default' : 'outline'}
-                  size="sm"
-                  className="h-8"
-                  onClick={() => handleAircraftViewNavigation(value)}
-                  disabled={value === 'detail' && !canOpenAircraftLeadDetail}
-                >
-                  {label}
-                </Button>
-              );
-            })}
-          </div>
-        ) : null}
         {entity === 'aircraft' && aircraftEnhancementEnabled ? (
           <Card className="mdm-template-panel">
             <CardHeader className="mdm-template-panel-head">
