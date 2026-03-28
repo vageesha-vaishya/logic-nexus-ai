@@ -88,9 +88,12 @@ type AircraftLeadsManagerProps = {
   sessionAccessToken: string;
   canManage: boolean;
   canDelete: boolean;
+  activeTab?: AircraftLeadsTab;
+  onActiveTabChange?: (tab: AircraftLeadsTab) => void;
+  onDetailAvailabilityChange?: (enabled: boolean) => void;
 };
 
-type AircraftLeadsTab = 'pipeline' | 'list' | 'grid' | 'card' | 'analytics' | 'import_export' | 'detail' | 'wizard';
+export type AircraftLeadsTab = 'pipeline' | 'list' | 'grid' | 'card' | 'analytics' | 'import_export' | 'detail' | 'wizard';
 
 const DEFAULT_WIZARD_VALUES: AircraftLeadWizardValues = {
   id: '',
@@ -199,7 +202,15 @@ function validateWizardStep(values: AircraftLeadWizardValues, step: number): Rec
   return errors;
 }
 
-export function AircraftLeadsManager({ scope, sessionAccessToken, canManage, canDelete }: AircraftLeadsManagerProps) {
+export function AircraftLeadsManager({
+  scope,
+  sessionAccessToken,
+  canManage,
+  canDelete,
+  activeTab: activeTabProp,
+  onActiveTabChange,
+  onDetailAvailabilityChange,
+}: AircraftLeadsManagerProps) {
   const [rows, setRows] = useState<AircraftLeadRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -215,7 +226,7 @@ export function AircraftLeadsManager({ scope, sessionAccessToken, canManage, can
   const [pageSize, setPageSize] = useState('25');
   const [totalCount, setTotalCount] = useState(0);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [activeTab, setActiveTab] = useState<AircraftLeadsTab>('list');
+  const [internalActiveTab, setInternalActiveTab] = useState<AircraftLeadsTab>('list');
   const [detailTab, setDetailTab] = useState<'overview' | 'compliance' | 'workflow'>('overview');
   const [selectedLeadId, setSelectedLeadId] = useState('');
   const [gridColumns, setGridColumns] = useState<'2' | '3' | '4'>('3');
@@ -238,6 +249,13 @@ export function AircraftLeadsManager({ scope, sessionAccessToken, canManage, can
     () => `amro:aircraft-leads:saved-filters:${scope.tenantId || 'tenant'}:${scope.franchiseId || 'franchise'}`,
     [scope.franchiseId, scope.tenantId],
   );
+  const activeTab = activeTabProp || internalActiveTab;
+  const setActiveTab = useCallback((tab: AircraftLeadsTab) => {
+    if (!activeTabProp) {
+      setInternalActiveTab(tab);
+    }
+    onActiveTabChange?.(tab);
+  }, [activeTabProp, onActiveTabChange]);
 
   const buildHeaders = useCallback(() => {
     const headers = new Headers({
@@ -370,6 +388,10 @@ export function AircraftLeadsManager({ scope, sessionAccessToken, canManage, can
     () => rows.find((row) => row.id === selectedLeadId) || null,
     [rows, selectedLeadId],
   );
+
+  useEffect(() => {
+    onDetailAvailabilityChange?.(Boolean(selectedLead));
+  }, [onDetailAvailabilityChange, selectedLead]);
 
   const totalPages = Math.max(1, Math.ceil(totalCount / Number(pageSize || '25')));
   const allSelected = rows.length > 0 && rows.every((row) => selectedIds.includes(row.id));
@@ -824,16 +846,6 @@ export function AircraftLeadsManager({ scope, sessionAccessToken, canManage, can
       </CardHeader>
       <CardContent className="mdm-template-panel-body space-y-3">
         <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as AircraftLeadsTab)}>
-          <TabsList className="h-8 flex-wrap">
-            <TabsTrigger value="pipeline">Pipeline</TabsTrigger>
-            <TabsTrigger value="list">List</TabsTrigger>
-            <TabsTrigger value="grid">Grid</TabsTrigger>
-            <TabsTrigger value="card">Card</TabsTrigger>
-            <TabsTrigger value="analytics">Analytics</TabsTrigger>
-            <TabsTrigger value="import_export">Import/Export</TabsTrigger>
-            <TabsTrigger value="detail" disabled={!selectedLead}>Detail</TabsTrigger>
-            <TabsTrigger value="wizard">Wizard</TabsTrigger>
-          </TabsList>
           <div className="mt-3 grid gap-2 lg:grid-cols-12">
             <div className="lg:col-span-4">
               <Label htmlFor="aircraft-leads-theme" className="text-[11px]">Theme</Label>

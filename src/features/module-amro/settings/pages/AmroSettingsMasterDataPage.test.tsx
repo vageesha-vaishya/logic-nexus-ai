@@ -618,7 +618,9 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     renderAircraftSubModulePage();
 
     expect(await screen.findByRole('heading', { name: 'AMRO · Aircraft' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'AMRO Overview' })).toHaveAttribute('href', '/dashboard/amro/overview');
+    expect(screen.queryByRole('link', { name: 'AMRO Overview' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Tenant-scoped aircraft operations management with governed CRUD controls, validation, filtering, and exports.')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Tenant:/)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /New Aircraft/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Run Bulk Import/ })).toBeInTheDocument();
     expect(screen.queryByRole('tab', { name: 'Parts Inventory' })).not.toBeInTheDocument();
@@ -754,24 +756,15 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
   });
 
-  it('renders aircraft leads workspace with parity tabs, theme controls, and wizard entrypoint', async () => {
+  it('does not render aircraft leads workspace in aircraft module header or body', async () => {
     renderAircraftPage();
 
-    expect(await screen.findByText('Aircraft Leads Workspace')).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'Pipeline' })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'List' })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'Grid' })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'Card' })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'Analytics' })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'Import/Export' })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'Wizard' })).toBeInTheDocument();
-    expect(screen.getByLabelText('Theme')).toBeInTheDocument();
-    expect(screen.getByLabelText('Auto refresh (30s)')).toBeInTheDocument();
-    expect(await screen.findByText('Hydraulic Inspection')).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: 'New Lead' }));
-    expect(screen.getByText('Step 1')).toBeInTheDocument();
-    expect(screen.getByText('Lead Title')).toBeInTheDocument();
+    await screen.findByText('Aircraft Operations Snapshot');
+    expect(screen.queryByText('Aircraft Leads Workspace')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Pipeline' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Import/Export' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Wizard' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'New Lead' })).not.toBeInTheDocument();
   });
 
   it('supports aircraft column filtering and row selection controls', async () => {
@@ -794,8 +787,6 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
   it('opens aircraft update form on row double click', async () => {
     renderAircraftPage();
 
-    const listTab = await screen.findByRole('tab', { name: 'List' });
-    fireEvent.click(listTab);
     const rowCheckbox = await screen.findByRole('checkbox', { name: 'Select row ac-1' });
     const aircraftRow = rowCheckbox.closest('tr');
     expect(aircraftRow).not.toBeNull();

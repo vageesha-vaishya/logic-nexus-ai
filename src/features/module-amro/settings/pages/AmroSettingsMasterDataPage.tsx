@@ -108,7 +108,6 @@ import {
   pickFormValuesFromRow,
 } from './amro-settings-master-data/utils';
 import { FlightLogsFilters } from './amro-settings-master-data/components/FlightLogsFilters';
-import { AircraftLeadsManager } from './amro-settings-master-data/components/AircraftLeadsManager';
 
 export { buildPayloadFromForm } from './amro-settings-master-data/utils';
 export { verifyReferenceExists } from './amro-settings-master-data/services';
@@ -854,6 +853,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     }
     return 'aircraft' as MasterEntity;
   }, [entityOverride, entityParam]);
+  const hideAircraftModuleHeaderMeta = isAircraftSubModule && resolvedRouteEntity === 'aircraft';
   const [entity, setEntity] = useState<MasterEntity>(resolvedRouteEntity);
   const [rows, setRows] = useState<RecordRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -985,9 +985,6 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   const canScheduleWorkPackage = hasPermission('edit_aircraft_records');
   const canExportAircraftOps = hasPermission('delete_flight_logs');
   const canEscalateAircraftOps = hasPermission('approve_work_orders');
-  const canManageAircraftLeads = hasPermission('edit_aircraft_records') || hasPermission('create_maintenance_request');
-  const canDeleteAircraftLeads = hasPermission('approve_work_orders') || hasPermission('delete_flight_logs');
-
   const scope = useMemo(
     () => ({
       tenantId: context.tenantId,
@@ -3623,15 +3620,17 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
               <span className="font-medium text-[hsl(var(--mdm-template-heading))]">{breadcrumbCurrentLabel}</span>
             </nav>
             <h1 className="mdm-template-header-title">{pageTitle}</h1>
-            <p className="mdm-template-header-subtitle">{pageSubtitle}</p>
+            {hideAircraftModuleHeaderMeta ? null : <p className="mdm-template-header-subtitle">{pageSubtitle}</p>}
           </div>
           <div className="flex items-center gap-2">
-            <Badge variant="secondary">Tenant: {context.tenantId || 'unscoped'}</Badge>
-            <Button variant="ghost" asChild>
-              <Link to={breadcrumbParentPath} className="underline-offset-4 hover:underline">
-                {homeActionLabel}
-              </Link>
-            </Button>
+            {hideAircraftModuleHeaderMeta ? null : <Badge variant="secondary">Tenant: {context.tenantId || 'unscoped'}</Badge>}
+            {hideAircraftModuleHeaderMeta ? null : (
+              <Button variant="ghost" asChild>
+                <Link to={breadcrumbParentPath} className="underline-offset-4 hover:underline">
+                  {homeActionLabel}
+                </Link>
+              </Button>
+            )}
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -3945,14 +3944,6 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
               </div>
             </CardContent>
           </Card>
-        ) : null}
-        {entity === 'aircraft' && aircraftEnhancementEnabled ? (
-          <AircraftLeadsManager
-            scope={scope}
-            sessionAccessToken={sessionAccessToken}
-            canManage={canManageAircraftLeads}
-            canDelete={canDeleteAircraftLeads}
-          />
         ) : null}
         <Card className="mdm-template-panel">
           <CardHeader className="mdm-template-panel-head">
