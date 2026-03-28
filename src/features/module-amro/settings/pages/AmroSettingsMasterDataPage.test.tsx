@@ -821,7 +821,7 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
 
     expect(screen.getByText('WP-BASE-002')).toBeInTheDocument();
 
-    const exportButton = screen.getByLabelText(/Export records CSV/i);
+    const exportButton = screen.getByLabelText(/Export records/i);
     expect(exportButton).toBeInTheDocument();
     fireEvent.click(exportButton);
   });
@@ -1102,8 +1102,7 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     renderAircraftPage();
 
     await screen.findByLabelText(/Refresh records/i, {}, { timeout: ASYNC_WAIT_TIMEOUT_MS });
-    expect(screen.getByLabelText(/Export records CSV/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Export records PDF/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Export records/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /New Aircraft/ })).toBeInTheDocument();
 
     const rowCheckboxes = await screen.findAllByRole('checkbox', { name: /Select row/ }, { timeout: ASYNC_WAIT_TIMEOUT_MS });

@@ -3693,53 +3693,66 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                 })}
               </div>
             ) : null}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="secondary"
-                  size="icon"
-                  onClick={() => {
-                    setBusyAction('refresh');
-                    void loadRecords().finally(() => setBusyAction(null));
-                  }}
-                  disabled={loading || busyAction === 'refresh'}
-                  aria-label="Refresh records"
-                >
-                  <RefreshCw className={cn('h-4 w-4', busyAction === 'refresh' && 'animate-spin')} aria-hidden="true" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Refresh</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="outline" size="icon" onClick={() => void handleExport()} disabled={busyAction === 'export'} aria-label="Export records CSV">
-                  <FileUp className="h-4 w-4" aria-hidden="true" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Export CSV</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="outline" size="icon" onClick={() => void handleExportPdf()} disabled={busyAction === 'export_pdf'} aria-label="Export records PDF">
-                  <FileDown className="h-4 w-4" aria-hidden="true" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Export PDF</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  className="bg-[hsl(var(--mdm-template-focus))] text-white hover:bg-[hsl(var(--mdm-template-focus))/0.9]"
-                  size="icon"
-                  onClick={handleOpenCreateModal}
-                  disabled={busyAction === 'create'}
-                  aria-label={`New ${ENTITY_LABEL[entity]}`}
-                >
-                  <Plus className="h-4 w-4" aria-hidden="true" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>{`New ${ENTITY_LABEL[entity]}`}</TooltipContent>
-            </Tooltip>
+            <div className="order-2 flex items-center gap-2">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    onClick={() => {
+                      setBusyAction('refresh');
+                      void loadRecords().finally(() => setBusyAction(null));
+                    }}
+                    disabled={loading || busyAction === 'refresh'}
+                    aria-label="Refresh records"
+                  >
+                    <RefreshCw className={cn('h-4 w-4', busyAction === 'refresh' && 'animate-spin')} aria-hidden="true" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Refresh</TooltipContent>
+              </Tooltip>
+              <DropdownMenu>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        disabled={busyAction === 'export' || busyAction === 'export_pdf'}
+                        aria-label="Export records"
+                      >
+                        <FileUp className="h-4 w-4" aria-hidden="true" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent>Export</TooltipContent>
+                </Tooltip>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => void handleExport()} disabled={busyAction === 'export' || busyAction === 'export_pdf'}>
+                    <FileUp className="mr-2 h-4 w-4" aria-hidden="true" />
+                    Export CSV
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => void handleExportPdf()} disabled={busyAction === 'export' || busyAction === 'export_pdf'}>
+                    <FileDown className="mr-2 h-4 w-4" aria-hidden="true" />
+                    Export PDF
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    className="bg-[hsl(var(--mdm-template-focus))] text-white hover:bg-[hsl(var(--mdm-template-focus))/0.9]"
+                    size="icon"
+                    onClick={handleOpenCreateModal}
+                    disabled={busyAction === 'create'}
+                    aria-label={`New ${ENTITY_LABEL[entity]}`}
+                  >
+                    <Plus className="h-4 w-4" aria-hidden="true" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{`New ${ENTITY_LABEL[entity]}`}</TooltipContent>
+              </Tooltip>
+            </div>
           </div>
         </div>
 
