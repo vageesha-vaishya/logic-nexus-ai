@@ -108,6 +108,7 @@ import {
   pickFormValuesFromRow,
 } from './amro-settings-master-data/utils';
 import { FlightLogsFilters } from './amro-settings-master-data/components/FlightLogsFilters';
+import { AircraftLeadsManager, type AircraftLeadsTab } from './amro-settings-master-data/components/AircraftLeadsManager';
 
 export { buildPayloadFromForm } from './amro-settings-master-data/utils';
 export { verifyReferenceExists } from './amro-settings-master-data/services';
@@ -949,12 +950,16 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   const [aircraftDashboardStatusFilter, setAircraftDashboardStatusFilter] = useState<'all' | 'active' | 'maintenance' | 'grounded'>('all');
   const [aircraftDashboardDueWindowDays, setAircraftDashboardDueWindowDays] = useState<(typeof AIRCRAFT_DASHBOARD_DUE_WINDOW_OPTIONS)[number]>('30');
   const [aircraftDashboardTrendDays, setAircraftDashboardTrendDays] = useState<'7' | '14' | '30'>('14');
+  const [aircraftLeadsActiveTab, setAircraftLeadsActiveTab] = useState<AircraftLeadsTab>('list');
+  const [aircraftNavigationView, setAircraftNavigationView] = useState<'module' | AircraftLeadsTab>('module');
+  const [canOpenAircraftLeadDetail, setCanOpenAircraftLeadDetail] = useState(false);
   const [aircraftPresenceByRowId, setAircraftPresenceByRowId] = useState<Record<string, AircraftPresenceCollaborator[]>>({});
   const [aircraftPresenceLoading, setAircraftPresenceLoading] = useState(false);
   const [aircraftPresenceError, setAircraftPresenceError] = useState('');
   const aircraftPresenceCacheRef = useRef<{ key: string; fetchedAt: number; map: Record<string, AircraftPresenceCollaborator[]> } | null>(null);
   const clickDelayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const firstFieldRef = useRef<HTMLInputElement | null>(null);
+  const masterSearchFieldRef = useRef<HTMLInputElement | null>(null);
   const recordsRequestControllerRef = useRef<AbortController | null>(null);
   const recordsRequestIdRef = useRef(0);
   const rowsRenderSignatureRef = useRef('');
@@ -985,6 +990,8 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   const canScheduleWorkPackage = hasPermission('edit_aircraft_records');
   const canExportAircraftOps = hasPermission('delete_flight_logs');
   const canEscalateAircraftOps = hasPermission('approve_work_orders');
+  const canManageAircraftLeads = hasPermission('edit_aircraft_records') || hasPermission('create_maintenance_request');
+  const canDeleteAircraftLeads = hasPermission('approve_work_orders') || hasPermission('delete_flight_logs');
   const scope = useMemo(
     () => ({
       tenantId: context.tenantId,
@@ -994,6 +1001,30 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     [context.franchiseId, context.tenantId, context.userId],
   );
   const sessionAccessToken = useMemo(() => String(session?.access_token || '').trim(), [session?.access_token]);
+  const showAircraftLeadWorkspace =
+    entity === 'aircraft'
+    && aircraftEnhancementEnabled
+    && aircraftNavigationView !== 'module';
+  const showAircraftMasterRecords = !showAircraftLeadWorkspace;
+  const handleAircraftViewNavigation = useCallback((tab: AircraftLeadsTab) => {
+    if (tab === 'list') {
+      setAircraftLeadsActiveTab(tab);
+      setAircraftNavigationView('module');
+      window.requestAnimationFrame(() => {
+        masterSearchFieldRef.current?.focus();
+      });
+      return;
+    }
+    setAircraftLeadsActiveTab(tab);
+    setAircraftNavigationView(tab);
+  }, []);
+
+  useEffect(() => {
+    if (entity !== 'aircraft') {
+      setAircraftNavigationView('module');
+      setAircraftLeadsActiveTab('list');
+    }
+  }, [entity]);
   const trackWorkPackageTemplateAdoption = useCallback(
     (event: string, details: Record<string, unknown> = {}) => {
       const payload = {
@@ -3694,6 +3725,37 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         ) : null}
 
         {entity === 'aircraft' && aircraftEnhancementEnabled ? (
+          <div className="flex flex-wrap gap-2 rounded-md border border-[hsl(var(--mdm-template-border))] bg-muted/10 p-2">
+            {([
+              ['pipeline', 'Pipeline'],
+              ['list', 'List'],
+              ['grid', 'Grid'],
+              ['card', 'Card'],
+              ['analytics', 'Analytics'],
+              ['import_export', 'Import/Export'],
+              ['detail', 'Detail'],
+              ['wizard', 'Wizard'],
+            ] as const).map(([value, label]) => {
+              const isActive = value === 'list'
+                ? aircraftNavigationView === 'module'
+                : aircraftNavigationView === value;
+              return (
+                <Button
+                  key={value}
+                  type="button"
+                  variant={isActive ? 'default' : 'outline'}
+                  size="sm"
+                  className="h-8"
+                  onClick={() => handleAircraftViewNavigation(value)}
+                  disabled={value === 'detail' && !canOpenAircraftLeadDetail}
+                >
+                  {label}
+                </Button>
+              );
+            })}
+          </div>
+        ) : null}
+        {entity === 'aircraft' && aircraftEnhancementEnabled ? (
           <Card className="mdm-template-panel">
             <CardHeader className="mdm-template-panel-head">
               <CardTitle className="mdm-template-panel-title">Aircraft Operations Snapshot</CardTitle>
@@ -3824,127 +3886,21 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                   );
                 })}
               </div>
-              <div className="space-y-3 rounded-md border border-[hsl(var(--mdm-template-border))] p-4">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h3 className="text-[14px] font-semibold text-[hsl(var(--mdm-template-heading))]">Lead Dashboard</h3>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Input
-                      value={aircraftDashboardSearch}
-                      onChange={(event) => setAircraftDashboardSearch(event.target.value)}
-                      placeholder="Search maintenance or defects"
-                      className="h-8 w-[220px] text-[12px]"
-                    />
-                    <Select value={aircraftDashboardStatusFilter} onValueChange={(value) => setAircraftDashboardStatusFilter(value as 'all' | 'active' | 'maintenance' | 'grounded')}>
-                      <SelectTrigger className="h-8 w-[130px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All status</SelectItem>
-                        <SelectItem value="active">Active</SelectItem>
-                        <SelectItem value="maintenance">Maintenance</SelectItem>
-                        <SelectItem value="grounded">Grounded</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Select value={aircraftDashboardDueWindowDays} onValueChange={(value) => setAircraftDashboardDueWindowDays(value as (typeof AIRCRAFT_DASHBOARD_DUE_WINDOW_OPTIONS)[number])}>
-                      <SelectTrigger className="h-8 w-[130px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {AIRCRAFT_DASHBOARD_DUE_WINDOW_OPTIONS.map((value) => (
-                          <SelectItem key={value} value={value}>
-                            Due {value} days
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Select value={aircraftDashboardTrendDays} onValueChange={(value) => setAircraftDashboardTrendDays(value as '7' | '14' | '30')}>
-                      <SelectTrigger className="h-8 w-[130px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="7">Trend 7d</SelectItem>
-                        <SelectItem value="14">Trend 14d</SelectItem>
-                        <SelectItem value="30">Trend 30d</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                {aircraftDashboardError ? (
-                  <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-700">{aircraftDashboardError}</div>
-                ) : null}
-                <div className="grid gap-2 md:grid-cols-4">
-                  <div className="rounded-md bg-muted/40 p-2 text-[12px]">Fleet Size: <span className="font-semibold">{aircraftDashboardKpis.fleet_size || DEFAULT_AIRCRAFT_DASHBOARD_KPIS.fleet_size}</span></div>
-                  <div className="rounded-md bg-muted/40 p-2 text-[12px]">Open Packages: <span className="font-semibold">{aircraftDashboardKpis.open_work_packages || DEFAULT_AIRCRAFT_DASHBOARD_KPIS.open_work_packages}</span></div>
-                  <div className="rounded-md bg-muted/40 p-2 text-[12px]">Open Defects: <span className="font-semibold">{aircraftDashboardKpis.open_defects || DEFAULT_AIRCRAFT_DASHBOARD_KPIS.open_defects}</span></div>
-                  <div className="rounded-md bg-muted/40 p-2 text-[12px]">Compliance: <span className="font-semibold">{aircraftDashboardKpis.compliance_ready_pct || DEFAULT_AIRCRAFT_DASHBOARD_KPIS.compliance_ready_pct}%</span></div>
-                </div>
-                <div className="grid gap-3 xl:grid-cols-2">
-                  <div className="rounded-md border border-[hsl(var(--mdm-template-border))] p-2">
-                    <p className="mb-1 text-[12px] font-medium text-[hsl(var(--mdm-template-heading))]">Flight Hours & Cycles</p>
-                    <div className="h-[220px] w-full" aria-busy={aircraftDashboardLoading}>
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={aircraftDashboardFlightHoursTrend}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="day" />
-                          <YAxis />
-                          <RechartsTooltip />
-                          <Line type="monotone" dataKey="flight_hours" stroke="#0ea5a6" strokeWidth={2} dot={false} />
-                          <Line type="monotone" dataKey="cycles" stroke="#1d4ed8" strokeWidth={2} dot={false} />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
-                  <div className="rounded-md border border-[hsl(var(--mdm-template-border))] p-2">
-                    <p className="mb-1 text-[12px] font-medium text-[hsl(var(--mdm-template-heading))]">Defect Open vs Resolved</p>
-                    <div className="h-[220px] w-full" aria-busy={aircraftDashboardLoading}>
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={aircraftDashboardDefectTrend}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="day" />
-                          <YAxis />
-                          <RechartsTooltip />
-                          <Bar dataKey="opened" fill="#f59e0b" radius={[4, 4, 0, 0]} />
-                          <Bar dataKey="resolved" fill="#10b981" radius={[4, 4, 0, 0]} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
-                </div>
-                <div className="grid gap-3 xl:grid-cols-2">
-                  <div className="rounded-md border border-[hsl(var(--mdm-template-border))] p-2">
-                    <p className="mb-1 text-[12px] font-medium text-[hsl(var(--mdm-template-heading))]">Maintenance Due Window</p>
-                    <div className="h-[200px] w-full" aria-busy={aircraftDashboardLoading}>
-                      <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={aircraftDashboardMaintenanceRows}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="work_package_number" />
-                          <YAxis />
-                          <RechartsTooltip />
-                          <Area type="monotone" dataKey="due_in_days" stroke="#9333ea" fill="#ddd6fe" />
-                        </AreaChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
-                  <div className="rounded-md border border-[hsl(var(--mdm-template-border))] p-2">
-                    <p className="mb-1 text-[12px] font-medium text-[hsl(var(--mdm-template-heading))]">Defect Tracker</p>
-                    <div className="space-y-2 text-[12px]">
-                      {aircraftDashboardDefectRows.length > 0 ? (
-                        aircraftDashboardDefectRows.map((row, index) => (
-                          <div key={`${String(row.id || row.title || index)}`} className="flex items-center justify-between rounded bg-muted/30 px-2 py-1">
-                            <span className="truncate pr-2">{String(row.title || 'Defect')}</span>
-                            <span className="text-[hsl(var(--mdm-template-muted))]">{String(row.severity || 'medium')} · {String(row.status || 'open')}</span>
-                          </div>
-                        ))
-                      ) : (
-                        <p className="text-[hsl(var(--mdm-template-muted))]">No defect records for the selected filters.</p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
             </CardContent>
           </Card>
         ) : null}
+        {showAircraftLeadWorkspace ? (
+          <AircraftLeadsManager
+            scope={scope}
+            sessionAccessToken={sessionAccessToken}
+            canManage={canManageAircraftLeads}
+            canDelete={canDeleteAircraftLeads}
+            activeTab={aircraftLeadsActiveTab}
+            onActiveTabChange={setAircraftLeadsActiveTab}
+            onDetailAvailabilityChange={setCanOpenAircraftLeadDetail}
+          />
+        ) : null}
+        {showAircraftMasterRecords ? (
         <Card className="mdm-template-panel">
           <CardHeader className="mdm-template-panel-head">
             <CardTitle className="mdm-template-panel-title">{ENTITY_LABEL[entity]} Search and Filter</CardTitle>
@@ -3952,7 +3908,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
           <CardContent className="mdm-template-panel-body mdm-template-grid-five">
             <div className="space-y-2 md:col-span-2">
               <Label htmlFor="amro-master-search" className="mdm-template-label">Search</Label>
-              <Input id="amro-master-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search..." className="mdm-template-input" />
+              <Input ref={masterSearchFieldRef} id="amro-master-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search..." className="mdm-template-input" />
             </div>
             <div className="space-y-2">
               <Label className="mdm-template-label">Status</Label>
@@ -3998,7 +3954,9 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
             ) : null}
           </CardContent>
         </Card>
+        ) : null}
 
+        {showAircraftMasterRecords ? (
         <Card className="mdm-template-panel">
           <CardHeader className="mdm-template-panel-head">
             <CardTitle className="mdm-template-panel-title">{ENTITY_LABEL[entity]} Records</CardTitle>
@@ -4265,6 +4223,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
             </div>
           </CardContent>
         </Card>
+        ) : null}
 
         <div className="grid gap-4">
           <Card className="mdm-template-panel">

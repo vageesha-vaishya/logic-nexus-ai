@@ -756,15 +756,27 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
   });
 
-  it('does not render aircraft leads workspace in aircraft module header or body', async () => {
+  it('renders aircraft navigation view buttons without duplicates and supports search-oriented list behavior', async () => {
     renderAircraftPage();
 
     await screen.findByText('Aircraft Operations Snapshot');
-    expect(screen.queryByText('Aircraft Leads Workspace')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Pipeline' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Import/Export' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Wizard' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'New Lead' })).not.toBeInTheDocument();
+
+    expect(screen.getAllByRole('button', { name: 'Pipeline' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'List' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'Grid' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'Card' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'Analytics' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'Import/Export' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'Wizard' })).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Pipeline' }));
+    expect(await screen.findByText('Aircraft Leads Workspace')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'List' }));
+    await waitFor(() => {
+      expect(screen.queryByText('Aircraft Leads Workspace')).not.toBeInTheDocument();
+    }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
+    expect(screen.getByLabelText('Search')).toHaveFocus();
   });
 
   it('supports aircraft column filtering and row selection controls', async () => {
