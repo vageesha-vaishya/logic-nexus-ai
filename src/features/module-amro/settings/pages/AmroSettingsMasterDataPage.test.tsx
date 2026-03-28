@@ -80,8 +80,30 @@ vi.mock('@/components/ui/dropdown-menu', () => {
     DropdownMenu: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
     DropdownMenuTrigger: ({ children, ...props }: { children: React.ReactNode }) => renderTrigger(children, props),
     DropdownMenuContent: ({ children }: { children: React.ReactNode }) => <div role="menu">{children}</div>,
+    DropdownMenuLabel: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    DropdownMenuSeparator: () => <hr />,
     DropdownMenuItem: ({ children, onClick, onSelect }: { children: React.ReactNode; onClick?: () => void; onSelect?: () => void }) => (
       <button type="button" role="menuitem" onClick={() => { onSelect?.(); onClick?.(); }}>
+        {children}
+      </button>
+    ),
+    DropdownMenuCheckboxItem: (
+      {
+        children,
+        checked,
+        onCheckedChange,
+        onSelect,
+      }: { children: React.ReactNode; checked?: boolean; onCheckedChange?: (checked: boolean) => void; onSelect?: (event: { preventDefault: () => void }) => void },
+    ) => (
+      <button
+        type="button"
+        role="menuitemcheckbox"
+        aria-checked={checked ? 'true' : 'false'}
+        onClick={() => {
+          onSelect?.({ preventDefault: () => undefined });
+          onCheckedChange?.(!checked);
+        }}
+      >
         {children}
       </button>
     ),
@@ -774,6 +796,42 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
       expect(screen.queryByText('Aircraft Leads Workspace')).not.toBeInTheDocument();
     }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
     expect(screen.getByLabelText('Search')).toHaveFocus();
+  });
+
+  it('adds a New action in aircraft header navigation and opens create modal', async () => {
+    renderAircraftPage();
+
+    const newButton = await screen.findByRole('button', { name: /New aircraft record/i });
+    fireEvent.click(newButton);
+
+    expect(await screen.findByRole('heading', { name: 'Create Aircraft' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument();
+  });
+
+  it('allows selecting aircraft fields and persists selected columns', async () => {
+    const firstRender = renderAircraftPage();
+
+    await screen.findByText('N100AA');
+    expect(await screen.findByRole('columnheader', { name: /Owner/i })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Select aircraft fields/i }));
+    fireEvent.click(await screen.findByRole('menuitemcheckbox', { name: 'Owner' }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole('columnheader', { name: /Owner/i })).not.toBeInTheDocument();
+    }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
+
+    const storageKey = 'amro:aircraft-visible-columns:tenant-1:franchise-1';
+    const storedValue = localStorage.getItem(storageKey);
+    expect(storedValue).not.toBeNull();
+    expect(storedValue).not.toContain('owner_name');
+
+    firstRender.unmount();
+    renderAircraftPage();
+    await screen.findByText('N100AA');
+    await waitFor(() => {
+      expect(screen.queryByRole('columnheader', { name: /Owner/i })).not.toBeInTheDocument();
+    }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
   });
 
   it('supports aircraft column filtering and row selection controls', async () => {

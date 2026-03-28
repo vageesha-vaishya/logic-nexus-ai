@@ -26,8 +26,11 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
@@ -58,6 +61,7 @@ import {
   ListChecks,
   Plus,
   RefreshCw,
+  SlidersHorizontal,
   TimerReset,
   Trash2,
   Users,
@@ -966,6 +970,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   const [aircraftPresenceLoading, setAircraftPresenceLoading] = useState(false);
   const [aircraftPresenceError, setAircraftPresenceError] = useState('');
   const aircraftPresenceCacheRef = useRef<{ key: string; fetchedAt: number; map: Record<string, AircraftPresenceCollaborator[]> } | null>(null);
+  const aircraftColumnPreferencesHydratedRef = useRef(false);
   const clickDelayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const firstFieldRef = useRef<HTMLInputElement | null>(null);
   const masterSearchFieldRef = useRef<HTMLInputElement | null>(null);
@@ -1010,6 +1015,11 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     [context.franchiseId, context.tenantId, context.userId],
   );
   const sessionAccessToken = useMemo(() => String(session?.access_token || '').trim(), [session?.access_token]);
+  const aircraftColumnPreferenceStorageKey = useMemo(
+    () => `amro:aircraft-visible-columns:${scope.tenantId || 'tenant'}:${scope.franchiseId || 'franchise'}`,
+    [scope.franchiseId, scope.tenantId],
+  );
+  const [aircraftSelectedColumns, setAircraftSelectedColumns] = useState<string[]>([]);
   const aircraftSubModuleSegment = useMemo(() => {
     if (!isAircraftSubModule) {
       return 'list';
@@ -2199,7 +2209,116 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   const renderedRowIds = useMemo(() => renderedRows.map((row) => row.id), [renderedRows]);
   const renderedRowIdSet = useMemo(() => new Set(renderedRowIds), [renderedRowIds]);
 
-  const aircraftHeaderColumns = useMemo(() => tableColumns, [tableColumns]);
+  const aircraftHeaderColumns = useMemo(() => {
+    const availableColumns = new Set(tableColumns);
+    const selectedColumns = (aircraftSelectedColumns.length > 0 ? aircraftSelectedColumns : tableColumns)
+      .filter((column) => availableColumns.has(column));
+    if (selectedColumns.length === 0) {
+      return tableColumns;
+    }
+    return tableColumns.filter((column) => selectedColumns.includes(column));
+  }, [aircraftSelectedColumns, tableColumns]);
+  const aircraftColumnSelectionSet = useMemo(() => new Set(aircraftHeaderColumns), [aircraftHeaderColumns]);
+
+  useEffect(() => {
+    if (entity === 'aircraft') {
+      return;
+    }
+    aircraftColumnPreferencesHydratedRef.current = false;
+    setAircraftSelectedColumns([]);
+  }, [entity]);
+
+  useEffect(() => {
+    if (entity !== 'aircraft') {
+      return;
+    }
+    if (tableColumns.length === 0) {
+      return;
+    }
+    setAircraftSelectedColumns((previous) => {
+      const availableColumns = new Set(tableColumns);
+      if (!aircraftColumnPreferencesHydratedRef.current) {
+        aircraftColumnPreferencesHydratedRef.current = true;
+        try {
+          const raw = localStorage.getItem(aircraftColumnPreferenceStorageKey);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) {
+              const normalized = parsed
+                .map((value) => String(value))
+                .filter((column) => availableColumns.has(column));
+              if (normalized.length > 0) {
+                return tableColumns.filter((column) => normalized.includes(column));
+              }
+            }
+          }
+        } catch (error) {
+          logger.warn('Unable to load aircraft column preferences', {
+            component: 'AmroSettingsMasterDataPage',
+            error: String((error as Error)?.message || error),
+          });
+        }
+        return [...tableColumns];
+      }
+      const normalizedPrevious = (previous.length > 0 ? previous : tableColumns).filter((column) => availableColumns.has(column));
+      if (normalizedPrevious.length > 0) {
+        return normalizedPrevious;
+      }
+      return [...tableColumns];
+    });
+  }, [aircraftColumnPreferenceStorageKey, entity, tableColumns]);
+
+  useEffect(() => {
+    if (entity !== 'aircraft') {
+      return;
+    }
+    if (!aircraftColumnPreferencesHydratedRef.current) {
+      return;
+    }
+    if (aircraftHeaderColumns.length === 0) {
+      return;
+    }
+    try {
+      localStorage.setItem(aircraftColumnPreferenceStorageKey, JSON.stringify(aircraftHeaderColumns));
+    } catch (error) {
+      logger.warn('Unable to persist aircraft column preferences', {
+        component: 'AmroSettingsMasterDataPage',
+        error: String((error as Error)?.message || error),
+      });
+    }
+  }, [aircraftColumnPreferenceStorageKey, aircraftHeaderColumns, entity]);
+
+  const handleAircraftColumnToggle = useCallback(
+    (column: string, checked: boolean) => {
+      if (!tableColumns.includes(column)) {
+        return;
+      }
+      setAircraftSelectedColumns((previous) => {
+        const normalizedPrevious = previous.length > 0 ? previous : [...tableColumns];
+        if (checked) {
+          if (normalizedPrevious.includes(column)) {
+            return normalizedPrevious;
+          }
+          const nextSet = new Set([...normalizedPrevious, column]);
+          return tableColumns.filter((item) => nextSet.has(item));
+        }
+        if (!normalizedPrevious.includes(column)) {
+          return normalizedPrevious;
+        }
+        const next = normalizedPrevious.filter((item) => item !== column);
+        if (next.length === 0) {
+          toast.error('At least one field must remain selected');
+          return normalizedPrevious;
+        }
+        return next;
+      });
+    },
+    [tableColumns],
+  );
+
+  const resetAircraftColumnSelection = useCallback(() => {
+    setAircraftSelectedColumns([...tableColumns]);
+  }, [tableColumns]);
 
   useEffect(() => {
     if (entity !== 'aircraft') {
@@ -3722,19 +3841,17 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
           },
         },
       ];
-      if (entity !== 'aircraft') {
-        actions.push({
-          id: 'new-record',
-          label: `New ${ENTITY_LABEL[entity]}`,
-          icon: <Plus className="h-4 w-4" aria-hidden="true" />,
-          group: 'primary',
-          loading: busyAction === 'create',
-          ariaLabel: `New ${ENTITY_LABEL[entity]}`,
-          onAction: async () => {
-            handleOpenCreateModal();
-          },
-        });
-      }
+      actions.push({
+        id: 'new-record',
+        label: entity === 'aircraft' ? 'New' : `New ${ENTITY_LABEL[entity]}`,
+        icon: <Plus className="h-4 w-4" aria-hidden="true" />,
+        group: 'primary',
+        loading: busyAction === 'create',
+        ariaLabel: entity === 'aircraft' ? 'New aircraft record' : `New ${ENTITY_LABEL[entity]}`,
+        onAction: async () => {
+          handleOpenCreateModal();
+        },
+      });
       return actions;
     },
     [busyAction, entity, handleExport, handleExportPdf, handleOpenCreateModal, loadRecords, loading],
@@ -4040,7 +4157,45 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         {showAircraftMasterRecords ? (
         <Card className="mdm-template-panel">
           <CardHeader className="mdm-template-panel-head">
-            <CardTitle className="mdm-template-panel-title">{ENTITY_LABEL[entity]} Records</CardTitle>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <CardTitle className="mdm-template-panel-title">{ENTITY_LABEL[entity]} Records</CardTitle>
+              {entity === 'aircraft' ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button type="button" variant="outline" size="sm" className="h-8 w-full sm:w-auto" aria-label="Select aircraft fields">
+                      <SlidersHorizontal className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+                      Fields
+                      <Badge variant="secondary" className="ml-2 px-1.5 py-0 text-[10px]">
+                        {aircraftHeaderColumns.length}/{tableColumns.length}
+                      </Badge>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-[280px]">
+                    <DropdownMenuLabel>Select visible fields</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    {tableColumns.map((column) => (
+                      <DropdownMenuCheckboxItem
+                        key={`aircraft-column-${column}`}
+                        checked={aircraftColumnSelectionSet.has(column)}
+                        onCheckedChange={(checked) => handleAircraftColumnToggle(column, Boolean(checked))}
+                        onSelect={(event) => event.preventDefault()}
+                      >
+                        {getColumnLabel(column)}
+                      </DropdownMenuCheckboxItem>
+                    ))}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onSelect={(event) => {
+                        event.preventDefault();
+                        resetAircraftColumnSelection();
+                      }}
+                    >
+                      Reset to default fields
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : null}
+            </div>
           </CardHeader>
           <CardContent className="mdm-template-panel-body space-y-3">
             <div className="overflow-auto rounded-md border max-h-[560px]">
