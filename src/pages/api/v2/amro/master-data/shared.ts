@@ -4,6 +4,7 @@ import { getSupabaseAdminClient } from '../../../_utils/supabaseAdmin';
 
 export type AmroMasterDataEntity =
   | 'aircraft'
+  | 'aircraft_template'
   | 'flight_logs'
   | 'parts_inventory'
   | 'suppliers'
@@ -300,6 +301,24 @@ const ENTITY_CONFIG: Record<AmroMasterDataEntity, EntityConfig> = {
       'scope_json',
       'tasks_json',
       'policy_snapshot_id',
+    ],
+    defaultSortColumn: 'updated_at',
+  },
+  aircraft_template: {
+    table: 'aircraft_template',
+    searchableColumns: ['template_name', 'aircraft_type', 'manufacturer', 'aircraft_model', 'maintenance_program'],
+    listColumns:
+      'id,tenant_id,template_name,aircraft_type,manufacturer,manufacturer_id,aircraft_model,maintenance_program,revision_number,amendment_number,created_at,updated_at',
+    requiredCreateFields: ['template_name', 'aircraft_type'],
+    writeAllowedFields: [
+      'template_name',
+      'aircraft_type',
+      'manufacturer',
+      'manufacturer_id',
+      'aircraft_model',
+      'maintenance_program',
+      'revision_number',
+      'amendment_number',
     ],
     defaultSortColumn: 'updated_at',
   },
@@ -627,6 +646,19 @@ function normalizeWorkPackageTemplate(payload: Record<string, unknown>) {
   };
 }
 
+function normalizeAircraftTemplate(payload: Record<string, unknown>) {
+  return {
+    template_name: asString(payload.template_name),
+    aircraft_type: asString(payload.aircraft_type),
+    manufacturer: asNullableString(payload.manufacturer),
+    manufacturer_id: asNullableString(payload.manufacturer_id),
+    aircraft_model: asNullableString(payload.aircraft_model),
+    maintenance_program: asNullableString(payload.maintenance_program),
+    revision_number: asNullableString(payload.revision_number),
+    amendment_number: asNullableString(payload.amendment_number),
+  };
+}
+
 export function normalizePayload(entity: AmroMasterDataEntity, payload: Record<string, unknown>) {
   if (entity === 'aircraft') return normalizeAircraft(payload);
   if (entity === 'flight_logs') return normalizeFlightLog(payload);
@@ -640,6 +672,7 @@ export function normalizePayload(entity: AmroMasterDataEntity, payload: Record<s
   if (entity === 'assembly_models') return normalizeAssemblyModel(payload);
   if (entity === 'regulator_profiles') return normalizeRegulatorProfile(payload);
   if (entity === 'shift_calendars') return normalizeShiftCalendar(payload);
+  if (entity === 'aircraft_template') return normalizeAircraftTemplate(payload);
   return normalizeWorkPackageTemplate(payload);
 }
 

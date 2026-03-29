@@ -22,6 +22,7 @@ type AirportRecord = {
 
 type MasterEntity =
   | 'aircraft'
+  | 'aircraft_template'
   | 'flight_logs'
   | 'parts_inventory'
   | 'suppliers'
@@ -86,6 +87,24 @@ const ENTITY_CONFIG: Record<MasterEntity, EntityConfig> = {
       'current_cycles_since_new',
     ],
     defaultSortColumn: 'updated_at',
+  },
+  aircraft_template: {
+    table: 'aircraft_template',
+    searchableColumns: ['template_name', 'aircraft_type', 'manufacturer', 'aircraft_model', 'maintenance_program'],
+    listColumns:
+      'id,tenant_id,franchise_id,template_name,aircraft_type,manufacturer,manufacturer_id,aircraft_model,maintenance_program,revision_number,amendment_number,created_at,updated_at,created_by,updated_by',
+    requiredCreateFields: ['template_name', 'aircraft_type'],
+    writeAllowedFields: [
+      'template_name',
+      'aircraft_type',
+      'manufacturer',
+      'manufacturer_id',
+      'aircraft_model',
+      'maintenance_program',
+      'revision_number',
+      'amendment_number',
+    ],
+    defaultSortColumn: 'template_name',
   },
   flight_logs: {
     table: 'flight_logs',
@@ -766,8 +785,22 @@ function normalizeWorkPackageTemplate(payload: JsonRecord): JsonRecord {
   };
 }
 
+function normalizeAircraftTemplate(payload: JsonRecord): JsonRecord {
+  return {
+    template_name: asString(payload.template_name),
+    aircraft_type: asString(payload.aircraft_type),
+    manufacturer: asNullableString(payload.manufacturer),
+    manufacturer_id: asNullableString(payload.manufacturer_id),
+    aircraft_model: asNullableString(payload.aircraft_model),
+    maintenance_program: asNullableString(payload.maintenance_program),
+    revision_number: asNullableString(payload.revision_number),
+    amendment_number: asNullableString(payload.amendment_number),
+  };
+}
+
 function normalizePayload(entity: MasterEntity, payload: JsonRecord): JsonRecord {
   if (entity === 'aircraft') return normalizeAircraft(payload);
+  if (entity === 'aircraft_template') return normalizeAircraftTemplate(payload);
   if (entity === 'flight_logs') return normalizeFlightLog(payload);
   if (entity === 'parts_inventory') return normalizePartsInventory(payload);
   if (entity === 'suppliers') return normalizeSupplier(payload);

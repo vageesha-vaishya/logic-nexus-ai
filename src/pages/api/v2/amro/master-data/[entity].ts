@@ -809,6 +809,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       for (let attempt = 0; attempt < 8; attempt += 1) {
         const selectClause = getSelectClause(entity, entityConfig.listColumns);
         const searchableColumns = getActiveSearchableColumns(entity, entityConfig.searchableColumns);
+        const supportsFranchiseScope = getActiveColumns(entity, entityConfig.listColumns).includes('franchise_id');
         let query = supabase
           .from(entityConfig.table)
           .select(selectClause, { count: 'exact' })
@@ -826,7 +827,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
           if (registrationAircraftIds.length > 0) query = query.in('aircraft_id', registrationAircraftIds);
         }
 
-        if (franchiseId) {
+        if (franchiseId && supportsFranchiseScope) {
           query = query.or(`franchise_id.is.null,franchise_id.eq.${franchiseId}`);
         }
         if (search && !franchiseId && searchableColumns.length) {
@@ -866,6 +867,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         for (let attempt = 0; attempt < 4; attempt += 1) {
           const selectClause = getSelectClause(entity, entityConfig.listColumns);
           const searchableColumns = getActiveSearchableColumns(entity, entityConfig.searchableColumns);
+          const supportsFranchiseScope = getActiveColumns(entity, entityConfig.listColumns).includes('franchise_id');
           let fallbackQuery: any = supabase
             .from(entityConfig.table)
             .select(selectClause, { count: 'exact' })
@@ -886,7 +888,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
             if (flightLogFilters?.flightNumber) fallbackQuery = fallbackQuery.ilike('flight_number', `%${flightLogFilters.flightNumber}%`);
             if (registrationAircraftIds.length > 0) fallbackQuery = fallbackQuery.in('aircraft_id', registrationAircraftIds);
           }
-          if (franchiseId) {
+          if (franchiseId && supportsFranchiseScope) {
             if (typeof fallbackQuery.is === 'function') {
               fallbackQuery = fallbackQuery.is('franchise_id', null);
             } else {
@@ -1022,12 +1024,18 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       if (invalidRows.length > 0) {
         throw new HttpError(`Validation failed for ${invalidRows.length} record(s)`, 422);
       }
-      const insertRows = prepared.map((record) => ({
-        ...record,
-        tenant_id: tenantId,
-        franchise_id: franchiseId,
-        updated_by: auth.userId,
-      }));
+      const supportsFranchiseScope = splitColumns(entityConfig.listColumns).includes('franchise_id');
+      const insertRows = prepared.map((record) => {
+        const insertRow: Record<string, unknown> = {
+          ...record,
+          tenant_id: tenantId,
+          updated_by: auth.userId,
+        };
+        if (supportsFranchiseScope) {
+          insertRow.franchise_id = franchiseId;
+        }
+        return insertRow;
+      });
       const { data, error } = await supabase
         .from(entityConfig.table)
         .insert(insertRows)
@@ -1109,13 +1117,16 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       });
       return;
     }
-    const insertPayload = {
+    const supportsFranchiseScope = splitColumns(entityConfig.listColumns).includes('franchise_id');
+    const insertPayload: Record<string, unknown> = {
       ...payload,
       tenant_id: tenantId,
-      franchise_id: franchiseId,
       created_by: auth.userId,
       updated_by: auth.userId,
     };
+    if (supportsFranchiseScope) {
+      insertPayload.franchise_id = franchiseId;
+    }
     const { data, error } = await supabase
       .from(entityConfig.table)
       .insert(insertPayload)
