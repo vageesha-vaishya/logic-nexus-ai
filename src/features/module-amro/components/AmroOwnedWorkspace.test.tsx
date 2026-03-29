@@ -1,12 +1,94 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { AmroOwnedWorkspace } from './AmroOwnedWorkspace';
 
 const mockUseAmroWorkspaceState = vi.fn();
+const mockScopedDbFrom = vi.fn();
 
 vi.mock('../hooks/useAmroWorkspaceState', () => ({
   useAmroWorkspaceState: () => mockUseAmroWorkspaceState(),
 }));
+
+vi.mock('@/hooks/useCRM', () => ({
+  useCRM: () => ({
+    scopedDb: {
+      from: (...args: unknown[]) => mockScopedDbFrom(...args),
+    },
+  }),
+}));
+
+const buildQueryMock = (payload: unknown) => ({
+  select: vi.fn().mockReturnThis(),
+  order: vi.fn().mockReturnThis(),
+  eq: vi.fn().mockReturnThis(),
+  limit: vi.fn().mockResolvedValue(payload),
+});
+
+beforeEach(() => {
+  mockUseAmroWorkspaceState.mockReset();
+  mockScopedDbFrom.mockReset();
+  mockScopedDbFrom.mockImplementation((table: string) => {
+    if (table === 'aircraft') {
+      return buildQueryMock({
+        data: [
+          {
+            id: 'ac-1',
+            registration: 'N123AB',
+            serial_number: 'SN-001',
+            aircraft_model: 'A320-200',
+            aircraft_type: 'Narrow Body',
+            operator_code: 'OPS',
+            owner_name: 'Tenant Airline',
+            station_code: 'DXB',
+            status: 'active',
+            current_flight_hours: 12543,
+            current_cycles: 6501,
+          },
+        ],
+        error: null,
+      });
+    }
+    if (table === 'maintenance_tasks') {
+      return buildQueryMock({
+        data: [
+          {
+            id: 'mt-1',
+            code_form_no: 'TASK-001',
+            description: 'A320 engine borescope inspection',
+            interval_hours: 500,
+            interval_cycles: null,
+            interval_months: null,
+            estimated_man_hours: 8,
+            category_code: 'ENG',
+            revision_status: 'released',
+          },
+          {
+            id: 'mt-2',
+            code_form_no: 'TASK-002',
+            description: 'A320 avionics operational check',
+            interval_hours: null,
+            interval_cycles: 200,
+            interval_months: null,
+            estimated_man_hours: 3,
+            category_code: 'AVN',
+            revision_status: 'released',
+          },
+        ],
+        error: null,
+      });
+    }
+    if (table === 'aircraft_maintenance_tasks') {
+      return buildQueryMock({
+        data: [],
+        error: null,
+      });
+    }
+    return buildQueryMock({
+      data: [],
+      error: null,
+    });
+  });
+});
 
 function createWorkspaceState(overrides: Record<string, unknown> = {}) {
   return {
@@ -275,24 +357,94 @@ describe('AmroOwnedWorkspace', () => {
     expect(screen.queryByText('Work Packages Redesign Baseline')).toBeNull();
   });
 
-  it('validates and submits add work package dialog flow', async () => {
+  it('validates and submits work package creation flow with aircraft-first gating', async () => {
     const createWorkPackage = vi.fn().mockResolvedValue(true);
     mockUseAmroWorkspaceState.mockReturnValue(createWorkspaceState({ createWorkPackage }));
     render(<AmroOwnedWorkspace moduleKey="work-packages" />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Add WP' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
-    expect(screen.getByText('Work package details is required.')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Review' }));
+    expect(screen.getByText('Aircraft is required before task selection.')).toBeTruthy();
     expect(createWorkPackage).toHaveBeenCalledTimes(0);
 
+    fireEvent.click(screen.getByRole('button', { name: /A320-200/ }));
+    fireEvent.change(screen.getByLabelText('Package Number'), { target: { value: 'WP-A320-001' } });
+    fireEvent.change(screen.getByLabelText('Topic'), { target: { value: 'C-Check package for fleet A1' } });
     fireEvent.change(screen.getByLabelText('Work Package Details'), { target: { value: 'C-Check package for fleet A1' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Select all valid' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Review' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Submit' }));
     await waitFor(() => {
       expect(createWorkPackage).toHaveBeenCalledWith('C-Check package for fleet A1', expect.objectContaining({
+        aircraftId: 'ac-1',
         maintenanceType: 'line',
         priority: 'medium',
+        taskPlan: expect.arrayContaining(['mt-1', 'mt-2']),
       }));
     });
+  });
+
+  it('disables duplicate task selections for selected aircraft', async () => {
+    mockScopedDbFrom.mockImplementation((table: string) => {
+      if (table === 'aircraft') {
+        return buildQueryMock({
+          data: [
+            {
+              id: 'ac-1',
+              registration: 'N123AB',
+              serial_number: 'SN-001',
+              aircraft_model: 'A320-200',
+              aircraft_type: 'Narrow Body',
+              operator_code: 'OPS',
+              owner_name: 'Tenant Airline',
+              station_code: 'DXB',
+              status: 'active',
+              current_flight_hours: 12543,
+              current_cycles: 6501,
+            },
+          ],
+          error: null,
+        });
+      }
+      if (table === 'maintenance_tasks') {
+        return buildQueryMock({
+          data: [
+            {
+              id: 'mt-1',
+              code_form_no: 'TASK-001',
+              description: 'A320 engine borescope inspection',
+              interval_hours: 500,
+              interval_cycles: null,
+              interval_months: null,
+              estimated_man_hours: 8,
+              category_code: 'ENG',
+              revision_status: 'released',
+            },
+          ],
+          error: null,
+        });
+      }
+      if (table === 'aircraft_maintenance_tasks') {
+        return buildQueryMock({
+          data: [{ task_id: 'mt-1' }],
+          error: null,
+        });
+      }
+      return buildQueryMock({ data: [], error: null });
+    });
+    const createWorkPackage = vi.fn().mockResolvedValue(true);
+    mockUseAmroWorkspaceState.mockReturnValue(createWorkspaceState({ createWorkPackage }));
+    render(<AmroOwnedWorkspace moduleKey="work-packages" />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add WP' }));
+    fireEvent.click(screen.getByRole('button', { name: /A320-200/ }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Task already assigned to this aircraft.')).toBeTruthy();
+    });
+    const selectAllValid = screen.getByRole('button', { name: 'Select all valid' });
+    fireEvent.click(selectAllValid);
+    expect(screen.getByText('0 selected')).toBeTruthy();
   });
 
   it('shows UX-AMRO-005 detail tabs and side panel headings on work-packages route', () => {

@@ -281,6 +281,15 @@ type CreateWorkPackageOptions = {
   revision?: string;
   assignedRole?: string;
   workflowStatus?: 'planning' | 'scheduled' | 'in_progress' | 'blocked';
+  taskSnapshot?: Array<{
+    id: string;
+    taskNumber: string;
+    title: string;
+    dueBasis: string;
+    estimatedManHours: string;
+    category: string;
+  }>;
+  clientMetadata?: Record<string, unknown>;
 };
 
 async function parseJsonSafe<T>(response: Response): Promise<T | null> {
@@ -1834,6 +1843,8 @@ export function useAmroWorkspaceState() {
             revision: options?.revision || '1',
             assigned_role: options?.assignedRole || 'planner',
             workflow_status: options?.workflowStatus || 'planning',
+            task_snapshot: Array.isArray(options?.taskSnapshot) ? options.taskSnapshot : [],
+            client_metadata: options?.clientMetadata || {},
             idempotency_key: `wp-create-${now}`,
             decision_trace_id: `wp-create-${now}`,
             scope_context: {

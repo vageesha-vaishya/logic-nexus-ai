@@ -112,6 +112,15 @@ type AmroRoleVariant = {
 type WorkPackageCreateTab = 'wp' | 'besting_wp' | 'task_payload' | 'workflow';
 
 type WorkPackageCreateFormState = {
+  packageNumber: string;
+  topic: string;
+  locationStation: string;
+  planningDate: string;
+  remarks: string;
+  createdBy: string;
+  aircraftId: string;
+  selectedAircraftModel: string;
+  selectedAircraftSerialOrRegistration: string;
   workPackageDetails: string;
   revision: string;
   selectedTaskIds: string[];
@@ -124,6 +133,37 @@ type WorkPackageCreateFormState = {
 };
 
 type WorkPackageCreateFormErrors = Partial<Record<keyof WorkPackageCreateFormState, string>>;
+
+type WorkPackageCreateAircraftOption = {
+  id: string;
+  registration: string;
+  serialNumber: string;
+  aircraftModel: string;
+  aircraftType: string;
+  operatorCode: string;
+  ownerName: string;
+  stationCode: string;
+  status: string;
+  currentFlightHours: number;
+  currentCycles: number;
+};
+
+type WorkPackageCreateTaskOption = {
+  value: string;
+  taskNumber: string;
+  title: string;
+  dueBasis: string;
+  dueDate: string;
+  estimatedManHours: string;
+  status: string;
+  category: string;
+  modelTags: string[];
+};
+
+type TaskConflictInfo = {
+  taskId: string;
+  reason: string;
+};
 
 const amroRoleVariants: Record<AmroUxRole, AmroRoleVariant> = {
   technician: {
@@ -156,7 +196,17 @@ const amroRoleVariants: Record<AmroUxRole, AmroRoleVariant> = {
 const createDefaultWorkPackageCreateFormState = (): WorkPackageCreateFormState => {
   const start = new Date();
   const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+  const today = start.toISOString().slice(0, 10);
   return {
+    packageNumber: '',
+    topic: '',
+    locationStation: '',
+    planningDate: today,
+    remarks: '',
+    createdBy: 'planner',
+    aircraftId: '',
+    selectedAircraftModel: '',
+    selectedAircraftSerialOrRegistration: '',
     workPackageDetails: '',
     revision: '1',
     selectedTaskIds: [],
@@ -206,7 +256,15 @@ export function AmroOwnedWorkspace({
   const [workPackageCreateTab, setWorkPackageCreateTab] = useState<WorkPackageCreateTab>('wp');
   const [workPackageCreateForm, setWorkPackageCreateForm] = useState<WorkPackageCreateFormState>(() => createDefaultWorkPackageCreateFormState());
   const [workPackageCreateErrors, setWorkPackageCreateErrors] = useState<WorkPackageCreateFormErrors>({});
-  const [maintenanceTaskSelectionOptions, setMaintenanceTaskSelectionOptions] = useState<Array<{ value: string; label: string }>>([]);
+  const [maintenanceTaskSelectionOptions, setMaintenanceTaskSelectionOptions] = useState<WorkPackageCreateTaskOption[]>([]);
+  const [workPackageAircraftOptions, setWorkPackageAircraftOptions] = useState<WorkPackageCreateAircraftOption[]>([]);
+  const [aircraftSearchTerm, setAircraftSearchTerm] = useState('');
+  const [taskSearchTerm, setTaskSearchTerm] = useState('');
+  const [taskConflictById, setTaskConflictById] = useState<Record<string, TaskConflictInfo>>({});
+  const [taskSelectionLoading, setTaskSelectionLoading] = useState(false);
+  const [aircraftSelectionLoading, setAircraftSelectionLoading] = useState(false);
+  const [reviewSubmitDialogOpen, setReviewSubmitDialogOpen] = useState(false);
+  const [workPackageCreateSubmitting, setWorkPackageCreateSubmitting] = useState(false);
   const workPackageCreateDraftCacheRef = useRef<Map<WorkPackageCreateTab, WorkPackageCreateFormState>>(new Map());
   const workspaceLoadStartedAtRef = useRef(typeof performance !== 'undefined' ? performance.now() : Date.now());
   const workspaceLoadMetricPublishedRef = useRef(false);
@@ -464,36 +522,171 @@ export function AmroOwnedWorkspace({
   const stationOptions = ['all', ...Array.from(new Set(state.scheduleBoardRows.map((row) => row.station_code)))];
   useEffect(() => {
     let active = true;
-    const loadMaintenanceTaskSelectionOptions = async () => {
+    const loadAircraftSelectionOptions = async () => {
+      setAircraftSelectionLoading(true);
       const { data, error } = await scopedDb
-        .from('maintenance_tasks')
-        .select('id, code_form_no, description')
-        .order('code_form_no', { ascending: true })
+        .from('aircraft')
+        .select('id, registration, serial_number, aircraft_model, aircraft_type, operator_code, owner_name, station_code, status, current_flight_hours, current_cycles')
+        .order('registration', { ascending: true })
         .limit(500);
       if (!active) {
         return;
       }
       if (error) {
-        setMaintenanceTaskSelectionOptions([]);
+        setWorkPackageAircraftOptions([]);
+        setAircraftSelectionLoading(false);
         return;
       }
-      const options = ((data ?? []) as Array<{ id: string; code_form_no: string | null; description: string | null }>)
+      const options = ((data ?? []) as Array<{
+        id: string;
+        registration: string | null;
+        serial_number: string | null;
+        aircraft_model: string | null;
+        aircraft_type: string | null;
+        operator_code: string | null;
+        owner_name: string | null;
+        station_code: string | null;
+        status: string | null;
+        current_flight_hours: number | null;
+        current_cycles: number | null;
+      }>)
         .map((item) => {
-          const code = String(item.code_form_no || '').trim();
-          const description = String(item.description || '').trim();
-          const label = [code, description].filter((part) => part.length > 0).join(' · ') || item.id;
           return {
-            value: item.id,
-            label,
+            id: item.id,
+            registration: String(item.registration || '').trim(),
+            serialNumber: String(item.serial_number || '').trim(),
+            aircraftModel: String(item.aircraft_model || '').trim(),
+            aircraftType: String(item.aircraft_type || '').trim(),
+            operatorCode: String(item.operator_code || '').trim(),
+            ownerName: String(item.owner_name || '').trim(),
+            stationCode: String(item.station_code || '').trim(),
+            status: String(item.status || '').trim(),
+            currentFlightHours: Number(item.current_flight_hours || 0),
+            currentCycles: Number(item.current_cycles || 0),
           };
         });
-      setMaintenanceTaskSelectionOptions(options);
+      setWorkPackageAircraftOptions(options);
+      setAircraftSelectionLoading(false);
+    };
+    void loadAircraftSelectionOptions();
+    return () => {
+      active = false;
+    };
+  }, [scopedDb]);
+  useEffect(() => {
+    let active = true;
+    const loadMaintenanceTaskSelectionOptions = async () => {
+      if (!workPackageCreateForm.aircraftId) {
+        setMaintenanceTaskSelectionOptions([]);
+        setTaskConflictById({});
+        return;
+      }
+      setTaskSelectionLoading(true);
+      const { data, error } = await scopedDb
+        .from('maintenance_tasks')
+        .select('id, code_form_no, description, interval_hours, interval_cycles, interval_months, estimated_man_hours, category_code, revision_status')
+        .order('code_form_no', { ascending: true })
+        .limit(1000);
+      if (!active) {
+        return;
+      }
+      if (error) {
+        setMaintenanceTaskSelectionOptions([]);
+        setTaskSelectionLoading(false);
+        return;
+      }
+      const selectedModel = workPackageCreateForm.selectedAircraftModel.trim().toLowerCase();
+      const normalizedModelTokens = selectedModel.length > 0
+        ? selectedModel.split(/[\s/-]+/).map((token) => token.trim()).filter((token) => token.length >= 3)
+        : [];
+      const allOptions = ((data ?? []) as Array<{
+        id: string;
+        code_form_no: string | null;
+        description: string | null;
+        interval_hours: number | null;
+        interval_cycles: number | null;
+        interval_months: number | null;
+        estimated_man_hours: number | null;
+        category_code: string | null;
+        revision_status: string | null;
+      }>).map((item) => {
+        const taskNumber = String(item.code_form_no || '').trim() || item.id;
+        const title = String(item.description || '').trim() || 'Untitled Task';
+        const dueBasis = item.interval_hours
+          ? `FH ${item.interval_hours}`
+          : item.interval_cycles
+            ? `FC ${item.interval_cycles}`
+            : item.interval_months
+              ? `MO ${item.interval_months}`
+              : 'On condition';
+        const dueDate = item.interval_months ? `${item.interval_months} months` : '-';
+        const modelTags = normalizedModelTokens.filter((token) => title.toLowerCase().includes(token) || taskNumber.toLowerCase().includes(token));
+        return {
+          value: item.id,
+          taskNumber,
+          title,
+          dueBasis,
+          dueDate,
+          estimatedManHours: item.estimated_man_hours ? `${item.estimated_man_hours}` : '-',
+          status: String(item.revision_status || 'pending').trim(),
+          category: String(item.category_code || 'GEN').trim(),
+          modelTags,
+        };
+      });
+      const matchedByModel = normalizedModelTokens.length > 0
+        ? allOptions.filter((item) => item.modelTags.length > 0)
+        : allOptions;
+      setMaintenanceTaskSelectionOptions(matchedByModel.length > 0 ? matchedByModel : allOptions);
+      setTaskSelectionLoading(false);
     };
     void loadMaintenanceTaskSelectionOptions();
     return () => {
       active = false;
     };
-  }, [scopedDb]);
+  }, [scopedDb, workPackageCreateForm.aircraftId, workPackageCreateForm.selectedAircraftModel]);
+  useEffect(() => {
+    let active = true;
+    const loadTaskConflicts = async () => {
+      if (!workPackageCreateForm.aircraftId || maintenanceTaskSelectionOptions.length === 0) {
+        setTaskConflictById({});
+        return;
+      }
+      const { data: linkedTasks, error: linkedTasksError } = await scopedDb
+        .from('aircraft_maintenance_tasks')
+        .select('task_id')
+        .eq('aircraft_id', workPackageCreateForm.aircraftId)
+        .eq('is_active', true)
+        .limit(2000);
+      if (!active) {
+        return;
+      }
+      if (linkedTasksError) {
+        setTaskConflictById({});
+        return;
+      }
+      const existingTaskIds = new Set(((linkedTasks ?? []) as Array<{ task_id: string | null }>)
+        .map((item) => String(item.task_id || '').trim())
+        .filter((id) => id.length > 0));
+      const nextConflictMap: Record<string, TaskConflictInfo> = {};
+      maintenanceTaskSelectionOptions.forEach((task) => {
+        if (existingTaskIds.has(task.value)) {
+          nextConflictMap[task.value] = {
+            taskId: task.value,
+            reason: 'Task already assigned to this aircraft.',
+          };
+        }
+      });
+      setTaskConflictById(nextConflictMap);
+      const selectedConflicts = workPackageCreateForm.selectedTaskIds.filter((taskId) => Boolean(nextConflictMap[taskId]));
+      if (selectedConflicts.length > 0) {
+        handleWorkPackageCreateFormChange('selectedTaskIds', workPackageCreateForm.selectedTaskIds.filter((taskId) => !nextConflictMap[taskId]));
+      }
+    };
+    void loadTaskConflicts();
+    return () => {
+      active = false;
+    };
+  }, [scopedDb, workPackageCreateForm.aircraftId, maintenanceTaskSelectionOptions]);
   useEffect(() => {
     setManualWorkPackageOrder((current) => {
       const liveIds = state.workPackages.map((workPackage) => workPackage.id);
@@ -548,15 +741,35 @@ export function AmroOwnedWorkspace({
   const visibleWorkspaceError = state.workPackagesError?.trim().toLowerCase() === 'not found' ? null : state.workPackagesError;
   const taskActionDisabledReason = canDirectTaskExecution ? '' : 'Disabled by policy: management role cannot submit technician execution actions.';
   const selectedWorkPackageAssignee = state.selectedWorkPackage?.tasks?.[0]?.assignedRole || 'Unassigned';
-  const taskSelectionOptions = [
-    ...maintenanceTaskSelectionOptions,
-    ...state.workPackages.flatMap((workPackage) =>
-      (workPackage.tasks || []).map((task) => ({
-        value: task.id,
-        label: `${workPackage.packageNumber} · ${task.title}`,
-      })),
-    ),
-  ].filter((task, index, all) => all.findIndex((candidate) => candidate.value === task.value) === index);
+  const selectedAircraft = workPackageAircraftOptions.find((aircraft) => aircraft.id === workPackageCreateForm.aircraftId) || null;
+  const filteredAircraftOptions = aircraftSearchTerm.trim()
+    ? workPackageAircraftOptions.filter((aircraft) => {
+      const token = aircraftSearchTerm.trim().toLowerCase();
+      return [
+        aircraft.aircraftModel,
+        aircraft.registration,
+        aircraft.serialNumber,
+        aircraft.operatorCode,
+      ].some((entry) => entry.toLowerCase().includes(token));
+    })
+    : workPackageAircraftOptions;
+  const taskSelectionOptions = taskSearchTerm.trim()
+    ? maintenanceTaskSelectionOptions.filter((task) => {
+      const token = taskSearchTerm.trim().toLowerCase();
+      return [
+        task.taskNumber,
+        task.title,
+        task.category,
+        task.status,
+      ].some((entry) => entry.toLowerCase().includes(token));
+    })
+    : maintenanceTaskSelectionOptions;
+  const selectedTaskOptions = maintenanceTaskSelectionOptions
+    .filter((task) => workPackageCreateForm.selectedTaskIds.includes(task.value));
+  const selectedTaskCount = selectedTaskOptions.length;
+  const selectedTaskConflicts = selectedTaskOptions.filter((task) => taskConflictById[task.value]);
+  const workPackageValidationSummary = Array.from(new Set(Object.values(workPackageCreateErrors).filter(Boolean)));
+  const canSelectTasks = Boolean(workPackageCreateForm.aircraftId);
   const formatDateTime = (value: string | number) => new Intl.DateTimeFormat(workspaceLocale, {
     dateStyle: 'medium',
     timeStyle: 'short',
@@ -901,6 +1114,10 @@ export function AmroOwnedWorkspace({
       ...cached,
     });
     setWorkPackageCreateErrors({});
+    setTaskSearchTerm('');
+    setAircraftSearchTerm('');
+    setTaskConflictById({});
+    setReviewSubmitDialogOpen(false);
     setWorkPackageCreateDialogOpen(true);
   };
 
@@ -928,7 +1145,20 @@ export function AmroOwnedWorkspace({
     });
   };
 
+  const handleSelectWorkPackageAircraft = (aircraftId: string) => {
+    const selected = workPackageAircraftOptions.find((aircraft) => aircraft.id === aircraftId);
+    handleWorkPackageCreateFormChange('aircraftId', aircraftId);
+    handleWorkPackageCreateFormChange('selectedAircraftModel', selected?.aircraftModel || '');
+    handleWorkPackageCreateFormChange('selectedAircraftSerialOrRegistration', selected?.serialNumber || selected?.registration || '');
+    handleWorkPackageCreateFormChange('locationStation', selected?.stationCode || '');
+    handleWorkPackageCreateFormChange('selectedTaskIds', []);
+    setTaskConflictById({});
+  };
+
   const handleToggleWorkPackageCreateTaskSelection = (taskId: string, checked: boolean) => {
+    if (taskConflictById[taskId]) {
+      return;
+    }
     const selected = workPackageCreateForm.selectedTaskIds;
     const nextSelected = checked
       ? selected.includes(taskId) ? selected : [...selected, taskId]
@@ -936,17 +1166,42 @@ export function AmroOwnedWorkspace({
     handleWorkPackageCreateFormChange('selectedTaskIds', nextSelected);
   };
 
+  const handleOpenWorkPackageSubmitReview = () => {
+    const validationErrors = validateWorkPackageCreateForm(workPackageCreateForm);
+    if (Object.keys(validationErrors).length > 0) {
+      setWorkPackageCreateErrors(validationErrors);
+      toast.error('Validation failed for work package form.');
+      return;
+    }
+    setReviewSubmitDialogOpen(true);
+  };
+
   const validateWorkPackageCreateForm = (values: WorkPackageCreateFormState): WorkPackageCreateFormErrors => {
     const nextErrors: WorkPackageCreateFormErrors = {};
+    if (!values.aircraftId.trim()) {
+      nextErrors.aircraftId = 'Aircraft is required before task selection.';
+    }
+    if (!values.packageNumber.trim()) {
+      nextErrors.packageNumber = 'Work package number is required.';
+    }
+    if (!values.topic.trim()) {
+      nextErrors.topic = 'Topic is required.';
+    }
     if (!values.workPackageDetails.trim()) {
       nextErrors.workPackageDetails = 'Work package details is required.';
+    }
+    if (!values.locationStation.trim()) {
+      nextErrors.locationStation = 'Location or station is required.';
     }
     const revisionValue = Number(values.revision);
     if (!Number.isInteger(revisionValue) || revisionValue < 1) {
       nextErrors.revision = 'Revision must be a positive integer.';
     }
-    if (taskSelectionOptions.length > 0 && values.selectedTaskIds.length === 0) {
+    if (values.selectedTaskIds.length === 0) {
       nextErrors.selectedTaskIds = 'Select at least one task.';
+    }
+    if (values.selectedTaskIds.some((taskId) => Boolean(taskConflictById[taskId]))) {
+      nextErrors.selectedTaskIds = 'Remove conflicted tasks before submission.';
     }
     if (!values.plannedStartDate) {
       nextErrors.plannedStartDate = 'Planned start date is required.';
@@ -976,21 +1231,49 @@ export function AmroOwnedWorkspace({
       toast.error('Validation failed for work package form.');
       return;
     }
-    const selectedTaskLabels = taskSelectionOptions
-      .filter((task) => workPackageCreateForm.selectedTaskIds.includes(task.value))
-      .map((task) => task.label);
-    const ok = await state.createWorkPackage(workPackageCreateForm.workPackageDetails, {
-      maintenanceType: workPackageCreateForm.maintenanceType,
-      priority: workPackageCreateForm.priority,
-      plannedStartIso: `${workPackageCreateForm.plannedStartDate}T00:00:00.000Z`,
-      plannedEndIso: `${workPackageCreateForm.plannedEndDate}T23:59:59.000Z`,
-      station: selectedStationFilter === 'all' ? undefined : selectedStationFilter,
-      scopeItems: [workPackageCreateForm.workPackageDetails, ...selectedTaskLabels].filter((item) => item.trim().length > 0),
-      taskPlan: workPackageCreateForm.selectedTaskIds.length > 0 ? workPackageCreateForm.selectedTaskIds : [workPackageCreateForm.workPackageDetails],
-      revision: workPackageCreateForm.revision,
-      assignedRole: workPackageCreateForm.assignedRole,
-      workflowStatus: workPackageCreateForm.workflowStatus,
-    });
+    const selectedTaskLabels = selectedTaskOptions.map((task) => `${task.taskNumber} · ${task.title}`);
+    setWorkPackageCreateSubmitting(true);
+    const ok = await state.createWorkPackage(
+      workPackageCreateForm.topic || workPackageCreateForm.workPackageDetails || workPackageCreateForm.packageNumber,
+      {
+        aircraftId: workPackageCreateForm.aircraftId,
+        maintenanceType: workPackageCreateForm.maintenanceType,
+        priority: workPackageCreateForm.priority,
+        plannedStartIso: `${workPackageCreateForm.plannedStartDate}T00:00:00.000Z`,
+        plannedEndIso: `${workPackageCreateForm.plannedEndDate}T23:59:59.000Z`,
+        station: workPackageCreateForm.locationStation || (selectedStationFilter === 'all' ? undefined : selectedStationFilter),
+        scopeItems: [
+          workPackageCreateForm.packageNumber,
+          workPackageCreateForm.topic,
+          workPackageCreateForm.workPackageDetails,
+          ...selectedTaskLabels,
+        ].filter((item) => item.trim().length > 0),
+        taskPlan: workPackageCreateForm.selectedTaskIds,
+        revision: workPackageCreateForm.revision,
+        assignedRole: workPackageCreateForm.assignedRole,
+        workflowStatus: workPackageCreateForm.workflowStatus,
+        taskSnapshot: selectedTaskOptions.map((task) => ({
+          id: task.value,
+          taskNumber: task.taskNumber,
+          title: task.title,
+          dueBasis: task.dueBasis,
+          estimatedManHours: task.estimatedManHours,
+          category: task.category,
+        })),
+        clientMetadata: {
+          createdBy: workPackageCreateForm.createdBy,
+          createdAt: new Date().toISOString(),
+          clientTimestamp: new Date().toISOString(),
+          clientTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+          duplicateCheckPassed: selectedTaskConflicts.length === 0,
+          planningDate: workPackageCreateForm.planningDate,
+          remarks: workPackageCreateForm.remarks,
+          serialOrRegistration: workPackageCreateForm.selectedAircraftSerialOrRegistration,
+          aircraftModel: workPackageCreateForm.selectedAircraftModel,
+        },
+      },
+    );
+    setWorkPackageCreateSubmitting(false);
     if (!ok) {
       setLastInteractionMessage('Unable to add work package. Retry after resolving API issues.');
       toast.error('Unable to add work package.');
@@ -1001,6 +1284,7 @@ export function AmroOwnedWorkspace({
         detail: {
           source: 'work-package-create-dialog',
           ...workPackageCreateForm,
+          selectedTaskCount: selectedTaskOptions.length,
           createdAt: new Date().toISOString(),
         },
       }));
@@ -1008,6 +1292,8 @@ export function AmroOwnedWorkspace({
     workPackageCreateDraftCacheRef.current.clear();
     setWorkPackageCreateForm(createDefaultWorkPackageCreateFormState());
     setWorkPackageCreateErrors({});
+    setTaskConflictById({});
+    setReviewSubmitDialogOpen(false);
     setWorkPackageCreateDialogOpen(false);
     setLastInteractionMessage('Work package added successfully.');
     toast.success('Work package added.');
@@ -2593,202 +2879,244 @@ export function AmroOwnedWorkspace({
         </DialogContent>
       </Dialog>
       <Dialog open={workPackageCreateDialogOpen} onOpenChange={setWorkPackageCreateDialogOpen}>
-        <DialogContent className="mdm-template-dialog max-w-3xl">
+        <DialogContent className="mdm-template-dialog max-h-[90vh] max-w-6xl overflow-hidden">
           <DialogHeader>
-            <DialogTitle>Add Work Package</DialogTitle>
+            <DialogTitle>Create Work Package</DialogTitle>
           </DialogHeader>
-          <Tabs value={workPackageCreateTab} onValueChange={(value) => handleWorkPackageCreateTabChange(value as WorkPackageCreateTab)}>
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="wp">WP</TabsTrigger>
-              <TabsTrigger value="besting_wp">Besting WP</TabsTrigger>
-              <TabsTrigger value="task_payload">Task Payload</TabsTrigger>
-              <TabsTrigger value="workflow">Workflow</TabsTrigger>
-            </TabsList>
-            <TabsContent value="wp" className="space-y-3 pt-2">
+          {workPackageValidationSummary.length > 0 ? (
+            <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-xs text-destructive">
+              {workPackageValidationSummary.map((error) => (
+                <p key={error}>{error}</p>
+              ))}
+            </div>
+          ) : null}
+          <div className="grid max-h-[calc(90vh-180px)] grid-cols-1 gap-4 overflow-y-auto lg:grid-cols-[1.1fr_1fr]">
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <Label htmlFor="wp-aircraft-search">Aircraft</Label>
+                <Input id="wp-aircraft-search" value={aircraftSearchTerm} onChange={(event) => setAircraftSearchTerm(event.target.value)} placeholder="Search model, registration, serial" />
+              </div>
+              <div className="max-h-56 space-y-2 overflow-y-auto rounded-md border p-2">
+                {aircraftSelectionLoading ? (
+                  <p className="text-xs text-muted-foreground">Loading aircraft...</p>
+                ) : filteredAircraftOptions.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">No aircraft found in tenant scope.</p>
+                ) : filteredAircraftOptions.map((aircraft) => (
+                  <button
+                    key={aircraft.id}
+                    type="button"
+                    onClick={() => handleSelectWorkPackageAircraft(aircraft.id)}
+                    className={`w-full rounded-md border px-3 py-2 text-left text-xs ${workPackageCreateForm.aircraftId === aircraft.id ? 'border-primary bg-primary/10' : 'border-border'}`}
+                  >
+                    <p className="font-medium">{aircraft.aircraftModel || 'Unknown Model'} · {aircraft.registration || '-'}</p>
+                    <p className="text-muted-foreground">SN {aircraft.serialNumber || '-'} · Station {aircraft.stationCode || '-'}</p>
+                  </button>
+                ))}
+              </div>
+              {workPackageCreateErrors.aircraftId ? <p className="text-xs text-destructive">{workPackageCreateErrors.aircraftId}</p> : null}
+              {selectedAircraft ? (
+                <div className="grid grid-cols-2 gap-2 rounded-md border p-3 text-xs">
+                  <div>Model: {selectedAircraft.aircraftModel || '-'}</div>
+                  <div>Serial: {selectedAircraft.serialNumber || '-'}</div>
+                  <div>Registration: {selectedAircraft.registration || '-'}</div>
+                  <div>Hours/Cycles: {selectedAircraft.currentFlightHours}/{selectedAircraft.currentCycles}</div>
+                  <div>Status: {selectedAircraft.status || '-'}</div>
+                  <div>Operator: {selectedAircraft.operatorCode || '-'}</div>
+                </div>
+              ) : null}
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <div className="space-y-1">
+                  <Label htmlFor="wp-number">Package Number</Label>
+                  <Input id="wp-number" value={workPackageCreateForm.packageNumber} onChange={(event) => handleWorkPackageCreateFormChange('packageNumber', event.target.value)} />
+                  {workPackageCreateErrors.packageNumber ? <p className="text-xs text-destructive">{workPackageCreateErrors.packageNumber}</p> : null}
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="wp-topic">Topic</Label>
+                  <Input id="wp-topic" value={workPackageCreateForm.topic} onChange={(event) => handleWorkPackageCreateFormChange('topic', event.target.value)} />
+                  {workPackageCreateErrors.topic ? <p className="text-xs text-destructive">{workPackageCreateErrors.topic}</p> : null}
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="wp-location">Location/Station</Label>
+                  <Input id="wp-location" value={workPackageCreateForm.locationStation} onChange={(event) => handleWorkPackageCreateFormChange('locationStation', event.target.value)} />
+                  {workPackageCreateErrors.locationStation ? <p className="text-xs text-destructive">{workPackageCreateErrors.locationStation}</p> : null}
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="wp-planning-date">Planning Date</Label>
+                  <Input id="wp-planning-date" type="date" value={workPackageCreateForm.planningDate} onChange={(event) => handleWorkPackageCreateFormChange('planningDate', event.target.value)} />
+                </div>
+              </div>
               <div className="space-y-1">
                 <Label htmlFor="wp-details">Work Package Details</Label>
-                <Textarea
-                  id="wp-details"
-                  value={workPackageCreateForm.workPackageDetails}
-                  onChange={(event) => handleWorkPackageCreateFormChange('workPackageDetails', event.target.value)}
-                  placeholder="Enter work package details"
-                  aria-invalid={Boolean(workPackageCreateErrors.workPackageDetails)}
-                />
-                {workPackageCreateErrors.workPackageDetails ? (
-                  <p className="text-xs text-destructive">{workPackageCreateErrors.workPackageDetails}</p>
-                ) : null}
+                <Textarea id="wp-details" value={workPackageCreateForm.workPackageDetails} onChange={(event) => handleWorkPackageCreateFormChange('workPackageDetails', event.target.value)} />
+                {workPackageCreateErrors.workPackageDetails ? <p className="text-xs text-destructive">{workPackageCreateErrors.workPackageDetails}</p> : null}
               </div>
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                <div className="space-y-1">
-                  <Label htmlFor="wp-revision">Revision</Label>
-                  <Input
-                    id="wp-revision"
-                    type="number"
-                    min={1}
-                    value={workPackageCreateForm.revision}
-                    onChange={(event) => handleWorkPackageCreateFormChange('revision', event.target.value)}
-                    aria-invalid={Boolean(workPackageCreateErrors.revision)}
-                  />
-                  {workPackageCreateErrors.revision ? (
-                    <p className="text-xs text-destructive">{workPackageCreateErrors.revision}</p>
-                  ) : null}
-                </div>
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <Label>Selected Tasks</Label>
-                    {taskSelectionOptions.length > 0 ? (
-                      <div className="flex items-center gap-2">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 px-2 text-xs"
-                          onClick={() => handleWorkPackageCreateFormChange('selectedTaskIds', taskSelectionOptions.map((task) => task.value))}
-                        >
-                          Select all
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 px-2 text-xs"
-                          onClick={() => handleWorkPackageCreateFormChange('selectedTaskIds', [])}
-                        >
-                          Clear
-                        </Button>
-                      </div>
-                    ) : null}
+              <div className="space-y-1">
+                <Label htmlFor="wp-remarks">Remarks</Label>
+                <Textarea id="wp-remarks" value={workPackageCreateForm.remarks} onChange={(event) => handleWorkPackageCreateFormChange('remarks', event.target.value)} />
+              </div>
+            </div>
+            <div className="space-y-3">
+              <Tabs value={workPackageCreateTab} onValueChange={(value) => handleWorkPackageCreateTabChange(value as WorkPackageCreateTab)}>
+                <TabsList className="grid w-full grid-cols-4">
+                  <TabsTrigger value="wp">Tasks</TabsTrigger>
+                  <TabsTrigger value="besting_wp">Tools/Spares</TabsTrigger>
+                  <TabsTrigger value="task_payload">Planning</TabsTrigger>
+                  <TabsTrigger value="workflow">Review</TabsTrigger>
+                </TabsList>
+                <TabsContent value="wp" className="space-y-3 pt-2">
+                  <div className="space-y-1">
+                    <Label htmlFor="wp-task-search">Task Search</Label>
+                    <Input id="wp-task-search" value={taskSearchTerm} onChange={(event) => setTaskSearchTerm(event.target.value)} disabled={!canSelectTasks} placeholder={canSelectTasks ? 'Search tasks' : 'Select aircraft first'} />
                   </div>
-                  <div className="max-h-40 space-y-2 overflow-y-auto rounded-md border p-2">
-                    {taskSelectionOptions.length > 0 ? taskSelectionOptions.map((task) => {
-                      const checked = workPackageCreateForm.selectedTaskIds.includes(task.value);
-                      return (
-                        <label key={task.value} className="flex cursor-pointer items-center gap-2 rounded px-1 py-1 text-xs hover:bg-muted/40">
-                          <Checkbox
-                            checked={checked}
-                            onCheckedChange={(value) => handleToggleWorkPackageCreateTaskSelection(task.value, Boolean(value))}
-                            aria-label={`Select ${task.label}`}
-                          />
-                          <span>{task.label}</span>
-                        </label>
-                      );
-                    }) : (
-                      <p className="text-xs text-muted-foreground">No tasks available</p>
-                    )}
+                  <div className="max-h-72 overflow-auto rounded-md border">
+                    <table className="w-full text-xs">
+                      <thead className="bg-muted/50">
+                        <tr>
+                          <th className="p-2 text-left">Sel</th>
+                          <th className="p-2 text-left">Task</th>
+                          <th className="p-2 text-left">Title</th>
+                          <th className="p-2 text-left">Due</th>
+                          <th className="p-2 text-left">MH</th>
+                          <th className="p-2 text-left">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {taskSelectionLoading ? (
+                          <tr><td className="p-2 text-muted-foreground" colSpan={6}>Loading tasks...</td></tr>
+                        ) : taskSelectionOptions.length === 0 ? (
+                          <tr><td className="p-2 text-muted-foreground" colSpan={6}>No tasks available.</td></tr>
+                        ) : taskSelectionOptions.map((task) => {
+                          const checked = workPackageCreateForm.selectedTaskIds.includes(task.value);
+                          const conflict = taskConflictById[task.value];
+                          return (
+                            <tr key={task.value} className={conflict ? 'bg-amber-50/40' : ''}>
+                              <td className="p-2"><Checkbox checked={checked} onCheckedChange={(value) => handleToggleWorkPackageCreateTaskSelection(task.value, Boolean(value))} disabled={!canSelectTasks || Boolean(conflict)} /></td>
+                              <td className="p-2">{task.taskNumber}</td>
+                              <td className="p-2"><p>{task.title}</p>{conflict ? <p className="text-amber-700">{conflict.reason}</p> : null}</td>
+                              <td className="p-2">{task.dueBasis}</td>
+                              <td className="p-2">{task.estimatedManHours}</td>
+                              <td className="p-2">{task.status}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
-                  {taskSelectionOptions.length > 0 ? (
-                    <p className="text-xs text-muted-foreground">{workPackageCreateForm.selectedTaskIds.length} task(s) selected</p>
-                  ) : null}
-                  {taskSelectionOptions.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">No tasks found in maintenance_tasks for your current scope.</p>
-                  ) : null}
-                  {workPackageCreateErrors.selectedTaskIds ? (
-                    <p className="text-xs text-destructive">{workPackageCreateErrors.selectedTaskIds}</p>
-                  ) : null}
-                </div>
-              </div>
-            </TabsContent>
-            <TabsContent value="besting_wp" className="space-y-3 pt-2">
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                <div className="space-y-1">
-                  <Label>Maintenance Type</Label>
-                  <Select value={workPackageCreateForm.maintenanceType} onValueChange={(value) => handleWorkPackageCreateFormChange('maintenanceType', value as WorkPackageCreateFormState['maintenanceType'])}>
-                    <SelectTrigger aria-label="Maintenance type">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="line">Line</SelectItem>
-                      <SelectItem value="base">Base</SelectItem>
-                      <SelectItem value="hangar">Hangar</SelectItem>
-                      <SelectItem value="shop">Shop</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1">
-                  <Label>Priority</Label>
-                  <Select value={workPackageCreateForm.priority} onValueChange={(value) => handleWorkPackageCreateFormChange('priority', value as WorkPackageCreateFormState['priority'])}>
-                    <SelectTrigger aria-label="Priority">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="low">Low</SelectItem>
-                      <SelectItem value="medium">Medium</SelectItem>
-                      <SelectItem value="high">High</SelectItem>
-                      <SelectItem value="critical">Critical</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </TabsContent>
-            <TabsContent value="task_payload" className="space-y-3 pt-2">
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                <div className="space-y-1">
-                  <Label htmlFor="wp-planned-start">Planned Start</Label>
-                  <Input
-                    id="wp-planned-start"
-                    type="date"
-                    value={workPackageCreateForm.plannedStartDate}
-                    onChange={(event) => handleWorkPackageCreateFormChange('plannedStartDate', event.target.value)}
-                    aria-invalid={Boolean(workPackageCreateErrors.plannedStartDate)}
-                  />
-                  {workPackageCreateErrors.plannedStartDate ? (
-                    <p className="text-xs text-destructive">{workPackageCreateErrors.plannedStartDate}</p>
-                  ) : null}
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="wp-planned-end">Planned End</Label>
-                  <Input
-                    id="wp-planned-end"
-                    type="date"
-                    value={workPackageCreateForm.plannedEndDate}
-                    onChange={(event) => handleWorkPackageCreateFormChange('plannedEndDate', event.target.value)}
-                    aria-invalid={Boolean(workPackageCreateErrors.plannedEndDate)}
-                  />
-                  {workPackageCreateErrors.plannedEndDate ? (
-                    <p className="text-xs text-destructive">{workPackageCreateErrors.plannedEndDate}</p>
-                  ) : null}
-                </div>
-              </div>
-            </TabsContent>
-            <TabsContent value="workflow" className="space-y-3 pt-2">
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                <div className="space-y-1">
-                  <Label>Assigned Role</Label>
-                  <Select value={workPackageCreateForm.assignedRole} onValueChange={(value) => handleWorkPackageCreateFormChange('assignedRole', value as WorkPackageCreateFormState['assignedRole'])}>
-                    <SelectTrigger aria-label="Assigned role">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="planner">Planner</SelectItem>
-                      <SelectItem value="engineer">Engineer</SelectItem>
-                      <SelectItem value="inspector">Inspector</SelectItem>
-                      <SelectItem value="technician">Technician</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1">
-                  <Label>Workflow Status</Label>
-                  <Select value={workPackageCreateForm.workflowStatus} onValueChange={(value) => handleWorkPackageCreateFormChange('workflowStatus', value as WorkPackageCreateFormState['workflowStatus'])}>
-                    <SelectTrigger aria-label="Workflow status">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="planning">Planning</SelectItem>
-                      <SelectItem value="scheduled">Scheduled</SelectItem>
-                      <SelectItem value="in_progress">In Progress</SelectItem>
-                      <SelectItem value="blocked">Blocked</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </TabsContent>
-          </Tabs>
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <p>{selectedTaskCount} selected</p>
+                    <div className="flex items-center gap-2">
+                      <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => handleWorkPackageCreateFormChange('selectedTaskIds', taskSelectionOptions.filter((task) => !taskConflictById[task.value]).map((task) => task.value))}>Select all valid</Button>
+                      <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => handleWorkPackageCreateFormChange('selectedTaskIds', [])}>Clear</Button>
+                    </div>
+                  </div>
+                  {workPackageCreateErrors.selectedTaskIds ? <p className="text-xs text-destructive">{workPackageCreateErrors.selectedTaskIds}</p> : null}
+                </TabsContent>
+                <TabsContent value="besting_wp" className="space-y-3 pt-2">
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <div className="space-y-1">
+                      <Label>Maintenance Type</Label>
+                      <Select value={workPackageCreateForm.maintenanceType} onValueChange={(value) => handleWorkPackageCreateFormChange('maintenanceType', value as WorkPackageCreateFormState['maintenanceType'])}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="line">Line</SelectItem>
+                          <SelectItem value="base">Base</SelectItem>
+                          <SelectItem value="hangar">Hangar</SelectItem>
+                          <SelectItem value="shop">Shop</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Priority</Label>
+                      <Select value={workPackageCreateForm.priority} onValueChange={(value) => handleWorkPackageCreateFormChange('priority', value as WorkPackageCreateFormState['priority'])}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="low">Low</SelectItem>
+                          <SelectItem value="medium">Medium</SelectItem>
+                          <SelectItem value="high">High</SelectItem>
+                          <SelectItem value="critical">Critical</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </TabsContent>
+                <TabsContent value="task_payload" className="space-y-3 pt-2">
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <div className="space-y-1">
+                      <Label htmlFor="wp-planned-start">Planned Start</Label>
+                      <Input id="wp-planned-start" type="date" value={workPackageCreateForm.plannedStartDate} onChange={(event) => handleWorkPackageCreateFormChange('plannedStartDate', event.target.value)} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="wp-planned-end">Planned End</Label>
+                      <Input id="wp-planned-end" type="date" value={workPackageCreateForm.plannedEndDate} onChange={(event) => handleWorkPackageCreateFormChange('plannedEndDate', event.target.value)} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="wp-created-by">Created By</Label>
+                      <Input id="wp-created-by" value={workPackageCreateForm.createdBy} onChange={(event) => handleWorkPackageCreateFormChange('createdBy', event.target.value)} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="wp-revision">Revision</Label>
+                      <Input id="wp-revision" type="number" min={1} value={workPackageCreateForm.revision} onChange={(event) => handleWorkPackageCreateFormChange('revision', event.target.value)} />
+                    </div>
+                  </div>
+                </TabsContent>
+                <TabsContent value="workflow" className="space-y-3 pt-2">
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <div className="space-y-1">
+                      <Label>Assigned Role</Label>
+                      <Select value={workPackageCreateForm.assignedRole} onValueChange={(value) => handleWorkPackageCreateFormChange('assignedRole', value as WorkPackageCreateFormState['assignedRole'])}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="planner">Planner</SelectItem>
+                          <SelectItem value="engineer">Engineer</SelectItem>
+                          <SelectItem value="inspector">Inspector</SelectItem>
+                          <SelectItem value="technician">Technician</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Workflow Status</Label>
+                      <Select value={workPackageCreateForm.workflowStatus} onValueChange={(value) => handleWorkPackageCreateFormChange('workflowStatus', value as WorkPackageCreateFormState['workflowStatus'])}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="planning">Planning</SelectItem>
+                          <SelectItem value="scheduled">Scheduled</SelectItem>
+                          <SelectItem value="in_progress">In Progress</SelectItem>
+                          <SelectItem value="blocked">Blocked</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="rounded-md border p-3 text-xs">
+                    <p>Aircraft: {selectedAircraft?.aircraftModel || '-'} · {selectedAircraft?.registration || selectedAircraft?.serialNumber || '-'}</p>
+                    <p>Tasks selected: {selectedTaskCount}</p>
+                    <p>Conflicts: {selectedTaskConflicts.length}</p>
+                  </div>
+                </TabsContent>
+              </Tabs>
+            </div>
+          </div>
+          <div className="sticky bottom-0 z-10 flex items-center justify-end gap-2 border-t bg-background pt-3">
+            <Button variant="outline" onClick={() => setWorkPackageCreateDialogOpen(false)}>Cancel</Button>
+            <Button variant="secondary" onClick={handleOpenWorkPackageSubmitReview} disabled={workPackageCreateSubmitting}>Review</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={reviewSubmitDialogOpen} onOpenChange={setReviewSubmitDialogOpen}>
+        <DialogContent className="mdm-template-dialog max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Confirm Work Package Submission</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 text-sm">
+            <p>Aircraft: {selectedAircraft?.aircraftModel || '-'} · {selectedAircraft?.registration || selectedAircraft?.serialNumber || '-'}</p>
+            <p>Package Number: {workPackageCreateForm.packageNumber || '-'}</p>
+            <p>Topic: {workPackageCreateForm.topic || '-'}</p>
+            <p>Tasks: {selectedTaskCount}</p>
+            <p>Conflicts: {selectedTaskConflicts.length}</p>
+          </div>
           <div className="flex items-center justify-end gap-2">
-            <Button variant="outline" onClick={() => setWorkPackageCreateDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={() => void handleSubmitWorkPackageCreateForm()}>
-              Add
+            <Button variant="outline" onClick={() => setReviewSubmitDialogOpen(false)}>Back</Button>
+            <Button onClick={() => void handleSubmitWorkPackageCreateForm()} disabled={workPackageCreateSubmitting || selectedTaskConflicts.length > 0}>
+              {workPackageCreateSubmitting ? 'Submitting...' : 'Submit'}
             </Button>
           </div>
         </DialogContent>
