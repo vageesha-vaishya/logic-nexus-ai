@@ -1,6 +1,7 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -8,6 +9,7 @@ import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { useCRM } from '@/hooks/useCRM';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useAmroWorkspaceState } from '../hooks/useAmroWorkspaceState';
@@ -112,7 +114,7 @@ type WorkPackageCreateTab = 'wp' | 'besting_wp' | 'task_payload' | 'workflow';
 type WorkPackageCreateFormState = {
   workPackageDetails: string;
   revision: string;
-  selectedTaskId: string;
+  selectedTaskIds: string[];
   maintenanceType: 'line' | 'base' | 'hangar' | 'shop';
   priority: 'low' | 'medium' | 'high' | 'critical';
   plannedStartDate: string;
@@ -157,7 +159,7 @@ const createDefaultWorkPackageCreateFormState = (): WorkPackageCreateFormState =
   return {
     workPackageDetails: '',
     revision: '1',
-    selectedTaskId: '',
+    selectedTaskIds: [],
     maintenanceType: 'line',
     priority: 'medium',
     plannedStartDate: start.toISOString().slice(0, 10),
@@ -173,6 +175,7 @@ export function AmroOwnedWorkspace({
   overviewControls: _overviewControls,
   overviewTelemetry: _overviewTelemetry,
 }: AmroOwnedWorkspaceProps) {
+  const { scopedDb } = useCRM();
   const state = useAmroWorkspaceState();
   const [newWorkPackageTitle, setNewWorkPackageTitle] = useState('');
   const [savedViewName, setSavedViewName] = useState('');
@@ -203,6 +206,7 @@ export function AmroOwnedWorkspace({
   const [workPackageCreateTab, setWorkPackageCreateTab] = useState<WorkPackageCreateTab>('wp');
   const [workPackageCreateForm, setWorkPackageCreateForm] = useState<WorkPackageCreateFormState>(() => createDefaultWorkPackageCreateFormState());
   const [workPackageCreateErrors, setWorkPackageCreateErrors] = useState<WorkPackageCreateFormErrors>({});
+  const [maintenanceTaskSelectionOptions, setMaintenanceTaskSelectionOptions] = useState<Array<{ value: string; label: string }>>([]);
   const workPackageCreateDraftCacheRef = useRef<Map<WorkPackageCreateTab, WorkPackageCreateFormState>>(new Map());
   const workspaceLoadStartedAtRef = useRef(typeof performance !== 'undefined' ? performance.now() : Date.now());
   const workspaceLoadMetricPublishedRef = useRef(false);
@@ -459,6 +463,38 @@ export function AmroOwnedWorkspace({
   const fleetOptions = ['all', ...Array.from(new Set(state.assets.map((asset) => asset.assetTag)))];
   const stationOptions = ['all', ...Array.from(new Set(state.scheduleBoardRows.map((row) => row.station_code)))];
   useEffect(() => {
+    let active = true;
+    const loadMaintenanceTaskSelectionOptions = async () => {
+      const { data, error } = await scopedDb
+        .from('maintenance_tasks')
+        .select('id, code_form_no, description')
+        .order('code_form_no', { ascending: true })
+        .limit(500);
+      if (!active) {
+        return;
+      }
+      if (error) {
+        setMaintenanceTaskSelectionOptions([]);
+        return;
+      }
+      const options = ((data ?? []) as Array<{ id: string; code_form_no: string | null; description: string | null }>)
+        .map((item) => {
+          const code = String(item.code_form_no || '').trim();
+          const description = String(item.description || '').trim();
+          const label = [code, description].filter((part) => part.length > 0).join(' · ') || item.id;
+          return {
+            value: item.id,
+            label,
+          };
+        });
+      setMaintenanceTaskSelectionOptions(options);
+    };
+    void loadMaintenanceTaskSelectionOptions();
+    return () => {
+      active = false;
+    };
+  }, [scopedDb]);
+  useEffect(() => {
     setManualWorkPackageOrder((current) => {
       const liveIds = state.workPackages.map((workPackage) => workPackage.id);
       const retained = current.filter((id) => liveIds.includes(id));
@@ -512,12 +548,15 @@ export function AmroOwnedWorkspace({
   const visibleWorkspaceError = state.workPackagesError?.trim().toLowerCase() === 'not found' ? null : state.workPackagesError;
   const taskActionDisabledReason = canDirectTaskExecution ? '' : 'Disabled by policy: management role cannot submit technician execution actions.';
   const selectedWorkPackageAssignee = state.selectedWorkPackage?.tasks?.[0]?.assignedRole || 'Unassigned';
-  const taskSelectionOptions = state.workPackages.flatMap((workPackage) =>
-    (workPackage.tasks || []).map((task) => ({
-      value: task.id,
-      label: `${workPackage.packageNumber} · ${task.title}`,
-    })),
-  );
+  const taskSelectionOptions = [
+    ...maintenanceTaskSelectionOptions,
+    ...state.workPackages.flatMap((workPackage) =>
+      (workPackage.tasks || []).map((task) => ({
+        value: task.id,
+        label: `${workPackage.packageNumber} · ${task.title}`,
+      })),
+    ),
+  ].filter((task, index, all) => all.findIndex((candidate) => candidate.value === task.value) === index);
   const formatDateTime = (value: string | number) => new Intl.DateTimeFormat(workspaceLocale, {
     dateStyle: 'medium',
     timeStyle: 'short',
@@ -857,10 +896,8 @@ export function AmroOwnedWorkspace({
   const handleOpenWorkPackageCreateDialog = () => {
     const cached = workPackageCreateDraftCacheRef.current.get(workPackageCreateTab);
     const defaultState = createDefaultWorkPackageCreateFormState();
-    const initialTaskId = taskSelectionOptions[0]?.value || '';
     setWorkPackageCreateForm({
       ...defaultState,
-      selectedTaskId: cached?.selectedTaskId || initialTaskId,
       ...cached,
     });
     setWorkPackageCreateErrors({});
@@ -891,6 +928,14 @@ export function AmroOwnedWorkspace({
     });
   };
 
+  const handleToggleWorkPackageCreateTaskSelection = (taskId: string, checked: boolean) => {
+    const selected = workPackageCreateForm.selectedTaskIds;
+    const nextSelected = checked
+      ? selected.includes(taskId) ? selected : [...selected, taskId]
+      : selected.filter((id) => id !== taskId);
+    handleWorkPackageCreateFormChange('selectedTaskIds', nextSelected);
+  };
+
   const validateWorkPackageCreateForm = (values: WorkPackageCreateFormState): WorkPackageCreateFormErrors => {
     const nextErrors: WorkPackageCreateFormErrors = {};
     if (!values.workPackageDetails.trim()) {
@@ -900,8 +945,8 @@ export function AmroOwnedWorkspace({
     if (!Number.isInteger(revisionValue) || revisionValue < 1) {
       nextErrors.revision = 'Revision must be a positive integer.';
     }
-    if (!values.selectedTaskId.trim()) {
-      nextErrors.selectedTaskId = 'Selected task is required.';
+    if (taskSelectionOptions.length > 0 && values.selectedTaskIds.length === 0) {
+      nextErrors.selectedTaskIds = 'Select at least one task.';
     }
     if (!values.plannedStartDate) {
       nextErrors.plannedStartDate = 'Planned start date is required.';
@@ -931,15 +976,17 @@ export function AmroOwnedWorkspace({
       toast.error('Validation failed for work package form.');
       return;
     }
-    const selectedTaskLabel = taskSelectionOptions.find((task) => task.value === workPackageCreateForm.selectedTaskId)?.label || '';
+    const selectedTaskLabels = taskSelectionOptions
+      .filter((task) => workPackageCreateForm.selectedTaskIds.includes(task.value))
+      .map((task) => task.label);
     const ok = await state.createWorkPackage(workPackageCreateForm.workPackageDetails, {
       maintenanceType: workPackageCreateForm.maintenanceType,
       priority: workPackageCreateForm.priority,
       plannedStartIso: `${workPackageCreateForm.plannedStartDate}T00:00:00.000Z`,
       plannedEndIso: `${workPackageCreateForm.plannedEndDate}T23:59:59.000Z`,
       station: selectedStationFilter === 'all' ? undefined : selectedStationFilter,
-      scopeItems: [workPackageCreateForm.workPackageDetails, selectedTaskLabel].filter((item) => item.trim().length > 0),
-      taskPlan: [workPackageCreateForm.selectedTaskId],
+      scopeItems: [workPackageCreateForm.workPackageDetails, ...selectedTaskLabels].filter((item) => item.trim().length > 0),
+      taskPlan: workPackageCreateForm.selectedTaskIds.length > 0 ? workPackageCreateForm.selectedTaskIds : [workPackageCreateForm.workPackageDetails],
       revision: workPackageCreateForm.revision,
       assignedRole: workPackageCreateForm.assignedRole,
       workflowStatus: workPackageCreateForm.workflowStatus,
@@ -2587,21 +2634,56 @@ export function AmroOwnedWorkspace({
                   ) : null}
                 </div>
                 <div className="space-y-1">
-                  <Label>Selected Task</Label>
-                  <Select value={workPackageCreateForm.selectedTaskId} onValueChange={(value) => handleWorkPackageCreateFormChange('selectedTaskId', value)}>
-                    <SelectTrigger aria-label="Selected task" aria-invalid={Boolean(workPackageCreateErrors.selectedTaskId)}>
-                      <SelectValue placeholder="Select task" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {taskSelectionOptions.map((task) => (
-                        <SelectItem key={task.value} value={task.value}>
-                          {task.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {workPackageCreateErrors.selectedTaskId ? (
-                    <p className="text-xs text-destructive">{workPackageCreateErrors.selectedTaskId}</p>
+                  <div className="flex items-center justify-between">
+                    <Label>Selected Tasks</Label>
+                    {taskSelectionOptions.length > 0 ? (
+                      <div className="flex items-center gap-2">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-xs"
+                          onClick={() => handleWorkPackageCreateFormChange('selectedTaskIds', taskSelectionOptions.map((task) => task.value))}
+                        >
+                          Select all
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-xs"
+                          onClick={() => handleWorkPackageCreateFormChange('selectedTaskIds', [])}
+                        >
+                          Clear
+                        </Button>
+                      </div>
+                    ) : null}
+                  </div>
+                  <div className="max-h-40 space-y-2 overflow-y-auto rounded-md border p-2">
+                    {taskSelectionOptions.length > 0 ? taskSelectionOptions.map((task) => {
+                      const checked = workPackageCreateForm.selectedTaskIds.includes(task.value);
+                      return (
+                        <label key={task.value} className="flex cursor-pointer items-center gap-2 rounded px-1 py-1 text-xs hover:bg-muted/40">
+                          <Checkbox
+                            checked={checked}
+                            onCheckedChange={(value) => handleToggleWorkPackageCreateTaskSelection(task.value, Boolean(value))}
+                            aria-label={`Select ${task.label}`}
+                          />
+                          <span>{task.label}</span>
+                        </label>
+                      );
+                    }) : (
+                      <p className="text-xs text-muted-foreground">No tasks available</p>
+                    )}
+                  </div>
+                  {taskSelectionOptions.length > 0 ? (
+                    <p className="text-xs text-muted-foreground">{workPackageCreateForm.selectedTaskIds.length} task(s) selected</p>
+                  ) : null}
+                  {taskSelectionOptions.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">No tasks found in maintenance_tasks for your current scope.</p>
+                  ) : null}
+                  {workPackageCreateErrors.selectedTaskIds ? (
+                    <p className="text-xs text-destructive">{workPackageCreateErrors.selectedTaskIds}</p>
                   ) : null}
                 </div>
               </div>
