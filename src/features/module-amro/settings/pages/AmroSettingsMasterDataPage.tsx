@@ -376,13 +376,14 @@ const normalizeWorkPackageRecordSummary = (record: Record<string, unknown>): Air
   }
   const normalizedTasks = taskRows
     .map((task, index): AircraftWorkPackageTaskListItem => {
-      const taskNumber = String(task.task_number || task.taskNumber || `TASK-${index + 1}`).trim() || `TASK-${index + 1}`;
-      const ataCode = String(task.ata_code || task.ataCode || '').trim();
-      const serialNumber = String(task.serial_number || task.serialNumber || '').trim();
-      const partNumber = String(task.part_number || task.partNumber || '').trim();
-      const description = String(task.description || task.title || task.name || '').trim();
-      const taskStatus = normalizeWorkPackageTaskStatus(task.status || status);
-      const source: AircraftWorkPackageTaskListItem['source'] = String(task.id || '').startsWith('scope-') ? 'scope' : 'existing_wp';
+      const taskRecord = task as Record<string, unknown>;
+      const taskNumber = String(taskRecord.task_number || taskRecord['taskNumber'] || `TASK-${index + 1}`).trim() || `TASK-${index + 1}`;
+      const ataCode = String(taskRecord.ata_code || taskRecord['ataCode'] || '').trim();
+      const serialNumber = String(taskRecord.serial_number || taskRecord['serialNumber'] || '').trim();
+      const partNumber = String(taskRecord.part_number || taskRecord['partNumber'] || '').trim();
+      const description = String(taskRecord.description || taskRecord['title'] || taskRecord['name'] || '').trim();
+      const taskStatus = normalizeWorkPackageTaskStatus(taskRecord.status || status);
+      const source: AircraftWorkPackageTaskListItem['source'] = String(taskRecord.id || '').startsWith('scope-') ? 'scope' : 'existing_wp';
       return {
         id: `existing-${id}-${index + 1}-${taskNumber}`.toLowerCase().replace(/[^a-z0-9-]/g, '-'),
         taskNumber,
@@ -1283,6 +1284,9 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   const [workPackageTemplateRegistry, setWorkPackageTemplateRegistry] = useState<WorkPackageTemplateRegistryItem[]>([]);
   const [workPackageTemplateRegistryLoading, setWorkPackageTemplateRegistryLoading] = useState(false);
   const [workPackageTemplateRegistryError, setWorkPackageTemplateRegistryError] = useState('');
+  const [workPackageTemplateTaskTemplates, setWorkPackageTemplateTaskTemplates] = useState<Record<string, unknown>[]>([]);
+  const [workPackageTemplateTaskTemplatesLoading, setWorkPackageTemplateTaskTemplatesLoading] = useState(false);
+  const [workPackageTemplateTaskTemplatesError, setWorkPackageTemplateTaskTemplatesError] = useState('');
   const [selectedWorkPackageTemplateId, setSelectedWorkPackageTemplateId] = useState('');
   const [flightLogDialogOpen, setFlightLogDialogOpen] = useState(false);
   const [flightLogSubmitting, setFlightLogSubmitting] = useState(false);
@@ -2819,30 +2823,8 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     if (entity !== 'work_package_templates') {
       return [] as Array<Record<string, unknown>>;
     }
-    const source = formValues.tasks_json;
-    if (Array.isArray(source)) {
-      return source.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object');
-    }
-    if (source && typeof source === 'object') {
-      return [source as Record<string, unknown>];
-    }
-    const raw = String(source || '').trim();
-    if (!raw) {
-      return [] as Array<Record<string, unknown>>;
-    }
-    try {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
-        return parsed.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object');
-      }
-      if (parsed && typeof parsed === 'object') {
-        return [parsed as Record<string, unknown>];
-      }
-      return [] as Array<Record<string, unknown>>;
-    } catch {
-      return [] as Array<Record<string, unknown>>;
-    }
-  }, [entity, formValues.tasks_json]);
+    return workPackageTemplateTaskTemplates;
+  }, [entity, workPackageTemplateTaskTemplates]);
   const selectedAircraft = useMemo(
     () => (entity === 'aircraft' ? (selectedRow || rows[0] || null) : null),
     [entity, rows, selectedRow],
@@ -4048,6 +4030,40 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     }
   }, [canCreateWorkPackage, entity, scope, sessionAccessToken, trackWorkPackageTemplateAdoption]);
 
+  const loadWorkPackageTemplateTaskTemplates = useCallback(async () => {
+    if (entity !== 'work_package_templates') {
+      return;
+    }
+    if (!scopedDb || !scope.tenantId) {
+      setWorkPackageTemplateTaskTemplates([]);
+      setWorkPackageTemplateTaskTemplatesError('');
+      return;
+    }
+    setWorkPackageTemplateTaskTemplatesLoading(true);
+    setWorkPackageTemplateTaskTemplatesError('');
+    try {
+      let query = (scopedDb as any)
+        .from('task_templates')
+        .select('id,task_id,tenant_id,franchise_id,code_form_no,ata_code,reference_amp,description,category_code,estimated_man_hours,is_mandatory,task_template_detail_json')
+        .eq('tenant_id', scope.tenantId);
+      if (scope.franchiseId) {
+        query = query.eq('franchise_id', scope.franchiseId);
+      } else {
+        query = query.is('franchise_id', null);
+      }
+      const { data, error } = await query.order('task_id', { ascending: true });
+      if (error) {
+        throw new Error(String(error.message || 'Failed to load task templates'));
+      }
+      setWorkPackageTemplateTaskTemplates(Array.isArray(data) ? (data as Record<string, unknown>[]) : []);
+    } catch (error) {
+      setWorkPackageTemplateTaskTemplates([]);
+      setWorkPackageTemplateTaskTemplatesError(String((error as Error).message || 'Failed to load task templates'));
+    } finally {
+      setWorkPackageTemplateTaskTemplatesLoading(false);
+    }
+  }, [entity, scope.franchiseId, scope.tenantId, scopedDb]);
+
   useEffect(() => {
     void loadAircraftWorkPackageSnapshot();
   }, [loadAircraftWorkPackageSnapshot]);
@@ -4064,6 +4080,13 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     setAircraftWorkPackageValues(getDefaultAircraftWorkPackageValues(stationHint));
     setAircraftWorkPackageErrors({});
   }, [entity, selectedAircraft]);
+
+  useEffect(() => {
+    if (entity !== 'work_package_templates' || !modalOpen) {
+      return;
+    }
+    void loadWorkPackageTemplateTaskTemplates();
+  }, [entity, loadWorkPackageTemplateTaskTemplates, modalOpen]);
 
   useEffect(() => {
     if (entity !== 'aircraft' || !aircraftWorkPackageDialogOpen) {
@@ -4725,7 +4748,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     return Array.from(merged.values());
   }, [aircraftExistingWorkPackages, aircraftWorkPackageSelectedTasks, selectedWorkPackageTemplate]);
 
-  const aircraftTaskGridRows = useMemo(() => {
+  const aircraftTaskGridRows = useMemo<AircraftWorkPackageTaskListItem[]>(() => {
     if (aircraftWorkPackageActiveTab === 'non-performed-tasks') {
       return aircraftNonPerformedTasks;
     }
@@ -4742,6 +4765,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       status: 'pending',
       selectable: true,
       source: 'selected' as const,
+      parentWorkPackageNumber: undefined,
     }));
   }, [
     aircraftAllWorkPackageTasks,
@@ -4799,21 +4823,35 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       toast.error('Select an existing work package first');
       return;
     }
-    setAircraftWorkPackageValues((previous) => ({
-      ...previous,
-      workPackageNumber: selectedRecord.workPackageNumber || previous.workPackageNumber,
-      topic: selectedRecord.title || previous.topic,
-      maintenanceType: (selectedRecord.maintenanceType || previous.maintenanceType) as AircraftWorkPackageFormValues['maintenanceType'],
-      station: selectedRecord.station || previous.station,
-      status: selectedRecord.status || previous.status,
-      priority: selectedRecord.priority || previous.priority,
-      selectedTaskNumber: selectedRecord.tasks[0]?.taskNumber || previous.selectedTaskNumber,
-      selectedTaskAtaCode: selectedRecord.tasks[0]?.ataCode || previous.selectedTaskAtaCode,
-      selectedTaskSerialNumber: selectedRecord.tasks[0]?.serialNumber || previous.selectedTaskSerialNumber,
-      selectedTaskPartNumber: selectedRecord.tasks[0]?.partNumber || previous.selectedTaskPartNumber,
-      selectedTaskDescription: selectedRecord.tasks[0]?.description || previous.selectedTaskDescription,
-      scopeItemsText: selectedRecord.tasks.map((task) => task.description).filter(Boolean).join('\n') || previous.scopeItemsText,
-    }));
+    setAircraftWorkPackageValues((previous) => {
+      const normalizedStatus = String(selectedRecord.status || '').toLowerCase();
+      const nextStatus = (
+        ['', 'planning', 'scheduled', 'in_progress', 'blocked'].includes(normalizedStatus)
+          ? normalizedStatus
+          : previous.status
+      ) as AircraftWorkPackageFormValues['status'];
+      const normalizedPriority = String(selectedRecord.priority || '').toLowerCase();
+      const nextPriority = (
+        ['low', 'medium', 'high', 'critical'].includes(normalizedPriority)
+          ? normalizedPriority
+          : previous.priority
+      ) as AircraftWorkPackageFormValues['priority'];
+      return {
+        ...previous,
+        workPackageNumber: selectedRecord.workPackageNumber || previous.workPackageNumber,
+        topic: selectedRecord.title || previous.topic,
+        maintenanceType: (selectedRecord.maintenanceType || previous.maintenanceType) as AircraftWorkPackageFormValues['maintenanceType'],
+        station: selectedRecord.station || previous.station,
+        status: nextStatus,
+        priority: nextPriority,
+        selectedTaskNumber: selectedRecord.tasks[0]?.taskNumber || previous.selectedTaskNumber,
+        selectedTaskAtaCode: selectedRecord.tasks[0]?.ataCode || previous.selectedTaskAtaCode,
+        selectedTaskSerialNumber: selectedRecord.tasks[0]?.serialNumber || previous.selectedTaskSerialNumber,
+        selectedTaskPartNumber: selectedRecord.tasks[0]?.partNumber || previous.selectedTaskPartNumber,
+        selectedTaskDescription: selectedRecord.tasks[0]?.description || previous.selectedTaskDescription,
+        scopeItemsText: selectedRecord.tasks.map((task) => task.description).filter(Boolean).join('\n') || previous.scopeItemsText,
+      };
+    });
     setAircraftWorkPackageSelectedTaskIds(selectedRecord.tasks.map((task) => task.id));
     setAircraftWorkPackageErrors((previous) => ({ ...previous, selectedTaskDescription: '', scopeItemsText: '' }));
     setAircraftWorkPackageActiveTab('selected-task');
@@ -7209,45 +7247,39 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                           <table className="w-full text-[12px]">
                             <thead className="bg-slate-50 text-left text-slate-600">
                               <tr>
-                                <th className="px-2 py-1.5 font-semibold">Task number</th>
-                                <th className="px-2 py-1.5 font-semibold">Task name</th>
-                                <th className="px-2 py-1.5 font-semibold">ATA code</th>
-                                <th className="px-2 py-1.5 font-semibold">Serial number</th>
-                                <th className="px-2 py-1.5 font-semibold">Part number</th>
-                                <th className="px-2 py-1.5 font-semibold">Priority</th>
-                                <th className="px-2 py-1.5 font-semibold">Estimated hours</th>
-                                <th className="px-2 py-1.5 font-semibold">Status</th>
-                                <th className="px-2 py-1.5 font-semibold">Dependencies</th>
+                                <th className="px-2 py-1.5 font-semibold">Task ID</th>
+                                <th className="px-2 py-1.5 font-semibold">Code Form No</th>
+                                <th className="px-2 py-1.5 font-semibold">ATA Code</th>
+                                <th className="px-2 py-1.5 font-semibold">Reference AMP</th>
                                 <th className="px-2 py-1.5 font-semibold">Description</th>
+                                <th className="px-2 py-1.5 font-semibold">Category Code</th>
+                                <th className="px-2 py-1.5 font-semibold">Estimated Man Hours</th>
+                                <th className="px-2 py-1.5 font-semibold">Is Mandatory</th>
+                                <th className="px-2 py-1.5 font-semibold">JSON_Details</th>
                               </tr>
                             </thead>
                             <tbody>
                               {workPackageTemplateTaskItems.length ? workPackageTemplateTaskItems.map((task, index) => (
-                                <tr key={`${String(task.id || task.task_number || index)}-${index}`} className="border-t border-slate-100 text-slate-700">
-                                  <td className="px-2 py-1.5">{String(task.task_number || task.taskNumber || '-')}</td>
-                                  <td className="px-2 py-1.5">{String(task.task_name || task.taskName || task.title || '-')}</td>
-                                  <td className="px-2 py-1.5">{String(task.ata_code || task.ataCode || '-')}</td>
-                                  <td className="px-2 py-1.5">{String(task.serial_number || task.serialNumber || '-')}</td>
-                                  <td className="px-2 py-1.5">{String(task.part_number || task.partNumber || '-')}</td>
-                                  <td className="px-2 py-1.5">{String(task.priority || '-')}</td>
-                                  <td className="px-2 py-1.5">{String(task.estimated_hours || task.estimatedHours || '-')}</td>
-                                  <td className="px-2 py-1.5">{String(task.status || '-')}</td>
-                                  <td className="px-2 py-1.5">
-                                    {Array.isArray(task.dependency_task_numbers)
-                                      ? (task.dependency_task_numbers as unknown[]).map((item) => String(item)).join(', ') || '-'
-                                      : String(task.dependency_task_numbers || task.dependencies || '-')}
-                                  </td>
+                                <tr key={`${String(task.id || task.task_id || index)}-${index}`} className="border-t border-slate-100 text-slate-700">
+                                  <td className="px-2 py-1.5">{String(task.task_id || '-')}</td>
+                                  <td className="px-2 py-1.5">{String(task.code_form_no || '-')}</td>
+                                  <td className="px-2 py-1.5">{String(task.ata_code || '-')}</td>
+                                  <td className="px-2 py-1.5">{String(task.reference_amp || '-')}</td>
                                   <td className="px-2 py-1.5">{String(task.description || '-')}</td>
+                                  <td className="px-2 py-1.5">{String(task.category_code || '-')}</td>
+                                  <td className="px-2 py-1.5">{String(task.estimated_man_hours || '-')}</td>
+                                  <td className="px-2 py-1.5">{typeof task.is_mandatory === 'boolean' ? String(task.is_mandatory) : '-'}</td>
+                                  <td className="px-2 py-1.5">{typeof task.task_template_detail_json === 'object' && task.task_template_detail_json !== null ? JSON.stringify(task.task_template_detail_json) : String(task.task_template_detail_json || '-')}</td>
                                 </tr>
                               )) : (
                                 <tr>
-                                  <td className="px-2 py-2 text-slate-500" colSpan={10}>No task rows available</td>
+                                  <td className="px-2 py-2 text-slate-500" colSpan={9}>{workPackageTemplateTaskTemplatesLoading ? 'Loading task templates…' : 'No task rows available'}</td>
                                 </tr>
                               )}
                             </tbody>
                           </table>
                         </div>
-                        {formErrors.tasks_json ? <p className="mdm-template-danger">{formErrors.tasks_json}</p> : null}
+                        {workPackageTemplateTaskTemplatesError ? <p className="mdm-template-danger">{workPackageTemplateTaskTemplatesError}</p> : null}
                       </div>
                     </section>
                   </div>
@@ -7935,7 +7967,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                             <TableCell className="px-2 py-1 text-[12px] text-[#5a5a5a]">{task.taskNumber || '-'}</TableCell>
                             <TableCell className="px-2 py-1 text-[12px] text-[#5a5a5a]">{task.ataCode || '-'}</TableCell>
                             <TableCell className="px-2 py-1 text-[12px] text-[#5a5a5a]">{task.description || '-'}</TableCell>
-                            <TableCell className="px-2 py-1 text-[12px] text-[#5a5a5a]">{task.parentWorkPackageNumber || '-'}</TableCell>
+                            <TableCell className="px-2 py-1 text-[12px] text-[#5a5a5a]">{('parentWorkPackageNumber' in task ? task.parentWorkPackageNumber : '') || '-'}</TableCell>
                           </TableRow>
                         ))}
                         {!aircraftTaskGridFilteredRows.length ? (

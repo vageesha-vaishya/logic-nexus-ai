@@ -31,6 +31,57 @@ vi.mock('@/hooks/useCRM', () => ({
       franchiseId: 'franchise-1',
       userId: 'user-1',
     },
+    scopedDb: {
+      from: (tableName: string) => {
+        const state: { tenantId?: string; franchiseId?: string | null } = {};
+        const query = {
+          select: () => query,
+          eq: (column: string, value: string) => {
+            if (column === 'tenant_id') {
+              state.tenantId = value;
+            }
+            if (column === 'franchise_id') {
+              state.franchiseId = value;
+            }
+            return query;
+          },
+          is: (column: string, value: null) => {
+            if (column === 'franchise_id' && value === null) {
+              state.franchiseId = null;
+            }
+            return query;
+          },
+          order: async () => {
+            if (tableName === 'task_templates' && state.tenantId === 'tenant-1' && state.franchiseId === 'franchise-1') {
+              return {
+                data: [
+                  {
+                    id: 'task-template-1',
+                    task_id: 1,
+                    tenant_id: 'tenant-1',
+                    franchise_id: 'franchise-1',
+                    code_form_no: '05-20',
+                    ata_code: '05-20',
+                    reference_amp: 'AMM 05-20',
+                    description: 'Scheduled Maintenance Checks',
+                    category_code: 'OPC',
+                    estimated_man_hours: '2.5',
+                    revision_status: 'active',
+                    interval_hours: 300,
+                    interval_cycles: null,
+                    interval_months: null,
+                    is_mandatory: true,
+                  },
+                ],
+                error: null,
+              };
+            }
+            return { data: [], error: null };
+          },
+        };
+        return query;
+      },
+    },
   }),
 }));
 
