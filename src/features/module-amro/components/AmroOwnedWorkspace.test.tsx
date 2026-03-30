@@ -4,6 +4,9 @@ import { AmroOwnedWorkspace } from './AmroOwnedWorkspace';
 
 const mockUseAmroWorkspaceState = vi.fn();
 const mockScopedDbFrom = vi.fn();
+const mockScopedDb = {
+  from: (...args: unknown[]) => mockScopedDbFrom(...args),
+};
 const mockToastSuccess = vi.fn();
 const mockToastError = vi.fn();
 const mockWorkbook = {};
@@ -38,9 +41,11 @@ vi.mock('xlsx', () => ({
 }));
 
 vi.mock('jspdf', () => ({
-  jsPDF: vi.fn(() => ({
-    save: (...args: unknown[]) => mockPdfSave(...args),
-  })),
+  jsPDF: function MockJsPdf() {
+    return {
+      save: (...args: unknown[]) => mockPdfSave(...args),
+    };
+  },
 }));
 
 vi.mock('jspdf-autotable', () => ({
@@ -49,9 +54,7 @@ vi.mock('jspdf-autotable', () => ({
 
 vi.mock('@/hooks/useCRM', () => ({
   useCRM: () => ({
-    scopedDb: {
-      from: (...args: unknown[]) => mockScopedDbFrom(...args),
-    },
+    scopedDb: mockScopedDb,
   }),
 }));
 
@@ -428,17 +431,28 @@ describe('AmroOwnedWorkspace', () => {
     render(<AmroOwnedWorkspace moduleKey="work-packages" />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Add WP' }));
+    expect(screen.getByLabelText('Package Number')).toBeTruthy();
+    expect(screen.getByLabelText('Topic')).toBeTruthy();
+    expect(screen.getByLabelText('Planning Date')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Review' }));
-    expect(screen.getByText('Aircraft is required before task selection.')).toBeTruthy();
+    expect(screen.getAllByText('Aircraft is required before task selection.').length).toBeGreaterThan(0);
     expect(createWorkPackage).toHaveBeenCalledTimes(0);
 
-    fireEvent.click(screen.getByRole('button', { name: /A320-200/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /A320-200/ }));
     fireEvent.change(screen.getByLabelText('Package Number'), { target: { value: 'WP-A320-001' } });
     fireEvent.change(screen.getByLabelText('Topic'), { target: { value: 'C-Check package for fleet A1' } });
+    fireEvent.change(screen.getByLabelText('Location/Station'), { target: { value: 'DXB' } });
     fireEvent.change(screen.getByLabelText('Work Package Details'), { target: { value: 'C-Check package for fleet A1' } });
+    await waitFor(() => {
+      expect(screen.getByText('TASK-001')).toBeTruthy();
+      expect(screen.getByText('TASK-002')).toBeTruthy();
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Select all valid' }));
+    await waitFor(() => {
+      expect(screen.getByText('2 selected')).toBeTruthy();
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Review' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Submit' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Submit' }));
     await waitFor(() => {
       expect(createWorkPackage).toHaveBeenCalledWith('C-Check package for fleet A1', expect.objectContaining({
         aircraftId: 'ac-1',
@@ -502,7 +516,8 @@ describe('AmroOwnedWorkspace', () => {
     render(<AmroOwnedWorkspace moduleKey="work-packages" />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Add WP' }));
-    fireEvent.click(screen.getByRole('button', { name: /A320-200/ }));
+    const aircraftOption = await screen.findByRole('button', { name: /A320-200/ });
+    fireEvent.click(aircraftOption);
 
     await waitFor(() => {
       expect(screen.getByText('Task already assigned to this aircraft.')).toBeTruthy();
@@ -596,17 +611,25 @@ describe('AmroOwnedWorkspace', () => {
     render(<AmroOwnedWorkspace moduleKey="work-packages" />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Open work package WP-1' }));
+    await waitFor(() => {
+      expect(openWorkPackageDetails).toHaveBeenCalledWith('wp-1');
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Schedule work package WP-1' }));
+    await waitFor(() => {
+      expect(updateWorkPackageScheduling).toHaveBeenCalledWith('wp-1');
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Hold work package WP-1' }));
+    await waitFor(() => {
+      expect(toggleWorkPackageHold).toHaveBeenCalledWith('wp-1');
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Clone work package WP-1' }));
+    await waitFor(() => {
+      expect(cloneWorkPackageFromTemplate).toHaveBeenCalledWith('wp-1');
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Export work package WP-1' }));
     fireEvent.click(screen.getByRole('button', { name: 'Delete work package WP-1' }));
 
     await waitFor(() => {
-      expect(openWorkPackageDetails).toHaveBeenCalledWith('wp-1');
-      expect(updateWorkPackageScheduling).toHaveBeenCalledWith('wp-1');
-      expect(toggleWorkPackageHold).toHaveBeenCalledWith('wp-1');
-      expect(cloneWorkPackageFromTemplate).toHaveBeenCalledWith('wp-1');
       expect(softDeleteWorkPackage).toHaveBeenCalledWith('wp-1');
     });
 

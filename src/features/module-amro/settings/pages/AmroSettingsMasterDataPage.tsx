@@ -151,6 +151,7 @@ type RecordRow = {
 };
 
 type SortDirection = 'asc' | 'desc';
+type AircraftWorkPackageTab = 'new-wp' | 'existing-wp' | 'non-performed-tasks' | 'selected-task' | 'all-tasks';
 
 type InlineEditingCell = {
   rowId: string;
@@ -219,6 +220,122 @@ const formatAirportLabel = (record: Record<string, unknown> | null, fallback: st
   if (name) return name;
   if (code) return code;
   return fallback;
+};
+
+const normalizeWorkPackageTaskStatus = (value: unknown): string => {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (!normalized) return 'pending';
+  return normalized;
+};
+
+const isTaskNonPerformedStatus = (value: unknown): boolean => {
+  const normalized = normalizeWorkPackageTaskStatus(value);
+  return !(
+    normalized.includes('completed')
+    || normalized.includes('performed')
+    || normalized.includes('closed')
+    || normalized.includes('done')
+  );
+};
+
+const coerceRecordArray = (value: unknown): Record<string, unknown>[] => {
+  if (Array.isArray(value)) {
+    return value.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object');
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return [];
+    }
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) {
+        return parsed.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object');
+      }
+      if (parsed && typeof parsed === 'object') {
+        return [parsed as Record<string, unknown>];
+      }
+      return [];
+    } catch {
+      return [];
+    }
+  }
+  if (value && typeof value === 'object') {
+    return [value as Record<string, unknown>];
+  }
+  return [];
+};
+
+const normalizeWorkPackageRecordSummary = (record: Record<string, unknown>): AircraftWorkPackageRecordSummary | null => {
+  const id = String(record.id || record.work_package_id || '').trim();
+  if (!id) {
+    return null;
+  }
+  const workPackageNumber = String(record.work_order_number || record.work_package_number || record.package_number || '').trim() || id;
+  const title = String(record.title || record.topic || workPackageNumber).trim() || workPackageNumber;
+  const status = String(record.status || record.lifecycle_stage || 'planning').trim() || 'planning';
+  const maintenanceType = String(record.maintenance_type || record.type || 'line').trim() || 'line';
+  const priority = String(record.priority || 'medium').trim() || 'medium';
+  const station = String(record.station || record.station_code || '').trim();
+  const updatedAt = String(record.updated_at || record.modified_at || record.created_at || '').trim();
+  const selectedTask = record.selected_task && typeof record.selected_task === 'object' ? (record.selected_task as Record<string, unknown>) : null;
+  const taskSnapshotRows = coerceRecordArray(record.task_snapshot);
+  const scopeRows = coerceRecordArray(record.scope_items).map((row, index) => ({
+    id: `scope-${id}-${index + 1}`,
+    task_number: String(row.task_number || row.taskNumber || `SCOPE-${index + 1}`),
+    ata_code: String(row.ata_code || row.ataCode || selectedTask?.ata_code || ''),
+    serial_number: String(row.serial_number || row.serialNumber || selectedTask?.serial_number || ''),
+    part_number: String(row.part_number || row.partNumber || selectedTask?.part_number || ''),
+    description: String(row.description || row.title || row.name || ''),
+    status: String(row.status || 'pending'),
+  }));
+  const taskRows = [...taskSnapshotRows, ...scopeRows];
+  if (selectedTask) {
+    taskRows.push({
+      id: `selected-${id}`,
+      task_number: String(selectedTask.task_number || ''),
+      ata_code: String(selectedTask.ata_code || ''),
+      serial_number: String(selectedTask.serial_number || ''),
+      part_number: String(selectedTask.part_number || ''),
+      description: String(selectedTask.description || ''),
+      status: String(selectedTask.status || 'pending'),
+    });
+  }
+  const normalizedTasks = taskRows
+    .map((task, index): AircraftWorkPackageTaskListItem => {
+      const taskNumber = String(task.task_number || task.taskNumber || `TASK-${index + 1}`).trim() || `TASK-${index + 1}`;
+      const ataCode = String(task.ata_code || task.ataCode || '').trim();
+      const serialNumber = String(task.serial_number || task.serialNumber || '').trim();
+      const partNumber = String(task.part_number || task.partNumber || '').trim();
+      const description = String(task.description || task.title || task.name || '').trim();
+      const taskStatus = normalizeWorkPackageTaskStatus(task.status || status);
+      const source: AircraftWorkPackageTaskListItem['source'] = String(task.id || '').startsWith('scope-') ? 'scope' : 'existing_wp';
+      return {
+        id: `existing-${id}-${index + 1}-${taskNumber}`.toLowerCase().replace(/[^a-z0-9-]/g, '-'),
+        taskNumber,
+        ataCode,
+        serialNumber,
+        partNumber,
+        description,
+        status: taskStatus,
+        selectable: true,
+        source,
+        parentWorkPackageId: id,
+        parentWorkPackageNumber: workPackageNumber,
+      };
+    })
+    .filter((task) => Boolean(task.description) || Boolean(task.taskNumber));
+  return {
+    id,
+    workPackageNumber,
+    title,
+    status,
+    maintenanceType,
+    priority,
+    station,
+    updatedAt,
+    tasks: normalizedTasks,
+  };
 };
 
 const resolveFlightLogAircraftLabel = (row: RecordRow): string => {
@@ -406,6 +523,32 @@ type WorkPackageTemplateRegistryItem = {
     partNumber: string;
     description: string;
   }>;
+};
+
+type AircraftWorkPackageRecordSummary = {
+  id: string;
+  workPackageNumber: string;
+  title: string;
+  status: string;
+  maintenanceType: string;
+  priority: string;
+  station: string;
+  updatedAt: string;
+  tasks: AircraftWorkPackageTaskListItem[];
+};
+
+type AircraftWorkPackageTaskListItem = {
+  id: string;
+  taskNumber: string;
+  ataCode: string;
+  serialNumber: string;
+  partNumber: string;
+  description: string;
+  status: string;
+  selectable: boolean;
+  source: 'template' | 'existing_wp' | 'scope' | 'selected';
+  parentWorkPackageId?: string;
+  parentWorkPackageNumber?: string;
 };
 
 type AircraftDashboardKpis = {
@@ -1053,12 +1196,16 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   const [aircraftWorkPackageValues, setAircraftWorkPackageValues] = useState<AircraftWorkPackageFormValues>(getDefaultAircraftWorkPackageValues());
   const [aircraftWorkPackageErrors, setAircraftWorkPackageErrors] = useState<Record<string, string>>({});
   const [aircraftWorkPackageSubmitting, setAircraftWorkPackageSubmitting] = useState(false);
-  const [aircraftWorkPackageActiveTab, setAircraftWorkPackageActiveTab] = useState('selected-task');
+  const [aircraftWorkPackageActiveTab, setAircraftWorkPackageActiveTab] = useState<AircraftWorkPackageTab>('new-wp');
   const [aircraftWorkPackageTaskSearch, setAircraftWorkPackageTaskSearch] = useState('');
   const [aircraftWorkPackageTaskSort, setAircraftWorkPackageTaskSort] = useState<'taskNumber' | 'ataCode' | 'description'>('taskNumber');
   const [aircraftWorkPackageTaskSortDirection, setAircraftWorkPackageTaskSortDirection] = useState<SortDirection>('asc');
   const [aircraftWorkPackageTaskPage, setAircraftWorkPackageTaskPage] = useState(1);
   const [aircraftWorkPackageSelectedTaskIds, setAircraftWorkPackageSelectedTaskIds] = useState<string[]>([]);
+  const [aircraftExistingWorkPackages, setAircraftExistingWorkPackages] = useState<AircraftWorkPackageRecordSummary[]>([]);
+  const [aircraftExistingWorkPackagesLoading, setAircraftExistingWorkPackagesLoading] = useState(false);
+  const [aircraftExistingWorkPackagesError, setAircraftExistingWorkPackagesError] = useState('');
+  const [aircraftSelectedExistingWorkPackageId, setAircraftSelectedExistingWorkPackageId] = useState('');
   const [workPackageTemplateRegistry, setWorkPackageTemplateRegistry] = useState<WorkPackageTemplateRegistryItem[]>([]);
   const [workPackageTemplateRegistryLoading, setWorkPackageTemplateRegistryLoading] = useState(false);
   const [workPackageTemplateRegistryError, setWorkPackageTemplateRegistryError] = useState('');
@@ -3754,6 +3901,89 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     void loadWorkPackageTemplateRegistry();
   }, [aircraftWorkPackageDialogOpen, entity, loadWorkPackageTemplateRegistry, workPackageTemplateRegistry.length]);
 
+  const loadAircraftExistingWorkPackages = useCallback(async () => {
+    if (entity !== 'aircraft' || !aircraftWorkPackageDialogOpen || !selectedAircraft?.id) {
+      setAircraftExistingWorkPackages([]);
+      setAircraftSelectedExistingWorkPackageId('');
+      return;
+    }
+    setAircraftExistingWorkPackagesLoading(true);
+    setAircraftExistingWorkPackagesError('');
+    try {
+      const headers = await buildApiHeaders(scope, {
+        fallbackAccessToken: sessionAccessToken,
+        requestTag: 'aircraft-work-package-dialog-existing-records',
+        requestUrl: '/api/v2/amro/work-packages',
+        requestMethod: 'GET',
+      });
+      const query = new URLSearchParams({
+        aircraft_id: String(selectedAircraft.id),
+        page: '1',
+        page_size: '100',
+      });
+      const response = await fetch(`/api/v2/amro/work-packages?${query.toString()}`, {
+        method: 'GET',
+        headers,
+      });
+      const payload = await parseApiPayload(response);
+      if (!response.ok) {
+        throw new Error(String(payload.error || 'Failed to load existing work packages'));
+      }
+      const normalizedRows = parseWorkPackageItems(payload)
+        .map(normalizeWorkPackageRecordSummary)
+        .filter((row): row is AircraftWorkPackageRecordSummary => Boolean(row));
+      setAircraftExistingWorkPackages(normalizedRows);
+      setAircraftSelectedExistingWorkPackageId((previous) => {
+        if (previous && normalizedRows.some((item) => item.id === previous)) {
+          return previous;
+        }
+        return normalizedRows[0]?.id || '';
+      });
+    } catch (error) {
+      setAircraftExistingWorkPackages([]);
+      setAircraftSelectedExistingWorkPackageId('');
+      setAircraftExistingWorkPackagesError(String((error as Error).message || 'Failed to load existing work packages'));
+    } finally {
+      setAircraftExistingWorkPackagesLoading(false);
+    }
+  }, [aircraftWorkPackageDialogOpen, entity, scope, selectedAircraft, sessionAccessToken]);
+
+  useEffect(() => {
+    if (!aircraftWorkPackageDialogOpen) {
+      return;
+    }
+    if (!['existing-wp', 'non-performed-tasks', 'all-tasks'].includes(aircraftWorkPackageActiveTab)) {
+      return;
+    }
+    void loadAircraftExistingWorkPackages();
+  }, [aircraftWorkPackageActiveTab, aircraftWorkPackageDialogOpen, loadAircraftExistingWorkPackages]);
+
+  useEffect(() => {
+    if (!aircraftWorkPackageDialogOpen) {
+      return;
+    }
+    if (aircraftWorkPackageActiveTab !== 'new-wp') {
+      return;
+    }
+    if (workPackageTemplateRegistryLoading) {
+      return;
+    }
+    if (workPackageTemplateRegistryError) {
+      return;
+    }
+    if (workPackageTemplateRegistry.length > 0) {
+      return;
+    }
+    void loadWorkPackageTemplateRegistry();
+  }, [
+    aircraftWorkPackageActiveTab,
+    aircraftWorkPackageDialogOpen,
+    loadWorkPackageTemplateRegistry,
+    workPackageTemplateRegistryError,
+    workPackageTemplateRegistry.length,
+    workPackageTemplateRegistryLoading,
+  ]);
+
   const handleAircraftContextNavigation = useCallback(
     (path: string) => {
       const query = new URLSearchParams();
@@ -3791,12 +4021,15 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     const stationHint = String(selectedAircraft?.station_code || '').trim();
     setAircraftWorkPackageValues(getDefaultAircraftWorkPackageValues(stationHint));
     setAircraftWorkPackageErrors({});
-    setAircraftWorkPackageActiveTab('selected-task');
+    setAircraftWorkPackageActiveTab('new-wp');
     setAircraftWorkPackageTaskSearch('');
     setAircraftWorkPackageTaskSort('taskNumber');
     setAircraftWorkPackageTaskSortDirection('asc');
     setAircraftWorkPackageTaskPage(1);
     setAircraftWorkPackageSelectedTaskIds([]);
+    setAircraftExistingWorkPackages([]);
+    setAircraftExistingWorkPackagesError('');
+    setAircraftSelectedExistingWorkPackageId('');
     setSelectedWorkPackageTemplateId((previous) => previous || workPackageTemplateRegistry[0]?.id || '');
     setAircraftWorkPackageDialogOpen(true);
     trackWorkPackageTemplateAdoption('dialog_opened', {
@@ -3806,8 +4039,30 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   }, [canCreateWorkPackage, selectedAircraft, selectedWorkPackageTemplateId, trackWorkPackageTemplateAdoption, workPackageTemplateRegistry]);
 
   const setAircraftWorkPackageField = useCallback((key: keyof AircraftWorkPackageFormValues, value: string) => {
-    setAircraftWorkPackageValues((previous) => ({ ...previous, [key]: value }));
-    setAircraftWorkPackageErrors((previous) => ({ ...previous, [key]: '' }));
+    setAircraftWorkPackageValues((previous) => {
+      const nextValues = { ...previous, [key]: value };
+      const normalizedValue = value.trim();
+      let nextError = '';
+      if (['workPackageNumber', 'topic', 'openingDate', 'revisionNumber', 'status', 'validationState', 'transmissionDate', 'expectedReceptionDate', 'maintenanceReleaseDate', 'workReceptionDate'].includes(key)) {
+        nextError = normalizedValue ? '' : `${String(key).replace(/([A-Z])/g, ' $1').replace(/^./, (char) => char.toUpperCase())} is required`;
+      }
+      if (['openingDate', 'revisionDate', 'transmissionDate', 'expectedReceptionDate', 'maintenanceReleaseDate', 'workReceptionDate', 'plannedStart', 'plannedEnd'].includes(key) && normalizedValue) {
+        if (Number.isNaN(Date.parse(normalizedValue))) {
+          nextError = `${String(key).replace(/([A-Z])/g, ' $1').replace(/^./, (char) => char.toUpperCase())} must be a valid date`;
+        }
+      }
+      if (key === 'ttafHours' && normalizedValue) {
+        const numericValue = Number(normalizedValue);
+        if (!Number.isFinite(numericValue) || numericValue < 0) {
+          nextError = 'TTAF must be a non-negative number';
+        }
+      }
+      if (key === 'scopeItemsText' && normalizedValue) {
+        nextError = '';
+      }
+      setAircraftWorkPackageErrors((previousErrors) => ({ ...previousErrors, [key]: nextError }));
+      return nextValues;
+    });
   }, []);
 
   const handleAircraftWorkPackageTemplateSelect = useCallback(
@@ -4032,51 +4287,97 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       }
 
       setAircraftWorkPackageSubmitting(true);
+      const now = Date.now();
+      const transactionId = `aircraft-wp-tx-${selectedAircraft.id}-${now}`;
+      const requestIdempotencyKey = `aircraft-wp-create-${now}`;
+      let committedWorkPackageId = '';
       try {
-        const headers = await buildApiHeaders(scope);
-        const now = Date.now();
+        const headers = await buildApiHeaders(scope, {
+          fallbackAccessToken: sessionAccessToken,
+          requestTag: 'aircraft-work-package-create',
+          requestUrl: '/api/v2/amro/work-packages?interface=create-work-package',
+          requestMethod: 'POST',
+        });
         const response = await fetch('/api/v2/amro/work-packages?interface=create-work-package', {
           method: 'POST',
           headers,
           body: JSON.stringify({
             ...workPackagePayload,
-            idempotency_key: `aircraft-wp-create-${now}`,
+            idempotency_key: requestIdempotencyKey,
             decision_trace_id: `aircraft-wp-${selectedAircraft.id}-${now}`,
+            transaction_id: transactionId,
             scope_context: {
               domain_id: 'amro',
+            },
+            audit_trail: {
+              action: action === 'create_schedule' ? 'create_and_schedule' : 'create',
+              actor_scope: scope.userId || '',
+              trigger_tab: aircraftWorkPackageActiveTab,
+              created_at: new Date(now).toISOString(),
+            },
+            version_info: {
+              revision_number: aircraftWorkPackageValues.revisionNumber.trim(),
+              revision_date: aircraftWorkPackageValues.revisionDate.trim()
+                ? new Date(aircraftWorkPackageValues.revisionDate).toISOString()
+                : null,
             },
           }),
         });
         const payload = await parseApiPayload(response);
+        const output = payload.output && typeof payload.output === 'object' ? (payload.output as Record<string, unknown>) : {};
+        committedWorkPackageId = String(output.work_package_id || output.id || '');
         if (!response.ok) {
           throw new Error(String(payload.error || 'Failed to create work package from aircraft'));
         }
-        const output = payload.output && typeof payload.output === 'object' ? (payload.output as Record<string, unknown>) : {};
-        const workPackageId = String(output.work_package_id || output.id || '');
         toast.success('Aircraft work package created');
         trackWorkPackageTemplateAdoption('submit_succeeded', {
           action,
           usesTemplate: Boolean(selectedWorkPackageTemplate?.id),
           templateId: selectedWorkPackageTemplate?.id || '',
           selectedTaskCount: aircraftWorkPackageSelectedTaskIds.length,
-          workPackageId,
+          workPackageId: committedWorkPackageId,
         });
         setAircraftWorkPackageDialogOpen(false);
         await loadAircraftWorkPackageSnapshot();
+        void loadAircraftExistingWorkPackages();
         if (action === 'create_schedule') {
           const query = new URLSearchParams();
           query.set('aircraft_id', String(selectedAircraft.id));
-          if (workPackageId) query.set('work_package_id', workPackageId);
+          if (committedWorkPackageId) query.set('work_package_id', committedWorkPackageId);
           navigate(`/dashboard/amro/scheduling?${query.toString()}`);
           return;
         }
         if (action === 'create_open') {
           const query = new URLSearchParams();
           query.set('aircraft_id', String(selectedAircraft.id));
-          if (workPackageId) query.set('focus', workPackageId);
+          if (committedWorkPackageId) query.set('focus', committedWorkPackageId);
           navigate(`/dashboard/amro/aircraft/work-packages?${query.toString()}`);
         }
       } catch (error) {
+        if (committedWorkPackageId) {
+          try {
+            const rollbackHeaders = await buildApiHeaders(scope, {
+              fallbackAccessToken: sessionAccessToken,
+              requestTag: 'aircraft-work-package-rollback',
+              requestUrl: `/api/v2/amro/work-packages/${committedWorkPackageId}`,
+              requestMethod: 'DELETE',
+            });
+            await fetch(`/api/v2/amro/work-packages/${committedWorkPackageId}?rollback=1`, {
+              method: 'DELETE',
+              headers: rollbackHeaders,
+              body: JSON.stringify({
+                transaction_id: transactionId,
+                rollback_reason: String((error as Error).message || 'Create work package failed'),
+              }),
+            });
+          } catch (rollbackError) {
+            trackWorkPackageTemplateAdoption('rollback_failed', {
+              action,
+              workPackageId: committedWorkPackageId,
+              errorMessage: String((rollbackError as Error).message || rollbackError),
+            });
+          }
+        }
         localStorage.setItem(
           `amro:aircraft-wp-draft:${selectedAircraft.id}`,
           JSON.stringify(workPackagePayload),
@@ -4093,7 +4394,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         setAircraftWorkPackageSubmitting(false);
       }
     },
-    [aircraftWorkPackageSelectedTaskIds, aircraftWorkPackageValues, canCreateWorkPackage, canScheduleWorkPackage, loadAircraftWorkPackageSnapshot, navigate, scope, selectedAircraft, selectedWorkPackageTemplate, trackWorkPackageTemplateAdoption],
+    [aircraftWorkPackageActiveTab, aircraftWorkPackageSelectedTaskIds, aircraftWorkPackageValues, canCreateWorkPackage, canScheduleWorkPackage, loadAircraftExistingWorkPackages, loadAircraftWorkPackageSnapshot, navigate, scope, selectedAircraft, selectedWorkPackageTemplate, sessionAccessToken, trackWorkPackageTemplateAdoption],
   );
 
   const aircraftWorkPackageSelectedTasks = useMemo(() => {
@@ -4177,6 +4478,171 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     const start = (normalizedPage - 1) * aircraftWorkPackageTaskPageSize;
     return aircraftWorkPackageFilteredTasks.slice(start, start + aircraftWorkPackageTaskPageSize);
   }, [aircraftWorkPackageFilteredTasks, aircraftWorkPackageTaskPage, aircraftWorkPackageTaskTotalPages]);
+
+  const aircraftExistingWorkPackageSelectedRecord = useMemo(
+    () => aircraftExistingWorkPackages.find((item) => item.id === aircraftSelectedExistingWorkPackageId) || null,
+    [aircraftExistingWorkPackages, aircraftSelectedExistingWorkPackageId],
+  );
+
+  const aircraftExistingWorkPackageList = useMemo(() => {
+    return [...aircraftExistingWorkPackages].sort((left, right) => {
+      const leftTime = Date.parse(left.updatedAt || '') || 0;
+      const rightTime = Date.parse(right.updatedAt || '') || 0;
+      if (leftTime !== rightTime) {
+        return rightTime - leftTime;
+      }
+      return left.workPackageNumber.localeCompare(right.workPackageNumber);
+    });
+  }, [aircraftExistingWorkPackages]);
+
+  const aircraftNonPerformedTasks = useMemo(() => {
+    const source = aircraftExistingWorkPackageSelectedRecord
+      ? aircraftExistingWorkPackageSelectedRecord.tasks
+      : aircraftExistingWorkPackages.flatMap((item) => item.tasks);
+    return source.filter((item) => isTaskNonPerformedStatus(item.status));
+  }, [aircraftExistingWorkPackageSelectedRecord, aircraftExistingWorkPackages]);
+
+  const aircraftAllWorkPackageTasks = useMemo(() => {
+    const merged = new Map<string, AircraftWorkPackageTaskListItem>();
+    selectedWorkPackageTemplate?.taskRows.forEach((item, index) => {
+      const id = item.id || `template-${index + 1}`;
+      merged.set(id, {
+        id,
+        taskNumber: item.taskNumber,
+        ataCode: item.ataCode,
+        serialNumber: item.serialNumber,
+        partNumber: item.partNumber,
+        description: item.description,
+        status: 'pending',
+        selectable: true,
+        source: 'template',
+      });
+    });
+    aircraftExistingWorkPackages.forEach((workPackage) => {
+      workPackage.tasks.forEach((task) => {
+        const key = `${task.taskNumber}|${task.ataCode}|${task.serialNumber}|${task.partNumber}|${task.description}|${workPackage.id}`.toLowerCase();
+        if (!merged.has(key)) {
+          merged.set(key, task);
+        }
+      });
+    });
+    aircraftWorkPackageSelectedTasks.forEach((item) => {
+      const id = `selected-${item.id}`;
+      if (!merged.has(id)) {
+        merged.set(id, {
+          id,
+          taskNumber: item.taskNumber,
+          ataCode: item.ataCode,
+          serialNumber: item.serialNumber,
+          partNumber: item.partNumber,
+          description: item.description,
+          status: 'pending',
+          selectable: true,
+          source: 'selected',
+        });
+      }
+    });
+    return Array.from(merged.values());
+  }, [aircraftExistingWorkPackages, aircraftWorkPackageSelectedTasks, selectedWorkPackageTemplate]);
+
+  const aircraftTaskGridRows = useMemo(() => {
+    if (aircraftWorkPackageActiveTab === 'non-performed-tasks') {
+      return aircraftNonPerformedTasks;
+    }
+    if (aircraftWorkPackageActiveTab === 'all-tasks') {
+      return aircraftAllWorkPackageTasks;
+    }
+    return aircraftWorkPackagePagedTasks.map((item) => ({
+      id: item.id,
+      taskNumber: item.taskNumber,
+      ataCode: item.ataCode,
+      serialNumber: item.serialNumber,
+      partNumber: item.partNumber,
+      description: item.description,
+      status: 'pending',
+      selectable: true,
+      source: 'selected' as const,
+    }));
+  }, [
+    aircraftAllWorkPackageTasks,
+    aircraftNonPerformedTasks,
+    aircraftWorkPackageActiveTab,
+    aircraftWorkPackagePagedTasks,
+  ]);
+
+  const aircraftTaskGridFilteredRows = useMemo(() => {
+    const normalizedSearch = aircraftWorkPackageTaskSearch.trim().toLowerCase();
+    const rows = normalizedSearch
+      ? aircraftTaskGridRows.filter((item) =>
+          [item.taskNumber, item.ataCode, item.serialNumber, item.partNumber, item.description, item.status]
+            .some((value) => String(value).toLowerCase().includes(normalizedSearch)),
+        )
+      : aircraftTaskGridRows;
+    return [...rows].sort((left, right) => {
+      const leftValue = String(left[aircraftWorkPackageTaskSort] || '').toLowerCase();
+      const rightValue = String(right[aircraftWorkPackageTaskSort] || '').toLowerCase();
+      if (leftValue === rightValue) {
+        return left.id.localeCompare(right.id);
+      }
+      return aircraftWorkPackageTaskSortDirection === 'asc'
+        ? leftValue.localeCompare(rightValue)
+        : rightValue.localeCompare(leftValue);
+    });
+  }, [aircraftTaskGridRows, aircraftWorkPackageTaskSearch, aircraftWorkPackageTaskSort, aircraftWorkPackageTaskSortDirection]);
+
+  const handleAircraftWorkPackageTaskSelection = useCallback((task: AircraftWorkPackageTaskListItem, checked: boolean) => {
+    if (!task.selectable) {
+      return;
+    }
+    setAircraftWorkPackageSelectedTaskIds((previous) => {
+      if (checked) {
+        return Array.from(new Set([...previous, task.id]));
+      }
+      return previous.filter((id) => id !== task.id);
+    });
+    if (checked) {
+      setAircraftWorkPackageValues((previous) => ({
+        ...previous,
+        selectedTaskNumber: task.taskNumber || previous.selectedTaskNumber,
+        selectedTaskAtaCode: task.ataCode || previous.selectedTaskAtaCode,
+        selectedTaskSerialNumber: task.serialNumber || previous.selectedTaskSerialNumber,
+        selectedTaskPartNumber: task.partNumber || previous.selectedTaskPartNumber,
+        selectedTaskDescription: task.description || previous.selectedTaskDescription,
+      }));
+    }
+    setAircraftWorkPackageErrors((previous) => ({ ...previous, selectedTaskDescription: '' }));
+  }, []);
+
+  const handleApplyExistingWorkPackageSelection = useCallback(() => {
+    const selectedRecord = aircraftExistingWorkPackages.find((item) => item.id === aircraftSelectedExistingWorkPackageId);
+    if (!selectedRecord) {
+      toast.error('Select an existing work package first');
+      return;
+    }
+    setAircraftWorkPackageValues((previous) => ({
+      ...previous,
+      workPackageNumber: selectedRecord.workPackageNumber || previous.workPackageNumber,
+      topic: selectedRecord.title || previous.topic,
+      maintenanceType: (selectedRecord.maintenanceType || previous.maintenanceType) as AircraftWorkPackageFormValues['maintenanceType'],
+      station: selectedRecord.station || previous.station,
+      status: selectedRecord.status || previous.status,
+      priority: selectedRecord.priority || previous.priority,
+      selectedTaskNumber: selectedRecord.tasks[0]?.taskNumber || previous.selectedTaskNumber,
+      selectedTaskAtaCode: selectedRecord.tasks[0]?.ataCode || previous.selectedTaskAtaCode,
+      selectedTaskSerialNumber: selectedRecord.tasks[0]?.serialNumber || previous.selectedTaskSerialNumber,
+      selectedTaskPartNumber: selectedRecord.tasks[0]?.partNumber || previous.selectedTaskPartNumber,
+      selectedTaskDescription: selectedRecord.tasks[0]?.description || previous.selectedTaskDescription,
+      scopeItemsText: selectedRecord.tasks.map((task) => task.description).filter(Boolean).join('\n') || previous.scopeItemsText,
+    }));
+    setAircraftWorkPackageSelectedTaskIds(selectedRecord.tasks.map((task) => task.id));
+    setAircraftWorkPackageErrors((previous) => ({ ...previous, selectedTaskDescription: '', scopeItemsText: '' }));
+    setAircraftWorkPackageActiveTab('selected-task');
+    toast.success('Existing work package loaded');
+  }, [aircraftExistingWorkPackages, aircraftSelectedExistingWorkPackageId]);
+
+  useEffect(() => {
+    setAircraftWorkPackageTaskPage(1);
+  }, [aircraftWorkPackageActiveTab]);
 
   const openFlightLogDialog = useCallback((rowId: string) => {
     const aircraftId = rowId.trim();
@@ -6536,9 +7002,14 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                             <thead className="bg-[#fafafa] text-left text-[#696969]">
                               <tr>
                                 <th className="px-2 py-1.5 font-semibold">Task number</th>
+                                <th className="px-2 py-1.5 font-semibold">Task name</th>
                                 <th className="px-2 py-1.5 font-semibold">ATA code</th>
                                 <th className="px-2 py-1.5 font-semibold">Serial number</th>
                                 <th className="px-2 py-1.5 font-semibold">Part number</th>
+                                <th className="px-2 py-1.5 font-semibold">Priority</th>
+                                <th className="px-2 py-1.5 font-semibold">Estimated hours</th>
+                                <th className="px-2 py-1.5 font-semibold">Status</th>
+                                <th className="px-2 py-1.5 font-semibold">Dependencies</th>
                                 <th className="px-2 py-1.5 font-semibold">Description</th>
                               </tr>
                             </thead>
@@ -6546,14 +7017,23 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                               {workPackageTemplateTaskItems.length ? workPackageTemplateTaskItems.map((task, index) => (
                                 <tr key={`${String(task.id || task.task_number || index)}-${index}`} className="border-t border-[#f1f1f1] text-[#555555]">
                                   <td className="px-2 py-1.5">{String(task.task_number || task.taskNumber || '-')}</td>
+                                  <td className="px-2 py-1.5">{String(task.task_name || task.taskName || task.title || '-')}</td>
                                   <td className="px-2 py-1.5">{String(task.ata_code || task.ataCode || '-')}</td>
                                   <td className="px-2 py-1.5">{String(task.serial_number || task.serialNumber || '-')}</td>
                                   <td className="px-2 py-1.5">{String(task.part_number || task.partNumber || '-')}</td>
+                                  <td className="px-2 py-1.5">{String(task.priority || '-')}</td>
+                                  <td className="px-2 py-1.5">{String(task.estimated_hours || task.estimatedHours || '-')}</td>
+                                  <td className="px-2 py-1.5">{String(task.status || '-')}</td>
+                                  <td className="px-2 py-1.5">
+                                    {Array.isArray(task.dependency_task_numbers)
+                                      ? (task.dependency_task_numbers as unknown[]).map((item) => String(item)).join(', ') || '-'
+                                      : String(task.dependency_task_numbers || task.dependencies || '-')}
+                                  </td>
                                   <td className="px-2 py-1.5">{String(task.description || '-')}</td>
                                 </tr>
                               )) : (
                                 <tr>
-                                  <td className="px-2 py-2 text-[#8b8b8b]" colSpan={5}>No task rows available</td>
+                                  <td className="px-2 py-2 text-[#8b8b8b]" colSpan={10}>No task rows available</td>
                                 </tr>
                               )}
                             </tbody>
@@ -6716,13 +7196,16 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
               </DialogTitle>
             </DialogHeader>
             <div className="flex h-full flex-col space-y-1 bg-[#f8f8f8] px-3 pb-2 pt-1">
-              <Tabs value={aircraftWorkPackageActiveTab} onValueChange={setAircraftWorkPackageActiveTab}>
+              <Tabs
+                value={aircraftWorkPackageActiveTab}
+                onValueChange={(value) => setAircraftWorkPackageActiveTab((['new-wp', 'existing-wp', 'non-performed-tasks', 'selected-task', 'all-tasks'].includes(value) ? value : 'selected-task') as AircraftWorkPackageTab)}
+              >
                 <TabsList className="h-auto w-full justify-start gap-0 overflow-x-auto rounded-none bg-transparent p-0">
-                  <TabsTrigger value="new-wp" className="h-[20px] rounded-none border border-r-0 border-[#d7d7d7] px-[7px] text-[10px] font-semibold leading-none text-[#6a6a6a] data-[state=active]:border-[#12aeb1] data-[state=active]:bg-[#12aeb1] data-[state=active]:text-white">New WP</TabsTrigger>
-                  <TabsTrigger value="existing-wp" className="h-[20px] rounded-none border border-r-0 border-[#d7d7d7] px-[7px] text-[10px] font-semibold leading-none text-[#6a6a6a] data-[state=active]:border-[#12aeb1] data-[state=active]:bg-[#12aeb1] data-[state=active]:text-white">Existing WP</TabsTrigger>
-                  <TabsTrigger value="non-performed-tasks" className="h-[20px] rounded-none border border-r-0 border-[#d7d7d7] px-[7px] text-[10px] font-semibold leading-none text-[#6a6a6a] data-[state=active]:border-[#12aeb1] data-[state=active]:bg-[#12aeb1] data-[state=active]:text-white">Non performed tasks</TabsTrigger>
-                  <TabsTrigger value="selected-task" className="h-[20px] rounded-none border border-r-0 border-[#d7d7d7] px-[7px] text-[10px] font-semibold leading-none text-[#6a6a6a] data-[state=active]:border-[#12aeb1] data-[state=active]:bg-[#12aeb1] data-[state=active]:text-white">Selected task</TabsTrigger>
-                  <TabsTrigger value="all-tasks" className="h-[20px] rounded-none border border-[#d7d7d7] px-[7px] text-[10px] font-semibold leading-none text-[#6a6a6a] data-[state=active]:border-[#12aeb1] data-[state=active]:bg-[#12aeb1] data-[state=active]:text-white">All Tasks</TabsTrigger>
+                  <TabsTrigger value="new-wp" onClick={() => setAircraftWorkPackageActiveTab('new-wp')} className="h-[20px] rounded-none border border-r-0 border-[#d7d7d7] px-[7px] text-[10px] font-semibold leading-none text-[#6a6a6a] data-[state=active]:border-[#12aeb1] data-[state=active]:bg-[#12aeb1] data-[state=active]:text-white">New WP</TabsTrigger>
+                  <TabsTrigger value="existing-wp" onClick={() => setAircraftWorkPackageActiveTab('existing-wp')} className="h-[20px] rounded-none border border-r-0 border-[#d7d7d7] px-[7px] text-[10px] font-semibold leading-none text-[#6a6a6a] data-[state=active]:border-[#12aeb1] data-[state=active]:bg-[#12aeb1] data-[state=active]:text-white">Existing WP</TabsTrigger>
+                  <TabsTrigger value="non-performed-tasks" onClick={() => setAircraftWorkPackageActiveTab('non-performed-tasks')} className="h-[20px] rounded-none border border-r-0 border-[#d7d7d7] px-[7px] text-[10px] font-semibold leading-none text-[#6a6a6a] data-[state=active]:border-[#12aeb1] data-[state=active]:bg-[#12aeb1] data-[state=active]:text-white">Non performed tasks</TabsTrigger>
+                  <TabsTrigger value="selected-task" onClick={() => setAircraftWorkPackageActiveTab('selected-task')} className="h-[20px] rounded-none border border-r-0 border-[#d7d7d7] px-[7px] text-[10px] font-semibold leading-none text-[#6a6a6a] data-[state=active]:border-[#12aeb1] data-[state=active]:bg-[#12aeb1] data-[state=active]:text-white">Selected task</TabsTrigger>
+                  <TabsTrigger value="all-tasks" onClick={() => setAircraftWorkPackageActiveTab('all-tasks')} className="h-[20px] rounded-none border border-[#d7d7d7] px-[7px] text-[10px] font-semibold leading-none text-[#6a6a6a] data-[state=active]:border-[#12aeb1] data-[state=active]:bg-[#12aeb1] data-[state=active]:text-white">All Tasks</TabsTrigger>
                 </TabsList>
                 <TabsContent value="selected-task" className="space-y-2 pt-1">
                   <div className="grid gap-2 lg:grid-cols-[1.06fr_0.94fr]">
@@ -6961,7 +7444,17 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                                   checked={aircraftWorkPackagePagedTasks.length > 0 && aircraftWorkPackagePagedTasks.every((task) => aircraftWorkPackageSelectedTaskIds.includes(task.id))}
                                   onCheckedChange={(checked) => {
                                     if (checked) {
-                                      setAircraftWorkPackageSelectedTaskIds((previous) => Array.from(new Set([...previous, ...aircraftWorkPackagePagedTasks.map((task) => task.id)])));
+                                      aircraftWorkPackagePagedTasks.forEach((task) => handleAircraftWorkPackageTaskSelection({
+                                        id: task.id,
+                                        taskNumber: task.taskNumber,
+                                        ataCode: task.ataCode,
+                                        serialNumber: task.serialNumber,
+                                        partNumber: task.partNumber,
+                                        description: task.description,
+                                        status: 'pending',
+                                        selectable: true,
+                                        source: 'selected',
+                                      }, true));
                                     } else {
                                       setAircraftWorkPackageSelectedTaskIds((previous) => previous.filter((id) => !aircraftWorkPackagePagedTasks.some((task) => task.id === id)));
                                     }
@@ -7032,13 +7525,17 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                                 <Checkbox
                                   aria-label={`Select task ${task.taskNumber || task.id}`}
                                   checked={aircraftWorkPackageSelectedTaskIds.includes(task.id)}
-                                  onCheckedChange={(checked) => {
-                                    if (checked) {
-                                      setAircraftWorkPackageSelectedTaskIds((previous) => Array.from(new Set([...previous, task.id])));
-                                      return;
-                                    }
-                                    setAircraftWorkPackageSelectedTaskIds((previous) => previous.filter((id) => id !== task.id));
-                                  }}
+                                  onCheckedChange={(checked) => handleAircraftWorkPackageTaskSelection({
+                                    id: task.id,
+                                    taskNumber: task.taskNumber,
+                                    ataCode: task.ataCode,
+                                    serialNumber: task.serialNumber,
+                                    partNumber: task.partNumber,
+                                    description: task.description,
+                                    status: 'pending',
+                                    selectable: true,
+                                    source: 'selected',
+                                  }, Boolean(checked))}
                                 />
                               </TableCell>
                               <TableCell className="px-2 py-1 text-[12px] text-[#5a5a5a]">{task.taskNumber || '1'}</TableCell>
@@ -7078,7 +7575,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                         Template registry
                       </Label>
                       <Select value={selectedWorkPackageTemplateId} onValueChange={handleAircraftWorkPackageTemplateSelect}>
-                        <SelectTrigger id="aircraft-wp-template" className="h-8 rounded-none border-[#e7e7e7] bg-white text-[12px] text-[#4f4f4f]">
+                        <SelectTrigger id="aircraft-wp-template" className="h-8 rounded-none border-[#e7e7e7] bg-white text-[12px] text-[#4f4f4f]" disabled={workPackageTemplateRegistryLoading || workPackageTemplateRegistry.length === 0}>
                           <SelectValue placeholder={workPackageTemplateRegistryLoading ? 'Loading templates...' : 'Choose template'} />
                         </SelectTrigger>
                         <SelectContent>
@@ -7089,6 +7586,8 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                           ))}
                         </SelectContent>
                       </Select>
+                      {workPackageTemplateRegistryLoading ? <p className="text-[11px] text-[#6a6a6a]" role="status">Loading template registry…</p> : null}
+                      {!workPackageTemplateRegistryLoading && workPackageTemplateRegistry.length === 0 && !workPackageTemplateRegistryError ? <p className="text-[11px] text-[#6a6a6a]">No templates available. Refresh to retry.</p> : null}
                       {workPackageTemplateRegistryError ? <p className="mdm-template-danger">{workPackageTemplateRegistryError}</p> : null}
                     </div>
                     <div className="rounded-sm border border-[#efefef] bg-white px-3 py-2">
@@ -7104,6 +7603,17 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                       <p className="text-[12px] font-semibold text-[#4f4f4f]">{selectedWorkPackageTemplate?.taskRows.length || 0}</p>
                     </div>
                   </div>
+                  <div className="flex items-center justify-end">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-8 rounded-none border-[#b6d2d4] text-[11px] text-[#2b8f95]"
+                      onClick={() => void loadWorkPackageTemplateRegistry()}
+                      disabled={workPackageTemplateRegistryLoading}
+                    >
+                      {workPackageTemplateRegistryLoading ? 'Refreshing…' : 'Refresh Templates'}
+                    </Button>
+                  </div>
                   <div className="rounded-sm border border-[#efefef] bg-[#fafafa] p-3">
                     <p className="text-[11px] font-medium text-[#6a6a6a]">
                       {selectedWorkPackageTemplate
@@ -7112,14 +7622,139 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                     </p>
                   </div>
                 </TabsContent>
-                <TabsContent value="existing-wp" className="rounded-md border p-6 text-sm text-muted-foreground">
-                  Existing WP will be loaded from previous maintenance records.
+                <TabsContent value="existing-wp" className="space-y-3 rounded-md border border-[#efefef] bg-white p-4">
+                  <div className="grid gap-3 lg:grid-cols-[1.2fr_0.8fr]">
+                    <div className="space-y-1">
+                      <Label htmlFor="aircraft-existing-wp-select" className="text-[12px] font-medium text-[#696969]">Existing work package</Label>
+                      <Select value={aircraftSelectedExistingWorkPackageId} onValueChange={setAircraftSelectedExistingWorkPackageId}>
+                        <SelectTrigger id="aircraft-existing-wp-select" className="h-8 rounded-none border-[#e7e7e7] bg-white text-[12px] text-[#4f4f4f]">
+                          <SelectValue placeholder={aircraftExistingWorkPackagesLoading ? 'Loading work packages...' : 'Choose existing work package'} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {aircraftExistingWorkPackageList.map((item) => (
+                            <SelectItem key={item.id} value={item.id}>
+                              {`${item.workPackageNumber} · ${item.title}`}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {aircraftExistingWorkPackagesError ? <p className="mdm-template-danger">{aircraftExistingWorkPackagesError}</p> : null}
+                    </div>
+                    <div className="flex items-end justify-end">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-8 rounded-none border-[#b6d2d4] text-[11px] text-[#2b8f95]"
+                        onClick={handleApplyExistingWorkPackageSelection}
+                        disabled={!aircraftSelectedExistingWorkPackageId}
+                      >
+                        Apply to Form
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="overflow-x-auto border border-[#e9e9e9]">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="border-b border-[#ededed] bg-[#f9f9f9]">
+                          <TableHead className="h-[30px] px-2 text-[12px] font-semibold text-[#4f4f4f]">WP Number</TableHead>
+                          <TableHead className="h-[30px] px-2 text-[12px] font-semibold text-[#4f4f4f]">Title</TableHead>
+                          <TableHead className="h-[30px] px-2 text-[12px] font-semibold text-[#4f4f4f]">Status</TableHead>
+                          <TableHead className="h-[30px] px-2 text-[12px] font-semibold text-[#4f4f4f]">Type</TableHead>
+                          <TableHead className="h-[30px] px-2 text-[12px] font-semibold text-[#4f4f4f]">Tasks</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {aircraftExistingWorkPackageList.map((item) => (
+                          <TableRow key={item.id} className={cn('h-[30px] border-b border-[#f0f0f0]', aircraftSelectedExistingWorkPackageId === item.id && 'bg-[#e8f8f8]')}>
+                            <TableCell className="px-2 py-1 text-[12px] text-[#5a5a5a]">{item.workPackageNumber}</TableCell>
+                            <TableCell className="px-2 py-1 text-[12px] text-[#5a5a5a]">{item.title}</TableCell>
+                            <TableCell className="px-2 py-1 text-[12px] text-[#5a5a5a]">{item.status}</TableCell>
+                            <TableCell className="px-2 py-1 text-[12px] text-[#5a5a5a]">{item.maintenanceType}</TableCell>
+                            <TableCell className="px-2 py-1 text-[12px] text-[#5a5a5a]">{item.tasks.length}</TableCell>
+                          </TableRow>
+                        ))}
+                        {!aircraftExistingWorkPackageList.length ? (
+                          <TableRow>
+                            <TableCell colSpan={5} className="text-center text-muted-foreground">No existing work packages available for this aircraft.</TableCell>
+                          </TableRow>
+                        ) : null}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </TabsContent>
-                <TabsContent value="non-performed-tasks" className="rounded-md border p-6 text-sm text-muted-foreground">
-                  Non performed tasks will be listed based on previous package history.
+                <TabsContent value="non-performed-tasks" className="space-y-3 rounded-md border border-[#efefef] bg-white p-4">
+                  <div className="overflow-x-auto border border-[#e9e9e9]">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="border-b border-[#ededed] bg-[#f9f9f9]">
+                          <TableHead className="h-[30px] w-[56px] px-2 text-[12px] font-semibold text-[#4f4f4f]">Select</TableHead>
+                          <TableHead className="h-[30px] px-2 text-[12px] font-semibold text-[#4f4f4f]">Task number</TableHead>
+                          <TableHead className="h-[30px] px-2 text-[12px] font-semibold text-[#4f4f4f]">ATA code</TableHead>
+                          <TableHead className="h-[30px] px-2 text-[12px] font-semibold text-[#4f4f4f]">Description</TableHead>
+                          <TableHead className="h-[30px] px-2 text-[12px] font-semibold text-[#4f4f4f]">WP</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {aircraftTaskGridFilteredRows.map((task) => (
+                          <TableRow key={task.id} className="h-[30px] border-b border-[#f0f0f0]">
+                            <TableCell className="px-2 py-1">
+                              <Checkbox
+                                aria-label={`Select task ${task.taskNumber || task.id}`}
+                                checked={aircraftWorkPackageSelectedTaskIds.includes(task.id)}
+                                onCheckedChange={(checked) => handleAircraftWorkPackageTaskSelection(task, Boolean(checked))}
+                              />
+                            </TableCell>
+                            <TableCell className="px-2 py-1 text-[12px] text-[#5a5a5a]">{task.taskNumber || '-'}</TableCell>
+                            <TableCell className="px-2 py-1 text-[12px] text-[#5a5a5a]">{task.ataCode || '-'}</TableCell>
+                            <TableCell className="px-2 py-1 text-[12px] text-[#5a5a5a]">{task.description || '-'}</TableCell>
+                            <TableCell className="px-2 py-1 text-[12px] text-[#5a5a5a]">{task.parentWorkPackageNumber || '-'}</TableCell>
+                          </TableRow>
+                        ))}
+                        {!aircraftTaskGridFilteredRows.length ? (
+                          <TableRow>
+                            <TableCell colSpan={5} className="text-center text-muted-foreground">No non-performed tasks found.</TableCell>
+                          </TableRow>
+                        ) : null}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </TabsContent>
-                <TabsContent value="all-tasks" className="rounded-md border p-6 text-sm text-muted-foreground">
-                  All Tasks shows complete task catalog scoped to aircraft maintenance profile.
+                <TabsContent value="all-tasks" className="space-y-3 rounded-md border border-[#efefef] bg-white p-4">
+                  <div className="overflow-x-auto border border-[#e9e9e9]">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="border-b border-[#ededed] bg-[#f9f9f9]">
+                          <TableHead className="h-[30px] w-[56px] px-2 text-[12px] font-semibold text-[#4f4f4f]">Select</TableHead>
+                          <TableHead className="h-[30px] px-2 text-[12px] font-semibold text-[#4f4f4f]">Task number</TableHead>
+                          <TableHead className="h-[30px] px-2 text-[12px] font-semibold text-[#4f4f4f]">ATA code</TableHead>
+                          <TableHead className="h-[30px] px-2 text-[12px] font-semibold text-[#4f4f4f]">Description</TableHead>
+                          <TableHead className="h-[30px] px-2 text-[12px] font-semibold text-[#4f4f4f]">Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {aircraftTaskGridFilteredRows.map((task) => (
+                          <TableRow key={task.id} className="h-[30px] border-b border-[#f0f0f0]">
+                            <TableCell className="px-2 py-1">
+                              <Checkbox
+                                aria-label={`Select task ${task.taskNumber || task.id}`}
+                                checked={aircraftWorkPackageSelectedTaskIds.includes(task.id)}
+                                onCheckedChange={(checked) => handleAircraftWorkPackageTaskSelection(task, Boolean(checked))}
+                              />
+                            </TableCell>
+                            <TableCell className="px-2 py-1 text-[12px] text-[#5a5a5a]">{task.taskNumber || '-'}</TableCell>
+                            <TableCell className="px-2 py-1 text-[12px] text-[#5a5a5a]">{task.ataCode || '-'}</TableCell>
+                            <TableCell className="px-2 py-1 text-[12px] text-[#5a5a5a]">{task.description || '-'}</TableCell>
+                            <TableCell className="px-2 py-1 text-[12px] text-[#5a5a5a]">{task.status}</TableCell>
+                          </TableRow>
+                        ))}
+                        {!aircraftTaskGridFilteredRows.length ? (
+                          <TableRow>
+                            <TableCell colSpan={5} className="text-center text-muted-foreground">No tasks available for this aircraft context.</TableCell>
+                          </TableRow>
+                        ) : null}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </TabsContent>
               </Tabs>
               <div className="mt-auto flex flex-wrap items-center justify-end gap-2 border-t border-[#ececec] bg-white py-2">

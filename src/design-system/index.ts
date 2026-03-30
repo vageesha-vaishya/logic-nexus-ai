@@ -1,4 +1,4 @@
-export { tokens } from './tokens';
+export { tokens } from './tokens/index';
 export * from './components';
 export * from './rolloutPlan';
 export * from './componentCatalog';

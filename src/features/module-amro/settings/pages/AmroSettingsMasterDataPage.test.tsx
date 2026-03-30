@@ -2,6 +2,7 @@ import { cloneElement, isValidElement, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { axe, toHaveNoViolations } from 'jest-axe';
 import AmroSettingsMasterDataPage, {
   AMRO_MASTER_ENTITY_FORM_FIELDS,
   buildPayloadFromForm,
@@ -16,6 +17,8 @@ const mockToastSuccess = vi.fn();
 const mockHasPermission = vi.fn((_permission: string) => true);
 let mockAuthAccessToken = 'token-1';
 const ASYNC_WAIT_TIMEOUT_MS = 4000;
+
+expect.extend(toHaveNoViolations);
 
 vi.mock('@/components/layout/DashboardLayout', () => ({
   DashboardLayout: ({ children }: { children: React.ReactNode }) => <div data-testid="dashboard-layout">{children}</div>,
@@ -871,6 +874,7 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     expect(await within(workPackageDialog).findByLabelText('Template registry')).toBeInTheDocument();
     fireEvent.click(within(workPackageDialog).getByLabelText('Template registry'));
     fireEvent.click(await screen.findByRole('option', { name: 'WP-LINE-001' }));
+    fireEvent.click(within(workPackageDialog).getByRole('tab', { name: 'Selected task' }));
 
     fireEvent.change(screen.getByLabelText('Number'), { target: { value: '145' } });
     fireEvent.change(screen.getByLabelText('Topic'), { target: { value: 'Hydraulic inspection campaign' } });
@@ -883,8 +887,21 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     fireEvent.click(screen.getByLabelText('Validation'));
     fireEvent.click(await screen.findByRole('option', { name: 'Pending' }));
 
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Select all tasks in page' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    expect(within(workPackageDialog).getByRole('tab', { name: 'New WP' })).toBeInTheDocument();
+    expect(within(workPackageDialog).getByRole('tab', { name: 'Existing WP' })).toBeInTheDocument();
+    expect(within(workPackageDialog).getByRole('tab', { name: 'Non performed tasks' })).toBeInTheDocument();
+    expect(within(workPackageDialog).getByRole('tab', { name: 'All Tasks' })).toBeInTheDocument();
+    expect(within(workPackageDialog).getByRole('tab', { name: 'Selected task' })).toBeInTheDocument();
+
+    fireEvent.click(within(workPackageDialog).getByRole('tab', { name: 'Existing WP' }));
+    expect(await within(workPackageDialog).findByText('Apply to Form')).toBeInTheDocument();
+
+    fireEvent.click(within(workPackageDialog).getByRole('tab', { name: 'All Tasks' }));
+    expect(await within(workPackageDialog).findByText(/No tasks available for this aircraft context|Task number/i)).toBeInTheDocument();
+
+    fireEvent.click(within(workPackageDialog).getByRole('tab', { name: 'Selected task' }));
+    fireEvent.click(within(workPackageDialog).getByRole('checkbox', { name: 'Select all tasks in page' }));
+    fireEvent.click(within(workPackageDialog).getByRole('button', { name: 'Add' }));
     await waitFor(() => {
       expect(mockToastSuccess).toHaveBeenCalledWith('Aircraft work package created');
     }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
@@ -898,6 +915,58 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     const createPayload = JSON.parse(String(createWorkPackageCall?.[1]?.body || '{}')) as Record<string, unknown>;
     expect(createPayload.trigger_source).toBe('schedule_due');
     expect(createPayload.trigger_reference_id).toBe('ac-1');
+  });
+
+  it('shows New WP template registry errors and supports template refresh retry', async () => {
+    const fetchMock = vi.mocked(fetch);
+    const baseImplementation = fetchMock.getMockImplementation();
+    let templateRegistryCallCount = 0;
+    fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = String(init?.method || 'GET').toUpperCase();
+      if (method === 'GET' && url.includes('/api/v2/amro/master-data/work_package_templates')) {
+        templateRegistryCallCount += 1;
+        if (templateRegistryCallCount <= 2) {
+          return {
+            ok: false,
+            text: async () => JSON.stringify({ error: 'Template registry unavailable' }),
+          } as Response;
+        }
+      }
+      if (!baseImplementation) {
+        throw new Error('Fetch base implementation unavailable');
+      }
+      return baseImplementation(input, init);
+    });
+
+    renderAircraftPage();
+    await screen.findByText('Aircraft Operations Snapshot');
+    fireEvent.click(screen.getByRole('button', { name: 'Create Work Package' }));
+    const workPackageDialog = await screen.findByTestId('amro-aircraft-work-package-dialog');
+    expect(await within(workPackageDialog).findByText('Template registry unavailable')).toBeInTheDocument();
+
+    fireEvent.click(within(workPackageDialog).getByRole('button', { name: 'Refresh Templates' }));
+    await waitFor(() => {
+      expect(within(workPackageDialog).queryByText('Template registry unavailable')).not.toBeInTheDocument();
+    }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
+    fireEvent.click(within(workPackageDialog).getByLabelText('Template registry'));
+    expect(await screen.findByRole('option', { name: 'WP-LINE-001' })).toBeInTheDocument();
+  });
+
+  it('meets baseline accessibility checks for New WP dialog content', async () => {
+    renderAircraftPage();
+    await screen.findByText('Aircraft Operations Snapshot');
+    fireEvent.click(screen.getByRole('button', { name: 'Create Work Package' }));
+    const workPackageDialog = await screen.findByTestId('amro-aircraft-work-package-dialog');
+    fireEvent.click(within(workPackageDialog).getByRole('tab', { name: 'New WP' }));
+
+    const result = await axe(workPackageDialog);
+    expect(result).toHaveNoViolations();
+
+    const newWpTab = within(workPackageDialog).getByRole('tab', { name: 'New WP' });
+    expect(newWpTab).toHaveAttribute('aria-controls');
+    expect(within(workPackageDialog).getByLabelText('Template registry')).toBeInTheDocument();
+    expect(within(workPackageDialog).getByRole('button', { name: /Refresh Templates|Refreshing/i })).toBeInTheDocument();
   });
 
   it('renders aircraft-only operations overview in aircraft operations snapshot without engine/components module leakage', async () => {

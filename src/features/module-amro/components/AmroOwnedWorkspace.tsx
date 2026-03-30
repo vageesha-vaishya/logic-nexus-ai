@@ -1,15 +1,10 @@
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { CRMDatePicker } from '@/design-system/components/molecules';
+import { Button, Checkbox, Input, Input as TextInput, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Tabs, TabsContent, TabsList, TabsTrigger } from '@/design-system';
+import { CRMDatePicker as DatePicker } from '@/design-system/components/molecules';
 import { useCRM } from '@/hooks/useCRM';
 import { ArrowDownUp, ChevronDown, ChevronUp, Copy, Download, Eye, GripVertical, PauseCircle, PlayCircle, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
@@ -54,8 +49,6 @@ const amroDashboardLoadBenchmark = { targetMs: 1000, hardLimitMs: 1500 };
 const amroWorkPackageFilterApplyBenchmark = { targetMs: 500, hardLimitMs: 900 };
 const amroDetailTabSwitchBenchmark = { targetMs: 250, hardLimitMs: 500 };
 const amroTaskStepSubmitBenchmark = { targetMs: 400, hardLimitMs: 800 };
-const TextInput = Input;
-
 type AmroUxRole = 'technician' | 'engineer' | 'inspector' | 'planner' | 'management';
 type AmroWorkspaceModuleKey =
   | 'overview'
@@ -3430,7 +3423,7 @@ export function AmroOwnedWorkspace({
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="wp-planning-date">Planning Date</Label>
-                  <CRMDatePicker id="wp-planning-date" value={workPackageCreateForm.planningDate} onChange={(event) => handleWorkPackageCreateFormChange('planningDate', event.target.value)} />
+                  <DatePicker id="wp-planning-date" value={workPackageCreateForm.planningDate} onChange={(event) => handleWorkPackageCreateFormChange('planningDate', event.target.value)} />
                 </div>
               </div>
               <div className="space-y-1">
@@ -3531,11 +3524,11 @@ export function AmroOwnedWorkspace({
                   <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                     <div className="space-y-1">
                       <Label htmlFor="wp-planned-start">Planned Start</Label>
-                      <CRMDatePicker id="wp-planned-start" value={workPackageCreateForm.plannedStartDate} onChange={(event) => handleWorkPackageCreateFormChange('plannedStartDate', event.target.value)} />
+                      <DatePicker id="wp-planned-start" value={workPackageCreateForm.plannedStartDate} onChange={(event) => handleWorkPackageCreateFormChange('plannedStartDate', event.target.value)} />
                     </div>
                     <div className="space-y-1">
                       <Label htmlFor="wp-planned-end">Planned End</Label>
-                      <CRMDatePicker id="wp-planned-end" value={workPackageCreateForm.plannedEndDate} onChange={(event) => handleWorkPackageCreateFormChange('plannedEndDate', event.target.value)} />
+                      <DatePicker id="wp-planned-end" value={workPackageCreateForm.plannedEndDate} onChange={(event) => handleWorkPackageCreateFormChange('plannedEndDate', event.target.value)} />
                     </div>
                     <div className="space-y-1">
                       <Label htmlFor="wp-created-by">Created By</Label>

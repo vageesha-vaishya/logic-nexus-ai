@@ -136,4 +136,44 @@ test.describe('amro aircraft CRUD smoke', () => {
     await expect(page.locator('tr', { hasText: tailNumber })).toHaveCount(0, { timeout: 30000 });
     await logStep(`CRUD smoke completed for tail_number=${tailNumber}`);
   });
+
+  test('verifies New WP tab workflow in aircraft workspace', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/dashboard/amro/settings/master-data/aircraft');
+    if (page.url().includes('/auth')) {
+      await login(page);
+      await page.goto('/dashboard/amro/settings/master-data/aircraft');
+    }
+    test.skip(page.url().includes('/auth'), 'Authentication failed for AMRO aircraft New WP environment');
+
+    const masterDataRoot = page.getByTestId('amro-master-data-template');
+    test.skip((await masterDataRoot.count()) === 0, 'AMRO master data surface is unavailable in this environment profile');
+    await expect(masterDataRoot.first()).toBeVisible();
+
+    const createWorkPackageButton = page.getByRole('button', { name: 'Create Work Package' }).first();
+    test.skip((await createWorkPackageButton.count()) === 0, 'Create Work Package action is unavailable in this environment profile');
+    await createWorkPackageButton.click();
+
+    const workPackageDialog = page.getByTestId('amro-aircraft-work-package-dialog');
+    await expect(workPackageDialog).toBeVisible({ timeout: 20000 });
+    await workPackageDialog.getByRole('tab', { name: 'New WP' }).click();
+    await expect(workPackageDialog.getByText('Template registry')).toBeVisible();
+
+    const refreshTemplatesButton = workPackageDialog.getByRole('button', { name: /Refresh Templates|Refreshing/i });
+    if (await refreshTemplatesButton.count()) {
+      await refreshTemplatesButton.click();
+    }
+
+    const templateTrigger = workPackageDialog.getByLabel('Template registry');
+    if (await templateTrigger.count()) {
+      await templateTrigger.first().click();
+      const templateOptions = page.getByRole('option');
+      test.skip((await templateOptions.count()) === 0, 'No active template options available for New WP flow');
+      await templateOptions.first().click();
+    }
+
+    await expect(workPackageDialog.getByText(/Maintenance/i).first()).toBeVisible();
+    await expect(workPackageDialog.getByText(/Scope items/i).first()).toBeVisible();
+    await expect(workPackageDialog.getByText(/Tasks/i).first()).toBeVisible();
+  });
 });
