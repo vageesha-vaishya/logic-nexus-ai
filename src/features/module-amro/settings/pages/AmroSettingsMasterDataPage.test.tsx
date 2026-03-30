@@ -1045,17 +1045,13 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     expect(await screen.findByRole('heading', { name: 'Update Aircraft' })).toBeInTheDocument();
 
     const formDialog = screen.getByTestId('amro-master-data-form-dialog');
-    const baseLabel = within(formDialog).getByText(/^Base$/);
-    const baseTrigger = (baseLabel.parentElement as HTMLElement).querySelector('button[role="combobox"]');
-    expect(baseTrigger).not.toBeNull();
-    fireEvent.click(baseTrigger as HTMLElement);
-    expect(await screen.findByRole('option', { name: 'DEL' })).toBeInTheDocument();
+    const baseSelect = within(formDialog).getByLabelText(/^Base$/i);
+    expect(baseSelect).toBeInTheDocument();
+    expect(within(baseSelect).getByRole('option', { name: 'DEL' })).toBeInTheDocument();
 
-    const ownerLabel = within(formDialog).getByText(/^Owner$/);
-    const ownerTrigger = (ownerLabel.parentElement as HTMLElement).querySelector('button[role="combobox"]');
-    expect(ownerTrigger).not.toBeNull();
-    fireEvent.click(ownerTrigger as HTMLElement);
-    expect(await screen.findByRole('option', { name: 'Owner One' })).toBeInTheDocument();
+    const ownerSelect = within(formDialog).getByLabelText(/^Owner$/i);
+    expect(ownerSelect).toBeInTheDocument();
+    expect(within(ownerSelect).getByRole('option', { name: 'Owner One' })).toBeInTheDocument();
   });
 
   it('filters aircraft model listbox options by selected manufacturer in aircraft create form', async () => {
@@ -1064,16 +1060,12 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     fireEvent.click(await screen.findByRole('button', { name: /New aircraft record/i }));
     const dialog = await screen.findByTestId('amro-master-data-form-dialog');
 
-    const manufacturerTrigger = within(dialog).getByText('Manufacturer').closest('button');
-    expect(manufacturerTrigger).not.toBeNull();
-    fireEvent.click(manufacturerTrigger as HTMLElement);
-    fireEvent.click(await screen.findByRole('option', { name: 'Airbus (AIR)' }));
+    const manufacturerSelect = within(dialog).getByLabelText(/^Manufacturer:/i);
+    fireEvent.change(manufacturerSelect, { target: { value: 'manu-2' } });
 
-    const modelTrigger = within(dialog).getByText('Aircraft model').closest('button');
-    expect(modelTrigger).not.toBeNull();
-    fireEvent.click(modelTrigger as HTMLElement);
-    expect(await screen.findByRole('option', { name: 'A320-200' })).toBeInTheDocument();
-    expect(screen.queryByRole('option', { name: 'B737-800' })).not.toBeInTheDocument();
+    const modelSelect = within(dialog).getByLabelText(/^Aircraft Model:/i);
+    expect(within(modelSelect).getByRole('option', { name: 'A320-200' })).toBeInTheDocument();
+    expect(within(modelSelect).queryByRole('option', { name: 'B737-800' })).not.toBeInTheDocument();
   });
 
   it('creates aircraft with manufacturer-model selection and preserves those values when reopened', async () => {
@@ -1172,15 +1164,11 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     fireEvent.change(within(createDialog).getByLabelText(/^Registration/i), { target: { value: 'N300AA' } });
     fireEvent.change(within(createDialog).getByLabelText(/^Serial number/i), { target: { value: 'SN-300' } });
 
-    const manufacturerTrigger = within(createDialog).getByText('Manufacturer').closest('button');
-    expect(manufacturerTrigger).not.toBeNull();
-    fireEvent.click(manufacturerTrigger as HTMLElement);
-    fireEvent.click(await screen.findByRole('option', { name: 'Airbus (AIR)' }));
+    const manufacturerSelect = within(createDialog).getByLabelText(/^Manufacturer:/i);
+    fireEvent.change(manufacturerSelect, { target: { value: 'manu-2' } });
 
-    const modelTrigger = within(createDialog).getByText('Aircraft model').closest('button');
-    expect(modelTrigger).not.toBeNull();
-    fireEvent.click(modelTrigger as HTMLElement);
-    fireEvent.click(await screen.findByRole('option', { name: 'A320-200' }));
+    const modelSelect = within(createDialog).getByLabelText(/^Aircraft Model:/i);
+    fireEvent.change(modelSelect, { target: { value: 'A320-200' } });
 
     fireEvent.click(within(createDialog).getByRole('button', { name: /Save/i }));
 
@@ -1213,10 +1201,8 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     fireEvent.click(await screen.findByRole('button', { name: /New aircraft record/i }));
     const dialog = await screen.findByTestId('amro-master-data-form-dialog');
 
-    const manufacturerTrigger = within(dialog).getByText('Manufacturer').closest('button');
-    expect(manufacturerTrigger).not.toBeNull();
-    fireEvent.click(manufacturerTrigger as HTMLElement);
-    expect(await screen.findByRole('option', { name: 'Unable to load manufacturers' })).toBeInTheDocument();
+    const manufacturerSelect = within(dialog).getByLabelText(/^Manufacturer:/i);
+    expect(within(manufacturerSelect).getByRole('option', { name: 'Unable to load manufacturers' })).toBeInTheDocument();
   });
 
   it('hides configured work package columns while preserving filter and export actions', async () => {
