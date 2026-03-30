@@ -584,3 +584,106 @@ this.eventsProducer.publishEvent(event)
 - ❌ Mobile offline-first framework incomplete
 
 **Conclusion:** M0 is at **85.7% completion** and requires M0-6 closure before milestone sign-off.
+
+---
+
+# New WP Work Package Template Selector Integration (Aircraft Module)
+
+## API Integration Points
+
+| Integration Point | Method + Endpoint | Auth | Request Shape | Response Shape | Error Handling |
+|---|---|---|---|---|---|
+| Template registry list | `GET /api/v2/amro/master-data/work_package_templates?page=1&page_size=100&sort_by=updated_at&sort_dir=desc` | `Authorization: Bearer <access_token>` from `buildApiHeaders` | Query params only | `{ output: { records: WorkPackageTemplateRegistryRecord[] } }` | Network failures map to `Network error. Verify connectivity and try again.`; aborted requests map to `Request timed out. Please check your connection and retry.` |
+| Create work package from selected template | `POST /api/v2/amro/work-packages?interface=create-work-package` | `Authorization: Bearer <access_token>` from `buildApiHeaders` | `AircraftWorkPackageCreateRequest` (includes `template_id`) | `{ output: { work_package_id?: string, id?: string } }` | `>=500` maps to `Work package service is temporarily unavailable. Try again shortly.`; other failures return API `error` payload text |
+| Rollback after partial create failure | `DELETE /api/v2/amro/work-packages/{workPackageId}?rollback=1` | `Authorization: Bearer <access_token>` from `buildApiHeaders` | `{ transaction_id: string, rollback_reason: string }` | Best-effort operation | Failure tracked through telemetry event `rollback_failed`; user keeps local draft |
+
+## TypeScript Contract Reference
+
+```typescript
+type WorkPackageTemplateRegistryItem = {
+  id: string;
+  templateCode: string;
+  templateName: string;
+  description: string;
+  maintenanceType: 'line' | 'base' | 'hangar' | 'shop';
+  version: string;
+  active: boolean;
+  scopeItems: string[];
+  taskRows: Array<{
+    id: string;
+    taskNumber: string;
+    ataCode: string;
+    serialNumber: string;
+    partNumber: string;
+    description: string;
+  }>;
+};
+
+type AircraftWorkPackageCreateRequest = {
+  aircraft_id: string;
+  work_order_number: string;
+  title: string;
+  opening_date: string;
+  revision_number: string;
+  revision_date: string | null;
+  transmission_date: string;
+  expected_reception_date: string;
+  maintenance_release_date: string;
+  work_reception_date: string;
+  work_report_number: string;
+  comments: string;
+  ttaf_hours: number;
+  validation_state: string;
+  selected_task: {
+    task_number: string;
+    ata_code: string;
+    serial_number: string;
+    part_number: string;
+    description: string;
+  };
+  source: string;
+  trigger_source: string;
+  maintenance_type: 'line' | 'base' | 'hangar' | 'shop';
+  station: string;
+  priority: string;
+  status: string;
+  planned_window: string;
+  scope_items: string[];
+  selected_task_ids: string[];
+  template_id?: string;
+  template_code?: string;
+  reference_id: string;
+  trigger_reference_id: string;
+  triggered_at: string;
+};
+```
+
+## Component Integration Guidelines
+
+- New WP flow loads registry on dialog open and renders template options as `Template Name · vVersion · Description`.
+- `Create New Work Package` remains disabled until `selectedWorkPackageTemplateId` is populated.
+- Form validation blocks submission if template is missing, even after switching tabs.
+- Empty registry state displays `No templates available. Add templates in Template Registry and refresh.`
+- Async states:
+  - Registry loading: `Loading template registry…`
+  - Create submit loading: button label switches to `Creating…`
+- Success feedback uses toast `Aircraft work package created`.
+- Failure feedback uses normalized error mapping from `resolveWorkPackageApiErrorMessage`.
+
+## Error Code and Message Mapping
+
+| Condition | HTTP/Runtime Signal | User-Facing Message |
+|---|---|---|
+| Request timeout | `AbortError` | `Request timed out. Please check your connection and retry.` |
+| Network unavailable | `TypeError: Failed to fetch` | `Network error. Verify connectivity and try again.` |
+| Service unavailable | HTTP `5xx` | `Work package service is temporarily unavailable. Try again shortly.` |
+| Validation: no template selected | Client-side validation | `Select a template before creating a new work package` |
+| Validation: missing fields/tasks | Client-side validation | `Please resolve aircraft work package validation errors` |
+
+## Configuration and Environment Requirements
+
+- Requires authenticated session token resolved through `useAuth`/Supabase session flow.
+- No additional environment variables are required for this selector; it uses existing AMRO API base routing (`/api/v2/amro/...`) and existing header builder utilities.
+- Timeout behavior:
+  - Template registry fetch timeout: `TEMPLATE_REGISTRY_TIMEOUT_MS = 12000`
+  - Create mutation timeout: `WORK_PACKAGE_CREATE_TIMEOUT_MS = 20000`
