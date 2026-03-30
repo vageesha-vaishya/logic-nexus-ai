@@ -68,7 +68,10 @@ BEGIN
       current_flight_hours,
       current_cycles,
       current_flight_hours_since_new,
-      current_cycles_since_new
+      current_cycles_since_new,
+      engine_install_history,
+      thrust_rating_change_log,
+      on_wing_lifecycle_records
     )
     SELECT
       t.id,
@@ -112,7 +115,34 @@ BEGIN
       (12000 + (gs * 275))::numeric(15,2),
       6000 + (gs * 120),
       (15000 + (gs * 300))::numeric(15,2),
-      7500 + (gs * 150)
+      7500 + (gs * 150),
+      jsonb_build_array(
+        jsonb_build_object(
+          'engine_serial_number', format('ENG-%s-%s-A', tenant_key, lpad(gs::text, 3, '0')),
+          'engine_position', 'A',
+          'installed_at', (current_date - make_interval(days => (220 + gs * 3)::int))::text,
+          'removed_at', NULL
+        )
+      ),
+      jsonb_build_array(
+        jsonb_build_object(
+          'engine_serial_number', format('ENG-%s-%s-A', tenant_key, lpad(gs::text, 3, '0')),
+          'rated_thrust', CASE WHEN gs % 2 = 0 THEN 27000 + (gs * 12) ELSE 69000 + (gs * 20) END,
+          'derate_mode', CASE WHEN gs % 3 = 0 THEN 'CLB2' ELSE 'CLB1' END,
+          'authority_basis', CASE WHEN gs % 2 = 0 THEN 'OEM-BASELINE' ELSE 'ENGINEERING-REVIEW' END,
+          'effective_from', (current_date - make_interval(days => (130 + gs * 2)::int))::text
+        )
+      ),
+      jsonb_build_array(
+        jsonb_build_object(
+          'engine_serial_number', format('ENG-%s-%s-A', tenant_key, lpad(gs::text, 3, '0')),
+          'event_type', 'install',
+          'event_at', (current_date - make_interval(days => (220 + gs * 3)::int))::text,
+          'event_status', 'completed',
+          'flight_hours_at_event', (10000 + (gs * 250))::numeric(15,2),
+          'cycles_at_event', 5000 + (gs * 110)
+        )
+      )
     FROM generate_series(1, 16) AS gs
     ON CONFLICT (serial_number) DO UPDATE
     SET
@@ -136,6 +166,9 @@ BEGIN
       current_cycles = EXCLUDED.current_cycles,
       current_flight_hours_since_new = EXCLUDED.current_flight_hours_since_new,
       current_cycles_since_new = EXCLUDED.current_cycles_since_new,
+      engine_install_history = EXCLUDED.engine_install_history,
+      thrust_rating_change_log = EXCLUDED.thrust_rating_change_log,
+      on_wing_lifecycle_records = EXCLUDED.on_wing_lifecycle_records,
       updated_at = now(),
       deleted_at = NULL;
 

@@ -2029,6 +2029,18 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/AircraftDashboardEngineLifecycleRow'
+        serialized_engine_tracking:
+          type: array
+          items:
+            $ref: '#/components/schemas/AircraftDashboardSerializedEngineRecord'
+        thrust_rating_management:
+          type: array
+          items:
+            $ref: '#/components/schemas/AircraftDashboardThrustRatingRecord'
+        on_wing_lifecycle:
+          type: array
+          items:
+            $ref: '#/components/schemas/AircraftDashboardOnWingLifecycleRecord'
         maintenance_schedule:
           type: array
           items:
@@ -2137,6 +2149,68 @@ components:
             additionalProperties: true
         retirement_readiness_score:
           type: number
+      additionalProperties: true
+    AircraftDashboardSerializedEngineRecord:
+      type: object
+      properties:
+        aircraft_id:
+          type: string
+        registration:
+          type: string
+        sequence:
+          type: integer
+        engine_serial_number:
+          type: string
+        engine_position:
+          type: string
+        installed_at:
+          type: string
+        removed_at:
+          type: string
+        authority_basis:
+          type: string
+      additionalProperties: true
+    AircraftDashboardThrustRatingRecord:
+      type: object
+      properties:
+        aircraft_id:
+          type: string
+        registration:
+          type: string
+        sequence:
+          type: integer
+        engine_serial_number:
+          type: string
+        rated_thrust:
+          type: number
+        derate_mode:
+          type: string
+        authority_basis:
+          type: string
+        effective_from:
+          type: string
+      additionalProperties: true
+    AircraftDashboardOnWingLifecycleRecord:
+      type: object
+      properties:
+        aircraft_id:
+          type: string
+        registration:
+          type: string
+        sequence:
+          type: integer
+        event_type:
+          type: string
+        engine_serial_number:
+          type: string
+        event_at:
+          type: string
+        baseline_hours:
+          type: number
+        baseline_cycles:
+          type: integer
+        event_status:
+          type: string
       additionalProperties: true
     AircraftDashboardEngineComponentMonitoring:
       type: object

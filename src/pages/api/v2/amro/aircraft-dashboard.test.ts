@@ -249,7 +249,18 @@ describe('/api/v2/amro/aircraft-dashboard', () => {
       from: vi.fn((table: string) => {
         if (table === 'aircraft') {
           return createQueryChain([
-            { id: 'ac-4', registration: 'A6-ENG', status: 'active', defect_count: 2, current_flight_hours: 2111, current_cycles: 880, updated_at: '2026-03-27T10:00:00.000Z' },
+            {
+              id: 'ac-4',
+              registration: 'A6-ENG',
+              status: 'active',
+              defect_count: 2,
+              current_flight_hours: 2111,
+              current_cycles: 880,
+              engine_install_history: [{ engine_serial_number: 'ENG-4L', engine_position: 'L', installed_at: '2026-01-12' }],
+              thrust_rating_change_log: [{ engine_serial_number: 'ENG-4L', rated_thrust: 27500, derate_mode: 'CLB1', effective_from: '2026-02-01' }],
+              on_wing_lifecycle_records: [{ engine_serial_number: 'ENG-4L', event_type: 'on_wing_start', event_at: '2026-01-12' }],
+              updated_at: '2026-03-27T10:00:00.000Z',
+            },
           ]);
         }
         if (table === 'work_packages') {
@@ -311,6 +322,9 @@ describe('/api/v2/amro/aircraft-dashboard', () => {
     expect((res.jsonBody as any)?.output?.engine_module?.validation).toBeTruthy();
     expect((res.jsonBody as any)?.output?.engine_module?.validation?.rbac_enforced).toBe(true);
     expect((res.jsonBody as any)?.output?.engine_module?.validation?.validation_layers?.schema_validation).toBeTruthy();
+    expect((res.jsonBody as any)?.output?.engine_module?.serialized_engine_tracking?.[0]?.engine_serial_number).toBe('ENG-4L');
+    expect((res.jsonBody as any)?.output?.engine_module?.thrust_rating_management?.[0]?.rated_thrust).toBe(27500);
+    expect((res.jsonBody as any)?.output?.engine_module?.on_wing_lifecycle?.[0]?.event_type).toBe('on_wing_start');
   });
 
   it('enforces due window guardrails for engine module scheduling', async () => {

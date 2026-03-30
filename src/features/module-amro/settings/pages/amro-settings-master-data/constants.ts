@@ -22,7 +22,21 @@ export const ENTITY_LABEL: Record<MasterEntity, string> = {
 };
 
 export const ENTITY_TABLE_COLUMNS: Record<MasterEntity, string[]> = {
-  aircraft: ['registration', 'serial_number', 'owner_name', 'base_location', 'defect_count', 'current_flight_hours', 'current_cycles', 'status', 'first_limit_remaining', 'restrictions'],
+  aircraft: [
+    'registration',
+    'serial_number',
+    'owner_name',
+    'base_location',
+    'defect_count',
+    'current_flight_hours',
+    'current_cycles',
+    'status',
+    'first_limit_remaining',
+    'restrictions',
+    'engine_install_history',
+    'thrust_rating_change_log',
+    'on_wing_lifecycle_records',
+  ],
   flight_logs: ['aircraft_id', 'flight_date', 'flight_number', 'departure_airport', 'arrival_airport', 'pilot_name', 'flight_hours', 'block_hours', 'flight_cycles', 'regulatory_authority'],
   parts_inventory: ['id', 'part_number', 'serial_number', 'description', 'quantity_available', 'warehouse_location', 'status', 'updated_at'],
   suppliers: ['id', 'supplier_code', 'name', 'contact_name', 'email', 'phone', 'is_active', 'updated_at'],
@@ -41,7 +55,7 @@ export const ENTITY_HIDDEN_COLUMNS: Partial<Record<MasterEntity, string[]>> = {
   flight_logs: ['tenant_id', 'franchise_id', 'is_deleted', 'deleted_at', 'deleted_by', 'created_by', 'updated_by', 'metadata'],
 };
 
-export const AIRCRAFT_EDITABLE_COLUMNS = new Set(['registration', 'tail_number', 'serial_number', 'aircraft_type', 'aircraft_model', 'maintenance_program', 'status']);
+export const AIRCRAFT_EDITABLE_COLUMNS = new Set(['registration', 'tail_number', 'serial_number', 'aircraft_type', 'engine_type', 'aircraft_model', 'maintenance_program', 'status']);
 
 export const COLUMN_LABEL_OVERRIDES: Record<string, string> = {
   id: 'ID',
@@ -55,6 +69,7 @@ export const COLUMN_LABEL_OVERRIDES: Record<string, string> = {
   first_limit_remaining: 'First Limit Remaining',
   restrictions: 'Restrictions',
   aircraft_type: 'Aircraft Type',
+  engine_type: 'Engine Type',
   aircraft_model: 'Aircraft Model',
   updated_at: 'Updated At',
   aircraft_id: 'Aircraft',
@@ -87,13 +102,14 @@ export const MANUFACTURER_SEED_NAMES = [
 export const AIRCRAFT_TYPE_OPTIONS = ['NarrowBody', 'RegionalJet', 'Turboprop', 'WideBody', 'auto_seeded'];
 export const AIRCRAFT_STATUS_OPTIONS = ['active', 'maintenance', 'grounded', 'retired', 'storage'] as const;
 export const AIRCRAFT_FORM_SECTION_FIELD_KEYS: Record<FormSectionKey, string[]> = {
-  basic: ['tail_number', 'registration', 'serial_number', 'aircraft_type', 'manufacturer_id'],
+  basic: ['tail_number', 'registration', 'serial_number', 'aircraft_type', 'engine_type', 'manufacturer_id'],
   configuration: ['aircraft_model', 'configuration_code', 'maintenance_program', 'status'],
 };
 export const AIRCRAFT_FIELD_HELP: Partial<Record<string, string>> = {
   tail_number: 'Use 3-12 uppercase letters, numbers, or hyphen.',
   registration: 'Registration should align with authority records and paint scheme.',
   serial_number: 'Enter manufacturer serial number with at least 3 characters.',
+  engine_type: 'Capture the installed engine family or model code for planning and traceability.',
   manufacturer_id: 'Choose the approved manufacturer before selecting aircraft model.',
   aircraft_model: 'Model list is filtered by selected manufacturer.',
   maintenance_program: 'Attach approved program code used by planning and compliance teams.',
@@ -117,10 +133,14 @@ export const ENTITY_FORM_FIELDS: Record<MasterEntity, EntityFormField[]> = {
     { key: 'tail_number', label: 'Tail Number', type: 'text', required: true },
     { key: 'serial_number', label: 'Serial Number', type: 'text', required: true },
     { key: 'aircraft_type', label: 'Aircraft Type', type: 'select', required: true, options: AIRCRAFT_TYPE_OPTIONS },
+    { key: 'engine_type', label: 'Engine Type', type: 'text' },
     { key: 'manufacturer_id', label: 'Manufacturer', type: 'select', required: true },
     { key: 'aircraft_model', label: 'Aircraft Model', type: 'select', required: true },
     { key: 'configuration_code', label: 'Configuration Code', type: 'text' },
     { key: 'maintenance_program', label: 'Maintenance Program', type: 'text' },
+    { key: 'engine_install_history', label: 'Engine Install History', type: 'json' },
+    { key: 'thrust_rating_change_log', label: 'Thrust Rating Change Log', type: 'json' },
+    { key: 'on_wing_lifecycle_records', label: 'On-Wing Lifecycle Records', type: 'json' },
     { key: 'status', label: 'Status', type: 'select', required: true, options: ['active', 'maintenance', 'grounded', 'retired', 'storage'] },
   ],
   flight_logs: [
@@ -270,7 +290,21 @@ export const ROUTE_SEGMENT_ENTITY: Record<string, MasterEntity> = Object.entries
 );
 
 export const ENTITY_DEFAULT_VALUES: Record<MasterEntity, FormValues> = {
-  aircraft: { registration: '', tail_number: '', serial_number: '', aircraft_type: '', aircraft_model: '', manufacturer_id: '', configuration_code: '', maintenance_program: '', status: 'active' },
+  aircraft: {
+    registration: '',
+    tail_number: '',
+    serial_number: '',
+    aircraft_type: '',
+    engine_type: '',
+    aircraft_model: '',
+    manufacturer_id: '',
+    configuration_code: '',
+    maintenance_program: '',
+    engine_install_history: '[]',
+    thrust_rating_change_log: '[]',
+    on_wing_lifecycle_records: '[]',
+    status: 'active',
+  },
   flight_logs: { aircraft_id: '', flight_date: new Date().toISOString().slice(0, 10), flight_number: '', departure_airport: '', arrival_airport: '', pilot_name: '', flight_hours: 0, block_hours: 0, flight_cycles: 0, crew_details: '', fuel_burn_kg: 0, oil_uplift_liters: 0, pirep_discrepancy: '', regulatory_authority: 'DGCA', metadata: '{}' },
   parts_inventory: { part_number: '', serial_number: '', description: '', category: '', unit_of_measure: 'EA', min_stock_level: 0, quantity_on_hand: 0, supplier_id: '', warehouse_location: '', status: 'active' },
   suppliers: { supplier_code: '', name: '', contact_name: '', email: '', phone: '', lead_time_days: 0, rating: 0, is_active: true, metadata: '{}' },

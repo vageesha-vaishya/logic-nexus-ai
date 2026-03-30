@@ -170,6 +170,9 @@ BEGIN
       current_cycles,
       current_flight_hours_since_new,
       current_cycles_since_new,
+      engine_install_history,
+      thrust_rating_change_log,
+      on_wing_lifecycle_records,
       manufacturing_date,
       created_by,
       updated_by
@@ -218,6 +221,56 @@ BEGIN
       8000 + gs * 155,
       (18000 + gs * 420)::numeric(15,2),
       9200 + gs * 170,
+      jsonb_build_array(
+        jsonb_build_object(
+          'engine_serial_number', format('ENG-%s-%s-L', tenant_key, lpad(gs::text, 3, '0')),
+          'engine_position', 'L',
+          'installed_at', (current_date - make_interval(days => (190 + gs * 4)::int))::text,
+          'removed_at', NULL,
+          'removal_reason', NULL
+        ),
+        jsonb_build_object(
+          'engine_serial_number', format('ENG-%s-%s-R', tenant_key, lpad(gs::text, 3, '0')),
+          'engine_position', 'R',
+          'installed_at', (current_date - make_interval(days => (182 + gs * 4)::int))::text,
+          'removed_at', NULL,
+          'removal_reason', NULL
+        )
+      ),
+      jsonb_build_array(
+        jsonb_build_object(
+          'engine_serial_number', format('ENG-%s-%s-L', tenant_key, lpad(gs::text, 3, '0')),
+          'rated_thrust', 27400 + (gs * 10),
+          'derate_mode', CASE WHEN gs % 3 = 0 THEN 'CLB2' WHEN gs % 2 = 0 THEN 'CLB1' ELSE 'TO' END,
+          'authority_basis', CASE WHEN gs % 2 = 0 THEN 'OEM-SB-2026-A' ELSE 'MRO-ENG-POLICY-21' END,
+          'effective_from', (current_date - make_interval(days => (95 + gs * 2)::int))::text
+        ),
+        jsonb_build_object(
+          'engine_serial_number', format('ENG-%s-%s-R', tenant_key, lpad(gs::text, 3, '0')),
+          'rated_thrust', 27400 + (gs * 10),
+          'derate_mode', CASE WHEN gs % 4 = 0 THEN 'CLB2' ELSE 'CLB1' END,
+          'authority_basis', CASE WHEN gs % 2 = 0 THEN 'OEM-SB-2026-A' ELSE 'MRO-ENG-POLICY-21' END,
+          'effective_from', (current_date - make_interval(days => (93 + gs * 2)::int))::text
+        )
+      ),
+      jsonb_build_array(
+        jsonb_build_object(
+          'engine_serial_number', format('ENG-%s-%s-L', tenant_key, lpad(gs::text, 3, '0')),
+          'event_type', 'install',
+          'event_at', (current_date - make_interval(days => (190 + gs * 4)::int))::text,
+          'event_status', 'completed',
+          'flight_hours_at_event', (14500 + gs * 360)::numeric(15,2),
+          'cycles_at_event', 7800 + gs * 150
+        ),
+        jsonb_build_object(
+          'engine_serial_number', format('ENG-%s-%s-R', tenant_key, lpad(gs::text, 3, '0')),
+          'event_type', 'install',
+          'event_at', (current_date - make_interval(days => (182 + gs * 4)::int))::text,
+          'event_status', 'completed',
+          'flight_hours_at_event', (14600 + gs * 360)::numeric(15,2),
+          'cycles_at_event', 7850 + gs * 150
+        )
+      ),
       current_date - make_interval(days => (3650 + gs * 35)::int),
       actor_user_id,
       actor_user_id
@@ -258,6 +311,9 @@ BEGIN
       current_cycles = EXCLUDED.current_cycles,
       current_flight_hours_since_new = EXCLUDED.current_flight_hours_since_new,
       current_cycles_since_new = EXCLUDED.current_cycles_since_new,
+      engine_install_history = EXCLUDED.engine_install_history,
+      thrust_rating_change_log = EXCLUDED.thrust_rating_change_log,
+      on_wing_lifecycle_records = EXCLUDED.on_wing_lifecycle_records,
       manufacturing_date = EXCLUDED.manufacturing_date,
       updated_by = EXCLUDED.updated_by,
       updated_at = now(),

@@ -58,7 +58,7 @@ const ENTITY_CONFIG: Record<AmroMasterDataEntity, EntityConfig> = {
       'restrictions',
     ],
     listColumns:
-      'id,tenant_id,franchise_id,registration,tail_number,serial_number,aircraft_type,aircraft_model,manufacturer,manufacturer_id,model,msn,line_number,configuration_code,maintenance_program,status,operator_code,station_code,engine_type,manufacturing_date,base_location,owner_name,defect_count,first_limit_remaining,restrictions,current_flight_hours,current_cycles,current_flight_hours_since_new,current_cycles_since_new,created_at,updated_at',
+      'id,tenant_id,franchise_id,registration,tail_number,serial_number,aircraft_type,aircraft_model,manufacturer,manufacturer_id,model,msn,line_number,configuration_code,maintenance_program,status,operator_code,station_code,engine_type,manufacturing_date,base_location,owner_name,defect_count,first_limit_remaining,restrictions,current_flight_hours,current_cycles,current_flight_hours_since_new,current_cycles_since_new,engine_install_history,thrust_rating_change_log,on_wing_lifecycle_records,created_at,updated_at',
     requiredCreateFields: ['tail_number', 'serial_number', 'aircraft_type', 'aircraft_model', 'manufacturer_id'],
     writeAllowedFields: [
       'registration',
@@ -87,6 +87,9 @@ const ENTITY_CONFIG: Record<AmroMasterDataEntity, EntityConfig> = {
       'current_cycles',
       'current_flight_hours_since_new',
       'current_cycles_since_new',
+      'engine_install_history',
+      'thrust_rating_change_log',
+      'on_wing_lifecycle_records',
     ],
     defaultSortColumn: 'updated_at',
   },
@@ -470,6 +473,9 @@ function normalizeAircraft(payload: Record<string, unknown>) {
     current_cycles: asNumber(payload.current_cycles) ?? 0,
     current_flight_hours_since_new: asNumber(payload.current_flight_hours_since_new) ?? 0,
     current_cycles_since_new: asNumber(payload.current_cycles_since_new) ?? 0,
+    engine_install_history: asJsonArray(payload.engine_install_history),
+    thrust_rating_change_log: asJsonArray(payload.thrust_rating_change_log),
+    on_wing_lifecycle_records: asJsonArray(payload.on_wing_lifecycle_records),
   };
 }
 

@@ -145,6 +145,28 @@ type AmroDocumentationReference = {
   external?: boolean;
 };
 
+type AmroEngineGapMatrixRow = {
+  capability: string;
+  dataModel: string;
+  api: string;
+  ui: string;
+  validation: string;
+  permissions: string;
+};
+
+type AmroEngineImplementationStatus = 'pending' | 'in_progress' | 'completed';
+type AmroEngineCapability = 'Engine Serial Tracking' | 'Thrust Rating Management' | 'On-Wing Lifecycle';
+type AmroEngineExecutionLayer = 'Data Model' | 'API' | 'UI' | 'Validation' | 'Permissions';
+
+type AmroEngineImplementationExecutionRow = {
+  id: string;
+  capability: AmroEngineCapability;
+  layer: AmroEngineExecutionLayer;
+  task: string;
+  targetPermission: string;
+  status: AmroEngineImplementationStatus;
+};
+
 const AMRO_DOCUMENTATION_REFERENCES: AmroDocumentationReference[] = [
   { id: 'openapi', label: 'OpenAPI 3.1 Contract', href: AMRO_OPENAPI_SPEC_PATH, category: 'contracts', external: true },
   { id: 'graphql', label: 'GraphQL Subgraph Contract', href: AMRO_GRAPHQL_SUBGRAPH_PATH, category: 'contracts', external: true },
@@ -163,9 +185,119 @@ const AMRO_DOCUMENTATION_REFERENCES: AmroDocumentationReference[] = [
   { id: 'a11y-surface', label: 'AMRO 16.4 Accessibility and Internationalization', href: '#amro-doc-a11y', category: 'accessibility' },
   { id: 'phase1-surface', label: AMRO_PHASE_1_SCOPE.title, href: '#amro-doc-phase-1', category: 'phase-1' },
   { id: 'phase-plan-surface', label: 'AMRO Phase-Wise Implementation Plan', href: '#amro-doc-phase-plan', category: 'phase-plan' },
+  { id: 'engine-gap-matrix-surface', label: 'AMRO Engine Gap-to-Implementation Matrix', href: '#amro-doc-engine-gap-matrix', category: 'phase-plan' },
+];
+
+const AMRO_ENGINE_GAP_IMPLEMENTATION_MATRIX: AmroEngineGapMatrixRow[] = [
+  {
+    capability: 'Engine Serial Tracking',
+    dataModel: 'Implemented (aircraft-scoped): engine_install_history jsonb persisted on aircraft records with array constraints.',
+    api: 'Implemented (aircraft endpoint): master-data normalization and write allowlist support engine_install_history payloads.',
+    ui: 'Implemented (aircraft workspace): JSON-backed create/edit field plus engine dashboard serialized tracking surface.',
+    validation: 'Partially implemented: JSON array schema validation in settings form; uniqueness and chronology guardrails still pending.',
+    permissions: 'Gap remains: dedicated view/manage/approve engine serial permission split is not yet introduced.',
+  },
+  {
+    capability: 'Thrust Rating Management',
+    dataModel: 'Implemented (aircraft-scoped): thrust_rating_change_log jsonb stores rated thrust, derate mode, and authority references.',
+    api: 'Implemented (aircraft endpoint): payload normalization accepts thrust_rating_change_log snapshots.',
+    ui: 'Implemented (aircraft workspace): settings form captures rating history and engine dashboard renders rating timeline.',
+    validation: 'Partially implemented: JSON array parsing is enforced; range/unit and overlap validation remain pending.',
+    permissions: 'Gap remains: no dedicated edit_engine_configuration authority boundary for thrust changes.',
+  },
+  {
+    capability: 'On-Wing Lifecycle',
+    dataModel: 'Implemented (aircraft-scoped): on_wing_lifecycle_records jsonb persists install/remove/overhaul event rows.',
+    api: 'Implemented (aircraft endpoint): create/update normalization accepts on_wing_lifecycle_records payloads.',
+    ui: 'Implemented (aircraft workspace): form captures lifecycle events and engine dashboard shows on-wing event timeline.',
+    validation: 'Partially implemented: JSON array validation is active; chronology and counter reset consistency checks remain pending.',
+    permissions: 'Gap remains: record_engine_lifecycle_event and approve_lifecycle_reset split permissions are still pending.',
+  },
 ];
 
 const AMRO_DOC_BOOKMARKS_STORAGE_KEY = 'amro.workspace.documentation.bookmarks';
+const AMRO_ENGINE_IMPLEMENTATION_STATUS_STORAGE_KEY = 'amro.workspace.documentation.engine-implementation-status';
+const AMRO_ENGINE_IMPLEMENTATION_EXECUTION_MATRIX: AmroEngineImplementationExecutionRow[] = [
+  {
+    id: 'eng-serial-data-model',
+    capability: 'Engine Serial Tracking',
+    layer: 'Data Model',
+    task: 'Create tenant/franchise scoped engine asset and installation history entities with unique serial constraints.',
+    targetPermission: 'manage_engine_records',
+    status: 'completed',
+  },
+  {
+    id: 'eng-serial-api',
+    capability: 'Engine Serial Tracking',
+    layer: 'API',
+    task: 'Deliver engine registry CRUD and installation timeline endpoints.',
+    targetPermission: 'manage_engine_records',
+    status: 'completed',
+  },
+  {
+    id: 'eng-serial-ui',
+    capability: 'Engine Serial Tracking',
+    layer: 'UI',
+    task: 'Build engine registry management surface with serial, position, install, and removal workflow controls.',
+    targetPermission: 'manage_engine_records',
+    status: 'in_progress',
+  },
+  {
+    id: 'eng-thrust-data-model',
+    capability: 'Thrust Rating Management',
+    layer: 'Data Model',
+    task: 'Add rated thrust and derate configuration fields with effective date lineage.',
+    targetPermission: 'edit_engine_configuration',
+    status: 'completed',
+  },
+  {
+    id: 'eng-thrust-api',
+    capability: 'Thrust Rating Management',
+    layer: 'API',
+    task: 'Expose rating update contract with immutable historical snapshots.',
+    targetPermission: 'edit_engine_configuration',
+    status: 'completed',
+  },
+  {
+    id: 'eng-thrust-validation',
+    capability: 'Thrust Rating Management',
+    layer: 'Validation',
+    task: 'Enforce unit/range checks and reject overlapping effective date windows.',
+    targetPermission: 'edit_engine_configuration',
+    status: 'in_progress',
+  },
+  {
+    id: 'eng-lifecycle-data-model',
+    capability: 'On-Wing Lifecycle',
+    layer: 'Data Model',
+    task: 'Persist installation and overhaul lifecycle events with on-wing counter baselines.',
+    targetPermission: 'record_engine_lifecycle_event',
+    status: 'completed',
+  },
+  {
+    id: 'eng-lifecycle-api',
+    capability: 'On-Wing Lifecycle',
+    layer: 'API',
+    task: 'Implement lifecycle event ingestion and counter recomputation APIs.',
+    targetPermission: 'record_engine_lifecycle_event',
+    status: 'completed',
+  },
+  {
+    id: 'eng-lifecycle-ui',
+    capability: 'On-Wing Lifecycle',
+    layer: 'UI',
+    task: 'Ship lifecycle timeline and reset approval flow for install/remove/overhaul actions.',
+    targetPermission: 'approve_lifecycle_reset',
+    status: 'in_progress',
+  },
+];
+const AMRO_ENGINE_IMPLEMENTATION_CAPABILITIES: AmroEngineCapability[] = [
+  'Engine Serial Tracking',
+  'Thrust Rating Management',
+  'On-Wing Lifecycle',
+];
+const AMRO_ENGINE_IMPLEMENTATION_LAYERS: AmroEngineExecutionLayer[] = ['Data Model', 'API', 'UI', 'Validation', 'Permissions'];
+const AMRO_ENGINE_IMPLEMENTATION_STATUSES: AmroEngineImplementationStatus[] = ['pending', 'in_progress', 'completed'];
 
 function AmroModuleShell({ children }: AmroModuleShellProps) {
   return (
@@ -206,6 +338,11 @@ function AmroWorkspaceDocumentationReference({
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<AmroDocumentationCategory>('all');
   const [bookmarkedReferenceIds, setBookmarkedReferenceIds] = useState<string[]>([]);
+  const [engineImplementationStatusByTask, setEngineImplementationStatusByTask] = useState<Record<string, AmroEngineImplementationStatus>>({});
+  const [engineTaskSearchQuery, setEngineTaskSearchQuery] = useState('');
+  const [engineCapabilityFilter, setEngineCapabilityFilter] = useState<'all' | AmroEngineCapability>('all');
+  const [engineLayerFilter, setEngineLayerFilter] = useState<'all' | AmroEngineExecutionLayer>('all');
+  const [engineStatusFilter, setEngineStatusFilter] = useState<'all' | AmroEngineImplementationStatus>('all');
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -218,6 +355,26 @@ function AmroWorkspaceDocumentationReference({
       }
     } catch {
       setBookmarkedReferenceIds([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const raw = window.localStorage.getItem(AMRO_ENGINE_IMPLEMENTATION_STATUS_STORAGE_KEY);
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') {
+        const normalizedEntries = Object.entries(parsed).reduce<Record<string, AmroEngineImplementationStatus>>((accumulator, [key, value]) => {
+          if (value === 'pending' || value === 'in_progress' || value === 'completed') {
+            accumulator[key] = value;
+          }
+          return accumulator;
+        }, {});
+        setEngineImplementationStatusByTask(normalizedEntries);
+      }
+    } catch {
+      setEngineImplementationStatusByTask({});
     }
   }, []);
 
@@ -244,6 +401,78 @@ function AmroWorkspaceDocumentationReference({
       return next;
     });
   };
+
+  const getEffectiveEngineTaskStatus = (taskId: string): AmroEngineImplementationStatus =>
+    engineImplementationStatusByTask[taskId] ?? AMRO_ENGINE_IMPLEMENTATION_EXECUTION_MATRIX.find((row) => row.id === taskId)?.status ?? 'pending';
+
+  const persistEngineImplementationStatus = (next: Record<string, AmroEngineImplementationStatus>) => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(AMRO_ENGINE_IMPLEMENTATION_STATUS_STORAGE_KEY, JSON.stringify(next));
+    }
+  };
+
+  const cycleEngineTaskStatus = (taskId: string) => {
+    setEngineImplementationStatusByTask((current) => {
+      const currentStatus = current[taskId] ?? getEffectiveEngineTaskStatus(taskId);
+      const nextStatus: AmroEngineImplementationStatus =
+        currentStatus === 'pending' ? 'in_progress' : currentStatus === 'in_progress' ? 'completed' : 'pending';
+      const next = { ...current, [taskId]: nextStatus };
+      persistEngineImplementationStatus(next);
+      return next;
+    });
+  };
+
+  const updateVisibleEngineTaskStatuses = (nextStatus: AmroEngineImplementationStatus, taskIds: string[]) => {
+    if (!taskIds.length) return;
+    setEngineImplementationStatusByTask((current) => {
+      const next = { ...current };
+      taskIds.forEach((taskId) => {
+        next[taskId] = nextStatus;
+      });
+      persistEngineImplementationStatus(next);
+      return next;
+    });
+  };
+
+  const clearEngineImplementationStatuses = () => {
+    setEngineImplementationStatusByTask({});
+    if (typeof window !== 'undefined') {
+      window.localStorage.removeItem(AMRO_ENGINE_IMPLEMENTATION_STATUS_STORAGE_KEY);
+    }
+  };
+
+  const engineExecutionSummary = useMemo(
+    () =>
+      AMRO_ENGINE_IMPLEMENTATION_EXECUTION_MATRIX.reduce(
+        (accumulator, row) => {
+          const status = getEffectiveEngineTaskStatus(row.id);
+          accumulator.total += 1;
+          if (status === 'pending') accumulator.pending += 1;
+          if (status === 'in_progress') accumulator.inProgress += 1;
+          if (status === 'completed') accumulator.completed += 1;
+          return accumulator;
+        },
+        { total: 0, pending: 0, inProgress: 0, completed: 0 },
+      ),
+    [engineImplementationStatusByTask],
+  );
+
+  const filteredEngineExecutionRows = useMemo(() => {
+    const normalized = engineTaskSearchQuery.trim().toLowerCase();
+    return AMRO_ENGINE_IMPLEMENTATION_EXECUTION_MATRIX.filter((row) => {
+      const capabilityMatch = engineCapabilityFilter === 'all' || row.capability === engineCapabilityFilter;
+      const layerMatch = engineLayerFilter === 'all' || row.layer === engineLayerFilter;
+      const status = getEffectiveEngineTaskStatus(row.id);
+      const statusMatch = engineStatusFilter === 'all' || status === engineStatusFilter;
+      const searchMatch =
+        !normalized ||
+        row.task.toLowerCase().includes(normalized) ||
+        row.targetPermission.toLowerCase().includes(normalized) ||
+        row.capability.toLowerCase().includes(normalized) ||
+        row.layer.toLowerCase().includes(normalized);
+      return capabilityMatch && layerMatch && statusMatch && searchMatch;
+    });
+  }, [engineCapabilityFilter, engineImplementationStatusByTask, engineLayerFilter, engineStatusFilter, engineTaskSearchQuery]);
 
   return (
     <div className="space-y-4">
@@ -592,6 +821,170 @@ function AmroWorkspaceDocumentationReference({
                 <p className="text-xs text-muted-foreground">{phase.deliverables}</p>
               </div>
             ))}
+          </div>
+        </CardContent>
+      </Card>
+      <Card id="amro-doc-engine-gap-matrix" data-amro-engine-gap-matrix-surface="engine-gap-matrix">
+        <CardHeader className="pb-2">
+          <CardTitle>AMRO Engine Gap-to-Implementation Matrix</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Strict field-by-field implementation baseline for engine serial tracking, thrust rating, and on-wing lifecycle.
+          </p>
+          <Badge variant="outline">Status: Engine record model rollout in progress</Badge>
+          <div className="flex flex-wrap gap-2 text-xs">
+            <Badge variant="outline">Execution Tasks: {engineExecutionSummary.total}</Badge>
+            <Badge variant="outline">Pending: {engineExecutionSummary.pending}</Badge>
+            <Badge variant="outline">In Progress: {engineExecutionSummary.inProgress}</Badge>
+            <Badge variant="outline">Completed: {engineExecutionSummary.completed}</Badge>
+            <Badge variant="outline">Visible Tasks: {filteredEngineExecutionRows.length}</Badge>
+          </div>
+          <div className="space-y-3">
+            {AMRO_ENGINE_GAP_IMPLEMENTATION_MATRIX.map((row) => (
+              <div key={row.capability} className="rounded-md border p-3">
+                <p className="text-sm font-semibold">{row.capability}</p>
+                <div className="mt-2 grid grid-cols-1 gap-2 text-xs md:grid-cols-2">
+                  <div className="rounded-md border p-2">
+                    <p className="font-medium">Data Model</p>
+                    <p className="mt-1 text-muted-foreground">{row.dataModel}</p>
+                  </div>
+                  <div className="rounded-md border p-2">
+                    <p className="font-medium">API</p>
+                    <p className="mt-1 text-muted-foreground">{row.api}</p>
+                  </div>
+                  <div className="rounded-md border p-2">
+                    <p className="font-medium">UI</p>
+                    <p className="mt-1 text-muted-foreground">{row.ui}</p>
+                  </div>
+                  <div className="rounded-md border p-2">
+                    <p className="font-medium">Validation</p>
+                    <p className="mt-1 text-muted-foreground">{row.validation}</p>
+                  </div>
+                  <div className="rounded-md border p-2 md:col-span-2">
+                    <p className="font-medium">Permissions</p>
+                    <p className="mt-1 text-muted-foreground">{row.permissions}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="space-y-2">
+            <p className="text-sm font-semibold">Implementation Execution Matrix</p>
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-4">
+              <Input
+                value={engineTaskSearchQuery}
+                onChange={(event) => setEngineTaskSearchQuery(event.target.value)}
+                placeholder="Search execution tasks"
+                aria-label="Search execution tasks"
+              />
+              <Button variant={engineCapabilityFilter === 'all' ? 'default' : 'outline'} onClick={() => setEngineCapabilityFilter('all')}>
+                All Capabilities
+              </Button>
+              <Button variant={engineLayerFilter === 'all' ? 'default' : 'outline'} onClick={() => setEngineLayerFilter('all')}>
+                All Layers
+              </Button>
+              <Button variant={engineStatusFilter === 'all' ? 'default' : 'outline'} onClick={() => setEngineStatusFilter('all')}>
+                All Statuses
+              </Button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {AMRO_ENGINE_IMPLEMENTATION_CAPABILITIES.map((capability) => (
+                <Button
+                  key={capability}
+                  variant={engineCapabilityFilter === capability ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setEngineCapabilityFilter(capability)}
+                >
+                  {capability}
+                </Button>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {AMRO_ENGINE_IMPLEMENTATION_LAYERS.map((layer) => (
+                <Button key={layer} variant={engineLayerFilter === layer ? 'default' : 'outline'} size="sm" onClick={() => setEngineLayerFilter(layer)}>
+                  {layer}
+                </Button>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {AMRO_ENGINE_IMPLEMENTATION_STATUSES.map((status) => (
+                <Button
+                  key={status}
+                  variant={engineStatusFilter === status ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setEngineStatusFilter(status)}
+                >
+                  {status === 'in_progress' ? 'in progress' : status}
+                </Button>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => updateVisibleEngineTaskStatuses('pending', filteredEngineExecutionRows.map((row) => row.id))}
+              >
+                Mark Visible Pending
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => updateVisibleEngineTaskStatuses('in_progress', filteredEngineExecutionRows.map((row) => row.id))}
+              >
+                Mark Visible In Progress
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => updateVisibleEngineTaskStatuses('completed', filteredEngineExecutionRows.map((row) => row.id))}
+              >
+                Mark Visible Completed
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setEngineTaskSearchQuery('');
+                  setEngineCapabilityFilter('all');
+                  setEngineLayerFilter('all');
+                  setEngineStatusFilter('all');
+                }}
+              >
+                Reset Filters
+              </Button>
+              <Button variant="outline" size="sm" onClick={clearEngineImplementationStatuses}>
+                Clear Saved Status
+              </Button>
+            </div>
+            <div className="space-y-2">
+              {filteredEngineExecutionRows.map((row) => {
+                const status = getEffectiveEngineTaskStatus(row.id);
+                const statusLabel = status === 'in_progress' ? 'in progress' : status;
+                const statusBadgeVariant = status === 'completed' ? 'default' : status === 'in_progress' ? 'secondary' : 'outline';
+                return (
+                  <div key={row.id} className="rounded-md border p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="space-y-1">
+                        <p className="text-xs font-medium">{row.capability}</p>
+                        <p className="text-xs text-muted-foreground">{row.layer}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={statusBadgeVariant}>{statusLabel}</Badge>
+                        <Button variant="outline" size="sm" onClick={() => cycleEngineTaskStatus(row.id)}>
+                          Update Status
+                        </Button>
+                      </div>
+                    </div>
+                    <p className="mt-2 text-xs text-muted-foreground">{row.task}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">Target Permission: {row.targetPermission}</p>
+                  </div>
+                );
+              })}
+              {!filteredEngineExecutionRows.length ? (
+                <div className="rounded-md border border-dashed p-3 text-xs text-muted-foreground">No execution tasks match current filters.</div>
+              ) : null}
+            </div>
           </div>
         </CardContent>
       </Card>

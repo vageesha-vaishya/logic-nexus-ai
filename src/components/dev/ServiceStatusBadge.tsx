@@ -57,8 +57,8 @@ export function ServiceStatusBadge() {
   const services = useMemo<Service[]>(
     () =>
       [
-        { id: "crm", label: "CRM", probePath: "/api/crm/__health__" },
-        { id: "amro", label: "AMRO", probePath: "/api/v2/amro/__health__" },
+        { id: "crm", label: "CRM", probePath: "/api/health" },
+        { id: "amro", label: "AMRO", probePath: "/api/v2/amro/health" },
         ...(isLocalBrowser ? [] : [{ id: "branding", label: "Branding", probePath: "/api/v1/tenant-branding" }]),
         ...(enableSupabaseFunctionProbe ? [{ id: "sb-fn", label: "Supabase Fn", probePath: "/functions/v1/list-edge-functions" }] : []),
       ] as Service[],

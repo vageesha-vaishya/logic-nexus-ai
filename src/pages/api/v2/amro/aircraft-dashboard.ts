@@ -138,6 +138,21 @@ function parseNumberValue(value: unknown, fallbackValue = 0): number {
   return parsed;
 }
 
+function parseJsonArrayValue(value: unknown): unknown[] {
+  if (Array.isArray(value)) {
+    return value;
+  }
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
 function parseDashboardModule(value: unknown): DashboardModule {
   const normalized = String(value || '').trim().toLowerCase();
   if (normalized === 'engine') return 'engine';
@@ -549,7 +564,17 @@ function buildComponentsSnapshot(args: {
 function buildEngineOperationsModule(args: {
   engineSnapshot: JsonRecord;
   maintenanceRows: Array<{ work_package_id: string; work_package_number: string; title: string; status: string; priority: string; due_in_days: number | null; compliance_state: string; due_at: string; aircraft_id: string }>;
-  aircraftStatusRows: Array<{ aircraft_id: string; registration: string; health_score: number; current_flight_hours: number; current_cycles: number; status: string }>;
+  aircraftStatusRows: Array<{
+    aircraft_id: string;
+    registration: string;
+    health_score: number;
+    current_flight_hours: number;
+    current_cycles: number;
+    status: string;
+    engine_install_history: unknown[];
+    thrust_rating_change_log: unknown[];
+    on_wing_lifecycle_records: unknown[];
+  }>;
   flightHoursTrend: Array<{ day: string; flight_hours: number; cycles: number }>;
   integrationJobRows: JsonRecord[];
   signalSource: string;
@@ -603,6 +628,52 @@ function buildEngineOperationsModule(args: {
       next_event_due_in_days: selectedMaintenanceRows[index]?.due_in_days ?? null,
     };
   });
+  const serializedEngineRecords = aircraftStatusRows.flatMap((row) =>
+    row.engine_install_history
+      .filter((entry): entry is JsonRecord => Boolean(entry) && typeof entry === 'object')
+      .map((entry, index) => ({
+        aircraft_id: row.aircraft_id,
+        registration: row.registration,
+        sequence: index + 1,
+        engine_serial_number: parseStringValue(entry.engine_serial_number || entry.serial_number || entry.engine_serial || ''),
+        engine_position: parseStringValue(entry.engine_position || entry.position || ''),
+        installed_at: parseStringValue(entry.installed_at || entry.effective_from || entry.event_at || ''),
+        removed_at: parseStringValue(entry.removed_at || ''),
+        authority_basis: parseStringValue(entry.authority_basis || entry.release_reference || ''),
+        notes: parseStringValue(entry.notes || ''),
+      })),
+  );
+  const thrustRatingHistory = aircraftStatusRows.flatMap((row) =>
+    row.thrust_rating_change_log
+      .filter((entry): entry is JsonRecord => Boolean(entry) && typeof entry === 'object')
+      .map((entry, index) => ({
+        aircraft_id: row.aircraft_id,
+        registration: row.registration,
+        sequence: index + 1,
+        engine_serial_number: parseStringValue(entry.engine_serial_number || entry.serial_number || ''),
+        rated_thrust: parseNumberValue(entry.rated_thrust || entry.rated_thrust_kn || entry.thrust_rating),
+        derate_mode: parseStringValue(entry.derate_mode || ''),
+        authority_basis: parseStringValue(entry.authority_basis || ''),
+        effective_from: parseStringValue(entry.effective_from || entry.changed_at || entry.event_at || ''),
+        remarks: parseStringValue(entry.remarks || entry.notes || ''),
+      })),
+  );
+  const onWingLifecycleRecords = aircraftStatusRows.flatMap((row) =>
+    row.on_wing_lifecycle_records
+      .filter((entry): entry is JsonRecord => Boolean(entry) && typeof entry === 'object')
+      .map((entry, index) => ({
+        aircraft_id: row.aircraft_id,
+        registration: row.registration,
+        sequence: index + 1,
+        event_type: parseStringValue(entry.event_type || entry.lifecycle_event || ''),
+        engine_serial_number: parseStringValue(entry.engine_serial_number || entry.serial_number || ''),
+        event_at: parseStringValue(entry.event_at || entry.effective_from || ''),
+        baseline_hours: parseNumberValue(entry.baseline_hours || entry.hours_baseline),
+        baseline_cycles: parseNumberValue(entry.baseline_cycles || entry.cycles_baseline),
+        event_status: parseStringValue(entry.event_status || 'recorded'),
+        performed_by: parseStringValue(entry.performed_by || ''),
+      })),
+  );
   const trendSummary = (Array.isArray(engineSnapshot.trend) ? (engineSnapshot.trend as JsonRecord[]) : [])
     .slice(-6)
     .map((row) => ({
@@ -835,6 +906,9 @@ function buildEngineOperationsModule(args: {
   return {
     ...engineSnapshot,
     lifecycle_management: lifecycleRows,
+    serialized_engine_tracking: serializedEngineRecords.slice(0, 80),
+    thrust_rating_management: thrustRatingHistory.slice(0, 80),
+    on_wing_lifecycle: onWingLifecycleRecords.slice(0, 120),
     lifecycle_traceability: lifecycleTraceability,
     maintenance_schedule: selectedMaintenanceRows,
     maintenance_planning: {
@@ -988,7 +1062,8 @@ async function loadAircraftRows(supabase: SupabaseClient, tenantId: string, fran
     limit,
     stats,
     candidateTables: ['aircraft'],
-    columns: 'id,tail_number,registration,status,current_flight_hours,current_cycles,defect_count,updated_at',
+    columns:
+      'id,tail_number,registration,status,current_flight_hours,current_cycles,defect_count,engine_install_history,thrust_rating_change_log,on_wing_lifecycle_records,updated_at',
   });
 }
 
@@ -1220,6 +1295,9 @@ function buildRoleScopedOutput(args: {
           compliance_tracking: (allData.engine_module as JsonRecord)?.compliance_tracking || {},
           performance_analytics: (allData.engine_module as JsonRecord)?.performance_analytics || {},
           integration_capabilities: (allData.engine_module as JsonRecord)?.integration_capabilities || [],
+          serialized_engine_tracking: (allData.engine_module as JsonRecord)?.serialized_engine_tracking || [],
+          thrust_rating_management: (allData.engine_module as JsonRecord)?.thrust_rating_management || [],
+          on_wing_lifecycle: (allData.engine_module as JsonRecord)?.on_wing_lifecycle || [],
         }
       : null,
     components_module: showComponents
@@ -1509,6 +1587,9 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       current_flight_hours: Number(parseNumberValue(row.current_flight_hours, 0).toFixed(2)),
       current_cycles: Math.trunc(parseNumberValue(row.current_cycles, 0)),
       health_score: Math.max(0, Math.min(100, Math.round(100 - parseNumberValue(row.defect_count, 0) * 8))),
+      engine_install_history: parseJsonArrayValue(row.engine_install_history),
+      thrust_rating_change_log: parseJsonArrayValue(row.thrust_rating_change_log),
+      on_wing_lifecycle_records: parseJsonArrayValue(row.on_wing_lifecycle_records),
       updated_at: parseStringValue(row.updated_at),
     }));
 

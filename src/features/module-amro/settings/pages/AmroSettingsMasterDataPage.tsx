@@ -252,6 +252,9 @@ const ENTITY_TABLE_COLUMNS: Record<MasterEntity, string[]> = {
     'status',
     'first_limit_remaining',
     'restrictions',
+    'engine_install_history',
+    'thrust_rating_change_log',
+    'on_wing_lifecycle_records',
   ],
   flight_logs: [
     'aircraft_id',
@@ -283,7 +286,7 @@ const ENTITY_HIDDEN_COLUMNS: Partial<Record<MasterEntity, string[]>> = {
   work_package_templates: ['id', 'created_at', 'updated_at', 'tenant_id', 'franchise_id', 'scope_json'],
 };
 
-const AIRCRAFT_EDITABLE_COLUMNS = new Set(['registration', 'tail_number', 'serial_number', 'aircraft_type', 'aircraft_model', 'maintenance_program', 'status']);
+const AIRCRAFT_EDITABLE_COLUMNS = new Set(['registration', 'tail_number', 'serial_number', 'aircraft_type', 'engine_type', 'aircraft_model', 'maintenance_program', 'status']);
 
 const COLUMN_LABEL_OVERRIDES: Record<string, string> = {
   id: 'ID',
@@ -297,6 +300,7 @@ const COLUMN_LABEL_OVERRIDES: Record<string, string> = {
   first_limit_remaining: 'First Limit Remaining',
   restrictions: 'Restrictions',
   aircraft_type: 'Aircraft Type',
+  engine_type: 'Engine Type',
   aircraft_model: 'Aircraft Model',
   updated_at: 'Updated At',
   aircraft_id: 'Aircraft',
@@ -442,6 +446,9 @@ type AircraftDashboardEngineModule = {
   statuses?: Record<string, string>;
   trend?: AircraftDashboardTrendPoint[];
   lifecycle_management?: Array<Record<string, unknown>>;
+  serialized_engine_tracking?: Array<Record<string, unknown>>;
+  thrust_rating_management?: Array<Record<string, unknown>>;
+  on_wing_lifecycle?: Array<Record<string, unknown>>;
   maintenance_schedule?: Array<Record<string, unknown>>;
   maintenance_planning?: {
     predictive_candidates?: Array<Record<string, unknown>>;
@@ -615,13 +622,14 @@ const MANUFACTURER_SEED_NAMES = [
 const AIRCRAFT_TYPE_FALLBACK_OPTIONS = ['NarrowBody', 'RegionalJet', 'Turboprop', 'WideBody', 'auto_seeded'];
 const AIRCRAFT_STATUS_OPTIONS = ['active', 'maintenance', 'grounded', 'retired', 'storage'] as const;
 const AIRCRAFT_FORM_SECTION_FIELD_KEYS: Record<FormSectionKey, string[]> = {
-  basic: ['tail_number', 'registration', 'serial_number', 'aircraft_type', 'manufacturer_id'],
+  basic: ['tail_number', 'registration', 'serial_number', 'aircraft_type', 'engine_type', 'manufacturer_id'],
   configuration: ['aircraft_model', 'configuration_code', 'maintenance_program', 'status'],
 };
 const AIRCRAFT_FIELD_HELP: Partial<Record<string, string>> = {
   tail_number: 'Use 3-12 uppercase letters, numbers, or hyphen.',
   registration: 'Registration should align with authority records and paint scheme.',
   serial_number: 'Enter manufacturer serial number with at least 3 characters.',
+  engine_type: 'Capture the installed engine family or model code for planning and traceability.',
   manufacturer_id: 'Choose the approved manufacturer before selecting aircraft model.',
   aircraft_model: 'Model list is filtered by selected manufacturer.',
   maintenance_program: 'Attach approved program code used by planning and compliance teams.',
@@ -654,10 +662,14 @@ const ENTITY_FORM_FIELDS: Record<MasterEntity, EntityFormField[]> = {
     { key: 'tail_number', label: 'Tail Number', type: 'text', required: true },
     { key: 'serial_number', label: 'Serial Number', type: 'text', required: true },
     { key: 'aircraft_type', label: 'Aircraft Type', type: 'select', required: true, options: AIRCRAFT_TYPE_FALLBACK_OPTIONS },
+    { key: 'engine_type', label: 'Engine Type', type: 'text' },
     { key: 'manufacturer_id', label: 'Manufacturer', type: 'select', required: true },
     { key: 'aircraft_model', label: 'Aircraft Model', type: 'select', required: true },
     { key: 'configuration_code', label: 'Configuration Code', type: 'text' },
     { key: 'maintenance_program', label: 'Maintenance Program', type: 'text' },
+    { key: 'engine_install_history', label: 'Engine Install History', type: 'json' },
+    { key: 'thrust_rating_change_log', label: 'Thrust Rating Change Log', type: 'json' },
+    { key: 'on_wing_lifecycle_records', label: 'On-Wing Lifecycle Records', type: 'json' },
     { key: 'status', label: 'Status', type: 'select', required: true, options: ['active', 'maintenance', 'grounded', 'retired', 'storage'] },
   ],
   flight_logs: [
@@ -811,10 +823,14 @@ const ENTITY_DEFAULT_VALUES: Record<MasterEntity, FormValues> = {
     tail_number: '',
     serial_number: '',
     aircraft_type: '',
+    engine_type: '',
     aircraft_model: '',
     manufacturer_id: '',
     configuration_code: '',
     maintenance_program: '',
+    engine_install_history: '[]',
+    thrust_rating_change_log: '[]',
+    on_wing_lifecycle_records: '[]',
     status: 'active',
   },
   flight_logs: {
@@ -4308,6 +4324,27 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     () => (Array.isArray(aircraftDashboardEngineModule?.lifecycle_management) ? aircraftDashboardEngineModule.lifecycle_management.slice(0, 6) : []),
     [aircraftDashboardEngineModule],
   );
+  const aircraftEngineSerializedTrackingRows = useMemo(
+    () =>
+      Array.isArray(aircraftDashboardEngineModule?.serialized_engine_tracking)
+        ? aircraftDashboardEngineModule.serialized_engine_tracking.slice(0, 8)
+        : [],
+    [aircraftDashboardEngineModule],
+  );
+  const aircraftEngineThrustRatingRows = useMemo(
+    () =>
+      Array.isArray(aircraftDashboardEngineModule?.thrust_rating_management)
+        ? aircraftDashboardEngineModule.thrust_rating_management.slice(0, 8)
+        : [],
+    [aircraftDashboardEngineModule],
+  );
+  const aircraftEngineOnWingLifecycleRows = useMemo(
+    () =>
+      Array.isArray(aircraftDashboardEngineModule?.on_wing_lifecycle)
+        ? aircraftDashboardEngineModule.on_wing_lifecycle.slice(0, 10)
+        : [],
+    [aircraftDashboardEngineModule],
+  );
   const aircraftEngineMaintenanceRows = useMemo(
     () => (Array.isArray(aircraftDashboardEngineModule?.maintenance_schedule) ? aircraftDashboardEngineModule.maintenance_schedule.slice(0, 8) : []),
     [aircraftDashboardEngineModule],
@@ -5357,6 +5394,44 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                           ))
                         )}
                       </div>
+                      <div className="grid gap-2 text-[12px] md:grid-cols-3">
+                        <div className="space-y-1 rounded-md border border-[hsl(var(--mdm-template-border))] p-2">
+                          <p className="font-medium text-[hsl(var(--mdm-template-heading))]">Serialized Engine Tracking</p>
+                          {aircraftEngineSerializedTrackingRows.length === 0 ? (
+                            <p className="text-[hsl(var(--mdm-template-muted))]">No serialized engine records available.</p>
+                          ) : (
+                            aircraftEngineSerializedTrackingRows.map((row, index) => (
+                              <div key={`engine-serialized-row-${index + 1}`} className="rounded-md border border-[hsl(var(--mdm-template-border))] px-2 py-1">
+                                {String(row.engine_serial_number || row.serial_number || `Engine ${index + 1}`)} · {String(row.engine_position || 'position n/a')} · installed {String(row.installed_at || '').slice(0, 10) || '-'}
+                              </div>
+                            ))
+                          )}
+                        </div>
+                        <div className="space-y-1 rounded-md border border-[hsl(var(--mdm-template-border))] p-2">
+                          <p className="font-medium text-[hsl(var(--mdm-template-heading))]">Thrust Rating Change Log</p>
+                          {aircraftEngineThrustRatingRows.length === 0 ? (
+                            <p className="text-[hsl(var(--mdm-template-muted))]">No thrust rating changes recorded.</p>
+                          ) : (
+                            aircraftEngineThrustRatingRows.map((row, index) => (
+                              <div key={`engine-thrust-rating-row-${index + 1}`} className="rounded-md border border-[hsl(var(--mdm-template-border))] px-2 py-1">
+                                {String(row.engine_serial_number || `Engine ${index + 1}`)} · thrust {String(row.rated_thrust ?? '-')} · {String(row.derate_mode || 'normal')} · effective {String(row.effective_from || '').slice(0, 10) || '-'}
+                              </div>
+                            ))
+                          )}
+                        </div>
+                        <div className="space-y-1 rounded-md border border-[hsl(var(--mdm-template-border))] p-2">
+                          <p className="font-medium text-[hsl(var(--mdm-template-heading))]">On-Wing Lifecycle Timeline</p>
+                          {aircraftEngineOnWingLifecycleRows.length === 0 ? (
+                            <p className="text-[hsl(var(--mdm-template-muted))]">No on-wing lifecycle events posted.</p>
+                          ) : (
+                            aircraftEngineOnWingLifecycleRows.map((row, index) => (
+                              <div key={`engine-on-wing-row-${index + 1}`} className="rounded-md border border-[hsl(var(--mdm-template-border))] px-2 py-1">
+                                {String(row.engine_serial_number || row.asset || `Engine ${index + 1}`)} · {String(row.event_type || 'event')} · at {String(row.event_at || row.recorded_at || '').slice(0, 10) || '-'} · status {String(row.event_status || 'logged')}
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
                       <div className="space-y-1 text-[12px]">
                         <p className="font-medium text-[hsl(var(--mdm-template-heading))]">Engine Drill-down</p>
                         {aircraftEngineDefectDrivers.length === 0 ? (
@@ -6110,6 +6185,16 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                         {formErrors.serial_number ? <p className="mdm-template-danger">{formErrors.serial_number}</p> : null}
                       </div>
                       <div className="space-y-1">
+                        <Label htmlFor="aircraft-engine-type" className="text-[12px]">Engine Type</Label>
+                        <Input
+                          id="aircraft-engine-type"
+                          value={String(formValues.engine_type ?? '')}
+                          onChange={(event) => setAircraftAuxField('engine_type', event.target.value)}
+                          className={cn('h-8 text-[12px]', formErrors.engine_type && 'border-destructive')}
+                        />
+                        {formErrors.engine_type ? <p className="mdm-template-danger">{formErrors.engine_type}</p> : null}
+                      </div>
+                      <div className="space-y-1">
                         <Label htmlFor="aircraft-manufacturing-date" className="text-[12px]">Manufacturing Date</Label>
                         <div className="relative">
                           <Input
@@ -6297,6 +6382,41 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                           }}
                           className="h-8 text-[12px]"
                         />
+                      </div>
+                    </div>
+                  </section>
+                  <section className="space-y-2 rounded bg-white p-3">
+                    <p className="text-[11px] text-slate-600">Engine lifecycle records</p>
+                    <div className="grid gap-2 lg:grid-cols-3">
+                      <div className="space-y-1">
+                        <Label htmlFor="aircraft-engine-install-history" className="text-[12px]">Engine Install History (JSON Array)</Label>
+                        <Textarea
+                          id="aircraft-engine-install-history"
+                          value={String(formValues.engine_install_history ?? '[]')}
+                          onChange={(event) => setAircraftAuxField('engine_install_history', event.target.value)}
+                          className={cn('min-h-[96px] text-[12px]', formErrors.engine_install_history && 'border-destructive')}
+                        />
+                        {formErrors.engine_install_history ? <p className="mdm-template-danger">{formErrors.engine_install_history}</p> : null}
+                      </div>
+                      <div className="space-y-1">
+                        <Label htmlFor="aircraft-thrust-rating-change-log" className="text-[12px]">Thrust Rating Change Log (JSON Array)</Label>
+                        <Textarea
+                          id="aircraft-thrust-rating-change-log"
+                          value={String(formValues.thrust_rating_change_log ?? '[]')}
+                          onChange={(event) => setAircraftAuxField('thrust_rating_change_log', event.target.value)}
+                          className={cn('min-h-[96px] text-[12px]', formErrors.thrust_rating_change_log && 'border-destructive')}
+                        />
+                        {formErrors.thrust_rating_change_log ? <p className="mdm-template-danger">{formErrors.thrust_rating_change_log}</p> : null}
+                      </div>
+                      <div className="space-y-1">
+                        <Label htmlFor="aircraft-on-wing-lifecycle-records" className="text-[12px]">On-Wing Lifecycle Records (JSON Array)</Label>
+                        <Textarea
+                          id="aircraft-on-wing-lifecycle-records"
+                          value={String(formValues.on_wing_lifecycle_records ?? '[]')}
+                          onChange={(event) => setAircraftAuxField('on_wing_lifecycle_records', event.target.value)}
+                          className={cn('min-h-[96px] text-[12px]', formErrors.on_wing_lifecycle_records && 'border-destructive')}
+                        />
+                        {formErrors.on_wing_lifecycle_records ? <p className="mdm-template-danger">{formErrors.on_wing_lifecycle_records}</p> : null}
                       </div>
                     </div>
                   </section>

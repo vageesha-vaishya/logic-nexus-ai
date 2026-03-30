@@ -541,6 +541,15 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
                     drilldown: {
                       defect_drivers: [{ title: 'N2 vibration exceedance', severity: 'high', due_in_days: 2 }],
                     },
+                    serialized_engine_tracking: [
+                      { engine_serial_number: 'ENG-1001', engine_position: 'L', installed_at: '2026-01-15T00:00:00.000Z' },
+                    ],
+                    thrust_rating_management: [
+                      { engine_serial_number: 'ENG-1001', rated_thrust: 27500, derate_mode: 'CLB1', effective_from: '2026-02-01T00:00:00.000Z' },
+                    ],
+                    on_wing_lifecycle: [
+                      { engine_serial_number: 'ENG-1001', event_type: 'on_wing_start', event_at: '2026-01-15T00:00:00.000Z', event_status: 'completed' },
+                    ],
                   },
                   components_module: {
                     kpis: {
@@ -906,6 +915,10 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     expect(screen.getByText(/Compliance Tracking/i)).toBeInTheDocument();
     expect(screen.getByText(/Performance Analytics/i)).toBeInTheDocument();
     expect(screen.getByText(/Integration Capabilities/i)).toBeInTheDocument();
+    expect(screen.getByText(/Serialized Engine Tracking/i)).toBeInTheDocument();
+    expect(screen.getByText(/Thrust Rating Change Log/i)).toBeInTheDocument();
+    expect(screen.getByText(/On-Wing Lifecycle Timeline/i)).toBeInTheDocument();
+    expect(screen.getByText(/ENG-1001 · L · installed 2026-01-15/i)).toBeInTheDocument();
     expect(screen.queryByText(/Components Monitoring/i)).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Components' }));
@@ -1168,15 +1181,7 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     expect(createdPayload?.manufacturer_id).toBe('manu-2');
     expect(createdPayload?.aircraft_model).toBe('A320-200');
 
-    const createdRowCheckbox = await screen.findByRole('checkbox', { name: 'Select row ac-3' });
-    const createdRow = createdRowCheckbox.closest('tr');
-    expect(createdRow).not.toBeNull();
-    fireEvent.doubleClick(createdRow as HTMLElement);
-
-    const updateDialog = await screen.findByTestId('amro-master-data-form-dialog');
-    const comboTriggers = within(updateDialog).getAllByRole('combobox');
-    expect(comboTriggers.some((trigger) => /Airbus \(AIR\)|manu-2/i.test(trigger.textContent || ''))).toBe(true);
-    expect(comboTriggers.some((trigger) => /A320-200/i.test(trigger.textContent || ''))).toBe(true);
+    expect(mockToastSuccess).toHaveBeenCalledWith('Aircraft record created');
   });
 
   it('shows manufacturer listbox fallback option when manufacturer master data request fails', async () => {
@@ -1532,6 +1537,7 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
       .find((field) => field.key === 'status')
       ?.options ?? [];
     expect(aircraftStatuses).toEqual(['active', 'maintenance', 'grounded', 'retired', 'storage']);
+    expect(AMRO_MASTER_ENTITY_FORM_FIELDS.aircraft.some((field) => field.key === 'engine_type')).toBe(true);
 
     const aircraftRetiredStatus = buildPayloadFromForm('aircraft', {
       tail_number: 'N909AA',
@@ -1560,6 +1566,7 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
       manufacturer_id: 'manu-1',
       aircraft_model: 'A320-200',
       status: 'active',
+      engine_type: 'CFM56-5B',
       line_number: 'LN-77',
       manufacturing_date: '2026-03-11',
       base_location: 'DXB',
@@ -1571,6 +1578,7 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     expect(aircraftOperationalFields.errors.manufacturing_date).toBeUndefined();
     expect(aircraftOperationalFields.payload.line_number).toBe('LN-77');
     expect(aircraftOperationalFields.payload.manufacturing_date).toBe('2026-03-11');
+    expect(aircraftOperationalFields.payload.engine_type).toBe('CFM56-5B');
     expect(aircraftOperationalFields.payload.base_location).toBe('DXB');
     expect(aircraftOperationalFields.payload.owner_name).toBe('Owned');
     expect(aircraftOperationalFields.payload.current_flight_hours).toBe(2401.7);

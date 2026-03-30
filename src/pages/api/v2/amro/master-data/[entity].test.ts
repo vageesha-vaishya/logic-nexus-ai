@@ -525,6 +525,9 @@ describe('/api/v2/amro/master-data/[entity]', () => {
         manufacturer: 'Boeing',
         status: 'inactive',
         manufacturing_date: '2026-03-01',
+        engine_install_history: [{ engine_serial_number: 'ENG-200-1', engine_position: 'L', installed_at: '2026-03-01' }],
+        thrust_rating_change_log: [{ engine_serial_number: 'ENG-200-1', rated_thrust: 27000, effective_from: '2026-03-02' }],
+        on_wing_lifecycle_records: [{ engine_serial_number: 'ENG-200-1', event_type: 'on_wing_start', event_at: '2026-03-03' }],
       },
       headers: {},
     };
@@ -537,6 +540,9 @@ describe('/api/v2/amro/master-data/[entity]', () => {
     expect(insertPayload?.model).toBe('A320neo');
     expect(insertPayload?.manufacturer_id).toBe('man-1');
     expect(insertPayload?.manufacturing_date).toBe('2026-03-01');
+    expect(insertPayload?.engine_install_history).toEqual([{ engine_serial_number: 'ENG-200-1', engine_position: 'L', installed_at: '2026-03-01' }]);
+    expect(insertPayload?.thrust_rating_change_log).toEqual([{ engine_serial_number: 'ENG-200-1', rated_thrust: 27000, effective_from: '2026-03-02' }]);
+    expect(insertPayload?.on_wing_lifecycle_records).toEqual([{ engine_serial_number: 'ENG-200-1', event_type: 'on_wing_start', event_at: '2026-03-03' }]);
     expect(res.statusCode).toBe(201);
   });
 

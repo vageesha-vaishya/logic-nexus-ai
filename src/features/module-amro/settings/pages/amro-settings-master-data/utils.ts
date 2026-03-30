@@ -454,6 +454,24 @@ function toTimeComparable(value: string): number {
   return hour * 3600 + minute * 60 + second;
 }
 
+function parseJsonArrayInput(raw: unknown): unknown[] | null {
+  if (isBlank(raw)) {
+    return [];
+  }
+  if (Array.isArray(raw)) {
+    return raw;
+  }
+  if (typeof raw !== 'string') {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(raw.trim());
+    return Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
 export function buildPayloadFromForm(entity: MasterEntity, values: FormValues): { payload: Record<string, unknown>; errors: Record<string, string> } {
   const fields = ENTITY_FORM_FIELDS[entity];
   const errors: Record<string, string> = {};
@@ -609,6 +627,22 @@ export function buildPayloadFromForm(entity: MasterEntity, values: FormValues): 
     if (payload.manufacturing_date && !/^\d{4}-\d{2}-\d{2}$/.test(String(payload.manufacturing_date))) {
       errors.manufacturing_date = 'Manufacturing Date must be in YYYY-MM-DD format';
     }
+
+    const aircraftOptionalJsonArrayFields: Array<{ key: string; label: string }> = [
+      { key: 'engine_install_history', label: 'Engine Install History' },
+      { key: 'thrust_rating_change_log', label: 'Thrust Rating Change Log' },
+      { key: 'on_wing_lifecycle_records', label: 'On-Wing Lifecycle Records' },
+    ];
+    aircraftOptionalJsonArrayFields.forEach(({ key, label }) => {
+      const parsed = parseJsonArrayInput(values[key]);
+      if (parsed === null) {
+        errors[key] = `${label} must be a valid JSON array`;
+        return;
+      }
+      if (parsed.length > 0) {
+        payload[key] = parsed;
+      }
+    });
   }
 
   return { payload, errors };
