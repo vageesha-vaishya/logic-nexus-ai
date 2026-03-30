@@ -10,7 +10,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useCRM } from '@/hooks/useCRM';
-import { useEffect, useRef, useState } from 'react';
+import { ArrowDownUp, ChevronDown, ChevronUp, Copy, Download, Eye, GripVertical, PauseCircle, PlayCircle, Trash2 } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -47,6 +48,7 @@ const amroWorkspaceThemeStorageKey = 'amro.workspace.theme';
 const amroWorkPackagePageSizeStorageKey = 'amro.workspace.work-package-page-size';
 const amroWorkspaceLocaleStorageKey = 'amro.workspace.locale';
 const amroManualWorkPackageOrderStorageKey = 'amro.workspace.work-package-order';
+const amroGridPreferencesStorageKey = 'amro-grid-preferences';
 const amroDashboardLoadBenchmark = { targetMs: 1000, hardLimitMs: 1500 };
 const amroWorkPackageFilterApplyBenchmark = { targetMs: 500, hardLimitMs: 900 };
 const amroDetailTabSwitchBenchmark = { targetMs: 250, hardLimitMs: 500 };
@@ -169,6 +171,63 @@ type TaskConflictInfo = {
   reason: string;
 };
 
+type WorkPackageGridColumnKey = 'packageNumber' | 'aircraft' | 'priority' | 'category' | 'station' | 'due' | 'status' | 'owner';
+
+type WorkPackageGridSortKey = WorkPackageGridColumnKey;
+
+type WorkPackageGridPreferences = {
+  visibleColumns: Record<WorkPackageGridColumnKey, boolean>;
+  columnWidths: Record<WorkPackageGridColumnKey, number>;
+};
+
+type WorkPackageGridRuntimeRow = {
+  id: string;
+  packageNumber: string;
+  aircraft: string;
+  priority: string;
+  category: string;
+  station: string;
+  due: string;
+  status: string;
+  owner: string;
+  dueEpoch: number;
+};
+
+const defaultGridVisibleColumns: Record<WorkPackageGridColumnKey, boolean> = {
+  packageNumber: true,
+  aircraft: true,
+  priority: true,
+  category: true,
+  station: true,
+  due: true,
+  status: true,
+  owner: true,
+};
+
+const defaultGridColumnWidths: Record<WorkPackageGridColumnKey, number> = {
+  packageNumber: 140,
+  aircraft: 160,
+  priority: 110,
+  category: 120,
+  station: 120,
+  due: 170,
+  status: 130,
+  owner: 120,
+};
+
+const workPackageGridColumnLabels: Record<WorkPackageGridColumnKey, string> = {
+  packageNumber: 'Work Order #',
+  aircraft: 'Aircraft',
+  priority: 'Priority',
+  category: 'Maintenance Category',
+  station: 'Station',
+  due: 'Due / Slot End',
+  status: 'Lifecycle Status',
+  owner: 'Owner',
+};
+
+const workPackageGridSortableColumns: WorkPackageGridSortKey[] = ['packageNumber', 'aircraft', 'priority', 'category', 'station', 'due', 'status', 'owner'];
+
 const amroRoleVariants: Record<AmroUxRole, AmroRoleVariant> = {
   technician: {
     primaryViews: 'Task cards, assigned work package details',
@@ -241,8 +300,30 @@ export function AmroOwnedWorkspace({
   const [workspaceLocale, setWorkspaceLocale] = useState<(typeof workspaceLocaleOptions)[number]>('en-US');
   const [workPackagePageSize, setWorkPackagePageSize] = useState<number>(workPackagePageSizes[0]);
   const [workPackagePage, setWorkPackagePage] = useState(1);
-  const [workPackageSortField, setWorkPackageSortField] = useState<'manual' | 'packageNumber' | 'lifecycleStage'>('manual');
+  const [workPackageSortField, setWorkPackageSortField] = useState<'manual' | WorkPackageGridSortKey>('manual');
   const [workPackageSortDirection, setWorkPackageSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [workPackageGridVisibleColumns, setWorkPackageGridVisibleColumns] = useState<Record<WorkPackageGridColumnKey, boolean>>(defaultGridVisibleColumns);
+  const [workPackageGridColumnWidths, setWorkPackageGridColumnWidths] = useState<Record<WorkPackageGridColumnKey, number>>(defaultGridColumnWidths);
+  const [workPackageGridFilters, setWorkPackageGridFilters] = useState<Record<WorkPackageGridColumnKey, string>>({
+    packageNumber: '',
+    aircraft: '',
+    priority: '',
+    category: '',
+    station: '',
+    due: '',
+    status: '',
+    owner: '',
+  });
+  const [debouncedWorkPackageGridFilters, setDebouncedWorkPackageGridFilters] = useState<Record<WorkPackageGridColumnKey, string>>({
+    packageNumber: '',
+    aircraft: '',
+    priority: '',
+    category: '',
+    station: '',
+    due: '',
+    status: '',
+    owner: '',
+  });
   const [selectedFleetFilter, setSelectedFleetFilter] = useState('all');
   const [selectedStationFilter, setSelectedStationFilter] = useState('all');
   const [closureConfirmOpen, setClosureConfirmOpen] = useState(false);
@@ -273,6 +354,11 @@ export function AmroOwnedWorkspace({
   const workspaceLoadStartedAtRef = useRef(typeof performance !== 'undefined' ? performance.now() : Date.now());
   const workspaceLoadMetricPublishedRef = useRef(false);
   const filterApplyStartedAtRef = useRef<number | null>(null);
+  const gridResizeActiveRef = useRef<{
+    columnKey: WorkPackageGridColumnKey;
+    startX: number;
+    startWidth: number;
+  } | null>(null);
   const hasUnsavedDetailChanges = detailDraft.trim() !== lastSavedDetailDraft.trim();
   const activeUxRole: AmroUxRole = state.activeRole === 'technician'
     ? 'technician'
@@ -720,12 +806,38 @@ export function AmroOwnedWorkspace({
       return [...retained, ...appended];
     });
   }, [state.workPackages]);
+  const workPackageRuntimeRows = useMemo<Record<string, WorkPackageGridRuntimeRow>>(
+    () =>
+      state.workPackages.reduce<Record<string, WorkPackageGridRuntimeRow>>((accumulator, workPackage) => {
+        const assetTag = state.assets.find((asset) => asset.id === workPackage.assetId)?.assetTag || workPackage.assetId;
+        const scheduleRow = state.scheduleBoardRows.find((row) => row.work_package_id === workPackage.id);
+        const dueLabel = scheduleRow?.slot_end || 'TBD';
+        accumulator[workPackage.id] = {
+          id: workPackage.id,
+          packageNumber: workPackage.packageNumber,
+          aircraft: assetTag,
+          priority: 'Normal',
+          category: 'Line',
+          station: scheduleRow?.station_code || 'N/A',
+          due: dueLabel,
+          status: String(workPackage.lifecycleStage),
+          owner: activeUxRole,
+          dueEpoch: dueLabel === 'TBD' ? Number.MAX_SAFE_INTEGER : new Date(dueLabel).getTime(),
+        };
+        return accumulator;
+      }, {}),
+    [activeUxRole, state.assets, state.scheduleBoardRows, state.workPackages],
+  );
   const filteredWorkPackages = state.workPackages.filter((workPackage) => {
-    const assetTag = state.assets.find((asset) => asset.id === workPackage.assetId)?.assetTag || '';
-    const stationCode = state.scheduleBoardRows.find((row) => row.work_package_id === workPackage.id)?.station_code || '';
-    const fleetMatch = selectedFleetFilter === 'all' || assetTag === selectedFleetFilter;
-    const stationMatch = selectedStationFilter === 'all' || stationCode === selectedStationFilter;
-    return fleetMatch && stationMatch;
+    const runtimeRow = workPackageRuntimeRows[workPackage.id];
+    const fleetMatch = selectedFleetFilter === 'all' || runtimeRow.aircraft === selectedFleetFilter;
+    const stationMatch = selectedStationFilter === 'all' || runtimeRow.station === selectedStationFilter;
+    const columnFilterMatch = (Object.entries(debouncedWorkPackageGridFilters) as Array<[WorkPackageGridColumnKey, string]>).every(([columnKey, rawFilterValue]) => {
+      const normalizedFilterValue = rawFilterValue.trim().toLowerCase();
+      if (!normalizedFilterValue) return true;
+      return String(runtimeRow[columnKey]).toLowerCase().includes(normalizedFilterValue);
+    });
+    return fleetMatch && stationMatch && columnFilterMatch;
   });
   const manuallyOrderedWorkPackages = [...filteredWorkPackages].sort((left, right) => {
     const leftIndex = manualWorkPackageOrder.indexOf(left.id);
@@ -738,9 +850,13 @@ export function AmroOwnedWorkspace({
   const sortedWorkPackages = workPackageSortField === 'manual'
     ? manuallyOrderedWorkPackages
     : [...filteredWorkPackages].sort((left, right) => {
-      const leftValue = workPackageSortField === 'packageNumber' ? left.packageNumber : left.lifecycleStage;
-      const rightValue = workPackageSortField === 'packageNumber' ? right.packageNumber : right.lifecycleStage;
-      const compare = leftValue.localeCompare(rightValue);
+      const leftRuntime = workPackageRuntimeRows[left.id];
+      const rightRuntime = workPackageRuntimeRows[right.id];
+      if (workPackageSortField === 'due') {
+        const compareDue = leftRuntime.dueEpoch - rightRuntime.dueEpoch;
+        return workPackageSortDirection === 'asc' ? compareDue : compareDue * -1;
+      }
+      const compare = String(leftRuntime[workPackageSortField]).localeCompare(String(rightRuntime[workPackageSortField]));
       return workPackageSortDirection === 'asc' ? compare : compare * -1;
     });
   const workPackageTotalPages = Math.max(1, Math.ceil(sortedWorkPackages.length / workPackagePageSize));
@@ -1134,6 +1250,63 @@ export function AmroOwnedWorkspace({
     state.setWorkPackageSearch(value);
   };
 
+  /**
+   * Updates a per-column filter value used by the AMRO work package data grid.
+   */
+  const handleGridFilterChange = (columnKey: WorkPackageGridColumnKey, value: string) => {
+    startFilterApplyTimer(`column_${columnKey}`);
+    setWorkPackageGridFilters((current) => ({
+      ...current,
+      [columnKey]: value,
+    }));
+    setWorkPackagePage(1);
+  };
+
+  /**
+   * Clears a single per-column filter while preserving other active column filters.
+   */
+  const handleGridFilterClear = (columnKey: WorkPackageGridColumnKey) => {
+    handleGridFilterChange(columnKey, '');
+  };
+
+  /**
+   * Sorts by clicking a semantic column header and toggles ascending/descending.
+   */
+  const handleGridSortToggle = (columnKey: WorkPackageGridSortKey) => {
+    if (workPackageSortField === columnKey) {
+      setWorkPackageSortDirection((current) => (current === 'asc' ? 'desc' : 'asc'));
+      return;
+    }
+    setWorkPackageSortField(columnKey);
+    setWorkPackageSortDirection('asc');
+  };
+
+  /**
+   * Toggles a column visibility preference while preserving at least one visible column.
+   */
+  const handleGridColumnVisibilityToggle = (columnKey: WorkPackageGridColumnKey) => {
+    setWorkPackageGridVisibleColumns((current) => {
+      const currentlyVisible = Object.values(current).filter(Boolean).length;
+      if (current[columnKey] && currentlyVisible === 1) return current;
+      return {
+        ...current,
+        [columnKey]: !current[columnKey],
+      };
+    });
+  };
+
+  /**
+   * Starts pointer-driven column resizing with hard min/max width constraints.
+   */
+  const handleGridResizeStart = (columnKey: WorkPackageGridColumnKey, event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    gridResizeActiveRef.current = {
+      columnKey,
+      startX: event.clientX,
+      startWidth: workPackageGridColumnWidths[columnKey],
+    };
+  };
+
   const handleSavedViewChange = (value: string) => {
     startFilterApplyTimer('saved_view');
     state.setSelectedSavedViewId(value);
@@ -1471,6 +1644,33 @@ export function AmroOwnedWorkspace({
         setManualWorkPackageOrder([]);
       }
     }
+    const storedGridPreferences = window.localStorage.getItem(amroGridPreferencesStorageKey);
+    if (storedGridPreferences) {
+      try {
+        const parsed = JSON.parse(storedGridPreferences) as Partial<WorkPackageGridPreferences>;
+        if (parsed.visibleColumns) {
+          setWorkPackageGridVisibleColumns((current) => ({
+            ...current,
+            ...parsed.visibleColumns,
+          }));
+        }
+        if (parsed.columnWidths) {
+          setWorkPackageGridColumnWidths((current) => {
+            const next = { ...current };
+            (Object.keys(current) as WorkPackageGridColumnKey[]).forEach((columnKey) => {
+              const candidate = Number(parsed.columnWidths?.[columnKey]);
+              if (Number.isFinite(candidate)) {
+                next[columnKey] = Math.max(80, Math.min(400, candidate));
+              }
+            });
+            return next;
+          });
+        }
+      } catch {
+        setWorkPackageGridVisibleColumns(defaultGridVisibleColumns);
+        setWorkPackageGridColumnWidths(defaultGridColumnWidths);
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -1497,6 +1697,47 @@ export function AmroOwnedWorkspace({
     if (typeof window === 'undefined') return;
     window.localStorage.setItem(amroManualWorkPackageOrderStorageKey, JSON.stringify(manualWorkPackageOrder));
   }, [manualWorkPackageOrder]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(
+      amroGridPreferencesStorageKey,
+      JSON.stringify({
+        visibleColumns: workPackageGridVisibleColumns,
+        columnWidths: workPackageGridColumnWidths,
+      } satisfies WorkPackageGridPreferences),
+    );
+  }, [workPackageGridColumnWidths, workPackageGridVisibleColumns]);
+
+  useEffect(() => {
+    const timerId = window.setTimeout(() => {
+      setDebouncedWorkPackageGridFilters(workPackageGridFilters);
+    }, 300);
+    return () => {
+      window.clearTimeout(timerId);
+    };
+  }, [workPackageGridFilters]);
+
+  useEffect(() => {
+    const handleMouseMove = (event: MouseEvent) => {
+      const activeResize = gridResizeActiveRef.current;
+      if (!activeResize) return;
+      const nextWidth = activeResize.startWidth + (event.clientX - activeResize.startX);
+      setWorkPackageGridColumnWidths((current) => ({
+        ...current,
+        [activeResize.columnKey]: Math.max(80, Math.min(400, nextWidth)),
+      }));
+    };
+    const releaseResize = () => {
+      gridResizeActiveRef.current = null;
+    };
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', releaseResize);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', releaseResize);
+    };
+  }, []);
 
   useEffect(() => {
     if (workPackagePage <= workPackageTotalPages) return;
@@ -1798,7 +2039,7 @@ export function AmroOwnedWorkspace({
                   </SelectContent>
                 </Select>
                 <Select value={`${workPackageSortField}:${workPackageSortDirection}`} onValueChange={(value) => {
-                  const [field, direction] = value.split(':') as ['packageNumber' | 'lifecycleStage', 'asc' | 'desc'];
+                  const [field, direction] = value.split(':') as ['manual' | WorkPackageGridSortKey, 'asc' | 'desc'];
                   setWorkPackageSortField(field);
                   setWorkPackageSortDirection(direction);
                 }}>
@@ -1806,10 +2047,11 @@ export function AmroOwnedWorkspace({
                     <SelectValue placeholder="Group" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="manual:asc">Manual Order</SelectItem>
                     <SelectItem value="packageNumber:asc">Group WO# ↑</SelectItem>
                     <SelectItem value="packageNumber:desc">Group WO# ↓</SelectItem>
-                    <SelectItem value="lifecycleStage:asc">Group Status ↑</SelectItem>
-                    <SelectItem value="lifecycleStage:desc">Group Status ↓</SelectItem>
+                    <SelectItem value="status:asc">Group Status ↑</SelectItem>
+                    <SelectItem value="status:desc">Group Status ↓</SelectItem>
                   </SelectContent>
                 </Select>
                 <Select value={state.selectedSavedViewId} onValueChange={handleSavedViewChange}>
@@ -1837,7 +2079,7 @@ export function AmroOwnedWorkspace({
               <Badge variant="outline">Sort: {workPackageSortField === 'manual' ? 'Manual' : workPackageSortField}</Badge>
               <Button variant="outline" size="sm" onClick={() => setWorkPackageSortField('manual')}>Manual Order</Button>
               <Button variant="outline" size="sm" onClick={() => setWorkPackageSortField('packageNumber')}>Sort WO#</Button>
-              <Button variant="outline" size="sm" onClick={() => setWorkPackageSortField('lifecycleStage')}>Sort Status</Button>
+              <Button variant="outline" size="sm" onClick={() => setWorkPackageSortField('status')}>Sort Status</Button>
               <Button
                 variant="outline"
                 size="sm"
@@ -1887,120 +2129,223 @@ export function AmroOwnedWorkspace({
                   </div>
                 </div>
               ) : (
-                <>
-                  <div className="rounded-md border bg-muted/30 px-2 py-1 text-[11px] font-semibold text-muted-foreground">
-                    <div className="grid grid-cols-2 gap-2 md:grid-cols-8">
-                      <span>WO#</span>
-                      <span>Aircraft</span>
-                      <span>Priority</span>
-                      <span>Category</span>
-                      <span>Station</span>
-                      <span>Due / Slot End</span>
-                      <span>Status</span>
-                      <span>Owner</span>
-                    </div>
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/20 p-2 text-xs">
+                    {(Object.keys(workPackageGridColumnLabels) as WorkPackageGridColumnKey[]).map((columnKey) => (
+                      <Button
+                        key={`toggle-${columnKey}`}
+                        type="button"
+                        size="sm"
+                        variant={workPackageGridVisibleColumns[columnKey] ? 'default' : 'outline'}
+                        onClick={() => handleGridColumnVisibilityToggle(columnKey)}
+                        className="h-7 px-2 text-[11px]"
+                        aria-pressed={workPackageGridVisibleColumns[columnKey]}
+                      >
+                        {workPackageGridColumnLabels[columnKey]}
+                      </Button>
+                    ))}
                   </div>
-                  {pagedWorkPackages.map((workPackage) => (
-                    <div
-                      key={`list-${workPackage.id}`}
-                      draggable
-                      onDragStart={() => {
-                        setDraggingWorkPackageId(workPackage.id);
-                        handleDragHandleInteraction(workPackage.id, workPackage.packageNumber);
-                      }}
-                      onDragEnd={() => setDraggingWorkPackageId(null)}
-                      onDragOver={(event) => event.preventDefault()}
-                      onDrop={() => {
-                        if (!draggingWorkPackageId) return;
-                        handleWorkPackageReorder(draggingWorkPackageId, workPackage.id);
-                        setDraggingWorkPackageId(null);
-                      }}
-                      className={`rounded-md border p-2 text-xs ${
-                        (state.scheduleBoardRows.find((row) => row.work_package_id === workPackage.id)?.slot_end
-                        && new Date(state.scheduleBoardRows.find((row) => row.work_package_id === workPackage.id)?.slot_end || nowEpoch).getTime() < nowEpoch)
-                          ? 'border-destructive/40 bg-destructive/5'
-                          : state.selectedWorkPackageId === workPackage.id
-                            ? 'border-primary bg-primary/5'
-                            : ''
-                      } ${draggingWorkPackageId === workPackage.id ? 'opacity-60 ring-2 ring-primary' : ''}`}
-                    >
-                      <div className="grid grid-cols-2 gap-2 md:grid-cols-8">
-                        <span>{workPackage.packageNumber}</span>
-                        <span>{workPackage.assetId}</span>
-                        <span>normal</span>
-                        <span>line</span>
-                        <span>{state.scheduleBoardRows.find((row) => row.work_package_id === workPackage.id)?.station_code || 'N/A'}</span>
-                        <span>{state.scheduleBoardRows.find((row) => row.work_package_id === workPackage.id)?.slot_end || 'TBD'}</span>
-                        <span><Badge variant="outline">{workPackage.lifecycleStage}</Badge></span>
-                        <span>{activeUxRole}</span>
-                      </div>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          aria-label={`Open work package ${workPackage.packageNumber}`}
-                          onClick={() => void handleOpenWorkPackage(workPackage.id, workPackage.packageNumber)}
-                          disabled={busyWorkPackageActionId !== null}
-                        >
-                          Open
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          aria-label={`Schedule work package ${workPackage.packageNumber}`}
-                          onClick={() => void handleScheduleWorkPackage(workPackage.id, workPackage.packageNumber)}
-                          disabled={busyWorkPackageActionId !== null}
-                        >
-                          Schedule
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          aria-label={`Hold work package ${workPackage.packageNumber}`}
-                          onClick={() => void handleHoldWorkPackage(workPackage.id, workPackage.packageNumber)}
-                          disabled={busyWorkPackageActionId !== null}
-                        >
-                          Hold
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          aria-label={`Clone work package ${workPackage.packageNumber}`}
-                          onClick={() => void handleCloneWorkPackage(workPackage.id, workPackage.packageNumber)}
-                          disabled={busyWorkPackageActionId !== null}
-                        >
-                          Clone
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          aria-label={`Export work package ${workPackage.packageNumber}`}
-                          onClick={() => handleWorkPackageExport(workPackage.id, workPackage.packageNumber)}
-                          disabled={busyWorkPackageActionId !== null}
-                        >
-                          Export
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          aria-label={`Delete work package ${workPackage.packageNumber}`}
-                          onClick={() => void handleDeleteWorkPackage(workPackage.id, workPackage.packageNumber)}
-                          disabled={busyWorkPackageActionId !== null || !state.canDeleteWorkPackage}
-                        >
-                          Delete
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          aria-label={`Drag handle for ${workPackage.packageNumber}`}
-                          onClick={() => handleDragHandleInteraction(workPackage.id, workPackage.packageNumber)}
-                        >
-                          Drag
-                        </Button>
-                      </div>
+                  {state.loadingWorkPackages ? (
+                    <div className="space-y-2">
+                      {Array.from({ length: Math.min(workPackagePageSize, 5) }).map((_, index) => (
+                        <div key={`grid-skeleton-${index}`} className="animate-pulse rounded-md border p-2">
+                          <div className="h-4 w-3/4 rounded bg-muted/60" />
+                          <div className="mt-2 h-4 w-1/2 rounded bg-muted/50" />
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </>
+                  ) : (
+                    <div className="overflow-x-auto rounded-md border">
+                      <div
+                        className="grid min-w-[920px] items-center bg-muted/30 px-2 py-2 text-[11px] font-semibold text-muted-foreground"
+                        style={{
+                          gridTemplateColumns: `${workPackageGridSortableColumns
+                            .filter((columnKey) => workPackageGridVisibleColumns[columnKey])
+                            .map((columnKey) => `minmax(80px, ${workPackageGridColumnWidths[columnKey]}px)`)
+                            .join(' ')} 156px`,
+                        }}
+                      >
+                        {workPackageGridSortableColumns
+                          .filter((columnKey) => workPackageGridVisibleColumns[columnKey])
+                          .map((columnKey) => (
+                            <div key={`header-${columnKey}`} className="flex min-w-0 items-center gap-1 pr-2">
+                              <button
+                                type="button"
+                                className="inline-flex min-w-0 items-center gap-1 truncate text-left text-[11px] transition-colors duration-200 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                                onClick={() => handleGridSortToggle(columnKey)}
+                                aria-label={`Sort by ${workPackageGridColumnLabels[columnKey]}`}
+                              >
+                                <span className="truncate">{workPackageGridColumnLabels[columnKey]}</span>
+                                {workPackageSortField === columnKey ? (
+                                  workPackageSortDirection === 'asc' ? <ChevronUp className="h-4 w-4" aria-hidden="true" /> : <ChevronDown className="h-4 w-4" aria-hidden="true" />
+                                ) : (
+                                  <ArrowDownUp className="h-4 w-4 opacity-50" aria-hidden="true" />
+                                )}
+                              </button>
+                              <button
+                                type="button"
+                                className="ml-auto inline-flex h-4 w-4 items-center justify-center rounded transition-colors duration-200 hover:bg-muted"
+                                onMouseDown={(event) => handleGridResizeStart(columnKey, event)}
+                                aria-label={`Resize ${workPackageGridColumnLabels[columnKey]} column`}
+                              >
+                                <GripVertical className="h-4 w-4" aria-hidden="true" />
+                              </button>
+                            </div>
+                          ))}
+                        <span className="px-1">Actions</span>
+                      </div>
+                      <div
+                        className="grid min-w-[920px] items-center border-t bg-muted/10 px-2 py-2"
+                        style={{
+                          gridTemplateColumns: `${workPackageGridSortableColumns
+                            .filter((columnKey) => workPackageGridVisibleColumns[columnKey])
+                            .map((columnKey) => `minmax(80px, ${workPackageGridColumnWidths[columnKey]}px)`)
+                            .join(' ')} 156px`,
+                        }}
+                      >
+                        {workPackageGridSortableColumns
+                          .filter((columnKey) => workPackageGridVisibleColumns[columnKey])
+                          .map((columnKey) => (
+                            <div key={`filter-${columnKey}`} className="pr-2">
+                              <div className="flex items-center gap-1">
+                                <Input
+                                  value={workPackageGridFilters[columnKey]}
+                                  onChange={(event) => handleGridFilterChange(columnKey, event.target.value)}
+                                  placeholder={`Filter ${workPackageGridColumnLabels[columnKey]}`}
+                                  className="h-7 text-[11px]"
+                                  aria-label={`Filter ${workPackageGridColumnLabels[columnKey]}`}
+                                />
+                                {workPackageGridFilters[columnKey] ? (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 px-2 text-[11px]"
+                                    onClick={() => handleGridFilterClear(columnKey)}
+                                    aria-label={`Clear filter ${workPackageGridColumnLabels[columnKey]}`}
+                                  >
+                                    Clear
+                                  </Button>
+                                ) : null}
+                              </div>
+                            </div>
+                          ))}
+                        <div />
+                      </div>
+                      {pagedWorkPackages.map((workPackage) => {
+                        const runtimeRow = workPackageRuntimeRows[workPackage.id];
+                        const isOverdue = runtimeRow.dueEpoch !== Number.MAX_SAFE_INTEGER && runtimeRow.dueEpoch < nowEpoch;
+                        const gridTemplateColumns = `${workPackageGridSortableColumns
+                          .filter((columnKey) => workPackageGridVisibleColumns[columnKey])
+                          .map((columnKey) => `minmax(80px, ${workPackageGridColumnWidths[columnKey]}px)`)
+                          .join(' ')} 156px`;
+                        return (
+                          <div
+                            key={`list-${workPackage.id}`}
+                            draggable
+                            onDragStart={() => {
+                              setDraggingWorkPackageId(workPackage.id);
+                              handleDragHandleInteraction(workPackage.id, workPackage.packageNumber);
+                            }}
+                            onDragEnd={() => setDraggingWorkPackageId(null)}
+                            onDragOver={(event) => event.preventDefault()}
+                            onDrop={() => {
+                              if (!draggingWorkPackageId) return;
+                              handleWorkPackageReorder(draggingWorkPackageId, workPackage.id);
+                              setDraggingWorkPackageId(null);
+                            }}
+                            className={`grid min-w-[920px] items-center border-t px-2 py-2 text-xs transition-colors duration-200 hover:bg-muted/40 ${
+                              isOverdue
+                                ? 'border-destructive/40 bg-destructive/5'
+                                : state.selectedWorkPackageId === workPackage.id
+                                  ? 'border-primary bg-primary/5'
+                                  : ''
+                            } ${draggingWorkPackageId === workPackage.id ? 'opacity-60 ring-2 ring-primary' : ''}`}
+                            style={{ gridTemplateColumns }}
+                          >
+                            {workPackageGridSortableColumns
+                              .filter((columnKey) => workPackageGridVisibleColumns[columnKey])
+                              .map((columnKey) => (
+                                <span key={`${workPackage.id}-${columnKey}`} className="truncate pr-2">
+                                  {columnKey === 'status' ? <Badge variant="outline">{runtimeRow.status}</Badge> : runtimeRow[columnKey]}
+                                </span>
+                              ))}
+                            <div className="flex flex-wrap items-center justify-end gap-1">
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-8 w-8 transition-all duration-200 hover:scale-105"
+                                aria-label={`Open work package ${workPackage.packageNumber}`}
+                                onClick={() => void handleOpenWorkPackage(workPackage.id, workPackage.packageNumber)}
+                                disabled={busyWorkPackageActionId !== null}
+                              >
+                                <Eye className="h-4 w-4" aria-hidden="true" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-8 w-8 transition-all duration-200 hover:scale-105"
+                                aria-label={`Schedule work package ${workPackage.packageNumber}`}
+                                onClick={() => void handleScheduleWorkPackage(workPackage.id, workPackage.packageNumber)}
+                                disabled={busyWorkPackageActionId !== null}
+                              >
+                                <PlayCircle className="h-4 w-4" aria-hidden="true" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-8 w-8 transition-all duration-200 hover:scale-105"
+                                aria-label={`Hold work package ${workPackage.packageNumber}`}
+                                onClick={() => void handleHoldWorkPackage(workPackage.id, workPackage.packageNumber)}
+                                disabled={busyWorkPackageActionId !== null}
+                              >
+                                <PauseCircle className="h-4 w-4" aria-hidden="true" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-8 w-8 transition-all duration-200 hover:scale-105"
+                                aria-label={`Clone work package ${workPackage.packageNumber}`}
+                                onClick={() => void handleCloneWorkPackage(workPackage.id, workPackage.packageNumber)}
+                                disabled={busyWorkPackageActionId !== null}
+                              >
+                                <Copy className="h-4 w-4" aria-hidden="true" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-8 w-8 transition-all duration-200 hover:scale-105"
+                                aria-label={`Export work package ${workPackage.packageNumber}`}
+                                onClick={() => handleWorkPackageExport(workPackage.id, workPackage.packageNumber)}
+                                disabled={busyWorkPackageActionId !== null}
+                              >
+                                <Download className="h-4 w-4" aria-hidden="true" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-8 w-8 transition-all duration-200 hover:scale-105"
+                                aria-label={`Delete work package ${workPackage.packageNumber}`}
+                                onClick={() => void handleDeleteWorkPackage(workPackage.id, workPackage.packageNumber)}
+                                disabled={busyWorkPackageActionId !== null || !state.canDeleteWorkPackage}
+                              >
+                                <Trash2 className="h-4 w-4" aria-hidden="true" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-8 w-8 transition-all duration-200 hover:scale-105"
+                                aria-label={`Drag handle for ${workPackage.packageNumber}`}
+                                onClick={() => handleDragHandleInteraction(workPackage.id, workPackage.packageNumber)}
+                              >
+                                <GripVertical className="h-4 w-4" aria-hidden="true" />
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               )}
             </div>
             <div className="mt-2 grid grid-cols-1 gap-3 md:grid-cols-3">
