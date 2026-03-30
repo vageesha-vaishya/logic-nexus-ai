@@ -152,6 +152,15 @@ type RecordRow = {
 
 type SortDirection = 'asc' | 'desc';
 type AircraftWorkPackageTab = 'new-wp' | 'existing-wp' | 'non-performed-tasks' | 'selected-task' | 'all-tasks';
+type WorkPackageTaskSortColumn =
+  | 'task_id'
+  | 'code_form_no'
+  | 'ata_code'
+  | 'reference_amp'
+  | 'description'
+  | 'category_code'
+  | 'estimated_man_hours'
+  | 'is_mandatory';
 
 type InlineEditingCell = {
   rowId: string;
@@ -1292,6 +1301,19 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   const [workPackageTemplateAircraftModelOptions, setWorkPackageTemplateAircraftModelOptions] = useState<SelectOption[]>([]);
   const [workPackageTemplateAircraftModelOptionsLoading, setWorkPackageTemplateAircraftModelOptionsLoading] = useState(false);
   const [workPackageTemplateAircraftModelOptionsError, setWorkPackageTemplateAircraftModelOptionsError] = useState('');
+  const [workPackageTemplateSelectedTaskIds, setWorkPackageTemplateSelectedTaskIds] = useState<string[]>([]);
+  const [workPackageTemplateTaskSortColumn, setWorkPackageTemplateTaskSortColumn] = useState<WorkPackageTaskSortColumn>('task_id');
+  const [workPackageTemplateTaskSortDirection, setWorkPackageTemplateTaskSortDirection] = useState<SortDirection>('asc');
+  const [workPackageTemplateTaskFilters, setWorkPackageTemplateTaskFilters] = useState<Record<WorkPackageTaskSortColumn, string>>({
+    task_id: '',
+    code_form_no: '',
+    ata_code: '',
+    reference_amp: '',
+    description: '',
+    category_code: '',
+    estimated_man_hours: '',
+    is_mandatory: '',
+  });
   const [selectedWorkPackageTemplateId, setSelectedWorkPackageTemplateId] = useState('');
   const [flightLogDialogOpen, setFlightLogDialogOpen] = useState(false);
   const [flightLogSubmitting, setFlightLogSubmitting] = useState(false);
@@ -2870,6 +2892,74 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       return matchesToken(taskText);
     });
   }, [entity, formValues.aircraft_model, workPackageTemplateAircraftModelOptions, workPackageTemplateTaskItems]);
+  const selectedWorkPackageAircraftModelTaskRows = useMemo(() => {
+    const filtered = selectedWorkPackageAircraftModelTaskItems.filter((task) => {
+      const resolveValue = (column: WorkPackageTaskSortColumn): string => {
+        if (column === 'is_mandatory') {
+          return typeof task.is_mandatory === 'boolean' ? String(task.is_mandatory) : '';
+        }
+        return String(task[column] ?? '').toLowerCase();
+      };
+      return (Object.entries(workPackageTemplateTaskFilters) as Array<[WorkPackageTaskSortColumn, string]>).every(([column, rawFilter]) => {
+        const normalizedFilter = rawFilter.trim().toLowerCase();
+        if (!normalizedFilter) {
+          return true;
+        }
+        return resolveValue(column).includes(normalizedFilter);
+      });
+    });
+    return [...filtered].sort((left, right) => {
+      const leftValue = workPackageTemplateTaskSortColumn === 'is_mandatory'
+        ? String(typeof left.is_mandatory === 'boolean' ? left.is_mandatory : '').toLowerCase()
+        : String(left[workPackageTemplateTaskSortColumn] ?? '').toLowerCase();
+      const rightValue = workPackageTemplateTaskSortColumn === 'is_mandatory'
+        ? String(typeof right.is_mandatory === 'boolean' ? right.is_mandatory : '').toLowerCase()
+        : String(right[workPackageTemplateTaskSortColumn] ?? '').toLowerCase();
+      if (leftValue === rightValue) {
+        return 0;
+      }
+      const result = leftValue.localeCompare(rightValue, undefined, { numeric: true, sensitivity: 'base' });
+      return workPackageTemplateTaskSortDirection === 'asc' ? result : -result;
+    });
+  }, [selectedWorkPackageAircraftModelTaskItems, workPackageTemplateTaskFilters, workPackageTemplateTaskSortColumn, workPackageTemplateTaskSortDirection]);
+  const selectedWorkPackageAircraftModelTaskRowIds = useMemo(
+    () => selectedWorkPackageAircraftModelTaskRows.map((task, index) => `${String(task.id || task.task_id || index)}-${index}`),
+    [selectedWorkPackageAircraftModelTaskRows],
+  );
+  const allWorkPackageTemplateTasksSelected = selectedWorkPackageAircraftModelTaskRowIds.length > 0
+    && selectedWorkPackageAircraftModelTaskRowIds.every((id) => workPackageTemplateSelectedTaskIds.includes(id));
+  const someWorkPackageTemplateTasksSelected = selectedWorkPackageAircraftModelTaskRowIds.some((id) => workPackageTemplateSelectedTaskIds.includes(id))
+    && !allWorkPackageTemplateTasksSelected;
+  const toggleWorkPackageTemplateTaskSort = useCallback((column: WorkPackageTaskSortColumn) => {
+    if (workPackageTemplateTaskSortColumn === column) {
+      setWorkPackageTemplateTaskSortDirection((previous) => (previous === 'asc' ? 'desc' : 'asc'));
+      return;
+    }
+    setWorkPackageTemplateTaskSortColumn(column);
+    setWorkPackageTemplateTaskSortDirection('asc');
+  }, [workPackageTemplateTaskSortColumn]);
+  const setWorkPackageTemplateTaskFilterValue = useCallback((column: WorkPackageTaskSortColumn, value: string) => {
+    setWorkPackageTemplateTaskFilters((previous) => ({ ...previous, [column]: value }));
+  }, []);
+  const toggleWorkPackageTemplateTaskSelection = useCallback((rowId: string, checked: boolean) => {
+    setWorkPackageTemplateSelectedTaskIds((previous) => {
+      if (checked) {
+        return previous.includes(rowId) ? previous : [...previous, rowId];
+      }
+      return previous.filter((id) => id !== rowId);
+    });
+  }, []);
+  const toggleWorkPackageTemplateSelectAllTasks = useCallback((checked: boolean) => {
+    setWorkPackageTemplateSelectedTaskIds((previous) => {
+      if (checked) {
+        return Array.from(new Set([...previous, ...selectedWorkPackageAircraftModelTaskRowIds]));
+      }
+      return previous.filter((id) => !selectedWorkPackageAircraftModelTaskRowIds.includes(id));
+    });
+  }, [selectedWorkPackageAircraftModelTaskRowIds]);
+  useEffect(() => {
+    setWorkPackageTemplateSelectedTaskIds((previous) => previous.filter((id) => selectedWorkPackageAircraftModelTaskRowIds.includes(id)));
+  }, [selectedWorkPackageAircraftModelTaskRowIds]);
   const selectedAircraft = useMemo(
     () => (entity === 'aircraft' ? (selectedRow || rows[0] || null) : null),
     [entity, rows, selectedRow],
@@ -7391,20 +7481,104 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                           <table className="w-full text-[12px]">
                             <thead className="bg-slate-50 text-left text-slate-600">
                               <tr>
-                                <th className="px-2 py-1.5 font-semibold">Task ID</th>
-                                <th className="px-2 py-1.5 font-semibold">Code Form No</th>
-                                <th className="px-2 py-1.5 font-semibold">ATA Code</th>
-                                <th className="px-2 py-1.5 font-semibold">Reference AMP</th>
-                                <th className="px-2 py-1.5 font-semibold">Description</th>
-                                <th className="px-2 py-1.5 font-semibold">Category Code</th>
-                                <th className="px-2 py-1.5 font-semibold">Estimated Man Hours</th>
-                                <th className="px-2 py-1.5 font-semibold">Is Mandatory</th>
+                                <th className="px-2 py-1.5 font-semibold">
+                                  <Checkbox
+                                    checked={allWorkPackageTemplateTasksSelected ? true : someWorkPackageTemplateTasksSelected ? 'indeterminate' : false}
+                                    onCheckedChange={(checked) => toggleWorkPackageTemplateSelectAllTasks(Boolean(checked))}
+                                    aria-label="Select all selected tasks rows"
+                                  />
+                                </th>
+                                <th className="px-2 py-1.5 font-semibold">
+                                  <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleWorkPackageTemplateTaskSort('task_id')}>
+                                    Task ID
+                                    {workPackageTemplateTaskSortColumn === 'task_id' ? (
+                                      workPackageTemplateTaskSortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                                    ) : <ArrowUpDown className="h-3 w-3" />}
+                                  </button>
+                                </th>
+                                <th className="px-2 py-1.5 font-semibold">
+                                  <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleWorkPackageTemplateTaskSort('code_form_no')}>
+                                    Code Form No
+                                    {workPackageTemplateTaskSortColumn === 'code_form_no' ? (
+                                      workPackageTemplateTaskSortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                                    ) : <ArrowUpDown className="h-3 w-3" />}
+                                  </button>
+                                </th>
+                                <th className="px-2 py-1.5 font-semibold">
+                                  <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleWorkPackageTemplateTaskSort('ata_code')}>
+                                    ATA Code
+                                    {workPackageTemplateTaskSortColumn === 'ata_code' ? (
+                                      workPackageTemplateTaskSortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                                    ) : <ArrowUpDown className="h-3 w-3" />}
+                                  </button>
+                                </th>
+                                <th className="px-2 py-1.5 font-semibold">
+                                  <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleWorkPackageTemplateTaskSort('reference_amp')}>
+                                    Reference AMP
+                                    {workPackageTemplateTaskSortColumn === 'reference_amp' ? (
+                                      workPackageTemplateTaskSortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                                    ) : <ArrowUpDown className="h-3 w-3" />}
+                                  </button>
+                                </th>
+                                <th className="px-2 py-1.5 font-semibold">
+                                  <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleWorkPackageTemplateTaskSort('description')}>
+                                    Description
+                                    {workPackageTemplateTaskSortColumn === 'description' ? (
+                                      workPackageTemplateTaskSortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                                    ) : <ArrowUpDown className="h-3 w-3" />}
+                                  </button>
+                                </th>
+                                <th className="px-2 py-1.5 font-semibold">
+                                  <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleWorkPackageTemplateTaskSort('category_code')}>
+                                    Category Code
+                                    {workPackageTemplateTaskSortColumn === 'category_code' ? (
+                                      workPackageTemplateTaskSortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                                    ) : <ArrowUpDown className="h-3 w-3" />}
+                                  </button>
+                                </th>
+                                <th className="px-2 py-1.5 font-semibold">
+                                  <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleWorkPackageTemplateTaskSort('estimated_man_hours')}>
+                                    Estimated Man Hours
+                                    {workPackageTemplateTaskSortColumn === 'estimated_man_hours' ? (
+                                      workPackageTemplateTaskSortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                                    ) : <ArrowUpDown className="h-3 w-3" />}
+                                  </button>
+                                </th>
+                                <th className="px-2 py-1.5 font-semibold">
+                                  <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleWorkPackageTemplateTaskSort('is_mandatory')}>
+                                    Is Mandatory
+                                    {workPackageTemplateTaskSortColumn === 'is_mandatory' ? (
+                                      workPackageTemplateTaskSortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                                    ) : <ArrowUpDown className="h-3 w-3" />}
+                                  </button>
+                                </th>
                                 <th className="px-2 py-1.5 font-semibold">JSON_Details</th>
+                              </tr>
+                              <tr className="border-t border-slate-200">
+                                <th className="px-2 py-1.5 text-[11px] font-medium text-slate-500">Filter</th>
+                                <th className="px-2 py-1.5"><Input value={workPackageTemplateTaskFilters.task_id} onChange={(event) => setWorkPackageTemplateTaskFilterValue('task_id', event.target.value)} className="h-7 border-slate-300 px-1.5 text-[11px]" placeholder="Filter Task ID" /></th>
+                                <th className="px-2 py-1.5"><Input value={workPackageTemplateTaskFilters.code_form_no} onChange={(event) => setWorkPackageTemplateTaskFilterValue('code_form_no', event.target.value)} className="h-7 border-slate-300 px-1.5 text-[11px]" placeholder="Filter Code" /></th>
+                                <th className="px-2 py-1.5"><Input value={workPackageTemplateTaskFilters.ata_code} onChange={(event) => setWorkPackageTemplateTaskFilterValue('ata_code', event.target.value)} className="h-7 border-slate-300 px-1.5 text-[11px]" placeholder="Filter ATA" /></th>
+                                <th className="px-2 py-1.5"><Input value={workPackageTemplateTaskFilters.reference_amp} onChange={(event) => setWorkPackageTemplateTaskFilterValue('reference_amp', event.target.value)} className="h-7 border-slate-300 px-1.5 text-[11px]" placeholder="Filter Reference" /></th>
+                                <th className="px-2 py-1.5"><Input value={workPackageTemplateTaskFilters.description} onChange={(event) => setWorkPackageTemplateTaskFilterValue('description', event.target.value)} className="h-7 border-slate-300 px-1.5 text-[11px]" placeholder="Filter Description" /></th>
+                                <th className="px-2 py-1.5"><Input value={workPackageTemplateTaskFilters.category_code} onChange={(event) => setWorkPackageTemplateTaskFilterValue('category_code', event.target.value)} className="h-7 border-slate-300 px-1.5 text-[11px]" placeholder="Filter Category" /></th>
+                                <th className="px-2 py-1.5"><Input value={workPackageTemplateTaskFilters.estimated_man_hours} onChange={(event) => setWorkPackageTemplateTaskFilterValue('estimated_man_hours', event.target.value)} className="h-7 border-slate-300 px-1.5 text-[11px]" placeholder="Filter Hours" /></th>
+                                <th className="px-2 py-1.5"><Input value={workPackageTemplateTaskFilters.is_mandatory} onChange={(event) => setWorkPackageTemplateTaskFilterValue('is_mandatory', event.target.value)} className="h-7 border-slate-300 px-1.5 text-[11px]" placeholder="true / false" /></th>
+                                <th className="px-2 py-1.5" />
                               </tr>
                             </thead>
                             <tbody>
-                              {selectedWorkPackageAircraftModelTaskItems.length ? selectedWorkPackageAircraftModelTaskItems.map((task, index) => (
-                                <tr key={`${String(task.id || task.task_id || index)}-${index}`} className="border-t border-slate-100 text-slate-700">
+                              {selectedWorkPackageAircraftModelTaskRows.length ? selectedWorkPackageAircraftModelTaskRows.map((task, index) => {
+                                const rowId = `${String(task.id || task.task_id || index)}-${index}`;
+                                return (
+                                <tr key={rowId} className="border-t border-slate-100 text-slate-700">
+                                  <td className="px-2 py-1.5">
+                                    <Checkbox
+                                      checked={workPackageTemplateSelectedTaskIds.includes(rowId)}
+                                      onCheckedChange={(checked) => toggleWorkPackageTemplateTaskSelection(rowId, Boolean(checked))}
+                                      aria-label={`Select task row ${String(task.task_id || rowId)}`}
+                                    />
+                                  </td>
                                   <td className="px-2 py-1.5">{String(task.task_id || '-')}</td>
                                   <td className="px-2 py-1.5">{String(task.code_form_no || '-')}</td>
                                   <td className="px-2 py-1.5">{String(task.ata_code || '-')}</td>
@@ -7415,13 +7589,17 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                                   <td className="px-2 py-1.5">{typeof task.is_mandatory === 'boolean' ? String(task.is_mandatory) : '-'}</td>
                                   <td className="px-2 py-1.5">{typeof task.task_template_detail_json === 'object' && task.task_template_detail_json !== null ? JSON.stringify(task.task_template_detail_json) : String(task.task_template_detail_json || '-')}</td>
                                 </tr>
-                              )) : (
+                                );
+                              }) : (
                                 <tr>
-                                  <td className="px-2 py-2 text-slate-500" colSpan={9}>{workPackageTemplateTaskTemplatesLoading ? 'Loading task templates…' : 'No task rows available for selected aircraft model'}</td>
+                                  <td className="px-2 py-2 text-slate-500" colSpan={10}>{workPackageTemplateTaskTemplatesLoading ? 'Loading task templates…' : 'No task rows available for selected aircraft model'}</td>
                                 </tr>
                               )}
                             </tbody>
                           </table>
+                        </div>
+                        <div className="text-[11px] text-slate-500">
+                          Selection Summary: Checked {workPackageTemplateSelectedTaskIds.length} | Records: {selectedWorkPackageAircraftModelTaskRows.length}
                         </div>
                         {workPackageTemplateTaskTemplatesError ? <p className="mdm-template-danger">{workPackageTemplateTaskTemplatesError}</p> : null}
                       </div>
