@@ -792,11 +792,11 @@ type AircraftCounterRow = {
 };
 
 const getDefaultAircraftCounterRows = (): AircraftCounterRow[] => [
-  { key: 'calendar', name: 'Calendar', serialNumber: '-', model: 'Nose Gear Assy', initialValue: 'since', initialDate: '', unit: 'Manufacturing date' },
-  { key: 'flight_hours', name: 'Flight hours', serialNumber: '-', model: '-', initialValue: '0.0', initialDate: '', unit: 'hours' },
-  { key: 'landing', name: 'Landing', serialNumber: '-', model: '-', initialValue: '0.0', initialDate: '', unit: 'cycles' },
-  { key: 'n1', name: 'N1', serialNumber: '-', model: '-', initialValue: '0.0', initialDate: '', unit: 'value' },
-  { key: 'n2', name: 'N2', serialNumber: '-', model: '-', initialValue: '0.0', initialDate: '', unit: 'value' },
+  { key: 'calendar', name: 'Calendar', serialNumber: '', model: '', initialValue: '', initialDate: '', unit: '' },
+  { key: 'flight_hours', name: 'Flight hours', serialNumber: '', model: '', initialValue: '', initialDate: '', unit: '' },
+  { key: 'landing', name: 'Landing', serialNumber: '', model: '', initialValue: '', initialDate: '', unit: '' },
+  { key: 'n1', name: 'N1', serialNumber: '', model: '', initialValue: '', initialDate: '', unit: '' },
+  { key: 'n2', name: 'N2', serialNumber: '', model: '', initialValue: '', initialDate: '', unit: '' },
 ];
 
 const ENTITY_FORM_FIELDS: Record<MasterEntity, EntityFormField[]> = {
@@ -1103,7 +1103,7 @@ type AmroSettingsMasterDataPageProps = {
 };
 
 export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-data' }: AmroSettingsMasterDataPageProps = {}) {
-  const { context } = useCRM();
+  const { context, scopedDb } = useCRM();
   const { hasPermission, session } = useAuth();
   const { entity: entityParam } = useParams<{ entity?: string }>();
   const location = useLocation();
@@ -1480,17 +1480,30 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   }, []);
 
   const fetchAircraftTempOptions = useCallback(async (headers: Headers): Promise<AircraftTempOption[]> => {
-    const query = new URLSearchParams({
-      page: '1',
-      page_size: '200',
-      sort_by: 'template_name',
-      sort_dir: 'asc',
-    });
-    const response = await fetch(`/api/v2/amro/master-data/aircraft_template?${query.toString()}`, { method: 'GET', headers });
-    const payload = await parseApiPayload(response);
-    if (!response.ok) throw new Error(String(payload.error || 'Failed to load aircraft templates'));
+    let records: Record<string, unknown>[] = [];
+    if (scopedDb) {
+      const { data, error } = await (scopedDb as any)
+        .from('aircraft_template')
+        .select('id,template_name,aircraft_type,manufacturer_id,manufacturer,aircraft_model,maintenance_program,revision_number,amendment_number')
+        .order('template_name', { ascending: true });
+      if (!error && Array.isArray(data)) {
+        records = data as Record<string, unknown>[];
+      }
+    }
+    if (records.length === 0) {
+      const query = new URLSearchParams({
+        page: '1',
+        page_size: '200',
+        sort_by: 'template_name',
+        sort_dir: 'asc',
+      });
+      const response = await fetch(`/api/v2/amro/master-data/aircraft_template?${query.toString()}`, { method: 'GET', headers });
+      const payload = await parseApiPayload(response);
+      if (!response.ok) throw new Error(String(payload.error || 'Failed to load aircraft templates'));
+      records = getPayloadRecords(payload);
+    }
     const seen = new Set<string>();
-    return getPayloadRecords(payload)
+    return records
       .map((record) => {
         const id = String(record.id || '').trim();
         const name = String(record.template_name || '').trim();
@@ -1511,7 +1524,49 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       })
       .filter((option): option is AircraftTempOption => Boolean(option))
       .sort((left, right) => left.name.localeCompare(right.name, undefined, { numeric: true, sensitivity: 'base' }));
-  }, []);
+  }, [scopedDb]);
+
+  const fetchAircraftTemplateCounterRows = useCallback(
+    async (templateId: string): Promise<AircraftCounterRow[]> => {
+      const normalizedTemplateId = String(templateId || '').trim();
+      if (!normalizedTemplateId || !scopedDb) {
+        return getDefaultAircraftCounterRows();
+      }
+      const { data, error } = await (scopedDb as any)
+        .from('aircraft_template_counters')
+        .select('*')
+        .eq('template_id', normalizedTemplateId);
+      if (error || !Array.isArray(data) || data.length === 0) {
+        return getDefaultAircraftCounterRows();
+      }
+      const normalizeCounterKey = (value: string) => value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+      const counterRowByKey = new Map(getDefaultAircraftCounterRows().map((row) => [row.key, row]));
+      const mappedRows = (data as Record<string, unknown>[])
+        .map((record) => {
+          const name = String(record.counter_name || '').trim();
+          if (!name) return null;
+          const key = normalizeCounterKey(name);
+          return {
+            key,
+            name,
+            serialNumber: String(record.serial_number || record.serial_no || '').trim(),
+            model: String(record.model || record.model_affected || '').trim(),
+            initialValue: String(record.initial_value || '').trim(),
+            initialDate: String(record.initial_date || '').trim().slice(0, 10),
+            unit: String(record.unit_measured || '').trim(),
+          } as AircraftCounterRow;
+        })
+        .filter((row): row is AircraftCounterRow => Boolean(row));
+      if (mappedRows.length === 0) {
+        return getDefaultAircraftCounterRows();
+      }
+      mappedRows.forEach((row) => {
+        counterRowByKey.set(row.key, row);
+      });
+      return Array.from(counterRowByKey.values());
+    },
+    [scopedDb],
+  );
 
   const fetchAircraftCreateCatalogOptions = useCallback(
     async (headers: Headers): Promise<{ aircraftTypes: string[]; aircraftStatuses: string[]; aircraftOwners: string[]; aircraftBases: string[] }> => {
@@ -1958,9 +2013,15 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         fetchAircraftBaseFacilityOptions(headers),
       ]);
       if (aircraftCatalogResult.status === 'fulfilled') {
-        setAircraftTypeOptions(aircraftCatalogResult.value.aircraftTypes);
+        const templateAircraftTypes = Array.from(new Set(templateOptions.map((option) => String(option.aircraftType || '').trim()).filter(Boolean)));
+        const enumLikeAircraftTypes = AIRCRAFT_TYPE_FALLBACK_OPTIONS.filter((option) => !templateAircraftTypes.includes(option));
+        setAircraftTypeOptions([...templateAircraftTypes, ...enumLikeAircraftTypes]);
         setAircraftStatusOptions(aircraftCatalogResult.value.aircraftStatuses);
         setAircraftOwnerCatalogOptions(aircraftCatalogResult.value.aircraftOwners);
+      } else {
+        const templateAircraftTypes = Array.from(new Set(templateOptions.map((option) => String(option.aircraftType || '').trim()).filter(Boolean)));
+        const enumLikeAircraftTypes = AIRCRAFT_TYPE_FALLBACK_OPTIONS.filter((option) => !templateAircraftTypes.includes(option));
+        setAircraftTypeOptions([...templateAircraftTypes, ...enumLikeAircraftTypes]);
       }
       if (facilityBasesResult.status === 'fulfilled') {
         const catalogBases = aircraftCatalogResult.status === 'fulfilled' ? aircraftCatalogResult.value.aircraftBases : [];
@@ -2795,23 +2856,36 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     setCollapsedFormPanels((previous) => ({ ...previous, [panel]: !previous[panel] }));
   }, []);
   const hasRestrictedAircraftFields = entity === 'aircraft' && !canScheduleWorkPackage;
+  const manufacturerMetaById = useMemo(() => new Map(manufacturerOptions.map((option) => [option.id, option])), [manufacturerOptions]);
   const manufacturerSelectOptions = useMemo<SelectOption[]>(() => {
-    const options = manufacturerOptions.map((option) => ({
-      value: option.id,
-      label: option.label,
-      disabled: !option.active,
-    }));
-    const currentManufacturerId = String(formValues.manufacturer_id ?? '').trim();
-    if (currentManufacturerId && !options.some((option) => option.value === currentManufacturerId)) {
-      options.unshift({
-        value: currentManufacturerId,
-        label: currentManufacturerId,
-        disabled: false,
+    const options: SelectOption[] = [];
+    const seen = new Set<string>();
+    const addOption = (value: string, label: string, disabled = false) => {
+      const normalizedValue = String(value || '').trim();
+      if (!normalizedValue) return;
+      if (seen.has(normalizedValue)) return;
+      seen.add(normalizedValue);
+      options.push({ value: normalizedValue, label: String(label || normalizedValue).trim() || normalizedValue, disabled });
+    };
+    if (entity === 'aircraft' && systemTemplateModelOptions.length > 0) {
+      systemTemplateModelOptions.forEach((templateOption) => {
+        const manufacturerId = String(templateOption.manufacturerId || '').trim();
+        if (!manufacturerId) return;
+        const manufacturerMeta = manufacturerMetaById.get(manufacturerId);
+        const label = manufacturerMeta?.label || String(templateOption.manufacturerName || '').trim() || manufacturerId;
+        addOption(manufacturerId, label, Boolean(manufacturerMeta && !manufacturerMeta.active));
+      });
+    } else {
+      manufacturerOptions.forEach((option) => {
+        addOption(option.id, option.label, !option.active);
       });
     }
+    const currentManufacturerId = String(formValues.manufacturer_id ?? '').trim();
+    if (currentManufacturerId && !options.some((option) => option.value === currentManufacturerId)) {
+      addOption(currentManufacturerId, manufacturerMetaById.get(currentManufacturerId)?.label || currentManufacturerId, false);
+    }
     return options;
-  }, [formValues.manufacturer_id, manufacturerOptions]);
-  const manufacturerMetaById = useMemo(() => new Map(manufacturerOptions.map((option) => [option.id, option])), [manufacturerOptions]);
+  }, [entity, formValues.manufacturer_id, manufacturerMetaById, manufacturerOptions, systemTemplateModelOptions]);
   const manufacturerLabelById = useMemo(
     () => new Map(manufacturerOptions.map((option) => [option.id, option.label])),
     [manufacturerOptions],
@@ -2962,6 +3036,16 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       setFieldValue(key, value);
     },
     [setFieldValue],
+  );
+  const hydrateAircraftCountersFromTemplate = useCallback(
+    async (templateId: string) => {
+      if (entity !== 'aircraft') {
+        return;
+      }
+      const nextRows = await fetchAircraftTemplateCounterRows(templateId);
+      setAircraftCounterRows(nextRows);
+    },
+    [entity, fetchAircraftTemplateCounterRows],
   );
 
   const resolveSelectOptions = useCallback(
@@ -3609,6 +3693,13 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       };
     });
   }, [aircraftStatusSelectOptions, aircraftTypeSelectOptions, entity, modalMode, modalOpen, selectedId, systemTemplateModelSelectOptions]);
+
+  useEffect(() => {
+    if (!modalOpen || entity !== 'aircraft') {
+      return;
+    }
+    void hydrateAircraftCountersFromTemplate(aircraftTemplateModel);
+  }, [aircraftTemplateModel, entity, hydrateAircraftCountersFromTemplate, modalOpen]);
 
   const handleSubmitModal = useCallback(async () => {
     const ok = modalMode === 'create' ? await handleCreate() : await handleUpdate();
@@ -6508,10 +6599,11 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                     <section className="space-y-2 rounded bg-white p-3">
                       <p className="text-[11px] text-slate-600">Aircraft Template</p>
                       <Label className="text-[12px] font-medium text-slate-800">Aircraft template</Label>
-                      <Select
+                      <select
                         value={aircraftTemplateModel}
                         disabled={aircraftListboxOptionsLoading}
-                        onValueChange={(value) => {
+                        onChange={(event) => {
+                          const value = event.target.value;
                           if (isSystemSelectValue(value)) {
                             return;
                           }
@@ -6539,19 +6631,16 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                           if (selectedTemplate.amendmentNumber) {
                             setFieldValue('amendment_number', selectedTemplate.amendmentNumber);
                           }
+                          void hydrateAircraftCountersFromTemplate(value);
                         }}
+                        className="h-8 w-full rounded-md border border-slate-300 bg-white px-2 text-[12px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                       >
-                        <SelectTrigger className="h-8 border-slate-300 text-[12px]">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {systemTemplateModelSelectOptions.map((option) => (
-                            <SelectItem key={option.value} value={option.value} disabled={Boolean(option.disabled)}>
-                              {option.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        {systemTemplateModelSelectOptions.map((option) => (
+                          <option key={option.value} value={option.value} disabled={Boolean(option.disabled)}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
                     </section>
                     <section className="rounded bg-white p-3">
                       <p className="mb-2 text-[11px] text-slate-600">Aircraft Template Details</p>
@@ -6563,62 +6652,80 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                         <div className="border-r border-t border-slate-200 px-3 py-2 text-slate-700">{String(formValues.serial_number || '') || '-'}</div>
                         <div className="border-t border-slate-200 px-3 py-2">
                           <div className="grid gap-2 sm:grid-cols-2">
-                            <Select
-                              value={String(formValues.aircraft_type ?? '')}
-                              disabled={aircraftListboxOptionsLoading}
-                              onValueChange={(value) => setSelectFieldValue('aircraft_type', value)}
-                            >
-                              <SelectTrigger className={cn('h-8 text-[12px]', formErrors.aircraft_type && 'border-destructive')}>
-                                <SelectValue placeholder="Aircraft type" />
-                              </SelectTrigger>
-                              <SelectContent>
+                            <div className="space-y-1">
+                              <Label htmlFor="aircraft-type-select" className="text-[12px]">Aircraft Type:</Label>
+                              <select
+                                id="aircraft-type-select"
+                                value={String(formValues.aircraft_type ?? '')}
+                                disabled={aircraftListboxOptionsLoading}
+                                onChange={(event) => setSelectFieldValue('aircraft_type', event.target.value)}
+                                className={cn(
+                                  'h-8 w-full rounded-md border border-input bg-white px-2 text-[12px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
+                                  formErrors.aircraft_type && 'border-destructive',
+                                )}
+                              >
                                 {aircraftTypeSelectOptions.map((option) => (
-                                  <SelectItem key={option.value} value={option.value} disabled={option.disabled}>
+                                  <option key={option.value} value={option.value} disabled={option.disabled}>
                                     {option.label}
-                                  </SelectItem>
+                                  </option>
                                 ))}
-                              </SelectContent>
-                            </Select>
-                            <Select
-                              value={String(formValues.status ?? '')}
-                              disabled={aircraftListboxOptionsLoading}
-                              onValueChange={(value) => setSelectFieldValue('status', value)}
-                            >
-                              <SelectTrigger className={cn('h-8 text-[12px]', formErrors.status && 'border-destructive')}>
-                                <SelectValue placeholder="Status" />
-                              </SelectTrigger>
-                              <SelectContent>
+                              </select>
+                            </div>
+                            <div className="space-y-1">
+                              <Label htmlFor="aircraft-status-select" className="text-[12px]">Status:</Label>
+                              <select
+                                id="aircraft-status-select"
+                                value={String(formValues.status ?? '')}
+                                disabled={aircraftListboxOptionsLoading}
+                                onChange={(event) => setSelectFieldValue('status', event.target.value)}
+                                className={cn(
+                                  'h-8 w-full rounded-md border border-input bg-white px-2 text-[12px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
+                                  formErrors.status && 'border-destructive',
+                                )}
+                              >
                                 {aircraftStatusSelectOptions.map((option) => (
-                                  <SelectItem key={option.value} value={option.value} disabled={option.disabled}>
+                                  <option key={option.value} value={option.value} disabled={option.disabled}>
                                     {option.label}
-                                  </SelectItem>
+                                  </option>
                                 ))}
-                              </SelectContent>
-                            </Select>
-                            <Select value={String(formValues.manufacturer_id ?? '')} onValueChange={(value) => setSelectFieldValue('manufacturer_id', value)}>
-                              <SelectTrigger className={cn('h-8 text-[12px]', formErrors.manufacturer_id && 'border-destructive')}>
-                                <SelectValue placeholder="Manufacturer" />
-                              </SelectTrigger>
-                              <SelectContent>
+                              </select>
+                            </div>
+                            <div className="space-y-1">
+                              <Label htmlFor="aircraft-manufacturer-select" className="text-[12px]">Manufacturer:</Label>
+                              <select
+                                id="aircraft-manufacturer-select"
+                                value={String(formValues.manufacturer_id ?? '')}
+                                onChange={(event) => setSelectFieldValue('manufacturer_id', event.target.value)}
+                                className={cn(
+                                  'h-8 w-full rounded-md border border-input bg-white px-2 text-[12px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
+                                  formErrors.manufacturer_id && 'border-destructive',
+                                )}
+                              >
                                 {resolveSelectOptions({ key: 'manufacturer_id', label: 'Manufacturer', type: 'select' }).map((option) => (
-                                  <SelectItem key={option.value} value={option.value} disabled={option.disabled}>
+                                  <option key={option.value} value={option.value} disabled={option.disabled}>
                                     {option.label}
-                                  </SelectItem>
+                                  </option>
                                 ))}
-                              </SelectContent>
-                            </Select>
-                            <Select value={String(formValues.aircraft_model ?? '')} onValueChange={(value) => setSelectFieldValue('aircraft_model', value)}>
-                              <SelectTrigger className={cn('h-8 text-[12px]', formErrors.aircraft_model && 'border-destructive')}>
-                                <SelectValue placeholder="Aircraft model" />
-                              </SelectTrigger>
-                              <SelectContent>
+                              </select>
+                            </div>
+                            <div className="space-y-1">
+                              <Label htmlFor="aircraft-model-select" className="text-[12px]">Aircraft Model:</Label>
+                              <select
+                                id="aircraft-model-select"
+                                value={String(formValues.aircraft_model ?? '')}
+                                onChange={(event) => setSelectFieldValue('aircraft_model', event.target.value)}
+                                className={cn(
+                                  'h-8 w-full rounded-md border border-input bg-white px-2 text-[12px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
+                                  formErrors.aircraft_model && 'border-destructive',
+                                )}
+                              >
                                 {resolveSelectOptions({ key: 'aircraft_model', label: 'Aircraft Model', type: 'select' }).map((option) => (
-                                  <SelectItem key={option.value} value={option.value} disabled={option.disabled}>
+                                  <option key={option.value} value={option.value} disabled={option.disabled}>
                                     {option.label}
-                                  </SelectItem>
+                                  </option>
                                 ))}
-                              </SelectContent>
-                            </Select>
+                              </select>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -6686,40 +6793,44 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                         </div>
                       </div>
                       <div className="space-y-1">
-                        <Label className="text-[12px]">Base</Label>
-                        <Select
+                        <Label htmlFor="aircraft-base-select" className="text-[12px]">Base</Label>
+                        <select
+                          id="aircraft-base-select"
                           value={aircraftBase}
                           disabled={aircraftListboxOptionsLoading}
-                          onValueChange={(value) => {
+                          onChange={(event) => {
+                            const value = event.target.value;
                             setAircraftBase(value);
                             setAircraftAuxField('base_location', value);
                           }}
+                          className="h-8 w-full rounded-md border border-input bg-white px-2 text-[12px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                         >
-                          <SelectTrigger className="h-8 text-[12px]"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            {aircraftBaseSelectOptions.map((option) => (
-                              <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                          {aircraftBaseSelectOptions.map((option) => (
+                            <option key={option.value} value={option.value} disabled={option.disabled}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                       <div className="space-y-1">
-                        <Label className="text-[12px]">Owner</Label>
-                        <Select
+                        <Label htmlFor="aircraft-owner-select" className="text-[12px]">Owner</Label>
+                        <select
+                          id="aircraft-owner-select"
                           value={aircraftOwner}
                           disabled={aircraftListboxOptionsLoading}
-                          onValueChange={(value) => {
+                          onChange={(event) => {
+                            const value = event.target.value;
                             setAircraftOwner(value);
                             setAircraftAuxField('owner_name', value);
                           }}
+                          className="h-8 w-full rounded-md border border-input bg-white px-2 text-[12px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                         >
-                          <SelectTrigger className="h-8 text-[12px]"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            {aircraftOwnerSelectOptions.map((option) => (
-                              <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                          {aircraftOwnerSelectOptions.map((option) => (
+                            <option key={option.value} value={option.value} disabled={option.disabled}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                       <div className="space-y-1">
                         <Label htmlFor="aircraft-line-number" className="text-[12px]">Line number</Label>

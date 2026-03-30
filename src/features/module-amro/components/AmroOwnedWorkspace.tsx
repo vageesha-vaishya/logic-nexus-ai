@@ -3357,19 +3357,20 @@ export function AmroOwnedWorkspace({
         </DialogContent>
       </Dialog>
       <Dialog open={workPackageCreateDialogOpen} onOpenChange={setWorkPackageCreateDialogOpen}>
-        <DialogContent className="mdm-template-dialog max-h-[90vh] max-w-6xl overflow-hidden">
-          <DialogHeader>
-            <DialogTitle>Create Work Package</DialogTitle>
+        <DialogContent className="mdm-template-dialog mdm-template-dialog-large h-[92vh] w-[96vw] max-h-[92vh] max-w-[1600px] overflow-hidden p-0">
+          <DialogHeader className="border-b border-[#efefef] px-5 py-3">
+            <DialogTitle className="text-[32px] font-semibold leading-none text-[#4c4c4c]">Add Work Package</DialogTitle>
           </DialogHeader>
           {workPackageValidationSummary.length > 0 ? (
-            <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-xs text-destructive">
+            <div className="mx-3 mt-2 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-xs text-destructive">
               {workPackageValidationSummary.map((error) => (
                 <p key={error}>{error}</p>
               ))}
             </div>
           ) : null}
-          <div className="grid max-h-[calc(90vh-180px)] grid-cols-1 gap-4 overflow-y-auto lg:grid-cols-[1.1fr_1fr]">
-            <div className="space-y-3">
+          <div className="grid h-[calc(92vh-148px)] grid-cols-1 gap-2 overflow-hidden bg-[#f8f8f8] px-3 pb-2 pt-1 lg:grid-cols-[1.06fr_0.94fr]">
+            <div className="space-y-3 overflow-y-auto border border-[#e5e5e5] bg-white p-2.5">
+              <div className="border-b border-[#efefef] bg-[#fafafa] px-[10px] py-[6px] text-[13px] font-semibold text-[#757575]">Work Package details</div>
               <div className="space-y-1">
                 <Label htmlFor="wp-aircraft-search">Aircraft</Label>
                 <TextInput id="wp-aircraft-search" value={aircraftSearchTerm} onChange={(event) => setAircraftSearchTerm(event.target.value)} placeholder="Search model, registration, serial" />
@@ -3436,13 +3437,13 @@ export function AmroOwnedWorkspace({
                 <Textarea id="wp-remarks" value={workPackageCreateForm.remarks} onChange={(event) => handleWorkPackageCreateFormChange('remarks', event.target.value)} />
               </div>
             </div>
-            <div className="space-y-3">
+            <div className="space-y-3 overflow-hidden border border-[#e5e5e5] bg-white p-2.5">
               <Tabs value={workPackageCreateTab} onValueChange={(value) => handleWorkPackageCreateTabChange(value as WorkPackageCreateTab)}>
-                <TabsList className="grid w-full grid-cols-4">
-                  <TabsTrigger value="wp">Tasks</TabsTrigger>
-                  <TabsTrigger value="besting_wp">Tools/Spares</TabsTrigger>
-                  <TabsTrigger value="task_payload">Planning</TabsTrigger>
-                  <TabsTrigger value="workflow">Review</TabsTrigger>
+                <TabsList className="h-auto w-full justify-start gap-0 overflow-x-auto rounded-none bg-transparent p-0">
+                  <TabsTrigger value="wp" className="h-[20px] rounded-none border border-r-0 border-[#d7d7d7] px-[7px] text-[10px] font-semibold leading-none text-[#6a6a6a] data-[state=active]:border-[#12aeb1] data-[state=active]:bg-[#12aeb1] data-[state=active]:text-white">Tasks</TabsTrigger>
+                  <TabsTrigger value="besting_wp" className="h-[20px] rounded-none border border-r-0 border-[#d7d7d7] px-[7px] text-[10px] font-semibold leading-none text-[#6a6a6a] data-[state=active]:border-[#12aeb1] data-[state=active]:bg-[#12aeb1] data-[state=active]:text-white">Tools/Spares</TabsTrigger>
+                  <TabsTrigger value="task_payload" className="h-[20px] rounded-none border border-r-0 border-[#d7d7d7] px-[7px] text-[10px] font-semibold leading-none text-[#6a6a6a] data-[state=active]:border-[#12aeb1] data-[state=active]:bg-[#12aeb1] data-[state=active]:text-white">Planning</TabsTrigger>
+                  <TabsTrigger value="workflow" className="h-[20px] rounded-none border border-[#d7d7d7] px-[7px] text-[10px] font-semibold leading-none text-[#6a6a6a] data-[state=active]:border-[#12aeb1] data-[state=active]:bg-[#12aeb1] data-[state=active]:text-white">Review</TabsTrigger>
                 </TabsList>
                 <TabsContent value="wp" className="space-y-3 pt-2">
                   <div className="space-y-1">
@@ -3496,27 +3497,29 @@ export function AmroOwnedWorkspace({
                   <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                     <div className="space-y-1">
                       <Label>Maintenance Type</Label>
-                      <Select value={workPackageCreateForm.maintenanceType} onValueChange={(value) => handleWorkPackageCreateFormChange('maintenanceType', value as WorkPackageCreateFormState['maintenanceType'])}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="line">Line</SelectItem>
-                          <SelectItem value="base">Base</SelectItem>
-                          <SelectItem value="hangar">Hangar</SelectItem>
-                          <SelectItem value="shop">Shop</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <select
+                        value={workPackageCreateForm.maintenanceType}
+                        onChange={(event) => handleWorkPackageCreateFormChange('maintenanceType', event.target.value as WorkPackageCreateFormState['maintenanceType'])}
+                        className="flex h-9 w-full rounded-md border border-input bg-white px-2.5 py-1.5 text-sm text-[#4f4f4f] focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                      >
+                        <option value="line">Line</option>
+                        <option value="base">Base</option>
+                        <option value="hangar">Hangar</option>
+                        <option value="shop">Shop</option>
+                      </select>
                     </div>
                     <div className="space-y-1">
                       <Label>Priority</Label>
-                      <Select value={workPackageCreateForm.priority} onValueChange={(value) => handleWorkPackageCreateFormChange('priority', value as WorkPackageCreateFormState['priority'])}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="low">Low</SelectItem>
-                          <SelectItem value="medium">Medium</SelectItem>
-                          <SelectItem value="high">High</SelectItem>
-                          <SelectItem value="critical">Critical</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <select
+                        value={workPackageCreateForm.priority}
+                        onChange={(event) => handleWorkPackageCreateFormChange('priority', event.target.value as WorkPackageCreateFormState['priority'])}
+                        className="flex h-9 w-full rounded-md border border-input bg-white px-2.5 py-1.5 text-sm text-[#4f4f4f] focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                      >
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                        <option value="critical">Critical</option>
+                      </select>
                     </div>
                   </div>
                 </TabsContent>
@@ -3544,27 +3547,29 @@ export function AmroOwnedWorkspace({
                   <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                     <div className="space-y-1">
                       <Label>Assigned Role</Label>
-                      <Select value={workPackageCreateForm.assignedRole} onValueChange={(value) => handleWorkPackageCreateFormChange('assignedRole', value as WorkPackageCreateFormState['assignedRole'])}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="planner">Planner</SelectItem>
-                          <SelectItem value="engineer">Engineer</SelectItem>
-                          <SelectItem value="inspector">Inspector</SelectItem>
-                          <SelectItem value="technician">Technician</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <select
+                        value={workPackageCreateForm.assignedRole}
+                        onChange={(event) => handleWorkPackageCreateFormChange('assignedRole', event.target.value as WorkPackageCreateFormState['assignedRole'])}
+                        className="flex h-9 w-full rounded-md border border-input bg-white px-2.5 py-1.5 text-sm text-[#4f4f4f] focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                      >
+                        <option value="planner">Planner</option>
+                        <option value="engineer">Engineer</option>
+                        <option value="inspector">Inspector</option>
+                        <option value="technician">Technician</option>
+                      </select>
                     </div>
                     <div className="space-y-1">
                       <Label>Workflow Status</Label>
-                      <Select value={workPackageCreateForm.workflowStatus} onValueChange={(value) => handleWorkPackageCreateFormChange('workflowStatus', value as WorkPackageCreateFormState['workflowStatus'])}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="planning">Planning</SelectItem>
-                          <SelectItem value="scheduled">Scheduled</SelectItem>
-                          <SelectItem value="in_progress">In Progress</SelectItem>
-                          <SelectItem value="blocked">Blocked</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <select
+                        value={workPackageCreateForm.workflowStatus}
+                        onChange={(event) => handleWorkPackageCreateFormChange('workflowStatus', event.target.value as WorkPackageCreateFormState['workflowStatus'])}
+                        className="flex h-9 w-full rounded-md border border-input bg-white px-2.5 py-1.5 text-sm text-[#4f4f4f] focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                      >
+                        <option value="planning">Planning</option>
+                        <option value="scheduled">Scheduled</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="blocked">Blocked</option>
+                      </select>
                     </div>
                   </div>
                   <div className="rounded-md border p-3 text-xs">
@@ -3576,7 +3581,7 @@ export function AmroOwnedWorkspace({
               </Tabs>
             </div>
           </div>
-          <div className="sticky bottom-0 z-10 flex items-center justify-end gap-2 border-t bg-background pt-3">
+          <div className="mt-auto flex items-center justify-end gap-2 border-t border-[#ececec] bg-white px-3 py-2">
             <Button variant="outline" onClick={() => setWorkPackageCreateDialogOpen(false)}>Cancel</Button>
             <Button variant="secondary" onClick={handleOpenWorkPackageSubmitReview} disabled={workPackageCreateSubmitting}>Review</Button>
           </div>
