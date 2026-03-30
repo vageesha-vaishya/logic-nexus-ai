@@ -200,6 +200,19 @@ type AircraftTempOption = {
 };
 
 const isSystemSelectValue = (value: string): boolean => value.startsWith('__');
+const TEMPLATE_REGISTRY_TIMEOUT_MS = 12000;
+const WORK_PACKAGE_CREATE_TIMEOUT_MS = 20000;
+
+const resolveWorkPackageApiErrorMessage = (error: unknown, fallbackMessage: string): string => {
+  const normalized = String((error as Error)?.message || '').trim();
+  if ((error as Error)?.name === 'AbortError') {
+    return 'Request timed out. Please check your connection and retry.';
+  }
+  if (normalized.toLowerCase() === 'failed to fetch') {
+    return 'Network error. Verify connectivity and try again.';
+  }
+  return normalized || fallbackMessage;
+};
 
 const extractJoinedRecord = (value: unknown): Record<string, unknown> | null => {
   if (Array.isArray(value)) {
@@ -264,6 +277,66 @@ const coerceRecordArray = (value: unknown): Record<string, unknown>[] => {
     return [value as Record<string, unknown>];
   }
   return [];
+};
+
+const extractTemplateRegistryRecords = (payload: Record<string, unknown>): Record<string, unknown>[] => {
+  const output = payload.output && typeof payload.output === 'object' ? (payload.output as Record<string, unknown>) : null;
+  const outputData = output?.data && typeof output.data === 'object' ? (output.data as Record<string, unknown>) : null;
+  const candidateArrays: unknown[] = [
+    output?.records,
+    output?.items,
+    output?.templates,
+    outputData?.records,
+    outputData?.items,
+    outputData?.templates,
+    payload.records,
+    payload.items,
+    payload.templates,
+  ];
+  for (const candidate of candidateArrays) {
+    const rows = coerceRecordArray(candidate);
+    if (rows.length > 0) {
+      return rows;
+    }
+  }
+  const stack: unknown[] = [payload];
+  const visited = new Set<unknown>();
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (!current || typeof current !== 'object' || visited.has(current)) {
+      continue;
+    }
+    visited.add(current);
+    if (Array.isArray(current)) {
+      for (const item of current) {
+        stack.push(item);
+      }
+      continue;
+    }
+    const record = current as Record<string, unknown>;
+    for (const value of Object.values(record)) {
+      if (Array.isArray(value)) {
+        const rows = coerceRecordArray(value);
+        if (
+          rows.length > 0
+          && rows.some((row) =>
+            Boolean(
+              row.id
+              || row.template_id
+              || row.template_code
+              || row.template_name
+              || row.tasks_json
+              || row.scope_json,
+            ))
+        ) {
+          return rows;
+        }
+      } else if (value && typeof value === 'object') {
+        stack.push(value);
+      }
+    }
+  }
+  return getPayloadRecords(payload);
 };
 
 const normalizeWorkPackageRecordSummary = (record: Record<string, unknown>): AircraftWorkPackageRecordSummary | null => {
@@ -511,6 +584,7 @@ type WorkPackageTemplateRegistryItem = {
   id: string;
   templateCode: string;
   templateName: string;
+  description: string;
   maintenanceType: 'line' | 'base' | 'hangar' | 'shop';
   version: string;
   active: boolean;
@@ -2777,6 +2851,10 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     () => workPackageTemplateRegistry.find((item) => item.id === selectedWorkPackageTemplateId) || null,
     [selectedWorkPackageTemplateId, workPackageTemplateRegistry],
   );
+  const canCreateWorkPackageFromTemplate = useMemo(
+    () => canCreateWorkPackage && Boolean(selectedWorkPackageTemplateId),
+    [canCreateWorkPackage, selectedWorkPackageTemplateId],
+  );
   const selectedFlightLogAircraft = useMemo(
     () =>
       String(flightLogInitialValues.aircraftId || '').trim()
@@ -3907,17 +3985,24 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         sort_by: 'updated_at',
         sort_dir: 'desc',
       });
+      const controller = new AbortController();
+      const timeoutHandle = window.setTimeout(() => controller.abort(), TEMPLATE_REGISTRY_TIMEOUT_MS);
       const response = await fetch(`/api/v2/amro/master-data/work_package_templates?${query.toString()}`, {
         method: 'GET',
         headers,
+        signal: controller.signal,
       });
+      window.clearTimeout(timeoutHandle);
       const payload = await parseApiPayload(response);
       if (!response.ok) {
-        throw new Error(String(payload.error || 'Failed to load work package templates'));
+        const statusMessage = response.status >= 500
+          ? 'Template registry is temporarily unavailable. Please retry.'
+          : String(payload.error || `Failed to load work package templates (${response.status})`);
+        throw new Error(statusMessage);
       }
-      const registry = getPayloadRecords(payload)
+      const registry = extractTemplateRegistryRecords(payload)
         .map((record) => {
-          const id = String(record.id || '').trim();
+          const id = String(record.id || record.template_id || record.uuid || record.template_code || '').trim();
           if (!id) {
             return null;
           }
@@ -3931,6 +4016,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
             id,
             templateCode: String(record.template_code || '').trim(),
             templateName: String(record.template_name || '').trim(),
+            description: String(record.description || record.template_description || '').trim(),
             maintenanceType,
             version: String(record.version || '1').trim() || '1',
             active: Boolean(record.active ?? true),
@@ -3940,9 +4026,6 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         })
         .filter((item): item is WorkPackageTemplateRegistryItem => Boolean(item) && item.active);
       setWorkPackageTemplateRegistry(registry);
-      if (registry.length === 0) {
-        setWorkPackageTemplateRegistryError('No active work package templates found');
-      }
       trackWorkPackageTemplateAdoption('registry_loaded', {
         activeTemplateCount: registry.length,
       });
@@ -3950,10 +4033,10 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         if (previous && registry.some((item) => item.id === previous)) {
           return previous;
         }
-        return registry[0]?.id || '';
+        return '';
       });
     } catch (error) {
-      const message = String((error as Error).message || 'Failed to load template registry');
+      const message = resolveWorkPackageApiErrorMessage(error, 'Failed to load template registry');
       setWorkPackageTemplateRegistry([]);
       setSelectedWorkPackageTemplateId('');
       setWorkPackageTemplateRegistryError(message);
@@ -4121,7 +4204,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     setAircraftExistingWorkPackages([]);
     setAircraftExistingWorkPackagesError('');
     setAircraftSelectedExistingWorkPackageId('');
-    setSelectedWorkPackageTemplateId((previous) => previous || workPackageTemplateRegistry[0]?.id || '');
+    setSelectedWorkPackageTemplateId((previous) => previous || '');
     setAircraftWorkPackageDialogOpen(true);
     trackWorkPackageTemplateAdoption('dialog_opened', {
       hasTemplateRegistry: workPackageTemplateRegistry.length > 0,
@@ -4158,10 +4241,6 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
 
   const handleAircraftWorkPackageTemplateSelect = useCallback(
     (templateId: string) => {
-      if (!canCreateWorkPackage) {
-        toast.error('You do not have permission to apply templates');
-        return;
-      }
       setSelectedWorkPackageTemplateId(templateId);
       const template = workPackageTemplateRegistry.find((item) => item.id === templateId);
       if (!template) {
@@ -4192,7 +4271,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         taskCount: template.taskRows.length,
       });
     },
-    [canCreateWorkPackage, trackWorkPackageTemplateAdoption, workPackageTemplateRegistry],
+    [trackWorkPackageTemplateAdoption, workPackageTemplateRegistry],
   );
 
   useEffect(() => {
@@ -4234,6 +4313,9 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         return;
       }
       const errors: Record<string, string> = {};
+      if (!selectedWorkPackageTemplateId.trim()) {
+        errors.templateRegistry = 'Select a template before creating a new work package';
+      }
       if (!aircraftWorkPackageValues.workPackageNumber.trim()) {
         errors.workPackageNumber = 'Work package number is required';
       }
@@ -4389,9 +4471,12 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
           requestUrl: '/api/v2/amro/work-packages?interface=create-work-package',
           requestMethod: 'POST',
         });
+        const controller = new AbortController();
+        const timeoutHandle = window.setTimeout(() => controller.abort(), WORK_PACKAGE_CREATE_TIMEOUT_MS);
         const response = await fetch('/api/v2/amro/work-packages?interface=create-work-package', {
           method: 'POST',
           headers,
+          signal: controller.signal,
           body: JSON.stringify({
             ...workPackagePayload,
             idempotency_key: requestIdempotencyKey,
@@ -4414,11 +4499,15 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
             },
           }),
         });
+        window.clearTimeout(timeoutHandle);
         const payload = await parseApiPayload(response);
         const output = payload.output && typeof payload.output === 'object' ? (payload.output as Record<string, unknown>) : {};
         committedWorkPackageId = String(output.work_package_id || output.id || '');
         if (!response.ok) {
-          throw new Error(String(payload.error || 'Failed to create work package from aircraft'));
+          const statusMessage = response.status >= 500
+            ? 'Work package service is temporarily unavailable. Try again shortly.'
+            : String(payload.error || `Failed to create work package from aircraft (${response.status})`);
+          throw new Error(statusMessage);
         }
         toast.success('Aircraft work package created');
         trackWorkPackageTemplateAdoption('submit_succeeded', {
@@ -4473,7 +4562,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
           `amro:aircraft-wp-draft:${selectedAircraft.id}`,
           JSON.stringify(workPackagePayload),
         );
-        toast.error(String((error as Error).message || 'Work package service degraded. Draft captured locally.'));
+        toast.error(resolveWorkPackageApiErrorMessage(error, 'Work package service degraded. Draft captured locally.'));
         trackWorkPackageTemplateAdoption('submit_failed', {
           action,
           usesTemplate: Boolean(selectedWorkPackageTemplate?.id),
@@ -7512,23 +7601,36 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                           <Label htmlFor="aircraft-wp-template-inline" className="text-[11px] font-medium text-[#696969]">
                             Template registry
                           </Label>
-                          <Select value={selectedWorkPackageTemplateId} onValueChange={handleAircraftWorkPackageTemplateSelect}>
-                            <SelectTrigger id="aircraft-wp-template-inline" className="h-[26px] rounded-none border-[#e7e7e7] bg-white px-2 text-[11px] text-[#4f4f4f]">
-                              <SelectValue placeholder={workPackageTemplateRegistryLoading ? 'Loading templates...' : 'Choose template'} />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {workPackageTemplateRegistry.map((template) => (
-                                <SelectItem key={template.id} value={template.id}>
-                                  {template.templateCode || template.templateName || template.id}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <select
+                            id="aircraft-wp-template-inline"
+                            aria-label="Template registry"
+                            value={selectedWorkPackageTemplateId}
+                            onChange={(event) => handleAircraftWorkPackageTemplateSelect(event.target.value)}
+                            className={cn(
+                              'h-[26px] w-full rounded-none border bg-white px-2 text-[11px] text-[#4f4f4f] transition-all',
+                              aircraftWorkPackageErrors.templateRegistry ? 'border-destructive' : 'border-[#e7e7e7]',
+                            )}
+                            disabled={workPackageTemplateRegistryLoading}
+                          >
+                            <option value="">{workPackageTemplateRegistryLoading ? 'Loading templates...' : 'Choose template'}</option>
+                            {workPackageTemplateRegistry.map((template) => (
+                              <option key={template.id} value={template.id}>
+                                {`${template.templateName || template.templateCode || template.id} · v${template.version}${template.description ? ` · ${template.description}` : ''}`}
+                              </option>
+                            ))}
+                          </select>
+                          {workPackageTemplateRegistryLoading ? <p className="text-[11px] text-[#6a6a6a] transition-opacity duration-200" role="status">Loading template registry…</p> : null}
+                          {!workPackageTemplateRegistryLoading && workPackageTemplateRegistry.length === 0 && !workPackageTemplateRegistryError ? <p className="text-[11px] text-[#6a6a6a]">No templates available. Add templates in Template Registry and refresh.</p> : null}
                           {workPackageTemplateRegistryError ? <p className="mdm-template-danger">{workPackageTemplateRegistryError}</p> : null}
+                          {aircraftWorkPackageErrors.templateRegistry ? <p className="mdm-template-danger">{aircraftWorkPackageErrors.templateRegistry}</p> : null}
                         </div>
                         {selectedWorkPackageTemplate ? (
-                          <div className="rounded-sm border border-[#e8f2f3] bg-[#f4fbfb] px-2 py-1 text-[11px] text-[#346569]">
-                            {selectedWorkPackageTemplate.templateCode || selectedWorkPackageTemplate.templateName} · v{selectedWorkPackageTemplate.version}
+                          <div className="rounded-sm border border-[#e8f2f3] bg-[#f4fbfb] px-2 py-1 text-[11px] text-[#346569] transition-all duration-200">
+                            <p className="font-semibold">{selectedWorkPackageTemplate.templateName || selectedWorkPackageTemplate.templateCode}</p>
+                            <p className="text-[10px] text-[#4d7f83]">
+                              {`Code ${selectedWorkPackageTemplate.templateCode || '-'} · v${selectedWorkPackageTemplate.version}`}
+                            </p>
+                            {selectedWorkPackageTemplate.description ? <p className="text-[10px] text-[#4d7f83]">{selectedWorkPackageTemplate.description}</p> : null}
                           </div>
                         ) : null}
                         <div className="flex items-center -space-x-1">
@@ -7685,21 +7787,28 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                       <Label htmlFor="aircraft-wp-template" className="text-[12px] font-medium text-[#696969]">
                         Template registry
                       </Label>
-                      <Select value={selectedWorkPackageTemplateId} onValueChange={handleAircraftWorkPackageTemplateSelect}>
-                        <SelectTrigger id="aircraft-wp-template" className="h-8 rounded-none border-[#e7e7e7] bg-white text-[12px] text-[#4f4f4f]" disabled={workPackageTemplateRegistryLoading || workPackageTemplateRegistry.length === 0}>
-                          <SelectValue placeholder={workPackageTemplateRegistryLoading ? 'Loading templates...' : 'Choose template'} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {workPackageTemplateRegistry.map((template) => (
-                            <SelectItem key={template.id} value={template.id}>
-                              {template.templateCode || template.templateName || template.id}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {workPackageTemplateRegistryLoading ? <p className="text-[11px] text-[#6a6a6a]" role="status">Loading template registry…</p> : null}
-                      {!workPackageTemplateRegistryLoading && workPackageTemplateRegistry.length === 0 && !workPackageTemplateRegistryError ? <p className="text-[11px] text-[#6a6a6a]">No templates available. Refresh to retry.</p> : null}
+                      <select
+                        id="aircraft-wp-template"
+                        aria-label="Template registry"
+                        value={selectedWorkPackageTemplateId}
+                        onChange={(event) => handleAircraftWorkPackageTemplateSelect(event.target.value)}
+                        className={cn(
+                          'h-8 w-full rounded-none border bg-white px-2 text-[12px] text-[#4f4f4f]',
+                          aircraftWorkPackageErrors.templateRegistry ? 'border-destructive' : 'border-[#e7e7e7]',
+                        )}
+                        disabled={workPackageTemplateRegistryLoading}
+                      >
+                        <option value="">{workPackageTemplateRegistryLoading ? 'Loading templates...' : 'Choose template'}</option>
+                        {workPackageTemplateRegistry.map((template) => (
+                          <option key={template.id} value={template.id}>
+                            {`${template.templateName || template.templateCode || template.id} · v${template.version}${template.description ? ` · ${template.description}` : ''}`}
+                          </option>
+                        ))}
+                      </select>
+                      {workPackageTemplateRegistryLoading ? <p className="text-[11px] text-[#6a6a6a] transition-opacity duration-200" role="status">Loading template registry…</p> : null}
+                      {!workPackageTemplateRegistryLoading && workPackageTemplateRegistry.length === 0 && !workPackageTemplateRegistryError ? <p className="text-[11px] text-[#6a6a6a]">No templates available. Add templates in Template Registry and refresh.</p> : null}
                       {workPackageTemplateRegistryError ? <p className="mdm-template-danger">{workPackageTemplateRegistryError}</p> : null}
+                      {aircraftWorkPackageErrors.templateRegistry ? <p className="mdm-template-danger">{aircraftWorkPackageErrors.templateRegistry}</p> : null}
                     </div>
                     <div className="rounded-sm border border-[#efefef] bg-white px-3 py-2">
                       <p className="text-[10px] uppercase tracking-wide text-[#8a8a8a]">Maintenance</p>
@@ -7725,10 +7834,10 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                       {workPackageTemplateRegistryLoading ? 'Refreshing…' : 'Refresh Templates'}
                     </Button>
                   </div>
-                  <div className="rounded-sm border border-[#efefef] bg-[#fafafa] p-3">
+                  <div className="rounded-sm border border-[#efefef] bg-[#fafafa] p-3 transition-all duration-200">
                     <p className="text-[11px] font-medium text-[#6a6a6a]">
                       {selectedWorkPackageTemplate
-                        ? `${selectedWorkPackageTemplate.templateName || selectedWorkPackageTemplate.templateCode} selected. Open "Selected task" to review and adjust mapped tasks before submitting.`
+                        ? `${selectedWorkPackageTemplate.templateName || selectedWorkPackageTemplate.templateCode} selected. Open "Selected task" to review and adjust mapped tasks before creating the new work package.`
                         : 'Choose a template to prefill maintenance type, scope, and task selections.'}
                     </p>
                   </div>
@@ -7872,8 +7981,12 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                 <Button variant="outline" className="h-[26px] rounded-none border-[#b6d2d4] px-4 text-[11px] text-[#2b8f95]" onClick={() => setAircraftWorkPackageDialogOpen(false)} disabled={aircraftWorkPackageSubmitting}>
                   Cancel
                 </Button>
-                <Button className="h-[26px] rounded-none bg-[#0ea5a6] px-4 text-[11px] text-white hover:bg-[#0d9394]" onClick={() => void handleAircraftWorkPackageSubmit('create_open')} disabled={aircraftWorkPackageSubmitting || !canCreateWorkPackage}>
-                  Add
+                <Button
+                  className="h-[26px] rounded-none bg-[#0ea5a6] px-4 text-[11px] text-white transition-colors hover:bg-[#0d9394]"
+                  onClick={() => void handleAircraftWorkPackageSubmit('create_open')}
+                  disabled={aircraftWorkPackageSubmitting || !canCreateWorkPackageFromTemplate}
+                >
+                  {aircraftWorkPackageSubmitting ? 'Creating…' : 'Create New Work Package'}
                 </Button>
               </div>
             </div>

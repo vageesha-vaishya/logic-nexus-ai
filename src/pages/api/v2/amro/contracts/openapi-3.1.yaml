@@ -26,6 +26,7 @@ paths:
     post:
       operationId: mutateAmroWorkPackages
       tags: [AMRO]
+      description: Supports work package lifecycle mutations. For New WP template flow, clients call `interface=create-work-package` with a selected `template_id` and authenticated Bearer token.
       parameters:
         - in: query
           name: interface
@@ -83,6 +84,17 @@ paths:
                     triggered_at:
                       type: string
                       format: date-time
+                    template_id:
+                      type: string
+                      description: Work package template registry identifier selected in New WP dialog.
+                    template_code:
+                      type: string
+                      description: Human-readable template code persisted for traceability.
+                    selected_task_ids:
+                      type: array
+                      items:
+                        type: string
+                      description: Selected template/scope task row identifiers submitted from New WP.
                 - type: object
                   required: [work_package_id, target_status, reason_code, actor_signature]
                   properties:
@@ -238,6 +250,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/WorkPackageMutationResponse'
+        '400':
+          description: Validation failure (for example missing template selection or malformed payload)
+        '401':
+          description: Missing or invalid bearer token
+        '503':
+          description: Work package service temporarily unavailable
   /api/v2/amro/templates:
     get:
       operationId: listAmroTemplates
