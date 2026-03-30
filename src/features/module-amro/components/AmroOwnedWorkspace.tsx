@@ -381,6 +381,20 @@ export function AmroOwnedWorkspace({
                 disabledReason: state.selectedWorkPackageId ? 'Ready.' : 'Select a work package first.',
               },
               {
+                id: 'scheduling-replan-simulate',
+                label: 'Run Replan Simulation',
+                onClick: () => void state.runWorkPackageReplanSimulation(),
+                disabled: !state.selectedWorkPackageId,
+                disabledReason: state.selectedWorkPackageId ? 'Ready.' : 'Select a work package first.',
+              },
+              {
+                id: 'scheduling-replan-confirm',
+                label: 'Confirm Replan',
+                onClick: () => void state.confirmWorkPackageReplan(),
+                disabled: state.workPackageReplanOptions.length === 0,
+                disabledReason: state.workPackageReplanOptions.length > 0 ? 'Ready.' : 'Run simulation first.',
+              },
+              {
                 id: 'scheduling-refresh-optimization',
                 label: 'Refresh Optimization',
                 onClick: () => void state.fetchScheduleOptimizationRecommendations(),
@@ -2439,6 +2453,12 @@ export function AmroOwnedWorkspace({
             <Button variant="outline" onClick={state.fetchScheduleOptimizationRecommendations}>
               Refresh Optimization Recommendations
             </Button>
+            <Button variant="outline" onClick={() => void state.runWorkPackageReplanSimulation()} disabled={!state.selectedWorkPackageId}>
+              Run Replan Simulation
+            </Button>
+            <Button variant="outline" onClick={() => void state.confirmWorkPackageReplan()} disabled={state.workPackageReplanOptions.length === 0}>
+              Confirm Replan
+            </Button>
           </div>
           <div className="space-y-2">
             {state.scheduleBoardRows.length === 0 ? (
@@ -2479,6 +2499,18 @@ export function AmroOwnedWorkspace({
                 <p className="text-muted-foreground">{item.rationale}</p>
               </div>
             ))}
+          </div>
+          <div className="space-y-2">
+            {state.workPackageReplanOptions.map((option) => (
+              <div key={option.option_id} className="rounded-md border p-2 text-xs">
+                <p className="font-medium">{option.title}</p>
+                <p className="text-muted-foreground">Option {option.option_id}</p>
+                <p className="text-muted-foreground">Impact score {option.impact_score}</p>
+              </div>
+            ))}
+            {state.lastConfirmedReplanScheduleId ? (
+              <Badge variant="secondary">Replan confirmed: {state.lastConfirmedReplanScheduleId}</Badge>
+            ) : null}
           </div>
         </CardContent>
       </Card>

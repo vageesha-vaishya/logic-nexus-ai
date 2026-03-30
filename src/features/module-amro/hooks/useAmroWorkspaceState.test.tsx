@@ -515,7 +515,7 @@ describe('useAmroWorkspaceState realtime schedule connectivity', () => {
     expect(result.current.authorityCertificationTemplate?.templateId).toBe('tmpl-faa-cert-release-v1');
   });
 
-  it('wires clone-template and sync-supplier-eta work package interfaces', async () => {
+  it('wires clone-template, replan, and supplier-eta work package interfaces', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
 
@@ -533,6 +533,28 @@ describe('useAmroWorkspaceState realtime schedule connectivity', () => {
           output: {
             updated_eta: '2026-03-23T00:00:00.000Z',
             impacted_work_packages: ['wp-1'],
+          },
+        });
+      }
+      if (url.includes('/api/v2/amro/work-packages?interface=run-replan-simulation')) {
+        return jsonResponse({
+          output: {
+            replan_options: [
+              {
+                option_id: 'replan-opt-1',
+                title: 'Move overnight slot',
+                impact_score: 11.4,
+              },
+            ],
+          },
+        });
+      }
+      if (url.includes('/api/v2/amro/work-packages?interface=confirm-replan')) {
+        return jsonResponse({
+          output: {
+            updated_schedule: {
+              schedule_id: 'sched-101',
+            },
           },
         });
       }
@@ -599,7 +621,12 @@ describe('useAmroWorkspaceState realtime schedule connectivity', () => {
 
     await act(async () => {
       await result.current.cloneWorkPackageFromTemplate('wp-1');
+      await result.current.runWorkPackageReplanSimulation();
       await result.current.syncSupplierEtaForSelectedWorkPackage();
+    });
+    await waitFor(() => expect(result.current.workPackageReplanOptions.length).toBeGreaterThan(0));
+    await act(async () => {
+      await result.current.confirmWorkPackageReplan();
     });
 
     expect(fetchMock.mock.calls.some((call) =>
@@ -607,6 +634,12 @@ describe('useAmroWorkspaceState realtime schedule connectivity', () => {
     )).toBe(true);
     expect(fetchMock.mock.calls.some((call) =>
       String(call[0]).includes('/api/v2/amro/work-packages?interface=sync-supplier-eta'),
+    )).toBe(true);
+    expect(fetchMock.mock.calls.some((call) =>
+      String(call[0]).includes('/api/v2/amro/work-packages?interface=run-replan-simulation'),
+    )).toBe(true);
+    expect(fetchMock.mock.calls.some((call) =>
+      String(call[0]).includes('/api/v2/amro/work-packages?interface=confirm-replan'),
     )).toBe(true);
   });
 });

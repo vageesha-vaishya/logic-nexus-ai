@@ -148,6 +148,12 @@ type ApiScheduleOptimizationRecommendation = {
   rationale: string;
 };
 
+type ApiWorkPackageReplanOption = {
+  option_id: string;
+  title: string;
+  impact_score: number;
+};
+
 type ApiEnvelope<T> = {
   data: T;
 };
@@ -536,6 +542,8 @@ export function useAmroWorkspaceState() {
   const [predictiveRecommendations, setPredictiveRecommendations] = useState<AmroPredictiveRecommendation[]>(initialPredictiveRecommendations);
   const [scheduleBoardRows, setScheduleBoardRows] = useState<ApiScheduleRow[]>([]);
   const [scheduleOptimizationRecommendations, setScheduleOptimizationRecommendations] = useState<ApiScheduleOptimizationRecommendation[]>([]);
+  const [workPackageReplanOptions, setWorkPackageReplanOptions] = useState<ApiWorkPackageReplanOption[]>([]);
+  const [lastConfirmedReplanScheduleId, setLastConfirmedReplanScheduleId] = useState<string>('');
   const [lastInventoryOptimizationRunId, setLastInventoryOptimizationRunId] = useState<string>('');
   const [lastProcurementSyncId, setLastProcurementSyncId] = useState<string>('');
   const [complianceGateModalOpen, setComplianceGateModalOpen] = useState<boolean>(false);
@@ -2115,6 +2123,121 @@ export function useAmroWorkspaceState() {
     }
   }, [apiBaseUrl, authHeaders, isApiTemporarilyUnavailable, markApiTemporarilyUnavailable]);
 
+  const runWorkPackageReplanSimulation = useCallback(async () => {
+    if (!authHeaders || !selectedWorkPackageId) return false;
+    if (isApiTemporarilyUnavailable()) {
+      setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+      return false;
+    }
+    try {
+      const tenantScope = String(assets[0]?.tenantId || 'tenant-ops-01').trim() || 'tenant-ops-01';
+      const disruptionStart = scheduleBoardRows[0]?.slot_start || new Date().toISOString();
+      const disruptionEnd = scheduleBoardRows[0]?.slot_end || new Date(Date.now() + 3600000).toISOString();
+      const response = await fetch(`${apiBaseUrl}/api/v2/amro/work-packages?interface=run-replan-simulation`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({
+          disrupted_slots: [
+            {
+              slot_id: scheduleBoardRows[0]?.schedule_id || `${selectedWorkPackageId}-slot`,
+              work_package_id: selectedWorkPackageId,
+              slot_start: disruptionStart,
+              slot_end: disruptionEnd,
+            },
+          ],
+          priority_rules: {
+            preserve_critical: true,
+            minimize_total_delay: true,
+          },
+          planning_horizon: 'P7D',
+          active_constraints: [
+            { id: 'station-capacity', enabled: true },
+            { id: 'qualified-team', enabled: true },
+          ],
+          tenant_calendar_id: `${tenantScope}:maintenance-calendar`,
+        }),
+      });
+      const payload = await parseJsonSafe<{ output?: { replan_options?: ApiWorkPackageReplanOption[] }; error?: string }>(response);
+      const options = payload?.output?.replan_options;
+      if (!response.ok || !Array.isArray(options)) {
+        throw new Error(payload?.error || `Failed to run replan simulation (${response.status})`);
+      }
+      setWorkPackageReplanOptions(options);
+      return true;
+    } catch (error) {
+      if (isNetworkConnectivityError(error)) {
+        markApiTemporarilyUnavailable();
+        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        return false;
+      }
+      setWorkPackagesError(error instanceof Error ? error.message : 'Failed to run replan simulation');
+      return false;
+    }
+  }, [
+    apiBaseUrl,
+    assets,
+    authHeaders,
+    isApiTemporarilyUnavailable,
+    markApiTemporarilyUnavailable,
+    scheduleBoardRows,
+    selectedWorkPackageId,
+  ]);
+
+  const confirmWorkPackageReplan = useCallback(async () => {
+    if (!authHeaders || !selectedWorkPackageId || workPackageReplanOptions.length === 0) return false;
+    if (isApiTemporarilyUnavailable()) {
+      setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+      return false;
+    }
+    try {
+      const selectedOption = workPackageReplanOptions[0];
+      const response = await fetch(`${apiBaseUrl}/api/v2/amro/work-packages?interface=confirm-replan`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({
+          selected_option_id: selectedOption.option_id,
+          approver_id: activeRole,
+          reason: 'ui-replan-approval',
+          affected_work_packages: [
+            {
+              work_package_id: selectedWorkPackageId,
+              current_state: mapLifecycleToStatus(selectedWorkPackage?.lifecycleStage || 'create'),
+            },
+          ],
+        }),
+      });
+      const payload = await parseJsonSafe<{ output?: { updated_schedule?: { schedule_id?: string } }; error?: string }>(response);
+      if (!response.ok) {
+        throw new Error(payload?.error || `Failed to confirm replan (${response.status})`);
+      }
+      const confirmedScheduleId = String(payload?.output?.updated_schedule?.schedule_id || '').trim();
+      setLastConfirmedReplanScheduleId(confirmedScheduleId);
+      setWorkPackageReplanOptions([]);
+      await fetchScheduleBoard();
+      await fetchWorkPackages();
+      return true;
+    } catch (error) {
+      if (isNetworkConnectivityError(error)) {
+        markApiTemporarilyUnavailable();
+        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        return false;
+      }
+      setWorkPackagesError(error instanceof Error ? error.message : 'Failed to confirm replan');
+      return false;
+    }
+  }, [
+    activeRole,
+    apiBaseUrl,
+    authHeaders,
+    fetchScheduleBoard,
+    fetchWorkPackages,
+    isApiTemporarilyUnavailable,
+    markApiTemporarilyUnavailable,
+    selectedWorkPackage,
+    selectedWorkPackageId,
+    workPackageReplanOptions,
+  ]);
+
   const reservePartsAllocationForSelectedWorkPackage = useCallback(async () => {
     if (!authHeaders || !selectedWorkPackageId || materials.length === 0) return false;
     if (isApiTemporarilyUnavailable()) {
@@ -2645,6 +2768,8 @@ export function useAmroWorkspaceState() {
     predictiveRecommendations,
     scheduleBoardRows,
     scheduleOptimizationRecommendations,
+    workPackageReplanOptions,
+    lastConfirmedReplanScheduleId,
     lastInventoryOptimizationRunId,
     lastProcurementSyncId,
     complianceGateModalOpen,
@@ -2695,6 +2820,8 @@ export function useAmroWorkspaceState() {
     submitTaskSignature,
     acknowledgeScheduleUpdate,
     fetchScheduleOptimizationRecommendations,
+    runWorkPackageReplanSimulation,
+    confirmWorkPackageReplan,
     reservePartsAllocationForSelectedWorkPackage,
     processCriticalShortageResponse,
     applyRotableLlpTraceability,
