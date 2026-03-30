@@ -7105,57 +7105,65 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                   </div>
                 </div>
               ) : entity === 'work_package_templates' ? (
-                <div className="space-y-3">
-                  <div className="grid gap-2 lg:grid-cols-[1fr_1fr]">
-                    <section className="overflow-hidden rounded-sm border border-[#e5e5e5] bg-white">
-                      <div className="border-b border-[#efefef] bg-[#fafafa] px-[10px] py-[6px] text-[13px] font-semibold text-[#757575]">Work Package Details</div>
-                      <div className="grid gap-2 p-2 lg:grid-cols-2">
+                <div className="space-y-3 rounded-md bg-[#08a8bd] p-3 text-[12px]">
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-white">
+                    <p className="font-semibold">Work Package Template Registry</p>
+                    <div className="flex items-center gap-2 text-[11px]">
+                      <Users className="h-3.5 w-3.5" />
+                      <span>Template authoring mode</span>
+                      <span>CRUD active</span>
+                    </div>
+                  </div>
+                  <div className="grid gap-3 lg:grid-cols-[1fr_1fr]">
+                    <section className="overflow-hidden rounded bg-white">
+                      <div className="border-b border-slate-200 px-3 py-2 text-[12px] font-semibold text-slate-700">Work Package Details</div>
+                      <div className="grid gap-2 p-3 lg:grid-cols-2">
                         <div className="space-y-1">
-                          <Label htmlFor="wpt-template-code" className="text-[12px] font-medium text-[#696969]">Template Code</Label>
+                          <Label htmlFor="wpt-template-code" className="text-[12px] font-medium text-slate-700">Template Code</Label>
                           <Input
                             id="wpt-template-code"
                             ref={firstFieldRef}
                             value={String(formValues.template_code ?? '')}
                             onChange={(event) => setFieldValue('template_code', event.target.value)}
-                            className={cn('h-7 rounded-none border-[#eeeeee] bg-white px-2 text-[12px] text-[#525252] shadow-none', formErrors.template_code && 'border-destructive')}
+                            className={cn('h-8 border-slate-300 bg-white px-2 text-[12px] text-slate-800', formErrors.template_code && 'border-destructive')}
                             aria-invalid={Boolean(formErrors.template_code)}
                             placeholder="WP-LINE-001"
                           />
                           {formErrors.template_code ? <p className="mdm-template-danger">{formErrors.template_code}</p> : null}
                         </div>
                         <div className="space-y-1">
-                          <Label htmlFor="wpt-version" className="text-[12px] font-medium text-[#696969]">Version</Label>
+                          <Label htmlFor="wpt-version" className="text-[12px] font-medium text-slate-700">Version</Label>
                           <Input
                             id="wpt-version"
                             type="number"
                             min={1}
                             value={String(formValues.version ?? '')}
                             onChange={(event) => setFieldValue('version', event.target.value)}
-                            className={cn('h-7 rounded-none border-[#eeeeee] bg-white px-2 text-[12px] text-[#525252] shadow-none', formErrors.version && 'border-destructive')}
+                            className={cn('h-8 border-slate-300 bg-white px-2 text-[12px] text-slate-800', formErrors.version && 'border-destructive')}
                             aria-invalid={Boolean(formErrors.version)}
                             placeholder="1"
                           />
                           {formErrors.version ? <p className="mdm-template-danger">{formErrors.version}</p> : null}
                         </div>
                         <div className="space-y-1 lg:col-span-2">
-                          <Label htmlFor="wpt-template-name" className="text-[12px] font-medium text-[#696969]">Template Name</Label>
+                          <Label htmlFor="wpt-template-name" className="text-[12px] font-medium text-slate-700">Template Name</Label>
                           <Input
                             id="wpt-template-name"
                             value={String(formValues.template_name ?? '')}
                             onChange={(event) => setFieldValue('template_name', event.target.value)}
-                            className={cn('h-7 rounded-none border-[#eeeeee] bg-white px-2 text-[12px] text-[#525252] shadow-none', formErrors.template_name && 'border-destructive')}
+                            className={cn('h-8 border-slate-300 bg-white px-2 text-[12px] text-slate-800', formErrors.template_name && 'border-destructive')}
                             aria-invalid={Boolean(formErrors.template_name)}
                             placeholder="Line Check Package"
                           />
                           {formErrors.template_name ? <p className="mdm-template-danger">{formErrors.template_name}</p> : null}
                         </div>
                         <div className="space-y-1">
-                          <Label htmlFor="wpt-maintenance-type" className="text-[12px] font-medium text-[#696969]">Maintenance Type</Label>
+                          <Label htmlFor="wpt-maintenance-type" className="text-[12px] font-medium text-slate-700">Maintenance Type</Label>
                           <Select value={String(formValues.maintenance_type ?? '')} onValueChange={(value) => setFieldValue('maintenance_type', value)}>
                             <SelectTrigger
                               id="wpt-maintenance-type"
                               className={cn(
-                                'h-7 rounded-none border-[#eeeeee] bg-white px-2 text-[12px] text-[#525252] shadow-none',
+                                'h-8 border-slate-300 bg-white px-2 text-[12px] text-slate-800',
                                 formErrors.maintenance_type && 'border-destructive',
                               )}
                               aria-invalid={Boolean(formErrors.maintenance_type)}
@@ -7173,33 +7181,33 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                           {formErrors.maintenance_type ? <p className="mdm-template-danger">{formErrors.maintenance_type}</p> : null}
                         </div>
                         <div className="flex items-end">
-                          <div className="flex h-7 items-center gap-2 rounded-none border border-[#eeeeee] bg-white px-2 text-[12px] text-[#525252]">
+                          <div className="flex h-8 items-center gap-2 rounded-md border border-slate-300 bg-white px-2 text-[12px] text-slate-700">
                             <Checkbox
                               id="wpt-active"
                               checked={Boolean(formValues.active)}
                               onCheckedChange={(value) => setFieldValue('active', Boolean(value))}
                             />
-                            <Label htmlFor="wpt-active" className="text-[12px] font-medium text-[#696969]">Active</Label>
+                            <Label htmlFor="wpt-active" className="text-[12px] font-medium text-slate-700">Active</Label>
                           </div>
                         </div>
                         <div className="space-y-1 lg:col-span-2">
-                          <Label htmlFor="wpt-policy-snapshot-id" className="text-[12px] font-medium text-[#696969]">Policy Snapshot ID</Label>
+                          <Label htmlFor="wpt-policy-snapshot-id" className="text-[12px] font-medium text-slate-700">Policy Snapshot ID</Label>
                           <Input
                             id="wpt-policy-snapshot-id"
                             value={String(formValues.policy_snapshot_id ?? '')}
                             onChange={(event) => setFieldValue('policy_snapshot_id', event.target.value)}
-                            className="h-7 rounded-none border-[#eeeeee] bg-white px-2 text-[12px] text-[#525252] shadow-none"
+                            className="h-8 border-slate-300 bg-white px-2 text-[12px] text-slate-800"
                             placeholder="POLICY-2026-001"
                           />
                         </div>
                       </div>
                     </section>
-                    <section className="overflow-hidden rounded-sm border border-[#e5e5e5] bg-white">
-                      <div className="border-b border-[#efefef] bg-[#fafafa] px-[10px] py-[6px] text-[13px] font-semibold text-[#757575]">Selected Tasks</div>
-                      <div className="space-y-2 p-2">
-                        <div className="overflow-x-auto border border-[#eeeeee]">
+                    <section className="overflow-hidden rounded bg-white">
+                      <div className="border-b border-slate-200 px-3 py-2 text-[12px] font-semibold text-slate-700">Selected Tasks</div>
+                      <div className="space-y-2 p-3">
+                        <div className="overflow-x-auto border border-slate-200">
                           <table className="w-full text-[12px]">
-                            <thead className="bg-[#fafafa] text-left text-[#696969]">
+                            <thead className="bg-slate-50 text-left text-slate-600">
                               <tr>
                                 <th className="px-2 py-1.5 font-semibold">Task number</th>
                                 <th className="px-2 py-1.5 font-semibold">Task name</th>
@@ -7215,7 +7223,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                             </thead>
                             <tbody>
                               {workPackageTemplateTaskItems.length ? workPackageTemplateTaskItems.map((task, index) => (
-                                <tr key={`${String(task.id || task.task_number || index)}-${index}`} className="border-t border-[#f1f1f1] text-[#555555]">
+                                <tr key={`${String(task.id || task.task_number || index)}-${index}`} className="border-t border-slate-100 text-slate-700">
                                   <td className="px-2 py-1.5">{String(task.task_number || task.taskNumber || '-')}</td>
                                   <td className="px-2 py-1.5">{String(task.task_name || task.taskName || task.title || '-')}</td>
                                   <td className="px-2 py-1.5">{String(task.ata_code || task.ataCode || '-')}</td>
@@ -7233,7 +7241,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                                 </tr>
                               )) : (
                                 <tr>
-                                  <td className="px-2 py-2 text-[#8b8b8b]" colSpan={10}>No task rows available</td>
+                                  <td className="px-2 py-2 text-slate-500" colSpan={10}>No task rows available</td>
                                 </tr>
                               )}
                             </tbody>
@@ -7243,17 +7251,17 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                       </div>
                     </section>
                   </div>
-                  <div className="grid gap-2 lg:grid-cols-2">
-                    <section className="overflow-hidden rounded-sm border border-[#e5e5e5] bg-white">
-                      <div className="border-b border-[#efefef] bg-[#fafafa] px-[10px] py-[6px] text-[13px] font-semibold text-[#757575]">Scope Definition</div>
-                      <div className="p-2">
+                  <div className="grid gap-3 lg:grid-cols-2">
+                    <section className="overflow-hidden rounded bg-white">
+                      <div className="border-b border-slate-200 px-3 py-2 text-[12px] font-semibold text-slate-700">Scope Definition</div>
+                      <div className="p-3">
                         <Label htmlFor="wpt-scope-json" className="sr-only">Scope JSON</Label>
                         <Textarea
                           id="wpt-scope-json"
                           value={String(formValues.scope_json ?? '')}
                           onChange={(event) => setFieldValue('scope_json', event.target.value)}
                           className={cn(
-                            'min-h-[118px] rounded-none border-[#eeeeee] bg-white px-2 py-1.5 text-[12px] text-[#525252] shadow-none',
+                            'min-h-[118px] border-slate-300 bg-white px-2 py-1.5 text-[12px] text-slate-800',
                             formErrors.scope_json && 'border-destructive',
                           )}
                           aria-invalid={Boolean(formErrors.scope_json)}
@@ -7262,16 +7270,16 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                         {formErrors.scope_json ? <p className="mt-1 mdm-template-danger">{formErrors.scope_json}</p> : null}
                       </div>
                     </section>
-                    <section className="overflow-hidden rounded-sm border border-[#e5e5e5] bg-white">
-                      <div className="border-b border-[#efefef] bg-[#fafafa] px-[10px] py-[6px] text-[13px] font-semibold text-[#757575]">Tasks JSON</div>
-                      <div className="p-2">
+                    <section className="overflow-hidden rounded bg-white">
+                      <div className="border-b border-slate-200 px-3 py-2 text-[12px] font-semibold text-slate-700">Tasks JSON</div>
+                      <div className="p-3">
                         <Label htmlFor="wpt-tasks-json" className="sr-only">Tasks JSON</Label>
                         <Textarea
                           id="wpt-tasks-json"
                           value={String(formValues.tasks_json ?? '')}
                           onChange={(event) => setFieldValue('tasks_json', event.target.value)}
                           className={cn(
-                            'min-h-[118px] rounded-none border-[#eeeeee] bg-white px-2 py-1.5 text-[12px] text-[#525252] shadow-none',
+                            'min-h-[118px] border-slate-300 bg-white px-2 py-1.5 text-[12px] text-slate-800',
                             formErrors.tasks_json && 'border-destructive',
                           )}
                           aria-invalid={Boolean(formErrors.tasks_json)}
