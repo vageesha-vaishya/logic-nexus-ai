@@ -6042,10 +6042,11 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                     <section className="space-y-2 rounded bg-white p-3">
                       <p className="text-[11px] text-slate-600">Aircraft Template</p>
                       <Label className="text-[12px] font-medium text-slate-800">Aircraft template</Label>
-                      <Select
+                      <select
                         value={aircraftTemplateModel}
                         disabled={aircraftListboxOptionsLoading}
-                        onValueChange={(value) => {
+                        onChange={(event) => {
+                          const value = event.target.value;
                           if (isSystemSelectValue(value)) {
                             return;
                           }
@@ -6074,18 +6075,14 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                             setFieldValue('amendment_number', selectedTemplate.amendmentNumber);
                           }
                         }}
+                        className="h-8 w-full rounded-md border border-slate-300 bg-white px-2 text-[12px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                       >
-                        <SelectTrigger className="h-8 border-slate-300 text-[12px]">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {systemTemplateModelSelectOptions.map((option) => (
-                            <SelectItem key={option.value} value={option.value} disabled={Boolean(option.disabled)}>
-                              {option.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        {systemTemplateModelSelectOptions.map((option) => (
+                          <option key={option.value} value={option.value} disabled={Boolean(option.disabled)}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
                     </section>
                     <section className="rounded bg-white p-3">
                       <p className="mb-2 text-[11px] text-slate-600">Aircraft Template Details</p>
@@ -6097,62 +6094,56 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                         <div className="border-r border-t border-slate-200 px-3 py-2 text-slate-700">{String(formValues.serial_number || '') || '-'}</div>
                         <div className="border-t border-slate-200 px-3 py-2">
                           <div className="grid gap-2 sm:grid-cols-2">
-                            <Select
+                            <select
                               value={String(formValues.aircraft_type ?? '')}
                               disabled={aircraftListboxOptionsLoading}
-                              onValueChange={(value) => setSelectFieldValue('aircraft_type', value)}
+                              onChange={(event) => setSelectFieldValue('aircraft_type', event.target.value)}
+                              className={cn('h-8 w-full rounded-md border border-input bg-white px-2 text-[12px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2', formErrors.aircraft_type && 'border-destructive')}
                             >
-                              <SelectTrigger className={cn('h-8 text-[12px]', formErrors.aircraft_type && 'border-destructive')}>
-                                <SelectValue placeholder="Aircraft type" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {aircraftTypeSelectOptions.map((option) => (
-                                  <SelectItem key={option.value} value={option.value} disabled={option.disabled}>
-                                    {option.label}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <Select
+                              <option value="">Aircraft type</option>
+                              {aircraftTypeSelectOptions.map((option) => (
+                                <option key={option.value} value={option.value} disabled={option.disabled}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
+                            <select
                               value={String(formValues.status ?? '')}
                               disabled={aircraftListboxOptionsLoading}
-                              onValueChange={(value) => setSelectFieldValue('status', value)}
+                              onChange={(event) => setSelectFieldValue('status', event.target.value)}
+                              className={cn('h-8 w-full rounded-md border border-input bg-white px-2 text-[12px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2', formErrors.status && 'border-destructive')}
                             >
-                              <SelectTrigger className={cn('h-8 text-[12px]', formErrors.status && 'border-destructive')}>
-                                <SelectValue placeholder="Status" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {aircraftStatusSelectOptions.map((option) => (
-                                  <SelectItem key={option.value} value={option.value} disabled={option.disabled}>
-                                    {option.label}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <Select value={String(formValues.manufacturer_id ?? '')} onValueChange={(value) => setSelectFieldValue('manufacturer_id', value)}>
-                              <SelectTrigger className={cn('h-8 text-[12px]', formErrors.manufacturer_id && 'border-destructive')}>
-                                <SelectValue placeholder="Manufacturer" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {resolveSelectOptions({ key: 'manufacturer_id', label: 'Manufacturer', type: 'select' }).map((option) => (
-                                  <SelectItem key={option.value} value={option.value} disabled={option.disabled}>
-                                    {option.label}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <Select value={String(formValues.aircraft_model ?? '')} onValueChange={(value) => setSelectFieldValue('aircraft_model', value)}>
-                              <SelectTrigger className={cn('h-8 text-[12px]', formErrors.aircraft_model && 'border-destructive')}>
-                                <SelectValue placeholder="Aircraft model" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {resolveSelectOptions({ key: 'aircraft_model', label: 'Aircraft Model', type: 'select' }).map((option) => (
-                                  <SelectItem key={option.value} value={option.value} disabled={option.disabled}>
-                                    {option.label}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                              <option value="">Status</option>
+                              {aircraftStatusSelectOptions.map((option) => (
+                                <option key={option.value} value={option.value} disabled={option.disabled}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
+                            <select
+                              value={String(formValues.manufacturer_id ?? '')}
+                              onChange={(event) => setSelectFieldValue('manufacturer_id', event.target.value)}
+                              className={cn('h-8 w-full rounded-md border border-input bg-white px-2 text-[12px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2', formErrors.manufacturer_id && 'border-destructive')}
+                            >
+                              <option value="">Manufacturer</option>
+                              {resolveSelectOptions({ key: 'manufacturer_id', label: 'Manufacturer', type: 'select' }).map((option) => (
+                                <option key={option.value} value={option.value} disabled={option.disabled}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
+                            <select
+                              value={String(formValues.aircraft_model ?? '')}
+                              onChange={(event) => setSelectFieldValue('aircraft_model', event.target.value)}
+                              className={cn('h-8 w-full rounded-md border border-input bg-white px-2 text-[12px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2', formErrors.aircraft_model && 'border-destructive')}
+                            >
+                              <option value="">Aircraft model</option>
+                              {resolveSelectOptions({ key: 'aircraft_model', label: 'Aircraft Model', type: 'select' }).map((option) => (
+                                <option key={option.value} value={option.value} disabled={option.disabled}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
                           </div>
                         </div>
                       </div>
@@ -6221,39 +6212,37 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                       </div>
                       <div className="space-y-1">
                         <Label className="text-[12px]">Base</Label>
-                        <Select
+                        <select
                           value={aircraftBase}
                           disabled={aircraftListboxOptionsLoading}
-                          onValueChange={(value) => {
+                          onChange={(event) => {
+                            const value = event.target.value;
                             setAircraftBase(value);
                             setAircraftAuxField('base_location', value);
                           }}
+                          className="h-8 w-full rounded-md border border-input bg-white px-2 text-[12px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                         >
-                          <SelectTrigger className="h-8 text-[12px]"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            {aircraftBaseSelectOptions.map((option) => (
-                              <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                          {aircraftBaseSelectOptions.map((option) => (
+                            <option key={option.value} value={option.value}>{option.label}</option>
+                          ))}
+                        </select>
                       </div>
                       <div className="space-y-1">
                         <Label className="text-[12px]">Owner</Label>
-                        <Select
+                        <select
                           value={aircraftOwner}
                           disabled={aircraftListboxOptionsLoading}
-                          onValueChange={(value) => {
+                          onChange={(event) => {
+                            const value = event.target.value;
                             setAircraftOwner(value);
                             setAircraftAuxField('owner_name', value);
                           }}
+                          className="h-8 w-full rounded-md border border-input bg-white px-2 text-[12px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                         >
-                          <SelectTrigger className="h-8 text-[12px]"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            {aircraftOwnerSelectOptions.map((option) => (
-                              <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                          {aircraftOwnerSelectOptions.map((option) => (
+                            <option key={option.value} value={option.value}>{option.label}</option>
+                          ))}
+                        </select>
                       </div>
                       <div className="space-y-1">
                         <Label htmlFor="aircraft-line-number" className="text-[12px]">Line number</Label>
