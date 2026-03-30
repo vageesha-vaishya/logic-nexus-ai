@@ -9,9 +9,10 @@ import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { CRMDatePicker } from '@/design-system/components/molecules';
 import { useCRM } from '@/hooks/useCRM';
 import { ArrowDownUp, ChevronDown, ChevronUp, Copy, Download, Eye, GripVertical, PauseCircle, PlayCircle, Trash2 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
 import { toast } from 'sonner';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -53,6 +54,7 @@ const amroDashboardLoadBenchmark = { targetMs: 1000, hardLimitMs: 1500 };
 const amroWorkPackageFilterApplyBenchmark = { targetMs: 500, hardLimitMs: 900 };
 const amroDetailTabSwitchBenchmark = { targetMs: 250, hardLimitMs: 500 };
 const amroTaskStepSubmitBenchmark = { targetMs: 400, hardLimitMs: 800 };
+const TextInput = Input;
 
 type AmroUxRole = 'technician' | 'engineer' | 'inspector' | 'planner' | 'management';
 type AmroWorkspaceModuleKey =
@@ -1298,7 +1300,7 @@ export function AmroOwnedWorkspace({
   /**
    * Starts pointer-driven column resizing with hard min/max width constraints.
    */
-  const handleGridResizeStart = (columnKey: WorkPackageGridColumnKey, event: React.MouseEvent<HTMLButtonElement>) => {
+  const handleGridResizeStart = (columnKey: WorkPackageGridColumnKey, event: ReactMouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
     gridResizeActiveRef.current = {
       columnKey,
@@ -3377,7 +3379,7 @@ export function AmroOwnedWorkspace({
             <div className="space-y-3">
               <div className="space-y-1">
                 <Label htmlFor="wp-aircraft-search">Aircraft</Label>
-                <Input id="wp-aircraft-search" value={aircraftSearchTerm} onChange={(event) => setAircraftSearchTerm(event.target.value)} placeholder="Search model, registration, serial" />
+                <TextInput id="wp-aircraft-search" value={aircraftSearchTerm} onChange={(event) => setAircraftSearchTerm(event.target.value)} placeholder="Search model, registration, serial" />
               </div>
               <div className="max-h-56 space-y-2 overflow-y-auto rounded-md border p-2">
                 {aircraftSelectionLoading ? (
@@ -3385,15 +3387,18 @@ export function AmroOwnedWorkspace({
                 ) : filteredAircraftOptions.length === 0 ? (
                   <p className="text-xs text-muted-foreground">No aircraft found in tenant scope.</p>
                 ) : filteredAircraftOptions.map((aircraft) => (
-                  <button
+                  <Button
                     key={aircraft.id}
                     type="button"
+                    variant="ghost"
+                    size="sm"
                     onClick={() => handleSelectWorkPackageAircraft(aircraft.id)}
-                    className={`w-full rounded-md border px-3 py-2 text-left text-xs ${workPackageCreateForm.aircraftId === aircraft.id ? 'border-primary bg-primary/10' : 'border-border'}`}
+                    className={`h-auto w-full justify-start rounded-md border px-3 py-2 text-left text-xs ${workPackageCreateForm.aircraftId === aircraft.id ? 'border-primary bg-primary/10' : 'border-border'}`}
+                    aria-pressed={workPackageCreateForm.aircraftId === aircraft.id}
                   >
                     <p className="font-medium">{aircraft.aircraftModel || 'Unknown Model'} · {aircraft.registration || '-'}</p>
                     <p className="text-muted-foreground">SN {aircraft.serialNumber || '-'} · Station {aircraft.stationCode || '-'}</p>
-                  </button>
+                  </Button>
                 ))}
               </div>
               {workPackageCreateErrors.aircraftId ? <p className="text-xs text-destructive">{workPackageCreateErrors.aircraftId}</p> : null}
@@ -3410,22 +3415,22 @@ export function AmroOwnedWorkspace({
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <div className="space-y-1">
                   <Label htmlFor="wp-number">Package Number</Label>
-                  <Input id="wp-number" value={workPackageCreateForm.packageNumber} onChange={(event) => handleWorkPackageCreateFormChange('packageNumber', event.target.value)} />
+                  <TextInput id="wp-number" value={workPackageCreateForm.packageNumber} onChange={(event) => handleWorkPackageCreateFormChange('packageNumber', event.target.value)} />
                   {workPackageCreateErrors.packageNumber ? <p className="text-xs text-destructive">{workPackageCreateErrors.packageNumber}</p> : null}
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="wp-topic">Topic</Label>
-                  <Input id="wp-topic" value={workPackageCreateForm.topic} onChange={(event) => handleWorkPackageCreateFormChange('topic', event.target.value)} />
+                  <TextInput id="wp-topic" value={workPackageCreateForm.topic} onChange={(event) => handleWorkPackageCreateFormChange('topic', event.target.value)} />
                   {workPackageCreateErrors.topic ? <p className="text-xs text-destructive">{workPackageCreateErrors.topic}</p> : null}
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="wp-location">Location/Station</Label>
-                  <Input id="wp-location" value={workPackageCreateForm.locationStation} onChange={(event) => handleWorkPackageCreateFormChange('locationStation', event.target.value)} />
+                  <TextInput id="wp-location" value={workPackageCreateForm.locationStation} onChange={(event) => handleWorkPackageCreateFormChange('locationStation', event.target.value)} />
                   {workPackageCreateErrors.locationStation ? <p className="text-xs text-destructive">{workPackageCreateErrors.locationStation}</p> : null}
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="wp-planning-date">Planning Date</Label>
-                  <Input id="wp-planning-date" type="date" value={workPackageCreateForm.planningDate} onChange={(event) => handleWorkPackageCreateFormChange('planningDate', event.target.value)} />
+                  <CRMDatePicker id="wp-planning-date" value={workPackageCreateForm.planningDate} onChange={(event) => handleWorkPackageCreateFormChange('planningDate', event.target.value)} />
                 </div>
               </div>
               <div className="space-y-1">
@@ -3449,7 +3454,7 @@ export function AmroOwnedWorkspace({
                 <TabsContent value="wp" className="space-y-3 pt-2">
                   <div className="space-y-1">
                     <Label htmlFor="wp-task-search">Task Search</Label>
-                    <Input id="wp-task-search" value={taskSearchTerm} onChange={(event) => setTaskSearchTerm(event.target.value)} disabled={!canSelectTasks} placeholder={canSelectTasks ? 'Search tasks' : 'Select aircraft first'} />
+                    <TextInput id="wp-task-search" value={taskSearchTerm} onChange={(event) => setTaskSearchTerm(event.target.value)} disabled={!canSelectTasks} placeholder={canSelectTasks ? 'Search tasks' : 'Select aircraft first'} />
                   </div>
                   <div className="max-h-72 overflow-auto rounded-md border">
                     <table className="w-full text-xs">
@@ -3526,19 +3531,19 @@ export function AmroOwnedWorkspace({
                   <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                     <div className="space-y-1">
                       <Label htmlFor="wp-planned-start">Planned Start</Label>
-                      <Input id="wp-planned-start" type="date" value={workPackageCreateForm.plannedStartDate} onChange={(event) => handleWorkPackageCreateFormChange('plannedStartDate', event.target.value)} />
+                      <CRMDatePicker id="wp-planned-start" value={workPackageCreateForm.plannedStartDate} onChange={(event) => handleWorkPackageCreateFormChange('plannedStartDate', event.target.value)} />
                     </div>
                     <div className="space-y-1">
                       <Label htmlFor="wp-planned-end">Planned End</Label>
-                      <Input id="wp-planned-end" type="date" value={workPackageCreateForm.plannedEndDate} onChange={(event) => handleWorkPackageCreateFormChange('plannedEndDate', event.target.value)} />
+                      <CRMDatePicker id="wp-planned-end" value={workPackageCreateForm.plannedEndDate} onChange={(event) => handleWorkPackageCreateFormChange('plannedEndDate', event.target.value)} />
                     </div>
                     <div className="space-y-1">
                       <Label htmlFor="wp-created-by">Created By</Label>
-                      <Input id="wp-created-by" value={workPackageCreateForm.createdBy} onChange={(event) => handleWorkPackageCreateFormChange('createdBy', event.target.value)} />
+                      <TextInput id="wp-created-by" value={workPackageCreateForm.createdBy} onChange={(event) => handleWorkPackageCreateFormChange('createdBy', event.target.value)} />
                     </div>
                     <div className="space-y-1">
                       <Label htmlFor="wp-revision">Revision</Label>
-                      <Input id="wp-revision" type="number" min={1} value={workPackageCreateForm.revision} onChange={(event) => handleWorkPackageCreateFormChange('revision', event.target.value)} />
+                      <TextInput id="wp-revision" type="number" min={1} value={workPackageCreateForm.revision} onChange={(event) => handleWorkPackageCreateFormChange('revision', event.target.value)} />
                     </div>
                   </div>
                 </TabsContent>
