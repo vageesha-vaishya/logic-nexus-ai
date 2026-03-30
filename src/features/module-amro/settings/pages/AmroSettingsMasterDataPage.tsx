@@ -1002,6 +1002,7 @@ const ENTITY_FORM_FIELDS: Record<MasterEntity, EntityFormField[]> = {
   work_package_templates: [
     { key: 'template_code', label: 'Template Code', type: 'text', required: true },
     { key: 'template_name', label: 'Template Name', type: 'text', required: true },
+    { key: 'aircraft_model', label: 'Aircraft Model', type: 'select' },
     { key: 'maintenance_type', label: 'Maintenance Type', type: 'select', required: true, options: ['line', 'base', 'hangar', 'shop'] },
     { key: 'version', label: 'Version', type: 'number', required: true, min: 1 },
     { key: 'active', label: 'Active', type: 'boolean' },
@@ -1163,6 +1164,7 @@ const ENTITY_DEFAULT_VALUES: Record<MasterEntity, FormValues> = {
   work_package_templates: {
     template_code: '',
     template_name: '',
+    aircraft_model: '',
     maintenance_type: 'line',
     version: 1,
     active: true,
@@ -1287,6 +1289,9 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   const [workPackageTemplateTaskTemplates, setWorkPackageTemplateTaskTemplates] = useState<Record<string, unknown>[]>([]);
   const [workPackageTemplateTaskTemplatesLoading, setWorkPackageTemplateTaskTemplatesLoading] = useState(false);
   const [workPackageTemplateTaskTemplatesError, setWorkPackageTemplateTaskTemplatesError] = useState('');
+  const [workPackageTemplateAircraftModelOptions, setWorkPackageTemplateAircraftModelOptions] = useState<SelectOption[]>([]);
+  const [workPackageTemplateAircraftModelOptionsLoading, setWorkPackageTemplateAircraftModelOptionsLoading] = useState(false);
+  const [workPackageTemplateAircraftModelOptionsError, setWorkPackageTemplateAircraftModelOptionsError] = useState('');
   const [selectedWorkPackageTemplateId, setSelectedWorkPackageTemplateId] = useState('');
   const [flightLogDialogOpen, setFlightLogDialogOpen] = useState(false);
   const [flightLogSubmitting, setFlightLogSubmitting] = useState(false);
@@ -2825,6 +2830,46 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     }
     return workPackageTemplateTaskTemplates;
   }, [entity, workPackageTemplateTaskTemplates]);
+  const selectedWorkPackageAircraftModelTaskItems = useMemo(() => {
+    if (entity !== 'work_package_templates') {
+      return [] as Array<Record<string, unknown>>;
+    }
+    const selectedModelValue = String(formValues.aircraft_model ?? '').trim().toLowerCase();
+    if (!selectedModelValue) {
+      return workPackageTemplateTaskItems;
+    }
+    const selectedModelOption = workPackageTemplateAircraftModelOptions.find((option) => String(option.value).trim().toLowerCase() === selectedModelValue);
+    const selectedLabel = String(selectedModelOption?.label || '').trim().toLowerCase();
+    const selectedCodeMatch = selectedLabel.match(/\(([^)]+)\)/);
+    const selectedCode = String(selectedCodeMatch?.[1] || '').trim().toLowerCase();
+    const rawTokens = [selectedModelValue, selectedLabel, selectedCode]
+      .flatMap((token) => token.split(/[\s/(),_-]+/g))
+      .map((token) => token.trim().toLowerCase())
+      .filter(Boolean);
+    const filterTokens = Array.from(new Set(rawTokens));
+    const normalizedTokens = filterTokens.map((token) => token.replace(/[^a-z0-9]/g, ''));
+    const matchesToken = (text: string) => {
+      const normalized = text.toLowerCase();
+      if (!normalized) {
+        return false;
+      }
+      if (filterTokens.some((token) => normalized.includes(token))) {
+        return true;
+      }
+      const compact = normalized.replace(/[^a-z0-9]/g, '');
+      return normalizedTokens.some((token) => token && compact.includes(token));
+    };
+    return workPackageTemplateTaskItems.filter((task) => {
+      const taskText = (() => {
+        try {
+          return JSON.stringify(task);
+        } catch {
+          return '';
+        }
+      })();
+      return matchesToken(taskText);
+    });
+  }, [entity, formValues.aircraft_model, workPackageTemplateAircraftModelOptions, workPackageTemplateTaskItems]);
   const selectedAircraft = useMemo(
     () => (entity === 'aircraft' ? (selectedRow || rows[0] || null) : null),
     [entity, rows, selectedRow],
@@ -4044,7 +4089,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     try {
       let query = (scopedDb as any)
         .from('task_templates')
-        .select('id,task_id,tenant_id,franchise_id,code_form_no,ata_code,reference_amp,description,category_code,estimated_man_hours,is_mandatory,task_template_detail_json')
+        .select('id,task_id,tenant_id,franchise_id,code_form_no,ata_code,reference_amp,description,category_code,estimated_man_hours,is_mandatory,task_template_detail_json,task_template_scope_json')
         .eq('tenant_id', scope.tenantId);
       if (scope.franchiseId) {
         query = query.eq('franchise_id', scope.franchiseId);
@@ -4063,6 +4108,51 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       setWorkPackageTemplateTaskTemplatesLoading(false);
     }
   }, [entity, scope.franchiseId, scope.tenantId, scopedDb]);
+
+  const loadWorkPackageTemplateAircraftModelOptions = useCallback(async () => {
+    if (entity !== 'work_package_templates') {
+      return;
+    }
+    if (!scopedDb || !scope.tenantId) {
+      setWorkPackageTemplateAircraftModelOptions([]);
+      setWorkPackageTemplateAircraftModelOptionsError('');
+      return;
+    }
+    setWorkPackageTemplateAircraftModelOptionsLoading(true);
+    setWorkPackageTemplateAircraftModelOptionsError('');
+    try {
+      const { data, error } = await (scopedDb as any)
+        .from('assembly_models')
+        .select('id,name,model_code,is_active,tenant_id')
+        .eq('tenant_id', scope.tenantId)
+        .order('name', { ascending: true });
+      if (error) {
+        throw new Error(String(error.message || 'Failed to load aircraft models'));
+      }
+      const options = (Array.isArray(data) ? data : [])
+        .map((record) => {
+          const value = String(record.model_code || record.name || record.id || '').trim();
+          if (!value) {
+            return null;
+          }
+          const name = String(record.name || '').trim();
+          const code = String(record.model_code || '').trim();
+          const label = name && code && name !== code ? `${name} (${code})` : name || code || value;
+          const active = String(record.is_active ?? 'true').toLowerCase() !== 'false';
+          if (!active) {
+            return null;
+          }
+          return { value, label };
+        })
+        .filter((option): option is SelectOption => Boolean(option));
+      setWorkPackageTemplateAircraftModelOptions(options);
+    } catch (error) {
+      setWorkPackageTemplateAircraftModelOptions([]);
+      setWorkPackageTemplateAircraftModelOptionsError(String((error as Error).message || 'Failed to load aircraft models'));
+    } finally {
+      setWorkPackageTemplateAircraftModelOptionsLoading(false);
+    }
+  }, [entity, scope.tenantId, scopedDb]);
 
   useEffect(() => {
     void loadAircraftWorkPackageSnapshot();
@@ -4086,7 +4176,34 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       return;
     }
     void loadWorkPackageTemplateTaskTemplates();
-  }, [entity, loadWorkPackageTemplateTaskTemplates, modalOpen]);
+    void loadWorkPackageTemplateAircraftModelOptions();
+  }, [entity, loadWorkPackageTemplateAircraftModelOptions, loadWorkPackageTemplateTaskTemplates, modalOpen]);
+
+  const workPackageTemplateAircraftModelSelectOptions = useMemo<SelectOption[]>(() => {
+    const selectedModel = String(formValues.aircraft_model ?? '').trim();
+    if (!selectedModel) {
+      return workPackageTemplateAircraftModelOptions;
+    }
+    if (workPackageTemplateAircraftModelOptions.some((option) => option.value === selectedModel)) {
+      return workPackageTemplateAircraftModelOptions;
+    }
+    return [{ value: selectedModel, label: selectedModel }, ...workPackageTemplateAircraftModelOptions];
+  }, [formValues.aircraft_model, workPackageTemplateAircraftModelOptions]);
+
+  useEffect(() => {
+    if (entity !== 'work_package_templates' || !modalOpen) {
+      return;
+    }
+    const currentModel = String(formValues.aircraft_model ?? '').trim();
+    if (currentModel) {
+      return;
+    }
+    const firstOption = workPackageTemplateAircraftModelSelectOptions[0];
+    if (!firstOption?.value) {
+      return;
+    }
+    setFieldValue('aircraft_model', firstOption.value);
+  }, [entity, formValues.aircraft_model, modalOpen, setFieldValue, workPackageTemplateAircraftModelSelectOptions]);
 
   useEffect(() => {
     if (entity !== 'aircraft' || !aircraftWorkPackageDialogOpen) {
@@ -7196,6 +7313,33 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                           {formErrors.template_name ? <p className="mdm-template-danger">{formErrors.template_name}</p> : null}
                         </div>
                         <div className="space-y-1">
+                          <Label htmlFor="wpt-aircraft-model" className="text-[12px] font-medium text-slate-700">Aircraft Model</Label>
+                          <select
+                            id="wpt-aircraft-model"
+                            value={String(formValues.aircraft_model ?? '')}
+                            onChange={(event) => setFieldValue('aircraft_model', event.target.value)}
+                            className={cn(
+                              'h-8 w-full rounded-md border border-slate-300 bg-white px-2 text-[12px] text-slate-800',
+                              formErrors.aircraft_model && 'border-destructive',
+                            )}
+                            aria-invalid={Boolean(formErrors.aircraft_model)}
+                            disabled={workPackageTemplateAircraftModelOptionsLoading}
+                          >
+                            <option value="" hidden />
+                            {workPackageTemplateAircraftModelSelectOptions.map((option) => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                          {workPackageTemplateAircraftModelOptionsLoading ? <p className="text-[11px] text-slate-500">Loading aircraft models...</p> : null}
+                          {!workPackageTemplateAircraftModelOptionsLoading && !workPackageTemplateAircraftModelOptionsError && workPackageTemplateAircraftModelSelectOptions.length === 0 ? (
+                            <p className="text-[11px] text-slate-500">No aircraft models available</p>
+                          ) : null}
+                          {workPackageTemplateAircraftModelOptionsError ? <p className="mdm-template-danger">{workPackageTemplateAircraftModelOptionsError}</p> : null}
+                          {formErrors.aircraft_model ? <p className="mdm-template-danger">{formErrors.aircraft_model}</p> : null}
+                        </div>
+                        <div className="space-y-1">
                           <Label htmlFor="wpt-maintenance-type" className="text-[12px] font-medium text-slate-700">Maintenance Type</Label>
                           <Select value={String(formValues.maintenance_type ?? '')} onValueChange={(value) => setFieldValue('maintenance_type', value)}>
                             <SelectTrigger
@@ -7259,7 +7403,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                               </tr>
                             </thead>
                             <tbody>
-                              {workPackageTemplateTaskItems.length ? workPackageTemplateTaskItems.map((task, index) => (
+                              {selectedWorkPackageAircraftModelTaskItems.length ? selectedWorkPackageAircraftModelTaskItems.map((task, index) => (
                                 <tr key={`${String(task.id || task.task_id || index)}-${index}`} className="border-t border-slate-100 text-slate-700">
                                   <td className="px-2 py-1.5">{String(task.task_id || '-')}</td>
                                   <td className="px-2 py-1.5">{String(task.code_form_no || '-')}</td>
@@ -7273,7 +7417,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                                 </tr>
                               )) : (
                                 <tr>
-                                  <td className="px-2 py-2 text-slate-500" colSpan={9}>{workPackageTemplateTaskTemplatesLoading ? 'Loading task templates…' : 'No task rows available'}</td>
+                                  <td className="px-2 py-2 text-slate-500" colSpan={9}>{workPackageTemplateTaskTemplatesLoading ? 'Loading task templates…' : 'No task rows available for selected aircraft model'}</td>
                                 </tr>
                               )}
                             </tbody>
