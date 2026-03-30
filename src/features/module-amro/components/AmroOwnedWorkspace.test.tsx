@@ -104,7 +104,7 @@ beforeEach(() => {
         error: null,
       });
     }
-    if (table === 'maintenance_tasks') {
+    if (table === 'task_templates') {
       return buildQueryMock({
         data: [
           {
@@ -485,7 +485,7 @@ describe('AmroOwnedWorkspace', () => {
           error: null,
         });
       }
-      if (table === 'maintenance_tasks') {
+      if (table === 'task_templates') {
         return buildQueryMock({
           data: [
             {

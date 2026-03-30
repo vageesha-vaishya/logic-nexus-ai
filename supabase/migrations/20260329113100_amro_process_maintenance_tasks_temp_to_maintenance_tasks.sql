@@ -1,12 +1,12 @@
 BEGIN;
 
-ALTER TABLE public.maintenance_tasks
+ALTER TABLE public.task_templates
   ALTER COLUMN revision_status TYPE text,
   ALTER COLUMN revision_status DROP NOT NULL;
 
 DO $$
 DECLARE
-  task_row public.maintenance_tasks_temp%ROWTYPE;
+  task_row public.task_templates_temp%ROWTYPE;
   v_category_id uuid;
   v_category_code_clean text;
   v_threshold_hours numeric(10,2);
@@ -19,7 +19,7 @@ DECLARE
 BEGIN
   FOR task_row IN
     SELECT *
-    FROM public.maintenance_tasks_temp
+    FROM public.task_templates_temp
     WHERE insert_status <> 'SUCCESS'
     ORDER BY id
   LOOP
@@ -102,7 +102,7 @@ BEGIN
         OR v_threshold_calendar IS NOT NULL
       );
 
-      INSERT INTO public.maintenance_tasks (
+      INSERT INTO public.task_templates (
         tenant_id,
         franchise_id,
         code_form_no,
@@ -138,14 +138,14 @@ BEGIN
       )
       RETURNING id INTO v_inserted_task_id;
 
-      UPDATE public.maintenance_tasks_temp
+      UPDATE public.task_templates_temp
       SET insert_status = 'SUCCESS',
           error_message = NULL,
           inserted_task_id = v_inserted_task_id,
           processed_at = now()
       WHERE id = task_row.id;
     EXCEPTION WHEN OTHERS THEN
-      UPDATE public.maintenance_tasks_temp
+      UPDATE public.task_templates_temp
       SET insert_status = 'FAILED',
           error_message = SQLERRM,
           inserted_task_id = NULL,

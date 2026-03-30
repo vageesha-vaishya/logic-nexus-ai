@@ -1,10 +1,10 @@
 BEGIN;
 
-ALTER TABLE public.maintenance_tasks
+ALTER TABLE public.task_templates
   ALTER COLUMN reference_amp TYPE text,
   ALTER COLUMN reference_amp DROP NOT NULL;
 
-CREATE TABLE IF NOT EXISTS public.maintenance_tasks_temp (
+CREATE TABLE IF NOT EXISTS public.task_templates_temp (
   id bigserial PRIMARY KEY,
   source_row_number integer,
   tenant_id uuid,
@@ -27,6 +27,6 @@ CREATE TABLE IF NOT EXISTS public.maintenance_tasks_temp (
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_maintenance_tasks_temp_source_row_number
-  ON public.maintenance_tasks_temp(source_row_number);
+  ON public.task_templates_temp(source_row_number);
 
 COMMIT;

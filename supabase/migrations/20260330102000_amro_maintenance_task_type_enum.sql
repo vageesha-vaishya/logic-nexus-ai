@@ -20,9 +20,9 @@ BEGIN
     SELECT 1
     FROM information_schema.tables
     WHERE table_schema = 'public'
-      AND table_name = 'maintenance_tasks'
+      AND table_name = 'task_templates'
   ) THEN
-    ALTER TABLE public.maintenance_tasks
+    ALTER TABLE public.task_templates
       ADD COLUMN IF NOT EXISTS maintenance_task_type public.maintenance_task_type;
   END IF;
 END $$;
@@ -33,9 +33,9 @@ BEGIN
     SELECT 1
     FROM information_schema.tables
     WHERE table_schema = 'public'
-      AND table_name = 'maintenance_tasks_temp'
+      AND table_name = 'task_templates_temp'
   ) THEN
-    ALTER TABLE public.maintenance_tasks_temp
+    ALTER TABLE public.task_templates_temp
       ADD COLUMN IF NOT EXISTS maintenance_task_type public.maintenance_task_type,
       ADD COLUMN IF NOT EXISTS model text;
   END IF;

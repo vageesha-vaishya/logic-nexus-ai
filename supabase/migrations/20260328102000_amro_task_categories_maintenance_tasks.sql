@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS public.task_categories (
 CREATE INDEX IF NOT EXISTS idx_task_categories_tenant_id ON public.task_categories(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_task_categories_franchise_id ON public.task_categories(franchise_id);
 
-CREATE TABLE IF NOT EXISTS public.maintenance_tasks (
+CREATE TABLE IF NOT EXISTS public.task_templates (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   task_id integer GENERATED ALWAYS AS IDENTITY UNIQUE,
   tenant_id uuid NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
@@ -41,10 +41,10 @@ CREATE TABLE IF NOT EXISTS public.maintenance_tasks (
   CONSTRAINT uq_maintenance_tasks_tenant_ata_ref UNIQUE (tenant_id, ata_code, reference_amp)
 );
 
-CREATE INDEX IF NOT EXISTS idx_maintenance_tasks_tenant_id ON public.maintenance_tasks(tenant_id);
-CREATE INDEX IF NOT EXISTS idx_maintenance_tasks_franchise_id ON public.maintenance_tasks(franchise_id);
-CREATE INDEX IF NOT EXISTS idx_maintenance_tasks_category_code ON public.maintenance_tasks(category_code);
-CREATE INDEX IF NOT EXISTS idx_maintenance_tasks_ata_code ON public.maintenance_tasks(ata_code);
+CREATE INDEX IF NOT EXISTS idx_maintenance_tasks_tenant_id ON public.task_templates(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_maintenance_tasks_franchise_id ON public.task_templates(franchise_id);
+CREATE INDEX IF NOT EXISTS idx_maintenance_tasks_category_code ON public.task_templates(category_code);
+CREATE INDEX IF NOT EXISTS idx_maintenance_tasks_ata_code ON public.task_templates(ata_code);
 
 INSERT INTO public.task_categories (
   tenant_id,
@@ -72,7 +72,7 @@ SET
   is_active = EXCLUDED.is_active,
   updated_at = now();
 
-INSERT INTO public.maintenance_tasks (
+INSERT INTO public.task_templates (
   tenant_id,
   franchise_id,
   code_form_no,
@@ -107,7 +107,7 @@ SET
   is_mandatory = EXCLUDED.is_mandatory;
 
 ALTER TABLE public.task_categories ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.maintenance_tasks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.task_templates ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS amro_platform_admin_access ON public.task_categories;
 CREATE POLICY amro_platform_admin_access
@@ -139,17 +139,17 @@ CREATE POLICY amro_tenant_franchise_scope
     )
   );
 
-DROP POLICY IF EXISTS amro_platform_admin_access ON public.maintenance_tasks;
+DROP POLICY IF EXISTS amro_platform_admin_access ON public.task_templates;
 CREATE POLICY amro_platform_admin_access
-  ON public.maintenance_tasks
+  ON public.task_templates
   FOR ALL
   TO authenticated
   USING (public.is_platform_admin(auth.uid()))
   WITH CHECK (public.is_platform_admin(auth.uid()));
 
-DROP POLICY IF EXISTS amro_tenant_franchise_scope ON public.maintenance_tasks;
+DROP POLICY IF EXISTS amro_tenant_franchise_scope ON public.task_templates;
 CREATE POLICY amro_tenant_franchise_scope
-  ON public.maintenance_tasks
+  ON public.task_templates
   FOR ALL
   TO authenticated
   USING (

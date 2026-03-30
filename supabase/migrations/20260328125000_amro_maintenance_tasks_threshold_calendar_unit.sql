@@ -13,7 +13,7 @@ BEGIN
   END IF;
 END $$;
 
-ALTER TABLE public.maintenance_tasks
+ALTER TABLE public.task_templates
   ADD COLUMN IF NOT EXISTS calendar_unit public.calendar_unit,
   ADD COLUMN IF NOT EXISTS repeat_interval boolean NOT NULL DEFAULT false;
 
@@ -23,10 +23,10 @@ BEGIN
     SELECT 1
     FROM information_schema.columns
     WHERE table_schema = 'public'
-      AND table_name = 'maintenance_tasks'
+      AND table_name = 'task_templates'
       AND column_name = 'interval_hours'
   ) THEN
-    ALTER TABLE public.maintenance_tasks RENAME COLUMN interval_hours TO threshold_hours;
+    ALTER TABLE public.task_templates RENAME COLUMN interval_hours TO threshold_hours;
   END IF;
 END $$;
 
@@ -36,10 +36,10 @@ BEGIN
     SELECT 1
     FROM information_schema.columns
     WHERE table_schema = 'public'
-      AND table_name = 'maintenance_tasks'
+      AND table_name = 'task_templates'
       AND column_name = 'interval_cycles'
   ) THEN
-    ALTER TABLE public.maintenance_tasks RENAME COLUMN interval_cycles TO threshold_cycles;
+    ALTER TABLE public.task_templates RENAME COLUMN interval_cycles TO threshold_cycles;
   END IF;
 END $$;
 
@@ -49,10 +49,10 @@ BEGIN
     SELECT 1
     FROM information_schema.columns
     WHERE table_schema = 'public'
-      AND table_name = 'maintenance_tasks'
+      AND table_name = 'task_templates'
       AND column_name = 'interval_months'
   ) THEN
-    ALTER TABLE public.maintenance_tasks RENAME COLUMN interval_months TO threshold_calendar;
+    ALTER TABLE public.task_templates RENAME COLUMN interval_months TO threshold_calendar;
   END IF;
 END $$;
 
@@ -62,11 +62,11 @@ BEGIN
     SELECT 1
     FROM information_schema.columns
     WHERE table_schema = 'public'
-      AND table_name = 'maintenance_tasks'
+      AND table_name = 'task_templates'
       AND column_name = 'threshold_hours'
       AND data_type <> 'numeric'
   ) THEN
-    ALTER TABLE public.maintenance_tasks
+    ALTER TABLE public.task_templates
       ALTER COLUMN threshold_hours TYPE numeric(10,2)
       USING threshold_hours::numeric;
   END IF;

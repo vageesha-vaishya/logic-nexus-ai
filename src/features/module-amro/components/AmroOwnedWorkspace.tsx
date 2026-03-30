@@ -689,7 +689,7 @@ export function AmroOwnedWorkspace({
       }
       setTaskSelectionLoading(true);
       const { data, error } = await scopedDb
-        .from('maintenance_tasks')
+        .from('task_templates')
         .select('id, code_form_no, description, interval_hours, interval_cycles, interval_months, estimated_man_hours, category_code, revision_status')
         .order('code_form_no', { ascending: true })
         .limit(1000);

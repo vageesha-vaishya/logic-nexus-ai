@@ -1,6 +1,6 @@
 BEGIN;
 
-CREATE TABLE IF NOT EXISTS public.maintenance_tasks_temp (
+CREATE TABLE IF NOT EXISTS public.task_templates_temp (
   id bigserial PRIMARY KEY,
   source_row_number integer,
   tenant_id uuid,
@@ -449,7 +449,7 @@ VALUES
 
 DO $$
 DECLARE
-  task_row public.maintenance_tasks_temp%ROWTYPE;
+  task_row public.task_templates_temp%ROWTYPE;
   v_category_code_cinterval_hours_raw, '') <> '' THEN
         v_threshold_hours := NULLIF(regexp_replace(split_part(task_row.interval_hours_raw, ':', 1), '[^0-9.]', '', 'g'), '')::numeric;
       END IF;
@@ -484,7 +484,7 @@ DECLARE
 
       v_repeat_interval := (v_threshold_hours IS NOT NULL OR v_threshold_cycles IS NOT NULL OR v_threshold_calendar IS NOT NULL);
 
-      INSERT INTO public.maintenance_tasks (
+      INSERT INTO public.task_templates (
         tenant_id,
         franchise_id,
         code_form_no,
@@ -520,11 +520,11 @@ DECLARE
       )
       RETURNING id INTO v_inserted_task_id;
 
-      UPDATE public.maintenance_tasks_temp
+      UPDATE public.task_templates_temp
       SET insert_status = 'SUCCESS', error_message = NULL, inserted_task_id = v_inserted_task_id, processed_at = now()
       WHERE id = task_row.id;
     EXCEPTION WHEN OTHERS THEN
-      UPDATE public.maintenance_tasks_temp
+      UPDATE public.task_templates_temp
       SET insert_status = 'FAILED', error_message = SQLERRM, inserted_task_id = NULL, processed_at = now()
       WHERE id = task_row.id;
     END;
