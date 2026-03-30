@@ -7152,7 +7152,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                       <span>CRUD active</span>
                     </div>
                   </div>
-                  <div className="grid gap-3 lg:grid-cols-[1fr_1fr]">
+                  <div className="grid gap-3">
                     <section className="overflow-hidden rounded bg-white">
                       <div className="border-b border-slate-200 px-3 py-2 text-[12px] font-semibold text-slate-700">Work Package Details</div>
                       <div className="grid gap-2 p-3 lg:grid-cols-2">
