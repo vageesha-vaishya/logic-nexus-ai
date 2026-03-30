@@ -1884,6 +1884,76 @@ export function useAmroWorkspaceState() {
     ],
   );
 
+  const cloneWorkPackageFromTemplate = useCallback(async (workPackageId?: string) => {
+    const targetWorkPackage = workPackageId
+      ? workPackages.find((item) => item.id === workPackageId) ?? null
+      : selectedWorkPackage;
+    if (!targetWorkPackage) return false;
+    const cloneTitle = `${targetWorkPackage.packageNumber} Clone`;
+    if (!authHeaders) {
+      return createLocalWorkPackage(cloneTitle);
+    }
+    if (isApiTemporarilyUnavailable()) {
+      setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+      return false;
+    }
+    try {
+      const now = Date.now();
+      const defaultAircraftId = String(import.meta.env.VITE_AMRO_DEFAULT_AIRCRAFT_ID || '').trim();
+      const fallbackAircraftId = String(assets[0]?.id || '').trim();
+      const aircraftId = String(targetWorkPackage.assetId || defaultAircraftId || fallbackAircraftId || 'amro-fallback-aircraft').trim();
+      const normalizedTemplateToken = targetWorkPackage.packageNumber
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+      const templateId = `tmpl-${normalizedTemplateToken || targetWorkPackage.id}`;
+      const response = await fetch(`${apiBaseUrl}/api/v2/amro/work-packages?interface=clone-template`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({
+          template_id: templateId,
+          aircraft_id: aircraftId,
+          registry_version: 'latest',
+          override_fields: {
+            source_work_package_id: targetWorkPackage.id,
+            source_package_number: targetWorkPackage.packageNumber,
+            clone_reason: 'ui-clone-action',
+            requested_at: new Date(now).toISOString(),
+          },
+        }),
+      });
+      const payload = await parseJsonSafe<{ error?: string }>(response);
+      if (!response.ok) {
+        throw new Error(payload?.error || `Failed to clone work package (${response.status})`);
+      }
+      await fetchWorkPackages();
+      return true;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to clone work package';
+      if (isNetworkConnectivityError(error)) {
+        markApiTemporarilyUnavailable();
+      }
+      if (shouldUseLocalWorkPackageFallback(message)) {
+        setWorkPackagesError('Running in local fallback mode for work package clone.');
+        return createLocalWorkPackage(cloneTitle);
+      }
+      setWorkPackagesError(message);
+      return false;
+    }
+  }, [
+    apiBaseUrl,
+    assets,
+    authHeaders,
+    createLocalWorkPackage,
+    fetchWorkPackages,
+    isApiTemporarilyUnavailable,
+    markApiTemporarilyUnavailable,
+    selectedWorkPackage,
+    shouldUseLocalWorkPackageFallback,
+    workPackages,
+  ]);
+
   const assignSelectedWorkPackageToNextSlot = useCallback(async (workPackageId?: string) => {
     const resolvedFallbackWorkPackageId = workPackages[0]?.id || `local-wp-${Date.now()}`;
     const targetWorkPackageId = workPackageId || selectedWorkPackageId || resolvedFallbackWorkPackageId;
@@ -2211,6 +2281,52 @@ export function useAmroWorkspaceState() {
     isApiTemporarilyUnavailable,
     markApiTemporarilyUnavailable,
     predictiveRecommendations,
+    selectedWorkPackageId,
+  ]);
+
+  const syncSupplierEtaForSelectedWorkPackage = useCallback(async () => {
+    if (!authHeaders || !selectedWorkPackageId) return false;
+    if (isApiTemporarilyUnavailable()) {
+      setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+      return false;
+    }
+    try {
+      const targetMaterial = materials.find((item) => item.reservationStatus === 'shortage') || materials[0];
+      if (!targetMaterial) return false;
+      const response = await fetch(`${apiBaseUrl}/api/v2/amro/work-packages?interface=sync-supplier-eta`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({
+          supplier_event_id: `supplier-eta-${Date.now()}`,
+          part_number: targetMaterial.partNumber,
+          eta: new Date(Date.now() + 86400000).toISOString(),
+          quantity_confirmed: targetMaterial.reservationStatus === 'shortage' ? 0 : 1,
+          supplier_source: 'vendor_portal',
+          impacted_work_packages: [selectedWorkPackageId],
+        }),
+      });
+      const payload = await parseJsonSafe<{ error?: string }>(response);
+      if (!response.ok) {
+        throw new Error(payload?.error || `Failed to sync supplier ETA (${response.status})`);
+      }
+      await fetchModuleSurfaces();
+      return true;
+    } catch (error) {
+      if (isNetworkConnectivityError(error)) {
+        markApiTemporarilyUnavailable();
+        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        return false;
+      }
+      setWorkPackagesError(error instanceof Error ? error.message : 'Failed to sync supplier ETA');
+      return false;
+    }
+  }, [
+    apiBaseUrl,
+    authHeaders,
+    fetchModuleSurfaces,
+    isApiTemporarilyUnavailable,
+    markApiTemporarilyUnavailable,
+    materials,
     selectedWorkPackageId,
   ]);
 
@@ -2572,6 +2688,7 @@ export function useAmroWorkspaceState() {
     savedWorkPackageViews,
     saveCurrentWorkPackageView,
     createWorkPackage,
+    cloneWorkPackageFromTemplate,
     assignSelectedWorkPackageToNextSlot,
     updateTaskExecutionStatus,
     uploadTaskEvidence,
@@ -2582,6 +2699,7 @@ export function useAmroWorkspaceState() {
     processCriticalShortageResponse,
     applyRotableLlpTraceability,
     runInventoryOptimizationModel,
+    syncSupplierEtaForSelectedWorkPackage,
     syncSupplierAsnAndErpProcurement,
     deleteSelectedWorkPackage,
     loadComplianceGateExplainability,

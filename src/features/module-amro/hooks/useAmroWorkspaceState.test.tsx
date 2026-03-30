@@ -514,4 +514,99 @@ describe('useAmroWorkspaceState realtime schedule connectivity', () => {
     expect(result.current.competencyAnalytics?.totalQualifiedStaff).toBe(1);
     expect(result.current.authorityCertificationTemplate?.templateId).toBe('tmpl-faa-cert-release-v1');
   });
+
+  it('wires clone-template and sync-supplier-eta work package interfaces', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+
+      if (url.includes('/api/v2/amro/work-packages?interface=clone-template')) {
+        return jsonResponse({
+          output: {
+            new_work_package_id: 'wp-clone-1',
+            inherited_tasks_count: 2,
+            version: '1',
+          },
+        });
+      }
+      if (url.includes('/api/v2/amro/work-packages?interface=sync-supplier-eta')) {
+        return jsonResponse({
+          output: {
+            updated_eta: '2026-03-23T00:00:00.000Z',
+            impacted_work_packages: ['wp-1'],
+          },
+        });
+      }
+      if (url.includes('/api/v1/work-packages/') && url.includes('/materials')) {
+        return jsonResponse({
+          data: [
+            {
+              id: 'mat-1',
+              part_number: 'PN-001',
+              status: 'pending',
+              action: 'install',
+            },
+          ],
+        });
+      }
+      if (url.includes('/api/v1/work-packages/') && url.includes('/tasks')) {
+        return jsonResponse({
+          data: [{ id: 'task-1', work_package_id: 'wp-1', title: 'Inspect', status: 'in_progress' }],
+        });
+      }
+      if (url.includes('/api/v1/work-packages')) {
+        return jsonResponse({
+          data: [{ id: 'wp-1', aircraft_id: 'ac-1', work_order_number: 'WP-1', status: 'planning', title: 'WP' }],
+        });
+      }
+      if (url.includes('/api/v2/amro/schedules')) {
+        return jsonResponse({ output: { schedules: [] } });
+      }
+      if (url.includes('/api/v1/assets')) {
+        return jsonResponse({
+          data: [
+            {
+              id: 'ac-1',
+              tenant_id: 'tenant-1',
+              franchise_id: 'fr-1',
+              registration: 'A320',
+              aircraft_type: 'A320',
+              serial_number: 'SN-1',
+              status: 'active',
+            },
+          ],
+        });
+      }
+      if (url.includes('/api/v1/qualifications')) {
+        return jsonResponse({
+          data: [{ id: 'qual-1', qualification_name: 'Inspector', rating: 'qa', can_certify_release: true }],
+        });
+      }
+      if (url.includes('/api/v1/compliance/summary')) {
+        return jsonResponse({ data: { authorityCoverage: ['FAA'], activeRulePacks: 1 } });
+      }
+      if (url.includes('/api/v1/evidence')) {
+        return jsonResponse({ data: [] });
+      }
+      if (url.includes('/api/v1/forecast/recommendations')) {
+        return jsonResponse({ data: [] });
+      }
+      return jsonResponse({ data: [] });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { result } = renderHook(() => useAmroWorkspaceState());
+    await waitFor(() => expect(result.current.selectedWorkPackageId).toBe('wp-1'));
+
+    await act(async () => {
+      await result.current.cloneWorkPackageFromTemplate('wp-1');
+      await result.current.syncSupplierEtaForSelectedWorkPackage();
+    });
+
+    expect(fetchMock.mock.calls.some((call) =>
+      String(call[0]).includes('/api/v2/amro/work-packages?interface=clone-template'),
+    )).toBe(true);
+    expect(fetchMock.mock.calls.some((call) =>
+      String(call[0]).includes('/api/v2/amro/work-packages?interface=sync-supplier-eta'),
+    )).toBe(true);
+  });
 });

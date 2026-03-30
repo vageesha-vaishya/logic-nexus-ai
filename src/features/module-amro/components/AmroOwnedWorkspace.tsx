@@ -405,6 +405,13 @@ export function AmroOwnedWorkspace({
                   disabledReason: state.selectedWorkPackageId ? 'Ready.' : 'Select a work package first.',
                 },
                 {
+                  id: 'parts-sync-eta',
+                  label: 'Sync Supplier ETA',
+                  onClick: () => void state.syncSupplierEtaForSelectedWorkPackage(),
+                  disabled: !state.selectedWorkPackageId,
+                  disabledReason: state.selectedWorkPackageId ? 'Ready.' : 'Select a work package first.',
+                },
+                {
                   id: 'parts-sync-procurement',
                   label: 'Sync ASN + ERP',
                   onClick: () => void state.syncSupplierAsnAndErpProcurement(),
@@ -892,10 +899,10 @@ export function AmroOwnedWorkspace({
     }
   };
 
-  const handleCloneWorkPackage = async (packageNumber: string) => {
-    setBusyWorkPackageActionId(`clone-${packageNumber}`);
+  const handleCloneWorkPackage = async (workPackageId: string, packageNumber: string) => {
+    setBusyWorkPackageActionId(`clone-${workPackageId}`);
     try {
-      const ok = await state.createWorkPackage(`${packageNumber} Clone`);
+      const ok = await state.cloneWorkPackageFromTemplate(workPackageId);
       setLastInteractionMessage(ok ? `Cloned from ${packageNumber}.` : `Clone failed for ${packageNumber}.`);
       if (ok) {
         toast.success(`Cloned ${packageNumber}.`);
@@ -1853,7 +1860,7 @@ export function AmroOwnedWorkspace({
                         variant="outline"
                         size="sm"
                         aria-label={`Clone work package ${workPackage.packageNumber}`}
-                        onClick={() => void handleCloneWorkPackage(workPackage.packageNumber)}
+                        onClick={() => void handleCloneWorkPackage(workPackage.id, workPackage.packageNumber)}
                         disabled={busyWorkPackageActionId !== null}
                       >
                         Clone
@@ -1930,6 +1937,9 @@ export function AmroOwnedWorkspace({
               </Button>
               <Button variant="outline" size="sm" disabled={!canEditPartsAllocation} onClick={() => void state.reservePartsAllocationForSelectedWorkPackage()}>
                 Material Reserve
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => void state.syncSupplierEtaForSelectedWorkPackage()} disabled={!state.selectedWorkPackageId}>
+                Supplier ETA
               </Button>
               <Button variant="outline" size="sm" onClick={() => void handleOpenComplianceGate()}>
                 Compliance Precheck
