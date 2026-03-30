@@ -4,9 +4,47 @@ import { AmroOwnedWorkspace } from './AmroOwnedWorkspace';
 
 const mockUseAmroWorkspaceState = vi.fn();
 const mockScopedDbFrom = vi.fn();
+const mockToastSuccess = vi.fn();
+const mockToastError = vi.fn();
+const mockWorkbook = {};
+const mockWorksheet = {};
+const mockPdfSave = vi.fn();
+const mockXlsxWriteFile = vi.fn();
+const mockAutoTable = vi.fn();
+const mockOpenWorkPackageDetails = vi.fn().mockResolvedValue(true);
+const mockUpdateWorkPackageScheduling = vi.fn().mockResolvedValue(true);
+const mockToggleWorkPackageHold = vi.fn().mockResolvedValue(true);
+const mockSoftDeleteWorkPackage = vi.fn().mockResolvedValue(true);
+const mockRestoreSoftDeletedWorkPackage = vi.fn().mockResolvedValue(true);
 
 vi.mock('../hooks/useAmroWorkspaceState', () => ({
   useAmroWorkspaceState: () => mockUseAmroWorkspaceState(),
+}));
+
+vi.mock('sonner', () => ({
+  toast: {
+    success: (...args: unknown[]) => mockToastSuccess(...args),
+    error: (...args: unknown[]) => mockToastError(...args),
+  },
+}));
+
+vi.mock('xlsx', () => ({
+  utils: {
+    book_new: vi.fn(() => mockWorkbook),
+    json_to_sheet: vi.fn(() => mockWorksheet),
+    book_append_sheet: vi.fn(),
+  },
+  writeFile: (...args: unknown[]) => mockXlsxWriteFile(...args),
+}));
+
+vi.mock('jspdf', () => ({
+  jsPDF: vi.fn(() => ({
+    save: (...args: unknown[]) => mockPdfSave(...args),
+  })),
+}));
+
+vi.mock('jspdf-autotable', () => ({
+  default: (...args: unknown[]) => mockAutoTable(...args),
 }));
 
 vi.mock('@/hooks/useCRM', () => ({
@@ -27,6 +65,21 @@ const buildQueryMock = (payload: unknown) => ({
 beforeEach(() => {
   mockUseAmroWorkspaceState.mockReset();
   mockScopedDbFrom.mockReset();
+  mockToastSuccess.mockReset();
+  mockToastError.mockReset();
+  mockPdfSave.mockReset();
+  mockXlsxWriteFile.mockReset();
+  mockAutoTable.mockReset();
+  mockOpenWorkPackageDetails.mockReset();
+  mockOpenWorkPackageDetails.mockResolvedValue(true);
+  mockUpdateWorkPackageScheduling.mockReset();
+  mockUpdateWorkPackageScheduling.mockResolvedValue(true);
+  mockToggleWorkPackageHold.mockReset();
+  mockToggleWorkPackageHold.mockResolvedValue(true);
+  mockSoftDeleteWorkPackage.mockReset();
+  mockSoftDeleteWorkPackage.mockResolvedValue(true);
+  mockRestoreSoftDeletedWorkPackage.mockReset();
+  mockRestoreSoftDeletedWorkPackage.mockResolvedValue(true);
   mockScopedDbFrom.mockImplementation((table: string) => {
     if (table === 'aircraft') {
       return buildQueryMock({
@@ -148,6 +201,12 @@ function createWorkspaceState(overrides: Record<string, unknown> = {}) {
     refreshWorkPackages: vi.fn(),
     createWorkPackage: vi.fn().mockResolvedValue(true),
     deleteSelectedWorkPackage: vi.fn().mockResolvedValue(true),
+    openWorkPackageDetails: mockOpenWorkPackageDetails,
+    updateWorkPackageScheduling: mockUpdateWorkPackageScheduling,
+    toggleWorkPackageHold: mockToggleWorkPackageHold,
+    softDeleteWorkPackage: mockSoftDeleteWorkPackage,
+    restoreSoftDeletedWorkPackage: mockRestoreSoftDeletedWorkPackage,
+    holdAuditTrail: [],
     advanceWorkPackageLifecycle: vi.fn(),
     workPackageStatusFilter: 'all',
     setWorkPackageStatusFilter: vi.fn(),
@@ -487,15 +546,17 @@ describe('AmroOwnedWorkspace', () => {
     expect(loadAuditReplayTimeline).toHaveBeenCalledTimes(2);
   });
 
-  it('wires shell and sticky action buttons to interactive handlers', () => {
+  it('wires shell and sticky action buttons to interactive handlers', async () => {
     const setSelectedWorkPackageId = vi.fn();
-    const assignSelectedWorkPackageToNextSlot = vi.fn().mockResolvedValue(true);
+    const updateWorkPackageScheduling = vi.fn().mockResolvedValue(true);
     const advanceWorkPackageLifecycle = vi.fn().mockResolvedValue(true);
+    const toggleWorkPackageHold = vi.fn().mockResolvedValue(true);
     mockUseAmroWorkspaceState.mockReturnValue(
       createWorkspaceState({
         setSelectedWorkPackageId,
-        assignSelectedWorkPackageToNextSlot,
+        updateWorkPackageScheduling,
         advanceWorkPackageLifecycle,
+        toggleWorkPackageHold,
       }),
     );
     render(<AmroOwnedWorkspace />);
@@ -505,9 +566,108 @@ describe('AmroOwnedWorkspace', () => {
     fireEvent.click(screen.getAllByRole('button', { name: 'Update work package status' })[0]);
     fireEvent.click(screen.getByRole('button', { name: 'Bulk Actions' }));
 
-    expect(assignSelectedWorkPackageToNextSlot).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(updateWorkPackageScheduling).toHaveBeenCalledTimes(1);
+      expect(toggleWorkPackageHold).toHaveBeenCalledTimes(1);
+    });
     expect(setSelectedWorkPackageId).toHaveBeenCalledWith('wp-1');
-    expect(advanceWorkPackageLifecycle).toHaveBeenCalledTimes(2);
+    expect(advanceWorkPackageLifecycle).toHaveBeenCalledTimes(1);
+  });
+
+  it('handles Open, Schedule, Hold, Clone, Export, Delete actions with feedback and recovery', async () => {
+    const cloneWorkPackageFromTemplate = vi.fn().mockResolvedValue(true);
+    const updateWorkPackageScheduling = vi.fn().mockResolvedValue(true);
+    const toggleWorkPackageHold = vi.fn().mockResolvedValue(true);
+    const openWorkPackageDetails = vi.fn().mockResolvedValue(true);
+    const softDeleteWorkPackage = vi.fn().mockResolvedValue(true);
+    const restoreSoftDeletedWorkPackage = vi.fn().mockResolvedValue(true);
+    const originalConfirm = window.confirm;
+    window.confirm = vi.fn().mockReturnValue(true);
+    mockUseAmroWorkspaceState.mockReturnValue(
+      createWorkspaceState({
+        cloneWorkPackageFromTemplate,
+        updateWorkPackageScheduling,
+        toggleWorkPackageHold,
+        openWorkPackageDetails,
+        softDeleteWorkPackage,
+        restoreSoftDeletedWorkPackage,
+      }),
+    );
+    render(<AmroOwnedWorkspace moduleKey="work-packages" />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open work package WP-1' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Schedule work package WP-1' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Hold work package WP-1' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Clone work package WP-1' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Export work package WP-1' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete work package WP-1' }));
+
+    await waitFor(() => {
+      expect(openWorkPackageDetails).toHaveBeenCalledWith('wp-1');
+      expect(updateWorkPackageScheduling).toHaveBeenCalledWith('wp-1');
+      expect(toggleWorkPackageHold).toHaveBeenCalledWith('wp-1');
+      expect(cloneWorkPackageFromTemplate).toHaveBeenCalledWith('wp-1');
+      expect(softDeleteWorkPackage).toHaveBeenCalledWith('wp-1');
+    });
+
+    expect(mockXlsxWriteFile).toHaveBeenCalledWith(mockWorkbook, 'WP-1-export.xlsx');
+    expect(mockAutoTable).toHaveBeenCalledTimes(1);
+    expect(mockPdfSave).toHaveBeenCalledWith('WP-1-export.pdf');
+    expect(mockToastSuccess).toHaveBeenCalled();
+
+    const deleteToastCall = mockToastSuccess.mock.calls.find((call) => String(call[0]).includes('Deleted WP-1'));
+    expect(deleteToastCall).toBeTruthy();
+    const toastOptions = deleteToastCall?.[1] as { action?: { onClick?: () => void } } | undefined;
+    toastOptions?.action?.onClick?.();
+    await waitFor(() => {
+      expect(restoreSoftDeletedWorkPackage).toHaveBeenCalledWith('wp-1');
+    });
+    window.confirm = originalConfirm;
+  });
+
+  it('persists drag reorder in local storage', async () => {
+    const originalSetItem = window.localStorage.setItem;
+    const localStorageSetItem = vi.fn();
+    Object.defineProperty(window.localStorage, 'setItem', {
+      configurable: true,
+      value: localStorageSetItem,
+    });
+    mockUseAmroWorkspaceState.mockReturnValue(createWorkspaceState({
+      workPackages: [
+        {
+          id: 'wp-1',
+          packageNumber: 'WP-1',
+          lifecycleStage: 'plan',
+          assetId: 'asset-1',
+          tasks: [],
+        },
+        {
+          id: 'wp-2',
+          packageNumber: 'WP-2',
+          lifecycleStage: 'plan',
+          assetId: 'asset-1',
+          tasks: [],
+        },
+      ],
+    }));
+    render(<AmroOwnedWorkspace moduleKey="work-packages" />);
+
+    const sourceRow = screen.getByRole('button', { name: 'Drag handle for WP-1' }).closest('[draggable="true"]');
+    const targetRow = screen.getByRole('button', { name: 'Drag handle for WP-2' }).closest('[draggable="true"]');
+    expect(sourceRow).toBeTruthy();
+    expect(targetRow).toBeTruthy();
+    if (!sourceRow || !targetRow) return;
+    fireEvent.dragStart(sourceRow);
+    fireEvent.drop(targetRow);
+
+    await waitFor(() => {
+      expect(localStorageSetItem).toHaveBeenCalledWith('amro.workspace.work-package-order', expect.any(String));
+    });
+
+    Object.defineProperty(window.localStorage, 'setItem', {
+      configurable: true,
+      value: originalSetItem,
+    });
   });
 
   it('opens compliance gate modal after loading explainability', async () => {

@@ -888,6 +888,16 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     await waitFor(() => {
       expect(mockToastSuccess).toHaveBeenCalledWith('Aircraft work package created');
     }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
+
+    const createWorkPackageCall = vi
+      .mocked(fetch)
+      .mock.calls.find(([input, init]) =>
+        String(input).includes('/api/v2/amro/work-packages?interface=create-work-package')
+        && String(init?.method || 'GET').toUpperCase() === 'POST');
+    expect(createWorkPackageCall).toBeDefined();
+    const createPayload = JSON.parse(String(createWorkPackageCall?.[1]?.body || '{}')) as Record<string, unknown>;
+    expect(createPayload.trigger_source).toBe('schedule_due');
+    expect(createPayload.trigger_reference_id).toBe('ac-1');
   });
 
   it('renders aircraft-only operations overview in aircraft operations snapshot without engine/components module leakage', async () => {

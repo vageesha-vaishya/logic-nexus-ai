@@ -4005,6 +4005,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
           description: aircraftWorkPackageValues.selectedTaskDescription.trim() || scopeItems[0] || '',
         },
         source: aircraftWorkPackageValues.source,
+        trigger_source: aircraftWorkPackageValues.source,
         maintenance_type: aircraftWorkPackageValues.maintenanceType,
         station: aircraftWorkPackageValues.station.trim(),
         priority: aircraftWorkPackageValues.priority,
@@ -4015,6 +4016,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         template_id: selectedWorkPackageTemplate?.id || undefined,
         template_code: selectedWorkPackageTemplate?.templateCode || undefined,
         reference_id: String(selectedAircraft.id),
+        trigger_reference_id: String(selectedAircraft.id),
         triggered_at: new Date().toISOString(),
       };
 
@@ -5721,7 +5723,14 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
           </CardHeader>
           <CardContent className="mdm-template-panel-body space-y-3">
             <div className="overflow-auto rounded-md border max-h-[560px]">
-                <Table>
+                <Table className="table-fixed">
+                  <colgroup>
+                    <col className="w-[52px]" />
+                    {entity === 'aircraft' ? <col className="w-[180px]" /> : null}
+                    {(entity === 'aircraft' ? aircraftHeaderColumns : tableColumns).map((column) => (
+                      <col key={`col-${column}`} className="w-[180px]" />
+                    ))}
+                  </colgroup>
                   <TableHeader>
                     <TableRow className="bg-[#F8FAFC]">
                       <TableHead className="sticky top-0 z-20 w-[52px] bg-[#F8FAFC] px-3 py-2">
@@ -5732,7 +5741,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                         />
                       </TableHead>
                       {entity === 'aircraft' ? (
-                        <TableHead className="sticky top-0 z-20 h-auto min-w-[180px] bg-[#F8FAFC] px-3 py-2 text-left text-[13px] font-semibold text-[#64748B]">
+                        <TableHead className="sticky top-0 z-20 h-auto w-[180px] bg-[#F8FAFC] px-3 py-2 text-left text-[13px] font-semibold text-[#64748B]">
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <span className="inline-flex items-center">
@@ -5744,7 +5753,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                         </TableHead>
                       ) : null}
                       {(entity === 'aircraft' ? aircraftHeaderColumns : tableColumns).map((column) => (
-                        <TableHead key={column} className="sticky top-0 z-20 h-auto min-w-[180px] bg-[#F8FAFC] px-3 py-2 text-left text-[13px] font-semibold text-[#64748B]">
+                        <TableHead key={column} className="sticky top-0 z-20 h-auto w-[180px] bg-[#F8FAFC] px-3 py-2 text-left text-[13px] font-semibold text-[#64748B]">
                           <button type="button" className="flex w-full items-center justify-between gap-2 text-left transition-colors hover:text-[hsl(var(--mdm-template-focus))]" onClick={() => toggleSort(column)}>
                             <Tooltip>
                               <TooltipTrigger asChild>
@@ -5869,7 +5878,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                           </TableCell>
                         ) : null}
                         {(entity === 'aircraft' ? aircraftHeaderColumns : tableColumns).map((column) => (
-                          <TableCell key={column} className="max-w-[260px] px-3 py-2 text-left align-middle text-[13px] text-[#1F2937]">
+                          <TableCell key={column} className="w-[180px] px-3 py-2 text-left align-middle text-[13px] text-[#1F2937]">
                             <ContextMenu>
                               <ContextMenuTrigger asChild>
                                 <div className="group w-full" onDoubleClick={(event) => {

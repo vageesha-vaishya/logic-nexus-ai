@@ -10,7 +10,17 @@ import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { EditableText } from '@/components/ui/editable-text';
-import { ArrowDown, ArrowUp, Download, Upload } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { ArrowDown, ArrowUp, Download, Upload, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { parseFileRows, exportCsv, exportExcel } from '@/lib/import-export';
 import { themeStyleFromPreset } from '@/lib/theme-utils';
@@ -99,6 +109,92 @@ const AIRCRAFT_LEAD_IMPORT_FIELDS = [
   'tags',
 ] as const;
 
+type LeadListColumnKey =
+  | 'title'
+  | 'aircraft'
+  | 'aircraft_type'
+  | 'status'
+  | 'priority'
+  | 'maintenance_due_at'
+  | 'compliance_state'
+  | 'assigned_to';
+
+type LeadListColumnDefinition = {
+  key: LeadListColumnKey;
+  label: string;
+  sortKey: string;
+  defaultWidth: number;
+  value: (row: AircraftLeadRecord) => string;
+  render: (row: AircraftLeadRecord) => string;
+};
+
+const LEAD_LIST_COLUMNS: LeadListColumnDefinition[] = [
+  {
+    key: 'title',
+    label: 'Title',
+    sortKey: 'title',
+    defaultWidth: 280,
+    value: (row) => String(row.title || ''),
+    render: (row) => String(row.title || '-'),
+  },
+  {
+    key: 'aircraft',
+    label: 'Aircraft',
+    sortKey: 'aircraft_registration',
+    defaultWidth: 170,
+    value: (row) => String(row.aircraft_registration || row.aircraft_id || ''),
+    render: (row) => String(row.aircraft_registration || row.aircraft_id || '-'),
+  },
+  {
+    key: 'aircraft_type',
+    label: 'Type',
+    sortKey: 'aircraft_type',
+    defaultWidth: 140,
+    value: (row) => String(row.aircraft_type || ''),
+    render: (row) => String(row.aircraft_type || '-'),
+  },
+  {
+    key: 'status',
+    label: 'Status',
+    sortKey: 'status',
+    defaultWidth: 140,
+    value: (row) => String(row.status || ''),
+    render: (row) => String(row.status || '-'),
+  },
+  {
+    key: 'priority',
+    label: 'Priority',
+    sortKey: 'priority',
+    defaultWidth: 140,
+    value: (row) => String(row.priority || ''),
+    render: (row) => String(row.priority || '-'),
+  },
+  {
+    key: 'maintenance_due_at',
+    label: 'Due',
+    sortKey: 'maintenance_due_at',
+    defaultWidth: 150,
+    value: (row) => String(row.maintenance_due_at || '').slice(0, 10),
+    render: (row) => (row.maintenance_due_at ? String(row.maintenance_due_at).slice(0, 10) : '-'),
+  },
+  {
+    key: 'compliance_state',
+    label: 'Compliance',
+    sortKey: 'compliance_state',
+    defaultWidth: 160,
+    value: (row) => String(row.compliance_state || ''),
+    render: (row) => String(row.compliance_state || '-'),
+  },
+  {
+    key: 'assigned_to',
+    label: 'Assignee',
+    sortKey: 'assigned_to',
+    defaultWidth: 160,
+    value: (row) => String(row.assigned_to || ''),
+    render: (row) => String(row.assigned_to || '-'),
+  },
+];
+
 function normalizeLeadRecord(value: unknown): AircraftLeadRecord {
   const row = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
   return {
@@ -158,9 +254,22 @@ export function AircraftLeadsManager({
   const [savedFilters, setSavedFilters] = useState<SavedFilter[]>([]);
   const [savedFilterName, setSavedFilterName] = useState('');
   const [selectedSavedFilterId, setSelectedSavedFilterId] = useState('none');
+  const [visibleListColumns, setVisibleListColumns] = useState<LeadListColumnKey[]>(() => LEAD_LIST_COLUMNS.map((column) => column.key));
+  const [columnSearchFilters, setColumnSearchFilters] = useState<Partial<Record<LeadListColumnKey, string>>>({});
+  const [columnWidths, setColumnWidths] = useState<Record<LeadListColumnKey, number>>(() =>
+    Object.fromEntries(LEAD_LIST_COLUMNS.map((column) => [column.key, column.defaultWidth])) as Record<LeadListColumnKey, number>,
+  );
 
   const savedFiltersStorageKey = useMemo(
     () => `amro:aircraft-leads:saved-filters:${scope.tenantId || 'tenant'}:${scope.franchiseId || 'franchise'}`,
+    [scope.franchiseId, scope.tenantId],
+  );
+  const listColumnsStorageKey = useMemo(
+    () => `amro:aircraft-leads:list-columns:${scope.tenantId || 'tenant'}:${scope.franchiseId || 'franchise'}`,
+    [scope.franchiseId, scope.tenantId],
+  );
+  const listColumnWidthsStorageKey = useMemo(
+    () => `amro:aircraft-leads:list-column-widths:${scope.tenantId || 'tenant'}:${scope.franchiseId || 'franchise'}`,
     [scope.franchiseId, scope.tenantId],
   );
   const activeTab = activeTabProp || internalActiveTab;
@@ -291,8 +400,69 @@ export function AircraftLeadsManager({
     }
   }, [savedFiltersStorageKey]);
 
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(listColumnsStorageKey);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return;
+      const allowed = new Set<LeadListColumnKey>(LEAD_LIST_COLUMNS.map((column) => column.key));
+      const normalized = parsed
+        .map((item) => String(item || ''))
+        .filter((item): item is LeadListColumnKey => allowed.has(item as LeadListColumnKey));
+      if (normalized.length > 0) {
+        setVisibleListColumns(LEAD_LIST_COLUMNS.map((column) => column.key).filter((key) => normalized.includes(key)));
+      }
+    } catch {
+      setVisibleListColumns(LEAD_LIST_COLUMNS.map((column) => column.key));
+    }
+  }, [listColumnsStorageKey]);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(listColumnWidthsStorageKey);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') return;
+      setColumnWidths((previous) => {
+        const next = { ...previous };
+        LEAD_LIST_COLUMNS.forEach((column) => {
+          const candidate = Number((parsed as Record<string, unknown>)[column.key]);
+          if (!Number.isFinite(candidate)) return;
+          next[column.key] = Math.min(640, Math.max(110, Math.round(candidate)));
+        });
+        return next;
+      });
+    } catch {
+      setColumnWidths(Object.fromEntries(LEAD_LIST_COLUMNS.map((column) => [column.key, column.defaultWidth])) as Record<LeadListColumnKey, number>);
+    }
+  }, [listColumnWidthsStorageKey]);
+
+  useEffect(() => {
+    localStorage.setItem(listColumnsStorageKey, JSON.stringify(visibleListColumns));
+  }, [listColumnsStorageKey, visibleListColumns]);
+
+  useEffect(() => {
+    localStorage.setItem(listColumnWidthsStorageKey, JSON.stringify(columnWidths));
+  }, [columnWidths, listColumnWidthsStorageKey]);
+
+  const visibleListColumnDefinitions = useMemo(
+    () => LEAD_LIST_COLUMNS.filter((column) => visibleListColumns.includes(column.key)),
+    [visibleListColumns],
+  );
+
+  const listRows = useMemo(
+    () =>
+      rows.filter((row) =>
+        visibleListColumnDefinitions.every((column) => {
+          const filterValue = String(columnSearchFilters[column.key] || '').trim().toLowerCase();
+          if (!filterValue) return true;
+          return column.value(row).toLowerCase().includes(filterValue);
+        })),
+    [columnSearchFilters, rows, visibleListColumnDefinitions],
+  );
   const totalPages = Math.max(1, Math.ceil(totalCount / Number(pageSize || '25')));
-  const allSelected = rows.length > 0 && rows.every((row) => selectedIds.includes(row.id));
+  const allSelected = listRows.length > 0 && listRows.every((row) => selectedIds.includes(row.id));
   const themeStyle = useMemo(() => themeStyleFromPreset(activeTheme), [activeTheme]);
   const pipelineColumns = useMemo<ColumnType[]>(
     () => [
@@ -506,6 +676,69 @@ export function AircraftLeadsManager({
     });
   }, []);
 
+  const handleListHeaderSort = useCallback((column: LeadListColumnDefinition) => {
+    setPage(1);
+    handleSortChange(column.sortKey);
+  }, [handleSortChange]);
+
+  const handleListColumnToggle = useCallback((columnKey: LeadListColumnKey, checked: boolean) => {
+    setVisibleListColumns((previous) => {
+      if (checked) {
+        if (previous.includes(columnKey)) return previous;
+        const nextSet = new Set([...previous, columnKey]);
+        return LEAD_LIST_COLUMNS.map((column) => column.key).filter((key) => nextSet.has(key));
+      }
+      if (!previous.includes(columnKey)) return previous;
+      const next = previous.filter((key) => key !== columnKey);
+      if (next.length === 0) {
+        toast.error('At least one column must remain visible');
+        return previous;
+      }
+      return next;
+    });
+  }, []);
+
+  const handleResetListColumns = useCallback(() => {
+    setVisibleListColumns(LEAD_LIST_COLUMNS.map((column) => column.key));
+    setColumnSearchFilters({});
+  }, []);
+
+  const handleClearAllColumnFilters = useCallback(() => {
+    setColumnSearchFilters({});
+    setPage(1);
+  }, []);
+
+  const hasActiveColumnFilters = useMemo(
+    () => Object.values(columnSearchFilters).some((value) => String(value || '').trim().length > 0),
+    [columnSearchFilters],
+  );
+
+  const handleAutoFitColumn = useCallback((column: LeadListColumnDefinition) => {
+    const headerLength = column.label.length;
+    const maxValueLength = Math.max(
+      0,
+      ...listRows.map((row) => column.render(row).length),
+    );
+    const estimatedWidth = Math.max(headerLength, maxValueLength) * 8 + 44;
+    const nextWidth = Math.min(640, Math.max(110, Math.round(estimatedWidth)));
+    setColumnWidths((previous) => ({ ...previous, [column.key]: nextWidth }));
+  }, [listRows]);
+
+  const handleResizeColumn = useCallback((columnKey: LeadListColumnKey, startX: number) => {
+    const startWidth = columnWidths[columnKey] || LEAD_LIST_COLUMNS.find((column) => column.key === columnKey)?.defaultWidth || 160;
+    const onMouseMove = (event: MouseEvent) => {
+      const delta = event.clientX - startX;
+      const nextWidth = Math.min(640, Math.max(110, Math.round(startWidth + delta)));
+      setColumnWidths((previous) => ({ ...previous, [columnKey]: nextWidth }));
+    };
+    const onMouseUp = () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  }, [columnWidths]);
+
   const handlePipelineDragEnd = useCallback(
     async (activeId: string, _overId: string, newStatus: string) => {
       const row = rows.find((item) => item.id === activeId);
@@ -679,7 +912,7 @@ export function AircraftLeadsManager({
                     void handlePipelineDragEnd(activeId, overId, newStatus);
                   }}
                   onItemClick={(id) => {
-                    setSelectedLeadId(id);
+                    setSelectedIds([id]);
                     setActiveTab('list');
                   }}
                   className="h-[460px]"
@@ -815,6 +1048,26 @@ export function AircraftLeadsManager({
 
             <div className="flex flex-wrap items-center gap-2">
               <Button size="sm" variant="outline" onClick={() => void loadLeads()}>Refresh</Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="sm" variant="outline">Columns ({visibleListColumns.length})</Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-56">
+                  <DropdownMenuLabel>Visible Columns</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {LEAD_LIST_COLUMNS.map((column) => (
+                    <DropdownMenuCheckboxItem
+                      key={`visible-column-${column.key}`}
+                      checked={visibleListColumns.includes(column.key)}
+                      onCheckedChange={(checked) => handleListColumnToggle(column.key, Boolean(checked))}
+                    >
+                      {column.label}
+                    </DropdownMenuCheckboxItem>
+                  ))}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onSelect={handleResetListColumns}>Reset Columns</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               {selectedIds.length > 0 ? (
                 <>
                   <Badge variant="secondary">{selectedIds.length} selected</Badge>
@@ -828,41 +1081,95 @@ export function AircraftLeadsManager({
             {error ? <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-700">{error}</div> : null}
 
             <div className="rounded-md border border-[hsl(var(--mdm-template-border))]">
-              <Table>
+              <Table className="table-fixed">
+                <colgroup>
+                  <col className="w-[44px]" />
+                  {visibleListColumnDefinitions.map((column) => (
+                    <col key={`list-col-${column.key}`} style={{ width: `${columnWidths[column.key]}px` }} />
+                  ))}
+                </colgroup>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[40px]">
-                      <input
-                        type="checkbox"
+                    <TableHead className="sticky top-0 z-20 w-[44px] bg-[#F8FAFC] px-2 py-2">
+                      <Checkbox
                         checked={allSelected}
-                        onChange={(event) => {
-                          if (event.target.checked) {
-                            setSelectedIds(rows.map((row) => row.id));
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setSelectedIds((previous) => Array.from(new Set([...previous, ...listRows.map((row) => row.id)])));
                             return;
                           }
-                          setSelectedIds([]);
+                          const listRowIds = new Set(listRows.map((row) => row.id));
+                          setSelectedIds((previous) => previous.filter((id) => !listRowIds.has(id)));
                         }}
                       />
                     </TableHead>
-                    <TableHead>Title</TableHead>
-                    <TableHead>Aircraft</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Priority</TableHead>
-                    <TableHead>Due</TableHead>
-                    <TableHead>Compliance</TableHead>
-                    <TableHead>Assignee</TableHead>
+                    {visibleListColumnDefinitions.map((column) => (
+                      <TableHead key={`header-${column.key}`} className="group sticky top-0 z-20 bg-[#F8FAFC] px-3 py-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-0 text-left text-[12px] font-semibold text-[#64748B] hover:bg-transparent"
+                            onClick={() => handleListHeaderSort(column)}
+                          >
+                            <span>{column.label}</span>
+                            {sortBy === column.sortKey ? (
+                              sortDirection === 'asc' ? <ArrowUp className="ml-1 h-3.5 w-3.5" /> : <ArrowDown className="ml-1 h-3.5 w-3.5" />
+                            ) : null}
+                          </Button>
+                          <button
+                            type="button"
+                            className="h-5 w-2 cursor-col-resize rounded opacity-0 transition group-hover:opacity-100"
+                            aria-label={`Resize ${column.label} column`}
+                            onDoubleClick={(event) => {
+                              event.preventDefault();
+                              handleAutoFitColumn(column);
+                            }}
+                            onMouseDown={(event) => {
+                              event.preventDefault();
+                              handleResizeColumn(column.key, event.clientX);
+                            }}
+                          />
+                        </div>
+                      </TableHead>
+                    ))}
+                  </TableRow>
+                  <TableRow>
+                    <TableHead className="bg-[#F8FAFC] px-2 py-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-1 text-[10px]"
+                        onClick={handleClearAllColumnFilters}
+                        disabled={!hasActiveColumnFilters}
+                      >
+                        <X className="h-3 w-3" />
+                        Clear
+                      </Button>
+                    </TableHead>
+                    {visibleListColumnDefinitions.map((column) => (
+                      <TableHead key={`filter-${column.key}`} className="bg-[#F8FAFC] px-2 py-1">
+                        <Input
+                          value={columnSearchFilters[column.key] || ''}
+                          onChange={(event) => {
+                            setColumnSearchFilters((previous) => ({ ...previous, [column.key]: event.target.value }));
+                            setPage(1);
+                          }}
+                          placeholder={`${column.label} search`}
+                          className="h-7 text-[11px]"
+                        />
+                      </TableHead>
+                    ))}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {rows.map((row) => (
+                  {listRows.map((row) => (
                     <TableRow key={row.id}>
                       <TableCell onClick={(event) => event.stopPropagation()}>
-                        <input
-                          type="checkbox"
+                        <Checkbox
                           checked={selectedIds.includes(row.id)}
-                          onChange={(event) => {
-                            if (event.target.checked) {
+                          onCheckedChange={(checked) => {
+                            if (checked) {
                               setSelectedIds((previous) => [...previous, row.id]);
                               return;
                             }
@@ -870,19 +1177,16 @@ export function AircraftLeadsManager({
                           }}
                         />
                       </TableCell>
-                      <TableCell className="text-[12px] font-medium">{row.title || '-'}</TableCell>
-                      <TableCell className="text-[12px]">{row.aircraft_registration || row.aircraft_id || '-'}</TableCell>
-                      <TableCell className="text-[12px]">{row.aircraft_type || '-'}</TableCell>
-                      <TableCell className="text-[12px]">{row.status || '-'}</TableCell>
-                      <TableCell className="text-[12px]">{row.priority || '-'}</TableCell>
-                      <TableCell className="text-[12px]">{row.maintenance_due_at ? String(row.maintenance_due_at).slice(0, 10) : '-'}</TableCell>
-                      <TableCell className="text-[12px]">{row.compliance_state || '-'}</TableCell>
-                      <TableCell className="text-[12px]">{row.assigned_to || '-'}</TableCell>
+                      {visibleListColumnDefinitions.map((column) => (
+                        <TableCell key={`cell-${row.id}-${column.key}`} className={column.key === 'title' ? 'text-[12px] font-medium' : 'text-[12px]'}>
+                          {column.render(row)}
+                        </TableCell>
+                      ))}
                     </TableRow>
                   ))}
-                  {!loading && rows.length === 0 ? (
+                  {!loading && listRows.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={9} className="text-center text-[12px] text-muted-foreground">
+                      <TableCell colSpan={visibleListColumnDefinitions.length + 1} className="text-center text-[12px] text-muted-foreground">
                         No leads found for current filters.
                       </TableCell>
                     </TableRow>
@@ -893,7 +1197,7 @@ export function AircraftLeadsManager({
 
             <div className="flex items-center justify-between text-[12px]">
               <p>
-                Showing {(page - 1) * Number(pageSize) + (rows.length > 0 ? 1 : 0)}-{Math.min(page * Number(pageSize), totalCount)} of {totalCount}
+                Showing {(page - 1) * Number(pageSize) + (listRows.length > 0 ? 1 : 0)}-{Math.min(page * Number(pageSize), totalCount)} of {totalCount}
               </p>
               <div className="flex items-center gap-2">
                 <Button size="sm" variant="outline" className="h-7 px-2" disabled={page <= 1} onClick={() => setPage((previous) => Math.max(1, previous - 1))}>Previous</Button>
@@ -920,13 +1224,13 @@ export function AircraftLeadsManager({
               {rows.map((row) => (
                 <Card key={`grid-${row.id}`} className="border border-[hsl(var(--mdm-template-border))]">
                   <CardContent className="space-y-2 p-3 text-[12px]">
-                    <EditableText value={row.title || ''} onSave={async (value) => handleInlineUpdate(row, { title: value })} className="font-semibold" />
+                    <EditableText value={row.title || ''} onSave={async (value) => handleInlineUpdate(row, { title: String(value) })} className="font-semibold" />
                     <p>{row.aircraft_registration || row.aircraft_id || '-'}</p>
                     <div className="flex items-center gap-2">
                       <Badge variant="secondary">{row.status || 'new'}</Badge>
                       <Badge variant="outline">{row.priority || 'medium'}</Badge>
                     </div>
-                    <EditableText value={row.assigned_to || ''} onSave={async (value) => handleInlineUpdate(row, { assigned_to: value })} placeholder="Assignee" />
+                    <EditableText value={row.assigned_to || ''} onSave={async (value) => handleInlineUpdate(row, { assigned_to: String(value) })} placeholder="Assignee" />
                   </CardContent>
                 </Card>
               ))}

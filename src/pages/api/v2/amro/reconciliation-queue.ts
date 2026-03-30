@@ -69,7 +69,8 @@ async function buildRuntime(): Promise<QueueRuntime | null> {
   if (!isQueueEnabled() || !shouldUseBullMq()) return null;
 
   const redisUrl = String(process.env.REDIS_URL || '').trim();
-  const { Queue } = await import('bullmq');
+  const loadModule = new Function('specifier', 'return import(specifier)') as (specifier: string) => Promise<Record<string, unknown>>;
+  const { Queue } = await loadModule('bullmq') as { Queue: new (name: string, options: Record<string, unknown>) => any };
   const parsedUrl = new URL(redisUrl);
   const connection = {
     host: parsedUrl.hostname,

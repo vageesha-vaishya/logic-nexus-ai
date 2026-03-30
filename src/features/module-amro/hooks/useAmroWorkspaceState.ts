@@ -70,6 +70,8 @@ type ApiWorkPackage = {
   maintenance_type?: string;
 };
 
+type WorkPackageStatus = 'planning' | 'scheduled' | 'in_progress' | 'completed' | 'blocked' | 'cancelled';
+
 type ApiTask = {
   id: string;
   work_package_id: string;
@@ -532,6 +534,17 @@ export function useAmroWorkspaceState() {
   const [workPackageSearch, setWorkPackageSearch] = useState<string>('');
   const [selectedSavedViewId, setSelectedSavedViewId] = useState<string>(DEFAULT_WORK_PACKAGE_SAVED_VIEW.id);
   const [savedWorkPackageViews, setSavedWorkPackageViews] = useState<V2SavedWorkPackageView[]>([DEFAULT_WORK_PACKAGE_SAVED_VIEW]);
+  const [holdReleaseStatusByWorkPackage, setHoldReleaseStatusByWorkPackage] = useState<Record<string, WorkPackageStatus>>({});
+  const [softDeletedWorkPackageStatusById, setSoftDeletedWorkPackageStatusById] = useState<Record<string, WorkPackageStatus>>({});
+  const [holdAuditTrail, setHoldAuditTrail] = useState<Array<{
+    workPackageId: string;
+    packageNumber: string;
+    action: 'hold' | 'release';
+    fromStatus: WorkPackageStatus;
+    toStatus: WorkPackageStatus;
+    actorRole: string;
+    occurredAt: string;
+  }>>([]);
   const [realtimeConnected, setRealtimeConnected] = useState<boolean>(false);
   const [requiredAuthority, setRequiredAuthority] = useState<AmroAuthorityLevel>('supervisor');
   const [selectedQualificationId, setSelectedQualificationId] = useState<string>(initialQualifications[0]?.id ?? '');
@@ -2048,6 +2061,242 @@ export function useAmroWorkspaceState() {
     workPackages,
   ]);
 
+  const updateWorkPackageStatusById = useCallback(
+    async (workPackageId: string, targetStatus: WorkPackageStatus) => {
+      const targetWorkPackage = workPackages.find((item) => item.id === workPackageId) ?? null;
+      if (!targetWorkPackage) return false;
+      if (!authHeaders) {
+        return Boolean(applyLocalLifecycleTransition(workPackageId, mapStatusToLifecycle(targetStatus)));
+      }
+      const currentStatus = mapLifecycleToStatus(targetWorkPackage.lifecycleStage) as WorkPackageStatus;
+      if (currentStatus === targetStatus) {
+        setWorkPackagesError(null);
+        return true;
+      }
+      if (isApiTemporarilyUnavailable()) {
+        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        return false;
+      }
+      try {
+        const idempotencyKey = `wp-status-${workPackageId}-${targetStatus}-${Date.now()}`;
+        const patchResponse = await fetch(`${apiBaseUrl}/api/v2/amro/work-packages/${workPackageId}`, {
+          method: 'PATCH',
+          headers: {
+            ...authHeaders,
+            'idempotency-key': idempotencyKey,
+          },
+          body: JSON.stringify({
+            current_status: currentStatus,
+            status: targetStatus,
+            idempotency_key: idempotencyKey,
+            decision_trace_id: `wp-status-${workPackageId}-${targetStatus}`,
+            scope_context: {
+              domain_id: 'amro',
+              role: activeRole,
+            },
+          }),
+        });
+        const patchPayload = await parseJsonSafe<{ error?: string }>(patchResponse);
+        if (!patchResponse.ok) {
+          throw new Error(patchPayload?.error || `Failed to update status (${patchResponse.status})`);
+        }
+        await fetchWorkPackages();
+        setWorkPackagesError(null);
+        return true;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to update work package status';
+        if (isNetworkConnectivityError(error)) {
+          markApiTemporarilyUnavailable();
+          return Boolean(applyLocalLifecycleTransition(workPackageId, mapStatusToLifecycle(targetStatus)));
+        }
+        if (shouldUseLocalWorkPackageFallback(message)) {
+          setWorkPackagesError('Running in local fallback mode for work package status update.');
+          return Boolean(applyLocalLifecycleTransition(workPackageId, mapStatusToLifecycle(targetStatus)));
+        }
+        setWorkPackagesError(message);
+        return false;
+      }
+    },
+    [
+      activeRole,
+      apiBaseUrl,
+      applyLocalLifecycleTransition,
+      authHeaders,
+      fetchWorkPackages,
+      isApiTemporarilyUnavailable,
+      markApiTemporarilyUnavailable,
+      shouldUseLocalWorkPackageFallback,
+      workPackages,
+    ],
+  );
+
+  const updateWorkPackageScheduling = useCallback(
+    async (workPackageId?: string) => {
+      const targetId = workPackageId || selectedWorkPackageId || workPackages[0]?.id || '';
+      if (!targetId) return false;
+      const scheduled = await assignSelectedWorkPackageToNextSlot(targetId);
+      if (!scheduled) return false;
+      const statusUpdated = await updateWorkPackageStatusById(targetId, 'scheduled');
+      if (!statusUpdated) return false;
+      await fetchScheduleBoard();
+      return true;
+    },
+    [assignSelectedWorkPackageToNextSlot, fetchScheduleBoard, selectedWorkPackageId, updateWorkPackageStatusById, workPackages],
+  );
+
+  const toggleWorkPackageHold = useCallback(
+    async (workPackageId?: string) => {
+      const targetWorkPackage = workPackageId
+        ? workPackages.find((item) => item.id === workPackageId) ?? null
+        : selectedWorkPackage;
+      if (!targetWorkPackage) return false;
+      const workPackageStatus = mapLifecycleToStatus(targetWorkPackage.lifecycleStage) as WorkPackageStatus;
+      const releaseStatus = holdReleaseStatusByWorkPackage[targetWorkPackage.id] || 'scheduled';
+      const nextStatus = workPackageStatus === 'blocked' ? releaseStatus : 'blocked';
+      const ok = await updateWorkPackageStatusById(targetWorkPackage.id, nextStatus);
+      if (!ok) return false;
+      if (workPackageStatus === 'blocked') {
+        setHoldReleaseStatusByWorkPackage((current) => {
+          const next = { ...current };
+          delete next[targetWorkPackage.id];
+          return next;
+        });
+      } else {
+        setHoldReleaseStatusByWorkPackage((current) => ({
+          ...current,
+          [targetWorkPackage.id]: workPackageStatus,
+        }));
+      }
+      const occurredAt = new Date().toISOString();
+      setHoldAuditTrail((current) => [
+        {
+          workPackageId: targetWorkPackage.id,
+          packageNumber: targetWorkPackage.packageNumber,
+          action: workPackageStatus === 'blocked' ? 'release' : 'hold',
+          fromStatus: workPackageStatus,
+          toStatus: nextStatus,
+          actorRole: activeRole,
+          occurredAt,
+        },
+        ...current,
+      ]);
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('amro:work-package-hold-audit', {
+          detail: {
+            workPackageId: targetWorkPackage.id,
+            packageNumber: targetWorkPackage.packageNumber,
+            action: workPackageStatus === 'blocked' ? 'release' : 'hold',
+            fromStatus: workPackageStatus,
+            toStatus: nextStatus,
+            actorRole: activeRole,
+            occurredAt,
+          },
+        }));
+      }
+      return true;
+    },
+    [
+      activeRole,
+      holdReleaseStatusByWorkPackage,
+      selectedWorkPackage,
+      updateWorkPackageStatusById,
+      workPackages,
+    ],
+  );
+
+  const softDeleteWorkPackage = useCallback(
+    async (workPackageId?: string) => {
+      const targetWorkPackage = workPackageId
+        ? workPackages.find((item) => item.id === workPackageId) ?? null
+        : selectedWorkPackage;
+      if (!targetWorkPackage) return false;
+      const previousStatus = mapLifecycleToStatus(targetWorkPackage.lifecycleStage) as WorkPackageStatus;
+      const ok = await updateWorkPackageStatusById(targetWorkPackage.id, 'cancelled');
+      if (!ok) return false;
+      setSoftDeletedWorkPackageStatusById((current) => ({
+        ...current,
+        [targetWorkPackage.id]: previousStatus,
+      }));
+      return true;
+    },
+    [selectedWorkPackage, updateWorkPackageStatusById, workPackages],
+  );
+
+  const restoreSoftDeletedWorkPackage = useCallback(
+    async (workPackageId: string) => {
+      const restoreStatus = softDeletedWorkPackageStatusById[workPackageId] || 'planning';
+      const ok = await updateWorkPackageStatusById(workPackageId, restoreStatus);
+      if (!ok) return false;
+      setSoftDeletedWorkPackageStatusById((current) => {
+        const next = { ...current };
+        delete next[workPackageId];
+        return next;
+      });
+      return true;
+    },
+    [softDeletedWorkPackageStatusById, updateWorkPackageStatusById],
+  );
+
+  const openWorkPackageDetails = useCallback(
+    async (workPackageId: string) => {
+      setSelectedWorkPackageId(workPackageId);
+      if (!authHeaders) return true;
+      if (isApiTemporarilyUnavailable()) {
+        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        return false;
+      }
+      try {
+        const response = await fetch(`${apiBaseUrl}/api/v2/amro/work-packages/${workPackageId}`, {
+          method: 'GET',
+          headers: authHeaders,
+        });
+        const payload = await parseJsonSafe<{
+          data?: {
+            work_package?: {
+              id?: string;
+              status?: string;
+              aircraft_id?: string;
+              code?: string;
+            };
+          };
+          error?: string;
+        }>(response);
+        if (!response.ok) {
+          throw new Error(payload?.error || `Failed to load work package detail (${response.status})`);
+        }
+        const detail = payload?.data?.work_package;
+        if (detail?.id) {
+          setWorkPackages((current) => current.map((item) => (
+            item.id === detail.id
+              ? {
+                  ...item,
+                  packageNumber: String(detail.code || item.packageNumber),
+                  lifecycleStage: mapStatusToLifecycle(String(detail.status || mapLifecycleToStatus(item.lifecycleStage))),
+                  assetId: String(detail.aircraft_id || item.assetId),
+                }
+              : item
+          )));
+        }
+        await fetchTasksForWorkPackage(workPackageId);
+        setWorkPackagesError(null);
+        return true;
+      } catch (error) {
+        if (isNetworkConnectivityError(error)) {
+          markApiTemporarilyUnavailable();
+        }
+        setWorkPackagesError(error instanceof Error ? error.message : 'Failed to open work package');
+        return false;
+      }
+    },
+    [
+      apiBaseUrl,
+      authHeaders,
+      fetchTasksForWorkPackage,
+      isApiTemporarilyUnavailable,
+      markApiTemporarilyUnavailable,
+    ],
+  );
+
   const acknowledgeScheduleUpdate = useCallback(
     async (scheduleId: string, workPackageId: string) => {
       if (!authHeaders) return false;
@@ -2815,6 +3064,12 @@ export function useAmroWorkspaceState() {
     createWorkPackage,
     cloneWorkPackageFromTemplate,
     assignSelectedWorkPackageToNextSlot,
+    updateWorkPackageScheduling,
+    toggleWorkPackageHold,
+    holdAuditTrail,
+    openWorkPackageDetails,
+    softDeleteWorkPackage,
+    restoreSoftDeletedWorkPackage,
     updateTaskExecutionStatus,
     uploadTaskEvidence,
     submitTaskSignature,

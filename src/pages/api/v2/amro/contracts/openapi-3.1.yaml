@@ -70,6 +70,19 @@ paths:
                       type: array
                       items:
                         type: string
+                    trigger_source:
+                      type: string
+                      enum: [schedule_due, defect, campaign, predictive_alert, compliance]
+                    source:
+                      type: string
+                      enum: [schedule_due, defect, campaign, predictive_alert, compliance]
+                    trigger_reference_id:
+                      type: string
+                    reference_id:
+                      type: string
+                    triggered_at:
+                      type: string
+                      format: date-time
                 - type: object
                   required: [work_package_id, target_status, reason_code, actor_signature]
                   properties:

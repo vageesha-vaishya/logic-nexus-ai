@@ -108,7 +108,7 @@ type WorkPackageStatus = 'planning' | 'scheduled' | 'in_progress' | 'completed' 
 type ReplanWorkPackageState = 'planning' | 'scheduled' | 'blocked';
 type ShortageAction = 'backorder' | 'substitute' | 'escalate';
 type TraceabilityAction = 'verify' | 'quarantine' | 'release';
-type WorkPackageCreationTrigger = 'schedule' | 'compliance';
+type WorkPackageCreationTrigger = 'schedule_due' | 'defect' | 'campaign' | 'predictive_alert' | 'compliance';
 type PlannerObjective = 'minimize_ground_time' | 'maximize_staff_utilization' | 'minimize_overtime' | 'protect_flight_commitments';
 
 const ALLOWED_SHORTAGE_ACTIONS = new Set(['backorder', 'substitute', 'escalate']);
@@ -460,11 +460,24 @@ function parseIsoTimestamp(value: unknown, fieldName: string): string {
 }
 
 function parseCreationTrigger(body: Record<string, unknown>) {
-  const source = String(body.trigger_source || 'schedule').trim().toLowerCase() as WorkPackageCreationTrigger;
-  if (source !== 'schedule' && source !== 'compliance') {
-    throw new Error('trigger_source must be schedule or compliance');
+  const requestedSource = String(body.trigger_source || body.source || 'schedule_due').trim().toLowerCase();
+  const sourceAliasMap: Record<string, WorkPackageCreationTrigger> = {
+    schedule: 'schedule_due',
+    schedule_due: 'schedule_due',
+    defect: 'defect',
+    campaign: 'campaign',
+    predictive: 'predictive_alert',
+    predictive_alert: 'predictive_alert',
+    compliance: 'compliance',
+  };
+  const source = sourceAliasMap[requestedSource];
+  if (!source) {
+    throw new Error('trigger_source must be schedule_due, defect, campaign, predictive_alert, or compliance');
   }
-  const referenceId = assertNonEmpty(body.trigger_reference_id || `${source}-trigger`, 'trigger_reference_id');
+  const referenceId = assertNonEmpty(
+    body.trigger_reference_id || body.reference_id || `${source}-trigger`,
+    'trigger_reference_id',
+  );
   const triggeredAt = parseIsoTimestamp(body.triggered_at || new Date().toISOString(), 'triggered_at');
   return {
     source,

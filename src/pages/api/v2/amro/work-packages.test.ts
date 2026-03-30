@@ -334,6 +334,38 @@ describe('/api/v2/amro/work-packages', () => {
     expect((res.jsonBody as any)?.output?.version).toBe(1);
   });
 
+  it('accepts aircraft trigger metadata for schedule due, defect, campaign, and predictive recommendations', async () => {
+    process.env.AMRO_WORK_PACKAGES_V2_ENABLED = 'true';
+    const triggerSources = ['schedule_due', 'defect', 'campaign', 'predictive_alert'] as const;
+
+    for (const triggerSource of triggerSources) {
+      const req: ApiRequest = {
+        method: 'POST',
+        query: { interface: 'create-work-package' },
+        body: {
+          aircraft_id: 'ac-001',
+          maintenance_type: 'line',
+          planned_window: '2026-03-21T00:00:00.000Z|2026-03-23T00:00:00.000Z',
+          station: 'station-a',
+          priority: 'high',
+          scope_items: ['inspection', 'lubrication'],
+          source: triggerSource,
+          reference_id: `ref-${triggerSource}`,
+          triggered_at: '2026-03-20T12:30:00.000Z',
+        },
+        headers: {},
+      };
+      const res = createResponse();
+
+      await handler(req, res);
+
+      expect(res.statusCode).toBe(200);
+      expect((res.jsonBody as any)?.input?.creation_trigger?.source).toBe(triggerSource);
+      expect((res.jsonBody as any)?.input?.creation_trigger?.reference_id).toBe(`ref-${triggerSource}`);
+      expect((res.jsonBody as any)?.input?.creation_trigger?.triggered_at).toBe('2026-03-20T12:30:00.000Z');
+    }
+  });
+
   it('saves work package view with filters', async () => {
     process.env.AMRO_WORK_PACKAGES_V2_ENABLED = 'true';
     const req: ApiRequest = {
