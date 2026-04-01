@@ -20,6 +20,7 @@ export type AircraftPaletteAction = {
   ariaLabel?: string;
   successMessage?: string;
   errorMessage?: string;
+  active?: boolean;
 };
 
 export type AircraftActionPermissionResolver = (permission: string) => boolean;
@@ -56,6 +57,7 @@ type AircraftActionPaletteProps = {
   className?: string;
   buttonClassName?: string;
   compact?: boolean;
+  toolbarLabel?: string;
 };
 
 export function AircraftActionPalette({
@@ -64,6 +66,7 @@ export function AircraftActionPalette({
   className,
   buttonClassName,
   compact = false,
+  toolbarLabel,
 }: AircraftActionPaletteProps) {
   const [activeActionId, setActiveActionId] = useState('');
 
@@ -94,22 +97,31 @@ export function AircraftActionPalette({
   };
 
   return (
-    <div className={cn('flex flex-wrap items-center gap-2', compact && 'gap-1.5', className)}>
+    <div
+      role={toolbarLabel ? 'toolbar' : undefined}
+      aria-label={toolbarLabel}
+      className={cn('flex flex-wrap items-center gap-2', compact && 'gap-1.5', className)}
+    >
       {orderedActions.map((action) => {
         const authorized = isPaletteActionAuthorized(action, hasPermission);
         const isBusy = activeActionId === action.id || action.loading;
+        const variant = action.variant || (action.group === 'primary' ? 'default' : action.group === 'secondary' ? 'outline' : 'secondary');
         return (
           <Button
             key={action.id}
             type="button"
             size={compact ? 'sm' : 'default'}
-            variant={action.variant || (action.group === 'primary' ? 'default' : action.group === 'secondary' ? 'outline' : 'secondary')}
-            className={buttonClassName}
+            variant={action.active ? 'default' : variant}
+            className={cn(
+              action.active && variant !== 'default' ? 'ring-1 ring-[hsl(var(--mdm-template-focus))/0.4]' : undefined,
+              buttonClassName,
+            )}
             onClick={() => {
               void handleAction(action);
             }}
             disabled={action.disabled || !authorized || isBusy}
             aria-label={action.ariaLabel || action.label}
+            aria-pressed={action.active ? true : undefined}
           >
             {isBusy ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : action.icon}
             <span>{action.label}</span>

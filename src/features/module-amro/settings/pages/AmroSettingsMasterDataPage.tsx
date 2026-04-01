@@ -53,11 +53,14 @@ import {
   ArrowUpDown,
   CalendarDays,
   CheckSquare,
+  CreditCard,
   Eye,
   FileCheck,
-  FileDown,
+  FileSpreadsheet,
   FileText,
   FileUp,
+  LayoutGrid,
+  List,
   ListChecks,
   Plus,
   RefreshCw,
@@ -65,6 +68,8 @@ import {
   TimerReset,
   Trash2,
   Users,
+  Workflow,
+  BarChart3,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
@@ -5727,6 +5732,139 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   );
   const headerPaletteActions = useMemo<AircraftPaletteAction[]>(
     () => {
+      if (entity === 'aircraft' && aircraftEnhancementEnabled) {
+        const resolveAircraftViewActive = (tab: AircraftLeadsTab): boolean => (tab === 'list'
+          ? aircraftNavigationView === 'module'
+          : aircraftNavigationView === tab);
+        return [
+          {
+            id: 'view-list',
+            label: 'List',
+            icon: <List className="h-4 w-4" aria-hidden="true" />,
+            group: 'primary',
+            variant: 'outline',
+            active: resolveAircraftViewActive('list'),
+            ariaLabel: 'List view',
+            onAction: async () => {
+              handleAircraftViewNavigation('list');
+            },
+          },
+          {
+            id: 'new-record',
+            label: 'New',
+            icon: <Plus className="h-4 w-4" aria-hidden="true" />,
+            group: 'primary',
+            variant: 'default',
+            loading: busyAction === 'create',
+            ariaLabel: 'New aircraft record',
+            onAction: async () => {
+              handleOpenCreateModal();
+            },
+          },
+          {
+            id: 'view-grid',
+            label: 'Grid',
+            icon: <LayoutGrid className="h-4 w-4" aria-hidden="true" />,
+            group: 'primary',
+            variant: 'outline',
+            active: resolveAircraftViewActive('grid'),
+            ariaLabel: 'Grid view',
+            onAction: async () => {
+              handleAircraftViewNavigation('grid');
+            },
+          },
+          {
+            id: 'view-card',
+            label: 'Card',
+            icon: <CreditCard className="h-4 w-4" aria-hidden="true" />,
+            group: 'primary',
+            variant: 'outline',
+            active: resolveAircraftViewActive('card'),
+            ariaLabel: 'Card view',
+            onAction: async () => {
+              handleAircraftViewNavigation('card');
+            },
+          },
+          {
+            id: 'refresh-records',
+            label: 'Refresh',
+            icon: <RefreshCw className={cn('h-4 w-4', busyAction === 'refresh' && 'animate-spin')} aria-hidden="true" />,
+            group: 'primary',
+            variant: 'outline',
+            disabled: loading,
+            loading: busyAction === 'refresh',
+            ariaLabel: 'Refresh records',
+            onAction: async () => {
+              setBusyAction('refresh');
+              await loadRecords();
+              setBusyAction(null);
+            },
+            errorMessage: 'Refresh failed',
+          },
+          {
+            id: 'view-pipeline',
+            label: 'Pipeline',
+            icon: <Workflow className="h-4 w-4" aria-hidden="true" />,
+            group: 'primary',
+            variant: 'outline',
+            active: resolveAircraftViewActive('pipeline'),
+            ariaLabel: 'Pipeline view',
+            onAction: async () => {
+              handleAircraftViewNavigation('pipeline');
+            },
+          },
+          {
+            id: 'view-analytics',
+            label: 'Analytics',
+            icon: <BarChart3 className="h-4 w-4" aria-hidden="true" />,
+            group: 'primary',
+            variant: 'outline',
+            active: resolveAircraftViewActive('analytics'),
+            ariaLabel: 'Analytics view',
+            onAction: async () => {
+              handleAircraftViewNavigation('analytics');
+            },
+          },
+          {
+            id: 'view-import-export',
+            label: 'Import/Export',
+            icon: <ArrowUpDown className="h-4 w-4" aria-hidden="true" />,
+            group: 'primary',
+            variant: 'outline',
+            active: resolveAircraftViewActive('import_export'),
+            ariaLabel: 'Import and export workspace',
+            onAction: async () => {
+              handleAircraftViewNavigation('import_export');
+            },
+          },
+          {
+            id: 'export-csv',
+            label: 'Export CSV',
+            icon: <FileSpreadsheet className="h-4 w-4" aria-hidden="true" />,
+            group: 'primary',
+            variant: 'outline',
+            loading: busyAction === 'export',
+            disabled: busyAction === 'export_pdf',
+            ariaLabel: 'Export records CSV',
+            onAction: async () => {
+              await handleExport();
+            },
+          },
+          {
+            id: 'export-pdf',
+            label: 'Export PDF',
+            icon: <FileText className="h-4 w-4" aria-hidden="true" />,
+            group: 'primary',
+            variant: 'outline',
+            loading: busyAction === 'export_pdf',
+            disabled: busyAction === 'export',
+            ariaLabel: 'Export records PDF',
+            onAction: async () => {
+              await handleExportPdf();
+            },
+          },
+        ];
+      }
       const actions: AircraftPaletteAction[] = [
         {
           id: 'refresh-records',
@@ -5760,7 +5898,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         {
           id: 'export-pdf',
           label: 'Export PDF',
-          icon: <FileDown className="h-4 w-4" aria-hidden="true" />,
+          icon: <FileText className="h-4 w-4" aria-hidden="true" />,
           group: 'secondary',
           variant: 'outline',
           loading: busyAction === 'export_pdf',
@@ -5773,18 +5911,29 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       ];
       actions.push({
         id: 'new-record',
-        label: entity === 'aircraft' ? 'New' : `New ${ENTITY_LABEL[entity]}`,
+        label: `New ${ENTITY_LABEL[entity]}`,
         icon: <Plus className="h-4 w-4" aria-hidden="true" />,
         group: 'primary',
         loading: busyAction === 'create',
-        ariaLabel: entity === 'aircraft' ? 'New aircraft record' : `New ${ENTITY_LABEL[entity]}`,
+        ariaLabel: `New ${ENTITY_LABEL[entity]}`,
         onAction: async () => {
           handleOpenCreateModal();
         },
       });
       return actions;
     },
-    [busyAction, entity, handleExport, handleExportPdf, handleOpenCreateModal, loadRecords, loading],
+    [
+      aircraftEnhancementEnabled,
+      aircraftNavigationView,
+      busyAction,
+      entity,
+      handleAircraftViewNavigation,
+      handleExport,
+      handleExportPdf,
+      handleOpenCreateModal,
+      loadRecords,
+      loading,
+    ],
   );
   const aircraftStatusPaletteActions = useMemo<AircraftPaletteAction[]>(
     () => [
@@ -5893,35 +6042,17 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                 </Link>
               </Button>
             )}
-            {entity === 'aircraft' && aircraftEnhancementEnabled ? (
-              <div className="order-1 flex max-w-full flex-wrap items-center justify-end gap-2 rounded-md border border-[hsl(var(--mdm-template-border))] bg-muted/10 p-1.5">
-                {([
-                  ['pipeline', 'Pipeline'],
-                  ['list', 'List'],
-                  ['grid', 'Grid'],
-                  ['card', 'Card'],
-                  ['analytics', 'Analytics'],
-                  ['import_export', 'Import/Export'],
-                ] as const).map(([value, label]) => {
-                  const isActive = value === 'list'
-                    ? aircraftNavigationView === 'module'
-                    : aircraftNavigationView === value;
-                  return (
-                    <Button
-                      key={value}
-                      type="button"
-                      variant={isActive ? 'default' : 'outline'}
-                      size="sm"
-                      className="h-9 px-3"
-                      onClick={() => handleAircraftViewNavigation(value)}
-                    >
-                      {label}
-                    </Button>
-                  );
-                })}
-              </div>
-            ) : null}
-            <AircraftActionPalette actions={headerPaletteActions} hasPermission={hasPermission} className="order-2" compact buttonClassName="h-9 px-3" />
+            <AircraftActionPalette
+              actions={headerPaletteActions}
+              hasPermission={hasPermission}
+              toolbarLabel={entity === 'aircraft' && aircraftEnhancementEnabled ? 'Aircraft header actions' : `${ENTITY_LABEL[entity]} header actions`}
+              className={cn(
+                'order-2 rounded-md border border-[hsl(var(--mdm-template-border))] bg-muted/10 p-1.5',
+                entity === 'aircraft' && aircraftEnhancementEnabled ? 'max-w-full justify-end' : undefined,
+              )}
+              compact
+              buttonClassName="h-9 px-3"
+            />
           </div>
         </div>
 

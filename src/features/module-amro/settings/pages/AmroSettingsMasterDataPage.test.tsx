@@ -1346,25 +1346,37 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     expect(await screen.findByText(/Aircraft Search and Filter/i)).toBeInTheDocument();
   });
 
-  it('renders aircraft navigation view buttons without duplicates and supports search-oriented list behavior', async () => {
+  it('renders unified aircraft header actions in the required sequence and supports view switching state', async () => {
     renderAircraftPage();
 
     await screen.findByText('Aircraft Operations Snapshot');
 
-    expect(screen.getAllByRole('button', { name: 'Pipeline' })).toHaveLength(1);
-    expect(screen.getAllByRole('button', { name: 'List' })).toHaveLength(1);
-    expect(screen.getAllByRole('button', { name: 'Grid' })).toHaveLength(1);
-    expect(screen.getAllByRole('button', { name: 'Card' })).toHaveLength(1);
-    expect(screen.getAllByRole('button', { name: 'Analytics' })).toHaveLength(1);
-    expect(screen.getAllByRole('button', { name: 'Import/Export' })).toHaveLength(1);
-    fireEvent.click(screen.getByRole('button', { name: 'Pipeline' }));
-    expect(await screen.findByText('Aircraft Leads Workspace')).toBeInTheDocument();
+    const toolbar = screen.getByRole('toolbar', { name: 'Aircraft header actions' });
+    const orderedLabels = within(toolbar).getAllByRole('button').map((button) => button.textContent?.trim());
+    expect(orderedLabels).toEqual([
+      'List',
+      'New',
+      'Grid',
+      'Card',
+      'Refresh',
+      'Pipeline',
+      'Analytics',
+      'Import/Export',
+      'Export CSV',
+      'Export PDF',
+    ]);
+    expect(within(toolbar).getByRole('button', { name: 'List view' })).toHaveAttribute('aria-pressed', 'true');
 
-    fireEvent.click(screen.getByRole('button', { name: 'List' }));
+    fireEvent.click(within(toolbar).getByRole('button', { name: 'Pipeline view' }));
+    expect(await screen.findByText('Aircraft Leads Workspace')).toBeInTheDocument();
+    expect(within(toolbar).getByRole('button', { name: 'Pipeline view' })).toHaveAttribute('aria-pressed', 'true');
+
+    fireEvent.click(within(toolbar).getByRole('button', { name: 'List view' }));
     await waitFor(() => {
       expect(screen.queryByText('Aircraft Leads Workspace')).not.toBeInTheDocument();
     }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
     expect(screen.getByLabelText('Search')).toBeInTheDocument();
+    expect(within(toolbar).getByRole('button', { name: 'List view' })).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('adds a New action in aircraft header navigation and opens create modal', async () => {

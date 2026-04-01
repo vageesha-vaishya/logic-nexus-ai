@@ -116,3 +116,50 @@ Standardized reusable classes are available in `src/index.css`:
 
 - UX reference mapping: `UX-AMRO-004` and `UX-AMRO-005` implementation surfaces.
 - Form layout standardization is additive and backward-compatible; CRUD behavior, API payloads, and route contracts remain unchanged.
+
+## Aircraft Header Button System
+
+- Surface: `src/features/module-amro/settings/pages/AmroSettingsMasterDataPage.tsx`
+- Shared renderer: `src/features/module-amro/settings/pages/amro-settings-master-data/components/AircraftActionPalette.tsx`
+- Toolbar accessibility contract:
+  - Container uses `role="toolbar"` with `aria-label="Aircraft header actions"`.
+  - View-mode buttons expose `aria-pressed` for active state.
+  - Every button has explicit `aria-label`.
+
+### Button Order Contract
+
+The Aircraft module header buttons must render in this exact order:
+
+1. List
+2. New
+3. Grid
+4. Card
+5. Refresh
+6. Pipeline
+7. Analytics
+8. Import/Export
+9. Export CSV
+10. Export PDF
+
+### Action Configuration and Behavior
+
+- List / Grid / Card / Pipeline / Analytics / Import-Export:
+  - Switch `AircraftLeadsTab` view mode in-place and preserve route behavior for aircraft sub-module paths.
+  - Active state uses `aria-pressed="true"` and primary visual emphasis.
+- New:
+  - Opens aircraft create form modal (`Create Aircraft`) and preserves existing payload validation flow.
+- Refresh:
+  - Reloads aircraft records from backend via `loadRecords()`.
+  - Shows spinner while running and prevents duplicate triggers.
+- Export CSV:
+  - Runs existing CSV export pipeline for selected aircraft rows.
+  - Emits user feedback toast for success/failure and selection preconditions.
+- Export PDF:
+  - Runs existing PDF export pipeline with the same selection and feedback contract.
+
+### Visual and Interaction Standards
+
+- Icon set uses `lucide-react` only; all icons use `h-4 w-4`.
+- Buttons use compact header sizing (`h-9 px-3`) and shared hover/focus behavior from the existing design system.
+- Active state uses default button variant plus focus ring for non-default variants.
+- Loading state uses spinner replacement with action-level disable protection.
