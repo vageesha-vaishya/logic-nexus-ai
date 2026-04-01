@@ -68,6 +68,36 @@ test.describe('amro overview dashboard', () => {
 });
 
 test.describe('amro aircraft CRUD smoke', () => {
+  test('navigates unified aircraft module rail for all standardized workspaces', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/dashboard/amro/aircraft/list');
+    if (page.url().includes('/auth')) {
+      await login(page);
+      await page.goto('/dashboard/amro/aircraft/list');
+    }
+    test.skip(page.url().includes('/auth'), 'Authentication failed for AMRO aircraft unified module navigation');
+
+    const unifiedLayout = page.getByTestId('aircraft-unified-layout');
+    test.skip((await unifiedLayout.count()) === 0, 'Unified aircraft layout is unavailable in this environment profile');
+    await expect(unifiedLayout.first()).toBeVisible();
+
+    const navSteps = [
+      { label: 'Aircraft List', urlSegment: '/dashboard/amro/aircraft/list' },
+      { label: 'Templates', urlSegment: '/dashboard/amro/aircraft/templates' },
+      { label: 'Engine', urlSegment: '/dashboard/amro/aircraft/engine' },
+      { label: 'Components', urlSegment: '/dashboard/amro/aircraft/components' },
+      { label: 'Documents', urlSegment: '/dashboard/amro/aircraft/documents' },
+      { label: 'AD/SB', urlSegment: '/dashboard/amro/aircraft/ad-sb' },
+      { label: 'Maintenance Planning', urlSegment: '/dashboard/amro/aircraft/work-packages' },
+    ];
+
+    for (const step of navSteps) {
+      await page.getByRole('button', { name: step.label }).first().click();
+      await expect(page).toHaveURL(new RegExp(step.urlSegment.replace(/\//g, '\\/')));
+      await expect(page.getByText(/Aircraft ·/).first()).toBeVisible();
+    }
+  });
+
   test('creates, updates, and deletes an aircraft record from master data page', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/dashboard/amro/settings/master-data/aircraft');

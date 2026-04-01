@@ -1050,6 +1050,8 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
 
     fireEvent.click(screen.getByLabelText('Validation'));
     fireEvent.click(await screen.findByRole('option', { name: 'Pending' }));
+    fireEvent.click(screen.getByLabelText('Trigger source'));
+    fireEvent.click(await screen.findByRole('option', { name: 'Defect' }));
 
     expect(within(workPackageDialog).getByRole('tab', { name: 'New WP' })).toBeInTheDocument();
     expect(within(workPackageDialog).getByRole('tab', { name: 'Existing WP' })).toBeInTheDocument();
@@ -1077,7 +1079,7 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
         && String(init?.method || 'GET').toUpperCase() === 'POST');
     expect(createWorkPackageCall).toBeDefined();
     const createPayload = JSON.parse(String(createWorkPackageCall?.[1]?.body || '{}')) as Record<string, unknown>;
-    expect(createPayload.trigger_source).toBe('schedule_due');
+    expect(createPayload.trigger_source).toBe('defect');
     expect(createPayload.trigger_reference_id).toBe('ac-1');
   });
 

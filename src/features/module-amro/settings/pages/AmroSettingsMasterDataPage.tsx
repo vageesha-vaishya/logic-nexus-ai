@@ -126,6 +126,12 @@ import {
 import { FlightLogsFilters } from './amro-settings-master-data/components/FlightLogsFilters';
 import { AircraftLeadsManager, type AircraftLeadsTab } from './amro-settings-master-data/components/AircraftLeadsManager';
 import { AircraftActionPalette, type AircraftPaletteAction } from './amro-settings-master-data/components/AircraftActionPalette';
+import {
+  AircraftUnifiedLayout,
+  filterUnifiedModuleRows,
+  type AircraftUnifiedFilterOption,
+  type AircraftUnifiedLayoutModuleKey,
+} from './amro-settings-master-data/components/AircraftUnifiedLayout';
 
 export { buildPayloadFromForm } from './amro-settings-master-data/utils';
 export { verifyReferenceExists } from './amro-settings-master-data/services';
@@ -850,6 +856,21 @@ const DEFAULT_AIRCRAFT_DASHBOARD_KPIS: AircraftDashboardKpis = {
 
 const AIRCRAFT_DASHBOARD_DUE_WINDOW_OPTIONS = ['7', '14', '30', '60'] as const;
 
+const AIRCRAFT_UNIFIED_STATUS_OPTIONS: AircraftUnifiedFilterOption[] = [
+  { value: 'all', label: 'All Statuses' },
+  { value: 'open', label: 'Open' },
+  { value: 'in_progress', label: 'In Progress' },
+  { value: 'active', label: 'Active' },
+  { value: 'critical', label: 'Critical' },
+  { value: 'compliant', label: 'Compliant' },
+];
+
+const AIRCRAFT_UNIFIED_LOCALE_OPTIONS: AircraftUnifiedFilterOption[] = [
+  { value: 'en', label: 'English' },
+  { value: 'es', label: 'Español' },
+  { value: 'fr', label: 'Français' },
+];
+
 
 const MANUFACTURER_SEED_NAMES = [
   'AIRBUS',
@@ -1333,6 +1354,9 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   const [selectedAircraftTemplateId, setSelectedAircraftTemplateId] = useState('');
   const [aircraftTemplateFormValues, setAircraftTemplateFormValues] = useState<AircraftTemplateFormValues>(getDefaultAircraftTemplateFormValues());
   const [aircraftTemplateFormErrors, setAircraftTemplateFormErrors] = useState<Record<string, string>>({});
+  const [aircraftUnifiedSearch, setAircraftUnifiedSearch] = useState('');
+  const [aircraftUnifiedStatusFilter, setAircraftUnifiedStatusFilter] = useState('all');
+  const [aircraftUnifiedLocale, setAircraftUnifiedLocale] = useState('en');
   const [aircraftTypeOptions, setAircraftTypeOptions] = useState<string[]>([]);
   const [aircraftStatusOptions, setAircraftStatusOptions] = useState<string[]>([]);
   const [aircraftBaseCatalogOptions, setAircraftBaseCatalogOptions] = useState<string[]>([]);
@@ -4692,7 +4716,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       const nextValues = { ...previous, [key]: value };
       const normalizedValue = value.trim();
       let nextError = '';
-      if (['workPackageNumber', 'topic', 'openingDate', 'revisionNumber', 'status', 'validationState', 'transmissionDate', 'expectedReceptionDate', 'maintenanceReleaseDate', 'workReceptionDate'].includes(key)) {
+      if (['workPackageNumber', 'topic', 'openingDate', 'revisionNumber', 'status', 'validationState', 'transmissionDate', 'expectedReceptionDate', 'maintenanceReleaseDate', 'workReceptionDate', 'source'].includes(key)) {
         nextError = normalizedValue ? '' : `${String(key).replace(/([A-Z])/g, ' $1').replace(/^./, (char) => char.toUpperCase())} is required`;
       }
       if (['openingDate', 'revisionDate', 'transmissionDate', 'expectedReceptionDate', 'maintenanceReleaseDate', 'workReceptionDate', 'plannedStart', 'plannedEnd'].includes(key) && normalizedValue) {
@@ -4823,6 +4847,9 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       }
       if (!aircraftWorkPackageValues.workReceptionDate.trim()) {
         errors.workReceptionDate = 'Work reception date is required';
+      }
+      if (!['schedule_due', 'defect', 'campaign', 'predictive_alert'].includes(aircraftWorkPackageValues.source)) {
+        errors.source = 'Trigger source is required';
       }
       const scopeItems = aircraftWorkPackageValues.scopeItemsText
         .split('\n')
@@ -6281,6 +6308,117 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     ],
     [handleAircraftContextNavigation, handleExportAircraftOpsReport],
   );
+  const activeAircraftUnifiedModuleKey = useMemo<AircraftUnifiedLayoutModuleKey>(() => {
+    if (aircraftSubModuleSegment === 'templates') return 'templates';
+    if (aircraftSubModuleSegment === 'engine') return 'engine';
+    if (aircraftSubModuleSegment === 'components') return 'components';
+    if (aircraftSubModuleSegment === 'documents') return 'documents';
+    if (aircraftSubModuleSegment === 'ad-sb') return 'ad-sb';
+    if (aircraftSubModuleSegment === 'work-packages') return 'work-packages';
+    return 'list';
+  }, [aircraftSubModuleSegment]);
+  const aircraftUnifiedSubtitles = useMemo<Record<AircraftUnifiedLayoutModuleKey, string>>(
+    () => ({
+      list: 'Standardized aircraft list controls, KPI telemetry, and governed navigation for fleet operations.',
+      templates: 'Reusable aircraft template registry with validated create/update/delete flows.',
+      engine: 'Engine lifecycle analytics, scheduling risk insights, and integrated compliance tracking.',
+      components: 'Component monitoring, reliability drill-down, replacement telemetry, and alerts.',
+      documents: 'Documents workspace with unified filtering, status controls, and publication actions.',
+      'ad-sb': 'AD/SB compliance monitoring with role-based control actions and audit-ready status views.',
+      'work-packages': 'Maintenance planning orchestration with New WP, Existing WP, and non-performed task workflows.',
+    }),
+    [],
+  );
+  const aircraftUnifiedActions = useMemo<AircraftPaletteAction[]>(() => {
+    if (activeAircraftUnifiedModuleKey === 'templates') {
+      return [
+        {
+          id: 'refresh-template-registry',
+          label: 'Refresh',
+          icon: <RefreshCw className={cn('h-3.5 w-3.5', aircraftTemplateLoading && 'animate-spin')} aria-hidden="true" />,
+          group: 'secondary',
+          disabled: aircraftTemplateLoading,
+          onAction: async () => {
+            await loadAircraftTemplatesWorkspace();
+          },
+        },
+        {
+          id: 'new-template-registry',
+          label: 'New Template',
+          icon: <Plus className="h-3.5 w-3.5" aria-hidden="true" />,
+          group: 'primary',
+          permission: 'edit_aircraft_records',
+          disabled: !canManageAircraftTemplates,
+          onAction: async () => {
+            openCreateAircraftTemplateDialog();
+          },
+        },
+      ];
+    }
+    if (activeAircraftUnifiedModuleKey === 'work-packages') {
+      return [
+        {
+          id: 'create-work-package-unified',
+          label: 'Create Work Package',
+          icon: <CheckSquare className="h-3.5 w-3.5" aria-hidden="true" />,
+          group: 'primary',
+          permission: 'create_maintenance_request',
+          onAction: async () => {
+            openAircraftWorkPackageDialog();
+          },
+        },
+      ];
+    }
+    return aircraftKpiPaletteActions;
+  }, [
+    activeAircraftUnifiedModuleKey,
+    aircraftKpiPaletteActions,
+    aircraftTemplateLoading,
+    canManageAircraftTemplates,
+    loadAircraftTemplatesWorkspace,
+    openAircraftWorkPackageDialog,
+    openCreateAircraftTemplateDialog,
+  ]);
+  const filteredAircraftTemplateRows = useMemo(
+    () => filterUnifiedModuleRows(
+      aircraftTemplateRows,
+      aircraftUnifiedSearch,
+      aircraftUnifiedStatusFilter,
+      (row) => [
+        String(row.template_name || ''),
+        String(row.aircraft_type || ''),
+        String(row.manufacturer || ''),
+        String(row.aircraft_model || ''),
+        String(row.maintenance_program || ''),
+      ],
+      (row) => String(row.status || row.is_active || 'active'),
+    ),
+    [aircraftTemplateRows, aircraftUnifiedSearch, aircraftUnifiedStatusFilter],
+  );
+  const filteredAircraftDocumentRows = useMemo(
+    () => filterUnifiedModuleRows(
+      aircraftDocumentRows,
+      aircraftUnifiedSearch,
+      aircraftUnifiedStatusFilter,
+      (row) => [String(row.title || ''), String(row.category || ''), String(row.date || '')],
+      (row) => String(row.status || 'open'),
+    ),
+    [aircraftDocumentRows, aircraftUnifiedSearch, aircraftUnifiedStatusFilter],
+  );
+  const filteredAircraftAdSbRows = useMemo(
+    () => filterUnifiedModuleRows(
+      aircraftAdSbRows,
+      aircraftUnifiedSearch,
+      aircraftUnifiedStatusFilter,
+      (row) => [
+        String(row.component_name || row.title || ''),
+        String(row.ad_sb_reference || row.reference || ''),
+        String(row.compliance_state || ''),
+      ],
+      (row) => String(row.compliance_state || 'open'),
+    ),
+    [aircraftAdSbRows, aircraftUnifiedSearch, aircraftUnifiedStatusFilter],
+  );
 
   return (
     <DashboardLayout>
@@ -6331,6 +6469,47 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
               ))}
             </TabsList>
           </Tabs>
+        ) : null}
+        {entity === 'aircraft' && aircraftEnhancementEnabled && isAircraftSubModule ? (
+          <AircraftUnifiedLayout
+            title={`Aircraft · ${AIRCRAFT_NAV_RAIL.find((item) => item.path === currentAircraftNavPath)?.label || 'Workspace'}`}
+            subtitle={aircraftUnifiedSubtitles[activeAircraftUnifiedModuleKey]}
+            activeModuleKey={activeAircraftUnifiedModuleKey}
+            navItems={AIRCRAFT_NAV_RAIL.map((item) => ({
+              key: item.path.split('/').pop() === 'work-packages' ? 'work-packages' : (item.path.split('/').pop() as AircraftUnifiedLayoutModuleKey),
+              label: item.label,
+              path: item.path,
+              icon: item.icon,
+            }))}
+            onNavigate={handleAircraftContextNavigation}
+            searchValue={aircraftUnifiedSearch}
+            onSearchChange={setAircraftUnifiedSearch}
+            statusValue={aircraftUnifiedStatusFilter}
+            onStatusChange={setAircraftUnifiedStatusFilter}
+            statusOptions={AIRCRAFT_UNIFIED_STATUS_OPTIONS}
+            localeValue={aircraftUnifiedLocale}
+            onLocaleChange={setAircraftUnifiedLocale}
+            localeOptions={AIRCRAFT_UNIFIED_LOCALE_OPTIONS}
+            actions={aircraftUnifiedActions}
+            hasPermission={hasPermission}
+            loading={aircraftDashboardLoading || aircraftTemplateLoading}
+            error={aircraftTemplateError || aircraftDashboardError}
+          >
+            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4 text-[12px]">
+              <div className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-muted/30 px-2 py-1">
+                Fleet size: <span className="font-semibold">{aircraftDashboardKpis.fleet_size}</span>
+              </div>
+              <div className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-muted/30 px-2 py-1">
+                Open work packages: <span className="font-semibold">{aircraftDashboardKpis.open_work_packages}</span>
+              </div>
+              <div className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-muted/30 px-2 py-1">
+                Open defects: <span className="font-semibold">{aircraftDashboardKpis.open_defects}</span>
+              </div>
+              <div className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-muted/30 px-2 py-1">
+                Compliance ready: <span className="font-semibold">{aircraftDashboardKpis.compliance_ready_pct}%</span>
+              </div>
+            </div>
+          </AircraftUnifiedLayout>
         ) : null}
 
         {entity === 'aircraft' && aircraftEnhancementEnabled ? (
@@ -6392,24 +6571,6 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                   </div>
                   <AircraftActionPalette actions={aircraftKpiPaletteActions} hasPermission={hasPermission} compact buttonClassName="h-8" className="pt-1" />
                 </div>
-              </div>
-              <div className="flex flex-wrap gap-2 rounded-md border border-[hsl(var(--mdm-template-border))] bg-muted/20 p-2">
-                {AIRCRAFT_NAV_RAIL.map((item) => {
-                  const Icon = item.icon;
-                  return (
-                    <Button
-                      key={item.path}
-                      type="button"
-                      variant={currentAircraftNavPath === item.path ? 'default' : 'outline'}
-                      size="sm"
-                      className="h-8"
-                      onClick={() => handleAircraftContextNavigation(item.path)}
-                    >
-                      <Icon className="mr-1 h-3.5 w-3.5" />
-                      {item.label}
-                    </Button>
-                  );
-                })}
               </div>
               {!showAircraftOperationsOverview || showAircraftOperationsOverviewSection ? (
                 <div className="space-y-2">
@@ -6802,7 +6963,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                 <div className="space-y-3 rounded-md border border-[hsl(var(--mdm-template-border))] p-4">
                   <div className="flex items-center justify-between gap-2">
                     <h4 className="text-[13px] font-semibold text-[hsl(var(--mdm-template-heading))]">Document Repository</h4>
-                    <Badge variant="secondary">{aircraftDocumentRows.length} records</Badge>
+                    <Badge variant="secondary">{filteredAircraftDocumentRows.length} records</Badge>
                   </div>
                   <div className="grid gap-2 text-[12px] md:grid-cols-3">
                     <div className="rounded-md bg-muted/40 p-2">Maintenance Docs: <span className="font-semibold">{aircraftDashboardMaintenanceRows.length}</span></div>
@@ -6810,10 +6971,10 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                     <div className="rounded-md bg-muted/40 p-2">Defect Reports: <span className="font-semibold">{aircraftDashboardDefectRows.length}</span></div>
                   </div>
                   <div className="grid gap-2 text-[12px]">
-                    {aircraftDocumentRows.length === 0 ? (
+                    {filteredAircraftDocumentRows.length === 0 ? (
                       <p className="text-[hsl(var(--mdm-template-muted))]">No documents available in the selected window.</p>
                     ) : (
-                      aircraftDocumentRows.map((row, index) => (
+                      filteredAircraftDocumentRows.map((row, index) => (
                         <div key={`doc-row-${index + 1}`} className="grid grid-cols-12 gap-2 rounded-md border border-[hsl(var(--mdm-template-border))] px-2 py-1">
                           <span className="col-span-6">{row.title}</span>
                           <span className="col-span-2 text-[hsl(var(--mdm-template-muted))]">{row.category}</span>
@@ -6844,13 +7005,13 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                   <div className="grid gap-2 text-[12px] md:grid-cols-3">
                     <div className="rounded-md bg-muted/40 p-2">Compliance %: <span className="font-semibold">{String(aircraftDashboardComponentsModule?.kpis?.ad_sb_compliance_pct ?? 0)}%</span></div>
                     <div className="rounded-md bg-muted/40 p-2">Tracked Components: <span className="font-semibold">{String(aircraftDashboardComponentsModule?.kpis?.tracked_components ?? 0)}</span></div>
-                    <div className="rounded-md bg-muted/40 p-2">Pending Directives: <span className="font-semibold">{aircraftAdSbRows.length}</span></div>
+                    <div className="rounded-md bg-muted/40 p-2">Pending Directives: <span className="font-semibold">{filteredAircraftAdSbRows.length}</span></div>
                   </div>
                   <div className="space-y-1 text-[12px]">
-                    {aircraftAdSbRows.length === 0 ? (
+                    {filteredAircraftAdSbRows.length === 0 ? (
                       <p className="text-[hsl(var(--mdm-template-muted))]">No pending AD/SB directives in the selected window.</p>
                     ) : (
-                      aircraftAdSbRows.map((row, index) => (
+                      filteredAircraftAdSbRows.map((row, index) => (
                         <div key={`ad-sb-row-${index + 1}`} className="rounded-md border border-[hsl(var(--mdm-template-border))] px-2 py-1">
                           {String(row.title || 'Directive')} · {String(row.compliance_state || 'pending')} · due {String(row.due_in_days ?? '-')}d
                         </div>
@@ -6916,22 +7077,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
             <CardHeader className="mdm-template-panel-head">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <CardTitle className="mdm-template-panel-title">Aircraft Template Registry</CardTitle>
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => void loadAircraftTemplatesWorkspace()}
-                    disabled={aircraftTemplateLoading}
-                  >
-                    <RefreshCw className={cn('mr-1.5 h-3.5 w-3.5', aircraftTemplateLoading && 'animate-spin')} aria-hidden="true" />
-                    Refresh
-                  </Button>
-                  <Button type="button" size="sm" onClick={openCreateAircraftTemplateDialog} disabled={!canManageAircraftTemplates}>
-                    <Plus className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
-                    New Template
-                  </Button>
-                </div>
+                <Badge variant="secondary">{filteredAircraftTemplateRows.length} templates</Badge>
               </div>
             </CardHeader>
             <CardContent className="mdm-template-panel-body space-y-3">
@@ -6955,14 +7101,14 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {aircraftTemplateRows.length === 0 && !aircraftTemplateLoading ? (
+                    {filteredAircraftTemplateRows.length === 0 && !aircraftTemplateLoading ? (
                       <TableRow>
                         <TableCell colSpan={8} className="px-3 py-8 text-center text-sm text-muted-foreground">
                           No aircraft templates found.
                         </TableCell>
                       </TableRow>
                     ) : null}
-                    {aircraftTemplateRows.map((template) => (
+                    {filteredAircraftTemplateRows.map((template) => (
                       <TableRow key={template.id}>
                         <TableCell className="px-3 py-2">{template.template_name || '-'}</TableCell>
                         <TableCell className="px-3 py-2">{template.aircraft_type || '-'}</TableCell>
@@ -8396,6 +8542,21 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                               </SelectContent>
                             </Select>
                             {aircraftWorkPackageErrors.status ? <p className="mdm-template-danger">{aircraftWorkPackageErrors.status}</p> : null}
+                          </div>
+                          <div className="space-y-1">
+                            <Label htmlFor="aircraft-wp-trigger-source" className="text-[12px] font-medium text-[#696969]">Trigger source</Label>
+                            <Select value={aircraftWorkPackageValues.source} onValueChange={(value) => setAircraftWorkPackageField('source', value)}>
+                              <SelectTrigger id="aircraft-wp-trigger-source" className={cn('h-[26px] rounded-none border-[#eeeeee] bg-white px-2 text-[11px] text-[#525252] shadow-none', aircraftWorkPackageErrors.source && 'border-destructive')}>
+                                <SelectValue placeholder="Schedule Due" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="schedule_due">Schedule Due</SelectItem>
+                                <SelectItem value="defect">Defect</SelectItem>
+                                <SelectItem value="campaign">Campaign</SelectItem>
+                                <SelectItem value="predictive_alert">Predictive Alert</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            {aircraftWorkPackageErrors.source ? <p className="mdm-template-danger">{aircraftWorkPackageErrors.source}</p> : null}
                           </div>
                           <div className="space-y-1">
                             <Label htmlFor="aircraft-wp-expected-reception" className="text-[12px] font-medium text-[#696969]">Expected reception date</Label>
