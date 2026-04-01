@@ -1420,7 +1420,9 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
 
   it('routes each aircraft sub-module to its dedicated interface without cross-module content leakage', async () => {
     renderAircraftSubModulePage('/dashboard/amro/aircraft/list');
-    expect(await screen.findByText(/Aircraft Search and Filter/i, {}, { timeout: ASYNC_WAIT_TIMEOUT_MS })).toBeInTheDocument();
+    expect(await screen.findByLabelText('Unified module search', {}, { timeout: ASYNC_WAIT_TIMEOUT_MS })).toBeInTheDocument();
+    expect(screen.getByLabelText('Records per page')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Unified module search'), { target: { value: 'A320' } });
 
     fireEvent.click(screen.getByRole('button', { name: 'Engine' }));
     expect(await screen.findByText(/View: engine/i, {}, { timeout: ASYNC_WAIT_TIMEOUT_MS })).toBeInTheDocument();
@@ -1440,20 +1442,30 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     fireEvent.click(screen.getByRole('button', { name: 'Components' }));
     expect(await screen.findByText(/View: components/i, {}, { timeout: ASYNC_WAIT_TIMEOUT_MS })).toBeInTheDocument();
     expect(screen.getByText(/AD\/SB Compliance:/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText('Records per page')).not.toBeInTheDocument();
     expect(screen.queryByText(/Document Repository/i)).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Documents' }));
     expect(await screen.findByText(/Documents Management/i, {}, { timeout: ASYNC_WAIT_TIMEOUT_MS })).toBeInTheDocument();
     expect(screen.getByText(/Document Repository/i)).toBeInTheDocument();
+    expect(screen.getByLabelText('Document category')).toBeInTheDocument();
     expect(screen.queryByText(/Engine Drill-down/i)).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'AD/SB' }));
     expect(await screen.findByText(/AD\/SB Management/i, {}, { timeout: ASYNC_WAIT_TIMEOUT_MS })).toBeInTheDocument();
     expect(screen.getByText(/AD\/SB Compliance Management/i)).toBeInTheDocument();
+    expect(screen.getByLabelText('AD/SB compliance state')).toBeInTheDocument();
     expect(screen.queryByText(/Document Repository/i)).not.toBeInTheDocument();
 
+    fireEvent.click(screen.getByRole('button', { name: 'Templates' }));
+    expect(await screen.findByRole('heading', { name: 'Aircraft Template Registry' }, { timeout: ASYNC_WAIT_TIMEOUT_MS })).toBeInTheDocument();
+    expect(screen.getByLabelText('Template aircraft type')).toBeInTheDocument();
+    expect(screen.getByLabelText('Template manufacturer')).toBeInTheDocument();
+
     fireEvent.click(screen.getByRole('button', { name: 'Aircraft List' }));
-    expect(await screen.findByText(/Aircraft Search and Filter/i)).toBeInTheDocument();
+    expect(await screen.findByLabelText('Unified module search')).toBeInTheDocument();
+    expect(screen.getByLabelText('Records per page')).toBeInTheDocument();
+    expect(screen.getByLabelText('Unified module search')).toHaveValue('A320');
   });
 
   it('renders aircraft templates workspace and validates required create fields', async () => {

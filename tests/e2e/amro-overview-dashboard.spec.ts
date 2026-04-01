@@ -95,6 +95,41 @@ test.describe('amro aircraft CRUD smoke', () => {
       await page.getByRole('button', { name: step.label }).first().click();
       await expect(page).toHaveURL(new RegExp(step.urlSegment.replace(/\//g, '\\/')));
       await expect(page.getByText(/Aircraft ·/).first()).toBeVisible();
+      await expect(page.getByLabel('Unified module search')).toBeVisible();
+      await expect(page.getByLabel('Unified module status filter')).toBeVisible();
+      await expect(page.getByLabel('Unified module locale selector')).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Clear filters' })).toBeVisible();
+      if (step.label === 'Aircraft List') {
+        await expect(page.getByLabel('Records per page')).toBeVisible();
+      }
+      if (step.label === 'Templates') {
+        await expect(page.getByLabel('Template aircraft type')).toBeVisible();
+        await expect(page.getByLabel('Template manufacturer')).toBeVisible();
+      }
+      if (step.label === 'Documents') {
+        await expect(page.getByLabel('Document category')).toBeVisible();
+      }
+      if (step.label === 'AD/SB') {
+        await expect(page.getByLabel('AD/SB compliance state')).toBeVisible();
+      }
+    }
+
+    const searchInput = page.getByLabel('Unified module search');
+    await page.getByRole('button', { name: 'Aircraft List' }).first().click();
+    await searchInput.fill('A320');
+    await expect(searchInput).toHaveValue('A320');
+    await page.getByRole('button', { name: 'Documents' }).first().click();
+    await expect(page.getByLabel('Unified module search')).toHaveValue('A320');
+    await page.getByRole('button', { name: 'Aircraft List' }).first().click();
+    await expect(page.getByLabel('Unified module search')).toHaveValue('A320');
+    await page.getByRole('button', { name: 'Clear filters' }).click();
+    await expect(searchInput).toHaveValue('');
+
+    await page.getByLabel('Unified module locale selector').click();
+    const spanishLocaleOption = page.getByRole('option', { name: 'Español' });
+    if (await spanishLocaleOption.count()) {
+      await spanishLocaleOption.first().click();
+      await expect(page.getByText('Locale: ES').first()).toBeVisible();
     }
   });
 

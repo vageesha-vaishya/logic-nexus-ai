@@ -98,7 +98,7 @@ export default defineConfig({
   projects,
   webServer: enableDevServer
     ? {
-        command: 'npm run dev -- --host 0.0.0.0 --port 4173',
+        command: 'npm run dev:vite -- --host 0.0.0.0 --port 4173 --strictPort',
         url: baseURL,
         reuseExistingServer: true,
       }

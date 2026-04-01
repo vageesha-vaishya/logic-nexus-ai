@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -128,8 +128,10 @@ import { AircraftLeadsManager, type AircraftLeadsTab } from './amro-settings-mas
 import { AircraftActionPalette, type AircraftPaletteAction } from './amro-settings-master-data/components/AircraftActionPalette';
 import {
   AircraftUnifiedLayout,
+  type AircraftUnifiedDynamicFilter,
   filterUnifiedModuleRows,
   type AircraftUnifiedFilterOption,
+  type AircraftUnifiedLayoutLabels,
   type AircraftUnifiedLayoutModuleKey,
 } from './amro-settings-master-data/components/AircraftUnifiedLayout';
 
@@ -871,6 +873,39 @@ const AIRCRAFT_UNIFIED_LOCALE_OPTIONS: AircraftUnifiedFilterOption[] = [
   { value: 'fr', label: 'Français' },
 ];
 
+const AIRCRAFT_UNIFIED_LAYOUT_I18N: Record<string, AircraftUnifiedLayoutLabels> = {
+  en: {
+    searchPlaceholder: 'Search in active module',
+    searchAriaLabel: 'Unified module search',
+    statusAriaLabel: 'Unified module status filter',
+    localeAriaLabel: 'Unified module locale selector',
+    navAriaLabel: 'Unified module navigation',
+    clearFilters: 'Clear filters',
+    loadingMessage: 'Loading module data…',
+    resultLabel: 'records',
+  },
+  es: {
+    searchPlaceholder: 'Buscar en el módulo activo',
+    searchAriaLabel: 'Búsqueda del módulo unificado',
+    statusAriaLabel: 'Filtro de estado del módulo unificado',
+    localeAriaLabel: 'Selector de idioma del módulo unificado',
+    navAriaLabel: 'Navegación de módulos unificados',
+    clearFilters: 'Limpiar filtros',
+    loadingMessage: 'Cargando datos del módulo…',
+    resultLabel: 'registros',
+  },
+  fr: {
+    searchPlaceholder: 'Rechercher dans le module actif',
+    searchAriaLabel: 'Recherche du module unifié',
+    statusAriaLabel: 'Filtre de statut du module unifié',
+    localeAriaLabel: 'Sélecteur de langue du module unifié',
+    navAriaLabel: 'Navigation du module unifié',
+    clearFilters: 'Réinitialiser les filtres',
+    loadingMessage: 'Chargement des données du module…',
+    resultLabel: 'enregistrements',
+  },
+};
+
 
 const MANUFACTURER_SEED_NAMES = [
   'AIRBUS',
@@ -1357,6 +1392,11 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   const [aircraftUnifiedSearch, setAircraftUnifiedSearch] = useState('');
   const [aircraftUnifiedStatusFilter, setAircraftUnifiedStatusFilter] = useState('all');
   const [aircraftUnifiedLocale, setAircraftUnifiedLocale] = useState('en');
+  const [aircraftUnifiedTemplateTypeFilter, setAircraftUnifiedTemplateTypeFilter] = useState('all');
+  const [aircraftUnifiedTemplateManufacturerFilter, setAircraftUnifiedTemplateManufacturerFilter] = useState('all');
+  const [aircraftUnifiedDocumentCategoryFilter, setAircraftUnifiedDocumentCategoryFilter] = useState('all');
+  const [aircraftUnifiedAdSbComplianceFilter, setAircraftUnifiedAdSbComplianceFilter] = useState('all');
+  const deferredAircraftUnifiedSearch = useDeferredValue(aircraftUnifiedSearch);
   const [aircraftTypeOptions, setAircraftTypeOptions] = useState<string[]>([]);
   const [aircraftStatusOptions, setAircraftStatusOptions] = useState<string[]>([]);
   const [aircraftBaseCatalogOptions, setAircraftBaseCatalogOptions] = useState<string[]>([]);
@@ -6379,10 +6419,102 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     openAircraftWorkPackageDialog,
     openCreateAircraftTemplateDialog,
   ]);
+  useEffect(() => {
+    if (activeAircraftUnifiedModuleKey !== 'list') {
+      return;
+    }
+    if (aircraftUnifiedSearch !== search) {
+      setSearch(aircraftUnifiedSearch);
+    }
+  }, [activeAircraftUnifiedModuleKey, aircraftUnifiedSearch, search]);
+  useEffect(() => {
+    if (activeAircraftUnifiedModuleKey !== 'list') {
+      return;
+    }
+    if (aircraftUnifiedStatusFilter !== statusFilter) {
+      setStatusFilter(aircraftUnifiedStatusFilter);
+    }
+  }, [activeAircraftUnifiedModuleKey, aircraftUnifiedStatusFilter, statusFilter]);
+  useEffect(() => {
+    if (activeAircraftUnifiedModuleKey !== 'list') {
+      return;
+    }
+    if (search !== aircraftUnifiedSearch) {
+      setAircraftUnifiedSearch(search);
+    }
+  }, [activeAircraftUnifiedModuleKey, aircraftUnifiedSearch, search]);
+  useEffect(() => {
+    if (activeAircraftUnifiedModuleKey !== 'list') {
+      return;
+    }
+    if (statusFilter !== aircraftUnifiedStatusFilter) {
+      setAircraftUnifiedStatusFilter(statusFilter);
+    }
+  }, [activeAircraftUnifiedModuleKey, aircraftUnifiedStatusFilter, statusFilter]);
+  const aircraftTemplateTypeOptions = useMemo<AircraftUnifiedFilterOption[]>(
+    () => [
+      { value: 'all', label: 'All Types' },
+      ...Array.from(
+        new Set(
+          aircraftTemplateRows
+            .map((row) => String(row.aircraft_type || '').trim())
+            .filter(Boolean),
+        ),
+      )
+        .sort((a, b) => a.localeCompare(b))
+        .map((value) => ({ value: value.toLowerCase(), label: value })),
+    ],
+    [aircraftTemplateRows],
+  );
+  const aircraftTemplateManufacturerOptions = useMemo<AircraftUnifiedFilterOption[]>(
+    () => [
+      { value: 'all', label: 'All Makers' },
+      ...Array.from(
+        new Set(
+          aircraftTemplateRows
+            .map((row) => String(row.manufacturer || '').trim())
+            .filter(Boolean),
+        ),
+      )
+        .sort((a, b) => a.localeCompare(b))
+        .map((value) => ({ value: value.toLowerCase(), label: value })),
+    ],
+    [aircraftTemplateRows],
+  );
+  const aircraftDocumentCategoryOptions = useMemo<AircraftUnifiedFilterOption[]>(
+    () => [
+      { value: 'all', label: 'All Categories' },
+      ...Array.from(
+        new Set(
+          aircraftDocumentRows
+            .map((row) => String(row.category || '').trim())
+            .filter(Boolean),
+        ),
+      )
+        .sort((a, b) => a.localeCompare(b))
+        .map((value) => ({ value: value.toLowerCase(), label: value })),
+    ],
+    [aircraftDocumentRows],
+  );
+  const aircraftAdSbComplianceOptions = useMemo<AircraftUnifiedFilterOption[]>(
+    () => [
+      { value: 'all', label: 'All Compliance' },
+      ...Array.from(
+        new Set(
+          aircraftAdSbRows
+            .map((row) => String(row.compliance_state || '').trim())
+            .filter(Boolean),
+        ),
+      )
+        .sort((a, b) => a.localeCompare(b))
+        .map((value) => ({ value: value.toLowerCase(), label: value })),
+    ],
+    [aircraftAdSbRows],
+  );
   const filteredAircraftTemplateRows = useMemo(
     () => filterUnifiedModuleRows(
       aircraftTemplateRows,
-      aircraftUnifiedSearch,
+      deferredAircraftUnifiedSearch,
       aircraftUnifiedStatusFilter,
       (row) => [
         String(row.template_name || ''),
@@ -6391,24 +6523,36 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         String(row.aircraft_model || ''),
         String(row.maintenance_program || ''),
       ],
-      (row) => String(row.status || row.is_active || 'active'),
-    ),
-    [aircraftTemplateRows, aircraftUnifiedSearch, aircraftUnifiedStatusFilter],
+      (row) => String((row as Record<string, unknown>).status || (row as Record<string, unknown>).is_active || 'active'),
+    ).filter((row) => {
+      const normalizedType = String(row.aircraft_type || '').trim().toLowerCase();
+      const normalizedManufacturer = String(row.manufacturer || '').trim().toLowerCase();
+      return (aircraftUnifiedTemplateTypeFilter === 'all' || normalizedType === aircraftUnifiedTemplateTypeFilter)
+        && (aircraftUnifiedTemplateManufacturerFilter === 'all' || normalizedManufacturer === aircraftUnifiedTemplateManufacturerFilter);
+    }),
+    [
+      aircraftTemplateRows,
+      aircraftUnifiedStatusFilter,
+      aircraftUnifiedTemplateManufacturerFilter,
+      aircraftUnifiedTemplateTypeFilter,
+      deferredAircraftUnifiedSearch,
+    ],
   );
   const filteredAircraftDocumentRows = useMemo(
     () => filterUnifiedModuleRows(
       aircraftDocumentRows,
-      aircraftUnifiedSearch,
+      deferredAircraftUnifiedSearch,
       aircraftUnifiedStatusFilter,
       (row) => [String(row.title || ''), String(row.category || ''), String(row.date || '')],
       (row) => String(row.status || 'open'),
-    ),
-    [aircraftDocumentRows, aircraftUnifiedSearch, aircraftUnifiedStatusFilter],
+    ).filter((row) => aircraftUnifiedDocumentCategoryFilter === 'all'
+      || String(row.category || '').trim().toLowerCase() === aircraftUnifiedDocumentCategoryFilter),
+    [aircraftDocumentRows, aircraftUnifiedDocumentCategoryFilter, aircraftUnifiedStatusFilter, deferredAircraftUnifiedSearch],
   );
   const filteredAircraftAdSbRows = useMemo(
     () => filterUnifiedModuleRows(
       aircraftAdSbRows,
-      aircraftUnifiedSearch,
+      deferredAircraftUnifiedSearch,
       aircraftUnifiedStatusFilter,
       (row) => [
         String(row.component_name || row.title || ''),
@@ -6416,9 +6560,192 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         String(row.compliance_state || ''),
       ],
       (row) => String(row.compliance_state || 'open'),
-    ),
-    [aircraftAdSbRows, aircraftUnifiedSearch, aircraftUnifiedStatusFilter],
+    ).filter((row) => aircraftUnifiedAdSbComplianceFilter === 'all'
+      || String(row.compliance_state || '').trim().toLowerCase() === aircraftUnifiedAdSbComplianceFilter),
+    [aircraftAdSbRows, aircraftUnifiedAdSbComplianceFilter, aircraftUnifiedStatusFilter, deferredAircraftUnifiedSearch],
   );
+  const filteredAircraftEngineMaintenanceRows = useMemo(
+    () => filterUnifiedModuleRows(
+      aircraftEngineMaintenanceRows,
+      deferredAircraftUnifiedSearch,
+      aircraftUnifiedStatusFilter,
+      (row) => [
+        String(row.work_package_number || ''),
+        String(row.title || ''),
+        String(row.status || ''),
+      ],
+      (row) => String(row.status || 'open'),
+    ),
+    [aircraftEngineMaintenanceRows, aircraftUnifiedStatusFilter, deferredAircraftUnifiedSearch],
+  );
+  const filteredAircraftComponentLifecycleRows = useMemo(
+    () => filterUnifiedModuleRows(
+      aircraftComponentLifecycleRows,
+      deferredAircraftUnifiedSearch,
+      aircraftUnifiedStatusFilter,
+      (row) => [
+        String(row.component_name || ''),
+        String(row.part_number || ''),
+        String(row.compliance_state || ''),
+      ],
+      (row) => String(row.compliance_state || row.status || 'open'),
+    ),
+    [aircraftComponentLifecycleRows, aircraftUnifiedStatusFilter, deferredAircraftUnifiedSearch],
+  );
+  const aircraftUnifiedLabels = useMemo<AircraftUnifiedLayoutLabels>(
+    () => AIRCRAFT_UNIFIED_LAYOUT_I18N[aircraftUnifiedLocale] || AIRCRAFT_UNIFIED_LAYOUT_I18N.en,
+    [aircraftUnifiedLocale],
+  );
+  const aircraftUnifiedStatusOptions = useMemo<AircraftUnifiedFilterOption[]>(() => {
+    if (aircraftUnifiedLocale === 'es') {
+      return [
+        { value: 'all', label: 'Todos los estados' },
+        { value: 'open', label: 'Abierto' },
+        { value: 'in_progress', label: 'En progreso' },
+        { value: 'active', label: 'Activo' },
+        { value: 'critical', label: 'Crítico' },
+        { value: 'compliant', label: 'Conforme' },
+      ];
+    }
+    if (aircraftUnifiedLocale === 'fr') {
+      return [
+        { value: 'all', label: 'Tous les statuts' },
+        { value: 'open', label: 'Ouvert' },
+        { value: 'in_progress', label: 'En cours' },
+        { value: 'active', label: 'Actif' },
+        { value: 'critical', label: 'Critique' },
+        { value: 'compliant', label: 'Conforme' },
+      ];
+    }
+    return AIRCRAFT_UNIFIED_STATUS_OPTIONS;
+  }, [aircraftUnifiedLocale]);
+  const clearAircraftUnifiedFilters = useCallback(() => {
+    setAircraftUnifiedSearch('');
+    setAircraftUnifiedStatusFilter('all');
+    setAircraftUnifiedTemplateTypeFilter('all');
+    setAircraftUnifiedTemplateManufacturerFilter('all');
+    setAircraftUnifiedDocumentCategoryFilter('all');
+    setAircraftUnifiedAdSbComplianceFilter('all');
+  }, []);
+  const aircraftUnifiedDynamicFilters = useMemo<AircraftUnifiedDynamicFilter[]>(() => {
+    if (activeAircraftUnifiedModuleKey === 'list') {
+      return [
+        {
+          id: 'list-page-size',
+          type: 'select',
+          value: pageSize,
+          onValueChange: setPageSize,
+          ariaLabel: 'Records per page',
+          options: [
+            { value: '25', label: '25 / page' },
+            { value: '50', label: '50 / page' },
+            { value: '100', label: '100 / page' },
+          ],
+          className: 'w-[140px] xl:w-[120px]',
+        },
+      ];
+    }
+    if (activeAircraftUnifiedModuleKey === 'templates') {
+      return [
+        {
+          id: 'template-type',
+          type: 'select',
+          value: aircraftUnifiedTemplateTypeFilter,
+          onValueChange: setAircraftUnifiedTemplateTypeFilter,
+          ariaLabel: 'Template aircraft type',
+          options: aircraftTemplateTypeOptions,
+        },
+        {
+          id: 'template-manufacturer',
+          type: 'select',
+          value: aircraftUnifiedTemplateManufacturerFilter,
+          onValueChange: setAircraftUnifiedTemplateManufacturerFilter,
+          ariaLabel: 'Template manufacturer',
+          options: aircraftTemplateManufacturerOptions,
+        },
+      ];
+    }
+    if (activeAircraftUnifiedModuleKey === 'documents') {
+      return [
+        {
+          id: 'document-category',
+          type: 'select',
+          value: aircraftUnifiedDocumentCategoryFilter,
+          onValueChange: setAircraftUnifiedDocumentCategoryFilter,
+          ariaLabel: 'Document category',
+          options: aircraftDocumentCategoryOptions,
+        },
+      ];
+    }
+    if (activeAircraftUnifiedModuleKey === 'ad-sb') {
+      return [
+        {
+          id: 'ad-sb-compliance',
+          type: 'select',
+          value: aircraftUnifiedAdSbComplianceFilter,
+          onValueChange: setAircraftUnifiedAdSbComplianceFilter,
+          ariaLabel: 'AD/SB compliance state',
+          options: aircraftAdSbComplianceOptions,
+        },
+      ];
+    }
+    return [];
+  }, [
+    activeAircraftUnifiedModuleKey,
+    aircraftAdSbComplianceOptions,
+    aircraftDocumentCategoryOptions,
+    aircraftTemplateManufacturerOptions,
+    aircraftTemplateTypeOptions,
+    aircraftUnifiedAdSbComplianceFilter,
+    aircraftUnifiedDocumentCategoryFilter,
+    aircraftUnifiedTemplateManufacturerFilter,
+    aircraftUnifiedTemplateTypeFilter,
+    pageSize,
+    setPageSize,
+  ]);
+  const aircraftUnifiedResultSummary = useMemo(() => {
+    if (activeAircraftUnifiedModuleKey === 'templates') {
+      return { visible: filteredAircraftTemplateRows.length, total: aircraftTemplateRows.length };
+    }
+    if (activeAircraftUnifiedModuleKey === 'documents') {
+      return { visible: filteredAircraftDocumentRows.length, total: aircraftDocumentRows.length };
+    }
+    if (activeAircraftUnifiedModuleKey === 'ad-sb') {
+      return { visible: filteredAircraftAdSbRows.length, total: aircraftAdSbRows.length };
+    }
+    if (activeAircraftUnifiedModuleKey === 'engine') {
+      return { visible: filteredAircraftEngineMaintenanceRows.length, total: aircraftEngineMaintenanceRows.length };
+    }
+    if (activeAircraftUnifiedModuleKey === 'components') {
+      return { visible: filteredAircraftComponentLifecycleRows.length, total: aircraftComponentLifecycleRows.length };
+    }
+    if (activeAircraftUnifiedModuleKey === 'work-packages') {
+      const total = aircraftWorkPackageSnapshot.open
+        + aircraftWorkPackageSnapshot.inProgress
+        + aircraftWorkPackageSnapshot.deferred
+        + aircraftWorkPackageSnapshot.completed;
+      return { visible: total, total };
+    }
+    return { visible: renderedRows.length, total: rows.length };
+  }, [
+    activeAircraftUnifiedModuleKey,
+    aircraftAdSbRows.length,
+    aircraftComponentLifecycleRows.length,
+    aircraftDocumentRows.length,
+    aircraftEngineMaintenanceRows.length,
+    aircraftTemplateRows.length,
+    aircraftWorkPackageSnapshot.completed,
+    aircraftWorkPackageSnapshot.deferred,
+    aircraftWorkPackageSnapshot.inProgress,
+    aircraftWorkPackageSnapshot.open,
+    filteredAircraftAdSbRows.length,
+    filteredAircraftComponentLifecycleRows.length,
+    filteredAircraftDocumentRows.length,
+    filteredAircraftEngineMaintenanceRows.length,
+    filteredAircraftTemplateRows.length,
+    renderedRows.length,
+    rows.length,
+  ]);
 
   return (
     <DashboardLayout>
@@ -6486,7 +6813,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
             onSearchChange={setAircraftUnifiedSearch}
             statusValue={aircraftUnifiedStatusFilter}
             onStatusChange={setAircraftUnifiedStatusFilter}
-            statusOptions={AIRCRAFT_UNIFIED_STATUS_OPTIONS}
+            statusOptions={aircraftUnifiedStatusOptions}
             localeValue={aircraftUnifiedLocale}
             onLocaleChange={setAircraftUnifiedLocale}
             localeOptions={AIRCRAFT_UNIFIED_LOCALE_OPTIONS}
@@ -6494,6 +6821,10 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
             hasPermission={hasPermission}
             loading={aircraftDashboardLoading || aircraftTemplateLoading}
             error={aircraftTemplateError || aircraftDashboardError}
+            resultSummary={aircraftUnifiedResultSummary}
+            onClearFilters={clearAircraftUnifiedFilters}
+            labels={aircraftUnifiedLabels}
+            dynamicFilters={aircraftUnifiedDynamicFilters}
           >
             <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4 text-[12px]">
               <div className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-muted/30 px-2 py-1">
@@ -6664,10 +6995,10 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                       <div className="grid gap-2 text-[12px] md:grid-cols-2">
                         <div className="space-y-1 rounded-md border border-[hsl(var(--mdm-template-border))] p-2">
                           <p className="font-medium text-[hsl(var(--mdm-template-heading))]">Maintenance Scheduling & Tracking</p>
-                          {aircraftEngineMaintenanceRows.length === 0 ? (
+                          {filteredAircraftEngineMaintenanceRows.length === 0 ? (
                             <p className="text-[hsl(var(--mdm-template-muted))]">No engine schedule rows in selected window.</p>
                           ) : (
-                            aircraftEngineMaintenanceRows.map((row, index) => (
+                            filteredAircraftEngineMaintenanceRows.map((row, index) => (
                               <div key={`engine-maintenance-row-${index + 1}`} className="rounded-md border border-[hsl(var(--mdm-template-border))] px-2 py-1">
                                 {String(row.work_package_number || row.title || 'Engine work order')} · {String(row.status || 'open')} · due {String(row.due_in_days ?? '-')}d
                               </div>
@@ -6932,10 +7263,10 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                       <div className="grid gap-2 text-[12px] md:grid-cols-2">
                         <div className="space-y-1">
                           <p className="font-medium text-[hsl(var(--mdm-template-heading))]">Lifecycle Tracking</p>
-                          {aircraftComponentLifecycleRows.length === 0 ? (
+                          {filteredAircraftComponentLifecycleRows.length === 0 ? (
                             <p className="text-[hsl(var(--mdm-template-muted))]">No lifecycle rows in selected window.</p>
                           ) : (
-                            aircraftComponentLifecycleRows.map((row, index) => (
+                            filteredAircraftComponentLifecycleRows.map((row, index) => (
                               <div key={`component-lifecycle-row-${index + 1}`} className="rounded-md border border-[hsl(var(--mdm-template-border))] px-2 py-1">
                                 {String(row.title || 'Component')} · {String(row.compliance_state || 'pending')} · due {String(row.due_in_days ?? '-')}d
                               </div>
@@ -7135,7 +7466,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
             </CardContent>
           </Card>
         ) : null}
-        {showAircraftMasterRecords ? (
+        {showAircraftMasterRecords && !(entity === 'aircraft' && aircraftEnhancementEnabled && isAircraftSubModule) ? (
         <Card className="mdm-template-panel">
           <CardHeader className="mdm-template-panel-head">
             <CardTitle className="mdm-template-panel-title">{ENTITY_LABEL[entity]} Search and Filter</CardTitle>

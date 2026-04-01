@@ -22,6 +22,42 @@ export type AircraftUnifiedFilterOption = {
   label: string;
 };
 
+export type AircraftUnifiedLayoutLabels = {
+  searchPlaceholder: string;
+  searchAriaLabel: string;
+  statusAriaLabel: string;
+  localeAriaLabel: string;
+  navAriaLabel: string;
+  clearFilters: string;
+  loadingMessage: string;
+  resultLabel: string;
+};
+
+export type AircraftUnifiedResultSummary = {
+  visible: number;
+  total: number;
+};
+
+export type AircraftUnifiedDynamicFilter =
+  | {
+      id: string;
+      type: 'text' | 'date';
+      value: string;
+      onValueChange: (value: string) => void;
+      placeholder?: string;
+      ariaLabel: string;
+      className?: string;
+    }
+  | {
+      id: string;
+      type: 'select';
+      value: string;
+      onValueChange: (value: string) => void;
+      options: AircraftUnifiedFilterOption[];
+      ariaLabel: string;
+      className?: string;
+    };
+
 type AircraftUnifiedLayoutProps = {
   title: string;
   subtitle: string;
@@ -40,7 +76,22 @@ type AircraftUnifiedLayoutProps = {
   hasPermission?: (permission: string) => boolean;
   loading?: boolean;
   error?: string;
+  resultSummary?: AircraftUnifiedResultSummary;
+  onClearFilters?: () => void;
+  labels?: Partial<AircraftUnifiedLayoutLabels>;
+  dynamicFilters?: AircraftUnifiedDynamicFilter[];
   children: ReactNode;
+};
+
+const DEFAULT_UNIFIED_LAYOUT_LABELS: AircraftUnifiedLayoutLabels = {
+  searchPlaceholder: 'Search in active module',
+  searchAriaLabel: 'Unified module search',
+  statusAriaLabel: 'Unified module status filter',
+  localeAriaLabel: 'Unified module locale selector',
+  navAriaLabel: 'Unified module navigation',
+  clearFilters: 'Clear filters',
+  loadingMessage: 'Loading module data…',
+  resultLabel: 'records',
 };
 
 export function filterUnifiedModuleRows<T>(
@@ -79,8 +130,14 @@ export function AircraftUnifiedLayout({
   hasPermission = () => true,
   loading = false,
   error = '',
+  resultSummary,
+  onClearFilters,
+  labels,
+  dynamicFilters = [],
   children,
 }: AircraftUnifiedLayoutProps) {
+  const uiLabels = { ...DEFAULT_UNIFIED_LAYOUT_LABELS, ...labels };
+
   return (
     <Card className="mdm-template-panel" data-testid="aircraft-unified-layout">
       <CardHeader className="mdm-template-panel-head space-y-3">
@@ -94,7 +151,12 @@ export function AircraftUnifiedLayout({
             <Badge variant="secondary">Module: {activeModuleKey}</Badge>
           </div>
         </div>
-        <div className="flex flex-wrap gap-2 rounded-md border border-[hsl(var(--mdm-template-border))] bg-muted/20 p-2" data-testid="aircraft-unified-nav">
+        <div
+          className="flex flex-wrap gap-2 rounded-md border border-[hsl(var(--mdm-template-border))] bg-muted/20 p-2"
+          data-testid="aircraft-unified-nav"
+          role="toolbar"
+          aria-label={uiLabels.navAriaLabel}
+        >
           {navItems.map((item) => {
             const Icon = item.icon;
             return (
@@ -105,6 +167,7 @@ export function AircraftUnifiedLayout({
                 size="sm"
                 className="h-8"
                 onClick={() => onNavigate(item.path)}
+                aria-pressed={activeModuleKey === item.key}
               >
                 <Icon className="mr-1 h-3.5 w-3.5" />
                 {item.label}
@@ -112,58 +175,107 @@ export function AircraftUnifiedLayout({
             );
           })}
         </div>
-        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
-          <div className="xl:col-span-2">
+        <div className="flex items-center gap-2 overflow-x-auto rounded-md border border-[hsl(var(--mdm-template-border))] bg-background/70 p-2 xl:flex-nowrap xl:overflow-visible">
+          <div className="min-w-[260px] flex-1 shrink-0 xl:min-w-[200px]">
             <div className="relative">
               <Search className="pointer-events-none absolute left-2 top-2 h-4 w-4 text-muted-foreground" />
               <Input
                 value={searchValue}
                 onChange={(event) => onSearchChange(event.target.value)}
-                placeholder="Search in active module"
+                placeholder={uiLabels.searchPlaceholder}
                 className="pl-8"
-                aria-label="Unified module search"
+                aria-label={uiLabels.searchAriaLabel}
               />
             </div>
           </div>
-          <Select value={statusValue} onValueChange={onStatusChange}>
-            <SelectTrigger aria-label="Unified module status filter">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {statusOptions.map((option) => (
-                <SelectItem key={`status-option-${option.value}`} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={localeValue} onValueChange={onLocaleChange}>
-            <SelectTrigger aria-label="Unified module locale selector">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {localeOptions.map((option) => (
-                <SelectItem key={`locale-option-${option.value}`} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <div className="sm:col-span-2 xl:col-span-1">
+          <div className="w-[160px] shrink-0 xl:w-[140px]">
+            <Select value={statusValue} onValueChange={onStatusChange}>
+              <SelectTrigger aria-label={uiLabels.statusAriaLabel}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {statusOptions.map((option) => (
+                  <SelectItem key={`status-option-${option.value}`} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="w-[140px] shrink-0 xl:w-[120px]">
+            <Select value={localeValue} onValueChange={onLocaleChange}>
+              <SelectTrigger aria-label={uiLabels.localeAriaLabel}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {localeOptions.map((option) => (
+                  <SelectItem key={`locale-option-${option.value}`} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {dynamicFilters.map((filterField) => {
+            if (filterField.type === 'select') {
+              return (
+                <div key={filterField.id} className={cn('w-[160px] shrink-0 xl:w-[140px]', filterField.className)}>
+                  <Select value={filterField.value} onValueChange={filterField.onValueChange}>
+                    <SelectTrigger aria-label={filterField.ariaLabel}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {filterField.options.map((option) => (
+                        <SelectItem key={`${filterField.id}-${option.value}`} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              );
+            }
+            return (
+              <div key={filterField.id} className={cn('w-[180px] shrink-0 xl:w-[160px]', filterField.className)}>
+                <Input
+                  type={filterField.type}
+                  value={filterField.value}
+                  onChange={(event) => filterField.onValueChange(event.target.value)}
+                  placeholder={filterField.placeholder}
+                  aria-label={filterField.ariaLabel}
+                />
+              </div>
+            );
+          })}
+          {actions.length > 0 ? (
             <AircraftActionPalette
               actions={actions}
               hasPermission={hasPermission}
               compact
-              buttonClassName="h-9"
-              className={cn('justify-end', actions.length === 0 && 'hidden')}
+              buttonClassName="h-9 px-2 xl:h-8 xl:px-2 xl:text-xs"
+              className={cn('shrink-0 justify-end xl:gap-1')}
               toolbarLabel="Aircraft unified actions"
             />
-          </div>
+          ) : null}
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={onClearFilters}
+            className="h-9 shrink-0 px-3 xl:h-8 xl:px-2 xl:text-xs"
+          >
+            {uiLabels.clearFilters}
+          </Button>
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[hsl(var(--mdm-template-muted))]">
+          <span>
+            {resultSummary ? `${resultSummary.visible}/${resultSummary.total} ${uiLabels.resultLabel}` : `0/0 ${uiLabels.resultLabel}`}
+          </span>
         </div>
       </CardHeader>
       <CardContent className="mdm-template-panel-body space-y-3">
         {loading ? (
-          <p className="text-xs text-[hsl(var(--mdm-template-muted))]">Loading module data…</p>
+          <p className="text-xs text-[hsl(var(--mdm-template-muted))]">{uiLabels.loadingMessage}</p>
         ) : null}
         {error ? (
           <div className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive" role="alert">

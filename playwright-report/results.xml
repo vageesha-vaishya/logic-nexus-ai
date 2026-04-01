@@ -1,12 +1,49 @@
-<testsuites id="" name="" tests="1" failures="0" skipped="1" errors="0" time="3.552895">
-<testsuite name="tests/e2e/amro-overview-dashboard.spec.ts" timestamp="2026-03-28T13:17:32.105Z" hostname="chromium" tests="1" failures="0" skipped="1" time="1.044" errors="0">
-<testcase name="amro aircraft CRUD smoke › creates, updates, and deletes an aircraft record from master data page" classname="tests/e2e/amro-overview-dashboard.spec.ts" time="1.044">
-<properties>
-<property name="skip" value="AMRO master data surface is unavailable in this environment profile">
-</property>
-</properties>
-<skipped>
-</skipped>
+<testsuites id="" name="" tests="1" failures="1" skipped="0" errors="0" time="1.74665">
+<testsuite name="tests/e2e/amro-overview-dashboard.spec.ts" timestamp="2026-04-01T12:56:16.073Z" hostname="chromium" tests="1" failures="1" skipped="0" time="0.436" errors="0">
+<testcase name="amro aircraft CRUD smoke › navigates unified aircraft module rail for all standardized workspaces" classname="tests/e2e/amro-overview-dashboard.spec.ts" time="0.436">
+<failure message="amro-overview-dashboard.spec.ts:92:3 navigates unified aircraft module rail for all standardized workspaces" type="FAILURE">
+<![CDATA[  [chromium] › tests/e2e/amro-overview-dashboard.spec.ts:92:3 › amro aircraft CRUD smoke › navigates unified aircraft module rail for all standardized workspaces 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:4173/dashboard/amro/aircraft/list
+    Call log:
+      - navigating to "http://localhost:4173/dashboard/amro/aircraft/list", waiting until "load"
+
+
+      71 |   test('navigates unified aircraft module rail for all standardized workspaces', async ({ page }) => {
+      72 |     await page.setViewportSize({ width: 1440, height: 900 });
+    > 73 |     await page.goto('/dashboard/amro/aircraft/list');
+         |                ^
+      74 |     if (page.url().includes('/auth')) {
+      75 |       await login(page);
+      76 |       await page.goto('/dashboard/amro/aircraft/list');
+        at /Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/amro-overview-dashboard.spec.ts:73:16
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-amro-overview-da-b26a8-all-standardized-workspaces-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-amro-overview-da-b26a8-all-standardized-workspaces-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-amro-overview-da-b26a8-all-standardized-workspaces-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/playwright/tests-e2e-amro-overview-da-b26a8-all-standardized-workspaces-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|../test-results/playwright/tests-e2e-amro-overview-da-b26a8-all-standardized-workspaces-chromium/test-failed-1.png]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-amro-overview-da-b26a8-all-standardized-workspaces-chromium/video.webm]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-amro-overview-da-b26a8-all-standardized-workspaces-chromium/trace.zip]]
+]]>
+</system-out>
 </testcase>
 </testsuite>
 </testsuites>

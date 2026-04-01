@@ -163,3 +163,61 @@ The Aircraft module header buttons must render in this exact order:
 - Buttons use compact header sizing (`h-9 px-3`) and shared hover/focus behavior from the existing design system.
 - Active state uses default button variant plus focus ring for non-default variants.
 - Loading state uses spinner replacement with action-level disable protection.
+
+## Aircraft Unified Layout System
+
+- Surface:
+  - `src/features/module-amro/settings/pages/AmroSettingsMasterDataPage.tsx`
+  - `src/features/module-amro/settings/pages/amro-settings-master-data/components/AircraftUnifiedLayout.tsx`
+- Coverage modules:
+  - Aircraft List
+  - Templates
+  - Engine
+  - Components
+  - Documents
+  - AD/SB
+  - Maintenance Planning
+
+### Unified Technical Contract
+
+- `AircraftUnifiedLayout` is the canonical shell for module rail, search, status filter, locale selector, actions, and content body.
+- `filterUnifiedModuleRows` is the canonical reusable helper for query + status filtering behavior across module datasets.
+- Localization contract:
+  - Locale selector values: `en`, `es`, `fr`
+  - Label dictionaries are resolved in `AmroSettingsMasterDataPage.tsx` and passed into `AircraftUnifiedLayout` via `labels`.
+- Performance contract:
+  - Search input uses deferred search value to avoid unnecessary heavy re-renders for large datasets.
+  - Result summary (`visible/total`) is displayed for active module context.
+- Access control contract:
+  - Action rendering is RBAC-aware through `hasPermission` and per-action `permission` keys.
+- Error and loading contract:
+  - Unified shell displays standardized loading and error states before module-specific content.
+
+### User Training Material
+
+- Navigation:
+  - Use the top module rail to move between Aircraft List, Templates, Engine, Components, Documents, AD/SB, and Maintenance Planning.
+- Search and status filtering:
+  - Use `Unified module search` for keyword filtering in the current module.
+  - Use `Unified module status filter` for status-based filtering.
+  - Use `Clear filters` to reset search and status in one action.
+- Locale switching:
+  - Use `Unified module locale selector` to switch language labels between English, Spanish, and French.
+- Actions:
+  - Module-specific actions appear on the right and only show for roles with matching permissions.
+- Validation expectations:
+  - Save/update actions enforce required field rules and return inline or toast feedback on validation failures.
+
+### Maintenance Plan
+
+- Quarterly review:
+  - Validate module rail paths and label dictionaries for newly introduced sub-modules.
+  - Confirm RBAC permission mapping remains aligned with `src/config/permissions.ts`.
+- Monthly regression:
+  - Run unit coverage for `AircraftUnifiedLayout` and `filterUnifiedModuleRows`.
+  - Run end-to-end coverage for module rail navigation and unified controls.
+- Performance checkpoint:
+  - Verify search/filter interactions remain responsive for high-volume records.
+  - Monitor and optimize expensive table rendering paths when record volumes increase.
+- Change governance:
+  - All layout contract changes must include test updates and style guide updates in the same change set.
