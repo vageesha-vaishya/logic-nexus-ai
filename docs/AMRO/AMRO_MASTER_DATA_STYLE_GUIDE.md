@@ -123,39 +123,29 @@ Standardized reusable classes are available in `src/index.css`:
 - Shared renderer: `src/features/module-amro/settings/pages/amro-settings-master-data/components/AircraftActionPalette.tsx`
 - Toolbar accessibility contract:
   - Container uses `role="toolbar"` with `aria-label="Aircraft header actions"`.
-  - View-mode buttons expose `aria-pressed` for active state.
+  - Header navigation buttons expose `aria-pressed` for active state.
   - Every button has explicit `aria-label`.
 
 ### Button Order Contract
 
-The Aircraft module header buttons must render in this exact order:
+The Aircraft module header navigation buttons must render in this exact order:
 
-1. List
-2. New
-3. Grid
-4. Card
-5. Refresh
-6. Pipeline
-7. Analytics
-8. Import/Export
-9. Export CSV
-10. Export PDF
+1. Aircraft List
+2. Templates
+3. Engine
+4. Components
+5. Documents
+6. AD/SB
+7. Operations
 
 ### Action Configuration and Behavior
 
-- List / Grid / Card / Pipeline / Analytics / Import-Export:
-  - Switch `AircraftLeadsTab` view mode in-place and preserve route behavior for aircraft sub-module paths.
-  - Active state uses `aria-pressed="true"` and primary visual emphasis.
-- New:
-  - Opens aircraft create form modal (`Create Aircraft`) and preserves existing payload validation flow.
-- Refresh:
-  - Reloads aircraft records from backend via `loadRecords()`.
-  - Shows spinner while running and prevents duplicate triggers.
-- Export CSV:
-  - Runs existing CSV export pipeline for selected aircraft rows.
-  - Emits user feedback toast for success/failure and selection preconditions.
-- Export PDF:
-  - Runs existing PDF export pipeline with the same selection and feedback contract.
+- Aircraft List / Templates / Engine / Components / Documents / AD/SB / Operations:
+  - Navigate to aircraft sub-module routes through the shared header toolbar.
+  - Preserve route behavior and query context through existing navigation helpers.
+  - Active module uses `aria-pressed="true"` and primary visual emphasis.
+- Legacy controls retained for future use but hidden from UI:
+  - List, New, Template, Grid, Card, Pipeline, Analytics, Import/Export.
 
 ### Visual and Interaction Standards
 
@@ -176,7 +166,7 @@ The Aircraft module header buttons must render in this exact order:
   - Components
   - Documents
   - AD/SB
-  - Maintenance Planning
+  - Operations
 
 ### Unified Technical Contract
 
@@ -196,15 +186,11 @@ The Aircraft module header buttons must render in this exact order:
 ### User Training Material
 
 - Navigation:
-  - Use the top module rail to move between Aircraft List, Templates, Engine, Components, Documents, AD/SB, and Maintenance Planning.
+  - Use the top module rail or header navigation to move between Aircraft List, Templates, Engine, Components, Documents, AD/SB, and Operations.
 - Search and status filtering:
   - Use `Unified module search` for keyword filtering in the current module.
   - Use `Unified module status filter` for status-based filtering.
-  - Use `Clear filters` to reset search and status in one action.
-- Locale switching:
-  - Use `Unified module locale selector` to switch language labels between English, Spanish, and French.
-- Actions:
-  - Module-specific actions appear on the right and only show for roles with matching permissions.
+- Locale selector, dynamic filter fields, inline action buttons, and `Clear filters` are hidden in the unified search row for the AMRO-Aircraft module.
 - Validation expectations:
   - Save/update actions enforce required field rules and return inline or toast feedback on validation failures.
 

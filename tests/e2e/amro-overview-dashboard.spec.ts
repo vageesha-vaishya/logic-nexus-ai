@@ -80,6 +80,23 @@ test.describe('amro aircraft CRUD smoke', () => {
     const unifiedLayout = page.getByTestId('aircraft-unified-layout');
     test.skip((await unifiedLayout.count()) === 0, 'Unified aircraft layout is unavailable in this environment profile');
     await expect(unifiedLayout.first()).toBeVisible();
+    const headerToolbar = page.getByRole('toolbar', { name: 'Aircraft header actions' });
+    await expect(headerToolbar).toBeVisible();
+    await expect(headerToolbar.getByRole('button', { name: 'Aircraft List' })).toBeVisible();
+    await expect(headerToolbar.getByRole('button', { name: 'Templates' })).toBeVisible();
+    await expect(headerToolbar.getByRole('button', { name: 'Engine' })).toBeVisible();
+    await expect(headerToolbar.getByRole('button', { name: 'Components' })).toBeVisible();
+    await expect(headerToolbar.getByRole('button', { name: 'Documents' })).toBeVisible();
+    await expect(headerToolbar.getByRole('button', { name: 'AD/SB' })).toBeVisible();
+    await expect(headerToolbar.getByRole('button', { name: 'Operations' })).toBeVisible();
+    await expect(headerToolbar.getByRole('button', { name: 'List' })).toHaveCount(0);
+    await expect(headerToolbar.getByRole('button', { name: 'New' })).toHaveCount(0);
+    await expect(headerToolbar.getByRole('button', { name: 'Template' })).toHaveCount(0);
+    await expect(headerToolbar.getByRole('button', { name: 'Grid' })).toHaveCount(0);
+    await expect(headerToolbar.getByRole('button', { name: 'Card' })).toHaveCount(0);
+    await expect(headerToolbar.getByRole('button', { name: 'Pipeline' })).toHaveCount(0);
+    await expect(headerToolbar.getByRole('button', { name: 'Analytics' })).toHaveCount(0);
+    await expect(headerToolbar.getByRole('button', { name: 'Import/Export' })).toHaveCount(0);
 
     const navSteps = [
       { label: 'Aircraft List', urlSegment: '/dashboard/amro/aircraft/list' },
@@ -88,7 +105,7 @@ test.describe('amro aircraft CRUD smoke', () => {
       { label: 'Components', urlSegment: '/dashboard/amro/aircraft/components' },
       { label: 'Documents', urlSegment: '/dashboard/amro/aircraft/documents' },
       { label: 'AD/SB', urlSegment: '/dashboard/amro/aircraft/ad-sb' },
-      { label: 'Maintenance Planning', urlSegment: '/dashboard/amro/aircraft/work-packages' },
+      { label: 'Operations', urlSegment: '/dashboard/amro/aircraft/work-packages' },
     ];
 
     for (const step of navSteps) {
@@ -97,21 +114,13 @@ test.describe('amro aircraft CRUD smoke', () => {
       await expect(page.getByText(/Aircraft ·/).first()).toBeVisible();
       await expect(page.getByLabel('Unified module search')).toBeVisible();
       await expect(page.getByLabel('Unified module status filter')).toBeVisible();
-      await expect(page.getByLabel('Unified module locale selector')).toBeVisible();
-      await expect(page.getByRole('button', { name: 'Clear filters' })).toBeVisible();
-      if (step.label === 'Aircraft List') {
-        await expect(page.getByLabel('Records per page')).toBeVisible();
-      }
-      if (step.label === 'Templates') {
-        await expect(page.getByLabel('Template aircraft type')).toBeVisible();
-        await expect(page.getByLabel('Template manufacturer')).toBeVisible();
-      }
-      if (step.label === 'Documents') {
-        await expect(page.getByLabel('Document category')).toBeVisible();
-      }
-      if (step.label === 'AD/SB') {
-        await expect(page.getByLabel('AD/SB compliance state')).toBeVisible();
-      }
+      await expect(page.getByLabel('Unified module locale selector')).toHaveCount(0);
+      await expect(page.getByRole('button', { name: 'Clear filters' })).toHaveCount(0);
+      await expect(page.getByLabel('Records per page')).toHaveCount(0);
+      await expect(page.getByLabel('Template aircraft type')).toHaveCount(0);
+      await expect(page.getByLabel('Template manufacturer')).toHaveCount(0);
+      await expect(page.getByLabel('Document category')).toHaveCount(0);
+      await expect(page.getByLabel('AD/SB compliance state')).toHaveCount(0);
     }
 
     const searchInput = page.getByLabel('Unified module search');
@@ -122,15 +131,6 @@ test.describe('amro aircraft CRUD smoke', () => {
     await expect(page.getByLabel('Unified module search')).toHaveValue('A320');
     await page.getByRole('button', { name: 'Aircraft List' }).first().click();
     await expect(page.getByLabel('Unified module search')).toHaveValue('A320');
-    await page.getByRole('button', { name: 'Clear filters' }).click();
-    await expect(searchInput).toHaveValue('');
-
-    await page.getByLabel('Unified module locale selector').click();
-    const spanishLocaleOption = page.getByRole('option', { name: 'Español' });
-    if (await spanishLocaleOption.count()) {
-      await spanishLocaleOption.first().click();
-      await expect(page.getByText('Locale: ES').first()).toBeVisible();
-    }
   });
 
   test('creates, updates, and deletes an aircraft record from master data page', async ({ page }) => {

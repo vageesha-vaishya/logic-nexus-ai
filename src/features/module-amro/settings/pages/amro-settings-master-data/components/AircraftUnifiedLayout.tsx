@@ -80,6 +80,10 @@ type AircraftUnifiedLayoutProps = {
   onClearFilters?: () => void;
   labels?: Partial<AircraftUnifiedLayoutLabels>;
   dynamicFilters?: AircraftUnifiedDynamicFilter[];
+  showLocaleSelector?: boolean;
+  showDynamicFilters?: boolean;
+  showActions?: boolean;
+  showClearFilters?: boolean;
   children: ReactNode;
 };
 
@@ -134,6 +138,10 @@ export function AircraftUnifiedLayout({
   onClearFilters,
   labels,
   dynamicFilters = [],
+  showLocaleSelector = true,
+  showDynamicFilters = true,
+  showActions = true,
+  showClearFilters = true,
   children,
 }: AircraftUnifiedLayoutProps) {
   const uiLabels = { ...DEFAULT_UNIFIED_LAYOUT_LABELS, ...labels };
@@ -202,21 +210,23 @@ export function AircraftUnifiedLayout({
               </SelectContent>
             </Select>
           </div>
-          <div className="w-[140px] shrink-0 xl:w-[120px]">
-            <Select value={localeValue} onValueChange={onLocaleChange}>
-              <SelectTrigger aria-label={uiLabels.localeAriaLabel}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {localeOptions.map((option) => (
-                  <SelectItem key={`locale-option-${option.value}`} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          {dynamicFilters.map((filterField) => {
+          {showLocaleSelector ? (
+            <div className="w-[140px] shrink-0 xl:w-[120px]">
+              <Select value={localeValue} onValueChange={onLocaleChange}>
+                <SelectTrigger aria-label={uiLabels.localeAriaLabel}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {localeOptions.map((option) => (
+                    <SelectItem key={`locale-option-${option.value}`} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
+          {showDynamicFilters ? dynamicFilters.map((filterField) => {
             if (filterField.type === 'select') {
               return (
                 <div key={filterField.id} className={cn('w-[160px] shrink-0 xl:w-[140px]', filterField.className)}>
@@ -246,8 +256,8 @@ export function AircraftUnifiedLayout({
                 />
               </div>
             );
-          })}
-          {actions.length > 0 ? (
+          }) : null}
+          {showActions && actions.length > 0 ? (
             <AircraftActionPalette
               actions={actions}
               hasPermission={hasPermission}
@@ -257,15 +267,17 @@ export function AircraftUnifiedLayout({
               toolbarLabel="Aircraft unified actions"
             />
           ) : null}
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={onClearFilters}
-            className="h-9 shrink-0 px-3 xl:h-8 xl:px-2 xl:text-xs"
-          >
-            {uiLabels.clearFilters}
-          </Button>
+          {showClearFilters ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={onClearFilters}
+              className="h-9 shrink-0 px-3 xl:h-8 xl:px-2 xl:text-xs"
+            >
+              {uiLabels.clearFilters}
+            </Button>
+          ) : null}
         </div>
         <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[hsl(var(--mdm-template-muted))]">
           <span>

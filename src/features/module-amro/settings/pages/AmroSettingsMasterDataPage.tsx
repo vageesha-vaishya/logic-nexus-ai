@@ -828,7 +828,7 @@ const AIRCRAFT_NAV_RAIL = [
   { label: 'Components', path: '/dashboard/amro/aircraft/components', view: 'grid' as const, icon: CheckSquare },
   { label: 'Documents', path: '/dashboard/amro/aircraft/documents', view: 'import_export' as const, icon: FileText },
   { label: 'AD/SB', path: '/dashboard/amro/aircraft/ad-sb', view: 'pipeline' as const, icon: FileCheck },
-  { label: 'Maintenance Planning', path: '/dashboard/amro/aircraft/work-packages', view: 'card' as const, icon: CalendarDays },
+  { label: 'Operations', path: '/dashboard/amro/aircraft/work-packages', view: 'card' as const, icon: CalendarDays },
 ] as const;
 
 type AircraftSubModuleSegment = 'list' | 'templates' | 'engine' | 'components' | 'documents' | 'ad-sb' | 'work-packages';
@@ -6044,7 +6044,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         const resolveAircraftViewActive = (tab: AircraftLeadsTab): boolean => (tab === 'list'
           ? aircraftNavigationView === 'module'
           : aircraftNavigationView === tab);
-        const actions: AircraftPaletteAction[] = [
+        const legacyActions: AircraftPaletteAction[] = [
           {
             id: 'view-list',
             label: 'List',
@@ -6186,9 +6186,28 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
             },
           },
         ];
-        return hideAircraftUtilityActions
-          ? actions.filter((action) => action.id !== 'refresh-records' && action.id !== 'export-csv' && action.id !== 'export-pdf')
-          : actions;
+        const nextHeaderNavigationActions: AircraftPaletteAction[] = AIRCRAFT_NAV_RAIL.map((item) => {
+          const segment = item.path.split('/').pop();
+          const isActive = isAircraftSubModule && aircraftSubModuleSegment === segment;
+          return {
+            id: `aircraft-nav-${segment}`,
+            label: item.label,
+            icon: <item.icon className="h-4 w-4" aria-hidden="true" />,
+            group: 'primary',
+            variant: 'outline',
+            active: isActive,
+            ariaLabel: `Go to ${item.label}`,
+            onAction: async () => {
+              handleAircraftContextNavigation(item.path);
+            },
+          };
+        });
+        const useLegacyAircraftHeaderActions = false;
+        return useLegacyAircraftHeaderActions
+          ? (hideAircraftUtilityActions
+            ? legacyActions.filter((action) => action.id !== 'refresh-records' && action.id !== 'export-csv' && action.id !== 'export-pdf')
+            : legacyActions)
+          : nextHeaderNavigationActions;
       }
       const actions: AircraftPaletteAction[] = hideAircraftUtilityActions
         ? []
@@ -6781,7 +6800,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                 entity === 'aircraft' && aircraftEnhancementEnabled ? 'max-w-full justify-end' : undefined,
               )}
               compact
-              buttonClassName="h-9 px-3"
+              buttonClassName="h-9 px-3 transition-all duration-200"
             />
           </div>
         </div>
@@ -6825,6 +6844,10 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
             onClearFilters={clearAircraftUnifiedFilters}
             labels={aircraftUnifiedLabels}
             dynamicFilters={aircraftUnifiedDynamicFilters}
+            showLocaleSelector={false}
+            showDynamicFilters={false}
+            showActions={false}
+            showClearFilters={false}
           >
             <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4 text-[12px]">
               <div className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-muted/30 px-2 py-1">

@@ -1421,7 +1421,7 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
   it('routes each aircraft sub-module to its dedicated interface without cross-module content leakage', async () => {
     renderAircraftSubModulePage('/dashboard/amro/aircraft/list');
     expect(await screen.findByLabelText('Unified module search', {}, { timeout: ASYNC_WAIT_TIMEOUT_MS })).toBeInTheDocument();
-    expect(screen.getByLabelText('Records per page')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Records per page')).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Unified module search'), { target: { value: 'A320' } });
 
     fireEvent.click(screen.getByRole('button', { name: 'Engine' }));
@@ -1448,23 +1448,23 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     fireEvent.click(screen.getByRole('button', { name: 'Documents' }));
     expect(await screen.findByText(/Documents Management/i, {}, { timeout: ASYNC_WAIT_TIMEOUT_MS })).toBeInTheDocument();
     expect(screen.getByText(/Document Repository/i)).toBeInTheDocument();
-    expect(screen.getByLabelText('Document category')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Document category')).not.toBeInTheDocument();
     expect(screen.queryByText(/Engine Drill-down/i)).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'AD/SB' }));
     expect(await screen.findByText(/AD\/SB Management/i, {}, { timeout: ASYNC_WAIT_TIMEOUT_MS })).toBeInTheDocument();
     expect(screen.getByText(/AD\/SB Compliance Management/i)).toBeInTheDocument();
-    expect(screen.getByLabelText('AD/SB compliance state')).toBeInTheDocument();
+    expect(screen.queryByLabelText('AD/SB compliance state')).not.toBeInTheDocument();
     expect(screen.queryByText(/Document Repository/i)).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Templates' }));
     expect(await screen.findByRole('heading', { name: 'Aircraft Template Registry' }, { timeout: ASYNC_WAIT_TIMEOUT_MS })).toBeInTheDocument();
-    expect(screen.getByLabelText('Template aircraft type')).toBeInTheDocument();
-    expect(screen.getByLabelText('Template manufacturer')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Template aircraft type')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Template manufacturer')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Aircraft List' }));
     expect(await screen.findByLabelText('Unified module search')).toBeInTheDocument();
-    expect(screen.getByLabelText('Records per page')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Records per page')).not.toBeInTheDocument();
     expect(screen.getByLabelText('Unified module search')).toHaveValue('A320');
   });
 
@@ -1491,45 +1491,39 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
   });
 
-  it('renders unified aircraft header actions in the required sequence and supports view switching state', async () => {
-    renderAircraftPage();
+  it('renders aircraft header navigation in relocated sequence with active module state', async () => {
+    renderAircraftSubModulePage('/dashboard/amro/aircraft/list');
 
     await screen.findByText('Aircraft Operations Snapshot');
 
     const toolbar = screen.getByRole('toolbar', { name: 'Aircraft header actions' });
     const orderedLabels = within(toolbar).getAllByRole('button').map((button) => button.textContent?.trim());
     expect(orderedLabels).toEqual([
-      'List',
-      'New',
-      'Template',
-      'Grid',
-      'Card',
-      'Pipeline',
-      'Analytics',
-      'Import/Export',
+      'Aircraft List',
+      'Templates',
+      'Engine',
+      'Components',
+      'Documents',
+      'AD/SB',
+      'Operations',
     ]);
-    expect(within(toolbar).getByRole('button', { name: 'List view' })).toHaveAttribute('aria-pressed', 'true');
-
-    fireEvent.click(within(toolbar).getByRole('button', { name: 'Pipeline view' }));
-    expect(await screen.findByText('Aircraft Leads Workspace')).toBeInTheDocument();
-    expect(within(toolbar).getByRole('button', { name: 'Pipeline view' })).toHaveAttribute('aria-pressed', 'true');
-
-    fireEvent.click(within(toolbar).getByRole('button', { name: 'List view' }));
-    await waitFor(() => {
-      expect(screen.queryByText('Aircraft Leads Workspace')).not.toBeInTheDocument();
-    }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
-    expect(screen.getByLabelText('Search')).toBeInTheDocument();
-    expect(within(toolbar).getByRole('button', { name: 'List view' })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(toolbar).getByRole('button', { name: 'Go to Aircraft List' })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(toolbar).getByRole('button', { name: 'Go to Engine' })).toBeInTheDocument();
+    expect(within(toolbar).getByRole('button', { name: 'Go to Operations' })).toBeInTheDocument();
   });
 
-  it('adds a New action in aircraft header navigation and opens create modal', async () => {
+  it('hides legacy aircraft header actions from the relocated navigation bar', async () => {
     renderAircraftPage();
-
-    const newButton = await screen.findByRole('button', { name: /New aircraft record/i });
-    fireEvent.click(newButton);
-
-    expect(await screen.findByRole('heading', { name: 'Create Aircraft' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument();
+    await screen.findByText('Aircraft Operations Snapshot');
+    const toolbar = screen.getByRole('toolbar', { name: 'Aircraft header actions' });
+    expect(within(toolbar).queryByRole('button', { name: 'List view' })).not.toBeInTheDocument();
+    expect(within(toolbar).queryByRole('button', { name: /New aircraft record/i })).not.toBeInTheDocument();
+    expect(within(toolbar).queryByRole('button', { name: 'Aircraft template workspace' })).not.toBeInTheDocument();
+    expect(within(toolbar).queryByRole('button', { name: 'Grid view' })).not.toBeInTheDocument();
+    expect(within(toolbar).queryByRole('button', { name: 'Card view' })).not.toBeInTheDocument();
+    expect(within(toolbar).queryByRole('button', { name: 'Pipeline view' })).not.toBeInTheDocument();
+    expect(within(toolbar).queryByRole('button', { name: 'Analytics view' })).not.toBeInTheDocument();
+    expect(within(toolbar).queryByRole('button', { name: 'Import and export workspace' })).not.toBeInTheDocument();
   });
 
   it('allows selecting aircraft fields and persists selected columns', async () => {
